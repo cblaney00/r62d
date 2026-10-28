@@ -6,7 +6,12 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-*(nothing waiting — add your next idea!)*
+- [ ] Pause screen when Esc is pressed.
+- [ ] Better drone animation, and a drone sound that is much less annoying.
+- [ ] More realistic gunshots.
+- [ ] An Operators page (who each operator is, their gear, your stats with them).
+- [ ] Saved profiles for everyone who has played: their loadouts and lifetime stats.
+- [ ] Match history: every past game and the stats from it.
 
 ## Done
 

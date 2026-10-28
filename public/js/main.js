@@ -9,6 +9,9 @@ import { S } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait } from './sprites.js';
 import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
+import { openOps, closeOps, updateOpsProfile } from './ops.js';
+import { openProfile } from './profile.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '/shared/operators.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label } from './keys.js';
 import { walkRay, tileAt } from '/shared/physics.js';
 import { blocksSight, FL } from '/shared/constants.js';
@@ -44,9 +47,12 @@ function connect() {
     const m = JSON.parse(ev.data);
     if (m.t === 'welcome') {
       st.id = m.id; loadMap(m.mapVersion, m.tiles, m.hp);
+      st.token = m.token; st.profile = m.profile;
+      try { localStorage.setItem('r62d-token', m.token); } catch {}
       $('join').classList.add('hidden'); $('room').classList.remove('hidden');
     } else if (m.t === 'snap') onSnap(m);
     else if (m.t === 'full') alert('The game is full (10 players).');
+    else if (m.t === 'profile') { st.profile = m.profile; updateOpsProfile($('opsPage'), m.profile); st.selBuilt = null; }
   };
   ws.onclose = () => { $('conn').classList.remove('hidden'); $('conn').textContent = 'Disconnected — reconnecting…'; setTimeout(() => location.reload(), 2500); };
 }
@@ -170,6 +176,7 @@ function anim(id) { let a = st.anim.get(id); if (!a) st.anim.set(id, a = { walk:
 let rebinding = null;
 addEventListener('keydown', e => {
   if (rebinding) { e.preventDefault(); if (e.code !== 'Escape') setBind(rebinding.id, rebinding.slot, e.code); rebinding = null; renderSettings(); return; }
+  if (e.code === 'Escape' && document.activeElement && document.activeElement.tagName === 'INPUT') document.activeElement.blur();
   if (document.activeElement && document.activeElement.tagName === 'INPUT') { if (e.key === 'Enter') $('joinBtn').click(); return; }
   const a = actionFor(e.code);
   if (a || e.code === 'AltLeft' || e.code === 'AltRight' || e.code === 'Tab') e.preventDefault();
@@ -187,6 +194,7 @@ addEventListener('keydown', e => {
     case 'view': ev.push({ k: 'view' }); break;
     case 'crouch': st.crouch = !st.crouch; break;
     case 'settings': toggleSettings(); break;
+    case 'pause': escape(); break;
     case 'spot': st.spotReq = true; break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
   }
@@ -242,7 +250,8 @@ $('joinBtn').onclick = () => {
   audio.initAudio(); audio.ui();
   const n = $('name').value.trim() || 'Operator';
   try { localStorage.setItem('r62d-name', n); } catch {}
-  send({ t: 'join', name: n });
+  let token = null; try { token = localStorage.getItem('r62d-token'); } catch {}
+  send({ t: 'join', name: n, token });
 };
 document.querySelectorAll('[data-bot]').forEach(b => b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'addBot', squad: +b.dataset.bot }); });
 document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'removeBot', squad: +b.dataset.unbot }); });
@@ -288,16 +297,18 @@ function buildSelect(s) {
       const c = document.createElement('canvas'); c.width = 240; c.height = 240; portrait(c, k);
       const speed = o.armor, armor = 4 - o.armor;
       const pips = n => [1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('');
-      const g = GADGETS[o.gadget];
+      const lo = cleanLoadout(k, st.profile && st.profile.loadouts[k]);
+      const g = GADGETS[lo.gadget];
       d.innerHTML = `<div class="who"></div>`;
       d.appendChild(c);
       const info = document.createElement('div'); info.className = 'info';
       info.innerHTML = `<div class="nm">${o.name}</div><div class="role">${o.role}</div>
         <div class="pips"><span>ARMOR ${pips(armor)}</span><span>SPEED ${pips(speed)}</span></div>
-        <div>${WEAPONS[o.primary].name} <span style="color:var(--dim)">${WEAPONS[o.primary].cls}</span>${o.secondary ? ' · ' + WEAPONS[o.secondary].name : ''}</div>
-        <div>${g.name} ×${o.gadgetCount}</div>
+        <div>${WEAPONS[lo.primary].name} <span style="color:var(--dim)">${WEAPONS[lo.primary].cls}</span>${lo.secondary ? ' · ' + WEAPONS[lo.secondary].name : ''}</div>
+        <div>${g.name} ×${GADGET_COUNT[lo.gadget]} <button class="lo" title="Change loadout">LOADOUT</button></div>
         <div class="ab">${o.ability.name}${o.ability.count ? ' ×' + o.ability.count : ''}</div><div>${o.ability.desc}</div>`;
       d.appendChild(info);
+      info.querySelector('.lo').onclick = e => { e.stopPropagation(); showOps(k); };
       d.onclick = () => { audio.ui(); send({ t: 'pick', op: k }); };
       grid.appendChild(d);
     }
@@ -459,7 +470,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
     sprint: keys.has('sprint') ? 1 : 0, walk: keys.has('walk') ? 1 : 0, crouch: st.crouch ? 1 : 0, fire: mouse.l ? 1 : 0, ads: mouse.r ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
   };
-  if (typing || !$('settings').classList.contains('hidden')) for (const key in k) k[key] = 0;
+  if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
   // mark the enemy nearest the cursor that you can actually see
   const trySpot = () => {
     if (!view || !me) return;
@@ -892,7 +903,7 @@ function hud(s) {
   $('wname').textContent = w ? `${w.name.toUpperCase()} · ${w.cls.toUpperCase()}` : '';
   $('mag').textContent = me.rl > 0 ? '··' : me.am; $('mag').className = w && me.am <= w.mag * 0.25 ? 'low' : '';
   $('res').textContent = '/ ' + me.rs;
-  const ab = o.ability, g = GADGETS[o.gadget];
+  const ab = o.ability, g = GADGETS[me.gd || o.gadget];
   const abCount = ab.id === 'scan' ? `${Math.round(me.bat / ab.battery * 100)}%` : ab.count ? me.ac : '';
   const viewName = side === 'atk' ? `Drone${s.ph === PHASE.ACTION ? ' ×' + me.dr : ''}` : 'Cameras';
   setHTML('gadgets',
@@ -1037,3 +1048,29 @@ function revealSeen() {
   for (const k of st.unseen) if (cellSeen(k)) { applyKnown(k); st.unseen.delete(k); }
 }
 function revealAll() { if (!st.unseen) return; for (const k of st.unseen) applyKnown(k); st.unseen.clear(); }
+
+// ---------------- pause menu & pages ----------------
+const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'pause'];
+function menuOpen() { return OVERLAYS.some(id => !$(id).classList.contains('hidden')); }
+function inMatch() { const p = st.last && st.last.ph; return p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END || p === PHASE.SELECT; }
+function showOps(op) { openOps($('opsPage'), { profile: st.profile, send, op }); }
+function showProfile() { if (st.token) openProfile($('profilePage'), { token: st.token }); }
+// Esc closes whatever is open, otherwise opens/closes the pause menu during a match.
+function escape() {
+  for (const id of ['settings', 'opsPage', 'profilePage']) if (!$(id).classList.contains('hidden')) {
+    if (id === 'opsPage') closeOps($(id)); else $(id).classList.add('hidden');
+    return;
+  }
+  if (inMatch() || !$('pause').classList.contains('hidden')) $('pause').classList.toggle('hidden');
+}
+// In fullscreen the browser uses Esc to leave fullscreen, so open the pause menu when that happens.
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && inMatch() && !menuOpen()) $('pause').classList.remove('hidden'); });
+$('pResume').onclick = () => $('pause').classList.add('hidden');
+$('pOps').onclick = () => showOps(st.me && st.me.op);
+$('pProf').onclick = () => showProfile();
+$('pSet').onclick = () => toggleSettings();
+$('pFs').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); $('pause').classList.add('hidden'); };
+$('pEnd').onclick = () => { if (confirm('End the match for everyone and go back to the lobby?')) { send({ t: 'lobby', a: 'end' }); $('pause').classList.add('hidden'); } };
+$('lobbyOpsBtn').onclick = () => showOps();
+$('lobbyProfBtn').onclick = () => showProfile();
+for (const id of ['opsPage', 'profilePage']) $(id).querySelector('.close').onclick = () => { if (id === 'opsPage') closeOps($(id)); else $(id).classList.add('hidden'); };

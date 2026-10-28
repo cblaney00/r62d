@@ -29,6 +29,10 @@
         <button id="fillBtn">Fill empty slots with bots</button>
         <button id="startBtn" class="primary">START MATCH</button>
       </div>
+      <div class="row center">
+        <button id="lobbyOpsBtn">Operators &amp; loadouts</button>
+        <button id="lobbyProfBtn">Profile &amp; match history</button>
+      </div>
       <p class="hint">Map: <b>Harbor Office</b> · First to 3 rounds · Sides swap every round</p>
     </div>
     <div class="controls">
@@ -72,6 +76,11 @@
     <div class="tablewrap"><table id="bindTable"></table></div>
     <div class="row center"><button id="setReset">Reset to defaults</button><button id="setClose" class="primary">Done</button></div>
   </div>
+  <div id="pause" class="overlay hidden"><div class="menu"><h2>PAUSED</h2><p class="hint">The match keeps running for everyone else.</p>
+    <button id="pResume" class="primary">Resume</button><button id="pOps">Operators &amp; loadouts</button><button id="pProf">Profile &amp; match history</button>
+    <button id="pSet">Settings &amp; keys</button><button id="pFs">Fullscreen</button><button id="pEnd">End match for everyone</button></div></div>
+  <div id="opsPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>OPERATORS</h2><button class="close">Close</button></div><div class="opsWrap"><div id="opsList"></div><div id="opsDetail"></div></div></div></div>
+  <div id="profilePage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>PROFILE</h2><button class="close">Close</button></div><div id="profBody"></div></div></div>
   <div id="corner"><button id="fsBtn" title="Fullscreen">⛶ Fullscreen</button><button id="setBtn">⚙ Settings</button><button id="muteBtn">🔊</button><button id="leaveBtn" class="hidden">End match</button></div>
   <div id="conn" class="hidden">Connecting…</div>
 </div>

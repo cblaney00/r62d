@@ -6,6 +6,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { attachWebSocket } from './ws.js';
 import { Game } from './game.js';
+import { store, publicProfile } from './store.js';
 import { TICK_RATE, SNAP_RATE } from '../shared/constants.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -13,6 +14,7 @@ const PORT = Number(process.env.PORT) || 6262;
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
 
 const server = http.createServer((req, res) => {
+  if (req.url.startsWith('/api/')) return api(req, res);
   let url = decodeURIComponent(req.url.split('?')[0]);
   if (url === '/') url = '/index.html';
   const base = url.startsWith('/shared/') ? ROOT : path.join(ROOT, 'public');
@@ -24,6 +26,21 @@ const server = http.createServer((req, res) => {
     res.end(data);
   });
 });
+
+// Saved profiles and match history, read by the Profile and Operators pages.
+function api(req, res) {
+  const u = new URL(req.url, 'http://x'), q = k => u.searchParams.get(k);
+  const json = (code, o) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' }); res.end(JSON.stringify(o)); };
+  const summary = m => ({ id: m.id, date: m.date, duration: m.duration, map: m.map, mode: m.mode, score: m.score, winner: m.winner, players: m.players });
+  if (u.pathname === '/api/profile') {
+    const p = q('token') ? store.byToken(q('token')) : store.byId(q('id'));
+    if (!p) return json(404, { error: 'no such profile' });
+    return json(200, { profile: publicProfile(p), matches: store.matchesFor(p.id, 40).map(summary) });
+  }
+  if (u.pathname === '/api/match') { const m = store.match(q('id')); return m ? json(200, m) : json(404, { error: 'no such match' }); }
+  if (u.pathname === '/api/players') return json(200, Object.values(store.profiles).map(p => ({ id: p.id, name: p.name, matches: p.stats.matches, wins: p.stats.wins, kills: p.stats.kills, deaths: p.stats.deaths })));
+  json(404, { error: 'unknown' });
+}
 
 const game = new Game();
 attachWebSocket(server, '/ws', sock => game.connect(sock));

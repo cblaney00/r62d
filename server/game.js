@@ -5,6 +5,8 @@ import { buildMap, roomAt } from '../shared/map.js';
 import { stepMove, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
+import { store, publicProfile } from './store.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '../shared/operators.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
@@ -33,6 +35,7 @@ export class Game {
     this.reinforce = 10;
     this.winner = null; this.reason = '';
     this.revealCheck = 0;
+    this.departed = []; this.roundLog = []; this.matchStart = 0;
   }
 
   // ---------------- connections ----------------
@@ -44,7 +47,10 @@ export class Game {
         if (this.humanCount() >= MAX_PLAYERS) { sock.send(JSON.stringify({ t: 'full' })); return; }
         p = this.addPlayer(String(m.name || 'Player').slice(0, 16), false);
         p.sock = sock;
-        sock.send(JSON.stringify({ t: 'welcome', id: p.id, mapVersion: this.mapVersion,
+        const login = store.login(typeof m.token === 'string' ? m.token : null, p.name);
+        p.token = login.token; p.pid = login.profile.id;
+        p.ms = this.blankMatchStats();
+        sock.send(JSON.stringify({ t: 'welcome', id: p.id, mapVersion: this.mapVersion, token: p.token, profile: publicProfile(login.profile),
           tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp) }));
         this.msg(`${p.name} joined`);
       } else if (p) this.handle(p, m);
@@ -53,6 +59,7 @@ export class Game {
       if (!p) return;
       this.msg(`${p.name} left`);
       if (p.hasDefuser) this.dropDefuser(p);
+      if (this.phase !== PHASE.LOBBY && this.phase !== PHASE.MATCH_END) this.departed.push(this.statLine(p, true));
       this.players.delete(p.id);
       if (this.humanCount() === 0) this.resetToLobby();
     });
@@ -106,6 +113,11 @@ export class Game {
       else if (m.a === 'start' && this.phase === PHASE.LOBBY) this.startMatch();
       else if (m.a === 'end' && this.phase !== PHASE.LOBBY) { this.msg(`${p.name} ended the match`); this.resetToLobby(); }
     } else if (m.t === 'pick') this.pickOp(p, m.op);
+    else if (m.t === 'loadout') {
+      const l = store.setLoadout(p.token, m.op, m.l);
+      const prof = store.byToken(p.token);
+      if (prof) p.sock.send(JSON.stringify({ t: 'profile', profile: publicProfile(prof) }));
+    }
   }
 
   squadCount(s) { let n = 0; for (const q of this.players.values()) if (q.squad === s) n++; return n; }
@@ -142,7 +154,8 @@ export class Game {
   startMatch() {
     if (this.players.size === 0) return;
     this.score = [0, 0]; this.round = 0;
-    for (const p of this.players.values()) { p.kills = 0; p.deaths = 0; }
+    for (const p of this.players.values()) { p.kills = 0; p.deaths = 0; p.ms = this.blankMatchStats(); }
+    this.departed = []; this.roundLog = []; this.matchStart = Date.now();
     this.nextRound();
   }
 
@@ -216,6 +229,13 @@ export class Game {
     if (this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END) return;
     const squad = this.squadOfSide(winTeam);
     this.score[squad]++;
+    this.roundLog.push({ n: this.round, winner: squad, side: winTeam, reason, attackers: this.squadOfSide(TEAM.ATK), site: this.map.sites[this.site].name });
+    for (const p of this.players.values()) {
+      if (!p.op || !p.ms) continue;
+      const o = this.opStat(p);
+      p.ms.rounds++; o.rounds++;
+      if (p.squad === squad) { p.ms.roundsWon++; o.roundsWon++; }
+    }
     this.winner = squad; this.reason = reason;
     this.phase = PHASE.ROUND_END; this.timer = DUR.roundEnd;
     this.events.push({ e: 'roundEnd', squad, side: winTeam, reason });
@@ -227,9 +247,11 @@ export class Game {
   equip(p) {
     const o = OPERATORS[p.op];
     p.alive = true; p.downed = false; p.maxHp = ARMOR_HP[o.armor]; p.hp = p.maxHp;
-    p.guns = [o.primary, o.secondary].filter(Boolean).map(w => ({ w, ammo: WEAPONS[w].mag, reserve: WEAPONS[w].reserve }));
+    const L = p.bot ? this.botLoadout(p.op) : store.loadout(p.token, p.op);
+    p.loadout = L; p.gadget = L.gadget;
+    p.guns = [L.primary, L.secondary].filter(Boolean).map(w => ({ w, ammo: WEAPONS[w].mag, reserve: WEAPONS[w].reserve }));
     p.slot = 0; p.fireCd = 0; p.reloadT = 0; p.bloom = 0;
-    p.abilityCount = o.ability.count; p.gadgetCount = o.gadgetCount;
+    p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false;
     p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0;
     p.downedBy = null; p.nitroId = null; p.ai = {};
@@ -250,6 +272,7 @@ export class Game {
         if (Math.max(...this.score) >= WIN_ROUNDS) {
           this.phase = PHASE.MATCH_END; this.timer = DUR.matchEnd;
           this.events.push({ e: 'matchEnd', squad: this.score[0] > this.score[1] ? 0 : 1 });
+          this.saveMatch(this.score[0] > this.score[1] ? 0 : 1);
         } else this.nextRound();
       }
       return;
@@ -257,6 +280,7 @@ export class Game {
     if (this.phase === PHASE.MATCH_END) { if (this.timer <= 0) this.resetToLobby(); return; }
 
     // PREP / ACTION
+    for (const p of this.players.values()) if (p.ms && p.alive) p.ms.playSeconds += dt;
     for (const p of this.players.values()) {
       if (p.bot) { botThink(this, p, dt); this.applyMove(p, dt); }
       this.tickPlayer(p, dt);
@@ -392,6 +416,7 @@ export class Game {
 
   fire(p, gun, w) {
     gun.ammo--; p.fireCd = 60 / w.rpm; p.lastShot = this.time;
+    if (p.ms) p.ms.shots += w.pellets;
     const moving = p.moving >= 2 ? 0.035 : 0;
     const spread = (p.input.ads ? w.ads : w.spread) + p.bloom + moving * (p.input.ads ? 0.4 : 1) + (p.input.crouch ? -0.006 : 0);
     p.bloom = Math.min(0.08, p.bloom + w.bloom);
@@ -442,6 +467,7 @@ export class Game {
           return { x: ex, y: ey, k: 'shield' };
         }
       }
+      if (src.ms) src.ms.hits++;
       this.damage(q, dmg * mult, src, wname, ang);
     } else if (best && best.e) this.hitEnt(best.e, src);
     else if (kind === 'hard' || kind === 'prop') this.events.push({ e: 'hit', k: kind, x: r1(ex), y: r1(ey) });
@@ -466,6 +492,7 @@ export class Game {
   damage(q, amount, src, wname, ang) {
     if (!q.alive || amount <= 0) return;
     amount = Math.round(amount);
+    if (src && src.ms && src !== q && this.side(src) !== this.side(q)) src.ms.damage += Math.min(amount, Math.max(0, q.hp));
     if (src && src.sock) this.events.push({ e: 'hitmark', to: src.id, kill: false });
     this.events.push({ e: 'hit', k: 'blood', x: r1(q.x), y: r1(q.y), a: r2(ang || 0) });
     this.events.push({ e: 'hurt', id: q.id, from: src ? r2(Math.atan2(src.y - q.y, src.x - q.x)) : 0 });
@@ -474,6 +501,7 @@ export class Game {
     if (q.hp <= 0) {
       const up = [...this.players.values()].filter(o => o.alive && !o.downed && this.side(o) === this.side(q)).length;
       if (q.hp > -35 && up > 1 && this.phase === PHASE.ACTION) {
+        if (src && src.ms && src !== q) src.ms.downs++;
         q.downed = true; q.hp = DUR.bleedout; q.downedBy = src ? src.id : null; q.busy = null; q.ctrl = 'body';
         q.scanning = false; q.bracing = false; q.reloadT = 0;
         this.events.push({ e: 'down', id: q.id, by: src ? src.id : null });
@@ -486,7 +514,8 @@ export class Game {
     if (!q.alive) return;
     q.alive = false; q.downed = false; q.hp = 0; q.deaths++; q.busy = null; q.scanning = false; q.bracing = false;
     if (q.ctrl !== 'body') q.ctrl = 'body';
-    if (src && src !== q) src.kills++;
+    if (src && src !== q) { src.kills++; if (src.ms && this.side(src) !== this.side(q)) { src.ms.kills++; this.opStat(src).kills++; } }
+    if (q.ms) { q.ms.deaths++; this.opStat(q).deaths++; }
     if (src && src.sock) this.events.push({ e: 'hitmark', to: src.id, kill: true });
     this.events.push({ e: 'kill', killer: src ? src.id : null, victim: q.id, w: wname || '' });
     if (q.hasDefuser) this.dropDefuser(q);
@@ -538,15 +567,15 @@ export class Game {
     if (b.k === 'plant') {
       const bomb = this.map.sites[this.site].bombs.find(x => x.id === b.bomb);
       this.planted = { x: bomb.x, y: bomb.y, bomb: bomb.id, t: DUR.bomb };
-      p.hasDefuser = false;
+      p.hasDefuser = false; if (p.ms) p.ms.plants++;
       this.events.push({ e: 'banner', text: 'DEFUSER PLANTED', sub: `Bomb ${bomb.id} — ${bomb.room}` });
       this.events.push({ e: 'snd', s: 'planted', x: r1(bomb.x), y: r1(bomb.y) });
     } else if (b.k === 'defuse') {
-      this.events.push({ e: 'banner', text: 'DEFUSER DISABLED', sub: '' });
+      this.events.push({ e: 'banner', text: 'DEFUSER DISABLED', sub: '' }); if (p.ms) p.ms.defuses++;
       this.endRound(TEAM.DEF, 'Defuser disabled');
     } else if (b.k === 'revive') {
       const q = this.players.get(b.target);
-      q.downed = false; q.hp = 25; this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) });
+      q.downed = false; q.hp = 25; if (p.ms) p.ms.revives++; this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) });
     } else if (b.k === 'reinforce') {
       if (this.map.tiles[b.cell] === T.SOFT && this.reinforce > 0) { this.reinforceWall(b.cell); this.reinforce--; }
     } else if (b.k === 'barricade') this.barricade(this.map.openId[b.cell], T.BARRI);
@@ -721,7 +750,7 @@ export class Game {
         if (t !== null && t < tb) { tb = t; tgt = q; }
       }
       tgt = tgt || p;
-      if (tgt.downed) { tgt.downed = false; tgt.hp = 40; }
+      if (tgt.downed) { tgt.downed = false; tgt.hp = 40; if (p.ms) p.ms.revives++; }
       else tgt.hp = Math.min(tgt.maxHp + 30, tgt.hp + 40);
       used();
       this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(tgt.x), y2: r1(tgt.y) });
@@ -729,7 +758,7 @@ export class Game {
   }
 
   useGadget(p) {
-    const op = OPERATORS[p.op], team = this.side(p), g = op.gadget;
+    const op = OPERATORS[p.op], team = this.side(p), g = p.gadget || op.gadget;
     if (g === 'nitro' && p.nitroId) { // second press sets it off
       const n = this.ent(p.nitroId); p.nitroId = null;
       if (n) this.detonate(n);
@@ -986,6 +1015,27 @@ export class Game {
 
   msg(text, team) { this.events.push({ e: 'msg', text, team }); }
 
+  // ---------------- saved stats ----------------
+  blankMatchStats() { return { rounds: 0, roundsWon: 0, kills: 0, deaths: 0, downs: 0, revives: 0, plants: 0, defuses: 0, shots: 0, hits: 0, damage: 0, playSeconds: 0, ops: {} }; }
+  opStat(p) { if (!p.ms) p.ms = this.blankMatchStats(); return p.ms.ops[p.op] || (p.ms.ops[p.op] = { rounds: 0, roundsWon: 0, kills: 0, deaths: 0 }); }
+  botLoadout(op) {
+    const L = LOADOUTS[op], pick = a => a.length ? a[Math.floor(Math.random() * a.length)] : null;
+    return cleanLoadout(op, { primary: pick(L.primaries), secondary: pick(L.secondaries), gadget: pick(L.gadgets) });
+  }
+  statLine(p, left = false) {
+    const ms = p.ms || this.blankMatchStats();
+    return { name: p.name, bot: !!p.bot, pid: p.pid || null, token: p.token || null, squad: p.squad, left, ...ms, playSeconds: Math.round(ms.playSeconds) };
+  }
+  saveMatch(winner) {
+    const players = [...[...this.players.values()].map(p => this.statLine(p)), ...(this.departed || [])];
+    if (!players.some(p => p.token)) return; // nobody real played
+    store.recordMatch({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: Date.now(),
+      duration: Math.round((Date.now() - (this.matchStart || Date.now())) / 1000),
+      map: 'Harbor Office', mode: 'Quick Match', score: [...this.score], winner, rounds: this.roundLog || [], players,
+    });
+  }
+
   // ---------------- snapshot ----------------
   broadcast() {
     const cells = [];
@@ -1000,7 +1050,7 @@ export class Game {
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim),
         sl: p.slot, w: g ? g.w : null, am: g ? g.ammo : 0, rs: g ? g.reserve : 0, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
-        ac: p.abilityCount, gc: p.gadgetCount, dr: p.drones, ct: p.ctrl, ci: p.camIdx, did: p.droneId,
+        ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, ct: p.ctrl, ci: p.camIdx, did: p.droneId,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
         mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sc: p.scanning ? 1 : 0,
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,

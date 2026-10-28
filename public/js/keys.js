@@ -18,6 +18,7 @@ export const ACTIONS = [
   ['spot', 'Mark enemy under cursor', 'KeyT', ''],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['settings', 'Settings', 'KeyO', 'F1'],
+  ['pause', 'Pause menu', 'Escape', 'KeyP'],
 ];
 
 const KEY = 'r62d-keys-v2';

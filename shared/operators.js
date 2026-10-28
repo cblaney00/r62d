@@ -7,6 +7,7 @@ export const WEAPONS = {
   mule:    { name: 'Mule LMG',     cls: 'LMG',     dmg: 33, rpm: 640, mag: 80, reserve: 160, reload: 4.4, spread: 0.08, ads: 0.022, bloom: 0.008, auto: true,  pellets: 1, range: 1100, len: 17 },
   longbow: { name: 'Longbow DMR',  cls: 'DMR',     dmg: 58, rpm: 360, mag: 12, reserve: 60,  reload: 2.7, spread: 0.06, ads: 0.004, bloom: 0.02,  auto: false, pellets: 1, range: 1300, len: 18 },
   hornet:  { name: 'Hornet MP',    cls: 'MP',      dmg: 21, rpm: 980, mag: 25, reserve: 150, reload: 1.9, spread: 0.08, ads: 0.03,  bloom: 0.010, auto: true,  pellets: 1, range: 800,  len: 8 },
+  vex50:   { name: 'Vex .50',      cls: 'Pistol',  dmg: 58, rpm: 210, mag: 7,  reserve: 35,  reload: 2.0, spread: 0.06, ads: 0.012, bloom: 0.04,  auto: false, pellets: 1, range: 900,  len: 8 },
   p10:     { name: 'P10 Sidearm',  cls: 'Pistol',  dmg: 36, rpm: 420, mag: 15, reserve: 60,  reload: 1.6, spread: 0.05, ads: 0.016, bloom: 0.02,  auto: false, pellets: 1, range: 900,  len: 7 },
 };
 
@@ -62,3 +63,45 @@ export const OPERATORS = {
 
 export const OP_LIST = Object.keys(OPERATORS);
 export const opsForTeam = team => OP_LIST.filter(k => OPERATORS[k].team === team);
+
+// ---- loadouts: each operator's weapon and gadget choices ----
+export const GADGET_COUNT = { smoke: 2, frag: 2, claymore: 1, breach: 2, stun: 2, dshield: 1, nitro: 1, wire: 2, impact: 2 };
+export const LOADOUTS = {
+  ember:   { primaries: ['k4', 'breaker'],     secondaries: ['p10', 'vex50'], gadgets: ['smoke', 'breach'] },
+  kestrel: { primaries: ['longbow', 'k4'],     secondaries: ['p10', 'vex50'], gadgets: ['frag', 'claymore'] },
+  hammer:  { primaries: ['breaker', 'v9'],     secondaries: ['p10', 'vex50'], gadgets: ['claymore', 'frag'] },
+  talon:   { primaries: ['v9', 'k4'],          secondaries: ['p10', 'vex50'], gadgets: ['breach', 'stun'] },
+  bulwark: { primaries: ['hornet'],            secondaries: [],               gadgets: ['stun', 'smoke'] },
+  mason:   { primaries: ['mule', 'breaker'],   secondaries: ['p10', 'vex50'], gadgets: ['dshield', 'wire'] },
+  veil:    { primaries: ['v9', 'breaker'],     secondaries: ['p10', 'vex50'], gadgets: ['nitro', 'impact'] },
+  lynx:    { primaries: ['v9', 'hornet'],      secondaries: ['p10', 'vex50'], gadgets: ['wire', 'impact'] },
+  solace:  { primaries: ['breaker', 'v9'],     secondaries: ['p10', 'vex50'], gadgets: ['wire', 'dshield'] },
+  wraith:  { primaries: ['longbow', 'v9'],     secondaries: ['p10', 'vex50'], gadgets: ['impact', 'nitro'] },
+};
+export function defaultLoadout(op) {
+  const L = LOADOUTS[op];
+  return { primary: L.primaries[0], secondary: L.secondaries[0] || null, gadget: L.gadgets[0] };
+}
+// Keep only choices that operator actually has.
+export function cleanLoadout(op, l) {
+  const L = LOADOUTS[op], d = defaultLoadout(op);
+  if (!L || !l || typeof l !== 'object') return d;
+  return {
+    primary: L.primaries.includes(l.primary) ? l.primary : d.primary,
+    secondary: L.secondaries.includes(l.secondary) ? l.secondary : d.secondary,
+    gadget: L.gadgets.includes(l.gadget) ? l.gadget : d.gadget,
+  };
+}
+
+export const BIOS = {
+  ember:   { real: 'Ines Duarte', from: 'Porto', text: 'A former shipyard welder who learned to cut through anything with a plasma torch. Calm under pressure, she treats every reinforced wall as a puzzle with one answer.' },
+  kestrel: { real: 'Tomas Halvorsen', from: 'Tromsø', text: 'An arctic-warfare marksman who prefers to see a fight before it starts. His seeker darts turn walls into windows for the whole team.' },
+  hammer:  { real: 'Dele Okafor', from: 'Lagos', text: 'A demolitions specialist with a launcher full of breaching rounds. Where Hammer goes, the floor plan changes.' },
+  talon:   { real: 'Mei Lin Zhao', from: 'Singapore', text: 'An electronics prodigy who builds her own EMPs. She clears traps and blinds cameras so her squad can move without being watched.' },
+  bulwark: { real: 'Viktor Brandt', from: 'Hamburg', text: 'A riot-control veteran who leads every push behind a ballistic shield. Slow, steady and almost impossible to stop from the front.' },
+  mason:   { real: 'Graham Cole', from: 'Glasgow', text: 'A structural engineer turned operator. He seals doorways with steel panels and has never met a chokepoint he could not make worse for the enemy.' },
+  veil:    { real: 'Amira Haddad', from: 'Beirut', text: 'A signals-intelligence officer who lives on the radio spectrum. Her jammers kill drones and stop breaching gadgets dead.' },
+  lynx:    { real: 'Rafael Cruz', from: 'Bogotá', text: 'A jungle tracker who thinks like his prey. He hides laser trip mines where attackers least expect them and hunts whoever trips them.' },
+  solace:  { real: 'Dr. Hana Sato', from: 'Osaka', text: 'A combat surgeon who refuses to lose a teammate. Her stim pistol heals at range and brings the downed back into the fight.' },
+  wraith:  { real: 'Elias Grey', from: 'Unknown', text: 'A roamer who hunts alone. His pulse scanner lets him see attackers through walls, so he is always where you are not looking.' },
+};
