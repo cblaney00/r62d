@@ -925,11 +925,14 @@ function draw(s, view, now, dt) {
     const sp = dist / Math.max(dt, 0.001);
     a.spd = (a.spd || 0) + (Math.min(240, sp) - (a.spd || 0)) * Math.min(1, dt * 10);
     a.wheel = (a.wheel || 0) + dist; if (dist > 0.05) a.mvAng = Math.atan2(my, mx);
+    // the body turns to face the way it is driving (smoothly, like a little car); parked, it keeps its last heading
+    if (a.heading === undefined) a.heading = own ? st.aim : (e.ag || 0);
+    if (a.spd > 12 && a.mvAng !== undefined) a.heading += angDiff(a.mvAng, a.heading) * Math.min(1, dt * 10);
     a.sway = (a.sway || 0) + ((a.spd / 200) * 0.6 - (a.sway || 0)) * Math.min(1, dt * 4);
     if (a.spd > 110 && Math.random() < dt * 12 && surfaceAt(x, y) !== 'carpet')
       fx.add({ type: 'smoke', x: x - Math.cos(a.mvAng) * 5, y: y - Math.sin(a.mvAng) * 5, vx: -Math.cos(a.mvAng) * 15, vy: -Math.sin(a.mvAng) * 15, life: 0.5, max: 0.5, size: 1.2, grow: 5, col: '170,160,140', a: 0.25 });
     audio.droneLoop(e.id, x, y, a.spd, own);
-    if (e.tm === side || seen(x, y)) drawDrone(ctx, { ...e, x, y, ag: own ? st.aim : e.ag, wheel: a.wheel, spd: a.spd, mvAng: a.mvAng ?? e.ag, sway: a.sway }, now, e.tm === side);
+    if (e.tm === side || seen(x, y)) drawDrone(ctx, { ...e, x, y, ag: a.heading, wheel: a.wheel, spd: a.spd, mvAng: a.mvAng ?? a.heading, sway: a.sway }, now, e.tm === side);
   }
   audio.pruneLoops(); tq = pfa('actors', tq);
   fx.draw(ctx);

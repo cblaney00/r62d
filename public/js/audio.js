@@ -457,7 +457,7 @@ export function ui(kind = 'click') {
 // Continuous drone motor whine, keyed by drone id.
 // Drone motor: a soft electric whirr plus gentle tyre rumble, only while it moves.
 export function droneLoop(id, x, y, speed, own) {
-  if (!ac || ac.state !== 'running') return;
+  if (!ac || (ac.state !== 'running' && !ac.offline)) return;
   let L = loops.get(id);
   if (!L) {
     const n = ac.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
@@ -477,7 +477,7 @@ export function droneLoop(id, x, y, speed, own) {
   const move = Math.min(1, speed / 160);
   const k = Math.max(0, 1 - d / 280) ** 1.6 * move * Math.pow(0.45, d > 20 ? occlude(x, y) : 0);
   const t = ac.currentTime;
-  L.mix.gain.setTargetAtTime((own ? 0.012 : 0.02) * k * (MIX.loops ?? 1), t, 0.12);
+  L.mix.gain.setTargetAtTime((own ? 0.095 : 0.13) * k * (MIX.loops ?? 1), t, 0.12); // measured: own ≈ -34 dB like your own footsteps
   L.whirr.frequency.setTargetAtTime(500 + move * 450, t, 0.2);
   L.hum.frequency.setTargetAtTime(95 + move * 40, t, 0.2);
   L.p.pan.setTargetAtTime(own ? 0 : Math.max(-0.9, Math.min(0.9, distTo(x, y).dx / 260)), t, 0.05);
@@ -510,7 +510,7 @@ export async function measureMix(tests) {
   ({ ac, master, sfx, verb, verbIn, noiseBuf, listener, occlude, indoorAt, C } = saved);
   return res;
 }
-const module = { gunshot: (...a) => gunshot(...a), explosion: (...a) => explosion(...a), step: (...a) => step(...a), shuffle: (...a) => shuffle(...a),
+const module = { droneLoop: (...a) => droneLoop(...a), gunshot: (...a) => gunshot(...a), explosion: (...a) => explosion(...a), step: (...a) => step(...a), shuffle: (...a) => shuffle(...a),
   foley: (...a) => foley(...a), impact: (...a) => impact(...a), casing: (...a) => casing(...a), whiz: (...a) => whiz(...a), debris: (...a) => debris(...a),
   play: (...a) => play(...a), ui: (...a) => ui(...a) };
 
