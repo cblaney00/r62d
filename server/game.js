@@ -533,6 +533,7 @@ export class Game {
   recordHistory() {
     const snap = new Map();
     for (const q of this.players.values()) if (q.alive) snap.set(q.id, { x: q.x, y: q.y });
+    for (const e of this.ents) if (e.type === 'drone') snap.set(e.id, { x: e.x, y: e.y }); // drones are judged where the shooter saw them too
     (this.hist || (this.hist = [])).push({ t: this.time, snap });
     while (this.hist.length > 40) this.hist.shift();
   }
@@ -559,7 +560,8 @@ export class Game {
     }
     for (const e of this.ents) {
       if (!e.hp || e.team === team || e.tu) continue; // turret cameras are bulletproof
-      const t = rayCircle(x0, y0, dx, dy, e.x, e.y, e.type === 'decoy' ? hitR(e.op) : 6);
+      const at = e.type === 'drone' && src.viewTime !== null && src.viewTime !== undefined ? this.posAt(e, src.viewTime) : e;
+      const t = rayCircle(x0, y0, dx, dy, at.x, at.y, e.type === 'decoy' ? hitR(e.op) : 6);
       if (t !== null && t < bestT) { bestT = t; best = { e }; }
     }
     let mult = 1, stopT = bestT, kind = best ? 'flesh' : 'none', pens = 0;
@@ -671,6 +673,15 @@ export class Game {
     this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) });
     this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) });
     this.removeEnt(e);
+    if (e.type === 'drone') this.droneLost(e);
+  }
+
+  // a drone has 1 hp: one bullet, hit, blast or zap and it's gone; its pilot drops back into their body
+  droneLost(e) {
+    const o = this.players.get(e.owner);
+    if (!o) return;
+    if (o.droneId === e.id) { o.droneId = null; if (o.ctrl === 'drone') o.ctrl = 'body'; }
+    this.msg(`${o.name}'s drone was destroyed`, e.team);
   }
 
   // ---------------- interaction ----------------
@@ -927,7 +938,7 @@ export class Game {
     } else if (id === 'arc') { // the first enemy gadget or defender along the bolt
       let bt = castSight(this.map, p.x, p.y, p.aim, 380, null), hitE = null, hitQ = null;
       for (const e of this.ents) {
-        if (e.team === team || !(e.hp || e.type === 'wire') || e.type === 'drone') continue;
+        if (e.team === team || !(e.hp || e.type === 'wire')) continue;
         const t = rayCircle(p.x, p.y, ca, sa, e.x, e.y, 8);
         if (t !== null && t < bt) { bt = t; hitE = e; }
       }
@@ -1258,7 +1269,7 @@ export class Game {
     let cx = e.x, cy = e.y;
     if (o.at !== undefined) { cx = (o.at % this.map.W + 0.5) * CELL; cy = (Math.floor(o.at / this.map.W) + 0.5) * CELL; }
     this.events.push({ e: 'boom', x: r1(e.x), y: r1(e.y), r: o.r, kind: o.kind });
-    for (const g of [...this.ents]) if (g !== e && g.team !== e.team && (g.hp || g.type === 'wire') && g.type !== 'drone' && Math.hypot(g.x - e.x, g.y - e.y) < o.r * 0.8) this.hitEnt(g, owner);
+    for (const g of [...this.ents]) if (g !== e && g.team !== e.team && (g.hp || g.type === 'wire') && Math.hypot(g.x - e.x, g.y - e.y) < o.r * 0.8) this.hitEnt(g, owner);
     if (o.cellR > 0) {
       const m = this.map, rr = Math.ceil(o.cellR / CELL) + 1;
       const gx = Math.floor(cx / CELL), gy = Math.floor(cy / CELL);
@@ -1291,7 +1302,7 @@ export class Game {
     for (const g of [...this.ents]) {
       if (g === e || g.team === e.team || Math.hypot(g.x - e.x, g.y - e.y) > o.r) continue;
       if (g.type === 'cam') g.hp = 0;
-      else if (['drone', 'jammer', 'mine', 'wire', 'claymore', 'dart', 'cutter', 'breach'].includes(g.type)) this.removeEnt(g);
+      else if (['drone', 'jammer', 'mine', 'wire', 'claymore', 'dart', 'cutter', 'breach'].includes(g.type)) { this.removeEnt(g); if (g.type === 'drone') this.droneLost(g); }
     }
   }
 

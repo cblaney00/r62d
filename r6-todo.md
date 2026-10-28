@@ -54,6 +54,7 @@ New ideas from him get added to the bottom of **To do**.
 - [x] Pause screen (Esc or P). In fullscreen, Esc leaves fullscreen and opens the pause menu.
 - [x] Drone: about a foot long, half as wide (a low rectangle), one small red dot in the middle of the top; wheels spin, it leans and sways; can't drive under furniture
       (still fits through barricade gaps); soft electric motor sound instead of the whine.
+- [x] Drones break: 1 hp, so one bullet, melee hit, blast or zap destroys one (shots count where you saw it moving); the pilot drops back to their body and their team is told; defender bots shoot drones they see.
 - [x] Realistic gunshots: pre-built recordings per weapon (crack, blast, boom, echo off walls, action click).
 - [x] Operators page: bio, armor/speed, skill, loadout choices (primary, secondary, gadget), your stats with them.
 - [x] Saved profiles for everyone who plays: loadouts and lifetime stats (Profile page).

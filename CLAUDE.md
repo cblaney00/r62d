@@ -50,7 +50,7 @@ His wishes so far:
     `PLAYER_R` 7 (he asked that people fit everywhere; at 10 a body couldn't pass 1-cell gaps beside bookcases), so a
     1-cell gap is a squeeze bots also take. `node tests/reach.js` must print 0 unreachable cells on every map.
     Drone holes (`map.dhole`): `mapkit.js droneHoles()` puts one in the middle of each plain wall two rooms share
-    (`K.droneHole(x, y)` adds one by hand); drones (radius 3.5) pass, people don't, reinforcing the wall closes it. `physics.js` (movement, collision, line of sight, ray casting),
+    (`K.droneHole(x, y)` adds one by hand); drones (radius 3.5) pass, people don't, reinforcing the wall closes it. Drones have 1 hp (`hp: 1`): any bullet (lag-compensated like bodies via `recordHistory`), melee, arc or blast breaks one (`droneLost` puts the pilot back in their body); defender bots shoot drones in sight unless someone stands behind (`enemyDrone` in bots.js). `physics.js` (movement, collision, line of sight, ray casting),
     `operators.js` (weapons + the 10 operators).
   - `server/game.js` — authoritative match: lobby, rounds/phases, shooting (hitscan,
     bullets go through soft walls; pistols/SMGs/MPs/ARs/LMGs only leave small see-through holes (`map.holes`, `HOLE_ONLY` in constants.js, sight checks in physics `castSight`), shotguns/DMRs/melee/explosives break them), gadgets, explosions, defuser, downed state, snapshots.

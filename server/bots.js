@@ -127,6 +127,32 @@ function visibleEnemy(game, p) {
   return best;
 }
 
+function behindDrone(game, p, e, d) {
+  const ux = (e.x - p.x) / (d || 1), uy = (e.y - p.y) / (d || 1);
+  for (const q of game.players.values()) {
+    if (q === p || !q.alive) continue;
+    const ax = q.x - p.x, ay = q.y - p.y, along = ax * ux + ay * uy;
+    if (along > d - 10 && along < d + 400 && Math.abs(ax * uy - ay * ux) < 30) return true;
+  }
+  return false;
+}
+
+function enemyDrone(game, p) {
+  const team = game.side(p);
+  const smokes = game.ents.filter(e => e.type === 'smoke');
+  let best = null, bd = Infinity;
+  for (const e of game.ents) {
+    if (e.type !== 'drone' || e.team === team) continue;
+    const d = Math.hypot(e.x - p.x, e.y - p.y);
+    if (d > 260 || d > bd || floorAt(game.map, e.x, e.y) !== floorAt(game.map, p.x, p.y)) continue;
+    if (d > 60 && Math.abs(angDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > 1.2) continue;
+    if (!los(game.map, p.x, p.y, e.x, e.y, smokes)) continue;
+    if (behindDrone(game, p, e, d)) continue; // a miss would hit a person standing behind it (bullets go through soft walls)
+    best = e; bd = d;
+  }
+  return best;
+}
+
 export function botThink(game, p, dt) {
   const ai = p.ai;
   const inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
@@ -185,6 +211,20 @@ export function botThink(game, p, dt) {
   }
   ai.seen = null;
   if (gun && gun.ammo < WEAPONS[gun.w].mag * 0.3 && gun.reserve > 0) game.startReload(p);
+
+  // --- an enemy drone in sight: turn and shoot it (one hit breaks it) ---
+  const drone = p.downed ? null : enemyDrone(game, p);
+  if (drone) {
+    if (ai.droneSeen !== drone.id) { ai.droneSeen = drone.id; ai.droneReact = -0.4 - Math.random() * 0.5; }
+    ai.droneReact += dt;
+    const want = Math.atan2(drone.y - p.y, drone.x - p.x);
+    p.aim += Math.max(-dt * 4.5, Math.min(dt * 4.5, angDiff(want, p.aim)));
+    inp.ads = 1; inp.crouch = 1;
+    if (gun && gun.ammo === 0) game.startReload(p);
+    else if (ai.droneReact > 0 && Math.abs(angDiff(want, p.aim)) < 0.08) { const w = gun && WEAPONS[gun.w]; inp.fire = w && !w.auto ? (ai.semi = !ai.semi) ? 1 : 0 : 1; }
+    return;
+  }
+  ai.droneSeen = null;
 
   // --- objective ---
   let goal = null, act = null;
