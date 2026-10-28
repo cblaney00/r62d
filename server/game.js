@@ -383,7 +383,7 @@ export class Game {
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
     p.bloom = Math.max(0, p.bloom - dt * 0.15);
     { const g = p.guns[p.slot], cls = g ? WEAPONS[g.w].cls : 'AR', rate = (1 / (ADS_TIME[cls] || 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
-      const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0;
+      const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && OPERATORS[p.op].ability.id !== 'brace'; // behind a shield you can only hip-fire
       p.adsT = Math.max(0, Math.min(1, (p.adsT || 0) + (canAds ? dt * rate : -dt * rate * 1.6)));
       if (this.time - p.lastShot > 0.14) { p.rc = (p.rc || 0) * Math.exp(-dt * 7); p.shots = 0; } }
 
@@ -427,6 +427,7 @@ export class Game {
         const f = this.facingCell(p, 30);
         if (f && [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD].includes(f.t)) {
           p.lancing = true; p.battery = Math.max(0, p.battery - dt);
+          if (this.time - (p.noiseT || 0) > 0.4) { p.noiseT = this.time; this.noise(p.x, p.y, team, 260); } // the hiss of the torch
           const fx = (f.cx + 0.5) * CELL, fy = (f.cy + 0.5) * CELL, grid = this.gridNear(fx, fy, other(team));
           if (grid) { // a static grid on that wall shocks you instead
             p.lanceT = 0; p.shockT -= dt;
@@ -453,8 +454,10 @@ export class Game {
     // a defender looking through a turret camera fires its laser
     if (p.ctrl === 'cam' && inp.fire && p.turretCd <= 0) {
       const c = this.aliveCams()[p.camIdx];
-      if (c && c.tu && !(c.offUntil > this.time)) {
+      if (c && c.tu) c.heat = Math.max(0, (c.heat || 0) - (this.time - (c.heatT ?? this.time)) * 2), c.heatT = this.time;
+      if (c && c.tu && !(c.offUntil > this.time) && !(c.coolUntil > this.time)) {
         p.turretCd = 0.45;
+        if ((c.heat += 1) >= 12) { c.coolUntil = this.time + 4; c.heat = 0; } // overheated
         const a = c.ang || 0, dx = Math.cos(a), dy = Math.sin(a);
         let bt = castSight(this.map, c.x, c.y, a, 520, this.smokeList()), hit = null;
         for (const q of this.players.values()) {
@@ -501,8 +504,8 @@ export class Game {
     // hip fire is a loose cone that widens while moving; aimed fire is accurate even on the move (R6 rules)
     const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED), at = p.adsT || 0;
     const m = gun.m || gunMods(gun.w);
-    const hip = (w.spread * (p.input.crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip, ads = w.ads * m.adsSpread;
-    const spread = (hip + (ads - hip) * at + p.bloom * (1 - 0.7 * at)) * (this.time < (p.dazeUntil || 0) ? 2.2 : 1); // dazed: shaky aim
+    const hip = (w.spread * (p.input.crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip * (OPERATORS[p.op].ability.id === 'brace' ? 1.35 : 1), ads = w.ads * m.adsSpread; // firing round a shield is loose
+    const spread = (hip + (ads - hip) * at + p.bloom * (1 - 0.7 * at)) * (this.time < (p.dazeUntil || 0) ? 1.7 : 1); // dazed: shaky aim
     p.bloom = Math.min(0.08, p.bloom + w.bloom);
     // recoil: drifts one way for a burst, then the other, with sway; pull against it
     const rc = RECOIL[w.cls] || RECOIL.AR;
@@ -571,8 +574,8 @@ export class Game {
     const ex = x0 + dx * stopT, ey = y0 + dy * stopT;
     if (best && best.q) {
       const q = best.q;
-      if (OPERATORS[q.op].ability.id === 'brace' && !q.downed && q.ctrl === 'body') {
-        const arc = q.bracing ? 1.45 : 0.95;
+      if (OPERATORS[q.op].ability.id === 'brace' && !q.downed && q.ctrl === 'body' && !(this.time < (q.shieldDownUntil || 0))) {
+        const arc = q.bracing ? 1.4 : this.time - (q.lastShot || -9) < 0.5 ? 0.45 : 0.8; // while shooting round the shield, more of you shows
         if (Math.abs(angDiff(Math.atan2(y0 - q.y, x0 - q.x), q.aim)) < arc) {
           this.events.push({ e: 'hit', k: 'shield', x: r1(ex), y: r1(ey) });
           return { x: ex, y: ey, k: 'shield' };
@@ -583,7 +586,8 @@ export class Game {
       const at = best.at || q, cx = at.x - x0, cy = at.y - y0, miss = Math.abs(cx * dy - cy * dx);
       const F = FALLOFF[cls] || FALLOFF.AR, rm = this.rangeMul || 1, fo = { from: F.from * rm, to: F.to * rm, min: F.min };
       const fall = stopT <= fo.from ? 1 : stopT >= fo.to ? fo.min : 1 - (1 - fo.min) * (stopT - fo.from) / (fo.to - fo.from);
-      if (miss < HEAD_R && !q.downed) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
+      if (miss < HEAD_R && !q.downed && cls !== 'Shotgun') { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
+      else if (miss < HEAD_R && cls === 'Shotgun') this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
       else this.damage(q, dmg * mult * fall, src, wname, ang);
     } else if (best && best.e) this.hitEnt(best.e, src);
     else if (kind === 'hard' || kind === 'prop') this.events.push({ e: 'hit', k: kind, x: r1(ex), y: r1(ey) });
@@ -798,6 +802,10 @@ export class Game {
       if (!q.alive || this.side(q) === team) continue;
       const d = Math.hypot(q.x - p.x, q.y - p.y);
       if (d < 28 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.1 && los(this.map, p.x, p.y, q.x, q.y)) {
+        // hitting a shield from the front knocks it aside for a moment instead of hurting
+        if (OPERATORS[q.op].ability.id === 'brace' && !q.downed && q.ctrl === 'body' && Math.abs(angDiff(Math.atan2(p.y - q.y, p.x - q.x), q.aim)) < 0.8 && !(this.time < (q.shieldDownUntil || 0))) {
+          q.shieldDownUntil = this.time + 1.2; this.events.push({ e: 'hit', k: 'shield', x: r1(q.x), y: r1(q.y) }); this.events.push({ e: 'snd', s: 'panel', x: r1(q.x), y: r1(q.y) }); return;
+        }
         this.damage(q, q.downed ? 999 : 55, p, 'Melee', p.aim); return;
       }
     }
@@ -1085,8 +1093,8 @@ export class Game {
             if (e.type === 'prox') { e.fuse = 0.9; this.events.push({ e: 'snd', s: 'beep', x: r1(e.x), y: r1(e.y) }); }
             else if (e.type === 'concuss') this.detonate(e);
             else { // clamp: held fast and badly hurt
-              q.clampUntil = this.time + 3; this.spot(e.team, q.id, 3);
-              this.damage(q, 35, this.players.get(e.owner), 'Clamp Trap', 0);
+              q.clampUntil = this.time + 2; this.spot(e.team, q.id, 3);
+              this.damage(q, 20, this.players.get(e.owner), 'Clamp Trap', 0);
               this.events.push({ e: 'snd', s: 'clamp', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e);
             }
             break;
@@ -1104,7 +1112,7 @@ export class Game {
         case 'plates':
           for (const q of this.players.values()) {
             if (!q.alive || q.plated || q.downed || this.side(q) !== e.team || Math.hypot(q.x - e.x, q.y - e.y) > 18) continue;
-            q.plated = true; q.maxHp += 20; q.hp += 20; e.c--;
+            q.plated = true; q.maxHp += 15; q.hp += 15; e.c--;
             this.events.push({ e: 'snd', s: 'place', x: r1(q.x), y: r1(q.y) });
             if (e.c <= 0) { this.removeEnt(e); break; }
           }
@@ -1162,7 +1170,7 @@ export class Game {
       case 'breach': this.explode(e, { r: 40, dmg: 60, cellR: 21, cells: SOFTISH, kind: 'breach', at: e.cell }); break;
       case 'claymore': this.explode(e, { r: 50, dmg: 95, cellR: 0, cells: [], kind: 'frag', cone: e.ang }); break;
       case 'mine': {
-        this.explode(e, { r: 32, dmg: 55, cellR: 0, cells: [], kind: 'mine' });
+        this.explode(e, { r: 32, dmg: 40, cellR: 0, cells: [], kind: 'mine' });
         for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < 40) {
           q.slowUntil = this.time + 3; this.spot(e.team, q.id, 4);
         }
@@ -1171,7 +1179,7 @@ export class Game {
       case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD], kind: 'cutter', at: e.cell }); break;
       case 'sonar': {
         let any = false;
-        for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 230) { this.spot(e.team, q.id, 4); any = true; }
+        for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 230) { this.spot(e.team, q.id, 2.5); any = true; }
         this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any, big: 1 });
         break;
       }
@@ -1181,7 +1189,7 @@ export class Game {
       case 'concuss': {
         this.explode(e, { r: 30, dmg: 15, cellR: 0, cells: [], kind: 'impact' });
         for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < 50) {
-          q.slowUntil = this.time + 5; q.dazeUntil = this.time + 5; this.events.push({ e: 'daze', id: q.id, dur: 5 });
+          q.slowUntil = this.time + 4; q.dazeUntil = this.time + 4; this.events.push({ e: 'daze', id: q.id, dur: 4 });
         }
         break;
       }
@@ -1190,7 +1198,7 @@ export class Game {
         for (let i = 0; i < 4; i++) {
           const d = 22 + i * 13 + Math.random() * 8, side = (Math.random() - 0.5) * 50;
           const x = cx + e.dx * d + (e.dy ? side : 0), y = cy + e.dy * d + (e.dx ? side : 0);
-          this.explode({ x, y, team: e.team, owner: e.owner }, { r: 30, dmg: 45, cellR: 0, cells: [], kind: 'impact' });
+          this.explode({ x, y, team: e.team, owner: e.owner }, { r: 30, dmg: 35, cellR: 0, cells: [], kind: 'impact' });
         }
         break;
       }
@@ -1373,7 +1381,7 @@ export class Game {
       if (e.owner) o.ow = e.owner;
       if (e.kind) o.kd = e.kind;
       if (e.ang !== undefined) o.ag = r2(e.ang);
-      if (e.type === 'cam') { o.hp = e.hp; o.off = e.offUntil > this.time ? 1 : 0; if (e.tu) o.tu = 1; }
+      if (e.type === 'cam') { o.hp = e.hp; o.off = e.offUntil > this.time ? 1 : 0; if (e.tu) { o.tu = 1; if (e.coolUntil > this.time) o.hot = 1; } }
       if (e.type === 'decoy') { o.op = e.op; o.w = e.w; }
       if (e.type === 'plates') o.c = e.c;
       if (e.type === 'gascloud') { o.r = e.r; o.l = r1(e.life); }

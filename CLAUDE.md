@@ -79,6 +79,7 @@ His wishes so far:
 - **Tests:** `node tests/abilities.js` has every operator use their ability in a live match.
   `node tests/sim.js` plays a bot-only match on every map (must print PASS; `--only <id>` for one).
   `node tests/stairs.js` walks a body up and down every staircase with real physics + bot path finding.
+  `node tests/balance.js 12` is the balance report (see docs/balance.md for how to read it and past changes).
   `tests/shoot.mjs` drives a hidden Firefox (run as insideabush, via WebDriver BiDi,
   `--remote-debugging-port`) to take screenshots; see `docs/testing.md`.
 - **Status:** first playable version — all 10 operators, gadgets, drones, cameras, reinforcement,

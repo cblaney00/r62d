@@ -166,6 +166,10 @@ export function botThink(game, p, dt) {
     p.aim += Math.max(-dt * 4.5, Math.min(dt * 4.5, angDiff(want, p.aim)));
     inp.ads = 1;
     if (gun && gun.ammo === 0) game.startReload(p);
+    // a shield facing us: circle round it and only shoot once its side shows (as people do)
+    const shieldUp = OPERATORS[enemy.op].ability.id === 'brace' && !enemy.downed && Math.abs(angDiff(Math.atan2(p.y - enemy.y, p.x - enemy.x), enemy.aim)) < 0.8;
+    if (shieldUp && Math.hypot(enemy.x - p.x, enemy.y - p.y) < 26) { p.aim = Math.atan2(enemy.y - p.y, enemy.x - p.x); game.event(p, { k: 'melee' }); return; } // knock the shield aside
+    if (shieldUp && !(game.time < (enemy.shieldDownUntil || 0))) { ai.strafe = ai.strafe || (Math.random() < 0.5 ? -1 : 1); const sa = Math.atan2(enemy.y - p.y, enemy.x - p.x) + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); return; }
     else if (ai.react > 0.55 && Math.abs(angDiff(want, p.aim)) < 0.2) {
       const w = gun && WEAPONS[gun.w];
       inp.fire = w && !w.auto ? (ai.semi = !ai.semi) ? 1 : 0 : 1;
