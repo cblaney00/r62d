@@ -10,28 +10,26 @@ export class MapRenderer {
   constructor(map, baseTiles) {
     this.map = map; this.base = baseTiles;
     this.Wp = map.W * CELL; this.Hp = map.H * CELL;
-    this.floorC = canvas(this.Wp * S, this.Hp * S);
     this.c = canvas(this.Wp * S, this.Hp * S);
     this.decal = canvas(this.Wp, this.Hp);
-    this.fctx = this.floorC.getContext('2d'); this.fctx.scale(S, S);
     this.ctx = this.c.getContext('2d'); this.ctx.scale(S, S);
     this.dctx = this.decal.getContext('2d');
-    this.pat = floorPatterns(this.fctx);
-    this.drawFloors();
+    this.pat = floorPatterns(this.ctx);
     this.region(0, 0, map.W - 1, map.H - 1);
   }
 
   t(x, y) { const m = this.map; return x < 0 || y < 0 || x >= m.W || y >= m.H ? T.HARD : m.tiles[y * m.W + x]; }
 
-  drawFloors() {
-    const m = this.map, x = this.fctx;
-    for (let cy = 0; cy < m.H; cy++) for (let cx = 0; cx < m.W; cx++) {
+  // Floors for a block of cells (the caller has clipped to that block).
+  drawFloors(x0, y0, x1, y1) {
+    const m = this.map, x = this.ctx;
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
       x.fillStyle = this.pat[m.floor[cy * m.W + cx]];
       x.fillRect(cx * CELL, cy * CELL, CELL, CELL);
     }
     // curbs where grass meets paving
     x.fillStyle = 'rgba(190,190,180,0.55)';
-    for (let cy = 0; cy < m.H; cy++) for (let cx = 0; cx < m.W; cx++) {
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
       const f = m.floor[cy * m.W + cx];
       if (f === FL.GRASS) continue;
       const g = (dx, dy) => { const nx = cx + dx, ny = cy + dy; return nx >= 0 && ny >= 0 && nx < m.W && ny < m.H && m.floor[ny * m.W + nx] === FL.GRASS && m.tiles[ny * m.W + nx] === T.GROUND; };
@@ -70,7 +68,7 @@ export class MapRenderer {
     const X = x0 * CELL, Y = y0 * CELL, Wd = (x1 - x0 + 1) * CELL, Hd = (y1 - y0 + 1) * CELL;
     ctx.save();
     ctx.beginPath(); ctx.rect(X, Y, Wd, Hd); ctx.clip();
-    ctx.drawImage(this.floorC, X * S, Y * S, Wd * S, Hd * S, X, Y, Wd, Hd);
+    this.drawFloors(x0, y0, x1, y1);
     const ex0 = x0 - 2, ey0 = y0 - 2, ex1 = x1 + 2, ey1 = y1 + 2;
     // rubble where walls used to be
     for (let y = ey0; y <= ey1; y++) for (let x = ex0; x <= ex1; x++) {

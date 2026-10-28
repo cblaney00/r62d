@@ -33,13 +33,8 @@
     </div>
     <div class="controls">
       <h4>CONTROLS</h4>
-      <div class="grid">
-        <span>WASD</span>Move <span>Mouse</span>Aim <span>Left click</span>Shoot <span>Right click</span>Aim down sights
-        <span>Shift</span>Sprint <span>C</span>Crouch <span>R</span>Reload <span>1 / 2 · Wheel</span>Switch weapon
-        <span>E (hold)</span>Interact: reinforce, barricade, plant, defuse, revive
-        <span>Z or Q</span>Operator ability <span>G</span>Secondary gadget <span>V or F</span>Melee
-        <span>5</span>Drone (attack) / Cameras (defence) <span>Tab</span>Scoreboard <span>H</span>Show controls
-      </div>
+      <div class="grid" id="ctlGrid"></div>
+      <div class="row center"><button id="lobbySetBtn">⚙ Settings &amp; keys</button></div>
     </div>
   </div>
 
@@ -66,11 +61,18 @@
     <div id="progress"><div class="label"></div><div class="bar"><i></i></div></div>
     <div id="banner"><div class="t"></div><div class="s"></div></div>
     <div id="viewlabel"></div>
+    <div id="cambar"></div>
     <div id="scoreboard" class="hidden"></div>
   </div>
   <div id="endscreen" class="hidden"><div class="t"></div><div class="s"></div><div class="board"></div></div>
   <div id="help" class="hidden"></div>
-  <div id="corner"><button id="fsBtn" title="Fullscreen">⛶ Fullscreen</button><button id="muteBtn">🔊</button><button id="leaveBtn" class="hidden">End match</button></div>
+  <div id="settings" class="hidden"><h2>SETTINGS</h2>
+    <div class="vols"><label>Master volume <input type="range" id="volMaster" min="0" max="100" value="60"></label><label>Effects volume <input type="range" id="volSfx" min="0" max="100" value="100"></label></div>
+    <p class="hint">Click a key to change it, then press the new key (Esc cancels).</p>
+    <div class="tablewrap"><table id="bindTable"></table></div>
+    <div class="row center"><button id="setReset">Reset to defaults</button><button id="setClose" class="primary">Done</button></div>
+  </div>
+  <div id="corner"><button id="fsBtn" title="Fullscreen">⛶ Fullscreen</button><button id="setBtn">⚙ Settings</button><button id="muteBtn">🔊</button><button id="leaveBtn" class="hidden">End match</button></div>
   <div id="conn" class="hidden">Connecting…</div>
 </div>
 <script type="module" src="/js/main.js"></script>

@@ -11,7 +11,7 @@ const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
 const BOT_NAMES = ['Viper', 'Moss', 'Rook-7', 'Static', 'Juno', 'Kilo', 'Brine', 'Ozone', 'Pike', 'Wick', 'Saber', 'Flint'];
-const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, sprint: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
+const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, sprint: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
 const JAM_R = 90;
 
 // R62D_FAST=1 shortens the menus, for quick testing.
@@ -93,6 +93,7 @@ export class Game {
     if (m.t === 'input') {
       p.input = { ...EMPTY_INPUT, ...m.k };
       if (typeof m.a === 'number' && isFinite(m.a)) p.aim = m.a;
+      if (p.ctrl === 'cam') { const c = this.aliveCams()[p.camIdx]; if (c) c.ang = p.aim; }
       if (typeof m.ax === 'number') { p.aimX = m.ax; p.aimY = m.ay; }
       this.applyMove(p, Math.max(0, Math.min(0.05, Number(m.dt) || 0)));
       p.lastSeq = m.s | 0;
@@ -171,7 +172,11 @@ export class Game {
       }
       this.equip(p);
     }
-    for (const c of map.cams) this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, team: TEAM.DEF, hp: 1, offUntil: 0 });
+    for (const c of map.cams) { // each camera starts facing its longest view
+      let best = 0, bestD = -1;
+      for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, d = castSight(map, c.x, c.y, a, 600, null); if (d > bestD) { bestD = d; best = a; } }
+      this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, team: TEAM.DEF, hp: 1, offUntil: 0, ang: best });
+    }
     // defenders start on site, attackers at one spawn (their bodies wait while they drone)
     const site = map.sites[this.site];
     const defCells = this.freeCellsInRooms(site.rooms);
@@ -313,7 +318,7 @@ export class Game {
     const before = { x: p.x, y: p.y };
     stepMove(this.map, p, p.input, dt, m);
     const moved = Math.hypot(p.x - before.x, p.y - before.y) / dt;
-    p.moving = moved < 5 ? 0 : p.input.crouch ? 1 : moved > 150 ? 3 : 2;
+    p.moving = moved < 5 ? 0 : (p.input.crouch || p.input.walk) ? 1 : moved > 150 ? 3 : 2;
     if (p.input.sprint && p.moving) p.lastSprint = this.time;
   }
 
@@ -598,6 +603,7 @@ export class Game {
       case 'gadget': if (!p.downed && p.ctrl === 'body' && !p.busy) this.useGadget(p); break;
       case 'view': this.toggleView(p); break;
       case 'camNext': case 'camPrev': if (p.ctrl === 'cam') this.cycleCam(p, e.k === 'camNext' ? 1 : -1); break;
+      case 'camSet': if (p.ctrl === 'cam') { const n = this.aliveCams().length; if (n) p.camIdx = Math.max(0, Math.min(n - 1, e.n | 0)); } break;
       case 'spot': {
         const q = this.players.get(e.id);
         if (q && q.alive && this.side(q) !== team) this.spot(team, q.id, DUR.spot);
@@ -630,8 +636,10 @@ export class Game {
     }
   }
 
+  aliveCams() { return this.ents.filter(e => e.type === 'cam' && e.hp > 0); }
+
   cycleCam(p, dir) {
-    const cams = this.ents.filter(e => e.type === 'cam' && e.hp > 0);
+    const cams = this.aliveCams();
     if (!cams.length) { p.ctrl = 'body'; return; }
     p.camIdx = (p.camIdx + dir + cams.length) % cams.length;
   }
@@ -994,7 +1002,7 @@ export class Game {
         sl: p.slot, w: g ? g.w : null, am: g ? g.ammo : 0, rs: g ? g.reserve : 0, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ac: p.abilityCount, gc: p.gadgetCount, dr: p.drones, ct: p.ctrl, ci: p.camIdx, did: p.droneId,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
-        mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, br: p.bracing ? 1 : 0, sc: p.scanning ? 1 : 0,
+        mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sc: p.scanning ? 1 : 0,
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         m: this.mods(p), fs: r2(this.time - p.lastShot),
       });

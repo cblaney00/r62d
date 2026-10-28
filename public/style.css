@@ -128,3 +128,21 @@ tr.me { color: var(--gold); } tr.dead { opacity: 0.5; }
 #corner:hover { opacity: 1; }
 #corner button { font-size: 12px; padding: 5px 10px; }
 #conn { position: absolute; inset: 0; display: grid; place-items: center; font: 700 28px var(--head); letter-spacing: 0.2em; background: rgba(0,0,0,0.85); pointer-events: auto; }
+
+/* ---------- settings ---------- */
+#settings { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(760px, 94vw); max-height: 90vh; display: flex; flex-direction: column; gap: 10px;
+  background: rgba(10,13,18,0.96); border: 1px solid var(--line); padding: 18px 22px; pointer-events: auto; z-index: 5; }
+#settings h2 { margin: 0; font: 800 30px var(--head); letter-spacing: 0.2em; }
+#settings .vols { display: flex; gap: 30px; font: 600 15px var(--head); letter-spacing: 0.08em; }
+#settings .vols input { width: 180px; vertical-align: middle; padding: 0; }
+#settings .tablewrap { overflow: auto; }
+#settings td { padding: 3px 8px; font-size: 15px; }
+#settings td button { width: 130px; padding: 4px 8px; font-size: 14px; }
+#settings td button.wait { background: var(--gold); color: #000; }
+/* ---------- camera bar ---------- */
+#cambar { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 6px; pointer-events: auto; }
+#cambar:empty { display: none; }
+#cambar button { font-size: 13px; padding: 6px 12px; background: var(--panel); text-align: left; line-height: 1.2; }
+#cambar button small { display: block; color: var(--dim); font-size: 11px; letter-spacing: 0.1em; }
+#cambar button.on { border-color: var(--gold); color: var(--gold); }
+#cambar button.dead { opacity: 0.35; text-decoration: line-through; pointer-events: none; }

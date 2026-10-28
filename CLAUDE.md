@@ -56,4 +56,5 @@ His wishes so far:
   `--remote-debugging-port`) to take screenshots; see `docs/testing.md`.
 - **Status:** first playable version — all 10 operators, gadgets, drones, cameras, reinforcement,
   barricades, destruction, defuser, DBNO, bots, lobby, operator select, HUD, scoreboard.
-  Ideas/next steps are in `docs/roadmap.md`.
+  **His idea list is `r6-todo.md` — work through it top to bottom, tick items off, keep going.**
+  Other ideas are in `docs/roadmap.md`.

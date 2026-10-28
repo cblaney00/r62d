@@ -5,9 +5,13 @@ import { buildMap, roomAt } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam } from '/shared/operators.js';
 import { MapRenderer } from './mapdraw.js';
+import { S } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait } from './sprites.js';
 import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
+import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label } from './keys.js';
+import { walkRay, tileAt } from '/shared/physics.js';
+import { blocksSight, FL } from '/shared/constants.js';
 
 const $ = id => document.getElementById(id);
 const cv = $('game'), ctx = cv.getContext('2d');
@@ -104,23 +108,31 @@ function onEvent(e, s, players) {
       const w = WEAPONS[e.w]; const a = Math.atan2(e.y2 - e.y, e.x2 - e.x);
       fx.tracer(e.x, e.y, e.x2, e.y2);
       const an = anim(e.id);
-      if (an.lastShotSnd !== s.time) { fx.muzzle(e.x, e.y, a); audio.gunshot(w ? w.cls : 'AR', e.x, e.y); an.lastShotSnd = s.time; }
+      if (an.lastShotSnd !== s.time) { fx.muzzle(e.x, e.y, a); audio.gunshot(w ? w.cls : 'AR', e.x, e.y, e.id === st.id); audio.casing(e.x, e.y, surfaceAt(e.x, e.y), w && w.cls === 'Shotgun'); an.lastShotSnd = s.time; }
       an.recoil = 1.6; an.flashT = now;
-      if (e.k === 'hard') { fx.impact(e.x2, e.y2, 'hard', a); if (Math.random() < 0.3) audio.play('ric', e.x2, e.y2); }
-      else if (e.k === 'prop') fx.impact(e.x2, e.y2, 'prop', a);
+      if (e.k === 'hard') { fx.impact(e.x2, e.y2, 'hard', a); audio.impact(hardMat(e.x2, e.y2, a), e.x2, e.y2); }
+      else if (e.k === 'prop') { fx.impact(e.x2, e.y2, 'prop', a); audio.impact(Math.random() < 0.5 ? 'wood' : 'metal', e.x2, e.y2); }
+      // a bullet passing close to you cracks past your ear
+      if (e.id !== st.id && st.listen) {
+        const L = st.listen, dx = e.x2 - e.x, dy = e.y2 - e.y, len2 = dx * dx + dy * dy || 1;
+        const tt = Math.max(0, Math.min(1, ((L.x - e.x) * dx + (L.y - e.y) * dy) / len2));
+        const px = e.x + dx * tt, py = e.y + dy * tt;
+        if (tt > 0.05 && tt < 0.98 && Math.hypot(px - L.x, py - L.y) < 34) audio.whiz(px, py);
+      }
       break;
     }
     case 'hit':
       fx.impact(e.x, e.y, e.k, e.a || 0);
-      if (e.k === 'blood') st.rend.blood(e.x, e.y, e.a || 0);
-      else if (e.k === 'wall') audio.play('wall', e.x, e.y);
-      else if (e.k === 'wood') audio.play('wood', e.x, e.y);
-      else if (e.k === 'shield') audio.play('ric', e.x, e.y);
+      if (e.k === 'blood') { st.rend.blood(e.x, e.y, e.a || 0); audio.impact('flesh', e.x, e.y); }
+      else if (e.k === 'spark') audio.impact('electronic', e.x, e.y);
+      else if (e.k === 'wall') audio.impact(wallMat(e.x, e.y, e.a), e.x, e.y);
+      else if (e.k === 'wood') audio.impact('wood', e.x, e.y);
+      else if (e.k === 'shield') audio.impact('metal', e.x, e.y);
       break;
     case 'boom':
       fx.explosion(e.x, e.y, e.r, e.kind);
       if (e.kind !== 'stun' && e.kind !== 'emp') st.rend.scorch(e.x, e.y, Math.min(40, e.r * 0.6));
-      audio.explosion(e.x, e.y, e.kind === 'frag' || e.kind === 'nitro' || e.kind === 'cutter');
+      audio.explosion(e.x, e.y, e.kind);
       break;
     case 'kill': {
       const v = players.get(e.victim), k = e.killer ? players.get(e.killer) : null;
@@ -132,7 +144,7 @@ function onEvent(e, s, players) {
     }
     case 'down': { const v = players.get(e.id); if (v) addFeed(`${v.n} is down`); break; }
     case 'msg': if (!e.team || e.team === mySide()) addFeed(e.text); break;
-    case 'banner': if (!e.team || e.team === mySide()) banner(e.text, e.sub); audio.play('round'); break;
+    case 'banner': if (!e.team || e.team === mySide()) banner(e.text, e.sub); audio.ui('round'); break;
     case 'roundEnd': {
       const won = st.me && e.squad === st.me.sq;
       banner(won ? 'ROUND WON' : 'ROUND LOST', e.reason, won ? 'var(--ally)' : 'var(--enemy)');
@@ -141,10 +153,10 @@ function onEvent(e, s, players) {
     case 'matchEnd': st.endT = now; showEnd(e.squad); break;
     case 'stun': if (st.me && e.id === st.me.id) st.flashUntil = now + e.dur; break;
     case 'hurt': if (st.me && e.id === st.me.id) { st.hurtT = now; st.hurtFrom = e.from; } break;
-    case 'hitmark': if (e.to === st.id) { st.hitT = now; st.hitKill = e.kill; audio.play(e.kill ? 'killmark' : 'hitmark'); } break;
-    case 'ping': if (e.team === mySide()) { fx.ping(e.x, e.y, e.any ? '255,90,60' : '79,179,169'); audio.play('ping', e.x, e.y); } break;
-    case 'stim': fx.tracer(e.x, e.y, e.x2, e.y2, '120,255,160'); fx.ping(e.x2, e.y2, '120,255,160'); audio.play('stim', e.x, e.y); break;
-    case 'melee': anim(e.id).melee = 1; { const p = players.get(e.id); if (p && p.x !== undefined) audio.play('melee', p.x, p.y); } break;
+    case 'hitmark': if (e.to === st.id) { st.hitT = now; st.hitKill = e.kill; audio.ui(e.kill ? 'kill' : 'hit'); } break;
+    case 'ping': if (e.team === mySide()) { fx.ping(e.x, e.y, e.any ? '255,90,60' : '79,179,169'); audio.foley('beep', e.x, e.y); } break;
+    case 'stim': fx.tracer(e.x, e.y, e.x2, e.y2, '120,255,160'); fx.ping(e.x2, e.y2, '120,255,160'); audio.foley('revive', e.x, e.y); break;
+    case 'melee': anim(e.id).melee = 1; { const p = players.get(e.id); if (p && p.x !== undefined) audio.foley('melee', p.x, p.y, e.id === st.id); } break;
     case 'snd': audio.play(e.s, e.x, e.y); break;
   }
 }
@@ -152,25 +164,35 @@ function onEvent(e, s, players) {
 function anim(id) { let a = st.anim.get(id); if (!a) st.anim.set(id, a = { walk: 0, recoil: 0, melee: 0, flashT: -9, lx: 0, ly: 0, stepAcc: 0 }); return a; }
 
 // ---------------- input ----------------
+// `keys` holds the names of actions currently held down (see keys.js for the bindings).
+let rebinding = null;
 addEventListener('keydown', e => {
+  if (rebinding) { e.preventDefault(); if (e.code !== 'Escape') setBind(rebinding.id, rebinding.slot, e.code); rebinding = null; renderSettings(); return; }
   if (document.activeElement && document.activeElement.tagName === 'INPUT') { if (e.key === 'Enter') $('joinBtn').click(); return; }
-  const k = e.key.toLowerCase();
-  if (['tab', ' '].includes(k) || k === 'f' || k === 'g' || k === 'z' || k === 'q') e.preventDefault();
-  if (keys.has(k)) return;
-  keys.add(k);
+  const a = actionFor(e.code);
+  if (a || e.code === 'AltLeft' || e.code === 'AltRight' || e.code === 'Tab') e.preventDefault();
+  if (!a || keys.has(a)) return;
+  keys.add(a);
   audio.initAudio();
   const ev = st.evq;
-  if (k === 'r') ev.push({ k: 'reload' });
-  else if (k === '1') ev.push({ k: 'slot', n: 0 });
-  else if (k === '2') ev.push({ k: 'slot', n: 1 });
-  else if (k === 'v' || k === 'f') ev.push({ k: 'melee' });
-  else if (k === 'g') ev.push({ k: 'gadget' });
-  else if (k === 'z' || k === 'q') ev.push({ k: 'ability' });
-  else if (k === '5' || k === 'x') ev.push({ k: 'view' });
-  else if (k === 'c' || k === 'control') st.crouch = !st.crouch;
-  else if (k === 'h') toggleHelp();
+  switch (a) {
+    case 'reload': ev.push({ k: 'reload' }); break;
+    case 'primary': ev.push({ k: 'slot', n: 0 }); break;
+    case 'secondary': ev.push({ k: 'slot', n: 1 }); break;
+    case 'melee': ev.push({ k: 'melee' }); break;
+    case 'gadget': ev.push({ k: 'gadget' }); audio.foley('gadget'); break;
+    case 'ability': ev.push({ k: 'ability' }); audio.foley('gadget'); break;
+    case 'view': ev.push({ k: 'view' }); break;
+    case 'crouch': st.crouch = !st.crouch; break;
+    case 'settings': toggleSettings(); break;
+    case 'spot': st.spotReq = true; break;
+    case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
+  }
 });
-addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('keyup', e => {
+  if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault(); // stop Firefox's menu bar popping up
+  const a = actionFor(e.code); if (a) keys.delete(a);
+});
 addEventListener('blur', () => { keys.clear(); mouse.l = mouse.r = false; });
 cv.addEventListener('mousemove', e => { mouse.x = e.clientX * DPR; mouse.y = e.clientY * DPR; });
 cv.addEventListener('mousedown', e => {
@@ -180,31 +202,68 @@ cv.addEventListener('mousedown', e => {
 });
 addEventListener('mouseup', e => { if (e.button === 0) mouse.l = false; if (e.button === 2) mouse.r = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
-cv.addEventListener('wheel', e => { if (st.me && st.me.a) st.evq.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); }, { passive: true });
+cv.addEventListener('wheel', e => {
+  if (!st.me || !st.me.a) return;
+  if (st.me.ct === 'cam') st.evq.push({ k: e.deltaY > 0 ? 'camNext' : 'camPrev' });
+  else st.evq.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 });
+}, { passive: true });
+cv.addEventListener('mousedown', e => { if (e.button === 1) { e.preventDefault(); st.spotReq = true; } });
+
+// ---------------- settings ----------------
+function toggleSettings() { $('settings').classList.toggle('hidden'); renderSettings(); }
+function renderSettings() {
+  const el = $('settings'); if (el.classList.contains('hidden')) return;
+  const rows = ACTIONS.map(([id, name]) => {
+    const b = bindsFor(id);
+    const btn = slot => `<button data-id="${id}" data-slot="${slot}" class="${rebinding && rebinding.id === id && rebinding.slot === slot ? 'wait' : ''}">${rebinding && rebinding.id === id && rebinding.slot === slot ? 'PRESS A KEY…' : keyName(b[slot])}</button>`;
+    return `<tr><td>${name}</td><td>${btn(0)}</td><td>${btn(1)}</td></tr>`;
+  }).join('');
+  $('bindTable').innerHTML = `<tr><th>ACTION</th><th>KEY</th><th>ALTERNATE</th></tr>${rows}
+    <tr><td>Shoot / Aim down sights</td><td>Left mouse</td><td>Right mouse</td></tr>
+    <tr><td>Mark enemy</td><td>Middle mouse</td><td></td></tr>`;
+  for (const b of $('bindTable').querySelectorAll('button')) b.onclick = () => { rebinding = { id: b.dataset.id, slot: +b.dataset.slot }; renderSettings(); };
+}
+$('setReset').onclick = () => { resetBinds(); renderSettings(); };
+$('setClose').onclick = () => toggleSettings();
+$('setBtn').onclick = () => toggleSettings();
+$('lobbySetBtn').onclick = () => toggleSettings();
+const saveVol = () => { try { localStorage.setItem('r62d-vol', JSON.stringify([+$('volMaster').value, +$('volSfx').value])); } catch {} };
+try { const v = JSON.parse(localStorage.getItem('r62d-vol') || 'null'); if (v) { $('volMaster').value = v[0]; $('volSfx').value = v[1]; } } catch {}
+const applyVol = () => audio.setVolume(st.muted ? 0 : $('volMaster').value / 100, $('volSfx').value / 100);
+$('volMaster').oninput = () => { applyVol(); saveVol(); };
+$('volSfx').oninput = () => { applyVol(); saveVol(); };
+applyVol();
 
 // ---------------- menus ----------------
 $('name').value = (() => { try { return localStorage.getItem('r62d-name') || ''; } catch { return ''; } })();
 $('joinBtn').onclick = () => {
-  audio.initAudio(); audio.play('ui');
+  audio.initAudio(); audio.ui();
   const n = $('name').value.trim() || 'Operator';
   try { localStorage.setItem('r62d-name', n); } catch {}
   send({ t: 'join', name: n });
 };
-document.querySelectorAll('[data-bot]').forEach(b => b.onclick = () => { audio.play('ui'); send({ t: 'lobby', a: 'addBot', squad: +b.dataset.bot }); });
-document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { audio.play('ui'); send({ t: 'lobby', a: 'removeBot', squad: +b.dataset.unbot }); });
-$('switchBtn').onclick = () => { audio.play('ui'); send({ t: 'lobby', a: 'switch' }); };
-$('fillBtn').onclick = () => { audio.play('ui'); send({ t: 'lobby', a: 'fillBots' }); };
-$('startBtn').onclick = () => { audio.play('ui'); send({ t: 'lobby', a: 'start' }); };
+document.querySelectorAll('[data-bot]').forEach(b => b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'addBot', squad: +b.dataset.bot }); });
+document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'removeBot', squad: +b.dataset.unbot }); });
+$('switchBtn').onclick = () => { audio.ui(); send({ t: 'lobby', a: 'switch' }); };
+$('fillBtn').onclick = () => { audio.ui(); send({ t: 'lobby', a: 'fillBots' }); };
+$('startBtn').onclick = () => { audio.ui(); send({ t: 'lobby', a: 'start' }); };
 $('leaveBtn').onclick = () => { if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
 $('fsBtn').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); };
-$('muteBtn').onclick = () => { st.muted = !st.muted; audio.setVolume(st.muted ? 0 : 0.5); $('muteBtn').textContent = st.muted ? '🔇' : '🔊'; };
-function toggleHelp() {
-  const h = $('help');
-  if (!h.innerHTML) h.innerHTML = document.querySelector('.controls').outerHTML;
-  h.classList.toggle('hidden');
+$('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); $('muteBtn').textContent = st.muted ? '🔇' : '🔊'; };
+function renderControls() {
+  const L = id => keyName(bindsFor(id)[0]);
+  const rows = [[`${L('up')}${L('left')}${L('down')}${L('right')}`, 'Move'], ['Mouse', 'Aim'], ['Left click', 'Shoot'], ['Right click', 'Aim down sights'],
+    [L('sprint'), 'Sprint'], [L('walk'), 'Slow walk (silent)'], [L('crouch'), 'Crouch'], [L('reload'), 'Reload'],
+    [L('interact') + ' (hold)', 'Reinforce, barricade, plant, defuse, revive'], [L('ability'), 'Operator skill'],
+    [L('gadget'), 'Secondary gadget'], [L('melee'), 'Melee'], [L('view'), 'Drone / Cameras'], [L('spot') + ' · Middle click', 'Mark enemy'],
+    [`${L('primary')} / ${L('secondary')} · Wheel`, 'Switch weapon'], [L('scoreboard'), 'Scoreboard']];
+  const html = rows.map(([k, d]) => `<span>${k}</span>${d}`).join('');
+  if ($('ctlGrid').innerHTML !== html) $('ctlGrid').innerHTML = html;
 }
 
+
 function renderLobby(s) {
+  renderControls();
   for (const sq of [0, 1]) {
     const ul = document.querySelector(`#sq${sq} ul`);
     const list = s.players.filter(p => p.sq === sq);
@@ -237,7 +296,7 @@ function buildSelect(s) {
         <div>${g.name} ×${o.gadgetCount}</div>
         <div class="ab">${o.ability.name}${o.ability.count ? ' ×' + o.ability.count : ''}</div><div>${o.ability.desc}</div>`;
       d.appendChild(info);
-      d.onclick = () => { audio.play('ui'); send({ t: 'pick', op: k }); };
+      d.onclick = () => { audio.ui(); send({ t: 'pick', op: k }); };
       grid.appendChild(d);
     }
   }
@@ -320,14 +379,14 @@ function frame(nowMs) {
   const camsAlive = s ? s.ents.filter(e => e.ty === 'cam' && e.hp > 0) : [];
   if (inGame && me && me.a) {
     if (ctrl === 'drone') view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: 230, near: 0, kind: 'drone' };
-    else if (ctrl === 'cam') { const c = camsAlive[me.ci % Math.max(1, camsAlive.length)]; if (c) view = { x: c.x, y: c.y, ang: 0, fov: Math.PI * 2, range: 420, near: 0, kind: 'cam', off: c.off, cam: c }; }
-    else view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: 1.75, range: 1100, near: 40, kind: 'body' };
+    else if (ctrl === 'cam') { const c = camsAlive[me.ci % Math.max(1, camsAlive.length)]; if (c) view = { x: c.x, y: c.y, ang: st.aim, fov: 1.9, range: 650, near: 14, kind: 'cam', off: c.off, cam: c }; }
+    else view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: fovFor(me), range: 1100, near: 26, kind: 'body' };
   } else if (inGame && me) {
     const mates = s.players.filter(p => p.a && p.sq === me.sq && p.id !== me.id);
     if (mouse.wl > 0) { st.spect++; mouse.wl = 0; }
     if (mates.length) {
       const m = interp(mates[st.spect % mates.length].id, 'players');
-      if (m) view = { x: m.x, y: m.y, ang: m.ag, fov: 1.75, range: 1100, near: 40, kind: 'spect', name: m.n };
+      if (m) view = { x: m.x, y: m.y, ang: m.ag, fov: fovFor(m), range: 1100, near: 26, kind: 'spect', name: m.n };
     }
   }
 
@@ -335,7 +394,14 @@ function frame(nowMs) {
   if (view && (view.kind === 'body' || view.kind === 'drone')) {
     const mw = screenToWorld(mouse.x, mouse.y);
     st.aim = Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x);
+  } else if (view && view.kind === 'cam') {
+    if (st.lastCam !== view.cam.id) { // switching cameras: start from that camera's current direction
+      st.lastCam = view.cam.id; st.aim = view.cam.ag || 0; view.ang = st.aim; audio.foley('camSwitch');
+      mouse.x = VW / 2 + Math.cos(st.aim) * VH * 0.25; mouse.y = VH / 2 + Math.sin(st.aim) * VH * 0.25;
+    } else if (Math.hypot(mouse.x - VW / 2, mouse.y - VH / 2) > 20 * DPR) st.aim = Math.atan2(mouse.y - VH / 2, mouse.x - VW / 2);
+    view.ang = st.aim;
   }
+  if (!view || view.kind !== 'cam') st.lastCam = null;
   sendInput(dt, me, ctrl, view, s, now);
 
   // --- camera ---
@@ -344,7 +410,8 @@ function frame(nowMs) {
     cx = view.x; cy = view.y;
     if (view.kind === 'body') {
       const mw = screenToWorld(mouse.x, mouse.y);
-      const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = me && me.ad ? 200 : 120;
+      const vh = st.viewH || 400;
+      const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? 0.32 : 0.2);
       cx += l > mx ? lx / l * mx : lx; cy += l > mx ? ly / l * mx : ly;
     }
   } else { // menus: slow drift over the map
@@ -353,9 +420,23 @@ function frame(nowMs) {
   const k = 1 - Math.exp(-dt * 14);
   st.cam.x += (cx - st.cam.x) * k; st.cam.y += (cy - st.cam.y) * k;
   if (view && view.kind !== 'body') { st.cam.x = cx; st.cam.y = cy; }
-  st.zoom = VH / (view && view.kind === 'drone' ? 470 : view && view.kind === 'cam' ? 560 : 600);
-  if (view) audio.setListener(view.x, view.y);
+  // zoom: close in tight rooms, wider outside or when looking down a long sightline
+  let want = 600;
+  if (view && view.kind === 'drone') want = 300;
+  else if (view) {
+    let sum = 0;
+    for (let i = 0; i < 24; i++) sum += castSight(st.map, view.x, view.y, i / 24 * Math.PI * 2, 700, null);
+    const avg = sum / 24, aimD = castSight(st.map, view.x, view.y, view.ang, 900, null);
+    want = Math.max(300, Math.min(620, avg * 1.5 + 150));
+    want = Math.max(want, Math.min(view.kind === 'cam' ? 720 : 680, aimD * (view.kind === 'cam' ? 0.9 : 0.75)));
+  }
+  st.viewH = st.viewH || want;
+  st.viewH += (want - st.viewH) * (1 - Math.exp(-dt * 2.2));
+  st.zoom = VH / st.viewH;
+  if (view && view.kind === 'cam') { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
+  if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
 
+  bodySounds(me, dt);
   draw(s, view, now, dt);
 }
 
@@ -365,26 +446,28 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const ev = st.evq; st.evq = [];
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
   const k = {
-    up: keys.has('w') ? 1 : 0, down: keys.has('s') ? 1 : 0, left: keys.has('a') ? 1 : 0, right: keys.has('d') ? 1 : 0,
-    sprint: keys.has('shift') ? 1 : 0, crouch: st.crouch ? 1 : 0, fire: mouse.l ? 1 : 0, ads: mouse.r ? 1 : 0,
-    interact: keys.has('e') ? 1 : 0, ability: keys.has('z') || keys.has('q') ? 1 : 0,
+    up: keys.has('up') ? 1 : 0, down: keys.has('down') ? 1 : 0, left: keys.has('left') ? 1 : 0, right: keys.has('right') ? 1 : 0,
+    sprint: keys.has('sprint') ? 1 : 0, walk: keys.has('walk') ? 1 : 0, crouch: st.crouch ? 1 : 0, fire: mouse.l ? 1 : 0, ads: mouse.r ? 1 : 0,
+    interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
   };
-  if (typing) for (const key in k) k[key] = 0;
-  if (ctrl === 'cam') {
-    if (mouse.wl) ev.push({ k: 'camNext' }); if (mouse.wr) ev.push({ k: 'camPrev' });
-    k.fire = 0; k.ads = 0;
-  } else if (ctrl === 'drone') {
-    if (mouse.wl && view) { // spot the enemy nearest the cursor
-      const mw = screenToWorld(mouse.x, mouse.y);
-      let best = null, bd = 40;
-      for (const p of s.players) if (p.a && p.tm !== me.tm && p.x !== undefined) {
-        const d = Math.hypot(p.x - mw.x, p.y - mw.y);
-        if (d < bd && canSee(st.map, view, p.x, p.y, smokes(s))) { bd = d; best = p; }
-      }
-      if (best) { ev.push({ k: 'spot', id: best.id }); audio.play('beep'); }
+  if (typing || !$('settings').classList.contains('hidden')) for (const key in k) k[key] = 0;
+  // mark the enemy nearest the cursor that you can actually see
+  const trySpot = () => {
+    if (!view || !me) return;
+    const mw = screenToWorld(mouse.x, mouse.y);
+    let best = null, bd = 45;
+    for (const p of s.players) if (p.a && p.tm !== me.tm && p.x !== undefined) {
+      const d = Math.hypot(p.x - mw.x, p.y - mw.y);
+      if (d < bd && canSee(st.map, view, p.x, p.y, smokes(s))) { bd = d; best = p; }
     }
+    if (best) { ev.push({ k: 'spot', id: best.id }); audio.foley('spot'); }
+  };
+  if (ctrl === 'cam' || ctrl === 'drone') {
+    if (mouse.wl) trySpot();
+    if (ctrl === 'cam') { k.up = k.down = k.left = k.right = 0; }
     k.fire = 0; k.ads = 0;
   }
+  if (st.spotReq) { trySpot(); st.spotReq = false; }
   mouse.wl = 0; mouse.wr = 0;
   if (!me || !s) return;
   const ph = s.ph;
@@ -401,6 +484,81 @@ function sendInput(dt, me, ctrl, view, s, now) {
 }
 
 const smokes = s => s ? s.ents.filter(e => e.ty === 'smoke').map(e => ({ x: e.x, y: e.y, r: e.r })) : [];
+
+// ---------------- what things are made of (for sound) ----------------
+const FLOOR_SURF = { [FL.WOOD]: 'wood', [FL.TILE]: 'tile', [FL.SERVER]: 'metal', [FL.MARBLE]: 'marble', [FL.CARPET]: 'carpet', [FL.CONCRETE]: 'concrete', [FL.GRASS]: 'grass', [FL.ASPHALT]: 'asphalt' };
+function cellAt(x, y) { const m = st.map, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return cx < 0 || cy < 0 || cx >= m.W || cy >= m.H ? -1 : cy * m.W + cx; }
+function surfaceAt(x, y) {
+  const k = cellAt(x, y); if (k < 0) return 'concrete';
+  const b = st.base[k], t = st.map.tiles[k];
+  if ((b === T.SOFT || b === T.HARD) && (t === T.FLOOR || t === T.GROUND || t === T.OPEN)) return 'rubble';
+  return FLOOR_SURF[st.map.floor[k]] || 'concrete';
+}
+function wallMat(x, y, a) {
+  const k = cellAt(x + Math.cos(a || 0) * 3, y + Math.sin(a || 0) * 3); if (k < 0) return 'drywall';
+  const t = st.map.tiles[k];
+  if (t === T.BARRI) return 'wood';
+  return st.map.mat[k] === MAT.BRICK ? 'brick' : 'drywall';
+}
+function hardMat(x, y, a) {
+  const k = cellAt(x + Math.cos(a) * 3, y + Math.sin(a) * 3); if (k < 0) return 'concrete';
+  const t = st.map.tiles[k];
+  return t === T.REINF || t === T.PANEL || t === T.DSHIELD ? 'metal' : t === T.TALL ? (Math.random() < 0.5 ? 'wood' : 'metal') : 'concrete';
+}
+audio.setWorld(
+  (x, y) => { // how many walls between you and the sound (0-3)
+    const L = st.listen; if (!L || !st.map) return 0;
+    const d = Math.hypot(x - L.x, y - L.y); if (d < 1) return 0;
+    let n = 0; const sk = cellAt(L.x, L.y), ek = cellAt(x, y);
+    walkRay(L.x, L.y, (x - L.x) / d, (y - L.y) / d, d, (cx, cy) => {
+      const k = cy * st.map.W + cx;
+      if (k !== sk && k !== ek && blocksSight(tileAt(st.map, cx, cy))) n++;
+      return n >= 3;
+    });
+    return Math.min(3, Math.ceil(n / 1.5));
+  },
+  (x, y) => { const k = cellAt(x, y); return k >= 0 && st.map && st.map.floor[k] !== FL.GRASS && st.map.floor[k] !== FL.ASPHALT; },
+);
+
+// Little sounds from each player's state: footsteps per surface, turning on the spot,
+// aiming, crouching, weapon swaps, reload stages, hammering, planting...
+function playerFoley(p, a, moved, own, dt) {
+  const w = WEAPONS[p.w], shotgun = w && w.cls === 'Shotgun';
+  const pace = p.dn ? 1 : p.wk ? 0 : p.cr ? 1 : p.mv >= 3 ? 3 : 2;
+  const stride = [19, 22, 27, 34][pace];
+  a.stepAcc += moved;
+  if (a.stepAcc > stride) { a.stepAcc = 0; audio.step(p.x, p.y, surfaceAt(p.x, p.y), pace, own); }
+  // turning on the spot: legs shuffle
+  const dAng = Math.abs(angDiff(p.ag, a.lag ?? p.ag)); a.lag = p.ag;
+  if (moved < 0.3 && !p.dn) {
+    a.walk += dAng * 2.4; a.turnAcc = (a.turnAcc || 0) + dAng;
+    if (a.turnAcc > 0.8) { a.turnAcc = 0; audio.shuffle(p.x, p.y, surfaceAt(p.x, p.y), own); }
+  } else a.turnAcc = 0;
+  if (a.pAd !== undefined) {
+    if (p.ad !== a.pAd && !p.dn) audio.foley(p.ad ? 'adsIn' : 'adsOut', p.x, p.y, own);
+    if (p.cr !== a.pCr && !p.dn) audio.foley(p.cr ? 'crouch' : 'stand', p.x, p.y, own);
+    if (p.w !== a.pW && p.w) audio.foley('draw', p.x, p.y, own);
+    if (p.mv && !a.pMv) audio.foley('cloth', p.x, p.y, own);
+    if (p.dn && !a.pDn) audio.foley('hurt', p.x, p.y, own);
+  }
+  if (p.rl > 0) {
+    if (!a.r1 && p.rl > 0.1) { a.r1 = 1; audio.foley(shotgun ? 'shell' : 'magOut', p.x, p.y, own); if (!shotgun) setTimeout(() => audio.foley('magDrop', p.x, p.y, own), 350); }
+    if (!a.r2 && p.rl > (shotgun ? 0.35 : 0.58)) { a.r2 = 1; audio.foley(shotgun ? 'shell' : 'magIn', p.x, p.y, own); }
+    if (!a.r3 && p.rl > (shotgun ? 0.6 : 0.84)) { a.r3 = 1; audio.foley(shotgun ? 'shell' : 'bolt', p.x, p.y, own); }
+  } else a.r1 = a.r2 = a.r3 = 0;
+  if (p.bu) {
+    a.buT = (a.buT || 0) - dt;
+    if (a.buT <= 0) {
+      const k = p.bu.k;
+      if (k === 'reinforce') { audio.foley('hammer', p.x, p.y, own); a.buT = 0.36 + Math.random() * 0.1; }
+      else if (k === 'barricade') { audio.foley('nail', p.x, p.y, own); a.buT = 0.28; }
+      else if (k === 'plant') { audio.foley('beep', p.x, p.y, own); a.buT = 0.7 - p.bu.p * 0.5; }
+      else if (k === 'defuse') { audio.foley('tick', p.x, p.y, own); a.buT = 0.22; }
+      else { audio.foley('cloth', p.x, p.y, own); a.buT = 0.5; }
+    }
+  } else a.buT = 0;
+  a.pAd = p.ad; a.pCr = p.cr; a.pW = p.w; a.pMv = p.mv; a.pDn = p.dn;
+}
 
 // ---------------- drawing ----------------
 function visionPolygon(v, sm) {
@@ -438,7 +596,7 @@ function draw(s, view, now, dt) {
   const wx0 = Math.max(0, st.cam.x - VW / 2 / z - 20), wy0 = Math.max(0, st.cam.y - VH / 2 / z - 20);
   const wx1 = Math.min(m.W * CELL, st.cam.x + VW / 2 / z + 20), wy1 = Math.min(m.H * CELL, st.cam.y + VH / 2 / z + 20);
   if (wx1 > wx0 && wy1 > wy0) {
-    ctx.drawImage(st.rend.c, wx0 * 2, wy0 * 2, (wx1 - wx0) * 2, (wy1 - wy0) * 2, wx0, wy0, wx1 - wx0, wy1 - wy0);
+    ctx.drawImage(st.rend.c, wx0 * S, wy0 * S, (wx1 - wx0) * S, (wy1 - wy0) * S, wx0, wy0, wx1 - wx0, wy1 - wy0);
     ctx.drawImage(st.rend.decal, wx0, wy0, wx1 - wx0, wy1 - wy0, wx0, wy0, wx1 - wx0, wy1 - wy0);
   }
   if (!s) return;
@@ -486,8 +644,7 @@ function draw(s, view, now, dt) {
     const a = anim(p.id);
     const moved = Math.hypot(p.x - a.lx, p.y - a.ly);
     a.walk += moved * 0.32; a.lx = p.x; a.ly = p.y;
-    a.stepAcc += moved;
-    if (a.stepAcc > (p.cr ? 60 : 26)) { a.stepAcc = 0; if (!p.cr) audio.play('step', p.x, p.y); }
+    playerFoley(p, a, moved, isMe, dt);
     a.recoil = Math.max(0, a.recoil - dt * 12); a.melee = Math.max(0, a.melee - dt * 4);
     const vis = ally || isMe || seen(p.x, p.y);
     if (!vis) continue;
@@ -497,6 +654,12 @@ function draw(s, view, now, dt) {
     }, now);
     drawn.push(p);
   }
+  for (const e of ents) if (e.ty === 'drone') { // motor whine for every moving drone you can hear
+    const a = anim(e.id), sp = Math.hypot(e.x - (a.dx ?? e.x), e.y - (a.dy ?? e.y)) / Math.max(dt, 0.001); a.dx = e.x; a.dy = e.y;
+    const own = me && e.id === me.did && me.ct === 'drone';
+    audio.droneLoop(e.id, own ? st.pred.x : e.x, own ? st.pred.y : e.y, Math.min(240, own ? (keys.has('up') || keys.has('down') || keys.has('left') || keys.has('right') ? 200 : 0) : sp));
+  }
+  audio.pruneLoops();
   for (const e of ents) if (e.ty === 'drone' && (e.tm === side || seen(e.x, e.y))) {
     const d = me && e.id === me.did && me.ct === 'drone' ? { ...e, x: st.pred.x, y: st.pred.y, ag: st.aim } : e;
     drawDrone(ctx, d, now, e.tm === side);
@@ -513,7 +676,7 @@ function draw(s, view, now, dt) {
     fctx.setTransform(z / 2, 0, 0, z / 2, ox / 2, oy / 2);
     fctx.globalCompositeOperation = 'destination-out';
     if (!view.off) {
-      if (view.near) { fctx.fillStyle = 'rgba(0,0,0,0.6)'; fillPoly(fctx, nearPolygon(view, sm)); }
+      if (view.near) { fctx.fillStyle = 'rgba(0,0,0,0.42)'; fillPoly(fctx, nearPolygon(view, sm)); }
       fctx.fillStyle = '#000'; fillPoly(fctx, visionPolygon(view, sm));
     }
     fctx.globalCompositeOperation = 'source-over';
@@ -559,7 +722,7 @@ function draw(s, view, now, dt) {
       ctx.strokeStyle = '#f2c14e'; ctx.beginPath(); ctx.arc(st.pred.x, st.pred.y, 18, -Math.PI / 2, -Math.PI / 2 + me.bu.p * Math.PI * 2); ctx.stroke();
     }
     // aim line for grenades so you can judge throws
-    if (me.a && me.ct === 'body' && keys.has('g')) {
+    if (me.a && me.ct === 'body' && keys.has('gadget')) {
       const mw = screenToWorld(mouse.x, mouse.y);
       ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 0.8;
       ctx.beginPath(); ctx.moveTo(st.pred.x, st.pred.y); ctx.lineTo(mw.x, mw.y); ctx.stroke(); ctx.setLineDash([]);
@@ -661,8 +824,8 @@ function screens(s, phase, now) {
   if (phase === PHASE.LOBBY) renderLobby(s);
   else if (phase === PHASE.SELECT) buildSelect(s);
   else if (phase !== PHASE.MATCH_END) hud(s);
-  $('scoreboard').classList.toggle('hidden', !keys.has('tab'));
-  if (keys.has('tab')) $('scoreboard').innerHTML = scoreTable(s);
+  $('scoreboard').classList.toggle('hidden', !keys.has('scoreboard'));
+  if (keys.has('scoreboard')) $('scoreboard').innerHTML = scoreTable(s);
 }
 
 function hud(s) {
@@ -719,14 +882,15 @@ function hud(s) {
   const abCount = ab.id === 'scan' ? `${Math.round(me.bat / ab.battery * 100)}%` : ab.count ? me.ac : '';
   const viewName = side === 'atk' ? `Drone${s.ph === PHASE.ACTION ? ' ×' + me.dr : ''}` : 'Cameras';
   setHTML('gadgets',
-    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>Z</b>${ab.name}<em>${abCount}</em></div>` +
-    `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>G</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +
-    `<div><b>5</b>${viewName}</div>`);
+    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${ab.name}<em>${abCount}</em></div>` +
+    `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>${label('gadget')}</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +
+    `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label
   let vl = '';
-  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); vl = d && d.j ? 'DRONE JAMMED' : 'DRONE · CLICK TO MARK ENEMIES · 5 TO EXIT'; }
-  else if (me.ct === 'cam') { const cams = s.ents.filter(e => e.ty === 'cam' && e.hp > 0); const c = cams[me.ci % Math.max(1, cams.length)]; vl = c ? `CAMERA ${me.ci % cams.length + 1}/${cams.length} · ${roomAt(st.map, c.x, c.y).toUpperCase()} · CLICK TO SWITCH${c.off ? ' · DISRUPTED' : ''}` : ''; }
+  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); vl = d && d.j ? 'DRONE JAMMED' : `DRONE · CLICK TO MARK ENEMIES · ${label('view')} TO EXIT`; }
+  else if (me.ct === 'cam') { const cams = s.ents.filter(e => e.ty === 'cam' && e.hp > 0); const c = cams[me.ci % Math.max(1, cams.length)]; vl = c ? `CAMERA ${me.ci % cams.length + 1}/${cams.length} · ${roomAt(st.map, c.x, c.y).toUpperCase()} · MOUSE LOOK · ${label('left')} ${label('right')} SWITCH · CLICK MARK${c.off ? ' · DISRUPTED' : ''}` : ''; }
   $('viewlabel').textContent = vl;
+  camBar(s, me);
   // interaction
   if (me.bu) {
     $('progress').style.display = 'block';
@@ -744,23 +908,57 @@ function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;
   if (side === 'atk' && me.df && s.ph === PHASE.ACTION && !s.pl) {
     const b = m.sites[s.site].bombs.find(b => Math.hypot(b.x - x, b.y - y) < 30);
-    if (b) return `<b>E</b>HOLD TO PLANT DEFUSER (BOMB ${b.id})`;
+    if (b) return `<b>${label('interact')}</b>HOLD TO PLANT DEFUSER (BOMB ${b.id})`;
   }
-  if (side === 'def' && s.pl && Math.hypot(s.pl.x - x, s.pl.y - y) < 30) return '<b>E</b>HOLD TO DISABLE DEFUSER';
+  if (side === 'def' && s.pl && Math.hypot(s.pl.x - x, s.pl.y - y) < 30) return '<b>' + label('interact') + '</b>HOLD TO DISABLE DEFUSER';
   const down = s.players.find(p => p.a && p.dn && p.tm === side && p.id !== me.id && Math.hypot(p.x - x, p.y - y) < 26);
-  if (down) return `<b>E</b>HOLD TO REVIVE ${esc(down.n.toUpperCase())}`;
+  if (down) return `<b>${label('interact')}</b>HOLD TO REVIVE ${esc(down.n.toUpperCase())}`;
   const f = facingCell(m, x, y, st.aim, 28);
   if (side === 'def' && f) {
-    if (f.t === T.SOFT && s.rf > 0) return `<b>E</b>HOLD TO REINFORCE WALL (${s.rf} LEFT)`;
-    if (f.t === T.OPEN && m.openId[f.k] >= 0) return `<b>E</b>BARRICADE${me.op === 'mason' && me.ac > 0 ? '  ·  <b>Z</b>ARMOR PANEL' : ''}`;
-    if (f.t === T.BARRI && me.op === 'mason' && me.ac > 0) return '<b>Z</b>ARMOR PANEL';
+    if (f.t === T.SOFT && s.rf > 0) return `<b>${label('interact')}</b>HOLD TO REINFORCE WALL (${s.rf} LEFT)`;
+    if (f.t === T.OPEN && m.openId[f.k] >= 0) return `<b>${label('interact')}</b>BARRICADE${me.op === 'mason' && me.ac > 0 ? '  ·  <b>' + label('ability') + '</b>ARMOR PANEL' : ''}`;
+    if (f.t === T.BARRI && me.op === 'mason' && me.ac > 0) return '<b>' + label('ability') + '</b>ARMOR PANEL';
   }
-  if (f && f.t === T.BARRI) return '<b>V</b>MELEE TO BREAK BARRICADE';
-  if (side === 'atk' && f && me.op === 'ember' && me.ac > 0 && [T.SOFT, T.REINF, T.BARRI, T.PANEL].includes(f.t)) return '<b>Z</b>PLACE PLASMA CUTTER';
-  if (side === 'atk' && f && me.op === 'talon' && me.gc > 0 && [T.SOFT, T.BARRI].includes(f.t)) return '<b>G</b>PLACE BREACH CHARGE';
+  if (f && f.t === T.BARRI) return '<b>' + label('melee') + '</b>MELEE TO BREAK BARRICADE';
+  if (side === 'atk' && f && me.op === 'ember' && me.ac > 0 && [T.SOFT, T.REINF, T.BARRI, T.PANEL].includes(f.t)) return '<b>' + label('ability') + '</b>PLACE PLASMA CUTTER';
+  if (side === 'atk' && f && me.op === 'talon' && me.gc > 0 && [T.SOFT, T.BARRI].includes(f.t)) return '<b>' + label('gadget') + '</b>PLACE BREACH CHARGE';
   return '';
 }
 
 $('conn').classList.add('hidden');
 connect();
 requestAnimationFrame(frame);
+
+// Field of view like a modern shooter: ~103° normally, narrower when aiming down sights.
+const FOV_HIP = 103 * Math.PI / 180, FOV_ADS = 70 * Math.PI / 180, FOV_SCOPE = 55 * Math.PI / 180;
+function fovFor(p) {
+  const target = !p || !p.ad ? FOV_HIP : (WEAPONS[p.w] && WEAPONS[p.w].cls === 'DMR' ? FOV_SCOPE : FOV_ADS);
+  const a = anim(p ? p.id : 'none');
+  a.fov = a.fov === undefined ? target : a.fov + (target - a.fov) * 0.2; // smooth zoom in/out
+  return a.fov;
+}
+
+// Your own heartbeat and breathing when badly hurt or downed.
+function bodySounds(me, dt) {
+  if (!me || !me.a || !st.last || st.last.ph !== PHASE.ACTION) return;
+  st.hbT = (st.hbT || 0) - dt; st.brT = (st.brT || 0) - dt;
+  if ((me.dn || me.hp < 35) && st.hbT <= 0) { audio.foley('heartbeat'); st.hbT = me.dn ? 0.85 : 1.15; }
+  if (me.hp < 35 && !me.dn && st.brT <= 0) { audio.foley('breath'); st.brT = 3.2; }
+}
+
+// Clickable list of cameras along the bottom while you're watching them.
+function camBar(s, me) {
+  const bar = $('cambar');
+  if (me.ct !== 'cam') { if (bar.innerHTML) bar.innerHTML = ''; return; }
+  const cams = s.ents.filter(e => e.ty === 'cam');
+  let alive = -1;
+  const html = cams.map(c => {
+    if (c.hp > 0) alive++;
+    const on = c.hp > 0 && alive === me.ci % Math.max(1, cams.filter(x => x.hp > 0).length);
+    return `<button data-n="${c.hp > 0 ? alive : -1}" class="${on ? 'on' : ''} ${c.hp > 0 ? '' : 'dead'}">CAM ${cams.indexOf(c) + 1}<small>${esc(roomAt(st.map, c.x, c.y).toUpperCase() || 'OUTSIDE')}${c.off ? ' · DISRUPTED' : ''}</small></button>`;
+  }).join('');
+  if (bar.innerHTML !== html) {
+    bar.innerHTML = html;
+    for (const b of bar.querySelectorAll('button')) b.onclick = e => { e.stopPropagation(); if (+b.dataset.n >= 0) st.evq.push({ k: 'camSet', n: +b.dataset.n }); };
+  }
+}

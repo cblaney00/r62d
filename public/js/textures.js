@@ -1,7 +1,7 @@
 // Procedural, tileable floor textures (drawn once at load).
 import { FL } from '/shared/constants.js';
 
-export const S = 2; // texture pixels per world pixel
+export const S = 3; // texture pixels per world pixel
 
 // Small deterministic random generator
 export function rng(seed) {

@@ -56,6 +56,7 @@ export function stepMove(map, o, input, dt, mods) {
     if (mods.downed) spd = 28;
     else if (input.sprint && !input.ads && !input.fire && !input.crouch) spd *= 1.45;
     else if (input.crouch) spd *= 0.5;
+    else if (input.walk) spd *= 0.45;
     else if (input.ads) spd *= 0.65;
   }
   moveCircle(map, o, mx * spd * dt, my * spd * dt, mods.drone ? 5 : 10, !!mods.drone);
