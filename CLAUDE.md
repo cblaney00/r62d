@@ -47,7 +47,7 @@ His wishes so far:
     1-cell gaps beside furniture — a body (radius 10) is wider than a cell (16). `physics.js` (movement, collision, line of sight, ray casting),
     `operators.js` (weapons + the 10 operators).
   - `server/game.js` — authoritative match: lobby, rounds/phases, shooting (hitscan,
-    soft walls penetrate & break), gadgets, explosions, defuser, downed state, snapshots.
+    bullets go through soft walls; pistols/SMGs/MPs/ARs/LMGs only leave small see-through holes (`map.holes`, `HOLE_ONLY` in constants.js, sight checks in physics `castSight`), shotguns/DMRs/melee/explosives break them), gadgets, explosions, defuser, downed state, snapshots.
     `server/bots.js` — bots (A* pathing, fighting, plant/defuse, site fortifying).
   - `public/` — `index.html`, `style.css`, `js/main.js` (network, prediction of your own
     movement, camera, vision blackout, HUD, menus), `js/mapdraw.js` (map pre-rendered to a

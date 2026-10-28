@@ -43,6 +43,12 @@ const DRONE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.TALL, T.PANEL, T.DSHIELD
 const SIGHT_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.TALL, T.PANEL, T.VOID]);
 const BULLET_STOP = new Set([T.HARD, T.REINF, T.TALL, T.PANEL, T.DSHIELD, T.VOID]);
 const BULLET_PEN = new Set([T.SOFT, T.BARRI]);
+// Pistols, SMGs, machine pistols, rifles and LMGs only punch small bullet holes in soft walls:
+// the wall never breaks, but each hole is a thin line of sight. Shotguns, DMRs, melee and
+// explosives still break soft walls open.
+export const HOLE_ONLY = new Set(['Pistol', 'SMG', 'MP', 'AR', 'LMG']);
+export const HOLE_R = 1.4;   // a sight line passes a hole if it comes this close to its centre (world px)
+export const HOLE_MAX = 24;  // holes kept per wall cell
 
 export const blocksMove = t => MOVE_BLOCK.has(t);
 export const blocksDrone = t => DRONE_BLOCK.has(t);

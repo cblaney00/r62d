@@ -117,9 +117,10 @@ function connect() {
         for (let k = 0; k < m.tiles.length; k++) if (m.tiles[k] !== st.map.tiles[k] || m.hp[k] !== st.map.hp[k]) {
           st.map.tiles[k] = st.known.tiles[k] = m.tiles[k]; st.map.hp[k] = st.known.hp[k] = m.hp[k]; st.rend.cellChanged(k);
         }
+        for (const k in m.holes || {}) { st.map.holes[k] = m.holes[k]; st.known.holes[k] = m.holes[k].slice(); st.rend.cellChanged(+k); }
       } else {
         st.mapLoading = true;
-        runLoading('LOADING MAP', [['Building the map', () => loadMap(m.mapVersion, m.tiles, m.hp, m.mapId)], ['Getting every floor ready', () => frames(6)]]).then(() => { st.mapLoading = false; });
+        runLoading('LOADING MAP', [['Building the map', () => loadMap(m.mapVersion, m.tiles, m.hp, m.mapId, m.holes)], ['Getting every floor ready', () => frames(6)]]).then(() => { st.mapLoading = false; });
       }
       st.token = m.token; st.profile = m.profile; updateCard();
       if (m.profile.settings) applySettings(m.profile.settings); else saveSettings(); // first time: keep what this browser had
@@ -135,13 +136,15 @@ function connect() {
 }
 const send = o => { if (st.ws && st.ws.readyState === 1) st.ws.send(JSON.stringify(o)); };
 
-function loadMap(mv, tiles, hp, id) {
+function loadMap(mv, tiles, hp, id, holes) {
   const t0 = performance.now();
   st.map = buildMap(id || st.mapId); st.mapId = st.map.id; st.base = st.map.tiles.slice(); st.mv = mv;
   if (tiles) { st.map.tiles.set(tiles); st.map.hp.set(hp); }
+  if (holes) Object.assign(st.map.holes, holes);
   // What your team remembers of the map. It only catches up with the real map when
   // someone on your team actually sees the changed spot.
-  st.known = { ...st.map, tiles: st.map.tiles.slice(), hp: st.map.hp.slice() };
+  st.known = { ...st.map, tiles: st.map.tiles.slice(), hp: st.map.hp.slice(), holes: {} };
+  for (const k in st.map.holes) st.known.holes[k] = st.map.holes[k].slice();
   st.unseen = new Set();
   // broken glass lies in and just around every window; splinters appear where barricades get smashed
   st.glass = new Set(); st.splinters = new Set();
@@ -159,8 +162,9 @@ function resetMap(mv) {
   const dirty = new Set(R.decalCells || []); R.decalCells = new Set();
   for (const k of st.splinters) dirty.add(k);
   for (let k = 0; k < fresh.tiles.length; k++) if (K.tiles[k] !== fresh.tiles[k] || K.hp[k] !== fresh.hp[k]) dirty.add(k);
+  for (const k in K.holes) dirty.add(+k);
   st.map = fresh; st.base = fresh.tiles.slice(); st.mv = mv;
-  st.known = { ...fresh, tiles: fresh.tiles.slice(), hp: fresh.hp.slice() };
+  st.known = { ...fresh, tiles: fresh.tiles.slice(), hp: fresh.hp.slice(), holes: {} };
   st.unseen = new Set(); st.splinters = new Set();
   R.map = st.known; R.base = st.base; R.splinters = st.splinters;
   for (const k of dirty) R.cellChanged(k);
@@ -207,6 +211,11 @@ function onSnap(s) {
   for (let i = 0; i < s.cells.length; i += 3) {
     const k = s.cells[i];
     m.tiles[k] = s.cells[i + 1]; m.hp[k] = s.cells[i + 2];
+    st.unseen.add(k);
+  }
+  for (let i = 0; i < (s.holes || []).length; i += 3) { // new bullet holes in soft walls
+    const k = s.holes[i];
+    (m.holes[k] || (m.holes[k] = [])).push(s.holes[i + 1], s.holes[i + 2]);
     st.unseen.add(k);
   }
   if (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION && s.ph !== PHASE.ROUND_END) revealAll();
@@ -1399,9 +1408,10 @@ function cellSeen(k) {
   return false;
 }
 function applyKnown(k) {
-  const m = st.map, K = st.known, prev = K.tiles[k];
-  if (prev === m.tiles[k] && K.hp[k] === m.hp[k]) return;
+  const m = st.map, K = st.known, prev = K.tiles[k], nh = m.holes[k] ? m.holes[k].length : 0;
+  if (prev === m.tiles[k] && K.hp[k] === m.hp[k] && nh === (K.holes[k] ? K.holes[k].length : 0)) return;
   K.tiles[k] = m.tiles[k]; K.hp[k] = m.hp[k];
+  if (nh && m.tiles[k] === T.SOFT) K.holes[k] = m.holes[k].slice(); else delete K.holes[k];
   st.rend.cellChanged(k);
   const wall = t => t === T.SOFT || t === T.BARRI || t === T.REINF || t === T.PANEL || t === T.DSHIELD;
   if (prev === T.BARRI && !wall(m.tiles[k])) for (const d of [0, 1, -1, m.W, -m.W]) st.splinters.add(k + d);

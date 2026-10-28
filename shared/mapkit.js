@@ -96,7 +96,7 @@ export function makeMap({ id, name, floors }) {
       }
     }
     return {
-      id, name, W, H, tiles, floor, mat, hp, openId, props, openings, rooms, portal, flAt, stairs, decor,
+      id, name, W, H, tiles, floor, mat, hp, holes: {}, openId, props, openings, rooms, portal, flAt, stairs, decor,
       floors: fl.map(f => ({ name: f.name, i: f.i, gx: f.gx, w: f.w, h: f.h, x0: f.x0, y0: f.y0 })),
       ...extra,
     };

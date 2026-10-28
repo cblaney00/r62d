@@ -1,5 +1,5 @@
 // Movement, collision, line of sight and ray casting on the tile grid.
-import { CELL, T, blocksMove, blocksDrone, blocksSight } from './constants.js';
+import { CELL, T, HOLE_R, blocksMove, blocksDrone, blocksSight } from './constants.js';
 
 export function tileAt(map, cx, cy) {
   if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return T.VOID;
@@ -116,13 +116,27 @@ export function walkRay(x0, y0, dx, dy, maxT, cb) {
 export function castSight(map, x0, y0, ang, maxD, smokes) {
   const dx = Math.cos(ang), dy = Math.sin(ang);
   const startCx = Math.floor(x0 / CELL), startCy = Math.floor(y0 / CELL);
-  let d = walkRay(x0, y0, dx, dy, maxD, (cx, cy) =>
-    !(cx === startCx && cy === startCy) && blocksSight(tileAt(map, cx, cy)));
+  let d = walkRay(x0, y0, dx, dy, maxD, (cx, cy) => {
+    if (cx === startCx && cy === startCy) return false;
+    const t = tileAt(map, cx, cy);
+    return blocksSight(t) && !(t === T.SOFT && throughHole(map, cy * map.W + cx, x0, y0, dx, dy));
+  });
   if (smokes) for (const s of smokes) {
     const t = raySmoke(x0, y0, dx, dy, s);
     if (t !== null && t < d) d = t;
   }
   return Math.min(d, maxD);
+}
+
+// Does a sight line pass through one of the bullet holes in this soft wall cell?
+function throughHole(map, k, x0, y0, dx, dy) {
+  const h = map.holes && map.holes[k];
+  if (!h) return false;
+  for (let i = 0; i < h.length; i += 2) {
+    const fx = h[i] - x0, fy = h[i + 1] - y0;
+    if (fx * dx + fy * dy > 0 && Math.abs(fx * dy - fy * dx) < HOLE_R) return true;
+  }
+  return false;
 }
 
 // A smoke cloud is see-through near its edge only; the core stops sight.

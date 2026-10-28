@@ -1,5 +1,5 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
-import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
+import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
 import { buildMap, roomAt, MAPS, MAP_LIST } from '../shared/map.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED } from '../shared/physics.js';
@@ -28,6 +28,7 @@ export class Game {
     this.ents = [];
     this.events = [];
     this.changed = new Set();
+    this.newHoles = []; // bullet holes made since the last snapshot: cell, x, y
     this.phase = PHASE.LOBBY;
     this.timer = 0; this.round = 0; this.score = [0, 0]; this.time = 0;
     this.mapId = 'harbor';
@@ -54,7 +55,7 @@ export class Game {
         p.token = login.token; p.pid = login.profile.id;
         p.ms = this.blankMatchStats();
         sock.send(JSON.stringify({ t: 'welcome', id: p.id, mapVersion: this.mapVersion, mapId: this.mapId, token: p.token, profile: publicProfile(login.profile),
-          tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp) }));
+          tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp), holes: this.map.holes }));
         this.msg(`${p.name} joined`);
       } else if (p) this.handle(p, m);
     });
@@ -115,7 +116,7 @@ export class Game {
       else if (m.a === 'fillBots') { for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); }
       else if (m.a === 'switch') this.switchSquad(p);
       else if (m.a === 'map' && this.phase === PHASE.LOBBY && MAPS[m.id] && m.id !== this.mapId) {
-        this.mapId = m.id; this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear();
+        this.mapId = m.id; this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
         this.msg(`${p.name} chose the map ${MAPS[m.id].name}`);
       }
       else if (m.a === 'start' && this.phase === PHASE.LOBBY) this.startMatch();
@@ -176,7 +177,7 @@ export class Game {
 
   nextRound() {
     this.round++;
-    this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear();
+    this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
     this.ents = []; this.planted = null; this.winner = null; this.reason = ''; this.noises = [];
     this.site = Math.floor(Math.random() * this.map.sites.length);
     this.siteRevealed = false;
@@ -568,7 +569,8 @@ export class Game {
       const k = cy * this.map.W + cx, tile = tileAt(this.map, cx, cy);
       if (stopsBullet(tile)) { stopT = t; kind = tile === T.TALL ? 'prop' : 'hard'; best = null; return true; }
       if (penBullet(tile)) {
-        this.damageCell(k, dmg * 0.6);
+        if (tile === T.SOFT && HOLE_ONLY.has(cls)) this.holeCell(k, cx, cy, x0, y0, dx, dy, t);
+        else this.damageCell(k, dmg * 0.6);
         mult *= 0.6; pens++;
         if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) });
         if (pens > 3) { stopT = t; kind = 'wall'; best = null; return true; }
@@ -598,6 +600,17 @@ export class Game {
     return { x: ex, y: ey, k: kind };
   }
 
+  // A small bullet hole through a soft wall, on the bullet's path through the middle of the cell.
+  holeCell(k, cx, cy, x0, y0, dx, dy, tIn) {
+    const h = this.map.holes[k] || (this.map.holes[k] = []);
+    if (h.length >= HOLE_MAX * 2) return;
+    const tx = dx > 0 ? ((cx + 1) * CELL - x0) / dx : dx < 0 ? (cx * CELL - x0) / dx : Infinity;
+    const ty = dy > 0 ? ((cy + 1) * CELL - y0) / dy : dy < 0 ? (cy * CELL - y0) / dy : Infinity;
+    const tm = (tIn + Math.min(tx, ty)) / 2, hx = r1(x0 + dx * tm), hy = r1(y0 + dy * tm);
+    for (let i = 0; i < h.length; i += 2) if (Math.abs(h[i] - hx) < 0.6 && Math.abs(h[i + 1] - hy) < 0.6) return;
+    h.push(hx, hy); this.newHoles.push(k, hx, hy);
+  }
+
   damageCell(k, amount) {
     const t = this.map.tiles[k];
     if (t !== T.SOFT && t !== T.BARRI && t !== T.PANEL && t !== T.DSHIELD) return;
@@ -610,7 +623,7 @@ export class Game {
     if (t === T.BARRI || t === T.PANEL) m.tiles[k] = T.OPEN;
     else if (m.openId[k] >= 0) m.tiles[k] = T.OPEN;
     else m.tiles[k] = (m.floor[k] === FL.GRASS || m.floor[k] === FL.ASPHALT) ? T.GROUND : T.FLOOR;
-    m.hp[k] = 0; this.changed.add(k);
+    m.hp[k] = 0; delete m.holes[k]; this.changed.add(k);
   }
 
   damage(q, amount, src, wname, ang) {
@@ -718,7 +731,7 @@ export class Game {
       if (tileAt(m, cx, cy) !== T.SOFT) break;
       cells.push(cy * W + cx);
     }
-    for (const c of cells) { m.tiles[c] = T.REINF; m.hp[c] = 0; this.changed.add(c); }
+    for (const c of cells) { m.tiles[c] = T.REINF; m.hp[c] = 0; delete m.holes[c]; this.changed.add(c); }
     this.events.push({ e: 'snd', s: 'reinforce', x: r1((x + 0.5) * CELL), y: r1((y + 0.5) * CELL) });
   }
 
@@ -1361,7 +1374,7 @@ export class Game {
   broadcast() {
     const cells = [];
     for (const k of this.changed) cells.push(k, this.map.tiles[k], Math.max(0, Math.round(this.map.hp[k])));
-    this.changed.clear();
+    this.changed.clear(); const holes = this.newHoles; this.newHoles = [];
     const mine = new Map(); // details only the player themself needs (ammo, gadget counts, recoil...) go to them alone
     const players = [...this.players.values()].map(p => {
       const g = p.guns[p.slot];
@@ -1407,7 +1420,7 @@ export class Game {
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId,
       site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       rf: this.reinforce, win: this.winner, why: this.reason, spawn: this.spawnName,
-      players, ents, cells, ev: this.events, spots, time: r2(this.time),
+      players, ents, cells, holes, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];
     for (const p of this.players.values()) if (p.sock && p.sock.open) p.sock.send('{"t":"snap","you":"' + p.id + '",' + (mine.has(p.id) ? '"mine":' + mine.get(p.id) + ',' : '') + common.slice(1));

@@ -298,6 +298,14 @@ export class MapRenderer {
       ctx.fillStyle = '#59626b'; ctx.fillRect(X, Y, CELL, 2); ctx.fillRect(X, Y + CELL - 2, CELL, 2);
       ctx.fillStyle = '#7fb6d6'; ctx.fillRect(X + 4, Y + 6.5, 8, 2.5);
     }
+    // bullet holes from rifles, SMGs and pistols: tiny dark pits with a pin of light through them
+    const holes = t === T.SOFT && m.holes && m.holes[k];
+    if (holes) for (let i = 0; i < holes.length; i += 2) {
+      const hx = holes[i], hy = holes[i + 1];
+      ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.arc(hx, hy, 1.9, 0, 7); ctx.fill();
+      ctx.fillStyle = '#15120f'; ctx.beginPath(); ctx.arc(hx, hy, 1.25, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,236,190,0.55)'; ctx.beginPath(); ctx.arc(hx, hy, 0.45, 0, 7); ctx.fill();
+    }
     // damage: bullet holes and cracks
     if ((t === T.SOFT || t === T.DSHIELD) && m.hp[k] < CELL_HP[t]) {
       const lost = 1 - m.hp[k] / CELL_HP[t], n = 1 + Math.floor(lost * 8);
