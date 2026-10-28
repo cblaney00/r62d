@@ -56,7 +56,9 @@ His wishes so far:
     `js/textures.js` (`S` = map picture detail, set by graphics quality), `js/sprites.js` (operators/gadgets drawn in code), `js/fx.js`
     (particles/explosions/smoke), `js/audio.js` (all sounds synthesised, no files; distances use the shared
     building frame so a sound on another floor is heard muffled from the right spot), `js/armory.js`
-    (private shooting range in the menus), `js/crosshair.js` (crosshair settings + drawing).
+    (private shooting range in the menus), `js/crosshair.js` (crosshair settings + drawing), `js/gunart.js` (side-view gun
+    pictures with attachments). Attachments: `ATTACH`/`gunMods` in shared/operators.js, stored in the loadout as `att[weapon]`,
+    applied in server `fire()` and the Armory; the current gun's attachments go to clients as `aa` ("barrel,grip,sight").
 - **Rendering & speed:** layers bottom to top: `#mapLayer` (map tiles, CSS transform), `#game` (people,
   gadgets, effects), `#fog` (line-of-sight blackout drawn small, stretched by the browser), `#over` (markers,
   crosshair, screen effects), `#vignette` (CSS). Graphics quality presets (`GFX` in main.js: Low/Medium/High/Ultra,

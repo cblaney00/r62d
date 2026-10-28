@@ -7,7 +7,7 @@ import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R } from '../shared/operators.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, cleanAtt, gunMods, attachFor, attCode } from '../shared/operators.js';
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -264,7 +264,10 @@ export class Game {
     p.alive = true; p.downed = false; p.maxHp = ARMOR_HP[o.armor]; p.hp = p.maxHp;
     const L = p.bot ? this.botLoadout(p.op) : store.loadout(p.token, p.op);
     p.loadout = L; p.gadget = L.gadget;
-    p.guns = [L.primary, L.secondary].filter(Boolean).map(w => ({ w, ammo: WEAPONS[w].mag, reserve: WEAPONS[w].reserve }));
+    p.guns = [L.primary, L.secondary].filter(Boolean).map(w => {
+      const att = cleanAtt(w, L.att && L.att[w]);
+      return { w, ammo: WEAPONS[w].mag, reserve: WEAPONS[w].reserve, att, m: gunMods(w, att) };
+    });
     p.slot = 0; p.fireCd = 0; p.reloadT = 0; p.bloom = 0; p.vx = 0; p.vy = 0; p.gait = 0;
     p.adsT = 0; p.rc = 0; p.shots = 0; p.rcDir = Math.random() < 0.5 ? 1 : -1; p.viewTime = null;
     p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
@@ -378,7 +381,7 @@ export class Game {
     const inp = p.input, prev = p.prevInput;
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
     p.bloom = Math.max(0, p.bloom - dt * 0.15);
-    { const g = p.guns[p.slot], cls = g ? WEAPONS[g.w].cls : 'AR', rate = (1 / (ADS_TIME[cls] || 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1);
+    { const g = p.guns[p.slot], cls = g ? WEAPONS[g.w].cls : 'AR', rate = (1 / (ADS_TIME[cls] || 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
       const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0;
       p.adsT = Math.max(0, Math.min(1, (p.adsT || 0) + (canAds ? dt * rate : -dt * rate * 1.6)));
       if (this.time - p.lastShot > 0.14) { p.rc = (p.rc || 0) * Math.exp(-dt * 7); p.shots = 0; } }
@@ -489,19 +492,22 @@ export class Game {
     if (p.ms) p.ms.shots += w.pellets;
     // hip fire is a loose cone that widens while moving; aimed fire is accurate even on the move (R6 rules)
     const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / 140), at = p.adsT || 0;
-    const hip = w.spread * (p.input.crouch && run < 0.15 ? 0.9 : 1) + run * 0.05;
-    const spread = (hip + (w.ads - hip) * at + p.bloom * (1 - 0.7 * at)) * (this.time < (p.dazeUntil || 0) ? 2.2 : 1); // dazed: shaky aim
+    const m = gun.m || gunMods(gun.w);
+    const hip = (w.spread * (p.input.crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip, ads = w.ads * m.adsSpread;
+    const spread = (hip + (ads - hip) * at + p.bloom * (1 - 0.7 * at)) * (this.time < (p.dazeUntil || 0) ? 2.2 : 1); // dazed: shaky aim
     p.bloom = Math.min(0.08, p.bloom + w.bloom);
     // recoil: drifts one way for a burst, then the other, with sway; pull against it
     const rc = RECOIL[w.cls] || RECOIL.AR;
     p.shots = (p.shots || 0) + 1;
     const dir = (Math.floor((p.shots - 1) / 6) % 2 ? -1 : 1) * (p.rcDir || 1);
-    p.rc = Math.max(-rc.max, Math.min(rc.max, (p.rc || 0) + dir * rc.kick + (Math.random() - 0.5) * rc.sway));
+    const kick = rc.kick * m.kick * (p.shots <= 3 ? m.first : 1);
+    p.rc = Math.max(-rc.max, Math.min(rc.max, (p.rc || 0) + dir * kick + (Math.random() - 0.5) * rc.sway * m.sway));
+    this.rangeMul = m.range;
     const mx = p.x + Math.cos(p.aim) * (w.len + 6), my = p.y + Math.sin(p.aim) * (w.len + 6);
     for (let i = 0; i < w.pellets; i++) {
       const a = p.aim + p.rc + gauss() * Math.max(0.002, spread);
-      const end = this.hitscan(p, p.x, p.y, a, w.range, w.dmg, w.name, w.cls);
-      if (i < 3) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k });
+      const end = this.hitscan(p, p.x, p.y, a, w.range, w.dmg * m.dmg, w.name, w.cls);
+      if (i < 3) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });
   }
@@ -567,7 +573,8 @@ export class Game {
       if (src.ms) src.ms.hits++;
       // headshot: the bullet passes through the very centre of the body — instant kill, no getting downed
       const at = best.at || q, cx = at.x - x0, cy = at.y - y0, miss = Math.abs(cx * dy - cy * dx);
-      const fo = FALLOFF[cls] || FALLOFF.AR, fall = stopT <= fo.from ? 1 : stopT >= fo.to ? fo.min : 1 - (1 - fo.min) * (stopT - fo.from) / (fo.to - fo.from);
+      const F = FALLOFF[cls] || FALLOFF.AR, rm = this.rangeMul || 1, fo = { from: F.from * rm, to: F.to * rm, min: F.min };
+      const fall = stopT <= fo.from ? 1 : stopT >= fo.to ? fo.min : 1 - (1 - fo.min) * (stopT - fo.from) / (fo.to - fo.from);
       if (miss < HEAD_R && !q.downed) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
       else this.damage(q, dmg * mult * fall, src, wname, ang);
     } else if (best && best.e) this.hitEnt(best.e, src);
@@ -1304,7 +1311,9 @@ export class Game {
   opStat(p) { if (!p.ms) p.ms = this.blankMatchStats(); return p.ms.ops[p.op] || (p.ms.ops[p.op] = { rounds: 0, roundsWon: 0, kills: 0, deaths: 0 }); }
   botLoadout(op) {
     const L = LOADOUTS[op], pick = a => a.length ? a[Math.floor(Math.random() * a.length)] : null;
-    return cleanLoadout(op, { primary: pick(L.primaries), secondary: pick(L.secondaries), gadget: pick(L.gadgets) });
+    const l = { primary: pick(L.primaries), secondary: pick(L.secondaries), gadget: pick(L.gadgets), att: {} };
+    for (const w of [l.primary, l.secondary]) if (w) { const o = attachFor(w); l.att[w] = { barrel: pick(o.barrel), grip: pick(o.grip), sight: pick(o.sight) }; }
+    return cleanLoadout(op, l);
   }
   statLine(p, left = false) {
     const ms = p.ms || this.blankMatchStats();
@@ -1338,7 +1347,7 @@ export class Game {
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), gt: r2(p.gait || 0), rc: Math.round((p.rc || 0) * 1000) / 1000, at: r2(p.adsT || 0), mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sc: p.scanning ? 1 : 0,
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
-        m: this.mods(p), fs: r2(this.time - p.lastShot),
+        m: this.mods(p), fs: r2(this.time - p.lastShot), aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0, gi: p.gasId ? 1 : 0,
       });

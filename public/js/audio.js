@@ -363,12 +363,16 @@ function gunBuf(cls) {
   if (!gunBufs[cls]) gunBufs[cls] = [1, 2, 3, 4].map(sd => buildGun(cls, sd + cls.length * 7));
   const list = gunBufs[cls]; return list[Math.floor(Math.random() * list.length)];
 }
-export function gunshot(cls, x, y, own) {
+export function gunshot(cls, x, y, own, quiet = false) {
   C = 'guns';
   const P = GUN[cls] || GUN.AR;
-  const g = out(own ? undefined : x, own ? undefined : y, P.v * (own ? 1.2 : 1), 1100, own ? 0.3 : 0.4); if (!g) return;
-  const src = ac.createBufferSource(); src.buffer = gunBuf(cls); src.playbackRate.value = 0.96 + Math.random() * 0.08;
-  src.connect(g); src.start();
+  // suppressed: a muffled thump that carries much less far (the action still clacks)
+  const g = out(own ? undefined : x, own ? undefined : y, P.v * (own ? 1.2 : 1) * (quiet ? 0.32 : 1), quiet ? 420 : 1100, own ? 0.3 : quiet ? 0.2 : 0.4); if (!g) return;
+  const src = ac.createBufferSource(); src.buffer = gunBuf(cls); src.playbackRate.value = (quiet ? 0.8 : 0.96) + Math.random() * 0.08;
+  if (quiet) { const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500; src.connect(lp); lp.connect(g); click(g, ac.currentTime + 0.012, 2600, 0.5); }
+  else src.connect(g);
+  src.start();
+  if (quiet) return;
   if (x !== undefined && !own) { // far away: the crack fades and the boom rolls on
     const d = distTo(x, y).d;
     if (d > 500) { const t = ac.currentTime; tone(g, t + d / 3400, 0.5, P.boom * 0.8, P.boom * 0.5, 'sine', 0.25, 0.02); }

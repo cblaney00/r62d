@@ -165,13 +165,73 @@ export function defaultLoadout(op) {
 // Keep only choices that operator actually has.
 export function cleanLoadout(op, l) {
   const L = LOADOUTS[op], d = defaultLoadout(op);
-  if (!L || !l || typeof l !== 'object') return d;
+  if (!L || !l || typeof l !== 'object') return { ...d, att: {} };
+  const att = {};
+  for (const w of [...L.primaries, ...L.secondaries]) if (l.att && l.att[w]) att[w] = cleanAtt(w, l.att[w]);
   return {
     primary: L.primaries.includes(l.primary) ? l.primary : d.primary,
     secondary: L.secondaries.includes(l.secondary) ? l.secondary : d.secondary,
     gadget: L.gadgets.includes(l.gadget) ? l.gadget : d.gadget,
+    att,
   };
 }
+
+// ---- weapons in plain words, and attachments ----
+export const CLASS_NAME = { AR: 'Assault rifle', SMG: 'Submachine gun', MP: 'Machine pistol', LMG: 'Light machine gun', DMR: 'Marksman rifle', Shotgun: 'Shotgun', Pistol: 'Pistol' };
+export const CLASS_TIP = {
+  AR: 'All-rounder: good at most ranges.', SMG: 'Fast-firing, best up close.', MP: 'Tiny and very fast, best up close.',
+  LMG: 'Huge magazine, slow to aim.', DMR: 'Hard-hitting single shots at range.', Shotgun: 'Devastating up close, weak far away.', Pistol: 'Backup gun.',
+};
+// Each attachment nudges the gun a little. Multipliers: dmg, range (full-damage distance), ads (time to aim),
+// hip (hip-fire spread), adsSpread (aimed spread), kick (upward recoil), sway (sideways recoil), first (first shots' kick).
+export const ATTACH = {
+  barrel: {
+    none: { name: 'Standard barrel', short: 'Standard', desc: 'No changes.' },
+    suppressor: { name: 'Suppressor', short: 'Suppressor', desc: 'Much quieter shots and no muzzle flash. 10% less damage.', dmg: 0.9, quiet: 1 },
+    compensator: { name: 'Compensator', short: 'Compensator', desc: 'Less sideways recoil when spraying.', sway: 0.55 },
+    brake: { name: 'Muzzle Brake', short: 'Muzzle brake', desc: 'Your first few shots kick much less.', first: 0.55 },
+    extended: { name: 'Extended Barrel', short: 'Extended', desc: 'Full damage from further away. Slightly slower to aim.', range: 1.3, ads: 1.08 },
+  },
+  grip: {
+    none: { name: 'No grip', short: 'None', desc: 'No changes.' },
+    vertical: { name: 'Vertical Grip', short: 'Vertical grip', desc: 'Less upward kick when spraying.', kick: 0.78 },
+    angled: { name: 'Angled Grip', short: 'Angled grip', desc: 'Aim down sights 20% faster.', ads: 0.8 },
+    laser: { name: 'Laser', short: 'Laser', desc: 'Tighter hip-fire, but enemies can see your beam.', hip: 0.72, laser: 1 },
+  },
+  sight: {
+    iron: { name: 'Iron Sights', short: 'Iron sights', desc: 'No changes.' },
+    reddot: { name: 'Red Dot', short: 'Red dot', desc: 'Slightly tighter aimed shots.', adsSpread: 0.88 },
+    holo: { name: 'Holo Sight', short: 'Holo', desc: 'A little faster to aim.', ads: 0.9 },
+    scope: { name: '2.0× Scope', short: '2× scope', desc: 'Very accurate aimed shots and you see further ahead, but slower to aim.', adsSpread: 0.7, ads: 1.2, zoom: 1 },
+  },
+};
+export const ATTACH_SLOTS = [['barrel', 'Barrel'], ['grip', 'Grip'], ['sight', 'Sight']];
+export function attachFor(w) {
+  const cls = WEAPONS[w] ? WEAPONS[w].cls : 'AR';
+  return {
+    barrel: cls === 'Shotgun' ? ['none', 'suppressor', 'extended'] : ['none', 'suppressor', 'compensator', 'brake', 'extended'],
+    grip: cls === 'Pistol' ? ['none', 'laser'] : ['none', 'vertical', 'angled', 'laser'],
+    sight: cls === 'Pistol' ? ['iron', 'reddot'] : ['iron', 'reddot', 'holo', 'scope'],
+  };
+}
+export function cleanAtt(w, a) {
+  const ok = attachFor(w), out = { barrel: 'none', grip: 'none', sight: 'iron' };
+  if (a && typeof a === 'object') for (const s of Object.keys(out)) if (ok[s].includes(a[s])) out[s] = a[s];
+  return out;
+}
+// All the attachments' effects on a gun, combined.
+export function gunMods(w, a) {
+  const m = { dmg: 1, range: 1, ads: 1, hip: 1, adsSpread: 1, kick: 1, sway: 1, first: 1, quiet: 0, laser: 0, zoom: 0 };
+  const c = cleanAtt(w, a);
+  for (const [slot] of ATTACH_SLOTS) {
+    const e = ATTACH[slot][c[slot]];
+    for (const k of Object.keys(m)) if (e[k] !== undefined) m[k] = k === 'quiet' || k === 'laser' || k === 'zoom' ? 1 : m[k] * e[k];
+  }
+  return m;
+}
+// three short letters for the snapshot: barrel / grip / sight
+export const attCode = a => [a.barrel, a.grip, a.sight].join(',');
+export const attFromCode = s => { const [barrel, grip, sight] = String(s || '').split(','); return { barrel, grip, sight }; };
 
 export const BIOS = {
   ember:   { real: 'Ines Duarte', from: 'Porto', text: 'A former shipyard welder who learned to cut through anything with a plasma torch. Calm under pressure, she treats every reinforced wall as a puzzle with one answer.' },

@@ -3,7 +3,8 @@
 import { CELL, PHASE, T, MAT } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, opsForTeam } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode } from '/shared/operators.js';
+import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading } from './sprites.js';
@@ -159,8 +160,8 @@ function onEvent(e, s, players) {
       const w = WEAPONS[e.w]; const a = Math.atan2(e.y2 - e.y, e.x2 - e.x);
       fx.tracer(e.x, e.y, e.x2, e.y2);
       const an = anim(e.id);
-      if (an.lastShotSnd !== s.time) { fx.muzzle(e.x, e.y, a); audio.gunshot(w ? w.cls : 'AR', e.x, e.y, e.id === st.id); audio.casing(e.x, e.y, surfaceAt(e.x, e.y), w && w.cls === 'Shotgun'); an.lastShotSnd = s.time; }
-      an.recoil = 1.6; an.flashT = now;
+      if (an.lastShotSnd !== s.time) { if (!e.q) fx.muzzle(e.x, e.y, a); audio.gunshot(w ? w.cls : 'AR', e.x, e.y, e.id === st.id, !!e.q); audio.casing(e.x, e.y, surfaceAt(e.x, e.y), w && w.cls === 'Shotgun'); an.lastShotSnd = s.time; }
+      an.recoil = 1.6; if (!e.q) an.flashT = now; // a suppressor hides the flash
       if (e.k === 'hard') { fx.impact(e.x2, e.y2, 'hard', a); audio.impact(hardMat(e.x2, e.y2, a), e.x2, e.y2); }
       else if (e.k === 'prop') { fx.impact(e.x2, e.y2, 'prop', a); audio.impact(Math.random() < 0.5 ? 'wood' : 'metal', e.x2, e.y2); }
       // a bullet passing close to you cracks past your ear
@@ -407,6 +408,7 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 function showOpInfo(html) {
   const el = $('opInfo'); if (el.dataset.h === html) return;
   el.dataset.h = html; el.innerHTML = html;
+  for (const g of el.querySelectorAll('.gp')) g.appendChild(gunPicture(g.dataset.w, attFromCode(g.dataset.a), 210, 74));
   const b = el.querySelector('.lo'); if (b) b.onclick = () => showOps(b.dataset.op);
 }
 function buildSelect(s) {
@@ -429,9 +431,9 @@ function buildSelect(s) {
       info.innerHTML = `<div class="nm">${o.name}</div><div class="role">${o.role}</div><div class="ab">${o.ability.name}</div>`;
       d.appendChild(info);
       // the full details show in the strip under the cards, for whichever card the mouse is on (or yours)
-      d.dataset.full = `<div class="nm">${o.name}<span>${o.role}</span></div>
+      d.dataset.full = `<span class="gp" data-w="${lo.primary}" data-a="${[lo.att[lo.primary] || {}].map(a => [a.barrel, a.grip, a.sight].join(','))[0]}"></span><div class="nm">${o.name}<span>${o.role}</span></div>
         <div><span class="pips"><span>ARMOR ${pips(armor)}</span><span>SPEED ${pips(speed)}</span></span> ·
-        ${WEAPONS[lo.primary].name} <span style="color:var(--dim)">${WEAPONS[lo.primary].cls}</span>${lo.secondary ? ' · ' + WEAPONS[lo.secondary].name : ''} · ${g.name} ×${GADGET_COUNT[lo.gadget]}
+        ${WEAPONS[lo.primary].name} <span style="color:var(--dim)">${CLASS_NAME[WEAPONS[lo.primary].cls]}</span>${lo.secondary ? ' · ' + WEAPONS[lo.secondary].name : ''} · ${g.name} ×${GADGET_COUNT[lo.gadget]}
         <button class="lo" data-op="${k}" title="Change loadout">LOADOUT</button></div>
         <div><span class="ab">${o.ability.name}${o.ability.count ? ' ×' + o.ability.count : ''}</span> — ${o.ability.desc}</div>`;
       d.onmouseenter = () => showOpInfo(d.dataset.full);
@@ -598,7 +600,7 @@ function frame(nowMs) {
     if (view.kind === 'body') {
       const mw = screenToWorld(mouse.x, mouse.y);
       const vh = st.viewH || 400;
-      const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? 0.32 : 0.2);
+      const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? (String(me.aa).includes('scope') ? 0.46 : 0.32) : 0.2); // a scope looks further ahead
       cx += l > mx ? lx / l * mx : lx; cy += l > mx ? ly / l * mx : ly;
     }
   } else { // menus: slow drift over the map
@@ -872,6 +874,12 @@ function draw(s, view, now, dt) {
       recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, scan: p.sc, melee: a.melee,
     }, now);
     drawn.push(p);
+    if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see
+      const L = Math.min(260, castSight(st.map, p.x, p.y, p.ag, 260, sm));
+      ctx.strokeStyle = 'rgba(255,40,40,0.35)'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(p.x + Math.cos(p.ag) * 14, p.y + Math.sin(p.ag) * 14); ctx.lineTo(p.x + Math.cos(p.ag) * L, p.y + Math.sin(p.ag) * L); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,60,60,0.8)'; ctx.fillRect(p.x + Math.cos(p.ag) * L - 0.8, p.y + Math.sin(p.ag) * L - 0.8, 1.6, 1.6);
+    }
     if (p.ln && Math.random() < dt * 40) { // Thermal Lance: sparks where it bites the wall
       const hx = p.x + Math.cos(p.ag) * 17, hy = p.y + Math.sin(p.ag) * 17, a2 = p.ag + Math.PI + (Math.random() - 0.5) * 2;
       fx.add({ type: 'spark', x: hx, y: hy, vx: Math.cos(a2) * 120, vy: Math.sin(a2) * 120, life: 0.25, max: 0.25, size: 1, col: '255,200,120', drag: 4 });
@@ -1023,7 +1031,8 @@ function marker(x, y, label, col, view) {
 
 function crosshair(me, now) {
   const w = WEAPONS[me.w];
-  const at = me.at || 0, base = w ? w.spread + (w.ads - w.spread) * at : 0.05; // tightens as you settle into your sights
+  const gm = gunMods(me.w, attFromCode(me.aa)), hipS = w ? w.spread * gm.hip : 0.05;
+  const at = me.at || 0, base = w ? hipS + (w.ads * gm.adsSpread - hipS) * at : 0.05; // tightens as you settle into your sights
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / 140);
   const spread = xh.dynamic ? Math.max(0, base * 160 + Math.pow(run, 1.4) * 15 + (me.cr && run < 0.15 ? -2 : 0)) : 0; // opens up while you run
   // recoil kicks the crosshair round your character: pull the mouse against it
@@ -1137,7 +1146,9 @@ function hud(s) {
   bar.className = me.hp > me.mhp ? 'over' : me.hp < 35 || me.dn ? 'low' : '';
   $('status').textContent = me.dn ? `DOWNED — BLEEDING OUT · ${Math.ceil(me.hp)}s` : me.df ? 'DEFUSER CARRIER' : '';
   const w = WEAPONS[me.w];
-  $('wname').textContent = w ? `${w.name.toUpperCase()} · ${w.cls.toUpperCase()}` : '';
+  $('wname').textContent = w ? `${w.name.toUpperCase()} · ${CLASS_NAME[w.cls].toUpperCase()}` : '';
+  const pk = me.w + '|' + me.aa;
+  if ($('wpic').dataset.k !== pk) { $('wpic').dataset.k = pk; $('wpic').innerHTML = ''; if (me.w) $('wpic').appendChild(gunPicture(me.w, attFromCode(me.aa), 150, 49)); }
   $('mag').textContent = me.rl > 0 ? '··' : me.am; $('mag').className = w && me.am <= w.mag * 0.25 ? 'low' : '';
   $('res').textContent = '/ ' + me.rs;
   const ab = o.ability, g = GADGETS[me.gd || o.gadget];

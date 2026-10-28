@@ -1,5 +1,6 @@
 // The Operators page: who each operator is, their gear choices (saved per player), and your stats with them.
-import { OPERATORS, WEAPONS, GADGETS, LOADOUTS, GADGET_COUNT, BIOS, OP_LIST, cleanLoadout } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, LOADOUTS, GADGET_COUNT, BIOS, OP_LIST, cleanLoadout, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt } from '/shared/operators.js';
+import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import { shade } from './textures.js';
 
@@ -50,7 +51,16 @@ function renderDetail(el) {
   const s = state.profile && state.profile.stats && state.profile.stats.ops[k];
   const pips = n => [1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('');
   const weaponCard = (w, slot) => `<button class="wcard ${cur[slot] === w ? 'on' : ''}" data-slot="${slot}" data-v="${w}">
-      <div class="wn">${WEAPONS[w].name}<small>${WEAPONS[w].cls}</small></div>${bars(w)}</button>`;
+      <div class="wpic" data-w="${w}"></div>
+      <div class="wn">${WEAPONS[w].name}<small>${CLASS_NAME[WEAPONS[w].cls]}</small></div><div class="wtip">${CLASS_TIP[WEAPONS[w].cls]}</div>${bars(w)}</button>`;
+  // attachments for the gun chosen in that slot: three rows of choices, each with what it does
+  const attRows = slot => {
+    const w = cur[slot]; if (!w) return '';
+    const a = cleanAtt(w, cur.att[w]), opts = attachFor(w);
+    return `<div class="atts"><div class="atthead">${WEAPONS[w].name} attachments</div>` + ATTACH_SLOTS.map(([s, label]) => `<div class="attrow"><span>${label}</span>` +
+      opts[s].map(v => `<button class="att ${a[s] === v ? 'on' : ''}" data-w="${w}" data-s="${s}" data-v="${v}" title="${ATTACH[s][v].desc}">${ATTACH[s][v].short}</button>`).join('') +
+      `<em>${ATTACH[s][a[s]].desc}</em></div>`).join('') + '</div>';
+  };
   const gadgetCard = g => `<button class="wcard g ${cur.gadget === g ? 'on' : ''}" data-slot="gadget" data-v="${g}">
       <div class="wn">${GADGETS[g].name}<small>×${GADGET_COUNT[g]}</small></div><p>${GADGET_DESC[g]}</p></button>`;
   const d = el.querySelector('#opsDetail');
@@ -66,10 +76,18 @@ function renderDetail(el) {
         <div class="ability"><b>${o.ability.name}${o.ability.count ? ' ×' + o.ability.count : ''}</b><p>${o.ability.desc}</p></div>
         <div class="mystats">${s ? `<div><b>${s.rounds}</b>ROUNDS</div><div><b>${s.rounds ? Math.round(s.roundsWon / s.rounds * 100) : 0}%</b>ROUNDS WON</div><div><b>${s.kills}</b>KILLS</div><div><b>${s.deaths}</b>DEATHS</div><div><b>${(s.kills / Math.max(1, s.deaths)).toFixed(2)}</b>K/D</div>` : '<div class="none">You haven\'t played this operator yet.</div>'}</div>
       </div></div>
-    <h3>PRIMARY WEAPON</h3><div class="cards">${L.primaries.map(w => weaponCard(w, 'primary')).join('')}</div>
-    ${L.secondaries.length ? `<h3>SECONDARY WEAPON</h3><div class="cards">${L.secondaries.map(w => weaponCard(w, 'secondary')).join('')}</div>` : ''}
+    <h3>PRIMARY WEAPON</h3><div class="cards">${L.primaries.map(w => weaponCard(w, 'primary')).join('')}</div>${attRows('primary')}
+    ${L.secondaries.length ? `<h3>SECONDARY WEAPON</h3><div class="cards">${L.secondaries.map(w => weaponCard(w, 'secondary')).join('')}</div>${attRows('secondary')}` : ''}
     <h3>GADGET</h3><div class="cards">${L.gadgets.map(gadgetCard).join('')}</div>
     <p class="hint">Your choices are saved to your profile and used every time you pick ${o.name}.</p>`;
+  for (const p of d.querySelectorAll('.wpic')) p.appendChild(gunPicture(p.dataset.w, cleanAtt(p.dataset.w, cur.att[p.dataset.w]), 270, 84));
+  for (const b of d.querySelectorAll('.att')) b.onclick = () => {
+    const l = loadoutOf(k), w = b.dataset.w;
+    l.att = { ...l.att, [w]: { ...cleanAtt(w, l.att[w]), [b.dataset.s]: b.dataset.v } };
+    if (state.profile) { state.profile.loadouts = { ...state.profile.loadouts, [k]: l }; }
+    if (state.send) state.send({ t: 'loadout', op: k, l });
+    renderDetail(el);
+  };
   for (const b of d.querySelectorAll('.wcard')) b.onclick = () => {
     const l = { ...loadoutOf(k), [b.dataset.slot]: b.dataset.v };
     if (state.profile) { state.profile.loadouts = { ...state.profile.loadouts, [k]: l }; }
