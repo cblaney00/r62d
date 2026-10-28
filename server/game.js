@@ -1334,6 +1334,7 @@ export class Game {
     const cells = [];
     for (const k of this.changed) cells.push(k, this.map.tiles[k], Math.max(0, Math.round(this.map.hp[k])));
     this.changed.clear();
+    const mine = new Map(); // details only the player themself needs (ammo, gadget counts, recoil...) go to them alone
     const players = [...this.players.values()].map(p => {
       const g = p.guns[p.slot];
       const o = {
@@ -1342,15 +1343,20 @@ export class Game {
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim),
-        sl: p.slot, w: g ? g.w : null, am: g ? g.ammo : 0, rs: g ? g.reserve : 0, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
-        ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, ct: p.ctrl, ci: p.camIdx, did: p.droneId,
+        sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
+        ct: p.ctrl,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
-        vx: r1(p.vx || 0), vy: r1(p.vy || 0), gt: r2(p.gait || 0), rc: Math.round((p.rc || 0) * 1000) / 1000, at: r2(p.adsT || 0), mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sc: p.scanning ? 1 : 0,
-        bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
-        m: this.mods(p), fs: r2(this.time - p.lastShot), aa: g && g.att ? attCode(g.att) : '',
+        gt: r2(p.gait || 0), mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sc: p.scanning ? 1 : 0,
+        aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
-        dz: this.time < (p.dazeUntil || 0) ? 1 : 0, gi: p.gasId ? 1 : 0,
+        dz: this.time < (p.dazeUntil || 0) ? 1 : 0,
       });
+      if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
+        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, ci: p.camIdx, did: p.droneId,
+        vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 1000) / 1000, at: r2(p.adsT || 0),
+        bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
+        m: this.mods(p), fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0,
+      }));
       return o;
     });
     const ents = this.ents.map(e => {
@@ -1376,6 +1382,6 @@ export class Game {
       players, ents, cells, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];
-    for (const p of this.players.values()) if (p.sock && p.sock.open) p.sock.send('{"t":"snap","you":"' + p.id + '",' + common.slice(1));
+    for (const p of this.players.values()) if (p.sock && p.sock.open) p.sock.send('{"t":"snap","you":"' + p.id + '",' + (mine.has(p.id) ? '"mine":' + mine.get(p.id) + ',' : '') + common.slice(1));
   }
 }

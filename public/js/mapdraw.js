@@ -7,7 +7,7 @@ const SOLID = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL]);
 const WALLISH = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.BARRI]);
 
 export class MapRenderer {
-  constructor(map, baseTiles) {
+  constructor(map, baseTiles, greyScale = 1.5) {
     this.map = map; this.base = baseTiles;
     this.Wp = map.W * CELL; this.Hp = map.H * CELL;
     this.c = canvas(this.Wp * S, this.Hp * S);
@@ -15,7 +15,7 @@ export class MapRenderer {
     this.dctx = this.ctx; // blood and scorch marks are painted straight onto the floor
     this.pat = floorPatterns(this.ctx);
     // a dull grey copy used for the parts of the map your team can't currently see
-    this.G = 1.5;
+    this.G = greyScale; // the grey "remembered" copy is drawn small on low graphics
     this.grey = canvas(Math.ceil(this.Wp * this.G), Math.ceil(this.Hp * this.G));
     this.gctx = this.grey.getContext('2d');
     this.region(0, 0, map.W - 1, map.H - 1);

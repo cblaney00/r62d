@@ -36,6 +36,6 @@ ws.onopen = async () => {
       }
     }
   } catch (e) { console.log('ERROR', e.message); }
-  console.log('--- browser log ---\n' + logs.slice(0, 40).join('\n'));
+  console.log('--- browser log ---\n' + logs.slice(0, 80).join('\n'));
   process.exit(0);
 };

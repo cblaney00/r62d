@@ -32,14 +32,22 @@ let DPR = 1, VW = 0, VH = 0;
 
 // Graphics quality (saved per computer): how many pixels get drawn and how many extras are added.
 const GFX = {
-  low:    { scale: 0.6,  fog: 0.3,  parts: 0.35, smoke: 7,  shade: false, rays: 0.5, map: 1.5 },
-  medium: { scale: 0.8,  fog: 0.4,  parts: 0.6,  smoke: 11, shade: true, rays: 0.7, map: 2 },
-  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1, map: 2.5 },
-  ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2, map: 3 },
+  low:    { scale: 0.6,  fog: 0.3,  parts: 0.35, smoke: 7,  shade: false, rays: 0.5, map: 1.25, grey: 0.75 },
+  medium: { scale: 0.8,  fog: 0.4,  parts: 0.6,  smoke: 11, shade: true, rays: 0.7, map: 2, grey: 1 },
+  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1, map: 2.5, grey: 1.5 },
+  ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2, map: 3, grey: 1.5 },
 };
-let gfxName = (() => { try { return localStorage.getItem('r62d-gfx') || 'high'; } catch { return 'high'; } })();
-if (!GFX[gfxName]) gfxName = 'high';
-let gq = GFX[gfxName];
+const LEVELS = ['low', 'medium', 'high', 'ultra'];
+// "auto" (the default) starts from a guess about this computer and steps down by itself if the game can't keep up
+let gfxName = (() => { try { return localStorage.getItem('r62d-gfx') || 'auto'; } catch { return 'auto'; } })();
+if (!GFX[gfxName] && gfxName !== 'auto') gfxName = 'auto';
+let autoLevel = (() => {
+  try { const s = localStorage.getItem('r62d-gfx-auto'); if (GFX[s]) return s; } catch {}
+  const weak = (navigator.hardwareConcurrency || 4) <= 4 || (navigator.deviceMemory && navigator.deviceMemory <= 4);
+  return weak ? 'medium' : 'high';
+})();
+const gfxLevel = () => (gfxName === 'auto' ? autoLevel : gfxName);
+let gq = GFX[gfxLevel()];
 setMapScale(gq.map);
 function resize() {
   const oldW = VW || 1, oldH = VH || 1;
@@ -49,14 +57,36 @@ function resize() {
   mouse.x *= VW / oldW; mouse.y *= VH / oldH;
 }
 function setGfx(name) {
-  if (!GFX[name]) return;
-  gfxName = name; gq = GFX[name];
+  if (!GFX[name] && name !== 'auto') return;
+  gfxName = name;
   try { localStorage.setItem('r62d-gfx', name); } catch {}
+  applyGfx();
+}
+function applyGfx() {
+  const old = gq; gq = GFX[gfxLevel()];
   fx.quality = gq.parts; setShading(gq.shade);
   resize(); renderGfx();
-  if (S !== gq.map) { // redraw the map picture at the new detail
+  if (S !== gq.map || old.grey !== gq.grey) { // redraw the map picture at the new detail
     setMapScale(gq.map);
-    if (st.rend) { st.rend = new MapRenderer(st.known, st.base); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); }
+    if (st.rend) { st.rend = new MapRenderer(st.known, st.base, gq.grey); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); }
+  }
+  perfWatch.skip = 2;
+}
+// Auto graphics: every 3 seconds of play, if frames are coming too slowly, drop one level (and remember it)
+const perfWatch = { t: 0, n: 0, gap: 0, work: 0, skip: 2 };
+function watchPerf(gapMs, workMs) {
+  if (gfxName !== 'auto' || document.hidden || !playing()) return;
+  perfWatch.n++; perfWatch.gap += gapMs; perfWatch.work += workMs; perfWatch.t += gapMs;
+  if (perfWatch.t < 3000) return;
+  const gap = perfWatch.gap / perfWatch.n, work = perfWatch.work / perfWatch.n;
+  Object.assign(perfWatch, { t: 0, n: 0, gap: 0, work: 0 });
+  if (perfWatch.skip > 0) { perfWatch.skip--; return; } // just after loading or a change: give it time to settle
+  const i = LEVELS.indexOf(autoLevel);
+  if ((gap > 24 || work > 12) && i > 0) {
+    autoLevel = LEVELS[i - 1];
+    try { localStorage.setItem('r62d-gfx-auto', autoLevel); } catch {}
+    applyGfx();
+    addFeed(`Graphics set to ${autoLevel[0].toUpperCase() + autoLevel.slice(1)} so the game runs smoothly`);
   }
 }
 
@@ -107,7 +137,7 @@ function loadMap(mv, tiles, hp, id) {
   // broken glass lies in and just around every window; splinters appear where barricades get smashed
   st.glass = new Set(); st.splinters = new Set();
   for (const o of st.map.openings) if (o.kind === 'window') for (const k of o.cells) for (const d of [0, 1, -1, st.map.W, -st.map.W]) st.glass.add(k + d);
-  st.rend = new MapRenderer(st.known, st.base); st.rend.mount(mapLayer);
+  st.rend = new MapRenderer(st.known, st.base, gq.grey); st.rend.mount(mapLayer); perfWatch.skip = 2;
   st.rend.splinters = st.splinters;
   st.corpses = []; fx.clear(); st.pending = [];
   st.loadMs = Math.round(performance.now() - t0); // map build + picture (shown in __r62d for speed checks)
@@ -124,6 +154,7 @@ function onSnap(s) {
   }
   if (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION && s.ph !== PHASE.ROUND_END) revealAll();
   const players = new Map(s.players.map(p => [p.id, p]));
+  if (s.mine && players.has(s.you)) Object.assign(players.get(s.you), s.mine); // your own private details
   const ents = new Map(s.ents.map(e => [e.id, e]));
   st.snaps.push({ t: now, st: s.time, players, ents }); if (st.snaps.length > 12) st.snaps.shift();
   const prevMe = st.me;
@@ -314,13 +345,13 @@ for (const k of ['outline', 'dynamic']) $('xh_' + k).onclick = () => { audio.ui(
 $('xhReset').onclick = () => { audio.ui(); setXhair(XH_DEFAULT); };
 renderXhair();
 // graphics: fullscreen switch + quality presets
-const GFX_HINT = { low: 'Low — for weak computers: fewer pixels, fewer particles, flat lighting.', medium: 'Medium — a little softer picture, runs well on most computers.', high: 'High — full sharpness. Recommended.', ultra: 'Ultra — extra-sharp, smoothest edges and most effects. Needs a strong computer.' };
+const GFX_HINT = { auto: 'Auto — picks the quality for this computer and lowers it by itself if the game can\'t keep up.', low: 'Low — for weak computers: fewer pixels, fewer particles, flat lighting.', medium: 'Medium — a little softer picture, runs well on most computers.', high: 'High — full sharpness. Recommended.', ultra: 'Ultra — extra-sharp, smoothest edges and most effects. Needs a strong computer.' };
 function renderGfx() {
   for (const b of $('gfxSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.q === gfxName);
   const app = new URLSearchParams(location.search).has('app'), on = app || !!document.fullscreenElement;
   const t = $('fsToggle'); t.textContent = on ? 'ON' : 'OFF'; t.classList.toggle('on', on); t.disabled = app;
   t.title = app ? 'The desktop app always runs full screen' : '';
-  $('gfxHint').textContent = GFX_HINT[gfxName] + (app ? '  (The desktop app is always full screen.)' : '');
+  $('gfxHint').textContent = GFX_HINT[gfxName] + (gfxName === 'auto' ? ` Now: ${autoLevel[0].toUpperCase() + autoLevel.slice(1)}.` : '') + (app ? '  (The desktop app is always full screen.)' : '');
 }
 for (const b of $('gfxSeg').querySelectorAll('button')) b.onclick = () => { audio.ui(); setGfx(b.dataset.q); };
 $('fsToggle').onclick = () => toggleFullscreen();
@@ -550,7 +581,7 @@ function interp(id, kind) {
 let lastT = performance.now();
 function frame(nowMs) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (nowMs - lastT) / 1000); lastT = nowMs;
+  const rawGap = nowMs - lastT, dt = Math.min(0.05, rawGap / 1000); lastT = nowMs;
   const now = nowMs / 1000;
   const s = st.last;
   const T0 = performance.now(); PF.frames++;
@@ -640,6 +671,7 @@ function frame(nowMs) {
   revealSeen(); t1 = pfa('viewers', t1);
   bodySounds(me, dt);
   draw(s, view, now, dt); ctx = ctx0; pfa('total', T0);
+  watchPerf(rawGap, performance.now() - T0);
 }
 let overDirty = false, fogShown = false;
 function showFog(on) { if (on !== fogShown) { fogShown = on; fog.style.visibility = on ? 'visible' : 'hidden'; } }

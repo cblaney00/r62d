@@ -62,10 +62,13 @@ His wishes so far:
 - **Rendering & speed:** layers bottom to top: `#mapLayer` (map tiles, CSS transform), `#game` (people,
   gadgets, effects), `#fog` (line-of-sight blackout drawn small, stretched by the browser), `#over` (markers,
   crosshair, screen effects), `#vignette` (CSS). Graphics quality presets (`GFX` in main.js: Low/Medium/High/Ultra,
-  saved per computer in localStorage `r62d-gfx`) set render scale, fog resolution, particles, smoke puffs, sight
+  saved per computer in localStorage `r62d-gfx`; default "auto" guesses from CPU cores/memory, then `watchPerf` drops a level
+  when frames run slow and remembers it in `r62d-gfx-auto`) set render scale, fog resolution, particles, smoke puffs, sight
   rays and sprite shading. `window.__r62d.PF` holds per-section frame timings (ms, summed; divide by `frames`).
   Measured 1600×900 headless: Low 3.7 ms, High 7.3 ms, Ultra 11.3 ms per frame (was 19.7 before the layers).
-- **Networking:** server ticks at 30/s, sends a JSON snapshot to everyone 20/s. Clients send
+- **Networking:** server ticks at 30/s, sends a JSON snapshot to everyone 20/s. Snapshots are compressed with permessage-deflate
+  (`server/ws.js`, no context takeover; ~6 KB → ~1 KB) and each player's private details (ammo, gadget counts, recoil,
+  prediction state) go only to them as `mine`, merged into `st.me` on arrival. Clients send
   input every frame; server applies movement per input message (with its dt) and echoes the
   last sequence number, client replays unacknowledged inputs (prediction + reconciliation).
   Other players are interpolated 100 ms behind.

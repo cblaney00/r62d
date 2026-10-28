@@ -378,7 +378,8 @@ export function gunshot(cls, x, y, own, quiet = false) {
     if (d > 500) { const t = ac.currentTime; tone(g, t + d / 3400, 0.5, P.boom * 0.8, P.boom * 0.5, 'sine', 0.25, 0.02); }
   }
 }
-export function prewarmGuns() { if (ac) for (const c of Object.keys(GUN)) gunBuf(c); }
+// built one gun type at a time, so a slow computer doesn't freeze while sound starts
+export function prewarmGuns() { if (!ac) return; const todo = Object.keys(GUN); const next = () => { const c = todo.shift(); if (!c) return; gunBuf(c); setTimeout(next, 40); }; next(); }
 
 export function explosion(x, y, kind) {
   C = 'explosions';
