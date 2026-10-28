@@ -731,14 +731,14 @@ function frame(nowMs) {
   st.cam.x += (cx - st.cam.x) * k; st.cam.y += (cy - st.cam.y) * k;
   if (view && view.kind !== 'body') { st.cam.x = cx; st.cam.y = cy; }
   // zoom: close in tight rooms, wider outside or when looking down a long sightline
-  let want = 600;
-  if (view && view.kind === 'drone') want = 300;
+  let want = 600; // world px shown top to bottom; he asked twice for a closer view
+  if (view && view.kind === 'drone') want = 240;
   else if (view) {
     let sum = 0;
     for (let i = 0; i < 24; i++) sum += castSight(st.map, view.x, view.y, i / 24 * Math.PI * 2, 700, null);
     const avg = sum / 24, aimD = castSight(st.map, view.x, view.y, view.ang, 900, null);
-    want = Math.max(300, Math.min(620, avg * 1.5 + 150));
-    want = Math.max(want, Math.min(view.kind === 'cam' ? 720 : 680, aimD * (view.kind === 'cam' ? 0.9 : 0.75)));
+    want = Math.max(240, Math.min(470, avg * 1.15 + 110));
+    want = Math.max(want, Math.min(view.kind === 'cam' ? 580 : 520, aimD * (view.kind === 'cam' ? 0.75 : 0.6)));
   }
   st.viewH = st.viewH || want;
   st.viewH += (want - st.viewH) * (1 - Math.exp(-dt * 2.2));

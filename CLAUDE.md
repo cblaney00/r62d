@@ -25,7 +25,7 @@ His wishes so far:
 - Aiming defaults to the **aim pad** (he asked for it): a ring on the right of the screen (`pad()` in main.js) acts like a joystick — the mouse is kept inside it and its direction from the centre sets the aim, its distance how far ahead the crosshair sits (`cursor()`), so turning round is a short flick. Settings → Aiming → "Cursor" brings back aim-at-the-cursor; saved per profile (`aim`).
 - Builds follow armor (`BODY_W`/`HIT_R` in shared/operators.js): heavies broad, mediums and lights skinnier. Bullets hit within `hitR(op)` (7.5 / 6.8 / 6.2 px), smaller than the bumping radius `PLAYER_R` 10, so people are harder to hit. He asked for this.
 - Movement uses real-world speeds (`M_S` in shared/physics.js, 1 m = 36 px = `PX_PER_M`): jog 2.6 m/s (2.3 heavy, 3.0 light), walk 1.4, ADS 1.5, crouch 0.9, downed crawl 0.5, drone 3.2. He asked for everything slower and realistic.
-- FOV like a modern FPS (103°, 70° ADS). Zoom adapts: close indoors, wide outside / long sightlines.
+- FOV like a modern FPS (103°, 70° ADS). Zoom adapts: close indoors, wider outside / long sightlines (`want` in the main.js camera: 240–470 world px tall indoors, up to 520 down a sightline; he asked twice for closer).
 - Abilities all work. Floors are joined by stairs only (no shooting or seeing between floors yet; no hatches).
 - Graphics detailed enough to interest people used to modern games; fills a fullscreen
   16:9 monitor; must not lag; it's a multi-day project.

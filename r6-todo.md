@@ -74,6 +74,7 @@ New ideas from him get added to the bottom of **To do**.
 - [x] Legs move when a character turns on the spot.
 - [x] More detailed characters.
 - [x] Zoom in closer; only zoom out outside or down long hallways. Camera stops at the map edge.
+- [x] Even closer zoom (about a quarter closer everywhere, drones too).
 - [x] Field of view like a modern shooter (≈103°, narrower when aiming down sights).
 - [x] First playable version (5v5 Quick Match, 10 operators, Harbor Office, bots).
 - [x] Desktop / app-menu shortcut.
