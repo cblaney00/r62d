@@ -68,7 +68,7 @@ function applyGfx() {
   resize(); renderGfx();
   if (S !== gq.map || old.grey !== gq.grey) { // redraw the map picture at the new detail
     setMapScale(gq.map);
-    if (st.rend) { st.rend = new MapRenderer(st.known, st.base, gq.grey); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); }
+    if (st.rend) { st.rend = new MapRenderer(st.known, st.base, gq.grey); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); st.warm = 4; }
   }
   perfWatch.skip = 2;
 }
@@ -137,7 +137,7 @@ function loadMap(mv, tiles, hp, id) {
   // broken glass lies in and just around every window; splinters appear where barricades get smashed
   st.glass = new Set(); st.splinters = new Set();
   for (const o of st.map.openings) if (o.kind === 'window') for (const k of o.cells) for (const d of [0, 1, -1, st.map.W, -st.map.W]) st.glass.add(k + d);
-  st.rend = new MapRenderer(st.known, st.base, gq.grey); st.rend.mount(mapLayer); perfWatch.skip = 2;
+  st.rend = new MapRenderer(st.known, st.base, gq.grey); st.rend.mount(mapLayer); perfWatch.skip = 2; st.warm = 4;
   st.rend.splinters = st.splinters;
   st.corpses = []; fx.clear(); st.pending = [];
   st.loadMs = Math.round(performance.now() - t0); // map build + picture (shown in __r62d for speed checks)
@@ -723,7 +723,9 @@ function sendInput(dt, me, ctrl, view, s, now) {
   send(msg);
 }
 
-const smokes = s => s ? s.ents.filter(e => e.ty === 'smoke').map(e => ({ x: e.x, y: e.y, r: e.r })) : [];
+// smoke clouds of a snapshot, worked out once per snapshot (it was being rebuilt many times a frame)
+const smokeMemo = new WeakMap();
+const smokes = s => { if (!s) return []; let v = smokeMemo.get(s); if (!v) smokeMemo.set(s, v = s.ents.filter(e => e.ty === 'smoke').map(e => ({ x: e.x, y: e.y, r: e.r }))); return v; };
 
 // ---------------- what things are made of (for sound) ----------------
 const FLOOR_SURF = { [FL.WOOD]: 'wood', [FL.TILE]: 'tile', [FL.SERVER]: 'metal', [FL.MARBLE]: 'marble', [FL.CARPET]: 'carpet', [FL.CONCRETE]: 'concrete', [FL.GRASS]: 'grass', [FL.ASPHALT]: 'asphalt' };
@@ -842,8 +844,14 @@ function draw(s, view, now, dt) {
   ctx.setTransform(z, 0, 0, z, ox, oy);
   ctx.imageSmoothingEnabled = true;
   // the map layer: copy over any changed spots, then let the browser place and scale it
+  st.rend.process(gfxLevel() === 'low' ? 2.5 : 4, st.cam.x, st.cam.y);
   st.rend.flush();
-  mapLayer.style.transform = `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / (S * DPR)})`;
+  if (st.warm > 0) { // just after loading a map: show every floor at once (invisibly) so the graphics card has them all ready
+    st.warm--;
+    const k = Math.min(innerWidth / (m.W * CELL * S), innerHeight / (m.H * CELL * S));
+    mapLayer.style.opacity = st.warm > 0 ? '0.02' : '';
+    mapLayer.style.transform = st.warm > 0 ? `scale(${k})` : '';
+  } else mapLayer.style.transform = `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / (S * DPR)})`;
   // visible window of the map (for the grey remembered copy)
   const wx0 = Math.max(0, st.cam.x - VW / 2 / z - 20), wy0 = Math.max(0, st.cam.y - VH / 2 / z - 20);
   const wx1 = Math.min(m.W * CELL, st.cam.x + VW / 2 / z + 20), wy1 = Math.min(m.H * CELL, st.cam.y + VH / 2 / z + 20);
@@ -1337,6 +1345,8 @@ function applyKnown(k) {
 }
 function revealSeen() {
   if (!st.unseen || !st.unseen.size) return;
+  const t = performance.now(); if (t - (st.revealT || 0) < 100) return; // ten times a second is plenty
+  st.revealT = t;
   for (const k of st.unseen) if (cellSeen(k)) { applyKnown(k); st.unseen.delete(k); }
 }
 function revealAll() { if (!st.unseen) return; for (const k of st.unseen) applyKnown(k); st.unseen.clear(); }

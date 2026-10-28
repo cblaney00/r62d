@@ -87,7 +87,7 @@ export class MapRenderer {
   }
 
   // Redraw a block of cells (inclusive), clipped so neighbours are untouched.
-  region(x0, y0, x1, y1) {
+  region(x0, y0, x1, y1, deferGrey = false) {
     const m = this.map, ctx = this.ctx;
     x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W - 1, x1); y1 = Math.min(m.H - 1, y1);
     const X = x0 * CELL, Y = y0 * CELL, Wd = (x1 - x0 + 1) * CELL, Hd = (y1 - y0 + 1) * CELL;
@@ -139,11 +139,35 @@ export class MapRenderer {
     }
     ctx.restore();
     this.mark(X, Y, X + Wd, Y + Hd);
+    if (deferGrey) (this.greyQ || (this.greyQ = [])).push([X, Y, Wd, Hd]); else this.greyRect(X, Y, Wd, Hd);
+  }
+  // the dull grey copy of a block (world pixels): the slowest step, so it can wait a few frames
+  greyRect(X, Y, Wd, Hd) {
     const G = this.G, gx = this.gctx;
     gx.filter = 'grayscale(1) brightness(0.42) contrast(1.15)';
     gx.clearRect(X * G, Y * G, Wd * G, Hd * G);
     gx.drawImage(this.c, X * S, Y * S, Wd * S, Hd * S, X * G, Y * G, Wd * G, Hd * G);
     gx.filter = 'none';
+  }
+
+  // Changed cells are redrawn a little at a time, nearest to the camera first, so seeing a whole
+  // fortified room at once (or arriving on another floor) never stalls a frame.
+  process(budgetMs, wx, wy) {
+    const P = this.pending, t0 = performance.now(), W = this.map.W, cx = wx / CELL, cy = wy / CELL;
+    while (P && P.size && performance.now() - t0 < budgetMs) {
+      let best = -1, bd = Infinity;
+      for (const k of P) { const d = Math.abs(k % W - cx) + Math.abs(Math.floor(k / W) - cy); if (d < bd) { bd = d; best = k; } }
+      const bx = best % W, by = Math.floor(best / W);
+      let x0 = bx, y0 = by, x1 = bx, y1 = by;
+      for (const k of [...P]) { // everything pending in the block around it goes in the same redraw
+        const x = k % W, y = Math.floor(k / W);
+        if (Math.abs(x - bx) > 5 || Math.abs(y - by) > 5) continue;
+        x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); P.delete(k);
+      }
+      this.region(x0 - 1, y0 - 1, x1 + 1, y1 + 1, true);
+    }
+    const Q = this.greyQ;
+    while (Q && Q.length && performance.now() - t0 < budgetMs + 1.5) this.greyRect(...Q.shift());
   }
 
   // The map is shown by the browser itself as a stack of tiles that it moves and scales on the
@@ -178,7 +202,7 @@ export class MapRenderer {
     this.dirty = null;
   }
 
-  cellChanged(k) { const x = k % this.map.W, y = Math.floor(k / this.map.W); this.region(x - 1, y - 1, x + 1, y + 1); }
+  cellChanged(k) { (this.pending || (this.pending = new Set())).add(k); } // drawn by process()
 
   rubble(x, y, mat) {
     const ctx = this.ctx, X = x * CELL, Y = y * CELL;
