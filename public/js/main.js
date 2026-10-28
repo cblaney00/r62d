@@ -101,6 +101,24 @@ const st = {
 const fx = new FX();
 const keys = new Set();
 const mouse = { x: 0, y: 0, l: false, r: false, wl: 0, wr: 0 };
+// Aim pad (default): a ring on the right of the screen works like a joystick. Where the mouse sits in
+// the ring sets which way you aim (and how far ahead you look), so turning round is a short flick
+// across the ring instead of dragging the cursor all the way round your character.
+// "Cursor" is the old way: you aim at wherever the cursor is.
+let aimMode = (() => { try { return localStorage.getItem('r62d-aim') || 'pad'; } catch { return 'pad'; } })();
+const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
+let padOn = false, padAng = 0, padReach = 0.6;
+// the point you aim at, in screen pixels (with the aim pad this sits ahead of your character)
+function cursor() {
+  if (!padOn) return mouse;
+  const z = st.zoom || 1, px = (st.pred.x - st.cam.x) * z + VW / 2, py = (st.pred.y - st.cam.y) * z + VH / 2;
+  const cx = Math.cos(padAng), cy = Math.sin(padAng), m = 30 * DPR;
+  let d = VH * 0.07 + padReach * VH * 0.36; // shortened if it would leave the screen (near the edge of a map)
+  if (cx > 0.01) d = Math.min(d, (VW - m - px) / cx); else if (cx < -0.01) d = Math.min(d, (m - px) / cx);
+  if (cy > 0.01) d = Math.min(d, (VH - m - py) / cy); else if (cy < -0.01) d = Math.min(d, (m - py) / cy);
+  d = Math.max(d, 24 * DPR);
+  return { x: px + cx * d, y: py + cy * d };
+}
 addEventListener('resize', resize); resize();
 fx.quality = gq.parts; setShading(gq.shade);
 
@@ -676,8 +694,14 @@ function frame(nowMs) {
   }
 
   // --- input & prediction ---
+  padOn = aimMode === 'pad' && !!view && (view.kind === 'body' || view.kind === 'drone');
+  if (padOn) { // keep the mouse inside the ring and read the aim from it
+    const P = pad(), dx = mouse.x - P.x, dy = mouse.y - P.y, l = Math.hypot(dx, dy);
+    if (l > P.r) { mouse.x = P.x + dx / l * P.r; mouse.y = P.y + dy / l * P.r; }
+    if (l > P.r * 0.12) { padAng = Math.atan2(dy, dx); padReach = Math.min(1, l / P.r); }
+  }
   if (view && (view.kind === 'body' || view.kind === 'drone')) {
-    const mw = screenToWorld(mouse.x, mouse.y);
+    const c = cursor(), mw = screenToWorld(c.x, c.y);
     st.aim = Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x);
     if (now < (st.dazeUntil || 0)) st.aim += Math.sin(now * 6.3) * 0.05 + Math.sin(now * 2.1) * 0.04; // dazed: the aim sways
   } else if (view && view.kind === 'cam') {
@@ -695,7 +719,7 @@ function frame(nowMs) {
   if (view) {
     cx = view.x; cy = view.y;
     if (view.kind === 'body') {
-      const mw = screenToWorld(mouse.x, mouse.y);
+      const c = cursor(), mw = screenToWorld(c.x, c.y);
       const vh = st.viewH || 400;
       const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? (String(me.aa).includes('scope') ? 0.46 : 0.32) : 0.2); // a scope looks further ahead
       cx += l > mx ? lx / l * mx : lx; cy += l > mx ? ly / l * mx : ly;
@@ -757,7 +781,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   // mark the enemy nearest the cursor that you can actually see
   const trySpot = () => {
     if (!view || !me) return;
-    const mw = screenToWorld(mouse.x, mouse.y);
+    const c = cursor(), mw = screenToWorld(c.x, c.y);
     let best = null, bd = 45;
     for (const p of s.players) if (p.a && p.tm !== me.tm && p.x !== undefined) {
       const d = Math.hypot(p.x - mw.x, p.y - mw.y);
@@ -781,7 +805,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
     stepMove(st.map, st.pred, k, dt, mods);
   }
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 1000) / 1000, dt: Math.round(dt * 10000) / 10000 };
-  const mw = screenToWorld(mouse.x, mouse.y); msg.ax = Math.round(mw.x); msg.ay = Math.round(mw.y);
+  const c = cursor(), mw = screenToWorld(c.x, c.y); msg.ax = Math.round(mw.x); msg.ay = Math.round(mw.y);
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
   if (ev.length) msg.ev = ev;
   st.pending.push({ s: msg.s, k, dt: msg.dt });
@@ -1094,7 +1118,7 @@ function draw(s, view, now, dt) {
     }
     // aim line for grenades so you can judge throws
     if (me.a && me.ct === 'body' && keys.has('gadget')) {
-      const mw = screenToWorld(mouse.x, mouse.y);
+      const c = cursor(), mw = screenToWorld(c.x, c.y);
       ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 0.8;
       ctx.beginPath(); ctx.moveTo(st.pred.x, st.pred.y); ctx.lineTo(mw.x, mw.y); ctx.stroke(); ctx.setLineDash([]);
     }
@@ -1120,7 +1144,8 @@ function draw(s, view, now, dt) {
   const fl = st.flashUntil - now;
   if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(1, fl / 1.2)})`; ctx.fillRect(0, 0, VW, VH); }
   if (inGame && me && me.a && me.ct === 'body' && !me.br) crosshair(me, now);
-  else if (inGame) { ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 2 * DPR, 0, 7); ctx.fill(); }
+  else if (inGame) { const c = cursor(); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(c.x, c.y, 2 * DPR, 0, 7); ctx.fill(); }
+  if (inGame && padOn && !menuOpen()) aimPad();
 }
 
 function marker(x, y, label, col, view) {
@@ -1138,6 +1163,21 @@ function marker(x, y, label, col, view) {
   ctx.restore();
 }
 
+// the aim pad: a faint ring with a knob where the mouse is and a tick showing which way you face
+function aimPad() {
+  const P = pad(), z = st.zoom || 1;
+  // fade right down when your own character is underneath it
+  const near = Math.hypot((st.pred.x - st.cam.x) * z + VW / 2 - P.x, (st.pred.y - st.cam.y) * z + VH / 2 - P.y) < P.r * 1.3;
+  ctx.save(); ctx.globalAlpha = near ? 0.35 : 1;
+  ctx.lineWidth = 1.5 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.fillStyle = 'rgba(10,16,24,0.18)';
+  ctx.beginPath(); ctx.arc(P.x, P.y, P.r, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.arc(P.x, P.y, P.r * 0.12, 0, 7); ctx.stroke();
+  ctx.strokeStyle = 'rgba(120,180,255,0.55)'; ctx.lineWidth = 3 * DPR;
+  ctx.beginPath(); ctx.arc(P.x, P.y, P.r, padAng - 0.18, padAng + 0.18); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 5 * DPR, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
 function crosshair(me, now) {
   const w = WEAPONS[me.w];
   const gm = gunMods(me.w, attFromCode(me.aa)), hipS = w ? w.spread * gm.hip : 0.05;
@@ -1147,7 +1187,7 @@ function crosshair(me, now) {
   // recoil kicks the crosshair round your character: pull the mouse against it
   const px = (st.pred.x - st.cam.x) * st.zoom + VW / 2, py = (st.pred.y - st.cam.y) * st.zoom + VH / 2;
   const rc = me.rc || 0, c = Math.cos(rc), s2 = Math.sin(rc);
-  const x = px + (mouse.x - px) * c - (mouse.y - py) * s2, y = py + (mouse.x - px) * s2 + (mouse.y - py) * c;
+  const m = cursor(), x = px + (m.x - px) * c - (m.y - py) * s2, y = py + (m.x - px) * s2 + (m.y - py) * c;
   drawXhair(ctx, x, y, xh, spread, DPR);
   const hk = 1 - (now - st.hitT) / 0.18;
   if (hk > 0) {
@@ -1552,7 +1592,7 @@ window.__r62d = { PF, st, showEnd, playXp }; // for automated screenshot tests
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
   try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, sens: +$('sens').value, adsSens: +$('adsSens').value, xh };
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, xh };
 }
 let saveTimer = 0;
 function saveSettings() {
@@ -1563,6 +1603,7 @@ function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
   for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = s[k];
   if (s.xh) setXhair(s.xh, false);
+  if (s.aim === 'pad' || s.aim === 'cursor') setAim(s.aim, false);
   showSens();
   applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100);
   saveVol(); try { localStorage.setItem('r62d-music', $('volMusic').value); } catch {}
@@ -1584,6 +1625,14 @@ const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFi
 for (const id of ['sens', 'adsSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
 try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; } } catch {}
 showSens();
+function setAim(m, save = true) {
+  aimMode = m; try { localStorage.setItem('r62d-aim', m); } catch {}
+  for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
+  if (m === 'pad') { const P = pad(); mouse.x = P.x + Math.cos(st.aim || 0) * P.r * 0.6; mouse.y = P.y + Math.sin(st.aim || 0) * P.r * 0.6; }
+  if (save) saveSettings();
+}
+for (const b of $('aimSeg').querySelectorAll('button')) b.onclick = () => { audio.ui(); setAim(b.dataset.a); };
+setAim(aimMode, false);
 
 // The server time of the world you're currently looking at (others are drawn slightly in the past).
 // Sent with every input so the server can judge your shots against what you saw — this is what
