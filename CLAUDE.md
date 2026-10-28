@@ -17,12 +17,13 @@ must be original**: our own operators, names, map, art. We declined to copy Sieg
 operators/maps/art (it would be recreating a specific existing game); keep it that way.
 
 His wishes so far:
-- One small map to start (Harbor Office), 10 operators (5 attack, 5 defence), Quick Match only
-  (first to 3 rounds, sides swap every round).
+- Six maps, each with 2–3 floors, picked in the lobby (Harbor Office, Cliffside Villa, Rail Depot, The Embassy,
+  Alpine Lodge, Clocktower School). 10 operators (5 attack, 5 defence) — he wants 30 + 30 eventually.
+  Quick Match only (first to 3 rounds, sides swap every round). Defenders choose the site during operator select.
 - Out of sight = dull grey "remembered" map; shared team vision (teammates, drones, cameras) is live colour; enemy changes out of sight stay hidden until seen (`st.known` vs `st.map` in main.js).
 - Controls are CS2-style (players come from CS2): run default, Shift walk, Ctrl crouch (hold), E use, Q skill, 3 melee, 4 gadget. Walking/crouching are silent to others. Running spreads shots (server `fire`). Mouse is pointer-locked in matches with sensitivity + ADS multiplier settings.
 - FOV like a modern FPS (103°, 70° ADS). Zoom adapts: close indoors, wide outside / long sightlines.
-- Abilities all work; no verticality.
+- Abilities all work. Floors are joined by stairs only (no shooting or seeing between floors yet; no hatches).
 - Graphics detailed enough to interest people used to modern games; fills a fullscreen
   16:9 monitor; must not lag; it's a multi-day project.
 - Setting/art direction (chosen by us, he can change it): modern counter-terror unit,
@@ -38,8 +39,12 @@ His wishes so far:
   `R62D_FAST=1` shortens operator-select and prep to a few seconds for testing. `PORT=` changes port.
 - **Layout:**
   - `shared/` — used by both server and browser: `constants.js` (tiles, timings),
-    `map.js` (the map, built from room/wall/door/furniture calls; run `node tests/sim.js --map`
-    for an ASCII view), `physics.js` (movement, collision, line of sight, ray casting),
+    `map.js` (list of maps + floorAt/localPos/roomAt), `mapkit.js` (map building kit: floors sit side by
+    side in ONE grid separated by void, joined by stairs — `map.portal` sends you to the other floor when you
+    walk off a staircase's end; maps are written in a shared building frame so floors line up),
+    `maps/*.js` (one file per map; `node tests/sim.js --map <id>` prints every floor as ASCII). Map rules
+    learned the hard way: doors at least 2 cells wide, 2 free rows beyond both ends of every staircase, no
+    1-cell gaps beside furniture — a body (radius 10) is wider than a cell (16). `physics.js` (movement, collision, line of sight, ray casting),
     `operators.js` (weapons + the 10 operators).
   - `server/game.js` — authoritative match: lobby, rounds/phases, shooting (hitscan,
     soft walls penetrate & break), gadgets, explosions, defuser, downed state, snapshots.
@@ -48,8 +53,10 @@ His wishes so far:
     movement, camera, vision blackout, HUD, menus), `js/mapdraw.js` (map pre-rendered to a
     big off-screen canvas with procedural textures; only changed cells are redrawn; shown as
     1024px tile canvases inside `#mapLayer` that the browser moves/scales with a CSS transform),
-    `js/textures.js`, `js/sprites.js` (operators/gadgets drawn in code), `js/fx.js`
-    (particles/explosions/smoke), `js/audio.js` (all sounds synthesised, no files).
+    `js/textures.js` (`S` = map picture detail, set by graphics quality), `js/sprites.js` (operators/gadgets drawn in code), `js/fx.js`
+    (particles/explosions/smoke), `js/audio.js` (all sounds synthesised, no files; distances use the shared
+    building frame so a sound on another floor is heard muffled from the right spot), `js/armory.js`
+    (private shooting range in the menus), `js/crosshair.js` (crosshair settings + drawing).
 - **Rendering & speed:** layers bottom to top: `#mapLayer` (map tiles, CSS transform), `#game` (people,
   gadgets, effects), `#fog` (line-of-sight blackout drawn small, stretched by the browser), `#over` (markers,
   crosshair, screen effects), `#vignette` (CSS). Graphics quality presets (`GFX` in main.js: Low/Medium/High/Ultra,
@@ -60,7 +67,8 @@ His wishes so far:
   input every frame; server applies movement per input message (with its dt) and echoes the
   last sequence number, client replays unacknowledged inputs (prediction + reconciliation).
   Other players are interpolated 100 ms behind.
-- **Tests:** `node tests/sim.js` plays a whole bot-only match headless (must print PASS).
+- **Tests:** `node tests/sim.js` plays a bot-only match on every map (must print PASS; `--only <id>` for one).
+  `node tests/stairs.js` walks a body up and down every staircase with real physics + bot path finding.
   `tests/shoot.mjs` drives a hidden Firefox (run as insideabush, via WebDriver BiDi,
   `--remote-debugging-port`) to take screenshots; see `docs/testing.md`.
 - **Status:** first playable version — all 10 operators, gadgets, drones, cameras, reinforcement,

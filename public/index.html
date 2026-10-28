@@ -45,8 +45,9 @@
           <div class="row"><input id="name" maxlength="16" placeholder="Your name" autocomplete="off"><button id="joinBtn" class="primary">ENTER</button></div>
         </div>
         <div id="room" class="hidden">
-          <div class="roomHead"><div><h2>LOBBY</h2><div class="hint">Harbor Office · First to 3 rounds · Sides swap every round</div></div>
+          <div class="roomHead"><div><h2>LOBBY</h2><div class="hint" id="lobbyHint">First to 3 rounds · Sides swap every round</div></div>
             <button id="startBtn" class="primary big">START MATCH</button></div>
+          <div id="mapPick"></div>
           <div class="squads">
             <div class="squad" id="sq0"><h3>TEAM ALPHA</h3><ul></ul><div class="row"><button data-bot="0">+ Bot</button><button data-unbot="0">− Bot</button></div></div>
             <div class="vs">VS</div>

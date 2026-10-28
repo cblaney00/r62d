@@ -96,6 +96,7 @@ function connect() {
 const send = o => { if (st.ws && st.ws.readyState === 1) st.ws.send(JSON.stringify(o)); };
 
 function loadMap(mv, tiles, hp, id) {
+  const t0 = performance.now();
   st.map = buildMap(id || st.mapId); st.mapId = st.map.id; st.base = st.map.tiles.slice(); st.mv = mv;
   if (tiles) { st.map.tiles.set(tiles); st.map.hp.set(hp); }
   // What your team remembers of the map. It only catches up with the real map when
@@ -108,6 +109,7 @@ function loadMap(mv, tiles, hp, id) {
   st.rend = new MapRenderer(st.known, st.base); st.rend.mount(mapLayer);
   st.rend.splinters = st.splinters;
   st.corpses = []; fx.clear(); st.pending = [];
+  st.loadMs = Math.round(performance.now() - t0); // map build + picture (shown in __r62d for speed checks)
 }
 
 function onSnap(s) {
@@ -359,8 +361,36 @@ function renderControls() {
 }
 
 
+// Little top-down pictures of each map's ground floor for the lobby's map picker.
+const mapThumbs = new Map();
+function mapThumb(id) {
+  if (mapThumbs.has(id)) return mapThumbs.get(id);
+  const m = buildMap(id), F = m.floors.find(f => f.name === '1F') || m.floors[0];
+  const c = document.createElement('canvas'); c.width = F.w * 3; c.height = F.h * 3; const x = c.getContext('2d');
+  const FC = { [FL.GRASS]: '#33502c', [FL.ASPHALT]: '#2c2e31', [FL.WOOD]: '#7a5534', [FL.TILE]: '#9aa2a6', [FL.CARPET]: '#4a5a78', [FL.CONCRETE]: '#6d6d68', [FL.MARBLE]: '#c7c2b8', [FL.SERVER]: '#3d4650' };
+  for (let y = 0; y < F.h; y++) for (let gx = F.gx; gx < F.gx + F.w; gx++) {
+    const k = y * m.W + gx, t = m.tiles[k];
+    x.fillStyle = t === T.HARD || t === T.SOFT ? '#d8d2c4' : t === T.TALL ? '#22262a' : t === T.OPEN ? '#e0b54a' : t === T.STAIR ? '#f2c14e' : FC[m.floor[k]] || '#111';
+    x.fillRect((gx - F.gx) * 3, y * 3, 3, 3);
+  }
+  mapThumbs.set(id, c); return c;
+}
+function renderMapPick(s) {
+  const el = $('mapPick'), key = s.mp + ':' + (s.ph === PHASE.LOBBY);
+  if (el.dataset.k === key) return;
+  el.dataset.k = key; el.innerHTML = '';
+  for (const id of MAP_LIST) {
+    const M = MAPS[id], b = document.createElement('button');
+    b.className = id === s.mp ? 'on' : ''; b.title = M.desc;
+    b.appendChild(mapThumb(id).cloneNode()); b.querySelector('canvas').getContext('2d').drawImage(mapThumb(id), 0, 0);
+    b.insertAdjacentHTML('beforeend', `<b>${esc(M.name)}</b><span>${esc(M.floors)}</span>`);
+    b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'map', id }); };
+    el.appendChild(b);
+  }
+  $('lobbyHint').textContent = `${MAPS[s.mp] ? MAPS[s.mp].name + ' · ' + MAPS[s.mp].desc + ' · ' : ''}First to 3 rounds · Sides swap every round`;
+}
 function renderLobby(s) {
-  renderControls();
+  renderControls(); renderMapPick(s);
   for (const sq of [0, 1]) {
     const ul = document.querySelector(`#sq${sq} ul`);
     const list = s.players.filter(p => p.sq === sq);
@@ -418,7 +448,8 @@ function buildSelect(s) {
     sc.innerHTML = side === 'def' ? '<span>CHOOSE THE SITE TO DEFEND</span>' + st.map.sites.map((x, i) => `<button data-n="${i}" class="${i === s.site ? 'on' : ''}">${esc(x.name)}</button>`).join('') : '';
     for (const b of sc.querySelectorAll('button')) b.onclick = () => { audio.ui(); send({ t: 'site', n: +b.dataset.n }); };
   }
-  $('selInfo').textContent = side === 'def' ? `DEFEND: ${site.name.toUpperCase()}  ·  HARBOR OFFICE` : `SPAWN: ${String(s.spawn).toUpperCase()}  ·  OBJECTIVE UNKNOWN  ·  HARBOR OFFICE`;
+  const mapName = st.map.name.toUpperCase();
+  $('selInfo').textContent = side === 'def' ? `DEFEND: ${site.name.toUpperCase()}  ·  ${mapName}` : `SPAWN: ${String(s.spawn).toUpperCase()}  ·  OBJECTIVE UNKNOWN  ·  ${mapName}`;
   $('selTime').textContent = Math.ceil(s.tm);
   $('picks').innerHTML = mates.map(p => `<span><b>${esc(p.n)}</b> ${p.op ? OPERATORS[p.op].name : '…'}</span>`).join('');
 }

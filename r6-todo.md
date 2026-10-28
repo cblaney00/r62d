@@ -6,15 +6,16 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-- [ ] Crosshair settings: players adjust their own crosshair (shape, size, gap, colour…).
-- [ ] Armory: a place to try out and inspect every gun.
-- [ ] Defenders set up their site like in R6 (more fortifying options during prep).
-- [ ] 2–3 floors per map (stairs, hatches, hearing and shooting between floors).
-- [ ] 5 more maps (each 2–3 floors), picked at the start of a game.
-- [ ] 30 attackers and 30 defenders (all original).
+- [ ] 30 attackers and 30 defenders (all original). *(next — waiting on his ideas for what kinds of operators he wants)*
+- [ ] Floors, part 2: hatches in floors/ceilings to break open, hearing/seeing through them.
 
 ## Done
 
+- [x] Crosshair settings: style (cross, dot, T, circle…), colour, length, thickness, gap, opacity, outline, opens up when moving; live preview; saved per profile.
+- [x] Armory (main menu): private shooting range with every gun, dummies at 5–45 m, real damage/drop-off/spread/recoil/headshots, stats and time-to-kill.
+- [x] Site setup like R6: defenders choose which site to defend during operator select; setup tips during prep.
+- [x] Floors: every map has 2–3 floors joined by stairs (inside staircases, outside fire escapes, garage ramps); bots use them.
+- [x] 5 more maps, chosen in the lobby: Cliffside Villa (B·1F·2F), Rail Depot (1F·2F), The Embassy (B·1F·2F), Alpine Lodge (1F·2F), Clocktower School (1F·2F·3F); Harbor Office got a 2F.
 - [x] Realistic footsteps: heel + toe strikes ringing each floor material, sole scuff, crunch grains on gravel/grass/glass.
 - [x] Speed: map drawn by the browser as moving tiles, blackout and markers on their own layers — frame time 20 ms → 7 ms.
 - [x] Graphics settings: Fullscreen on/off and one quality choice (Low / Medium / High / Ultra).
