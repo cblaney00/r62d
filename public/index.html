@@ -31,6 +31,7 @@
     </header>
     <nav class="mnav" id="mnav">
       <button data-tab="play" class="on">PLAY</button>
+      <button data-tab="tutorial">TUTORIAL</button>
       <button data-tab="ops">OPERATORS</button>
       <button data-tab="armory">ARMORY</button>
       <button data-tab="profile">PROFILE</button>
@@ -47,7 +48,7 @@
           <div class="row"><input id="name" maxlength="16" placeholder="Your name" autocomplete="off"><button id="joinBtn" class="primary">ENTER</button></div>
         </div>
         <div id="room" class="hidden">
-          <div class="roomHead"><div><h2>LOBBY</h2><div class="hint" id="lobbyHint">First to 3 rounds · Sides swap every round</div></div>
+          <div class="roomHead"><div><h2>LOBBY</h2><div class="hint" id="lobbyHint">First to 3 rounds · Sides swap every round</div><div class="hint addr" id="joinAddr"></div></div>
             <button id="startBtn" class="primary big">START MATCH</button></div>
           <div id="mapPick"></div>
           <div class="squads">
@@ -57,6 +58,22 @@
           </div>
           <div class="row center"><button id="switchBtn">Switch team</button><button id="fillBtn">Fill empty slots with bots</button>
             <button id="lobbyOpsBtn" class="hidden">Operators</button><button id="lobbyProfBtn" class="hidden">Profile</button></div>
+        </div>
+      </section>
+      <section class="tab" id="tab-tutorial">
+        <div class="tutPage">
+          <h2>LEARN R62D</h2>
+          <p class="hint">Two short playable lessons in a private match against two easy bots. The clock waits while the coach explains each step.</p>
+          <div class="tutLessons">
+            <div class="tutCard"><h3>1 · ATTACKING</h3><p>The three phases of a round, attacker roles, droning to find the objective, pinging, breaching and planting the defuser.</p><button class="primary" data-lesson="atk">START LESSON</button></div>
+            <div class="tutCard"><h3>2 · DEFENDING</h3><p>Defender roles, reinforcing walls, barricading doors, watching cameras, holding an angle and disabling the defuser.</p><button class="primary" data-lesson="def">START LESSON</button></div>
+          </div>
+          <div class="tutInfo">
+            <div><h4>THE ROUND</h4><p><b>Operator select</b> — pick who you play; defenders choose the objective. <b>Preparation</b> (40 s) — attackers drone, defenders fortify. <b>Action</b> (3 min) — attackers break in and plant, defenders stop them. First to 3 rounds; sides swap every round.</p></div>
+            <div><h4>ROLES</h4><p>Breachers open walls, intel finds enemies, support clears the way, entry goes in first, flankers come from behind. On defence anchors hold the objective, roamers slow the attack, trappers and intel make every door dangerous.</p></div>
+            <div><h4>INFORMATION IS KEY</h4><p>Most rounds are won before the first shot. Drone before you walk in, check cameras before you peek, listen for footsteps and breaking walls, and tell your team everything you find.</p></div>
+            <div><h4>PING ANYTHING</h4><p>Press <kbd>T</kbd> or middle-click (a click in a drone or camera) on an enemy, camera, trap, door, window, wall, drone hole, the objective or any spot. Your team sees a named marker and a line in team chat.</p></div>
+          </div>
         </div>
       </section>
       <section class="tab" id="tab-controls">
@@ -102,6 +119,7 @@
     </div>
     <div class="board"></div>
   </div>
+  <div id="coach" class="hidden"></div>
   <div id="countdown"></div>
   <div id="chat"><div id="chatLog"></div><div id="chatBar" class="hidden"><span id="chatMode">TEAM</span><input id="chatIn" maxlength="140" autocomplete="off" placeholder="Say something…  ( / switches team ⇄ all · Enter sends · Esc closes )"></div></div>
   <div id="help" class="hidden"></div>

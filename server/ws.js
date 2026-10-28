@@ -80,6 +80,6 @@ export function attachWebSocket(server, path, onConnect) {
     sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
       `Sec-WebSocket-Accept: ${accept}\r\n` +
       (deflate ? 'Sec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover; client_no_context_takeover\r\n' : '') + '\r\n');
-    onConnect(new Socket(sock, deflate));
+    onConnect(new Socket(sock, deflate), req);
   });
 }

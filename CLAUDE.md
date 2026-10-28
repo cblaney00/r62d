@@ -30,6 +30,15 @@ His wishes so far:
 - Team feeds (he asked): the view key opens your team's feeds and left/right or the mouse wheel flips through all of them (`feeds()` in server/game.js, `feedList`/`feedView`/`camBar` in main.js). Defence: every working camera, map, turret or sticky. Attack: every team drone and wall scope. Only the owner steers their own drone or turns/fires their own gadget camera (`operates`); others watch only but can still mark enemies. Map cameras are anyone's. `node tests/feeds.js` checks it.
 - Operator select shows a big loadout panel (he asked: the old small LOADOUT button wasn't immersive enough). Cards sit in a 4-wide grid on the left (`#opgrid`), the right ~60% is `#selLo`: the hovered card's loadout as a preview until you pick, then your pick's; guns, attachments and gadget are changed right there. It reuses the Operators page detail (`showLoadout`/`fillDetail` in ops.js, compact = no bio/stats).
 - Friendly fire is always on (he asked): bullets, melee, shield bash, hammer, arc gun, turret cameras, toxin gas and every explosion (traps included) hurt teammates too; a teamkill costs a kill.
+- Tutorial (he asked): a TUTORIAL tab in the menu (phases, roles, information, pinging) with two playable lessons, attacking and defending.
+  Each runs in its own private match on the server (`/ws?tut=1` → a `new Game({ tut: true })` in server.js; `tutAction` in game.js) against
+  two slow bots on Harbor Office; operator select and preparation clocks are held until the coach says go, nothing is saved. The coach
+  box is `public/js/tutorial.js` (steps with `done` checks on the snapshot's `tu` info; Space continues/skips).
+- Ping anything with T / middle click / a click in a drone or camera (he asked): `pingTarget` in main.js names what is under your aim
+  (enemy → the old red spot, else a gadget/camera/drone, the objective, else the first wall/door/barricade/drone hole along your aim, else
+  GO HERE / LOOK HERE). Server `mark` sends a labelled marker to the team and a PING line in team chat with the room; 4 pings per 3 s.
+- Playing with friends: the lobby shows "Friends join at http://<wired LAN IP>:6262" (`/api/addr`); the scoreboard (Tab) has a PING column
+  (each browser measures its round trip every 2 s and reports it).
 - Abilities all work. Floors are joined by stairs only (no shooting or seeing between floors yet; no hatches).
 - Graphics detailed enough to interest people used to modern games; fills a fullscreen
   16:9 monitor; must not lag; it's a multi-day project.

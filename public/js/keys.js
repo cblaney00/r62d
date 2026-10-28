@@ -14,7 +14,7 @@ export const ACTIONS = [
   ['ability', 'Operator skill', 'KeyQ', 'KeyZ'],
   ['view', 'Drone / Cameras', 'Digit5', ''],
   ['melee', 'Melee (knife)', 'Digit3', 'KeyV'],
-  ['spot', 'Mark enemy under cursor', 'KeyT', ''],
+  ['spot', 'Ping what is under your aim (enemy, gadget, wall, door, place)', 'KeyT', ''],
   ['chat', 'Chat (opens team chat; / switches team ⇄ all)', 'KeyY', 'Enter'],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['settings', 'Settings', 'KeyO', 'F1'],

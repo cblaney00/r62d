@@ -22,7 +22,11 @@ const JAM_R = 90;
 if (typeof process !== 'undefined' && process.env.R62D_FAST) { DUR.select = 3; DUR.prep = 6; }
 
 export class Game {
-  constructor() {
+  // opts.tut: a private tutorial match for one player (see tutAction), with its timers held
+  // while the coach explains each step, and nothing saved to their profile.
+  constructor(opts = {}) {
+    this.tut = opts.tut ? { lesson: null, hold: true, info: this.blankTutInfo() } : null;
+    this.onEmpty = null;
     this.players = new Map();
     this.nextId = 1;
     this.ents = [];
@@ -65,7 +69,7 @@ export class Game {
       if (p.hasDefuser) this.dropDefuser(p);
       if (this.phase !== PHASE.LOBBY && this.phase !== PHASE.MATCH_END) this.departed.push(this.statLine(p, true));
       this.players.delete(p.id);
-      if (this.humanCount() === 0) this.resetToLobby();
+      if (this.humanCount() === 0) { this.resetToLobby(); if (this.onEmpty) this.onEmpty(); }
     });
   }
 
@@ -110,7 +114,11 @@ export class Game {
       this.applyMove(p, Math.max(0, Math.min(0.05, Number(m.dt) || 0)));
       p.lastSeq = m.s | 0;
       if (Array.isArray(m.ev)) for (const e of m.ev.slice(0, 10)) this.event(p, e);
-    } else if (m.t === 'lobby') {
+    } else if (m.t === 'ping') {
+      if (p.sock && p.sock.open) p.sock.send(JSON.stringify({ t: 'pong', c: m.c }));
+      if (typeof m.rtt === 'number' && isFinite(m.rtt)) p.rtt = Math.max(0, Math.min(9999, Math.round(m.rtt)));
+    } else if (m.t === 'tut') { if (this.tut) this.tutAction(p, m); }
+    else if (m.t === 'lobby' && !this.tut) {
       if (m.a === 'addBot') this.addBot(m.squad);
       else if (m.a === 'removeBot') this.removeBot(m.squad);
       else if (m.a === 'fillBots') { for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); }
@@ -169,7 +177,7 @@ export class Game {
   // ---------------- match flow ----------------
   startMatch() {
     if (this.players.size === 0) return;
-    this.score = [0, 0]; this.round = 0;
+    this.score = [0, 0]; this.round = this.tut && this.tut.lesson === 'def' ? 1 : 0; // the tutorial's defence lesson starts with you defending
     for (const p of this.players.values()) { p.kills = 0; p.deaths = 0; p.ms = this.blankMatchStats(); }
     this.departed = []; this.roundLog = []; this.matchStart = Date.now();
     this.nextRound();
@@ -179,7 +187,7 @@ export class Game {
     this.round++;
     this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
     this.ents = []; this.planted = null; this.winner = null; this.reason = ''; this.noises = [];
-    this.site = Math.floor(Math.random() * this.map.sites.length);
+    this.site = this.tut ? 0 : Math.floor(Math.random() * this.map.sites.length);
     this.siteRevealed = false;
     this.spots = { atk: new Map(), def: new Map() };
     this.reinforce = 10;
@@ -222,7 +230,7 @@ export class Game {
         p.x = pos.x; p.y = pos.y;
         p.aim = Math.atan2(map.H * CELL / 2 - p.y, map.W * CELL / 2 - p.x);
         const d = { id: this.eid(), type: 'drone', owner: p.id, team: TEAM.ATK, x: p.x + Math.cos(p.aim) * 14, y: p.y + Math.sin(p.aim) * 14, hp: 1, ang: p.aim };
-        this.ents.push(d); p.droneId = d.id; p.ctrl = 'drone'; p.drones = 1;
+        this.ents.push(d); p.droneId = d.id; p.ctrl = 'drone'; p.drones = this.tut && !p.bot ? 3 : 1; // spares in the tutorial, in case a defender shoots it
         atkers.push(p);
       }
     }
@@ -284,13 +292,15 @@ export class Game {
   tick(dt) {
     this.time += dt;
     if (this.phase === PHASE.LOBBY) return;
-    this.timer -= dt;
+    const held = this.tut && this.tut.hold && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP);
+    if (!held) this.timer -= dt;
     if (this.phase === PHASE.SELECT) {
       for (const p of this.players.values()) if (p.bot && !p.op && Math.random() < dt * 0.8) botPickOp(this, p);
       if (this.timer <= 0) this.beginPrep();
       return;
     }
     if (this.phase === PHASE.ROUND_END) {
+      if (this.tut) { this.timer = Math.max(0, this.timer); return; } // a lesson is one round: the coach offers what's next
       if (this.timer <= 0) {
         if (Math.max(...this.score) >= WIN_ROUNDS) {
           this.phase = PHASE.MATCH_END; this.timer = DUR.matchEnd;
@@ -734,8 +744,8 @@ export class Game {
       const q = this.players.get(b.target);
       q.downed = false; q.hp = 25; if (p.ms) p.ms.revives++; this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) });
     } else if (b.k === 'reinforce') {
-      if (this.map.tiles[b.cell] === T.SOFT && this.reinforce > 0) { this.reinforceWall(b.cell); this.reinforce--; }
-    } else if (b.k === 'barricade') this.barricade(this.map.openId[b.cell], T.BARRI);
+      if (this.map.tiles[b.cell] === T.SOFT && this.reinforce > 0) { this.reinforceWall(b.cell); this.reinforce--; if (this.tut && !p.bot) this.tut.info.reinf++; }
+    } else if (b.k === 'barricade') { if (this.barricade(this.map.openId[b.cell], T.BARRI) && this.tut && !p.bot) this.tut.info.barri++; }
   }
 
   facingCell(p, reach) { return facingCell(this.map, p.x, p.y, p.aim, reach); }
@@ -792,7 +802,18 @@ export class Game {
       case 'camSet': if (p.ctrl === 'cam' || p.ctrl === 'drone') { const f = this.feeds(team).find(f => f.id === e.id); if (f) this.watch(p, f); } break;
       case 'spot': {
         const q = this.players.get(e.id);
-        if (q && q.alive && this.side(q) !== team) this.spot(team, q.id, DUR.spot);
+        if (q && q.alive && this.side(q) !== team && this.markOk(p)) {
+          this.spot(team, q.id, DUR.spot);
+          this.mark(p, q.x, q.y, 'ENEMY' + (q.op ? ' ' + OPERATORS[q.op].name : ''), q.id);
+        }
+        break;
+      }
+      // a ping on anything else: a camera, a trap, a wall, a door, a spot on the floor (the browser names it)
+      case 'mark': {
+        const x = Number(e.x), y = Number(e.y);
+        if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > this.map.W * CELL || y > this.map.H * CELL || !this.markOk(p)) break;
+        const w = String(e.w || '').toUpperCase().replace(/[^A-Z0-9 .'-]/g, '').trim().slice(0, 28) || 'HERE';
+        this.mark(p, x, y, w, typeof e.id === 'string' || typeof e.id === 'number' ? e.id : null);
         break;
       }
     }
@@ -1073,6 +1094,43 @@ export class Game {
   jammedAt(x, y) {
     for (const e of this.ents) if (e.type === 'jammer' && Math.hypot(e.x - x, e.y - y) < JAM_R) return true;
     return false;
+  }
+
+  // pings: a few per player every 3 seconds, only while alive in a round
+  markOk(p) {
+    if (!p.alive || (this.phase !== PHASE.PREP && this.phase !== PHASE.ACTION)) return false;
+    const now = this.time; p.markTimes = (p.markTimes || []).filter(t => now - t < 3);
+    if (p.markTimes.length >= 4) return false;
+    p.markTimes.push(now); return true;
+  }
+  // A labelled marker for the pinger's team, plus a line in their team chat saying what and where.
+  mark(p, x, y, w, id) {
+    const team = this.side(p), room = roomAt(this.map, x, y);
+    this.events.push({ e: 'mark', team, x: r1(x), y: r1(y), w, by: p.name, from: p.id, id });
+    const msg = JSON.stringify({ t: 'chat', from: p.id, name: p.name, text: w + (room ? ' · ' + room : ''), team: true, squad: p.squad, ping: 1 });
+    for (const q of this.players.values()) if (q.sock && q.sock.open && q.squad === p.squad) q.sock.send(msg);
+    if (this.tut && !p.bot) { const i = this.tut.info; if (!i.pings.includes(w)) i.pings.push(w); i.n++; if (p.ctrl !== 'body') i.feedPings++; }
+  }
+
+  // ---------------- tutorial ----------------
+  blankTutInfo() { return { reinf: 0, barri: 0, pings: [], n: 0, feedPings: 0 }; }
+  // 'start' / 'retry' sets up a lesson: you alone against two easy bots on Harbor Office.
+  // 'go' moves on when the coach is done with a held phase (operator select, preparation).
+  tutAction(p, m) {
+    const tu = this.tut;
+    if (m.a === 'start' || m.a === 'retry') {
+      const lesson = m.a === 'retry' ? tu.lesson : m.lesson;
+      if (lesson !== 'atk' && lesson !== 'def') return;
+      for (const q of [...this.players.values()]) if (q.bot) this.players.delete(q.id);
+      p.squad = 0;
+      tu.lesson = lesson; tu.hold = true; tu.info = this.blankTutInfo();
+      if (this.mapId !== 'harbor') { this.mapId = 'harbor'; this.map = buildMap(this.mapId); }
+      this.addBot(1); this.addBot(1);
+      this.startMatch();
+    } else if (m.a === 'go') {
+      if (this.phase === PHASE.SELECT) this.timer = 0;
+      else if (this.phase === PHASE.PREP && tu.hold) { tu.hold = false; this.timer = Math.min(this.timer, 3.5); }
+    }
   }
 
   spot(team, id, dur) {
@@ -1392,6 +1450,7 @@ export class Game {
     return { name: p.name, bot: !!p.bot, pid: p.pid || null, token: p.token || null, squad: p.squad, left, ...ms, damage: Math.round(ms.damage), playSeconds: Math.round(ms.playSeconds) };
   }
   saveMatch(winner) {
+    if (this.tut) return null; // tutorials never count
     const players = [...[...this.players.values()].map(p => this.statLine(p)), ...(this.departed || [])];
     if (!players.some(p => p.token)) return null; // nobody real played
     return store.recordMatch({
@@ -1411,7 +1470,7 @@ export class Game {
       const g = p.guns[p.slot];
       const o = {
         id: p.id, n: p.name, b: p.bot ? 1 : 0, sq: p.squad, tm: this.round ? this.side(p) : (p.squad === 0 ? 'atk' : 'def'),
-        op: p.op, a: p.alive ? 1 : 0, k: p.kills, d: p.deaths,
+        op: p.op, a: p.alive ? 1 : 0, k: p.kills, d: p.deaths, ms: p.rtt,
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim),
@@ -1450,7 +1509,7 @@ export class Game {
     const common = JSON.stringify({
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId,
       site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
-      rf: this.reinforce, win: this.winner, why: this.reason, spawn: this.spawnName,
+      rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName,
       players, ents, cells, holes, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];

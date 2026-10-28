@@ -185,6 +185,7 @@ export function botThink(game, p, dt) {
       const expected = heardRecently && Math.hypot(ai.heard.x - enemy.x, ai.heard.y - enemy.y) < 200;
       ai.seen = enemy.id; ai.ox = (Math.random() - 0.5) * 12; ai.oy = (Math.random() - 0.5) * 12;
       ai.react = -(expected ? 0.15 : 0.45) - Math.random() * 0.45; ai.err = (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.4);
+      if (game.tut) { ai.react -= 0.7; ai.err *= 1.8; } // tutorial bots are slow and shaky, so a beginner can win
     }
     ai.react += dt; ai.err *= Math.exp(-dt * 1.3);
     ai.err += (Math.random() - 0.5) * dt * 0.6; // hands are never perfectly steady

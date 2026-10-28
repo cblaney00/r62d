@@ -46,13 +46,26 @@ function api(req, res) {
     setTimeout(() => execFile('pkill', ['-f', 'r62d/firefox-kiosk'], () => {}), 300);
     return;
   }
+  // the addresses friends type to join this server (shown in the lobby)
+  if (u.pathname === '/api/addr') {
+    const urls = [];
+    for (const list of Object.values(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) urls.push(`http://${a.address}:${PORT}`);
+    return json(200, { urls });
+  }
   if (u.pathname === '/api/match') { const m = store.match(q('id')); return m ? json(200, m) : json(404, { error: 'no such match' }); }
   if (u.pathname === '/api/players') return json(200, Object.values(store.profiles).map(p => ({ id: p.id, name: p.name, matches: p.stats.matches, wins: p.stats.wins, kills: p.stats.kills, deaths: p.stats.deaths })));
   json(404, { error: 'unknown' });
 }
 
 const game = new Game();
-attachWebSocket(server, '/ws', sock => game.connect(sock));
+// /ws?tut=1 gets its own private tutorial match, gone when that player leaves it
+const tutorials = new Set();
+attachWebSocket(server, '/ws', (sock, req) => {
+  if (!/[?&]tut=1/.test(req.url)) return game.connect(sock);
+  const g = new Game({ tut: true }); tutorials.add(g);
+  g.onEmpty = () => tutorials.delete(g);
+  g.connect(sock);
+});
 
 let last = performance.now(), acc = 0, snapAcc = 0;
 setInterval(() => {
@@ -60,9 +73,9 @@ setInterval(() => {
   acc += Math.min(0.25, (now - last) / 1000); last = now;
   const dt = 1 / TICK_RATE;
   while (acc >= dt) {
-    acc -= dt; game.tick(dt);
+    acc -= dt; game.tick(dt); for (const g of tutorials) g.tick(dt);
     snapAcc += dt;
-    if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = 0; game.broadcast(); }
+    if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = 0; game.broadcast(); for (const g of tutorials) g.broadcast(); }
   }
 }, 1000 / 120);
 

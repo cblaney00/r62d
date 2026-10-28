@@ -19,6 +19,7 @@ import { levelFor } from '/shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '/shared/operators.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
 import { walkRay, tileAt } from '/shared/physics.js';
+import { createCoach } from './tutorial.js';
 import { blocksSight, FL } from '/shared/constants.js';
 
 const $ = id => document.getElementById(id);
@@ -123,12 +124,15 @@ addEventListener('resize', resize); resize();
 fx.quality = gq.parts; setShading(gq.shade);
 
 // ---------------- network ----------------
-function connect() {
-  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+function connect(tut = false) {
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws${tut ? '?tut=1' : ''}`);
   st.ws = ws;
+  ws.onopen = () => { if (st.rejoin) { st.rejoin = false; $('joinBtn').click(); } };
   ws.onmessage = ev => {
     const m = JSON.parse(ev.data);
+    if (m.t === 'pong') { const r = performance.now() - m.c; st.rtt = st.rtt == null ? r : st.rtt * 0.7 + r * 0.3; return; }
     if (m.t === 'welcome') {
+      if (st.tutorial) send({ t: 'tut', a: 'start', lesson: st.tutorial });
       st.id = m.id;
       if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
         resetMap(m.mapVersion);
@@ -150,9 +154,24 @@ function connect() {
     else if (m.t === 'xp') { st.profile = m.profile; playXp(m); }
     else if (m.t === 'profile') { st.profile = m.profile; updateOpsProfile($('opsPage'), m.profile); st.loDirty = true; }
   };
-  ws.onclose = () => { $('conn').classList.remove('hidden'); $('conn').textContent = 'Disconnected — reconnecting…'; setTimeout(() => location.reload(), 2500); };
+  ws.onclose = () => { if (ws !== st.ws) return; $('conn').classList.remove('hidden'); $('conn').textContent = 'Disconnected — reconnecting…'; setTimeout(() => location.reload(), 2500); };
 }
 const send = o => { if (st.ws && st.ws.readyState === 1) st.ws.send(JSON.stringify(o)); };
+// latency: a ping every 2 s; your own figure is shown on the HUD and sent on so the scoreboard shows everyone's
+setInterval(() => send({ t: 'ping', c: performance.now(), rtt: st.rtt == null ? null : Math.round(st.rtt) }), 2000);
+
+// ---------------- tutorial ----------------
+// A lesson runs in its own private match on the server: leave the lobby, join a tutorial, come back after.
+const coach = createCoach({ el: $('coach'), send, getMap: () => st.map, onExit: () => switchMatch(null) });
+function switchMatch(lesson) {
+  if (!st.token) { setTab('play'); $('name').focus(); return; }
+  st.tutorial = lesson; st.rejoin = true; st.marks = [];
+  if (lesson) coach.start(lesson); else coach.stop();
+  $('pEnd').textContent = lesson ? 'Leave tutorial' : 'End match for everyone'; $('leaveBtn').textContent = lesson ? 'Leave tutorial' : 'End match';
+  const old = st.ws; connect(!!lesson); try { old.close(); } catch {}
+  $('pause').classList.add('hidden');
+}
+for (const b of document.querySelectorAll('[data-lesson]')) b.onclick = () => switchMatch(b.dataset.lesson);
 
 function loadMap(mv, tiles, hp, id, holes) {
   const t0 = performance.now();
@@ -325,6 +344,11 @@ function onEvent(e, s, players) {
     case 'arc': fx.tracer(e.x, e.y, e.x2, e.y2, '130,200,255'); fx.tracer(e.x, e.y, e.x2 + 2, e.y2 - 2, '200,230,255'); fx.impact(e.x2, e.y2, 'spark'); audio.impact('electronic', e.x2, e.y2); break;
     case 'laser': fx.tracer(e.x, e.y, e.x2, e.y2, '255,50,50'); fx.impact(e.x2, e.y2, 'spark'); audio.foley('tick', e.x, e.y); break;
     case 'daze': if (st.me && e.id === st.me.id) { st.dazeUntil = now + e.dur; audio.tinnitus(1); } break;
+    case 'mark': if (e.team === mySide()) {
+      st.marks = (st.marks || []).filter(k => !(k.from === e.from && (k.id === e.id && e.id != null || st.marks.filter(q => q.from === e.from).length >= 3)));
+      st.marks.push({ ...e, t: now }); fx.ping(e.x, e.y, e.w.startsWith('ENEMY') ? '255,70,70' : '255,210,74');
+      if (e.from !== st.id) audio.foley('spot');
+    } break;
     case 'ping': if (e.team === mySide()) { fx.ping(e.x, e.y, e.any ? '255,90,60' : '79,179,169'); audio.foley('beep', e.x, e.y); } break;
     case 'stim': fx.tracer(e.x, e.y, e.x2, e.y2, '120,255,160'); fx.ping(e.x2, e.y2, '120,255,160'); audio.foley('revive', e.x, e.y); break;
     case 'melee': anim(e.id).melee = 1; { const p = players.get(e.id); if (p && p.x !== undefined) audio.foley('melee', p.x, p.y, e.id === st.id); } break;
@@ -342,6 +366,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Escape' && document.activeElement && document.activeElement.tagName === 'INPUT') document.activeElement.blur();
   if (document.activeElement === $('chatIn')) { chatKey(e); return; }
   if (document.activeElement && document.activeElement.tagName === 'INPUT') { if (e.key === 'Enter') $('joinBtn').click(); return; }
+  if (e.code === 'Space' && coach.active && !e.repeat && coach.space(st.last)) { e.preventDefault(); return; }
   const a = actionFor(e.code);
   if (a || e.code === 'AltLeft' || e.code === 'AltRight' || e.code === 'Tab') e.preventDefault();
   if (!a || keys.has(a)) return;
@@ -402,7 +427,7 @@ function renderSettings() {
   }).join('');
   $('bindTable').innerHTML = `<tr><th>ACTION</th><th>KEY</th><th>ALTERNATE</th></tr>${rows}
     <tr><td>Shoot / Aim down sights</td><td>Left mouse</td><td>Right mouse</td></tr>
-    <tr><td>Mark enemy</td><td>Middle mouse</td><td></td></tr>`;
+    <tr><td>Ping</td><td>Middle mouse</td><td></td></tr>`;
   for (const b of $('bindTable').querySelectorAll('button')) b.onclick = () => { rebinding = { id: b.dataset.id, slot: +b.dataset.slot }; renderSettings(); };
 }
 $('setReset').onclick = () => { resetBinds(); renderSettings(); };
@@ -465,7 +490,7 @@ document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { send(
 $('switchBtn').onclick = () => { send({ t: 'lobby', a: 'switch' }); };
 $('fillBtn').onclick = () => { send({ t: 'lobby', a: 'fillBots' }); };
 $('startBtn').onclick = () => { send({ t: 'lobby', a: 'start' }); };
-$('leaveBtn').onclick = () => { if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
+$('leaveBtn').onclick = () => { if (st.tutorial) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
 $('fsBtn').onclick = () => toggleFullscreen();
 $('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100); $('muteBtn').textContent = st.muted ? '🔇' : '🔊'; };
 function renderControls() {
@@ -473,7 +498,7 @@ function renderControls() {
   const rows = [[`${L('up')}${L('left')}${L('down')}${L('right')}`, 'Move'], ['Mouse', 'Aim'], ['Left click', 'Shoot'], ['Right click', 'Aim down sights'],
     [L('walk'), 'Walk (silent)'], [L('crouch'), 'Crouch (hold, silent)'], [L('reload'), 'Reload'],
     [L('interact') + ' (hold)', 'Reinforce, barricade, plant, defuse, revive'], [L('ability'), 'Operator skill'],
-    [L('gadget'), 'Secondary gadget'], [L('melee'), 'Melee'], [L('view'), 'Drone / Cameras'], [L('spot') + ' · Middle click', 'Mark enemy'],
+    [L('gadget'), 'Secondary gadget'], [L('melee'), 'Melee'], [L('view'), 'Drone / Cameras'], [L('spot') + ' · Middle click', 'Ping (enemies, gadgets, walls, doors, places)'],
     [`${L('primary')} / ${L('secondary')} · Wheel`, 'Switch weapon'], [L('scoreboard'), 'Scoreboard']];
   const html = rows.map(([k, d]) => `<span>${k}</span>${d}`).join('');
   if ($('ctlGrid').innerHTML !== html) $('ctlGrid').innerHTML = html;
@@ -510,6 +535,10 @@ function renderMapPick(s) {
 }
 function renderLobby(s) {
   renderControls(); renderMapPick(s);
+  // the address friends type to join (the first network card is the wired one)
+  if (st.addr === undefined) { st.addr = null; fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
+  const jt = st.addr && st.addr.urls.length ? `Friends join at ${st.addr.urls[0]}` : '';
+  if ($('joinAddr').textContent !== jt) $('joinAddr').textContent = jt;
   for (const sq of [0, 1]) {
     const ul = document.querySelector(`#sq${sq} ul`);
     const list = s.players.filter(p => p.sq === sq);
@@ -631,8 +660,8 @@ async function playXp(m) {
 function scoreTable(s) {
   const me = st.me;
   const rows = [...s.players].sort((a, b) => (a.sq - b.sq) || (b.k - a.k)).map(p =>
-    `<tr class="${me && p.sq === me.sq ? 'ally' : 'enemy'} ${p.id === s.you ? 'me' : ''} ${p.a ? '' : 'dead'}"><td>${esc(p.n)}</td><td>${p.op ? OPERATORS[p.op].name : '—'}</td><td>${p.k}</td><td>${p.d}</td></tr>`).join('');
-  return `<table><tr><th>PLAYER</th><th>OPERATOR</th><th>KILLS</th><th>DEATHS</th></tr>${rows}</table>`;
+    `<tr class="${me && p.sq === me.sq ? 'ally' : 'enemy'} ${p.id === s.you ? 'me' : ''} ${p.a ? '' : 'dead'}"><td>${esc(p.n)}</td><td>${p.op ? OPERATORS[p.op].name : '—'}</td><td>${p.k}</td><td>${p.d}</td><td>${p.b ? 'BOT' : p.ms != null ? p.ms + ' ms' : '…'}</td></tr>`).join('');
+  return `<table><tr><th>PLAYER</th><th>OPERATOR</th><th>KILLS</th><th>DEATHS</th><th>PING</th></tr>${rows}</table>`;
 }
 
 // ---------------- interpolation ----------------
@@ -669,6 +698,7 @@ function frame(nowMs) {
   const inGame = phase === PHASE.PREP || phase === PHASE.ACTION || phase === PHASE.ROUND_END;
   screens(s, phase, now);
   const me = st.me;
+  if (coach.active) coach.update(s, me);
 
   // --- view source ---
   let view = null, ctrl = me && me.a ? me.ct : null;
@@ -780,16 +810,13 @@ function sendInput(dt, me, ctrl, view, s, now) {
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
   };
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
-  // mark the enemy nearest the cursor that you can actually see
+  // ping whatever is under your aim: an enemy you can see, else a gadget, camera or the objective, else the wall, door or floor you point at
   const trySpot = () => {
     if (!view || !me) return;
-    const c = cursor(), mw = screenToWorld(c.x, c.y);
-    let best = null, bd = 45;
-    for (const p of s.players) if (p.a && p.tm !== me.tm && p.x !== undefined) {
-      const d = Math.hypot(p.x - mw.x, p.y - mw.y);
-      if (d < bd && canSee(st.map, view, p.x, p.y, smokes(s))) { bd = d; best = p; }
-    }
-    if (best) { ev.push({ k: 'spot', id: best.id }); audio.foley('spot'); }
+    const c = cursor(), mw = screenToWorld(c.x, c.y), t = pingTarget(view, me, s, mw);
+    if (!t) return;
+    ev.push(t.spot ? { k: 'spot', id: t.spot } : { k: 'mark', x: Math.round(t.x), y: Math.round(t.y), w: t.w, id: t.id });
+    audio.foley('spot');
   };
   if (ctrl === 'cam' || ctrl === 'drone') {
     if (mouse.wl) trySpot();
@@ -813,6 +840,88 @@ function sendInput(dt, me, ctrl, view, s, now) {
   st.pending.push({ s: msg.s, k, dt: msg.dt });
   if (st.pending.length > 120) st.pending.shift();
   send(msg);
+}
+
+// What a ping names. Gadgets and skills are called by their names in operators.js.
+const ENT_NAME = (() => {
+  const n = { cam: 'CAMERA', drone: 'DRONE', defuser: 'DEFUSER', decoy: 'DECOY', smoke: 'SMOKE', gascloud: 'GAS' };
+  for (const [k, g] of Object.entries(GADGETS)) if (!n[k]) n[k] = g.name.toUpperCase();
+  for (const o of Object.values(OPERATORS)) if (o.ability && !n[o.ability.id]) n[o.ability.id] = o.ability.name.toUpperCase();
+  return n;
+})();
+function entName(e) {
+  if (e.ty === 'cam') return e.tu ? 'TURRET CAMERA' : 'CAMERA';
+  if (e.ty === 'nade') return e.kd && GADGETS[e.kd] ? GADGETS[e.kd].name.toUpperCase() : 'GRENADE';
+  return ENT_NAME[e.ty] || e.ty.toUpperCase();
+}
+function cellName(k, t) {
+  const m = st.map, o = m.openId[k] >= 0 ? m.openings[m.openId[k]] : null, ok = o && o.kind === 'window' ? 'WINDOW' : 'DOOR';
+  if (t === T.BARRI) return o ? 'BARRICADED ' + ok : 'BARRICADE';
+  if (t === T.OPEN) return o ? ok : null;
+  if (t === T.REINF) return 'REINFORCED WALL';
+  if (t === T.SOFT) return m.dhole[k] ? 'DRONE HOLE' : 'SOFT WALL';
+  if (t === T.HARD) return 'HARD WALL';
+  if (t === T.PANEL) return 'ARMOR PANEL';
+  if (t === T.DSHIELD) return 'DEPLOYABLE SHIELD';
+  if (t === T.TALL) return 'COVER';
+  if (t === T.LOW) return 'LOW COVER';
+  if (t === T.STAIR) return 'STAIRS';
+  return null;
+}
+function pingTarget(view, me, s, mw) {
+  const sm = smokes(s), m = st.map, seeIt = (x, y) => canSee(m, view, x, y, sm);
+  let best = null, bd = 45;
+  for (const p of s.players) if (p.a && p.tm !== me.tm && p.x !== undefined) {
+    const d = Math.hypot(p.x - mw.x, p.y - mw.y);
+    if (d < bd && seeIt(p.x, p.y)) { bd = d; best = p; }
+  }
+  if (best) return { spot: best.id };
+  let be = null; bd = 20;
+  for (const e of s.ents) {
+    if (e.id === me.did || e.id === me.fi || e.ty === 'smoke' || e.ty === 'gascloud') continue;
+    const d = Math.hypot(e.x - mw.x, e.y - mw.y);
+    if (d < bd && (e.tm === me.tm || seeIt(e.x, e.y))) { bd = d; be = e; }
+  }
+  if (be) return { x: be.x, y: be.y, w: entName(be), id: be.id };
+  const site = m.sites[s.site];
+  if (site && (me.tm === 'def' || s.rev)) for (const b of site.bombs) if (Math.hypot(b.x - mw.x, b.y - mw.y) < 22) return { x: b.x, y: b.y, w: 'OBJECTIVE ' + b.id };
+  // follow the aim line out from where you look: the first thing that stops your sight, or the floor where you point
+  const dx = mw.x - view.x, dy = mw.y - view.y, L = Math.hypot(dx, dy) || 1;
+  if (L > view.range || (L > view.near && Math.abs(angDiff(Math.atan2(dy, dx), view.ang)) > view.fov / 2 + 0.1)) return null;
+  for (let d = 3; ; d += 2) {
+    const end = d >= L, x = view.x + dx / L * Math.min(d, L), y = view.y + dy / L * Math.min(d, L);
+    const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), k = cy * m.W + cx, t = tileAt(m, cx, cy);
+    if (t === T.VOID) return null;
+    if (blocksSight(t) || end) {
+      if (!blocksSight(t) && !seeIt(x, y)) return null;
+      const name = cellName(k, t);
+      if (name) return { x: blocksSight(t) ? (cx + 0.5) * CELL : x, y: blocksSight(t) ? (cy + 0.5) * CELL : y, w: name };
+      for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k2 = (cy + oy) * m.W + cx + ox; if (m.dhole[k2]) return { x, y, w: 'DRONE HOLE' }; }
+      return { x, y, w: view.kind === 'body' ? 'GO HERE' : 'LOOK HERE' };
+    }
+  }
+}
+// Pings on screen: a diamond with what it is, who pinged it and how far; kept at the screen edge when off screen.
+function drawMarks(view, now) {
+  if (!st.marks || !st.marks.length) return;
+  st.marks = st.marks.filter(k => now - k.t < 6);
+  const z = st.zoom, pad = 40 * DPR;
+  for (const k of st.marks) {
+    const age = now - k.t, al = age > 5 ? 6 - age : 1, pop = Math.min(1, age / 0.15), col = k.w.startsWith('ENEMY') ? '255,70,70' : '255,210,74';
+    const sx = (k.x - st.cam.x) * z + VW / 2, sy = (k.y - st.cam.y) * z + VH / 2;
+    const cx = Math.max(pad, Math.min(VW - pad, sx)), cy = Math.max(pad + 60 * DPR, Math.min(VH - pad - 60 * DPR, sy));
+    const wx = (cx - VW / 2) / z + st.cam.x, wy = (cy - VH / 2) / z + st.cam.y, r = 5 * (2 - pop);
+    ctx.save(); ctx.translate(wx, wy); ctx.globalAlpha = al;
+    ctx.fillStyle = `rgba(${col},0.25)`; ctx.strokeStyle = `rgb(${col})`; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(0, 0, 1.2, 0, 7); ctx.fill();
+    ctx.textAlign = 'center'; ctx.font = '700 6.5px Barlow Condensed, sans-serif';
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(k.w, 0, -r - 3); ctx.fillText(k.w, 0, -r - 3);
+    const d = view ? ` · ${Math.round(Math.hypot(k.x - view.x, k.y - view.y) / CELL * 0.8)}m` : '';
+    ctx.font = '600 5px Barlow Condensed, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.strokeText(k.by + d, 0, r + 7); ctx.fillText(k.by + d, 0, r + 7);
+    ctx.restore();
+  }
 }
 
 // smoke clouds of a snapshot, worked out once per snapshot (it was being rebuilt many times a frame)
@@ -1102,6 +1211,7 @@ function draw(s, view, now, dt) {
     if (side === 'def' || s.rev) for (const b of site.bombs) marker(b.x, b.y, b.id, '#f2c14e', view);
     if (s.pl) marker(s.pl.x, s.pl.y, '!', '#ff4040', view);
     if (side === 'atk') for (const e of ents) if (e.ty === 'defuser') marker(e.x, e.y, 'D', '#f2c14e', view);
+    drawMarks(view, now);
     // footstep direction hints around you
     if (view && view.kind === 'body') for (const p of drawn) { /* visible: no hint */ }
     if (view && view.kind === 'body') for (const sp of s.players) {
@@ -1310,12 +1420,12 @@ function hud(s) {
     `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label
   let vl = '';
-  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); vl = d && d.j ? 'DRONE JAMMED' : `YOUR DRONE · CLICK TO MARK ENEMIES · WHEEL: TEAM DRONES · ${label('view')} TO EXIT`; }
+  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); vl = d && d.j ? 'DRONE JAMMED' : `YOUR DRONE · CLICK OR ${label('spot')} TO PING · WHEEL: TEAM DRONES · ${label('view')} TO EXIT`; }
   else if (me.ct === 'cam') {
     const list = feedList(s, me), c = list.find(e => e.id === me.fi);
     if (c) {
       const ro = c.ow && c.ow !== me.id, who = ro ? `${ownerName(s, c.ow).toUpperCase()}'S ` : c.ow ? 'YOUR ' : '';
-      vl = `${who}${feedKind(c)} ${list.indexOf(c) + 1}/${list.length} · ${(roomAt(st.map, c.x, c.y) || 'outside').toUpperCase()} · ${ro || c.ty !== 'cam' ? 'WATCH ONLY' : 'MOUSE LOOK'} · ${label('left')} ${label('right')} SWITCH · CLICK MARK${c.off || c.j ? ' · DISRUPTED' : ''}`;
+      vl = `${who}${feedKind(c)} ${list.indexOf(c) + 1}/${list.length} · ${(roomAt(st.map, c.x, c.y) || 'outside').toUpperCase()} · ${ro || c.ty !== 'cam' ? 'WATCH ONLY' : 'MOUSE LOOK'} · ${label('left')} ${label('right')} SWITCH · CLICK PING${c.off || c.j ? ' · DISRUPTED' : ''}`;
     }
   }
   $('viewlabel').textContent = vl;
@@ -1521,7 +1631,7 @@ $('pOps').onclick = () => showOps(st.me && st.me.op);
 $('pProf').onclick = () => showProfile();
 $('pSet').onclick = () => toggleSettings();
 $('pFs').onclick = () => { toggleFullscreen(); $('pause').classList.add('hidden'); };
-$('pEnd').onclick = () => { if (confirm('End the match for everyone and go back to the lobby?')) { send({ t: 'lobby', a: 'end' }); $('pause').classList.add('hidden'); } };
+$('pEnd').onclick = () => { if (st.tutorial) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) { send({ t: 'lobby', a: 'end' }); $('pause').classList.add('hidden'); } };
 $('lobbyOpsBtn').onclick = () => showOps();
 $('lobbyProfBtn').onclick = () => showProfile();
 $('armoryPage').querySelector('.close').onclick = () => closeArmory($('armoryPage'));
@@ -1572,7 +1682,8 @@ const TIPS = [
   'Attackers: use your drone in preparation to find the objective before you go in.',
   'Bullets go through soft walls. If you can hear them, you can shoot them.',
   'A downed teammate can be revived — hold interact next to them.',
-  'Mark enemies with the middle mouse button or T so your whole team sees them.',
+  'Press T (or middle click) to ping anything for your team: enemies, cameras, traps, doors, walls, or a place to go.',
+  'New to R62D? The TUTORIAL tab teaches the phases, the roles and pinging in two short playable lessons.',
   'Cameras see a cone: aim them with the mouse and switch with A and D.',
   'Change your loadout for every operator on the Operators page.',
   'Smashed barricades leave splinters that crack underfoot.',
@@ -1693,7 +1804,8 @@ function chatKey(e) {
 function addChat(m) {
   const me = st.me, mine = me && m.squad === me.sq;
   const d = document.createElement('div');
-  d.innerHTML = `<span class="tag ${m.team ? 'team' : 'all'}">${m.team ? 'TEAM' : 'ALL'}</span>${m.dead ? '<span class="dead">(dead)</span> ' : ''}<b class="${mine ? 'a' : 'e'}">${esc(m.name)}:</b> ${esc(m.text)}`;
+  d.innerHTML = m.ping ? `<span class="tag ping">PING</span><b class="${mine ? 'a' : 'e'}">${esc(m.name)}:</b> <span class="pingTxt">${esc(m.text)}</span>`
+    : `<span class="tag ${m.team ? 'team' : 'all'}">${m.team ? 'TEAM' : 'ALL'}</span>${m.dead ? '<span class="dead">(dead)</span> ' : ''}<b class="${mine ? 'a' : 'e'}">${esc(m.name)}:</b> ${esc(m.text)}`;
   $('chatLog').appendChild(d);
   while ($('chatLog').children.length > 30) $('chatLog').firstChild.remove();
   d.dataset.t = performance.now();

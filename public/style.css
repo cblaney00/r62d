@@ -423,3 +423,27 @@ button.big { font-size: 22px; padding: 14px 34px; }
 #chatBar { display: flex; margin-top: 4px; pointer-events: auto; animation: rise 0.15s both; }
 #chatMode { font: 800 13px var(--head); letter-spacing: 0.15em; padding: 8px 10px; }
 #chatIn { flex: 1; width: auto; font: 500 15px var(--body); padding: 7px 10px; background: rgba(0,0,0,0.75); }
+
+/* tutorial: the menu page and the coach box in the match */
+.tutPage { max-width: 1100px; }
+.tutLessons { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 18px 0 26px; }
+.tutCard { background: rgba(20,26,32,0.8); border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid var(--ally); padding: 18px 20px; }
+.tutCard h3 { font: 800 22px var(--head); letter-spacing: 0.12em; margin: 0 0 8px; }
+.tutCard p { color: var(--dim); margin: 0 0 14px; line-height: 1.4; }
+.tutInfo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 26px; }
+.tutInfo h4 { font: 800 15px var(--head); letter-spacing: 0.18em; color: #f2c14e; margin: 0 0 4px; }
+.tutInfo p { margin: 0; line-height: 1.45; color: #cfd6dd; }
+kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid rgba(255,255,255,0.35); border-bottom-width: 2px; border-radius: 3px; font: 700 0.85em var(--head); text-align: center; background: rgba(255,255,255,0.08); }
+#coach { position: fixed; left: 18px; top: 92px; width: min(420px, 34vw); z-index: 40; background: rgba(10,14,18,0.9); border: 1px solid rgba(255,255,255,0.1); border-left: 3px solid #f2c14e; padding: 14px 16px; color: #e6ebf0; font-size: 15px; line-height: 1.4; box-shadow: 0 8px 30px rgba(0,0,0,0.5); animation: fadeIn 0.3s both; }
+#coach .cHead { font: 700 12px var(--head); letter-spacing: 0.2em; color: #f2c14e; display: flex; justify-content: space-between; }
+#coach .cHead span { color: var(--dim); }
+#coach .cDots { display: flex; gap: 4px; margin: 8px 0 10px; } #coach .cDots i { flex: 1; height: 3px; background: rgba(255,255,255,0.12); } #coach .cDots i.d { background: #f2c14e88; } #coach .cDots i.on { background: #f2c14e; }
+#coach .cTitle { font: 800 22px var(--head); letter-spacing: 0.06em; margin-bottom: 6px; }
+#coach .cBody ul, #coach .cBody ol { margin: 6px 0; padding-left: 20px; } #coach .cBody li { margin: 3px 0; } #coach small { color: var(--dim); }
+#coach .cFoot { margin-top: 10px; font: 600 12px var(--head); letter-spacing: 0.12em; color: var(--dim); }
+#coach .cPings { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; } #coach .cPings span { background: rgba(242,193,78,0.18); color: #f2c14e; font: 700 12px var(--head); letter-spacing: 0.08em; padding: 1px 6px; }
+#coach .cBtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+#select ~ #coach, #coach { pointer-events: auto; }
+#chatLog .tag.ping { background: #f2c14e; color: #111; } #chatLog .pingTxt { color: #f2c14e; font-weight: 600; }
+.hint.addr { color: #f2c14e; margin-top: 4px; }
+#coach.sel { top: auto; bottom: 74px; left: auto; right: 140px; transform: none; width: 600px; }
