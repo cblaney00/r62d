@@ -21,12 +21,15 @@ function faceWall(g, p, door) {
 
 let fails = 0;
 for (const op of OP_LIST) {
-  const g = new Game();
-  for (let i = 0; i < 10; i++) g.addBot();
-  g.startMatch();
-  while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
   const team = OPERATORS[op].team;
-  const p = [...g.players.values()].find(q => g.side(q) === team && q.alive);
+  let g, p;
+  do { // now and then bots kill a whole side before the round starts (friendly fire): set it up again
+    g = new Game();
+    for (let i = 0; i < 10; i++) g.addBot();
+    g.startMatch();
+    while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+    p = [...g.players.values()].find(q => g.side(q) === team && q.alive);
+  } while (!p);
   p.op = op; g.equip(p); p.bot = false; // a still body that only uses its ability
   if (WALLY.has(OPERATORS[op].ability.id)) faceWall(g, p, OPERATORS[op].ability.id === 'panel');
   const startTiles = g.map.tiles.slice();
