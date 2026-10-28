@@ -6,11 +6,14 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-- [ ] 30 attackers and 30 defenders (all original). *(next — waiting on his ideas for what kinds of operators he wants)*
 - [ ] Floors, part 2: hatches in floors/ceilings to break open, hearing/seeing through them.
 
 ## Done
 
+- [x] 15 attackers and 15 defenders (he changed 30 to 15 each). New attack: Rivet (thermal lance), Haze (smoke barrage), Glint (sonar),
+      Brisk (adrenal shot), Onyx (cluster charge), Prism (holo decoy), Volt (arc gun), Tether (wall scope), Strider (ghost step), Ferro (hammer).
+      New defence: Bramble (proximity charge), Kite (turret camera), Gravel (daze mines), Shunt (static grid), Hush (silent shroud),
+      Shade (sound sensors), Rampart (armor bag), Miasma (toxin gas), Snare (clamp traps), Argus (sticky cams). Pick screen: 8 per row + details strip.
 - [x] Crosshair settings: style (cross, dot, T, circle…), colour, length, thickness, gap, opacity, outline, opens up when moving; live preview; saved per profile.
 - [x] Armory (main menu): private shooting range with every gun, dummies at 5–45 m, real damage/drop-off/spread/recoil/headshots, stats and time-to-kill.
 - [x] Site setup like R6: defenders choose which site to defend during operator select; setup tips during prep.

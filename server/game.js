@@ -2,7 +2,7 @@
 import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
 import { buildMap, roomAt, MAPS, MAP_LIST } from '../shared/map.js';
-import { stepMove, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell } from '../shared/physics.js';
+import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, publicProfile } from './store.js';
@@ -271,6 +271,8 @@ export class Game {
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false;
     p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0;
     p.downedBy = null; p.nitroId = null; p.ai = {};
+    p.boostUntil = 0; p.ghostUntil = 0; p.dazeUntil = 0; p.clampUntil = 0; p.plated = false; p.gasId = null;
+    p.lanceT = 0; p.lancing = false; p.shrouded = false; p.turretCd = 0; p.shockT = 0;
   }
 
   // ---------------- simulation ----------------
@@ -346,8 +348,10 @@ export class Game {
     if (this.time < p.slowUntil) mul *= 0.45;
     if (p.bracing) mul *= 0.45;
     if (p.scanning) mul *= 0.6;
+    if (this.time < (p.boostUntil || 0)) mul *= 1.25; // Adrenal Shot
+    if (p.shrouded) mul *= 0.8;
     for (const e of this.ents) if (e.type === 'wire' && e.team !== this.side(p) && Math.hypot(e.x - p.x, e.y - p.y) < 24) { mul *= 0.3; break; }
-    const frozen = !p.alive || p.ctrl !== 'body' || !!(p.busy && p.busy.k !== 'revive') ||
+    const frozen = !p.alive || p.ctrl !== 'body' || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') ||
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
       (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK);
     return { armor: o.armor, mul, downed: p.downed, frozen };
@@ -372,9 +376,9 @@ export class Game {
     if (!p.alive) return;
     const team = this.side(p);
     const inp = p.input, prev = p.prevInput;
-    p.fireCd -= dt; p.meleeCd -= dt;
+    p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
     p.bloom = Math.max(0, p.bloom - dt * 0.15);
-    { const g = p.guns[p.slot], cls = g ? WEAPONS[g.w].cls : 'AR', rate = 1 / (ADS_TIME[cls] || 0.3);
+    { const g = p.guns[p.slot], cls = g ? WEAPONS[g.w].cls : 'AR', rate = (1 / (ADS_TIME[cls] || 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1);
       const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0;
       p.adsT = Math.max(0, Math.min(1, (p.adsT || 0) + (canAds ? dt * rate : -dt * rate * 1.6)));
       if (this.time - p.lastShot > 0.14) { p.rc = (p.rc || 0) * Math.exp(-dt * 7); p.shots = 0; } }
@@ -409,8 +413,31 @@ export class Game {
       if (inp.ability && p.battery > 0 && p.ctrl === 'body') {
         p.scanning = true; p.battery = Math.max(0, p.battery - dt);
         for (const q of this.players.values())
-          if (q.alive && this.side(q) === TEAM.ATK && Math.hypot(q.x - p.x, q.y - p.y) < 300) this.spot(TEAM.DEF, q.id, 0.4);
+          if (q.alive && this.side(q) === TEAM.ATK && !this.ghost(q) && Math.hypot(q.x - p.x, q.y - p.y) < 300) this.spot(TEAM.DEF, q.id, 0.4);
       } else { p.scanning = false; p.battery = Math.min(op.ability.battery, p.battery + dt * 0.35); }
+    }
+
+    if (op.ability.id === 'lance') { // Thermal Lance: burn the wall cell you face, one at a time
+      p.lancing = false;
+      if (inp.ability && p.battery > 0 && p.ctrl === 'body' && !p.downed) {
+        const f = this.facingCell(p, 30);
+        if (f && [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD].includes(f.t)) {
+          p.lancing = true; p.battery = Math.max(0, p.battery - dt);
+          const fx = (f.cx + 0.5) * CELL, fy = (f.cy + 0.5) * CELL, grid = this.gridNear(fx, fy, other(team));
+          if (grid) { // a static grid on that wall shocks you instead
+            p.lanceT = 0; p.shockT -= dt;
+            if (p.shockT <= 0) { p.shockT = 0.5; this.damage(p, 8, this.players.get(grid.owner), 'Static Grid', 0); this.events.push({ e: 'arc', x: r1(grid.x), y: r1(grid.y), x2: r1(p.x), y2: r1(p.y) }); }
+          } else {
+            p.lanceT += dt;
+            if (p.lanceT >= 1.3) { p.lanceT = 0; this.destroyCell(f.k); this.events.push({ e: 'hit', k: 'spark', x: r1(fx), y: r1(fy) }); }
+          }
+        }
+      }
+      if (!p.lancing) p.lanceT = 0;
+    }
+    if (op.ability.id === 'shroud') { // Silent Shroud: hold to go dark
+      if (inp.ability && p.battery > 0 && p.ctrl === 'body' && !p.downed) { p.shrouded = true; p.battery = Math.max(0, p.battery - dt); }
+      else { p.shrouded = false; p.battery = Math.min(op.ability.battery, p.battery + dt * 0.25); }
     }
 
     // interaction (hold E)
@@ -418,6 +445,23 @@ export class Game {
       if (!p.busy) p.busy = this.startInteract(p);
       if (p.busy) this.continueInteract(p, dt);
     } else p.busy = null;
+
+    // a defender looking through a turret camera fires its laser
+    if (p.ctrl === 'cam' && inp.fire && p.turretCd <= 0) {
+      const c = this.aliveCams()[p.camIdx];
+      if (c && c.tu && !(c.offUntil > this.time)) {
+        p.turretCd = 0.45;
+        const a = c.ang || 0, dx = Math.cos(a), dy = Math.sin(a);
+        let bt = castSight(this.map, c.x, c.y, a, 520, this.smokeList()), hit = null;
+        for (const q of this.players.values()) {
+          if (!q.alive || this.side(q) === team) continue;
+          const t = rayCircle(c.x, c.y, dx, dy, q.x, q.y, PLAYER_R);
+          if (t !== null && t < bt) { bt = t; hit = q; }
+        }
+        if (hit) this.damage(hit, 7, p, 'Turret Camera', a);
+        this.events.push({ e: 'laser', x: r1(c.x), y: r1(c.y), x2: r1(c.x + dx * bt), y2: r1(c.y + dy * bt) });
+      }
+    }
 
     // shooting
     const canShoot = p.ctrl === 'body' && !p.busy && p.reloadT <= 0 && !p.scanning && !p.bracing && gun &&
@@ -446,7 +490,7 @@ export class Game {
     // hip fire is a loose cone that widens while moving; aimed fire is accurate even on the move (R6 rules)
     const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / 140), at = p.adsT || 0;
     const hip = w.spread * (p.input.crouch && run < 0.15 ? 0.9 : 1) + run * 0.05;
-    const spread = hip + (w.ads - hip) * at + p.bloom * (1 - 0.7 * at);
+    const spread = (hip + (w.ads - hip) * at + p.bloom * (1 - 0.7 * at)) * (this.time < (p.dazeUntil || 0) ? 2.2 : 1); // dazed: shaky aim
     p.bloom = Math.min(0.08, p.bloom + w.bloom);
     // recoil: drifts one way for a burst, then the other, with sway; pull against it
     const rc = RECOIL[w.cls] || RECOIL.AR;
@@ -492,8 +536,8 @@ export class Game {
       if (t !== null && t < bestT) { bestT = t; best = { q, at }; }
     }
     for (const e of this.ents) {
-      if (!e.hp || e.team === team) continue;
-      const t = rayCircle(x0, y0, dx, dy, e.x, e.y, e.type === 'drone' ? 6 : 6);
+      if (!e.hp || e.team === team || e.tu) continue; // turret cameras are bulletproof
+      const t = rayCircle(x0, y0, dx, dy, e.x, e.y, e.type === 'decoy' ? PLAYER_R : 6);
       if (t !== null && t < bestT) { bestT = t; best = { e }; }
     }
     let mult = 1, stopT = bestT, kind = best ? 'flesh' : 'none', pens = 0;
@@ -771,7 +815,17 @@ export class Game {
 
   useAbility(p) {
     const op = OPERATORS[p.op], team = this.side(p), id = op.ability.id;
+    if (id === 'gas' && p.gasId) { const n = this.ent(p.gasId); p.gasId = null; if (n) this.detonate(n); return; } // second press releases the gas
     if (op.ability.count && p.abilityCount <= 0) return;
+    const ca = Math.cos(p.aim), sa = Math.sin(p.aim);
+    const place = (type, dist, extra = {}) => { // set something down just in front of you, if there's floor there
+      const pos = this.freeSpotNear(p.x + ca * dist, p.y + sa * dist, 4);
+      const e = { id: this.eid(), type, x: pos.x, y: pos.y, ang: p.aim, team, owner: p.id, hp: 1, ...extra };
+      this.ents.push(e); used(); this.events.push({ e: 'snd', s: 'place', x: r1(pos.x), y: r1(pos.y) });
+      return e;
+    };
+    // the far side of the wall you face (for gadgets that push through it)
+    const through = w => { const cx = (w.cx + 0.5) * CELL, cy = (w.cy + 0.5) * CELL, dx = Math.sign(Math.round(cx - w.x)), dy = Math.sign(Math.round(cy - w.y)); return { dx, dy, x: cx + dx * (CELL / 2 + 5), y: cy + dy * (CELL / 2 + 5) }; };
     const used = () => { p.abilityCount--; };
     if (id === 'cutter') {
       const w = this.wallInFront(p, [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD]);
@@ -798,6 +852,74 @@ export class Game {
     } else if (id === 'mine') {
       this.ents.push({ id: this.eid(), type: 'mine', x: p.x + Math.cos(p.aim) * 10, y: p.y + Math.sin(p.aim) * 10, ang: p.aim, team, owner: p.id, arm: 1.5, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y) });
+    } else if (id === 'barrage') { // three smokes in a line
+      const far = castSight(this.map, p.x, p.y, p.aim, 220, null);
+      for (const d of [55, 105, 155]) {
+        const dd = Math.min(d, far - 14); if (dd < 20) continue;
+        this.ents.push({ id: this.eid(), type: 'smoke', x: p.x + ca * dd, y: p.y + sa * dd, r: 50, life: 12, team });
+      }
+      used(); this.events.push({ e: 'snd', s: 'smoke', x: r1(p.x), y: r1(p.y) });
+    } else if (id === 'sonar' || id === 'stickycam') { this.throwNade(p, id === 'sonar' ? 'sonar' : 'cam'); used(); }
+    else if (id === 'gas') { p.gasId = this.throwNade(p, 'gas').id; used(); }
+    else if (id === 'adrenal') { p.boostUntil = this.time + 6; used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x), y2: r1(p.y) }); }
+    else if (id === 'ghost') { p.ghostUntil = this.time + 10; used(); this.events.push({ e: 'snd', s: 'ghost', x: r1(p.x), y: r1(p.y) }); }
+    else if (id === 'cluster') {
+      const w = this.wallInFront(p, [T.SOFT, T.BARRI]); if (!w) return;
+      const t = through(w);
+      this.ents.push({ id: this.eid(), type: 'cluster', x: w.x, y: w.y, cell: w.k, dx: t.dx, dy: t.dy, team, owner: p.id, t: 3, hp: 1 });
+      used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
+    } else if (id === 'scope') {
+      const w = this.wallInFront(p, [T.SOFT]); if (!w) return;
+      const t = through(w);
+      this.ents.push({ id: this.eid(), type: 'scope', x: t.x, y: t.y, ang: Math.atan2(t.dy, t.dx), cell: w.k, team, owner: p.id, hp: 1 });
+      used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
+    } else if (id === 'decoy') {
+      const g = p.guns[0];
+      this.ents.push({ id: this.eid(), type: 'decoy', x: p.x + ca * 14, y: p.y + sa * 14, ang: p.aim, op: p.op, w: g ? g.w : null, team, owner: p.id, hp: 1, life: 6 });
+      used(); this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y) });
+    } else if (id === 'arc') { // the first enemy gadget or defender along the bolt
+      let bt = castSight(this.map, p.x, p.y, p.aim, 380, null), hitE = null, hitQ = null;
+      for (const e of this.ents) {
+        if (e.team === team || !(e.hp || e.type === 'wire') || e.type === 'drone') continue;
+        const t = rayCircle(p.x, p.y, ca, sa, e.x, e.y, 8);
+        if (t !== null && t < bt) { bt = t; hitE = e; }
+      }
+      for (const q of this.players.values()) {
+        if (!q.alive || this.side(q) === team) continue;
+        const t = rayCircle(p.x, p.y, ca, sa, q.x, q.y, PLAYER_R);
+        if (t !== null && t < bt) { bt = t; hitQ = q; hitE = null; }
+      }
+      if (hitE) { if (hitE.tu) hitE.offUntil = this.time + 10; else this.hitEnt(hitE, p); }
+      if (hitQ) { this.damage(hitQ, 15, p, 'Arc Gun', p.aim); hitQ.stunUntil = Math.max(hitQ.stunUntil, this.time + 0.5); }
+      used(); this.events.push({ e: 'arc', x: r1(p.x), y: r1(p.y), x2: r1(p.x + ca * bt), y2: r1(p.y + sa * bt) });
+    } else if (id === 'hammer') { // smash soft walls and barricades open, or flatten someone in reach
+      if (p.meleeCd > 0) return;
+      const f = this.facingCell(p, 30);
+      if (f && (f.t === T.SOFT || f.t === T.BARRI)) {
+        const across = Math.abs(ca) > Math.abs(sa) ? [0, 1] : [1, 0];
+        for (const d of [0, 1, -1]) {
+          const k = (f.cy + across[1] * d) * this.map.W + f.cx + across[0] * d, t = this.map.tiles[k];
+          if (t === T.SOFT || t === T.BARRI) this.destroyCell(k);
+        }
+        this.events.push({ e: 'hit', k: f.t === T.BARRI ? 'wood' : 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) });
+        this.events.push({ e: 'snd', s: 'break', x: r1(p.x), y: r1(p.y) });
+      } else {
+        const q = [...this.players.values()].find(q => q.alive && this.side(q) !== team && Math.hypot(q.x - p.x, q.y - p.y) < 30 &&
+          Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.1);
+        if (!q) return;
+        this.damage(q, 75, p, 'Breaching Hammer', p.aim);
+      }
+      p.meleeCd = 0.9; used(); this.events.push({ e: 'melee', id: p.id });
+    } else if (id === 'prox') place('prox', 10, { arm: 1.5 });
+    else if (id === 'concuss') place('concuss', 10, { arm: 1.5 });
+    else if (id === 'clamp') place('clamp', 14, { arm: 1.5 });
+    else if (id === 'sensor') place('sensor', 8, { t: 0, pingT: 0 });
+    else if (id === 'plates') place('plates', 14, { c: 5 });
+    else if (id === 'turret') place('cam', 14, { tu: 1, offUntil: 0 });
+    else if (id === 'grid') {
+      const w = this.wallInFront(p, [T.SOFT, T.REINF, T.BARRI, T.PANEL]); if (!w) return;
+      this.ents.push({ id: this.eid(), type: 'grid', x: w.x, y: w.y, cell: w.k, team, owner: p.id, hp: 1 });
+      used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
     } else if (id === 'stim') {
       const dx = Math.cos(p.aim), dy = Math.sin(p.aim);
       let tgt = null, tb = castSight(this.map, p.x, p.y, p.aim, 420, null);
@@ -852,7 +974,7 @@ export class Game {
     const tx = p.aimX ?? p.x + Math.cos(p.aim) * 200, ty = p.aimY ?? p.y + Math.sin(p.aim) * 200;
     const dist = Math.max(40, Math.min(300, Math.hypot(tx - p.x, ty - p.y)));
     const v = dist * 2.5;
-    const fuse = { frag: 2.5, smoke: 1.0, stun: 1.3, impact: 3, nitro: 999, emp: 1.5 }[kind];
+    const fuse = { frag: 2.5, smoke: 1.0, stun: 1.3, impact: 3, nitro: 999, emp: 1.5, sonar: 1.1, gas: 999, cam: 0.9 }[kind];
     const n = { id: this.eid(), type: 'nade', kind, x: p.x + Math.cos(p.aim) * 10, y: p.y + Math.sin(p.aim) * 10,
       vx: Math.cos(p.aim) * v, vy: Math.sin(p.aim) * v, fuse, team: this.side(p), owner: p.id };
     this.ents.push(n);
@@ -864,6 +986,10 @@ export class Game {
   eid() { return 'e' + (this.nextId++); }
   ent(id) { return id ? this.ents.find(e => e.id === id) : null; }
   removeEnt(e) { const i = this.ents.indexOf(e); if (i >= 0) this.ents.splice(i, 1); }
+
+  ghost(q) { return this.time < (q.ghostUntil || 0); } // Ghost Step: traps and sensors don't notice
+  gridNear(x, y, team) { return this.ents.find(g => g.type === 'grid' && g.team === team && Math.hypot(g.x - x, g.y - y) < 30) || null; }
+  smokeList() { return this.ents.filter(e => e.type === 'smoke'); }
 
   jammedAt(x, y) {
     for (const e of this.ents) if (e.type === 'jammer' && Math.hypot(e.x - x, e.y - y) < JAM_R) return true;
@@ -886,7 +1012,9 @@ export class Game {
         }
         case 'nade': this.tickNade(e, dt); break;
         case 'smoke': e.life -= dt; if (e.life <= 0) this.removeEnt(e); break;
-        case 'cutter': case 'breach':
+        case 'cutter': case 'breach': case 'cluster':
+          { const g = this.gridNear(e.x, e.y, other(e.team)); // a static grid fries breaching gadgets on its wall
+            if (g) { this.events.push({ e: 'arc', x: r1(g.x), y: r1(g.y), x2: r1(e.x), y2: r1(e.y) }); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e); break; } }
           if (!this.jammedAt(e.x, e.y)) e.t -= dt;
           if (e.t <= 0) this.detonate(e);
           break;
@@ -895,7 +1023,7 @@ export class Game {
           if (e.ping <= 0 && !this.jammedAt(e.x, e.y)) {
             e.ping = 1.5;
             let any = false;
-            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < 170) { this.spot(e.team, q.id, 1.6); any = true; }
+            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 170) { this.spot(e.team, q.id, 1.6); any = true; }
             this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any });
           }
           if (e.life <= 0) this.removeEnt(e);
@@ -916,11 +1044,71 @@ export class Game {
           if (e.travel > 520) this.detonate(e);
           break;
         }
+        case 'scope': {
+          const g = this.gridNear(e.x, e.y, other(e.team));
+          if (this.map.tiles[e.cell] !== T.SOFT || g) { if (g) this.events.push({ e: 'arc', x: r1(g.x), y: r1(g.y), x2: r1(e.x), y2: r1(e.y) }); this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e); }
+          break;
+        }
+        case 'decoy': { // runs straight on, turning away from walls
+          e.life -= dt; if (e.life <= 0) { this.removeEnt(e); break; }
+          const o = { x: e.x, y: e.y }, sp = 135 * dt;
+          moveCircle(this.map, o, Math.cos(e.ang) * sp, Math.sin(e.ang) * sp, PLAYER_R);
+          if (Math.hypot(o.x - e.x, o.y - e.y) < sp * 0.4) {
+            const l = castSight(this.map, e.x, e.y, e.ang - Math.PI / 2, 300, null), r = castSight(this.map, e.x, e.y, e.ang + Math.PI / 2, 300, null);
+            e.ang += l > r ? -Math.PI / 2 : Math.PI / 2;
+          }
+          e.x = o.x; e.y = o.y;
+          break;
+        }
+        case 'prox': case 'concuss': case 'clamp': {
+          if (e.arm > 0) { e.arm -= dt; break; }
+          if (e.fuse !== undefined) { e.fuse -= dt; if (e.fuse <= 0) this.detonate(e); break; }
+          const reach = { prox: 42, concuss: 30, clamp: 13 }[e.type];
+          for (const q of this.players.values()) {
+            if (!q.alive || this.side(q) === e.team || this.ghost(q)) continue;
+            if (Math.hypot(q.x - e.x, q.y - e.y) > reach || !los(this.map, e.x, e.y, q.x, q.y)) continue;
+            if (e.type === 'prox') { e.fuse = 0.9; this.events.push({ e: 'snd', s: 'beep', x: r1(e.x), y: r1(e.y) }); }
+            else if (e.type === 'concuss') this.detonate(e);
+            else { // clamp: held fast and badly hurt
+              q.clampUntil = this.time + 3; this.spot(e.team, q.id, 3);
+              this.damage(q, 35, this.players.get(e.owner), 'Clamp Trap', 0);
+              this.events.push({ e: 'snd', s: 'clamp', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e);
+            }
+            break;
+          }
+          break;
+        }
+        case 'sensor': {
+          e.t -= dt; e.pingT -= dt; if (e.t > 0) break; e.t = 0.5;
+          let any = false;
+          for (const q of this.players.values())
+            if (q.alive && this.side(q) !== e.team && !this.ghost(q) && q.moving === 2 && Math.hypot(q.x - e.x, q.y - e.y) < 190) { this.spot(e.team, q.id, 1.5); any = true; }
+          if (any && e.pingT <= 0) { e.pingT = 1.5; this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); }
+          break;
+        }
+        case 'plates':
+          for (const q of this.players.values()) {
+            if (!q.alive || q.plated || q.downed || this.side(q) !== e.team || Math.hypot(q.x - e.x, q.y - e.y) > 18) continue;
+            q.plated = true; q.maxHp += 20; q.hp += 20; e.c--;
+            this.events.push({ e: 'snd', s: 'place', x: r1(q.x), y: r1(q.y) });
+            if (e.c <= 0) { this.removeEnt(e); break; }
+          }
+          break;
+        case 'gascloud':
+          e.life -= dt; e.tick = (e.tick || 0) - dt;
+          if (e.tick <= 0) {
+            e.tick = 0.5;
+            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < e.r)
+              this.damage(q, 6, this.players.get(e.owner), 'Toxin Canister', 0);
+          }
+          if (e.life <= 0) this.removeEnt(e);
+          break;
         case 'mine': case 'claymore': {
           if (e.arm > 0) { e.arm -= dt; break; }
           for (const q of this.players.values()) {
             if (!q.alive || this.side(q) === e.team) continue;
             const d = Math.hypot(q.x - e.x, q.y - e.y);
+            if (this.ghost(q)) continue;
             const inCone = e.type === 'mine' ? d < 22 : d < 44 && Math.abs(angDiff(Math.atan2(q.y - e.y, q.x - e.x), e.ang)) < 0.7;
             if (inCone && los(this.map, e.x, e.y, q.x, q.y)) { this.detonate(e); break; }
           }
@@ -942,7 +1130,7 @@ export class Game {
     const f = Math.exp(-2.5 * dt); e.vx *= f; e.vy *= f;
     if (bounced && sp > 60) this.events.push({ e: 'snd', s: 'bounce', x: r1(e.x), y: r1(e.y) });
     if (e.kind === 'impact' && bounced) return this.detonate(e);
-    if (e.kind === 'nitro') return; // waits for its owner
+    if (e.kind === 'nitro' || e.kind === 'gas') return; // waits for its owner
     e.fuse -= dt;
     if (e.fuse <= 0) this.detonate(e);
   }
@@ -966,6 +1154,31 @@ export class Game {
         break;
       }
       case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD], kind: 'cutter', at: e.cell }); break;
+      case 'sonar': {
+        let any = false;
+        for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 230) { this.spot(e.team, q.id, 4); any = true; }
+        this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any, big: 1 });
+        break;
+      }
+      case 'gas': this.ents.push({ id: this.eid(), type: 'gascloud', x: e.x, y: e.y, r: 58, life: 8, team: e.team, owner: e.owner }); this.events.push({ e: 'snd', s: 'smoke', x: r1(e.x), y: r1(e.y) }); break;
+      case 'cam': this.ents.push({ id: this.eid(), type: 'cam', x: e.x, y: e.y, team: e.team, owner: e.owner, hp: 1, offUntil: 0, ang: Math.atan2(e.vy || 0, e.vx || 1) }); this.events.push({ e: 'snd', s: 'place', x: r1(e.x), y: r1(e.y) }); break;
+      case 'prox': this.explode(e, { r: 48, dmg: 90, cellR: 0, cells: [], kind: 'frag' }); break;
+      case 'concuss': {
+        this.explode(e, { r: 30, dmg: 15, cellR: 0, cells: [], kind: 'impact' });
+        for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < 50) {
+          q.slowUntil = this.time + 5; q.dazeUntil = this.time + 5; this.events.push({ e: 'daze', id: q.id, dur: 5 });
+        }
+        break;
+      }
+      case 'cluster': { // four bomblets scatter into the room behind the wall
+        const cx = (e.cell % this.map.W + 0.5) * CELL, cy = (Math.floor(e.cell / this.map.W) + 0.5) * CELL;
+        for (let i = 0; i < 4; i++) {
+          const d = 22 + i * 13 + Math.random() * 8, side = (Math.random() - 0.5) * 50;
+          const x = cx + e.dx * d + (e.dy ? side : 0), y = cy + e.dy * d + (e.dx ? side : 0);
+          this.explode({ x, y, team: e.team, owner: e.owner }, { r: 30, dmg: 45, cellR: 0, cells: [], kind: 'impact' });
+        }
+        break;
+      }
       case 'smoke': this.ents.push({ id: this.eid(), type: 'smoke', x: e.x, y: e.y, r: 62, life: 12, team: e.team }); this.events.push({ e: 'snd', s: 'smoke', x: r1(e.x), y: r1(e.y) }); break;
       case 'stun': {
         this.events.push({ e: 'boom', x: r1(e.x), y: r1(e.y), r: 40, kind: 'stun' });
@@ -985,7 +1198,7 @@ export class Game {
         for (const o of [...this.ents]) {
           if (o.team === e.team || Math.hypot(o.x - e.x, o.y - e.y) > 110) continue;
           if (o.type === 'cam') o.offUntil = this.time + 12;
-          else if (['jammer', 'mine', 'nade', 'claymore'].includes(o.type)) this.removeEnt(o);
+          else if (['jammer', 'mine', 'nade', 'claymore', 'prox', 'concuss', 'clamp', 'sensor', 'grid', 'gascloud'].includes(o.type)) this.removeEnt(o);
         }
         break;
       }
@@ -997,6 +1210,7 @@ export class Game {
     let cx = e.x, cy = e.y;
     if (o.at !== undefined) { cx = (o.at % this.map.W + 0.5) * CELL; cy = (Math.floor(o.at / this.map.W) + 0.5) * CELL; }
     this.events.push({ e: 'boom', x: r1(e.x), y: r1(e.y), r: o.r, kind: o.kind });
+    for (const g of [...this.ents]) if (g !== e && g.team !== e.team && (g.hp || g.type === 'wire') && g.type !== 'drone' && Math.hypot(g.x - e.x, g.y - e.y) < o.r * 0.8) this.hitEnt(g, owner);
     if (o.cellR > 0) {
       const m = this.map, rr = Math.ceil(o.cellR / CELL) + 1;
       const gx = Math.floor(cx / CELL), gy = Math.floor(cy / CELL);
@@ -1125,6 +1339,8 @@ export class Game {
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), gt: r2(p.gait || 0), rc: Math.round((p.rc || 0) * 1000) / 1000, at: r2(p.adsT || 0), mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sc: p.scanning ? 1 : 0,
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         m: this.mods(p), fs: r2(this.time - p.lastShot),
+        si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
+        dz: this.time < (p.dazeUntil || 0) ? 1 : 0, gi: p.gasId ? 1 : 0,
       });
       return o;
     });
@@ -1133,7 +1349,11 @@ export class Game {
       if (e.owner) o.ow = e.owner;
       if (e.kind) o.kd = e.kind;
       if (e.ang !== undefined) o.ag = r2(e.ang);
-      if (e.type === 'cam') { o.hp = e.hp; o.off = e.offUntil > this.time ? 1 : 0; }
+      if (e.type === 'cam') { o.hp = e.hp; o.off = e.offUntil > this.time ? 1 : 0; if (e.tu) o.tu = 1; }
+      if (e.type === 'decoy') { o.op = e.op; o.w = e.w; }
+      if (e.type === 'plates') o.c = e.c;
+      if (e.type === 'gascloud') { o.r = e.r; o.l = r1(e.life); }
+      if (e.type === 'cluster') o.t = r1(e.t);
       if (e.type === 'smoke') { o.r = e.r; o.l = r1(e.life); }
       if (e.type === 'cutter' || e.type === 'breach') { o.t = r1(e.t); o.j = this.jammedAt(e.x, e.y) ? 1 : 0; }
       if (e.type === 'drone') { o.j = this.jammedAt(e.x, e.y) ? 1 : 0; o.vx = r1(e.vx || 0); o.vy = r1(e.vy || 0); }

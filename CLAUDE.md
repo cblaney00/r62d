@@ -18,7 +18,7 @@ operators/maps/art (it would be recreating a specific existing game); keep it th
 
 His wishes so far:
 - Six maps, each with 2–3 floors, picked in the lobby (Harbor Office, Cliffside Villa, Rail Depot, The Embassy,
-  Alpine Lodge, Clocktower School). 10 operators (5 attack, 5 defence) — he wants 30 + 30 eventually.
+  Alpine Lodge, Clocktower School). 30 operators (15 attack, 15 defence; he chose 15 each), covering R6's role types with our own names and twists.
   Quick Match only (first to 3 rounds, sides swap every round). Defenders choose the site during operator select.
 - Out of sight = dull grey "remembered" map; shared team vision (teammates, drones, cameras) is live colour; enemy changes out of sight stay hidden until seen (`st.known` vs `st.map` in main.js).
 - Controls are CS2-style (players come from CS2): run default, Shift walk, Ctrl crouch (hold), E use, Q skill, 3 melee, 4 gadget. Walking/crouching are silent to others. Running spreads shots (server `fire`). Mouse is pointer-locked in matches with sensitivity + ADS multiplier settings.
@@ -67,7 +67,12 @@ His wishes so far:
   input every frame; server applies movement per input message (with its dt) and echoes the
   last sequence number, client replays unacknowledged inputs (prediction + reconciliation).
   Other players are interpolated 100 ms behind.
-- **Tests:** `node tests/sim.js` plays a bot-only match on every map (must print PASS; `--only <id>` for one).
+- **Abilities:** server `useAbility` (instant), the "held abilities" block in the player tick (scan, lance, shroud,
+  brace), `tickEnts` (gadgets over time), `detonate`/`explode`; client draws them in `sprites.js drawGadget` and
+  `main.js draw` (decoys, lance sparks, gas, shroud hiding via `teamSeesBody`, scope viewers in `teamViewers`).
+  Defending bots place their gadgets in `botPrep`; attacking bots use a few abilities in `botThink`.
+- **Tests:** `node tests/abilities.js` has every operator use their ability in a live match.
+  `node tests/sim.js` plays a bot-only match on every map (must print PASS; `--only <id>` for one).
   `node tests/stairs.js` walks a body up and down every staircase with real physics + bot path finding.
   `tests/shoot.mjs` drives a hidden Firefox (run as insideabush, via WebDriver BiDi,
   `--remote-debugging-port`) to take screenshots; see `docs/testing.md`.

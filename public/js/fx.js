@@ -120,13 +120,13 @@ export class FX {
 }
 
 // Billowing smoke grenade cloud
-export function drawSmoke(ctx, s, t, puffs = 22) {
+export function drawSmoke(ctx, s, t, puffs = 22, col = '205,205,200') {
   const fade = Math.min(1, s.l / 2) * Math.min(1, (12 - s.l) * 2 + 0.2);
   for (let i = 0; i < puffs; i++) {
     const a = i * 2.4 + t * 0.15 * (i % 2 ? 1 : -1), d = (i % 5) / 5 * s.r * 0.75;
     const x = s.x + Math.cos(a) * d, y = s.y + Math.sin(a) * d, r = s.r * (0.38 + (i % 3) * 0.08);
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `rgba(205,205,200,${0.5 * fade})`); g.addColorStop(1, 'rgba(190,190,185,0)');
+    g.addColorStop(0, `rgba(${col},${0.5 * fade})`); g.addColorStop(1, `rgba(${col},0)`);
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
   }
 }

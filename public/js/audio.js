@@ -395,6 +395,9 @@ export function play(name, x, y) {
   if (!ac) return;
   switch (name) {
     case 'reload': return; // handled by the reload phases in foley
+    case 'beep': return foley('beep', x, y);
+    case 'ghost': return foley('cloth', x, y);
+    case 'clamp': impact('metal', x, y); return foley('hurt', x, y);
     case 'swap': return;
     case 'empty': return foley('empty', x, y);
     case 'break': return impact('electronic', x, y);

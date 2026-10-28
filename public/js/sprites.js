@@ -255,7 +255,11 @@ export function drawCam(ctx, c, t) {
     ctx.strokeStyle = '#555'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(-3, -2); ctx.lineTo(2, 3); ctx.moveTo(2, -3); ctx.lineTo(-1, 2); ctx.stroke();
   } else {
     if (c.ag !== undefined) { ctx.save(); ctx.rotate(c.ag); const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 22); g.addColorStop(0, 'rgba(255,60,60,0.35)'); g.addColorStop(1, 'rgba(255,60,60,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 22, -0.95, 0.95); ctx.fill(); ctx.fillStyle = '#2a2c30'; ctx.fillRect(2, -1.6, 4, 3.2); ctx.restore(); }
-    ctx.fillStyle = '#d7d9db'; ctx.beginPath(); ctx.arc(0, 0, 4.4, 0, 7); ctx.fill();
+    if (c.tu) { // turret camera: armoured octagon with a laser barrel
+      ctx.save(); ctx.rotate(c.ag || 0); ctx.fillStyle = '#3a1e1e'; ctx.fillRect(3, -1, 6, 2); ctx.fillStyle = '#ff4040'; ctx.fillRect(8, -0.5, 1.5, 1); ctx.restore();
+      ctx.fillStyle = '#5c6268'; ctx.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8; ctx.lineTo(Math.cos(a) * 5.4, Math.sin(a) * 5.4); } ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#2a2d31'; ctx.lineWidth = 0.6; ctx.stroke();
+    } else { ctx.fillStyle = '#d7d9db'; ctx.beginPath(); ctx.arc(0, 0, 4.4, 0, 7); ctx.fill(); }
     ctx.fillStyle = '#1b1d20'; ctx.beginPath(); ctx.arc(0, 0, 2.8, 0, 7); ctx.fill();
     ctx.fillStyle = c.off ? '#4060ff' : (Math.floor(t * 2) % 2 ? '#ff3030' : '#601010'); ctx.beginPath(); ctx.arc(2.6, -2.6, 0.9, 0, 7); ctx.fill();
   }
@@ -310,13 +314,59 @@ export function drawGadget(ctx, e, t, ally) {
       ctx.strokeStyle = `rgba(79,179,169,${0.25 + 0.2 * Math.sin(t * 6)})`; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(0, 0, 170, 0, 7); ctx.stroke();
       break;
     case 'nade': {
-      const col = { frag: '#3d4a2c', smoke: '#7a7f86', stun: '#2c3e5a', impact: '#6a3a2a', nitro: '#5a5f2c', emp: '#a46ad6' }[e.kd] || '#555';
+      const col = { frag: '#3d4a2c', smoke: '#7a7f86', stun: '#2c3e5a', impact: '#6a3a2a', nitro: '#5a5f2c', emp: '#a46ad6', sonar: '#5fd3e8', gas: '#7f9c2c', cam: '#d7d9db' }[e.kd] || '#555';
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.arc(1, 1.2, 2.6, 0, 7); ctx.fill();
       ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, e.kd === 'nitro' ? 3.2 : 2.5, 0, 7); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(-0.8, -0.8, 0.8, 0, 7); ctx.fill();
+      if (e.kd === 'gas') { ctx.fillStyle = blink ? '#c8ff60' : '#3a4a10'; ctx.fillRect(-0.6, -0.6, 1.2, 1.2); }
       if (e.kd === 'nitro') { ctx.fillStyle = blink ? '#ff3030' : '#601010'; ctx.fillRect(-0.6, -0.6, 1.2, 1.2); }
       break;
     }
+    case 'prox': // Proximity Charge: a flat green disc with a sensor eye
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.arc(0.8, 1, 4.4, 0, 7); ctx.fill();
+      ctx.fillStyle = '#3d4a22'; ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, 7); ctx.fill();
+      ctx.fillStyle = '#26301a'; ctx.beginPath(); ctx.arc(0, 0, 2.6, 0, 7); ctx.fill();
+      ctx.fillStyle = blink ? '#ffd040' : '#5a4a10'; ctx.beginPath(); ctx.arc(0, 0, 0.9, 0, 7); ctx.fill();
+      if (ally) { ctx.strokeStyle = 'rgba(255,200,60,0.25)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(0, 0, 42, 0, 7); ctx.stroke(); }
+      break;
+    case 'concuss': // Daze Mine: a squat sticky puck with yellow bands
+      ctx.fillStyle = '#4a3c22'; ctx.beginPath(); ctx.arc(0, 0, 3.2, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#d8b04a'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, 7); ctx.stroke();
+      ctx.fillStyle = blink ? '#ffe070' : '#5a4a10'; ctx.beginPath(); ctx.arc(0, 0, 0.7, 0, 7); ctx.fill();
+      break;
+    case 'clamp': { // Clamp Trap: open steel jaws
+      ctx.strokeStyle = '#7a7f84'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(0, 0, 5, 0, 7); ctx.stroke();
+      ctx.fillStyle = '#9aa0a6'; for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 5, Math.sin(a) * 5); ctx.lineTo(Math.cos(a + 0.2) * 3, Math.sin(a + 0.2) * 3); ctx.lineTo(Math.cos(a + 0.4) * 5, Math.sin(a + 0.4) * 5); ctx.fill(); }
+      ctx.fillStyle = '#3a3d40'; ctx.fillRect(-1.2, -1.2, 2.4, 2.4);
+      break;
+    }
+    case 'sensor': // Sound Sensor: a small microphone with sound rings for the defenders
+      ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.arc(0, 0, 2.6, 0, 7); ctx.fill();
+      ctx.fillStyle = '#9b6be0'; ctx.beginPath(); ctx.arc(0, 0, 1.3, 0, 7); ctx.fill();
+      if (ally) { const k = (t * 0.7) % 1; ctx.strokeStyle = `rgba(155,107,224,${0.35 * (1 - k)})`; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(0, 0, 190 * k, 0, 7); ctx.stroke(); }
+      break;
+    case 'grid': // Static Grid: a blue clamp with crackling arcs
+      ctx.fillStyle = '#26324e'; ctx.fillRect(-3.5, -3.5, 7, 7);
+      ctx.strokeStyle = '#4f86ff'; ctx.lineWidth = 0.6; ctx.strokeRect(-3.5, -3.5, 7, 7);
+      ctx.strokeStyle = `rgba(140,190,255,${0.4 + 0.4 * Math.random()})`; ctx.beginPath(); ctx.moveTo(-3, 0); for (let i = 1; i <= 4; i++) ctx.lineTo(-3 + i * 1.5, (Math.random() - 0.5) * 4); ctx.stroke();
+      break;
+    case 'plates': // Armor Bag: a canvas bag with plates showing
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(-4, -2, 10, 7);
+      ctx.fillStyle = '#4a4f38'; ctx.fillRect(-5, -3.5, 10, 7);
+      for (let i = 0; i < (e.c || 0); i++) { ctx.fillStyle = '#8f9aa6'; ctx.fillRect(-4 + i * 1.8, -2.5, 1.4, 5); }
+      break;
+    case 'cluster': // Cluster Charge: a black box of four tubes
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(-4, -3, 9, 7);
+      ctx.fillStyle = '#26282c'; ctx.fillRect(-5, -4, 10, 8);
+      for (const [cx, cy] of [[-2.2, -1.8], [2.2, -1.8], [-2.2, 1.8], [2.2, 1.8]]) { ctx.fillStyle = '#55595f'; ctx.beginPath(); ctx.arc(cx, cy, 1.4, 0, 7); ctx.fill(); }
+      ctx.fillStyle = blink ? '#ff3030' : '#601010'; ctx.fillRect(-0.6, -0.6, 1.2, 1.2);
+      break;
+    case 'scope': // Wall Scope: a lens poking out of the wall
+      ctx.rotate(e.ag || 0);
+      ctx.fillStyle = '#2b2f36'; ctx.fillRect(-4, -1.5, 5, 3);
+      ctx.fillStyle = '#6fbf73'; ctx.beginPath(); ctx.arc(1.5, 0, 1.5, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(1.9, -0.5, 0.5, 0, 7); ctx.fill();
+      break;
     case 'slug':
       ctx.fillStyle = '#ffcf6a'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, 7); ctx.fill();
       break;

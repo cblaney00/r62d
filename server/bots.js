@@ -36,6 +36,19 @@ export function botPrep(game, p) {
   const id = op.ability.id;
   if (id === 'panel') for (const o of siteOpenings.slice(0, 3)) { if (p.abilityCount > 0 && game.barricade(o.id, T.PANEL)) p.abilityCount--; }
   if (id === 'jammer') for (let i = 0; i < 2; i++) { const s = near(60); game.ents.push({ id: game.eid(), type: 'jammer', x: s.x, y: s.y, team: TEAM.DEF, owner: p.id, hp: 1 }); p.abilityCount--; }
+  // the newer defenders: traps by the site's doors and windows, eyes and ears around it
+  const placeAt = (type, x, y, extra = {}) => { game.ents.push({ id: game.eid(), type, x, y, ang: Math.random() * 6.28, team: TEAM.DEF, owner: p.id, hp: 1, ...extra }); p.abilityCount--; };
+  const atOpening = i => { const o = siteOpenings[i % siteOpenings.length], k = o.cells[0]; return game.freeSpotNear((k % m.W + 0.5) * CELL, (Math.floor(k / m.W) + 0.5) * CELL, 18); };
+  if (['prox', 'concuss', 'clamp'].includes(id) && siteOpenings.length) for (let i = 0; p.abilityCount > 0 && i < 3; i++) { const s = atOpening(i); placeAt(id, s.x, s.y, { arm: 0 }); }
+  if (id === 'sensor') while (p.abilityCount > 0) { const s = near(150); placeAt('sensor', s.x, s.y, { t: 0, pingT: 0 }); }
+  if (id === 'plates') { const s = near(30); placeAt('plates', s.x, s.y, { c: 5 }); }
+  if (id === 'turret' || id === 'stickycam') while (p.abilityCount > 0) {
+    const s = near(100); placeAt('cam', s.x, s.y, { offUntil: 0, tu: id === 'turret' ? 1 : 0, ang: Math.atan2(s.y - bomb.y, s.x - bomb.x) });
+  }
+  if (id === 'grid') for (let k = 0; k < m.tiles.length && p.abilityCount > 0; k++) {
+    if (m.tiles[k] !== T.REINF || !inSite(k % m.W, Math.floor(k / m.W)) || Math.random() < 0.6) continue;
+    placeAt('grid', (k % m.W + 0.5) * CELL, (Math.floor(k / m.W) + 0.5) * CELL, { cell: k });
+  }
   if (id === 'mine') for (const o of siteOpenings.slice(0, 2)) {
     const k = o.cells[0], x = (k % m.W + 0.5) * CELL, y = (Math.floor(k / m.W) + 0.5) * CELL;
     const s = game.freeSpotNear(x, y, 14);
@@ -120,8 +133,16 @@ export function botThink(game, p, dt) {
   const team = game.side(p), map = game.map, site = map.sites[game.site];
   const gun = p.guns[p.slot];
 
+  // --- abilities ---
+  const abId = OPERATORS[p.op].ability.id;
+  if (game.phase === PHASE.ACTION && p.abilityCount > 0 && !p.downed && team === TEAM.ATK && ['ghost', 'sonar', 'decoy', 'barrage'].includes(abId)) {
+    ai.abT = (ai.abT ?? 4 + Math.random() * 10) - dt;
+    if (ai.abT <= 0) { ai.abT = 10 + Math.random() * 12; game.event(p, { k: 'ability' }); }
+  }
+
   // --- fight ---
   const enemy = p.downed ? null : visibleEnemy(game, p);
+  if (enemy && abId === 'adrenal' && p.abilityCount > 0 && !(game.time < (p.boostUntil || 0))) game.event(p, { k: 'ability' });
   if (enemy) {
     if (ai.seen !== enemy.id) { ai.seen = enemy.id; ai.ox = (Math.random() - 0.5) * 12; ai.oy = (Math.random() - 0.5) * 12; ai.react = -Math.random() * 0.35; ai.err = (Math.random() < 0.5 ? -1 : 1) * (0.25 + Math.random() * 0.35); }
     ai.react += dt; ai.err *= Math.exp(-dt * 1.3);

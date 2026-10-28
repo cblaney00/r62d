@@ -58,7 +58,19 @@ input { font: 600 20px var(--head); padding: 10px 14px; background: rgba(0,0,0,0
 #siteChoice button.on { background: #8fc8ff; color: #000; border-color: #8fc8ff; }
 #selInfo { font: 600 18px var(--head); color: var(--dim); letter-spacing: 0.1em; margin-top: 6px; }
 #selTime { font: 700 56px var(--head); color: var(--gold); }
-#opgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.2vw; flex: 1; min-height: 0; }
+#opgrid { display: grid; grid-template-columns: repeat(8, 1fr); grid-auto-rows: min-content; gap: 0.7vw; flex: 1; min-height: 0; overflow-y: auto; align-content: start; }
+#opgrid .op .info { padding: 6px 8px; gap: 2px; }
+#opgrid .op .nm { font-size: clamp(16px, 1.5vw, 26px); }
+#opgrid .op .role { font-size: 11px; letter-spacing: 0.14em; }
+#opgrid .op .more { display: none; }
+#opgrid .op .ab { font-size: 12px; margin-top: 2px; }
+#opInfo { min-height: 92px; background: var(--panel); border: 1px solid var(--line); padding: 10px 14px; display: flex; flex-direction: column; gap: 5px; font-size: 14px; color: #c9d1d9; }
+#opInfo .nm { font: 800 22px/1 var(--head); letter-spacing: 0.08em; color: #fff; }
+#opInfo .nm span { font: 600 13px var(--head); letter-spacing: 0.2em; color: var(--dim); margin-left: 10px; }
+#opInfo .ab { color: #fff; font: 700 15px var(--head); }
+#opInfo .pips { display: inline-flex; gap: 14px; font: 600 12px var(--head); color: var(--dim); }
+#opInfo .pips i { display: inline-block; width: 14px; height: 5px; background: rgba(255,255,255,0.2); margin-left: 3px; }
+#opInfo .pips i.on { background: #fff; }
 .op { background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; cursor: pointer; transition: transform 0.12s, border-color 0.12s; position: relative; overflow: hidden; }
 .op:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.4); }
 .op.mine { border: 2px solid var(--gold); }

@@ -206,6 +206,9 @@ function onEvent(e, s, players) {
     case 'stun': if (st.me && e.id === st.me.id) { st.flashUntil = now + e.dur; audio.tinnitus(e.dur); } break;
     case 'hurt': if (st.me && e.id === st.me.id) { st.hurtT = now; st.hurtFrom = e.from; } break;
     case 'hitmark': if (e.to === st.id) { st.hitT = now; st.hitKill = e.kill; audio.ui(e.kill ? 'kill' : 'hit'); } break;
+    case 'arc': fx.tracer(e.x, e.y, e.x2, e.y2, '130,200,255'); fx.tracer(e.x, e.y, e.x2 + 2, e.y2 - 2, '200,230,255'); fx.impact(e.x2, e.y2, 'spark'); audio.impact('electronic', e.x2, e.y2); break;
+    case 'laser': fx.tracer(e.x, e.y, e.x2, e.y2, '255,50,50'); fx.impact(e.x2, e.y2, 'spark'); audio.foley('tick', e.x, e.y); break;
+    case 'daze': if (st.me && e.id === st.me.id) { st.dazeUntil = now + e.dur; audio.tinnitus(1); } break;
     case 'ping': if (e.team === mySide()) { fx.ping(e.x, e.y, e.any ? '255,90,60' : '79,179,169'); audio.foley('beep', e.x, e.y); } break;
     case 'stim': fx.tracer(e.x, e.y, e.x2, e.y2, '120,255,160'); fx.ping(e.x2, e.y2, '120,255,160'); audio.foley('revive', e.x, e.y); break;
     case 'melee': anim(e.id).melee = 1; { const p = players.get(e.id); if (p && p.x !== undefined) audio.foley('melee', p.x, p.y, e.id === st.id); } break;
@@ -401,6 +404,11 @@ function renderLobby(s) {
 }
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+function showOpInfo(html) {
+  const el = $('opInfo'); if (el.dataset.h === html) return;
+  el.dataset.h = html; el.innerHTML = html;
+  const b = el.querySelector('.lo'); if (b) b.onclick = () => showOps(b.dataset.op);
+}
 function buildSelect(s) {
   const me = st.me; if (!me) return;
   const side = me.tm, key = s.rd + side;
@@ -418,16 +426,19 @@ function buildSelect(s) {
       d.innerHTML = `<div class="who"></div>`;
       d.appendChild(c);
       const info = document.createElement('div'); info.className = 'info';
-      info.innerHTML = `<div class="nm">${o.name}</div><div class="role">${o.role}</div>
-        <div class="pips"><span>ARMOR ${pips(armor)}</span><span>SPEED ${pips(speed)}</span></div>
-        <div>${WEAPONS[lo.primary].name} <span style="color:var(--dim)">${WEAPONS[lo.primary].cls}</span>${lo.secondary ? ' · ' + WEAPONS[lo.secondary].name : ''}</div>
-        <div>${g.name} ×${GADGET_COUNT[lo.gadget]} <button class="lo" title="Change loadout">LOADOUT</button></div>
-        <div class="ab">${o.ability.name}${o.ability.count ? ' ×' + o.ability.count : ''}</div><div>${o.ability.desc}</div>`;
+      info.innerHTML = `<div class="nm">${o.name}</div><div class="role">${o.role}</div><div class="ab">${o.ability.name}</div>`;
       d.appendChild(info);
-      info.querySelector('.lo').onclick = e => { e.stopPropagation(); showOps(k); };
+      // the full details show in the strip under the cards, for whichever card the mouse is on (or yours)
+      d.dataset.full = `<div class="nm">${o.name}<span>${o.role}</span></div>
+        <div><span class="pips"><span>ARMOR ${pips(armor)}</span><span>SPEED ${pips(speed)}</span></span> ·
+        ${WEAPONS[lo.primary].name} <span style="color:var(--dim)">${WEAPONS[lo.primary].cls}</span>${lo.secondary ? ' · ' + WEAPONS[lo.secondary].name : ''} · ${g.name} ×${GADGET_COUNT[lo.gadget]}
+        <button class="lo" data-op="${k}" title="Change loadout">LOADOUT</button></div>
+        <div><span class="ab">${o.ability.name}${o.ability.count ? ' ×' + o.ability.count : ''}</span> — ${o.ability.desc}</div>`;
+      d.onmouseenter = () => showOpInfo(d.dataset.full);
       d.onclick = () => { send({ t: 'pick', op: k }); };
       grid.appendChild(d);
     }
+    if (grid.firstChild) showOpInfo(grid.firstChild.dataset.full);
   }
   const mates = s.players.filter(p => p.sq === me.sq);
   for (const d of document.querySelectorAll('#opgrid .op')) {
@@ -435,6 +446,7 @@ function buildSelect(s) {
     const mineNow = !!who && who.id === me.id;
     if (mineNow && !d.classList.contains('mine')) { d.classList.add('locked'); audio.ui('lock'); setTimeout(() => d.classList.remove('locked'), 700); }
     d.classList.toggle('mine', mineNow);
+    if (mineNow && !d.matches(':hover') && !document.querySelector('#opgrid .op:hover')) showOpInfo(d.dataset.full);
     d.classList.toggle('taken', !!who && who.id !== me.id);
     d.querySelector('.who').textContent = who ? who.n : '';
     d.querySelector('.who').style.display = who ? '' : 'none';
@@ -568,6 +580,7 @@ function frame(nowMs) {
   if (view && (view.kind === 'body' || view.kind === 'drone')) {
     const mw = screenToWorld(mouse.x, mouse.y);
     st.aim = Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x);
+    if (now < (st.dazeUntil || 0)) st.aim += Math.sin(now * 6.3) * 0.05 + Math.sin(now * 2.1) * 0.04; // dazed: the aim sways
   } else if (view && view.kind === 'cam') {
     if (st.lastCam !== view.cam.id) { // switching cameras: start from that camera's current direction
       st.lastCam = view.cam.id; st.aim = view.cam.ag || 0; view.ang = st.aim; audio.foley('camSwitch');
@@ -655,7 +668,9 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (ctrl === 'cam' || ctrl === 'drone') {
     if (mouse.wl) trySpot();
     if (ctrl === 'cam') { k.up = k.down = k.left = k.right = 0; }
-    k.fire = 0; k.ads = 0;
+    const cams = s ? s.ents.filter(e => e.ty === 'cam' && e.hp > 0) : [], cam = cams[(me && me.ci || 0) % Math.max(1, cams.length)];
+    if (!(ctrl === 'cam' && cam && cam.tu)) k.fire = 0; // a turret camera fires its laser
+    k.ads = 0;
   }
   if (st.spotReq) { trySpot(); st.spotReq = false; }
   mouse.wl = 0; mouse.wr = 0;
@@ -723,7 +738,7 @@ function playerFoley(p, a, moved, own, dt) {
   const pace = p.dn ? 1 : p.wk ? 0 : p.cr ? 1 : p.mv >= 3 ? 3 : 2;
   // legs follow the real step cycle; a foot plants each time the gait passes a multiple of PI
   const gt = p.gt || 0, plant = Math.floor(gt / Math.PI);
-  if (a.plant !== undefined && plant > a.plant && moved > 0.05) audio.step(p.x, p.y, surfaceAt(p.x, p.y), pace, own);
+  if (a.plant !== undefined && plant > a.plant && moved > 0.05 && (own || !p.si)) audio.step(p.x, p.y, surfaceAt(p.x, p.y), pace, own);
   if (a.plant === undefined || plant < a.plant - 1 || plant > a.plant) a.plant = plant;
   // turning on the spot: feet shuffle round, each shuffle a little step
   const dAng = Math.abs(angDiff(p.ag, a.lag ?? p.ag)); a.lag = p.ag;
@@ -731,7 +746,7 @@ function playerFoley(p, a, moved, own, dt) {
   if (moved < 0.3 && !p.dn) {
     const before = Math.floor(a.turn / Math.PI);
     a.turn += dAng * 2.4; a.turnAmp = Math.min(1, (a.turnAmp || 0) + dAng * 3);
-    if (Math.floor(a.turn / Math.PI) > before) audio.shuffle(p.x, p.y, surfaceAt(p.x, p.y), own);
+    if (Math.floor(a.turn / Math.PI) > before && (own || !p.si)) audio.shuffle(p.x, p.y, surfaceAt(p.x, p.y), own);
   }
   a.walk = gt + Math.PI / 2 + a.turn;
   if (a.pAd !== undefined) {
@@ -825,7 +840,8 @@ function draw(s, view, now, dt) {
   const ents = s.ents.map(e => interp(e.id, 'ents') || e);
   for (const e of ents) {
     const ally = e.tm === side;
-    if (e.ty === 'drone' || e.ty === 'cam' || e.ty === 'smoke') continue;
+    if (e.ty === 'drone' || e.ty === 'cam' || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud') continue;
+    if ((e.ty === 'clamp' || e.ty === 'prox' || e.ty === 'concuss') && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < 110)) continue; // hidden traps
     if (!ally && !seen(e.x, e.y)) continue;
     if (e.ty === 'mine' && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < 140)) continue;
     drawGadget(ctx, e, now, ally);
@@ -848,13 +864,19 @@ function draw(s, view, now, dt) {
     a.mvS = (a.mvS || 0) + (Math.min(1.4, moved / Math.max(dt, 0.001) / 95) - (a.mvS || 0)) * Math.min(1, dt * 10);
     a.turnAmp = Math.max(0, (a.turnAmp || 0) - dt * 2.5);
     a.recoil = Math.max(0, a.recoil - dt * 12); a.melee = Math.max(0, a.melee - dt * 4);
-    const vis = ally || isMe || seen(p.x, p.y);
+    // Silent Shroud: drones and cameras can't see her, only eyes can
+    const vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
     if (!vis) continue;
     drawOperator(ctx, {
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, downed: p.dn,
       recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, scan: p.sc, melee: a.melee,
     }, now);
     drawn.push(p);
+    if (p.ln && Math.random() < dt * 40) { // Thermal Lance: sparks where it bites the wall
+      const hx = p.x + Math.cos(p.ag) * 17, hy = p.y + Math.sin(p.ag) * 17, a2 = p.ag + Math.PI + (Math.random() - 0.5) * 2;
+      fx.add({ type: 'spark', x: hx, y: hy, vx: Math.cos(a2) * 120, vy: Math.sin(a2) * 120, life: 0.25, max: 0.25, size: 1, col: '255,200,120', drag: 4 });
+      if ((a.lanceSnd = (a.lanceSnd || 0) - dt) <= 0) { a.lanceSnd = 0.18; audio.impact('metal', hx, hy); fx.lights.push({ x: hx, y: hy, r: 40, life: 0.12, max: 0.12, col: '255,170,80', a: 0.5 }); }
+    }
   }
   for (const e of ents) if (e.ty === 'drone') { // motion, wheel spin, dust and motor sound for every drone
     const own = me && e.id === me.did && me.ct === 'drone';
@@ -871,7 +893,17 @@ function draw(s, view, now, dt) {
   }
   audio.pruneLoops(); tq = pfa('actors', tq);
   fx.draw(ctx);
+  for (const e of ents) if (e.ty === 'decoy') { // Holo Decoy: looks, moves and sounds like the real operator
+    const a = anim(e.id), mv = Math.hypot(e.x - (a.dx ?? e.x), e.y - (a.dy ?? e.y)); a.dx = e.x; a.dy = e.y;
+    a.walk = (a.walk || 0) + mv / 28 * Math.PI; a.stepAcc = (a.stepAcc || 0) + mv;
+    if (a.stepAcc > 31) { a.stepAcc = 0; audio.step(e.x, e.y, surfaceAt(e.x, e.y), 2, false); }
+    const ally = e.tm === side; if (!ally && !seen(e.x, e.y)) continue;
+    if (ally) ctx.globalAlpha = 0.45;
+    drawOperator(ctx, { x: e.x, y: e.y, aim: e.ag, op: e.op, w: e.w, ally, walk: a.walk, legs: 1 }, now);
+    ctx.globalAlpha = 1;
+  }
   for (const e of ents) if (e.ty === 'smoke') drawSmoke(ctx, e, now, gq.smoke);
+  for (const e of ents) if (e.ty === 'gascloud' && (e.tm === side || seen(e.x, e.y))) drawSmoke(ctx, { ...e, l: Math.min(e.l * 1.5, 12) }, now, Math.ceil(gq.smoke * 0.6), '150,200,70');
   fx.drawLights(ctx); tq = pfa('fx', tq);
 
   // --- line-of-sight blackout ---
@@ -966,6 +998,7 @@ function draw(s, view, now, dt) {
     ctx.fillStyle = `rgba(255,40,40,${0.8 * hurtK})`; ctx.beginPath(); ctx.moveTo(VH * 0.2, -22 * DPR); ctx.lineTo(VH * 0.24, 0); ctx.lineTo(VH * 0.2, 22 * DPR); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
+  if (now < (st.dazeUntil || 0)) { const k = Math.min(1, st.dazeUntil - now); ctx.fillStyle = `rgba(210,190,140,${0.12 * k})`; ctx.fillRect(0, 0, VW, VH); fx.shake = Math.max(fx.shake, 1.2 * k); }
   if (me && me.a && me.dn) { ctx.fillStyle = 'rgba(90,0,0,0.25)'; ctx.fillRect(0, 0, VW, VH); }
   const fl = st.flashUntil - now;
   if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(1, fl / 1.2)})`; ctx.fillRect(0, 0, VW, VH); }
@@ -1024,6 +1057,7 @@ function camOverlay(view, now) {
   ctx.fillStyle = 'rgba(255,255,255,0.035)'; for (let y = (now * 40 * DPR) % (4 * DPR); y < VH; y += 4 * DPR) ctx.fillRect(0, y, VW, DPR);
   ctx.fillStyle = Math.floor(now * 2) % 2 ? '#ff3030' : 'rgba(255,48,48,0.3)'; ctx.beginPath(); ctx.arc(80 * DPR, 120 * DPR, 7 * DPR, 0, 7); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.font = `700 ${18 * DPR}px Barlow Condensed`; ctx.textAlign = 'left'; ctx.fillText('REC', 94 * DPR, 126 * DPR);
+  if (view.cam && view.cam.tu) { ctx.fillStyle = '#ff6060'; ctx.font = `700 ${16 * DPR}px Barlow Condensed`; ctx.fillText('TURRET · CLICK TO FIRE THE LASER', 80 * DPR, 150 * DPR); }
   if (view.off) { for (let i = 0; i < 900; i++) { ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.4})`; ctx.fillRect(Math.random() * VW, Math.random() * VH, 4 * DPR, 2 * DPR); } }
 }
 
@@ -1107,10 +1141,10 @@ function hud(s) {
   $('mag').textContent = me.rl > 0 ? '··' : me.am; $('mag').className = w && me.am <= w.mag * 0.25 ? 'low' : '';
   $('res').textContent = '/ ' + me.rs;
   const ab = o.ability, g = GADGETS[me.gd || o.gadget];
-  const abCount = ab.id === 'scan' ? `${Math.round(me.bat / ab.battery * 100)}%` : ab.count ? me.ac : '';
+  const abCount = ab.battery ? `${Math.round(me.bat / ab.battery * 100)}%` : ab.count ? me.ac : '';
   const viewName = side === 'atk' ? `Drone${s.ph === PHASE.ACTION ? ' ×' + me.dr : ''}` : 'Cameras';
   setHTML('gadgets',
-    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${ab.name}<em>${abCount}</em></div>` +
+    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : ab.name}<em>${me.gi ? '!' : abCount}</em></div>` +
     `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>${label('gadget')}</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +
     `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label
@@ -1214,12 +1248,19 @@ function teamViewers(s, view, me, inGame) {
     if (e.ty === 'drone') {
       if (view && view.kind === 'drone' && me.did === e.id) continue;
       vs.push({ x: ie.x, y: ie.y, ang: 0, fov: Math.PI * 2, range: 230, near: 0, kind: 'drone' });
+    } else if (e.ty === 'scope' && side === 'atk') { // Wall Scope: a view through the wall
+      vs.push({ x: ie.x, y: ie.y, ang: e.ag || 0, fov: 1.3, range: 420, near: 6, kind: 'cam' });
     } else if (e.ty === 'cam' && e.hp > 0 && !e.off && side === 'def') {
       if (view && view.kind === 'cam' && view.cam.id === e.id) continue;
       vs.push({ x: e.x, y: e.y, ang: e.ag || 0, fov: 1.9, range: 650, near: 14, kind: 'cam' });
     }
   }
   return vs;
+}
+function teamSeesBody(x, y) { // seen by someone's own eyes (not a drone, camera or scope)
+  const sm = smokes(st.last);
+  for (const v of st.viewers || []) if (!v.off && v.kind !== 'drone' && v.kind !== 'cam' && canSee(st.map, v, x, y, sm)) return true;
+  return false;
 }
 function teamSees(x, y) {
   const sm = smokes(st.last);
