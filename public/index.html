@@ -108,6 +108,16 @@
     <div class="vols gfx"><label>Fullscreen <button id="fsToggle" class="tog">ON</button></label>
       <label>Graphics quality <span class="seg" id="gfxSeg"><button data-q="low">Low</button><button data-q="medium">Medium</button><button data-q="high">High</button><button data-q="ultra">Ultra</button></span></label></div>
     <p class="hint" id="gfxHint"></p>
+    <div class="xh"><canvas id="xhPreview" width="150" height="150"></canvas>
+      <div class="xhopts">
+        <div class="xhrow"><span>Crosshair</span><span class="seg" id="xhStyle"></span></div>
+        <div class="xhrow"><span>Colour</span><span id="xhColor"></span></div>
+        <div class="xhrow"><label>Length <input type="range" id="xh_len" min="1" max="20" step="0.5"> <b id="xh_lenV"></b></label>
+          <label>Thickness <input type="range" id="xh_thick" min="0.5" max="5" step="0.5"> <b id="xh_thickV"></b></label></div>
+        <div class="xhrow"><label>Gap <input type="range" id="xh_gap" min="0" max="20" step="0.5"> <b id="xh_gapV"></b></label>
+          <label>Opacity <input type="range" id="xh_alpha" min="20" max="100" step="5"> <b id="xh_alphaV"></b></label></div>
+        <div class="xhrow"><span>Outline</span><button id="xh_outline" class="tog">ON</button><span>Opens up when moving / spraying</span><button id="xh_dynamic" class="tog">ON</button><button id="xhReset">Default</button></div>
+      </div></div>
     <p class="hint">Click a key to change it, then press the new key (Esc cancels).</p>
     <div class="tablewrap"><table id="bindTable"></table></div>
     <div class="row center"><button id="setReset">Reset to defaults</button><button id="setClose" class="primary">Done</button></div>

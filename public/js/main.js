@@ -11,6 +11,7 @@ import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
 import { openOps, closeOps, updateOpsProfile } from './ops.js';
 import { openProfile } from './profile.js';
+import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './crosshair.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor } from '/shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '/shared/operators.js';
@@ -278,6 +279,28 @@ function renderSettings() {
   for (const b of $('bindTable').querySelectorAll('button')) b.onclick = () => { rebinding = { id: b.dataset.id, slot: +b.dataset.slot }; renderSettings(); };
 }
 $('setReset').onclick = () => { resetBinds(); renderSettings(); };
+// crosshair: chosen in Settings, saved in your profile
+let xh = (() => { try { return cleanXhair(JSON.parse(localStorage.getItem('r62d-xh') || 'null')); } catch { return cleanXhair(); } })();
+function setXhair(o, save = true) {
+  xh = cleanXhair(o);
+  try { localStorage.setItem('r62d-xh', JSON.stringify(xh)); } catch {}
+  renderXhair(); if (save) saveSettings();
+}
+function renderXhair() {
+  $('xhStyle').innerHTML = XH_STYLES.map(([k, n]) => `<button data-v="${k}" class="${xh.style === k ? 'on' : ''}">${n}</button>`).join('');
+  $('xhColor').innerHTML = XH_COLORS.map(c => `<button data-v="${c}" class="sw${xh.color === c ? ' on' : ''}" style="background:${c}"></button>`).join('');
+  for (const k of ['len', 'thick', 'gap', 'alpha']) { $('xh_' + k).value = xh[k]; $('xh_' + k + 'V').textContent = xh[k]; }
+  for (const k of ['outline', 'dynamic']) { const b = $('xh_' + k); b.textContent = xh[k] ? 'ON' : 'OFF'; b.classList.toggle('on', xh[k]); }
+  const c = $('xhPreview'), x = c.getContext('2d'), k = 2;
+  x.fillStyle = '#5b6168'; x.fillRect(0, 0, c.width, c.height / 2); x.fillStyle = '#1b1e22'; x.fillRect(0, c.height / 2, c.width, c.height / 2);
+  drawXhair(x, c.width / 2, c.height / 2, xh, 0, k);
+}
+$('xhStyle').onclick = e => { const v = e.target.dataset.v; if (v) { audio.ui(); setXhair({ ...xh, style: v }); } };
+$('xhColor').onclick = e => { const v = e.target.dataset.v; if (v) { audio.ui(); setXhair({ ...xh, color: v }); } };
+for (const k of ['len', 'thick', 'gap', 'alpha']) $('xh_' + k).oninput = e => setXhair({ ...xh, [k]: +e.target.value });
+for (const k of ['outline', 'dynamic']) $('xh_' + k).onclick = () => { audio.ui(); setXhair({ ...xh, [k]: !xh[k] }); };
+$('xhReset').onclick = () => { audio.ui(); setXhair(XH_DEFAULT); };
+renderXhair();
 // graphics: fullscreen switch + quality presets
 const GFX_HINT = { low: 'Low — for weak computers: fewer pixels, fewer particles, flat lighting.', medium: 'Medium — a little softer picture, runs well on most computers.', high: 'High — full sharpness. Recommended.', ultra: 'Ultra — extra-sharp, smoothest edges and most effects. Needs a strong computer.' };
 function renderGfx() {
@@ -909,17 +932,12 @@ function crosshair(me, now) {
   const w = WEAPONS[me.w];
   const at = me.at || 0, base = w ? w.spread + (w.ads - w.spread) * at : 0.05; // tightens as you settle into your sights
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / 140);
-  const gap = (4 + base * 160 + Math.pow(run, 1.4) * 15 + (me.cr && run < 0.15 ? -2 : 0)) * DPR; // opens up while you run
+  const spread = xh.dynamic ? Math.max(0, base * 160 + Math.pow(run, 1.4) * 15 + (me.cr && run < 0.15 ? -2 : 0)) : 0; // opens up while you run
   // recoil kicks the crosshair round your character: pull the mouse against it
   const px = (st.pred.x - st.cam.x) * st.zoom + VW / 2, py = (st.pred.y - st.cam.y) * st.zoom + VH / 2;
   const rc = me.rc || 0, c = Math.cos(rc), s2 = Math.sin(rc);
   const x = px + (mouse.x - px) * c - (mouse.y - py) * s2, y = py + (mouse.x - px) * s2 + (mouse.y - py) * c;
-  ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5 * DPR;
-  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 2;
-  ctx.beginPath();
-  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(x + dx * gap, y + dy * gap); ctx.lineTo(x + dx * (gap + 7 * DPR), y + dy * (gap + 7 * DPR)); }
-  ctx.stroke();
-  ctx.fillStyle = '#fff'; ctx.fillRect(x - DPR, y - DPR, 2 * DPR, 2 * DPR);
+  drawXhair(ctx, x, y, xh, spread, DPR);
   const hk = 1 - (now - st.hitT) / 0.18;
   if (hk > 0) {
     ctx.strokeStyle = st.hitKill ? `rgba(255,60,60,${hk})` : `rgba(255,255,255,${hk})`; ctx.lineWidth = 2 * DPR;
@@ -927,7 +945,6 @@ function crosshair(me, now) {
     for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { ctx.moveTo(x + dx * 5 * DPR, y + dy * 5 * DPR); ctx.lineTo(x + dx * 11 * DPR, y + dy * 11 * DPR); }
     ctx.stroke();
   }
-  ctx.shadowBlur = 0;
 }
 
 function droneOverlay(now, ents) {
@@ -1299,7 +1316,7 @@ window.__r62d = { PF, st, showEnd, playXp }; // for automated screenshot tests
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
   try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, sens: +$('sens').value, adsSens: +$('adsSens').value };
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, sens: +$('sens').value, adsSens: +$('adsSens').value, xh };
 }
 let saveTimer = 0;
 function saveSettings() {
@@ -1309,6 +1326,7 @@ function saveSettings() {
 function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
   for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = s[k];
+  if (s.xh) setXhair(s.xh, false);
   showSens();
   applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100);
   saveVol(); try { localStorage.setItem('r62d-music', $('volMusic').value); } catch {}

@@ -146,6 +146,15 @@ tr.me { color: var(--gold); } tr.dead { opacity: 0.5; }
 #settings .tog.on, #settings .seg button.on { background: var(--gold); color: #000; border-color: var(--gold); }
 #settings .seg { display: inline-flex; gap: 0; margin-left: 8px; }
 #settings .seg button { border-radius: 0; margin: 0; }
+#settings .xh { display: flex; gap: 16px; align-items: flex-start; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px 0; }
+#settings .xh canvas { width: 150px; height: 150px; flex-shrink: 0; border: 1px solid var(--line); }
+#settings .xhopts { display: flex; flex-direction: column; gap: 7px; font: 600 14px var(--head); letter-spacing: 0.06em; }
+#settings .xhrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+#settings .xhrow input { width: 120px; vertical-align: middle; padding: 0; }
+#settings .xhrow button { padding: 3px 9px; font-size: 13px; }
+#settings .xhrow .seg { margin-left: 0; }
+#settings .sw { width: 24px; height: 24px; padding: 0 !important; margin-right: 4px; border: 2px solid #333; }
+#settings .sw.on { outline: 2px solid var(--gold); outline-offset: 1px; }
 #settings .tog:disabled { opacity: 0.6; cursor: default; }
 #settings td { padding: 3px 8px; font-size: 15px; }
 #settings td button { width: 130px; padding: 4px 8px; font-size: 14px; }
