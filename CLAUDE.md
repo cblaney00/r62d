@@ -26,6 +26,7 @@ His wishes so far:
 - Builds follow armor (`BODY_W`/`HIT_R` in shared/operators.js): heavies broad, mediums and lights skinnier. Bullets hit within `hitR(op)` (7.5 / 6.8 / 6.2 px), smaller than the bumping radius `PLAYER_R` 10, so people are harder to hit. He asked for this.
 - Movement uses real-world speeds (`M_S` in shared/physics.js, 1 m = 36 px = `PX_PER_M`): jog 2.6 m/s (2.3 heavy, 3.0 light), walk 1.4, ADS 1.5, crouch 0.9, downed crawl 0.5, drone 3.2. He asked for everything slower and realistic.
 - FOV like a modern FPS (103°, 70° ADS). Aiming is quick (`ADS_TIME` 0.1–0.28 s) and zooms the camera in (×0.82, scope ×0.9, `st.adsZ`) within ~0.15 s; he asked for that and for less slow panning, so the room-size zoom (`st.envWant`/`st.envH`) only changes for a >15% difference and settles in ~0.5 s. Zoom adapts: close indoors, wider outside / long sightlines (`want` in the main.js camera: 240–470 world px tall indoors, up to 520 down a sightline; he asked twice for closer).
+- Friendly fire is always on (he asked): bullets, melee, shield bash, hammer, arc gun, turret cameras, toxin gas and every explosion (traps included) hurt teammates too; a teamkill costs a kill.
 - Abilities all work. Floors are joined by stairs only (no shooting or seeing between floors yet; no hatches).
 - Graphics detailed enough to interest people used to modern games; fills a fullscreen
   16:9 monitor; must not lag; it's a multi-day project.

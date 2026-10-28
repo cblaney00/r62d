@@ -466,7 +466,7 @@ export class Game {
         const a = c.ang || 0, dx = Math.cos(a), dy = Math.sin(a);
         let bt = castSight(this.map, c.x, c.y, a, 520, this.smokeList()), hit = null;
         for (const q of this.players.values()) {
-          if (!q.alive || this.side(q) === team) continue;
+          if (!q.alive || q === p) continue;
           const t = rayCircle(c.x, c.y, dx, dy, q.x, q.y, hitR(q.op));
           if (t !== null && t < bt) { bt = t; hit = q; }
         }
@@ -828,13 +828,13 @@ export class Game {
     this.events.push({ e: 'melee', id: p.id });
     const team = this.side(p);
     if (p.bracing) { // shield bash: staggers whoever it hits; a miss leaves the shield down for a while
-      const q = [...this.players.values()].find(q => q.alive && this.side(q) !== team && Math.hypot(q.x - p.x, q.y - p.y) < 34 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.0);
+      const q = [...this.players.values()].find(q => q.alive && q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 34 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.0);
       if (q) { this.damage(q, 30, p, 'Shield Bash', p.aim); q.staggerUntil = this.time + 0.7; q.slowUntil = Math.max(q.slowUntil, this.time + 1); p.meleeCd = 0.8; }
       else { p.meleeCd = 1.4; p.shieldDownUntil = this.time + 1.2; }
       return;
     }
     for (const q of this.players.values()) {
-      if (!q.alive || this.side(q) === team) continue;
+      if (!q.alive || q === p) continue; // friendly fire: a swing hits teammates too
       const d = Math.hypot(q.x - p.x, q.y - p.y);
       if (d < 28 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.1 && los(this.map, p.x, p.y, q.x, q.y)) {
         // hitting a shield from the front knocks it aside for a moment instead of hurting
@@ -943,7 +943,7 @@ export class Game {
         if (t !== null && t < bt) { bt = t; hitE = e; }
       }
       for (const q of this.players.values()) {
-        if (!q.alive || this.side(q) === team) continue;
+        if (!q.alive || q === p) continue;
         const t = rayCircle(p.x, p.y, ca, sa, q.x, q.y, hitR(q.op));
         if (t !== null && t < bt) { bt = t; hitQ = q; hitE = null; }
       }
@@ -962,7 +962,7 @@ export class Game {
         this.events.push({ e: 'hit', k: f.t === T.BARRI ? 'wood' : 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) });
         this.events.push({ e: 'snd', s: 'break', x: r1(p.x), y: r1(p.y) });
       } else {
-        const q = [...this.players.values()].find(q => q.alive && this.side(q) !== team && Math.hypot(q.x - p.x, q.y - p.y) < 30 &&
+        const q = [...this.players.values()].find(q => q.alive && q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 30 &&
           Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.1);
         if (!q) return;
         this.damage(q, 75, p, 'Breaching Hammer', p.aim);
@@ -1156,7 +1156,7 @@ export class Game {
           e.life -= dt; e.tick = (e.tick || 0) - dt;
           if (e.tick <= 0) {
             e.tick = 0.5;
-            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < e.r)
+            for (const q of this.players.values()) if (q.alive && Math.hypot(q.x - e.x, q.y - e.y) < e.r) // toxin hurts everyone in it
               this.damage(q, 6, this.players.get(e.owner), 'Toxin Canister', 0);
           }
           if (e.life <= 0) this.removeEnt(e);
@@ -1198,9 +1198,9 @@ export class Game {
     const kind = e.type === 'nade' ? e.kind : e.type;
     const SOFTISH = [T.SOFT, T.BARRI];
     switch (kind) {
-      case 'frag': this.explode(e, { r: 75, dmg: 130, cellR: 14, cells: SOFTISH, kind: 'frag', ff: 1 }); break;
-      case 'impact': this.explode(e, { r: 34, dmg: 40, cellR: 22, cells: SOFTISH, kind: 'impact', ff: 1 }); break;
-      case 'nitro': this.explode(e, { r: 70, dmg: 140, cellR: 20, cells: SOFTISH, kind: 'nitro', ff: 1 }); break;
+      case 'frag': this.explode(e, { r: 75, dmg: 130, cellR: 14, cells: SOFTISH, kind: 'frag' }); break;
+      case 'impact': this.explode(e, { r: 34, dmg: 40, cellR: 22, cells: SOFTISH, kind: 'impact' }); break;
+      case 'nitro': this.explode(e, { r: 70, dmg: 140, cellR: 20, cells: SOFTISH, kind: 'nitro' }); break;
       case 'slug': this.explode(e, { r: 36, dmg: 75, cellR: 21, cells: SOFTISH, kind: 'slug', selfMul: 0.3 }); break;
       case 'breach': this.explode(e, { r: 40, dmg: 60, cellR: 21, cells: SOFTISH, kind: 'breach', at: e.cell }); break;
       case 'claymore': this.explode(e, { r: 50, dmg: 95, cellR: 0, cells: [], kind: 'frag', cone: e.ang }); break;
@@ -1282,8 +1282,7 @@ export class Game {
     }
     for (const q of this.players.values()) {
       if (!q.alive) continue;
-      const self = owner && q === owner;
-      if (!self && this.side(q) === e.team && !o.ff) continue; // thrown/placed explosives hurt teammates; traps don't
+      const self = owner && q === owner; // friendly fire: every blast hurts everyone in range, owner included
       const d = Math.hypot(q.x - e.x, q.y - e.y);
       if (d > o.r) continue;
       if (o.cone !== undefined && Math.abs(angDiff(Math.atan2(q.y - e.y, q.x - e.x), o.cone)) > 0.8) continue;
