@@ -1,7 +1,7 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
-import { buildMap, roomAt } from '../shared/map.js';
+import { buildMap, roomAt, MAPS, MAP_LIST } from '../shared/map.js';
 import { stepMove, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
@@ -30,7 +30,8 @@ export class Game {
     this.changed = new Set();
     this.phase = PHASE.LOBBY;
     this.timer = 0; this.round = 0; this.score = [0, 0]; this.time = 0;
-    this.map = buildMap();
+    this.mapId = 'harbor';
+    this.map = buildMap(this.mapId);
     this.mapVersion = 0;
     this.site = 0; this.siteRevealed = false; this.planted = null;
     this.spots = { atk: new Map(), def: new Map() };
@@ -52,7 +53,7 @@ export class Game {
         const login = store.login(typeof m.token === 'string' ? m.token : null, p.name);
         p.token = login.token; p.pid = login.profile.id;
         p.ms = this.blankMatchStats();
-        sock.send(JSON.stringify({ t: 'welcome', id: p.id, mapVersion: this.mapVersion, token: p.token, profile: publicProfile(login.profile),
+        sock.send(JSON.stringify({ t: 'welcome', id: p.id, mapVersion: this.mapVersion, mapId: this.mapId, token: p.token, profile: publicProfile(login.profile),
           tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp) }));
         this.msg(`${p.name} joined`);
       } else if (p) this.handle(p, m);
@@ -113,6 +114,10 @@ export class Game {
       else if (m.a === 'removeBot') this.removeBot(m.squad);
       else if (m.a === 'fillBots') { for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); }
       else if (m.a === 'switch') this.switchSquad(p);
+      else if (m.a === 'map' && this.phase === PHASE.LOBBY && MAPS[m.id] && m.id !== this.mapId) {
+        this.mapId = m.id; this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear();
+        this.msg(`${p.name} chose the map ${MAPS[m.id].name}`);
+      }
       else if (m.a === 'start' && this.phase === PHASE.LOBBY) this.startMatch();
       else if (m.a === 'end' && this.phase !== PHASE.LOBBY) { this.msg(`${p.name} ended the match`); this.resetToLobby(); }
     } else if (m.t === 'pick') this.pickOp(p, m.op);
@@ -171,7 +176,7 @@ export class Game {
 
   nextRound() {
     this.round++;
-    this.map = buildMap(); this.mapVersion++; this.changed.clear();
+    this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear();
     this.ents = []; this.planted = null; this.winner = null; this.reason = '';
     this.site = Math.floor(Math.random() * this.map.sites.length);
     this.siteRevealed = false;
@@ -1097,7 +1102,7 @@ export class Game {
     return store.recordMatch({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: Date.now(),
       duration: Math.round((Date.now() - (this.matchStart || Date.now())) / 1000),
-      map: 'Harbor Office', mode: 'Quick Match', score: [...this.score], winner, rounds: this.roundLog || [], players,
+      map: this.map.name, mode: 'Quick Match', score: [...this.score], winner, rounds: this.roundLog || [], players,
     });
   }
 
@@ -1136,7 +1141,7 @@ export class Game {
     });
     const spots = { atk: [...this.spots.atk.keys()], def: [...this.spots.def.keys()] };
     const common = JSON.stringify({
-      ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion,
+      ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId,
       site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       rf: this.reinforce, win: this.winner, why: this.reason, spawn: this.spawnName,
       players, ents, cells, ev: this.events, spots, time: r2(this.time),

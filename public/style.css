@@ -6,6 +6,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #050607; color: var(--text); font-family: var(--body); user-select: none; }
 canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: none; }
+#objective .flr { color: var(--gold); margin-right: 4px; }
 #mapLayer { position: fixed; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 canvas#fog, canvas#over, #vignette { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; }
 canvas#fog { visibility: hidden; }

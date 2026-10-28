@@ -24,11 +24,13 @@ export const DUR = {
 export const T = {
   GROUND: 0, FLOOR: 1, HARD: 2, SOFT: 3, REINF: 4, BARRI: 5, OPEN: 6,
   LOW: 7, TALL: 8, PANEL: 9, DSHIELD: 10,
+  VOID: 11,  // outside a floor: open air above ground, solid earth below — nothing passes
+  STAIR: 12, // staircase: walkable; the far end takes you to the other floor (map.portal)
 };
 
 // Floor looks
 export const FL = {
-  GRASS: 0, ASPHALT: 1, WOOD: 2, TILE: 3, CARPET: 4, CONCRETE: 5, MARBLE: 6, SERVER: 7,
+  GRASS: 0, ASPHALT: 1, WOOD: 2, TILE: 3, CARPET: 4, CONCRETE: 5, MARBLE: 6, SERVER: 7, VOID: 8,
 };
 
 // Wall materials (for drawing)
@@ -36,10 +38,10 @@ export const MAT = { DRYWALL: 0, BRICK: 1, CONCRETE: 2 };
 
 export const CELL_HP = { [T.SOFT]: 60, [T.BARRI]: 60, [T.PANEL]: 400, [T.DSHIELD]: 300 };
 
-const MOVE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.LOW, T.TALL, T.PANEL, T.DSHIELD]);
-const DRONE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.TALL, T.PANEL, T.DSHIELD, T.LOW]); // drones fit through barricade gaps but not under furniture
-const SIGHT_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.TALL, T.PANEL]);
-const BULLET_STOP = new Set([T.HARD, T.REINF, T.TALL, T.PANEL, T.DSHIELD]);
+const MOVE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.LOW, T.TALL, T.PANEL, T.DSHIELD, T.VOID]);
+const DRONE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.TALL, T.PANEL, T.DSHIELD, T.LOW, T.VOID]); // drones fit through barricade gaps but not under furniture
+const SIGHT_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.TALL, T.PANEL, T.VOID]);
+const BULLET_STOP = new Set([T.HARD, T.REINF, T.TALL, T.PANEL, T.DSHIELD, T.VOID]);
 const BULLET_PEN = new Set([T.SOFT, T.BARRI]);
 
 export const blocksMove = t => MOVE_BLOCK.has(t);
@@ -47,6 +49,7 @@ export const blocksDrone = t => DRONE_BLOCK.has(t);
 export const blocksSight = t => SIGHT_BLOCK.has(t);
 export const stopsBullet = t => BULLET_STOP.has(t);
 export const penBullet = t => BULLET_PEN.has(t);
+export const walkable = t => t === T.FLOOR || t === T.GROUND || t === T.STAIR || t === T.OPEN;
 export const isWall = t => t === T.HARD || t === T.SOFT || t === T.REINF || t === T.BARRI || t === T.PANEL;
 
 export const TEAM = { ATK: 'atk', DEF: 'def' };

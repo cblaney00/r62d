@@ -1,7 +1,10 @@
 // R62D sound engine. Everything is synthesised (no audio files).
 // Each sound is positioned: distance fade, stereo pan, muffling through walls, and a room echo.
 let ac = null, master = null, sfx = null, verb = null, verbIn = null, noiseBuf = null;
-let listener = { x: 0, y: 0 }, occlude = () => 0, indoorAt = () => true;
+let listener = { x: 0, y: 0 }, occlude = () => 0, indoorAt = () => true, localize = null;
+// distance between a sound and the listener, measured in the shared building frame (floors stack)
+const L = (x, y) => (localize ? localize(x, y) : { x, y });
+const distTo = (x, y) => { const a = L(x, y), b = L(listener.x, listener.y); return { d: Math.hypot(a.x - b.x, a.y - b.y), dx: a.x - b.x }; };
 let vol = { master: 0.6, sfx: 1 };
 const loops = new Map();
 
@@ -46,7 +49,7 @@ function buildGraph(context) {
 }
 
 export function setListener(x, y) { listener = { x, y }; }
-export function setWorld(occFn, indoorFn) { occlude = occFn; indoorAt = indoorFn; }
+export function setWorld(occFn, indoorFn, locFn) { occlude = occFn; indoorAt = indoorFn; localize = locFn || null; }
 export function setVolume(m, s) { if (m !== undefined) vol.master = m; if (s !== undefined) vol.sfx = s; if (master) { master.gain.value = vol.master; sfx.gain.value = vol.sfx; } }
 export const now = () => (ac ? ac.currentTime : 0);
 
@@ -56,10 +59,10 @@ function out(x, y, gain, range = 900, wet = 0.25) {
   gain *= MIX[C] ?? 1;
   let pan = 0, walls = 0, d = 0;
   if (x !== undefined) {
-    d = Math.hypot(x - listener.x, y - listener.y);
+    const dd = distTo(x, y); d = dd.d;
     gain *= Math.max(0, 1 - d / range) ** 1.7;
     if (gain < 0.003) return null;
-    pan = Math.max(-0.9, Math.min(0.9, (x - listener.x) / 260));
+    pan = Math.max(-0.9, Math.min(0.9, dd.dx / 260));
     walls = d > 20 ? occlude(x, y) : 0;
   }
   const g = ac.createGain(); g.gain.value = gain * Math.pow(0.55, walls);
@@ -367,7 +370,7 @@ export function gunshot(cls, x, y, own) {
   const src = ac.createBufferSource(); src.buffer = gunBuf(cls); src.playbackRate.value = 0.96 + Math.random() * 0.08;
   src.connect(g); src.start();
   if (x !== undefined && !own) { // far away: the crack fades and the boom rolls on
-    const d = Math.hypot(x - listener.x, y - listener.y);
+    const d = distTo(x, y).d;
     if (d > 500) { const t = ac.currentTime; tone(g, t + d / 3400, 0.5, P.boom * 0.8, P.boom * 0.5, 'sine', 0.25, 0.02); }
   }
 }
@@ -462,14 +465,14 @@ export function droneLoop(id, x, y, speed, own) {
     n.start(); hum.start();
     L = { n, hum, mix, p, whirr, lp, seen: 0 }; loops.set(id, L);
   }
-  const d = own ? 0 : Math.hypot(x - listener.x, y - listener.y);
+  const d = own ? 0 : distTo(x, y).d;
   const move = Math.min(1, speed / 160);
   const k = Math.max(0, 1 - d / 280) ** 1.6 * move * Math.pow(0.45, d > 20 ? occlude(x, y) : 0);
   const t = ac.currentTime;
   L.mix.gain.setTargetAtTime((own ? 0.012 : 0.02) * k * (MIX.loops ?? 1), t, 0.12);
   L.whirr.frequency.setTargetAtTime(500 + move * 450, t, 0.2);
   L.hum.frequency.setTargetAtTime(95 + move * 40, t, 0.2);
-  L.p.pan.setTargetAtTime(own ? 0 : Math.max(-0.9, Math.min(0.9, (x - listener.x) / 260)), t, 0.05);
+  L.p.pan.setTargetAtTime(own ? 0 : Math.max(-0.9, Math.min(0.9, distTo(x, y).dx / 260)), t, 0.05);
   L.seen = t;
 }
 export function pruneLoops() {

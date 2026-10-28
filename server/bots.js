@@ -52,6 +52,7 @@ function findPath(map, sx, sy, gx, gy) {
   const cost = k => {
     const t = map.tiles[k];
     if (t === T.BARRI) return 8;
+    if (t === T.SOFT && map.hp[k] > 0) return 30; // a plain wall: attackers will knock a hole in it if there's no other way
     if (blocksMove(t)) return Infinity;
     // keep a little away from walls so the bot's body fits
     const x = k % W, y = (k / W) | 0;
@@ -62,11 +63,19 @@ function findPath(map, sx, sy, gx, gy) {
   const push = (f, k) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const pi = (i - 1) >> 1; if (heap[pi][0] <= heap[i][0]) break; [heap[pi], heap[i]] = [heap[i], heap[pi]]; i = pi; } };
   const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let s = i; if (l < heap.length && heap[l][0] < heap[s][0]) s = l; if (r < heap.length && heap[r][0] < heap[s][0]) s = r; if (s === i) break; [heap[s], heap[i]] = [heap[i], heap[s]]; i = s; } } return top; };
   let iter = 0;
-  while (heap.length && iter++ < 6000) {
+  // distance guess measured in the shared building frame, so floors stacked above each other are "close"
+  const F = map.floors || [], flAt = map.flAt;
+  const lx = k => { const f = F[flAt ? flAt[k] : 0]; return k % W + (f ? f.x0 - f.gx : 0); };
+  const ly = k => { const f = F[flAt ? flAt[k] : 0]; return ((k / W) | 0) + (f ? f.y0 : 0); };
+  const glx = lx(goal), gly = ly(goal), gfl = flAt ? flAt[goal] : 0;
+  const h = k => Math.hypot(glx - lx(k), gly - ly(k)) + (flAt && flAt[k] !== gfl ? 6 : 0);
+  while (heap.length && iter++ < 30000) {
     const [, k] = pop();
     if (k === goal) break;
     if (closed[k]) continue; closed[k] = 1;
     const x = k % W, y = (k / W) | 0;
+    const pk = map.portal ? map.portal[k] : -1; // the end of a staircase leads to the other floor
+    if (pk >= 0) { const ng = g[k] + 1; if (ng < g[pk]) { g[pk] = ng; from[pk] = k; push(ng + h(pk), pk); } continue; }
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       const nx = x + dx, ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
@@ -74,7 +83,7 @@ function findPath(map, sx, sy, gx, gy) {
       if (dx && dy && (blocksMove(map.tiles[y * W + nx]) || blocksMove(map.tiles[ny * W + x]))) continue;
       const c = cost(nk); if (c === Infinity) continue;
       const ng = g[k] + c * (dx && dy ? 1.414 : 1);
-      if (ng < g[nk]) { g[nk] = ng; from[nk] = k; push(ng + Math.hypot(gx - nx, gy - ny), nk); }
+      if (ng < g[nk]) { g[nk] = ng; from[nk] = k; push(ng + h(nk), nk); }
     }
   }
   if (from[goal] < 0 && goal !== start) return null;
@@ -155,7 +164,7 @@ export function botThink(game, p, dt) {
   if (!ai.path || ai.pathT <= 0 || ai.goalK !== gy * map.W + gx) {
     ai.path = findPath(map, sx, sy, gx, gy) || []; ai.pathT = 1.2; ai.goalK = gy * map.W + gx;
   }
-  while (ai.path.length && ai.path[0] === sy * map.W + sx) ai.path.shift();
+  { const i = ai.path.indexOf(sy * map.W + sx); if (i >= 0 && i < 6) ai.path.splice(0, i + 1); } // also skips the stair end after being carried to the other floor
   if (!ai.path.length) {
     if (Math.hypot(goal.x - p.x, goal.y - p.y) > 6) setDir(inp, goal.x - p.x, goal.y - p.y);
     else if (team === TEAM.DEF) { p.aim += dt * 0.6 * (ai.look || (ai.look = Math.random() < 0.5 ? -1 : 1)); inp.crouch = 1; }
@@ -165,7 +174,7 @@ export function botThink(game, p, dt) {
   const nx = (next % map.W + 0.5) * CELL, ny = (Math.floor(next / map.W) + 0.5) * CELL;
   const dirA = Math.atan2(ny - p.y, nx - p.x);
   p.aim += Math.max(-dt * 6, Math.min(dt * 6, angDiff(dirA, p.aim)));
-  if (map.tiles[next] === T.BARRI) {
+  if (map.tiles[next] === T.BARRI || map.tiles[next] === T.SOFT) {
     if (Math.hypot(nx - p.x, ny - p.y) < 26) { p.aim = dirA; game.event(p, { k: 'melee' }); return; }
   }
   setDir(inp, nx - p.x, ny - p.y);
@@ -185,3 +194,4 @@ function setDir(inp, dx, dy) {
   inp.right = dx > 0.38 ? 1 : 0; inp.left = dx < -0.38 ? 1 : 0;
   inp.down = dy > 0.38 ? 1 : 0; inp.up = dy < -0.38 ? 1 : 0;
 }
+export const __findPath = (...a) => findPath(...a); // for tests

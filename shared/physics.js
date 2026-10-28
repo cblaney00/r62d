@@ -2,7 +2,7 @@
 import { CELL, T, blocksMove, blocksDrone, blocksSight } from './constants.js';
 
 export function tileAt(map, cx, cy) {
-  if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return T.HARD;
+  if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return T.VOID;
   return map.tiles[cy * map.W + cx];
 }
 
@@ -77,6 +77,7 @@ export function stepMove(map, o, input, dt, mods) {
   }
   const bx = o.x, by = o.y;
   moveCircle(map, o, o.vx * pulse * dt, o.vy * pulse * dt, mods.drone ? 5 : 10, !!mods.drone);
+  takeStairs(map, o);
   // walking into a wall soaks up the velocity in that direction
   if (dt > 0) {
     const ax = (o.x - bx) / (dt * pulse), ay = (o.y - by) / (dt * pulse);
@@ -84,6 +85,16 @@ export function stepMove(map, o, input, dt, mods) {
     if (Math.abs(ay) < Math.abs(o.vy) - 1) o.vy = ay;
   }
   return len > 0;
+}
+
+// Walking off the end of a staircase puts you on the same spot of the other floor.
+export function takeStairs(map, o) {
+  if (!map.portal) return false;
+  const cx = Math.floor(o.x / CELL), cy = Math.floor(o.y / CELL);
+  if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return false;
+  const to = map.portal[cy * map.W + cx]; if (to < 0) return false;
+  o.x += (to % map.W - cx) * CELL; o.y += (Math.floor(to / map.W) - cy) * CELL;
+  return true;
 }
 
 // Walk cells along a ray (Amanatides–Woo). cb(cx, cy, tEnter) returns true to stop.

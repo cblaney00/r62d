@@ -1,11 +1,11 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT } from '/shared/constants.js';
-import { buildMap, roomAt } from '/shared/map.js';
+import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam } from '/shared/operators.js';
 import { MapRenderer } from './mapdraw.js';
-import { S } from './textures.js';
+import { S, setMapScale } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading } from './sprites.js';
 import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
@@ -31,14 +31,15 @@ let DPR = 1, VW = 0, VH = 0;
 
 // Graphics quality (saved per computer): how many pixels get drawn and how many extras are added.
 const GFX = {
-  low:    { scale: 0.6,  fog: 0.3,  parts: 0.35, smoke: 7,  shade: false, rays: 0.5 },
-  medium: { scale: 0.8,  fog: 0.4,  parts: 0.6,  smoke: 11, shade: true, rays: 0.7 },
-  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1 },
-  ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2 },
+  low:    { scale: 0.6,  fog: 0.3,  parts: 0.35, smoke: 7,  shade: false, rays: 0.5, map: 1.5 },
+  medium: { scale: 0.8,  fog: 0.4,  parts: 0.6,  smoke: 11, shade: true, rays: 0.7, map: 2 },
+  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1, map: 2.5 },
+  ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2, map: 3 },
 };
 let gfxName = (() => { try { return localStorage.getItem('r62d-gfx') || 'high'; } catch { return 'high'; } })();
 if (!GFX[gfxName]) gfxName = 'high';
 let gq = GFX[gfxName];
+setMapScale(gq.map);
 function resize() {
   const oldW = VW || 1, oldH = VH || 1;
   DPR = Math.min(2, Math.min(window.devicePixelRatio || 1, 1.5) * gq.scale);
@@ -52,6 +53,10 @@ function setGfx(name) {
   try { localStorage.setItem('r62d-gfx', name); } catch {}
   fx.quality = gq.parts; setShading(gq.shade);
   resize(); renderGfx();
+  if (S !== gq.map) { // redraw the map picture at the new detail
+    setMapScale(gq.map);
+    if (st.rend) { st.rend = new MapRenderer(st.known, st.base); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); }
+  }
 }
 
 // ---------------- state ----------------
@@ -75,7 +80,7 @@ function connect() {
   ws.onmessage = ev => {
     const m = JSON.parse(ev.data);
     if (m.t === 'welcome') {
-      st.id = m.id; loadMap(m.mapVersion, m.tiles, m.hp);
+      st.id = m.id; loadMap(m.mapVersion, m.tiles, m.hp, m.mapId);
       st.token = m.token; st.profile = m.profile; updateCard();
       if (m.profile.settings) applySettings(m.profile.settings); else saveSettings(); // first time: keep what this browser had
       try { localStorage.setItem('r62d-token', m.token); } catch {}
@@ -90,8 +95,8 @@ function connect() {
 }
 const send = o => { if (st.ws && st.ws.readyState === 1) st.ws.send(JSON.stringify(o)); };
 
-function loadMap(mv, tiles, hp) {
-  st.map = buildMap(); st.base = st.map.tiles.slice(); st.mv = mv;
+function loadMap(mv, tiles, hp, id) {
+  st.map = buildMap(id || st.mapId); st.mapId = st.map.id; st.base = st.map.tiles.slice(); st.mv = mv;
   if (tiles) { st.map.tiles.set(tiles); st.map.hp.set(hp); }
   // What your team remembers of the map. It only catches up with the real map when
   // someone on your team actually sees the changed spot.
@@ -106,7 +111,7 @@ function loadMap(mv, tiles, hp) {
 }
 
 function onSnap(s) {
-  if (s.mv !== st.mv) loadMap(s.mv);
+  if (s.mv !== st.mv || (s.mp && s.mp !== st.mapId)) loadMap(s.mv, null, null, s.mp);
   const m = st.map, now = performance.now() / 1000;
   const changed = [];
   for (let i = 0; i < s.cells.length; i += 3) {
@@ -489,6 +494,7 @@ function interp(id, kind) {
   if (!pa) return pb || snaps[snaps.length - 1][kind].get(id) || null;
   if (!pb || pa.x === undefined || pb.x === undefined) return pa;
   const f = Math.max(0, Math.min(1, (rt - a.t) / (b.t - a.t || 1)));
+  if (Math.abs(pb.x - pa.x) + Math.abs(pb.y - pa.y) > 120) return f < 0.5 ? pa : pb; // took the stairs
   const o = { ...pb, x: pa.x + (pb.x - pa.x) * f, y: pa.y + (pb.y - pa.y) * f };
   if (pa.ag !== undefined && pb.ag !== undefined) o.ag = pa.ag + angDiff(pb.ag, pa.ag) * f;
   if (pa.gt !== undefined && pb.gt !== undefined && pb.gt >= pa.gt) o.gt = pa.gt + (pb.gt - pa.gt) * f;
@@ -571,10 +577,15 @@ function frame(nowMs) {
   st.viewH += (want - st.viewH) * (1 - Math.exp(-dt * 2.2));
   st.zoom = VH / st.viewH;
   if (view && view.kind === 'cam') { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
-  { // never look past the edge of the map
-    const hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom, mw = st.map.W * CELL, mh = st.map.H * CELL;
-    st.cam.x = mw > hw * 2 ? Math.max(hw, Math.min(mw - hw, st.cam.x)) : mw / 2;
+  { // never look past the edge of the floor you are on (other floors sit beside it in the map grid)
+    const fi = view ? Math.max(0, floorAt(st.map, view.x, view.y)) : 0, F = st.map.floors[fi];
+    if (st.camFloor !== fi) { // changed floor: jump straight there
+      st.camFloor = fi; if (view) { st.cam.x = cx; st.cam.y = cy; }
+    }
+    const hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom, x0 = F.gx * CELL, mw = F.w * CELL, mh = F.h * CELL;
+    st.cam.x = mw > hw * 2 ? Math.max(x0 + hw, Math.min(x0 + mw - hw, st.cam.x)) : x0 + mw / 2;
     st.cam.y = mh > hh * 2 ? Math.max(hh, Math.min(mh - hh, st.cam.y)) : mh / 2;
+    st.floorRect = [x0, 0, x0 + mw, mh];
   }
   if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
 
@@ -657,8 +668,10 @@ function hardMat(x, y, a) {
   return t === T.REINF || t === T.PANEL || t === T.DSHIELD ? 'metal' : t === T.TALL ? (Math.random() < 0.5 ? 'wood' : 'metal') : 'concrete';
 }
 audio.setWorld(
-  (x, y) => { // how many walls between you and the sound (0-3)
+  (x, y) => { // how many walls between you and the sound (0-3); another floor counts as 2
     const L = st.listen; if (!L || !st.map) return 0;
+    const fa = floorAt(st.map, L.x, L.y), fb = floorAt(st.map, x, y);
+    if (fa !== fb) return Math.min(3, 1 + Math.abs(fa - fb));
     const d = Math.hypot(x - L.x, y - L.y); if (d < 1) return 0;
     let n = 0; const sk = cellAt(L.x, L.y), ek = cellAt(x, y);
     walkRay(L.x, L.y, (x - L.x) / d, (y - L.y) / d, d, (cx, cy) => {
@@ -669,6 +682,7 @@ audio.setWorld(
     return Math.min(3, Math.ceil(n / 1.5));
   },
   (x, y) => { const k = cellAt(x, y); return k >= 0 && st.map && st.map.floor[k] !== FL.GRASS && st.map.floor[k] !== FL.ASPHALT; },
+  (x, y) => (st.map ? localPos(st.map, x, y) : { x, y }),
 );
 
 // Little sounds from each player's state: footsteps per surface, turning on the spot,
@@ -852,6 +866,14 @@ function draw(s, view, now, dt) {
   // everything from here on goes on the top layer, above the blackout
   ctx = octx; overDirty = true;
   ctx.setTransform(z, 0, 0, z, ox, oy);
+  if (st.floorRect) { // hide the neighbouring floors that sit beside this one in the map grid
+    const [a, b, c, d] = st.floorRect;
+    ctx.fillStyle = '#050607';
+    const L = st.cam.x - VW / 2 / z - 50, R = st.cam.x + VW / 2 / z + 50, Tp = st.cam.y - VH / 2 / z - 50, B = st.cam.y + VH / 2 / z + 50;
+    if (L < a) ctx.fillRect(L, Tp, a - L, B - Tp);
+    if (R > c) ctx.fillRect(c, Tp, R - c, B - Tp);
+    if (B > d) ctx.fillRect(a, d, c - a, B - d);
+  }
 
   tq = pfa('fog', tq);
   // --- markers drawn above the blackout ---
@@ -1029,7 +1051,9 @@ function hud(s) {
     if (me.df) sub = 'You are carrying the defuser';
     else { const c = s.players.find(p => p.df); sub = c ? `${c.n} has the defuser` : 'The defuser is on the ground'; }
   }
-  setHTML('objective', `${esc(obj)}<small>${esc(sub)}${where ? ' · ' + esc(where) : ''}</small>`);
+  const fi = me.a && me.x !== undefined ? floorAt(st.map, st.pred.x, st.pred.y) : -1;
+  const flName = fi >= 0 && st.map.floors.length > 1 ? st.map.floors[fi].name : '';
+  setHTML('objective', `${esc(obj)}<small>${flName ? '<b class="flr">' + esc(flName) + '</b> ' : ''}${esc(sub)}${where ? ' · ' + esc(where) : ''}</small>`);
   if (!me.a) {
     $('opname').innerHTML = me.op ? `${OPERATORS[me.op].name}` : '';
     $('hpnum').textContent = '—'; $('hpbar').firstElementChild.style.width = '0%';

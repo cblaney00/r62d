@@ -1,7 +1,10 @@
 // Procedural, tileable floor textures (drawn once at load).
 import { FL } from '/shared/constants.js';
 
-export const S = 3; // texture pixels per world pixel
+const TEX = 3; // texture pixels per world pixel in the floor patterns
+// detail of the map picture (pixels per world pixel); lower graphics quality uses less memory
+export let S = 2.5;
+export function setMapScale(v) { S = v; }
 
 // Small deterministic random generator
 export function rng(seed) {
@@ -17,7 +20,7 @@ export const hash = (x, y, s = 0) => {
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 
 function noise(ctx, P, r, amt, dark = true) {
-  const n = P * S;
+  const n = P * TEX;
   const img = ctx.getImageData(0, 0, n, n), d = img.data;
   for (let i = 0; i < d.length; i += 4) {
     const v = (r() - 0.5) * amt;
@@ -36,8 +39,8 @@ const shade = (hex, f) => {
 };
 
 function wood(P) {
-  const c = canvas(P * S, P * S), x = c.getContext('2d'), r = rng(11);
-  x.scale(S, S);
+  const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(11);
+  x.scale(TEX, TEX);
   const rowH = 6;
   for (let y = 0; y < P; y += rowH) {
     let px = -r() * 60;
@@ -68,8 +71,8 @@ function wood(P) {
 }
 
 function tile(P, base, size, grout) {
-  const c = canvas(P * S, P * S), x = c.getContext('2d'), r = rng(23);
-  x.scale(S, S);
+  const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(23);
+  x.scale(TEX, TEX);
   x.fillStyle = grout; x.fillRect(0, 0, P, P);
   for (let ty = 0; ty < P; ty += size) for (let tx = 0; tx < P; tx += size) {
     x.fillStyle = shade(base, 0.94 + r() * 0.1); x.fillRect(tx + 0.5, ty + 0.5, size - 1, size - 1);
@@ -82,8 +85,8 @@ function tile(P, base, size, grout) {
 }
 
 function serverFloor(P) {
-  const c = canvas(P * S, P * S), x = c.getContext('2d'), r = rng(31);
-  x.scale(S, S);
+  const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(31);
+  x.scale(TEX, TEX);
   x.fillStyle = '#1f2327'; x.fillRect(0, 0, P, P);
   for (let ty = 0; ty < P; ty += 32) for (let tx = 0; tx < P; tx += 32) {
     x.fillStyle = shade('#3c434b', 0.92 + r() * 0.12); x.fillRect(tx + 0.75, ty + 0.75, 30.5, 30.5);
@@ -98,8 +101,8 @@ function serverFloor(P) {
 }
 
 function marble(P) {
-  const c = canvas(P * S, P * S), x = c.getContext('2d'), r = rng(41);
-  x.scale(S, S);
+  const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(41);
+  x.scale(TEX, TEX);
   for (let ty = 0; ty < P; ty += 32) for (let tx = 0; tx < P; tx += 32) {
     x.fillStyle = ((tx + ty) / 32) % 2 ? '#dcd6cb' : '#cfc8bb'; x.fillRect(tx, ty, 32, 32);
   }
@@ -120,8 +123,8 @@ function marble(P) {
 }
 
 function carpet(P) {
-  const c = canvas(P * S, P * S), x = c.getContext('2d'), r = rng(53);
-  x.scale(S, S);
+  const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(53);
+  x.scale(TEX, TEX);
   x.fillStyle = '#4a556a'; x.fillRect(0, 0, P, P);
   x.strokeStyle = 'rgba(160,170,200,0.08)'; x.lineWidth = 0.6;
   for (let i = -P; i < P * 2; i += 8) {
@@ -133,8 +136,8 @@ function carpet(P) {
 }
 
 function concrete(P) {
-  const c = canvas(P * S, P * S), x = c.getContext('2d'), r = rng(67);
-  x.scale(S, S);
+  const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(67);
+  x.scale(TEX, TEX);
   x.fillStyle = '#8a8c88'; x.fillRect(0, 0, P, P);
   for (let i = 0; i < 18; i++) {
     const bx = r() * P, by = r() * P, br = 8 + r() * 26, dark = r() < 0.5;
@@ -156,8 +159,8 @@ function concrete(P) {
 }
 
 function grass(P) {
-  const c = canvas(P * S, P * S), x = c.getContext('2d'), r = rng(71);
-  x.scale(S, S);
+  const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(71);
+  x.scale(TEX, TEX);
   x.fillStyle = '#4c6833'; x.fillRect(0, 0, P, P);
   for (let i = 0; i < 12; i++) {
     const bx = r() * P, by = r() * P, br = 10 + r() * 30, dark = r() < 0.6;
@@ -182,8 +185,8 @@ function grass(P) {
 }
 
 function asphalt(P) {
-  const c = canvas(P * S, P * S), x = c.getContext('2d'), r = rng(83);
-  x.scale(S, S);
+  const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(83);
+  x.scale(TEX, TEX);
   x.fillStyle = '#3a3c3f'; x.fillRect(0, 0, P, P);
   for (let i = 0; i < 900; i++) {
     x.fillStyle = r() < 0.5 ? 'rgba(150,150,150,0.35)' : 'rgba(15,15,15,0.4)';
@@ -211,7 +214,7 @@ export function floorPatterns(ctx) {
   const out = {};
   for (const [k, c] of Object.entries(cache)) {
     const p = ctx.createPattern(c, 'repeat');
-    p.setTransform(new DOMMatrix().scale(1 / S));
+    p.setTransform(new DOMMatrix().scale(1 / TEX));
     out[k] = p;
   }
   return out;

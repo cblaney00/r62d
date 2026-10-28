@@ -42,26 +42,47 @@ export class MapRenderer {
       if (g(-1, 0)) x.fillRect(cx * CELL, cy * CELL, 1.2, CELL);
       if (g(1, 0)) x.fillRect(cx * CELL + CELL - 1.2, cy * CELL, 1.2, CELL);
     }
-    // road markings
-    x.fillStyle = 'rgba(230,190,60,0.8)';
-    for (let px = 0; px < this.Wp; px += 40) x.fillRect(px, 55 * CELL - 1, 22, 2);
-    x.fillStyle = 'rgba(235,235,230,0.7)';
-    x.fillRect(0, 52 * CELL + 3, this.Wp, 1.2); x.fillRect(0, 58 * CELL - 4, this.Wp, 1.2);
-    for (let py = 9 * CELL; py < 51 * CELL; py += 48) x.fillRect(75 * CELL, py, 8 * CELL, 1.2);
-    for (let px = 37 * CELL; px < 49 * CELL; px += 40) x.fillRect(px, 0, 1.2, 6 * CELL);
-    // oil stains in the garage
-    for (const [sx, sy] of [[48, 45], [58, 44], [66, 46]]) {
-      const g = x.createRadialGradient(sx * CELL, sy * CELL, 0, sx * CELL, sy * CELL, 22);
-      g.addColorStop(0, 'rgba(20,20,25,0.45)'); g.addColorStop(1, 'rgba(20,20,25,0)');
-      x.fillStyle = g; x.fillRect(sx * CELL - 22, sy * CELL - 22, 44, 44);
+    // the map's own painted details (road lines, mats, stains)
+    for (const fn of m.decor || []) fn(x);
+    // void: open air beside upper floors, earth around basements
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+      if (m.tiles[cy * m.W + cx] !== T.VOID) continue;
+      x.fillStyle = '#07090c'; x.fillRect(cx * CELL, cy * CELL, CELL, CELL);
+      if (hash(cx, cy, 9) < 0.25) { x.fillStyle = 'rgba(255,255,255,0.025)'; x.fillRect(cx * CELL + hash(cx, cy, 1) * 12, cy * CELL + hash(cx, cy, 2) * 12, 3, 3); }
     }
-    // entrance mats
-    x.fillStyle = '#2b2b2e'; x.fillRect(23.5 * CELL, 47 * CELL, 4 * CELL, 1.6 * CELL);
-    x.strokeStyle = 'rgba(255,255,255,0.08)'; x.lineWidth = 0.5;
-    for (let i = 0; i < 12; i++) { x.beginPath(); x.moveTo(23.5 * CELL + 2, 47 * CELL + 2 + i * 1.9); x.lineTo(27.5 * CELL - 2, 47 * CELL + 2 + i * 1.9); x.stroke(); }
-    // garage floor bay markings
-    x.fillStyle = 'rgba(230,190,50,0.55)';
-    for (const bx of [43, 63]) { x.fillRect(bx * CELL - 4, 41.5 * CELL, 1.5, 7 * CELL); x.fillRect((bx + 4) * CELL + 2, 41.5 * CELL, 1.5, 7 * CELL); }
+    this.drawStairs(x0, y0, x1, y1);
+  }
+
+  // Staircases: steps across the direction of travel, darker as they go down, with an arrow.
+  drawStairs(x0, y0, x1, y1) {
+    const m = this.map, x = this.ctx;
+    for (const st of m.stairs || []) for (const [g, up] of [[st.ga, true], [st.gb, false]]) {
+      const gx = g % m.W, gy = Math.floor(g / m.W);
+      if (gx > x1 || gy > y1 || gx + st.w < x0 || gy + st.h < y0) continue;
+      const X = gx * CELL, Y = gy * CELL, Wd = st.w * CELL, Hd = st.h * CELL;
+      const vert = st.dir === 'n' || st.dir === 's', n = (vert ? st.h : st.w) * 2;
+      // step k = 0 at the bottom end
+      for (let k = 0; k < n; k++) {
+        const f = k / (n - 1), lit = up ? 0.55 + 0.45 * f : 1 - 0.6 * f; // climbing gets lighter; going down gets darker
+        const along = (st.dir === 'n' || st.dir === 'w') ? n - 1 - k : k;
+        x.fillStyle = `rgba(${Math.round(150 * lit)},${Math.round(148 * lit)},${Math.round(140 * lit)},0.9)`;
+        if (vert) x.fillRect(X, Y + along * CELL / 2, Wd, CELL / 2 - 0.8); else x.fillRect(X + along * CELL / 2, Y, CELL / 2 - 0.8, Hd);
+        x.fillStyle = 'rgba(0,0,0,0.35)';
+        if (vert) x.fillRect(X, Y + along * CELL / 2 + CELL / 2 - 0.8, Wd, 0.8); else x.fillRect(X + along * CELL / 2 + CELL / 2 - 0.8, Y, 0.8, Hd);
+      }
+      x.strokeStyle = 'rgba(30,30,30,0.9)'; x.lineWidth = 1; x.strokeRect(X + 0.5, Y + 0.5, Wd - 1, Hd - 1);
+      // arrow pointing the way you walk to change floor
+      const ang = { n: -Math.PI / 2, s: Math.PI / 2, e: 0, w: Math.PI }[st.dir] + (up ? 0 : Math.PI);
+      x.save(); x.translate(X + Wd / 2, Y + Hd / 2); x.rotate(ang);
+      x.fillStyle = up ? 'rgba(242,193,78,0.85)' : 'rgba(120,180,255,0.85)';
+      x.beginPath(); x.moveTo(9, 0); x.lineTo(1, -6); x.lineTo(1, -2.5); x.lineTo(-9, -2.5); x.lineTo(-9, 2.5); x.lineTo(1, 2.5); x.lineTo(1, 6); x.closePath(); x.fill();
+      x.restore();
+      x.save(); x.translate(X + Wd / 2, Y + Hd / 2 + (vert ? 0 : 10));
+      if (vert) { x.translate(Wd / 2 + 1, 0); x.rotate(Math.PI / 2); }
+      x.font = '700 6px Barlow Condensed, sans-serif'; x.textAlign = 'center'; x.fillStyle = 'rgba(255,255,255,0.75)';
+      x.fillText(up ? 'UP · ' + m.floors[st.b].name : 'DOWN · ' + m.floors[st.a].name, 0, vert ? -2 : 0);
+      x.restore();
+    }
   }
 
   // Redraw a block of cells (inclusive), clipped so neighbours are untouched.
@@ -311,6 +332,17 @@ export function drawProp(ctx, p, m) {
   const X = p.x * CELL, Y = p.y * CELL, W = p.w * CELL, H = p.h * CELL;
   const h = (i) => hash(p.x, p.y, i);
   switch (p.kind) {
+    case 'railing': { // waist-high metal rail round a stairwell
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(X + 2, Y + 2, W - 2, H - 2);
+      const hor = W >= H, cx = X + W / 2, cy = Y + H / 2;
+      ctx.fillStyle = '#7d848b';
+      if (hor) ctx.fillRect(X, cy - 1.5, W, 3); else ctx.fillRect(cx - 1.5, Y, 3, H);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      if (hor) ctx.fillRect(X, cy - 1.5, W, 0.8); else ctx.fillRect(cx - 1.5, Y, 0.8, H);
+      ctx.fillStyle = '#4a5056';
+      for (let i = 0; i <= (hor ? p.w : p.h); i++) { const px = hor ? X + i * CELL : cx, py = hor ? cy : Y + i * CELL; ctx.fillRect(px - 1.2, py - 1.2, 2.4, 2.4); }
+      break;
+    }
     case 'desk': {
       shadowRect(ctx, X + 1, Y + 1, W - 2, H - 2);
       ctx.fillStyle = '#6e4c2f'; rr(ctx, X + 1, Y + 1, W - 2, H - 2, 1.5); ctx.fill();
