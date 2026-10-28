@@ -5,6 +5,8 @@ cd "$(dirname "$(readlink -f "$0")")"
 up() { (exec 3<>/dev/tcp/127.0.0.1/6262) 2>/dev/null; }
 if ! up; then
   mkdir -p "$HOME/.local/share/r62d"
+  # profiles and match history: the same place the installed app keeps them, so both share one set
+  export R62D_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/r62d/data"; mkdir -p "$R62D_DATA"
   nohup nix develop /home/insideabush/nixos-config#vibe-web --command node server/server.js > "$HOME/.local/share/r62d/server.log" 2>&1 &
   for i in $(seq 1 90); do up && break; sleep 1; done
 fi
