@@ -89,7 +89,7 @@ function onSnap(s) {
   if (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION && s.ph !== PHASE.ROUND_END) revealAll();
   const players = new Map(s.players.map(p => [p.id, p]));
   const ents = new Map(s.ents.map(e => [e.id, e]));
-  st.snaps.push({ t: now, players, ents }); if (st.snaps.length > 12) st.snaps.shift();
+  st.snaps.push({ t: now, st: s.time, players, ents }); if (st.snaps.length > 12) st.snaps.shift();
   const prevMe = st.me;
   st.last = s; st.me = players.get(s.you) || null;
   for (const e of s.ev) onEvent(e, s, players);
@@ -155,7 +155,8 @@ function onEvent(e, s, players) {
       const prev = st.snaps.length > 1 ? st.snaps[st.snaps.length - 2].players.get(e.victim) : null;
       const pos = prev && prev.x !== undefined ? prev : null;
       if (pos && v && (v.tm === mySide() || teamSees(pos.x, pos.y))) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide() }); st.rend.pool(pos.x, pos.y); }
-      addKill(k, v, e.w);
+      addKill(k, v, e.w, e.hs);
+      if (e.hs && k && k.id === st.id) audio.ui('headshot');
       break;
     }
     case 'down': { const v = players.get(e.id); if (v) addFeed(`${v.n} is down`); break; }
@@ -351,11 +352,11 @@ function banner(text, sub, color) {
   b.querySelector('.t').style.color = color || ''; b.classList.add('show'); st.bannerT = performance.now() / 1000 + 3;
 }
 function addFeed(text) { const d = document.createElement('div'); d.textContent = text; $('feed').appendChild(d); setTimeout(() => d.remove(), 7000); }
-function addKill(k, v, w) {
+function addKill(k, v, w, hs) {
   if (!v) return;
   const side = mySide(), cls = p => p && p.tm === side ? 'a' : 'e';
   const d = document.createElement('div');
-  d.innerHTML = k && k !== v ? `<span class="${cls(k)}">${esc(k.n)}</span><span class="w">${esc(w || '').toUpperCase()}</span><span class="${cls(v)}">${esc(v.n)}</span>` : `<span class="${cls(v)}">${esc(v.n)}</span><span class="w">${esc(w || 'DIED').toUpperCase()}</span>`;
+  d.innerHTML = k && k !== v ? `<span class="${cls(k)}">${esc(k.n)}</span><span class="w">${esc(w || '').toUpperCase()}${hs ? ' <b class="hs">✛ HEADSHOT</b>' : ''}</span><span class="${cls(v)}">${esc(v.n)}</span>` : `<span class="${cls(v)}">${esc(v.n)}</span><span class="w">${esc(w || 'DIED').toUpperCase()}</span>`;
   $('killfeed').appendChild(d); setTimeout(() => d.remove(), 6000);
   while ($('killfeed').children.length > 6) $('killfeed').firstChild.remove();
 }
@@ -547,6 +548,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   }
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 1000) / 1000, dt: Math.round(dt * 10000) / 10000 };
   const mw = screenToWorld(mouse.x, mouse.y); msg.ax = Math.round(mw.x); msg.ay = Math.round(mw.y);
+  const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
   if (ev.length) msg.ev = ev;
   st.pending.push({ s: msg.s, k, dt: msg.dt });
   if (st.pending.length > 120) st.pending.shift();
@@ -857,10 +859,13 @@ function marker(x, y, label, col, view) {
 
 function crosshair(me, now) {
   const w = WEAPONS[me.w];
-  const base = w ? (me.ad ? w.ads : w.spread) : 0.05;
+  const at = me.at || 0, base = w ? w.spread + (w.ads - w.spread) * at : 0.05; // tightens as you settle into your sights
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / 140);
   const gap = (4 + base * 160 + Math.pow(run, 1.4) * 15 + (me.cr && run < 0.15 ? -2 : 0)) * DPR; // opens up while you run
-  const x = mouse.x, y = mouse.y;
+  // recoil kicks the crosshair round your character: pull the mouse against it
+  const px = (st.pred.x - st.cam.x) * st.zoom + VW / 2, py = (st.pred.y - st.cam.y) * st.zoom + VH / 2;
+  const rc = me.rc || 0, c = Math.cos(rc), s2 = Math.sin(rc);
+  const x = px + (mouse.x - px) * c - (mouse.y - py) * s2, y = py + (mouse.x - px) * s2 + (mouse.y - py) * c;
   ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5 * DPR;
   ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 2;
   ctx.beginPath();
@@ -1277,3 +1282,17 @@ const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFi
 for (const id of ['sens', 'adsSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
 try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; } } catch {}
 showSens();
+
+// The server time of the world you're currently looking at (others are drawn slightly in the past).
+// Sent with every input so the server can judge your shots against what you saw — this is what
+// creates peeker's advantage, the same way R6's netcode does.
+function viewServerTime() {
+  const snaps = st.snaps; if (snaps.length < 2) return null;
+  const rt = performance.now() / 1000 - DELAY;
+  for (let i = snaps.length - 1; i >= 0; i--) if (snaps[i].t <= rt) {
+    const a = snaps[i], b = snaps[i + 1]; if (!b) return a.st;
+    const f = Math.max(0, Math.min(1, (rt - a.t) / ((b.t - a.t) || 1)));
+    return a.st + (b.st - a.st) * f;
+  }
+  return snaps[0].st;
+}

@@ -318,3 +318,4 @@ button.big { font-size: 22px; padding: 14px 34px; }
 /* keep the settings panel centred while it animates in */
 @keyframes riseCentered { from { opacity: 0; transform: translate(-50%, calc(-50% + 16px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
 #settings:not(.hidden) { animation: riseCentered 0.3s cubic-bezier(.2,.8,.2,1) both; }
+#killfeed .hs { color: #ff5a5a; font-size: 12px; letter-spacing: 0.12em; margin-left: 4px; }

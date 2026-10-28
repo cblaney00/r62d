@@ -6,7 +6,8 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-*(nothing waiting — add your next idea!)*
+- [ ] R6 aiming rules (headshots one-tap, accurate ADS, ADS time, recoil, damage drop-off) and R6-level peeker's advantage.
+- [ ] Chat: Y opens team chat; / switches between team chat and all chat.
 
 ## Done
 

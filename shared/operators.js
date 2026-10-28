@@ -105,3 +105,19 @@ export const BIOS = {
   solace:  { real: 'Dr. Hana Sato', from: 'Osaka', text: 'A combat surgeon who refuses to lose a teammate. Her stim pistol heals at range and brings the downed back into the fight.' },
   wraith:  { real: 'Elias Grey', from: 'Unknown', text: 'A roamer who hunts alone. His pulse scanner lets him see attackers through walls, so he is always where you are not looking.' },
 };
+
+// ---- R6-style gun handling, by weapon class ----
+export const ADS_TIME = { Pistol: 0.18, MP: 0.2, SMG: 0.24, Shotgun: 0.28, AR: 0.32, DMR: 0.4, LMG: 0.5 }; // seconds to fully aim
+// recoil per shot (radians): kick drifts one way with some sway; you pull against it with the mouse
+export const RECOIL = {
+  AR: { kick: 0.010, sway: 0.006, max: 0.11 }, SMG: { kick: 0.009, sway: 0.009, max: 0.13 }, MP: { kick: 0.011, sway: 0.012, max: 0.15 },
+  LMG: { kick: 0.007, sway: 0.007, max: 0.10 }, DMR: { kick: 0.03, sway: 0.008, max: 0.10 }, Shotgun: { kick: 0.04, sway: 0.01, max: 0.1 },
+  Pistol: { kick: 0.022, sway: 0.008, max: 0.09 },
+};
+// damage drop-off: full damage up to `from` px, sliding down to `min`× by `to` px
+export const FALLOFF = {
+  AR: { from: 400, to: 720, min: 0.75 }, SMG: { from: 300, to: 600, min: 0.65 }, MP: { from: 240, to: 520, min: 0.6 },
+  LMG: { from: 450, to: 760, min: 0.8 }, DMR: { from: 9999, to: 9999, min: 1 }, Pistol: { from: 300, to: 560, min: 0.7 },
+  Shotgun: { from: 70, to: 260, min: 0.25 },
+};
+export const HEAD_R = 2.3; // a bullet passing this close to the centre of a body is a headshot: instant kill
