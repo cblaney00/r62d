@@ -1,5 +1,6 @@
 // Rifles, SMGs, pistols and LMGs only punch small see-through holes in soft walls; shotguns
 // still break them. Run: node tests/holes.js
+import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { T, CELL, CELL_HP } from '../shared/constants.js';
 import { los } from '../shared/physics.js';

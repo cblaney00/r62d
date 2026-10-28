@@ -174,6 +174,7 @@ function connect(tut = false) {
       $('join').classList.add('hidden'); $('room').classList.remove('hidden');
     } else if (m.t === 'snap') onSnap(m);
     else if (m.t === 'full') alert('The game is full (10 players).');
+    else if (m.t === 'taken') alert(`Someone is already playing as ${m.name}. Type a different name.`);
     else if (m.t === 'chat') addChat(m);
     else if (m.t === 'xp') { st.profile = m.profile; playXp(m); }
     else if (m.t === 'profile') { st.profile = m.profile; updateOpsProfile($('opsPage'), m.profile); st.loDirty = true; }
@@ -551,8 +552,7 @@ $('joinBtn').onclick = () => {
   audio.initAudio(); audio.ui();
   const n = $('name').value.trim() || 'Operator';
   try { localStorage.setItem('r62d-name', n); } catch {}
-  let token = null; try { token = localStorage.getItem('r62d-token'); } catch {}
-  send({ t: 'join', name: n, token });
+  send({ t: 'join', name: n }); // your name is your profile (no password)
 };
 document.querySelectorAll('[data-bot]').forEach(b => b.onclick = () => { send({ t: 'lobby', a: 'addBot', squad: +b.dataset.bot }); });
 document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { send({ t: 'lobby', a: 'removeBot', squad: +b.dataset.unbot }); });

@@ -39,6 +39,7 @@ His wishes so far:
 - Ping anything with T / middle click / a click in a drone or camera (he asked): `pingTarget` in main.js names what is under your aim
   (enemy → the old red spot, else a gadget/camera/drone, the objective, else the first wall/door/barricade/drone hole along your aim, else
   GO HERE / LOOK HERE). Server `mark` sends a labelled marker to the team and a PING line in team chat with the room; 4 pings per 3 s.
+- Profiles go by name, no passwords (he asked): the same name (any capitals/spaces) is the same profile on any computer (`login(name)` in server/store.js). Two people cannot play as one name in the same match (`taken`). Old per-browser duplicates are joined by name at start-up (`mergeDuplicates`, backups `data/*.before-merge`). Tests import `tests/_tmpdata.js` first so they never write to the real `data/`.
 - Playing with friends: the lobby shows "Friends join at http://<wired LAN IP>:6262" (`/api/addr`); the scoreboard (Tab) has a PING column
   (each browser measures its round trip every 2 s and reports it).
 - Abilities all work. Floors are joined by stairs only (no shooting or seeing between floors yet; no hatches).

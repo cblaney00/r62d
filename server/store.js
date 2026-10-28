@@ -11,6 +11,10 @@ const DIR = process.env.R62D_DATA || path.resolve(path.dirname(fileURLToPath(imp
 const PROFILES = path.join(DIR, 'profiles.json');
 const MATCHES = path.join(DIR, 'matches.json');
 const MAX_MATCHES = 500;
+// Profiles are found by name (no passwords, he asked): the same name, whatever the capitals or extra
+// spaces, is the same profile on any computer.
+export const cleanName = n => String(n || '').trim().replace(/\s+/g, ' ').slice(0, 16) || 'Operator';
+const nameKey = n => cleanName(n).toLowerCase();
 
 function load(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
@@ -32,6 +36,7 @@ class Store {
     this.profiles = load(PROFILES, {});
     this.matches = load(MATCHES, []);
     this.dirty = new Set();
+    this.mergeDuplicates();
     setInterval(() => this.flush(), 3000).unref();
   }
   flush() {
@@ -40,16 +45,50 @@ class Store {
     this.dirty.clear();
   }
 
-  // Find a profile by its secret browser token, or make a new one.
-  login(token, name) {
-    let p = token && this.profiles[token];
+  // Find the profile with this name, or make a new one. The token it hands back is only the server's
+  // own key for the profile (kept secret so nobody else's browser can change it mid-match).
+  login(name) {
+    const k = nameKey(name);
+    let token = Object.keys(this.profiles).find(t => nameKey(this.profiles[t].name) === k), p = token && this.profiles[token];
     if (!p) {
       token = crypto.randomBytes(16).toString('hex');
-      p = this.profiles[token] = { id: crypto.randomBytes(5).toString('hex'), name, created: Date.now(), lastSeen: Date.now(), loadouts: {}, stats: blankStats(), history: [] };
+      p = this.profiles[token] = { id: crypto.randomBytes(5).toString('hex'), name: cleanName(name), created: Date.now(), lastSeen: Date.now(), loadouts: {}, stats: blankStats(), history: [] };
     }
-    p.name = name || p.name; p.lastSeen = Date.now();
+    p.lastSeen = Date.now();
     this.dirty.add('p');
     return { token, profile: p };
+  }
+  // Before profiles went by name, one name could have several (one per browser). Join those into one:
+  // stats, XP and match history add up; loadouts and settings come from the most recently used one.
+  // The data from before is kept next to it as profiles.json.before-merge / matches.json.before-merge.
+  mergeDuplicates() {
+    const groups = new Map();
+    for (const [t, p] of Object.entries(this.profiles)) { const k = nameKey(p.name); if (!groups.has(k)) groups.set(k, []); groups.get(k).push([t, p]); }
+    let merged = 0;
+    for (const list of groups.values()) {
+      if (list.length < 2) continue;
+      list.sort(([, a], [, b]) => (b.lastSeen || 0) - (a.lastSeen || 0));
+      const [, keep] = list[0];
+      for (const [t, p] of list.slice(1)) {
+        for (const k in p.stats) if (typeof p.stats[k] === 'number') keep.stats[k] = (keep.stats[k] || 0) + p.stats[k];
+        for (const [op, o] of Object.entries(p.stats.ops || {})) {
+          const s = keep.stats.ops[op] || (keep.stats.ops[op] = { rounds: 0, roundsWon: 0, kills: 0, deaths: 0 });
+          for (const k in s) s[k] += o[k] || 0;
+        }
+        keep.xp = (keep.xp || 0) + (p.xp || 0);
+        keep.created = Math.min(keep.created || Date.now(), p.created || Date.now());
+        for (const op in p.loadouts || {}) if (!keep.loadouts[op]) keep.loadouts[op] = p.loadouts[op];
+        if (!keep.settings && p.settings) keep.settings = p.settings;
+        for (const m of this.matches) for (const pl of m.players) if (pl.pid === p.id) pl.pid = keep.id;
+        delete this.profiles[t]; merged++;
+      }
+      const ids = new Set(this.matches.map(m => m.id));
+      keep.history = this.matches.filter(m => m.players.some(pl => pl.pid === keep.id)).map(m => m.id).filter(id => ids.has(id)).slice(0, 200);
+    }
+    if (!merged) return;
+    for (const f of [PROFILES, MATCHES]) try { if (!fs.existsSync(f + '.before-merge')) fs.copyFileSync(f, f + '.before-merge'); } catch {}
+    this.dirty.add('p'); this.dirty.add('m'); this.flush();
+    console.log(`profiles: joined ${merged} duplicate profile(s) by name`);
   }
   byToken(token) { return token ? this.profiles[token] || null : null; }
   byId(id) { return Object.values(this.profiles).find(p => p.id === id) || null; }

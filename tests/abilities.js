@@ -1,5 +1,6 @@
 // Every operator uses their ability (twice, and holds it for held ones) in a live bot match,
 // to prove nothing throws and each ability does something. Run: node tests/abilities.js
+import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { OPERATORS, OP_LIST } from '../shared/operators.js';
 import { PHASE, T, CELL } from '../shared/constants.js';

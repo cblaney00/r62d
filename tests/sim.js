@@ -1,5 +1,6 @@
 // Plays bot-only matches on every map on the server with no browser, to check the rules hold up.
 // Run:  node tests/sim.js [--map <id>] [--only <id>]
+import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { buildMap, MAP_LIST, floorAt } from '../shared/map.js';
 import { T, PHASE } from '../shared/constants.js';

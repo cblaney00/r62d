@@ -1,6 +1,7 @@
 // Team camera / drone feeds: defenders flip through every working camera of their team (map, turret,
 // sticky), attackers through every team drone and wall scope; only the owner can steer their own drone
 // or turn / fire their own gadget camera, but anyone watching can mark enemies. Run: node tests/feeds.js
+import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { MAP_LIST, buildMap } from '../shared/map.js';
 import { PHASE, TEAM } from '../shared/constants.js';

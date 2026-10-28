@@ -1,5 +1,6 @@
 // Balance report: many bot-only matches on every map, recording how each operator and each gun
 // does (round win rate, kills and deaths per round, damage, accuracy). Run: node tests/balance.js [matches per map]
+import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { buildMap, MAP_LIST } from '../shared/map.js';
 import { PHASE, TEAM } from '../shared/constants.js';

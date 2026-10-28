@@ -5,7 +5,7 @@ import { buildMap, roomAt, wallMount, MAPS, MAP_LIST } from '../shared/map.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
-import { store, publicProfile } from './store.js';
+import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode } from '../shared/operators.js';
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
@@ -53,9 +53,10 @@ export class Game {
       let m; try { m = JSON.parse(raw); } catch { return; }
       if (m.t === 'join' && !p) {
         if (this.humanCount() >= MAX_PLAYERS) { sock.send(JSON.stringify({ t: 'full' })); return; }
-        p = this.addPlayer(String(m.name || 'Player').slice(0, 16), false);
+        const login = store.login(cleanName(m.name));
+        if (!this.tut && [...this.players.values()].some(q => !q.bot && q.pid === login.profile.id)) { sock.send(JSON.stringify({ t: 'taken', name: login.profile.name })); return; }
+        p = this.addPlayer(login.profile.name, false);
         p.sock = sock;
-        const login = store.login(typeof m.token === 'string' ? m.token : null, p.name);
         p.token = login.token; p.pid = login.profile.id;
         p.ms = this.blankMatchStats();
         sock.send(JSON.stringify({ t: 'welcome', id: p.id, mapVersion: this.mapVersion, mapId: this.mapId, token: p.token, profile: publicProfile(login.profile),

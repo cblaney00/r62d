@@ -1,5 +1,6 @@
 // Map cameras hang on walls (never mid-floor) and break like drones: one bullet from inside the room,
 // a melee hit, or knocking down the wall they hang on. Run: node tests/wallcams.js
+import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { MAP_LIST, buildMap } from '../shared/map.js';
 import { PHASE, T, CELL } from '../shared/constants.js';
