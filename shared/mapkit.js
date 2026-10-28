@@ -36,6 +36,8 @@ export function makeMap({ id, name, floors }) {
       c: (x, y) => ({ x: (f.gx + x - f.x0 + 0.5) * CELL, y: (y - f.y0 + 0.5) * CELL }),
       ground(x0, y0, w, h, fType) { each(x0, y0, x0 + w - 1, y0 + h - 1, k => { tiles[k] = T.GROUND; floor[k] = fType; }); },
       // walkable floor that is not a room (balcony, roof, basement corridor without a name)
+      // an open drop (to the floor below): you can see and shoot across it, but not walk into it
+      drop(x0, y0, w, h) { each(x0, y0, x0 + w - 1, y0 + h - 1, k => { tiles[k] = T.LOW; floor[k] = FL.VOID; }); },
       slab(x0, y0, w, h, fType) { each(x0, y0, x0 + w - 1, y0 + h - 1, k => { tiles[k] = T.FLOOR; floor[k] = fType; }); },
       room(rname, x, y, w, h, fType) { rooms.push({ name: rname, fl: f.i, x: f.gx + x - f.x0, y: y - f.y0, w, h }); K.slab(x, y, w, h, fType); },
       // a room with its own walls one cell outside it (neighbouring rooms leave a one-cell gap: the shared wall)

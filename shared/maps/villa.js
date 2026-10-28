@@ -72,7 +72,7 @@ export function build() {
   U.prop('desk', 47, 24, 5, 2, T.LOW); U.prop('bookshelf', 44, 31, 10, 1, T.TALL); U.prop('couch', 56, 27, 1, 4, T.LOW, 1);
   U.prop('bed', 13, 27, 4, 6, T.LOW); U.prop('bed', 22, 27, 4, 6, T.LOW); U.prop('crates', 13, 37, 2, 2, T.LOW); U.prop('desk', 21, 38, 4, 2, T.LOW);
   U.prop('pillar', 33, 30, 1, 1, T.TALL); U.prop('pillar', 38, 30, 1, 1, T.TALL); U.prop('pillar', 33, 36, 1, 1, T.TALL); U.prop('pillar', 38, 36, 1, 1, T.TALL);
-  U.prop('shelf', 44, 35, 1, 5, T.TALL); U.prop('stall', 59, 35, 1, 3, T.TALL); U.prop('sink', 54, 39, 2, 1, T.LOW);
+  U.prop('shelf', 50, 35, 1, 5, T.TALL); U.prop('stall', 59, 35, 1, 3, T.TALL); U.prop('sink', 54, 39, 2, 1, T.LOW);
 
   // ================= B =================
   B.area('Wine Cellar', 11, 9, 18, 14, FL.CONCRETE, T.HARD, MAT.CONCRETE);
@@ -93,12 +93,12 @@ export function build() {
   B.prop('tank', 49, 36, 4, 3, T.TALL); B.prop('tank', 55, 36, 4, 3, T.TALL);
 
   // ================= stairs =================
-  stair(1, 2, 30, 19, 2, 6, 'n', FL.WOOD);             // hallway -> upper landing
-  G.prop('railing', 32, 18, 1, 7, T.LOW); G.prop('railing', 30, 18, 2, 1, T.LOW);
-  U.prop('railing', 32, 19, 1, 6, T.LOW);
-  stair(0, 1, 34, 34, 2, 6, 'n', FL.CONCRETE);         // storage -> garden room
-  B.prop('railing', 33, 33, 1, 7, T.LOW); B.prop('railing', 36, 33, 1, 7, T.LOW); B.prop('railing', 34, 33, 2, 1, T.LOW);
-  G.prop('railing', 33, 35, 1, 6, T.LOW); G.prop('railing', 36, 35, 1, 6, T.LOW); G.prop('railing', 34, 40, 2, 1, T.LOW);
+  stair(1, 2, 30, 19, 2, 4, 'n', FL.WOOD);             // hallway -> upper landing
+  G.prop('railing', 32, 18, 1, 5, T.LOW); G.prop('railing', 30, 18, 2, 1, T.LOW);
+  U.prop('railing', 32, 19, 1, 4, T.LOW); U.prop('railing', 30, 23, 2, 1, T.LOW);
+  stair(0, 1, 34, 32, 2, 6, 'n', FL.CONCRETE);         // storage -> garden room
+  B.prop('railing', 33, 31, 1, 7, T.LOW); B.prop('railing', 36, 31, 1, 7, T.LOW); B.prop('railing', 34, 31, 2, 1, T.LOW);
+  G.prop('railing', 33, 33, 1, 6, T.LOW); G.prop('railing', 36, 33, 1, 6, T.LOW); G.prop('railing', 34, 38, 2, 1, T.LOW);
   stair(0, 1, 12, 34, 2, 6, 'n', FL.CONCRETE);         // mechanical room -> library
   B.prop('railing', 14, 33, 1, 7, T.LOW); B.prop('railing', 12, 33, 2, 1, T.LOW);
   G.prop('railing', 14, 35, 1, 6, T.LOW); G.prop('railing', 12, 40, 2, 1, T.LOW);

@@ -46,8 +46,9 @@ export class MapRenderer {
     for (const fn of m.decor || []) fn(x);
     // void: open air beside upper floors, earth around basements
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
-      if (m.tiles[cy * m.W + cx] !== T.VOID) continue;
-      x.fillStyle = '#07090c'; x.fillRect(cx * CELL, cy * CELL, CELL, CELL);
+      const vk = cy * m.W + cx;
+      if (m.tiles[vk] !== T.VOID && m.floor[vk] !== FL.VOID) continue;
+      x.fillStyle = m.tiles[vk] === T.VOID ? '#07090c' : '#101318'; x.fillRect(cx * CELL, cy * CELL, CELL, CELL);
       if (hash(cx, cy, 9) < 0.25) { x.fillStyle = 'rgba(255,255,255,0.025)'; x.fillRect(cx * CELL + hash(cx, cy, 1) * 12, cy * CELL + hash(cx, cy, 2) * 12, 3, 3); }
     }
     this.drawStairs(x0, y0, x1, y1);

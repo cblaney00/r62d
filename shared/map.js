@@ -2,10 +2,14 @@
 import { CELL, T } from './constants.js';
 import { build as harbor } from './maps/harbor.js';
 import { build as villa } from './maps/villa.js';
+import { build as depot } from './maps/depot.js';
+import { build as embassy } from './maps/embassy.js';
 
 export const MAPS = {
   harbor: { name: 'Harbor Office', floors: '1F · 2F', desc: 'Offices and a garage by the docks.', build: harbor },
   villa: { name: 'Cliffside Villa', floors: 'B · 1F · 2F', desc: 'A luxury house on a cliff, wine cellar and panic room below.', build: villa },
+  depot: { name: 'Rail Depot', floors: '1F · 2F', desc: 'A train shed with catwalks above the tracks and an office wing.', build: depot },
+  embassy: { name: 'The Embassy', floors: 'B · 1F · 2F', desc: 'A consulate round an open courtyard, with a vault and cells below.', build: embassy },
 };
 export const MAP_LIST = Object.keys(MAPS);
 
