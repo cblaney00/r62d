@@ -322,7 +322,7 @@ function renderGfx() {
   $('gfxHint').textContent = GFX_HINT[gfxName] + (app ? '  (The desktop app is always full screen.)' : '');
 }
 for (const b of $('gfxSeg').querySelectorAll('button')) b.onclick = () => { audio.ui(); setGfx(b.dataset.q); };
-$('fsToggle').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); };
+$('fsToggle').onclick = () => toggleFullscreen();
 document.addEventListener('fullscreenchange', renderGfx);
 renderGfx();
 $('setClose').onclick = () => toggleSettings();
@@ -350,7 +350,7 @@ $('switchBtn').onclick = () => { send({ t: 'lobby', a: 'switch' }); };
 $('fillBtn').onclick = () => { send({ t: 'lobby', a: 'fillBots' }); };
 $('startBtn').onclick = () => { send({ t: 'lobby', a: 'start' }); };
 $('leaveBtn').onclick = () => { if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
-$('fsBtn').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); };
+$('fsBtn').onclick = () => toggleFullscreen();
 $('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100); $('muteBtn').textContent = st.muted ? '🔇' : '🔊'; };
 function renderControls() {
   const L = id => keyName(bindsFor(id)[0]);
@@ -1328,7 +1328,7 @@ $('pResume').onclick = () => $('pause').classList.add('hidden');
 $('pOps').onclick = () => showOps(st.me && st.me.op);
 $('pProf').onclick = () => showProfile();
 $('pSet').onclick = () => toggleSettings();
-$('pFs').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); $('pause').classList.add('hidden'); };
+$('pFs').onclick = () => { toggleFullscreen(); $('pause').classList.add('hidden'); };
 $('pEnd').onclick = () => { if (confirm('End the match for everyone and go back to the lobby?')) { send({ t: 'lobby', a: 'end' }); $('pause').classList.add('hidden'); } };
 $('lobbyOpsBtn').onclick = () => showOps();
 $('lobbyProfBtn').onclick = () => showProfile();
@@ -1340,7 +1340,7 @@ st.started = false;
 $('splash').addEventListener('click', () => {
   if (st.started) return;
   audio.initAudio(); audio.ui('open');
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  if (!document.fullscreenElement && !inApp()) document.documentElement.requestFullscreen().catch(() => {});
   st.started = true; updateNav();
   let saved = ''; try { saved = localStorage.getItem('r62d-name') || ''; } catch {}
   if (saved) { $('name').value = saved; setTimeout(() => $('joinBtn').click(), 250); } // returning player: straight in
@@ -1499,3 +1499,12 @@ function addChat(m) {
 }
 // older lines fade out unless the chat is open
 setInterval(() => { const now = performance.now(); for (const d of $('chatLog').children) d.classList.toggle('old', now - d.dataset.t > 12000); }, 500);
+
+// The desktop app's window is already full screen (Firefox kiosk). Asking the browser for full
+// screen again there shrinks the picture into a corner, so the switch only acts in a normal browser.
+function inApp() { return new URLSearchParams(location.search).has('app'); }
+function toggleFullscreen() {
+  if (inApp()) return;
+  if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {});
+}
+if (inApp()) for (const id of ['fsBtn', 'pFs']) $(id).style.display = 'none'; // nothing to switch in the desktop app
