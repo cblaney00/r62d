@@ -10,7 +10,7 @@ export const SNAP_RATE = 20;       // snapshots sent per second
 // sideways) so a body fits through every one-cell gap beside furniture and round door frames; at 10 a
 // lot of rooms had corners and gaps behind bookcases nobody could get into. Bullets use HIT_R instead.
 export const PLAYER_R = 7;
-export const DRONE_R = 5;           // small enough for the drone holes at the foot of walls (map.dhole)
+export const DRONE_R = 3.5;         // a foot-long, half-foot-wide drone; small enough for the drone holes at the foot of walls (map.dhole)
 export const MAX_PLAYERS = 10;
 export const TEAM_SIZE = 5;
 export const WIN_ROUNDS = 3;       // Quick Match: first to 3

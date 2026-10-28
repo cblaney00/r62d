@@ -50,7 +50,7 @@ New ideas from him get added to the bottom of **To do**.
       ripples on every button, animated pages, operator cards that deal in and lock in, 3-2-1-GO countdown, sliding kill
       feed and banners, end-of-match screen with MVP, stats counting up and an XP bar with level-ups.
 - [x] Pause screen (Esc or P). In fullscreen, Esc leaves fullscreen and opens the pause menu.
-- [x] Drone: small and low-key with one small red light; wheels spin, it leans and sways; can't drive under furniture
+- [x] Drone: about a foot long, half as wide (a low rectangle), one small red dot in the middle of the top; wheels spin, it leans and sways; can't drive under furniture
       (still fits through barricade gaps); soft electric motor sound instead of the whine.
 - [x] Realistic gunshots: pre-built recordings per weapon (crack, blast, boom, echo off walls, action click).
 - [x] Operators page: bio, armor/speed, skill, loadout choices (primary, secondary, gadget), your stats with them.

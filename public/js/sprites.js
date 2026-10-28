@@ -225,26 +225,26 @@ export function drawDrone(ctx, d, t, ally) {
   const spd = d.spd || 0, wheel = d.wheel || 0, lean = Math.min(1, spd / 115); // 115 = drone top speed (DRONE_SPEED)
   const rel = (d.mvAng ?? d.ag) - (d.ag || 0);
   ctx.save(); ctx.translate(d.x, d.y);
-  if (ally) { ctx.strokeStyle = 'rgba(70,170,255,0.45)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, 7); ctx.stroke(); }
-  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(0.6, 1, 4.6, 3.6, 0, 0, 7); ctx.fill();
   ctx.rotate(d.ag || 0);
-  ctx.scale(0.68, 0.68); // small and easy to miss
-  for (const [wx, wy] of [[-3.2, -4.2], [3, -4.2], [-3.2, 4.2], [3, 4.2]]) {
-    ctx.fillStyle = '#121314'; ctx.beginPath(); ctx.roundRect(wx - 2, wy - 1.3, 4, 2.6, 1); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.12)'; const off = (wheel * 1.6) % 1.4;
-    for (let i = -2 + off; i < 2; i += 1.4) ctx.fillRect(wx + i, wy - 1.3, 0.3, 2.6);
+  // about a foot long (10 px, 1 m = 36 px) and half as wide: a low rectangle on four little wheels
+  if (ally) { ctx.strokeStyle = 'rgba(70,170,255,0.45)'; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.roundRect(-5.8, -3.5, 11.6, 7, 2); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(0.5, 0.8, 5.2, 2.9, 0, 0, 7); ctx.fill();
+  for (const [wx, wy] of [[-3.1, -2.1], [3.1, -2.1], [-3.1, 2.1], [3.1, 2.1]]) {
+    ctx.fillStyle = '#121314'; ctx.beginPath(); ctx.roundRect(wx - 1.3, wy - 0.55, 2.6, 1.1, 0.5); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; const off = (wheel * 1.1) % 0.9;
+    for (let i = -1.3 + off; i < 1.3; i += 0.9) ctx.fillRect(wx + i, wy - 0.55, 0.2, 1.1);
   }
-  ctx.save(); ctx.translate(-Math.cos(rel) * lean * 0.5, -Math.sin(rel) * lean * 0.5 + (spd > 20 ? Math.sin(wheel) * 0.2 : 0));
-  const g = ctx.createLinearGradient(-4.5, -3, 4.5, 3); g.addColorStop(0, '#4a4f55'); g.addColorStop(1, '#2a2d31');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(-4.5, -3, 9, 6, 1.2); ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 0.4; ctx.stroke();
-  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-2.6, -1.8, 0.4, 3.6); ctx.fillRect(-1.6, -1.8, 0.4, 3.6);
-  ctx.fillStyle = '#16181b'; ctx.beginPath(); ctx.arc(3.2, 0, 1.6, 0, 7); ctx.fill();           // camera
-  ctx.fillStyle = 'rgba(140,200,240,0.5)'; ctx.beginPath(); ctx.arc(3.5, -0.4, 0.45, 0, 7); ctx.fill();
-  // the giveaway: one small red light on top
-  ctx.fillStyle = `rgba(255,40,40,${0.75 + 0.25 * Math.sin(t * 4)})`; ctx.beginPath(); ctx.arc(0.6, 0, 0.75, 0, 7); ctx.fill();
-  ctx.strokeStyle = '#6d7278'; ctx.lineWidth = 0.3; ctx.beginPath(); ctx.moveTo(-4, -1.2);
-  ctx.lineTo(-6 - (d.sway || 0) * 0.8, -1.2 - (d.sway || 0) * 2); ctx.stroke();
+  ctx.save(); ctx.translate(-Math.cos(rel) * lean * 0.35, -Math.sin(rel) * lean * 0.35 + (spd > 20 ? Math.sin(wheel) * 0.15 : 0));
+  const g = ctx.createLinearGradient(-4.6, -1.7, 4.6, 1.7); g.addColorStop(0, '#4a4f55'); g.addColorStop(1, '#2a2d31');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(-4.6, -1.7, 9.2, 3.4, 0.8); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 0.3; ctx.stroke();
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-3, -1.1, 0.3, 2.2); ctx.fillRect(-2.3, -1.1, 0.3, 2.2);
+  ctx.fillStyle = '#16181b'; ctx.beginPath(); ctx.arc(4.1, 0, 1, 0, 7); ctx.fill();           // camera
+  ctx.fillStyle = 'rgba(140,200,240,0.5)'; ctx.beginPath(); ctx.arc(4.35, -0.3, 0.3, 0, 7); ctx.fill();
+  // the giveaway: one small red dot in the middle of the top
+  ctx.fillStyle = `rgba(255,40,40,${0.75 + 0.25 * Math.sin(t * 4)})`; ctx.beginPath(); ctx.arc(0, 0, 0.6, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#6d7278'; ctx.lineWidth = 0.25; ctx.beginPath(); ctx.moveTo(-4.2, -0.8);
+  ctx.lineTo(-5.8 - (d.sway || 0) * 0.6, -0.8 - (d.sway || 0) * 1.5); ctx.stroke();
   ctx.restore();
   if (d.j) {
     ctx.strokeStyle = `rgba(150,200,255,${0.4 + Math.random() * 0.5})`; ctx.lineWidth = 0.5; ctx.beginPath();
