@@ -407,6 +407,12 @@ function buildSelect(s) {
   $('selSide').textContent = `ROUND ${s.rd} — ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`;
   $('selSide').style.color = side === 'atk' ? '#ffb27a' : '#8fc8ff';
   const site = st.map.sites[s.site];
+  const sc = $('siteChoice'), sk = side === 'def' ? s.rd + ':' + s.site : '';
+  if (sc.dataset.k !== sk) {
+    sc.dataset.k = sk;
+    sc.innerHTML = side === 'def' ? '<span>CHOOSE THE SITE TO DEFEND</span>' + st.map.sites.map((x, i) => `<button data-n="${i}" class="${i === s.site ? 'on' : ''}">${esc(x.name)}</button>`).join('') : '';
+    for (const b of sc.querySelectorAll('button')) b.onclick = () => { audio.ui(); send({ t: 'site', n: +b.dataset.n }); };
+  }
   $('selInfo').textContent = side === 'def' ? `DEFEND: ${site.name.toUpperCase()}  ·  HARBOR OFFICE` : `SPAWN: ${String(s.spawn).toUpperCase()}  ·  OBJECTIVE UNKNOWN  ·  HARBOR OFFICE`;
   $('selTime').textContent = Math.ceil(s.tm);
   $('picks').innerHTML = mates.map(p => `<span><b>${esc(p.n)}</b> ${p.op ? OPERATORS[p.op].name : '…'}</span>`).join('');
@@ -1017,7 +1023,7 @@ function hud(s) {
   const where = me.a && me.x !== undefined ? roomAt(st.map, st.pred.x, st.pred.y) : '';
   if (side === 'def') {
     obj = s.pl ? 'DISABLE THE DEFUSER!' : s.ph === PHASE.PREP ? `FORTIFY: ${site.name}` : `DEFEND: ${site.name}`;
-    sub = `Reinforcements left: ${s.rf}`;
+    sub = s.ph === PHASE.PREP ? `Reinforcements left: ${s.rf} · hold E on walls to reinforce, E on doors/windows to barricade, melee soft walls for rotation holes` : `Reinforcements left: ${s.rf}`;
   } else {
     obj = s.pl ? 'PROTECT THE DEFUSER' : s.ph === PHASE.PREP ? 'LOCATE THE OBJECTIVE WITH YOUR DRONE' : s.rev ? `PLANT THE DEFUSER: ${site.name}` : 'FIND THE OBJECTIVE';
     if (me.df) sub = 'You are carrying the defuser';

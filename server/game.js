@@ -116,6 +116,11 @@ export class Game {
       else if (m.a === 'start' && this.phase === PHASE.LOBBY) this.startMatch();
       else if (m.a === 'end' && this.phase !== PHASE.LOBBY) { this.msg(`${p.name} ended the match`); this.resetToLobby(); }
     } else if (m.t === 'pick') this.pickOp(p, m.op);
+    else if (m.t === 'site') { // like R6, the defenders choose which objective to defend while picking operators
+      if (this.phase === PHASE.SELECT && this.side(p) === TEAM.DEF && Number.isInteger(m.n) && m.n >= 0 && m.n < this.map.sites.length && m.n !== this.site) {
+        this.site = m.n; this.msg(`${p.name} chose to defend ${this.map.sites[m.n].name}`, TEAM.DEF);
+      }
+    }
     else if (m.t === 'settings') store.setSettings(p.token, m.s);
     else if (m.t === 'chat') this.chat(p, m);
     else if (m.t === 'loadout') {
