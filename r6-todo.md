@@ -10,6 +10,11 @@ New ideas from him get added to the bottom of **To do**.
 
 ## Done
 
+- [x] CS2-style controls for players coming from Counter-Strike: run by default (no sprint), Shift = silent walk,
+      Ctrl (hold) = silent crouch, E = use, 3 = melee, 4 = gadget, Q = operator skill, 5 = drone/cams, middle mouse = mark.
+      Accuracy drops while running (stop or crouch to shoot straight). Ctrl can't close the full-screen window.
+- [x] Aiming down sights: narrower field of view, slower movement, lower mouse sensitivity. The mouse is captured in matches
+      (Esc releases it and pauses); Mouse sensitivity + ADS sensitivity settings, saved per profile.
 - [x] Opens straight into fullscreen: the desktop icon starts its own Firefox window in kiosk mode (no browser bars,
       separate profile). In a normal browser it goes fullscreen on the first click.
 - [x] Quit to desktop: Esc on the title screen / menus, QUIT in the side menu, and in the pause menu.

@@ -113,10 +113,11 @@ const SURF = {
 
 export function step(x, y, surf, pace, own) {
   C = 'steps';
-  // pace: 0 slow-walk, 1 crouch, 2 walk, 3 run
+  // pace: 0 walk (Shift), 1 crouch, 2 run, 3 run (heavy)
+  if (pace <= 1 && !own) return; // silent movement, like CS2
   const s = SURF[surf] || SURF.concrete;
-  const loud = [0.2, 0.32, 0.6, 1][pace] * s.v;
-  const range = [160, 220, 420, 620][pace];
+  const loud = [0.2, 0.32, 0.92, 1][pace] * s.v;
+  const range = [160, 220, 580, 620][pace];
   const g = out(own ? undefined : x, own ? undefined : y, loud * (own ? 0.42 : 1), range, 0.12); if (!g) return;
   const t = ac.currentTime + rnd(0, 0.01);
   noise(g, t, 0.05, 'bandpass', s.f * rnd(0.85, 1.15), s.q, 0.9);                    // heel
@@ -133,7 +134,7 @@ export function step(x, y, surf, pace, own) {
   if (surf === 'marble') ring(g, t + 0.002, rnd(1800, 2400), 0.06, 0.06);
   if (surf === 'asphalt' || surf === 'concrete') noise(g, t + 0.04, 0.09, 'bandpass', 2600, 0.8, 0.18, 0.03);       // scuff
   if (surf === 'wood' && Math.random() < 0.12) tone(g, t + 0.05, 0.22, rnd(300, 500), rnd(250, 420), 'triangle', 0.06, 0.05); // creak
-  if (pace === 3) gear(g, t + 0.02, 0.35);
+  if (pace >= 2 && Math.random() < 0.45) gear(g, t + 0.02, 0.28);
 }
 function gear(g, t, v) { // equipment rattle: buckles, mags, sling
   noise(g, t, 0.06, 'bandpass', rnd(2500, 4000), 3, v * 0.5, 0.004);

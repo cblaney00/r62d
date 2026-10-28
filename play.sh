@@ -22,5 +22,6 @@ user_pref("media.autoplay.default", 0);
 user_pref("full-screen-api.warning.timeout", 0);
 user_pref("browser.tabs.warnOnClose", false);
 user_pref("dom.disable_beforeunload", true);
+user_pref("permissions.default.shortcuts", 2);
 PREFS
 exec firefox --kiosk --no-remote --profile "$PROFILE" "http://localhost:6262/?app=1"

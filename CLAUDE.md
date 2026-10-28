@@ -20,6 +20,7 @@ His wishes so far:
 - One small map to start (Harbor Office), 10 operators (5 attack, 5 defence), Quick Match only
   (first to 3 rounds, sides swap every round).
 - Out of sight = dull grey "remembered" map; shared team vision (teammates, drones, cameras) is live colour; enemy changes out of sight stay hidden until seen (`st.known` vs `st.map` in main.js).
+- Controls are CS2-style (players come from CS2): run default, Shift walk, Ctrl crouch (hold), E use, Q skill, 3 melee, 4 gadget. Walking/crouching are silent to others. Running spreads shots (server `fire`). Mouse is pointer-locked in matches with sensitivity + ADS multiplier settings.
 - FOV like a modern FPS (103°, 70° ADS). Zoom adapts: close indoors, wide outside / long sightlines.
 - Abilities all work; no verticality.
 - Graphics detailed enough to interest people used to modern games; fills a fullscreen

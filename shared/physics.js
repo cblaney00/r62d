@@ -38,7 +38,7 @@ export function moveCircle(map, o, dx, dy, r, drone = false) {
 }
 
 // Movement speed in world px/s
-export const BASE_SPEED = 120;
+export const BASE_SPEED = 140; // running is the default, like CS2 (no sprint)
 export const ARMOR_SPEED = { 1: 0.88, 2: 1.0, 3: 1.14 };
 
 // Apply one input step to whatever the player controls. Shared so the client
@@ -54,10 +54,9 @@ export function stepMove(map, o, input, dt, mods) {
   else {
     spd = BASE_SPEED * (ARMOR_SPEED[mods.armor] || 1) * (mods.mul || 1);
     if (mods.downed) spd = 28;
-    else if (input.sprint && !input.ads && !input.fire && !input.crouch) spd *= 1.45;
-    else if (input.crouch) spd *= 0.5;
-    else if (input.walk) spd *= 0.45;
-    else if (input.ads) spd *= 0.65;
+    else if (input.crouch) spd *= 0.36;   // crouch: slowest, silent, most accurate
+    else if (input.walk) spd *= 0.52;     // walk (Shift): silent
+    else if (input.ads) spd *= 0.58;      // aiming down sights: slow and steady
   }
   // Weight: velocity eases toward where you want to go instead of jumping there.
   o.vx = o.vx || 0; o.vy = o.vy || 0;
@@ -72,7 +71,7 @@ export function stepMove(map, o, input, dt, mods) {
   let pulse = 1;
   if (!mods.drone) {
     const v = Math.hypot(o.vx, o.vy);
-    const stride = mods.downed ? 13 : v > 150 ? 31 : v > 90 ? 24 : 17;
+    const stride = mods.downed ? 13 : v > 110 ? 28 : v > 60 ? 21 : 16;
     o.gait = (o.gait || 0) + v * dt / stride * Math.PI;
     pulse = v > 5 ? 0.74 + 0.52 * Math.sin(o.gait) ** 2 : 1;
   }

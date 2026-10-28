@@ -4,24 +4,24 @@ export const ACTIONS = [
   ['down', 'Move back', 'KeyS', 'ArrowDown'],
   ['left', 'Move left', 'KeyA', 'ArrowLeft'],
   ['right', 'Move right', 'KeyD', 'ArrowRight'],
-  ['sprint', 'Sprint (hold)', 'ShiftLeft', ''],
-  ['walk', 'Slow walk — silent (hold)', 'AltLeft', 'KeyX'],
-  ['crouch', 'Crouch (toggle)', 'KeyC', ''],
-  ['interact', 'Interact — reinforce, barricade, plant, defuse, revive (hold)', 'KeyF', 'KeyE'],
+  ['walk', 'Walk — silent (hold)', 'ShiftLeft', ''],
+  ['crouch', 'Crouch — silent, most accurate (hold)', 'ControlLeft', 'KeyC'],
+  ['interact', 'Use — reinforce, barricade, plant, defuse, revive (hold)', 'KeyE', 'KeyF'],
   ['reload', 'Reload', 'KeyR', ''],
   ['primary', 'Primary weapon', 'Digit1', ''],
   ['secondary', 'Secondary weapon', 'Digit2', ''],
-  ['gadget', 'Secondary gadget', 'Digit3', 'KeyG'],
-  ['ability', 'Operator skill', 'Digit4', 'KeyZ'],
+  ['gadget', 'Gadget / grenade', 'Digit4', 'KeyG'],
+  ['ability', 'Operator skill', 'KeyQ', 'KeyZ'],
   ['view', 'Drone / Cameras', 'Digit5', ''],
-  ['melee', 'Melee', 'KeyV', ''],
+  ['melee', 'Melee (knife)', 'Digit3', 'KeyV'],
   ['spot', 'Mark enemy under cursor', 'KeyT', ''],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['settings', 'Settings', 'KeyO', 'F1'],
   ['pause', 'Pause menu', 'Escape', 'KeyP'],
 ];
 
-const KEY = 'r62d-keys-v2';
+const KEY = 'r62d-keys-v3'; // v3 = CS2-style defaults
+export const BINDS_VERSION = 3;
 let binds = {};
 export function loadBinds() {
   binds = {};

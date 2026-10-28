@@ -101,7 +101,7 @@ function visibleEnemy(game, p) {
 
 export function botThink(game, p, dt) {
   const ai = p.ai;
-  const inp = { up: 0, down: 0, left: 0, right: 0, sprint: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
+  const inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
   p.input = inp;
   if (!p.alive || p.ctrl !== 'body') return;
   if (game.phase === PHASE.PREP && game.side(p) === TEAM.ATK) return;

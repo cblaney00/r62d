@@ -315,3 +315,6 @@ button.big { font-size: 22px; padding: 14px 34px; }
 #quitDlg .menu { display: flex; flex-direction: column; gap: 8px; width: 340px; background: var(--panel); border: 1px solid var(--line); padding: 22px; }
 #quitDlg h2 { margin: 0; font: 800 44px var(--head); letter-spacing: 0.2em; }
 #quitDlg button { font-size: 18px; padding: 11px; text-align: left; }
+/* keep the settings panel centred while it animates in */
+@keyframes riseCentered { from { opacity: 0; transform: translate(-50%, calc(-50% + 16px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+#settings:not(.hidden) { animation: riseCentered 0.3s cubic-bezier(.2,.8,.2,1) both; }

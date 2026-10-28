@@ -14,7 +14,7 @@ const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
 const BOT_NAMES = ['Viper', 'Moss', 'Rook-7', 'Static', 'Juno', 'Kilo', 'Brine', 'Ozone', 'Pike', 'Wick', 'Saber', 'Flint'];
-const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, sprint: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
+const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
 const JAM_R = 90;
 
 // R62D_FAST=1 shortens the menus, for quick testing.
@@ -350,8 +350,7 @@ export class Game {
     const before = { x: p.x, y: p.y };
     stepMove(this.map, p, p.input, dt, m);
     const moved = Math.hypot(p.x - before.x, p.y - before.y) / dt;
-    p.moving = moved < 5 ? 0 : (p.input.crouch || p.input.walk) ? 1 : moved > 150 ? 3 : 2;
-    if (p.input.sprint && p.moving) p.lastSprint = this.time;
+    p.moving = moved < 5 ? 0 : (p.input.crouch || p.input.walk) ? 1 : 2;
   }
 
   tickPlayer(p, dt) {
@@ -403,7 +402,7 @@ export class Game {
 
     // shooting
     const canShoot = p.ctrl === 'body' && !p.busy && p.reloadT <= 0 && !p.scanning && !p.bracing && gun &&
-      !(inp.sprint && p.moving >= 3);
+      true;
     if (canShoot && inp.fire) {
       const w = WEAPONS[gun.w];
       const edge = !prev.fire;
@@ -425,8 +424,10 @@ export class Game {
   fire(p, gun, w) {
     gun.ammo--; p.fireCd = 60 / w.rpm; p.lastShot = this.time;
     if (p.ms) p.ms.shots += w.pellets;
-    const moving = p.moving >= 2 ? 0.035 : 0;
-    const spread = (p.input.ads ? w.ads : w.spread) + p.bloom + moving * (p.input.ads ? 0.4 : 1) + (p.input.crouch ? -0.006 : 0);
+    const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / 140);
+    const movePen = Math.pow(run, 1.4) * ({ Shotgun: 0.03, DMR: 0.14, Pistol: 0.06 }[w.cls] ?? 0.09);
+    let spread = (p.input.ads ? w.ads : w.spread) + p.bloom + movePen * (p.input.ads ? 0.75 : 1);
+    if (p.input.crouch && run < 0.15) spread *= 0.72;
     p.bloom = Math.min(0.08, p.bloom + w.bloom);
     const mx = p.x + Math.cos(p.aim) * (w.len + 6), my = p.y + Math.sin(p.aim) * (w.len + 6);
     for (let i = 0; i < w.pellets; i++) {

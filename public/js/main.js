@@ -14,7 +14,7 @@ import { openProfile } from './profile.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor } from '/shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '/shared/operators.js';
-import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange } from './keys.js';
+import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
 import { walkRay, tileAt } from '/shared/physics.js';
 import { blocksSight, FL } from '/shared/constants.js';
 
@@ -200,7 +200,6 @@ addEventListener('keydown', e => {
     case 'gadget': ev.push({ k: 'gadget' }); audio.foley('gadget'); break;
     case 'ability': ev.push({ k: 'ability' }); audio.foley('gadget'); break;
     case 'view': ev.push({ k: 'view' }); break;
-    case 'crouch': st.crouch = !st.crouch; break;
     case 'settings': toggleSettings(); break;
     case 'pause': escape(); break;
     case 'spot': st.spotReq = true; break;
@@ -212,9 +211,17 @@ addEventListener('keyup', e => {
   const a = actionFor(e.code); if (a) keys.delete(a);
 });
 addEventListener('blur', () => { keys.clear(); mouse.l = mouse.r = false; });
-cv.addEventListener('mousemove', e => { mouse.x = e.clientX * DPR; mouse.y = e.clientY * DPR; });
+cv.addEventListener('mousemove', e => {
+  if (document.pointerLockElement === cv) {
+    const ads = mouse.r && st.me && st.me.a && st.me.ct === 'body';
+    const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * DPR;
+    mouse.x = Math.max(0, Math.min(VW, mouse.x + e.movementX * k));
+    mouse.y = Math.max(0, Math.min(VH, mouse.y + e.movementY * k));
+  } else { mouse.x = e.clientX * DPR; mouse.y = e.clientY * DPR; }
+});
 cv.addEventListener('mousedown', e => {
   audio.initAudio();
+  if (playing() && !menuOpen() && document.pointerLockElement !== cv) cv.requestPointerLock?.();
   if (e.button === 0) { mouse.l = true; mouse.wl++; }
   if (e.button === 2) { mouse.r = true; mouse.wr++; }
 });
@@ -272,7 +279,7 @@ $('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(
 function renderControls() {
   const L = id => keyName(bindsFor(id)[0]);
   const rows = [[`${L('up')}${L('left')}${L('down')}${L('right')}`, 'Move'], ['Mouse', 'Aim'], ['Left click', 'Shoot'], ['Right click', 'Aim down sights'],
-    [L('sprint'), 'Sprint'], [L('walk'), 'Slow walk (silent)'], [L('crouch'), 'Crouch'], [L('reload'), 'Reload'],
+    [L('walk'), 'Walk (silent)'], [L('crouch'), 'Crouch (hold, silent)'], [L('reload'), 'Reload'],
     [L('interact') + ' (hold)', 'Reinforce, barricade, plant, defuse, revive'], [L('ability'), 'Operator skill'],
     [L('gadget'), 'Secondary gadget'], [L('melee'), 'Melee'], [L('view'), 'Drone / Cameras'], [L('spot') + ' · Middle click', 'Mark enemy'],
     [`${L('primary')} / ${L('secondary')} · Wheel`, 'Switch weapon'], [L('scoreboard'), 'Scoreboard']];
@@ -510,7 +517,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
   const k = {
     up: keys.has('up') ? 1 : 0, down: keys.has('down') ? 1 : 0, left: keys.has('left') ? 1 : 0, right: keys.has('right') ? 1 : 0,
-    sprint: keys.has('sprint') ? 1 : 0, walk: keys.has('walk') ? 1 : 0, crouch: st.crouch ? 1 : 0, fire: mouse.l ? 1 : 0, ads: mouse.r ? 1 : 0,
+    walk: keys.has('walk') ? 1 : 0, crouch: keys.has('crouch') ? 1 : 0, fire: mouse.l ? 1 : 0, ads: mouse.r ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
   };
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
@@ -788,9 +795,9 @@ function draw(s, view, now, dt) {
     // footstep direction hints around you
     if (view && view.kind === 'body') for (const p of drawn) { /* visible: no hint */ }
     if (view && view.kind === 'body') for (const sp of s.players) {
-      if (!sp.a || sp.tm === side || sp.x === undefined || !sp.mv || sp.cr) continue;
+      if (!sp.a || sp.tm === side || sp.x === undefined || (sp.mv || 0) < 2) continue; // only running makes noise
       const p = interp(sp.id, 'players'); const d = Math.hypot(p.x - view.x, p.y - view.y);
-      const range = sp.mv >= 3 ? 420 : 260;
+      const range = 380;
       if (d > range || seen(p.x, p.y)) continue;
       const a = Math.atan2(p.y - view.y, p.x - view.x), al = (1 - d / range) * 0.8;
       ctx.strokeStyle = `rgba(255,140,60,${al})`; ctx.lineWidth = 2.2;
@@ -851,7 +858,8 @@ function marker(x, y, label, col, view) {
 function crosshair(me, now) {
   const w = WEAPONS[me.w];
   const base = w ? (me.ad ? w.ads : w.spread) : 0.05;
-  const gap = (4 + base * 160 + (me.mv >= 2 ? 6 : 0)) * DPR;
+  const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / 140);
+  const gap = (4 + base * 160 + Math.pow(run, 1.4) * 15 + (me.cr && run < 0.15 ? -2 : 0)) * DPR; // opens up while you run
   const x = mouse.x, y = mouse.y;
   ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5 * DPR;
   ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 2;
@@ -1130,9 +1138,10 @@ function escape() {
   if (inMatch() || !$('pause').classList.contains('hidden')) $('pause').classList.toggle('hidden');
   else { $('quitDlg').classList.remove('hidden'); audio.ui('open'); } // title screen / menus: offer to quit
 }
-const APP = new URLSearchParams(location.search).has('app'); // opened from the desktop icon (full-screen window)
+const APP = new URLSearchParams(location.search).has('app');
+addEventListener('beforeunload', e => { if (st.id && !st.quitting && inMatch()) { e.preventDefault(); e.returnValue = ''; } }); // opened from the desktop icon (full-screen window)
 async function quitGame() {
-  stopMusic();
+  stopMusic(); st.quitting = true;
   if (APP) { try { await fetch('/api/quit', { method: 'POST' }); } catch {} }
   window.close();
   setTimeout(() => { document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;font:700 28px Barlow Condensed,sans-serif;letter-spacing:.2em;color:#93a0ad">YOU CAN CLOSE THIS TAB NOW</div>'; }, 600);
@@ -1188,7 +1197,8 @@ function updateCard() {
   $('pcXp').style.width = (L.into / L.need * 100) + '%'; $('pcXpText').textContent = `LEVEL ${L.level} · ${L.into} / ${L.need} XP`;
 }
 const TIPS = [
-  'Hold your slow-walk key to move without making footstep noise.',
+  'Walk (Shift) or crouch (Ctrl) to move without footsteps — just like CS2.',
+  'Stop before you shoot: running ruins your accuracy. Crouching still is the most accurate.',
   'Broken glass under windows crunches loudly — listen for it.',
   'Defenders: reinforce the walls of the objective room before the action phase starts.',
   'Attackers: use your drone in preparation to find the objective before you go in.',
@@ -1235,7 +1245,8 @@ window.__r62d = { st, showEnd, playXp }; // for automated screenshot tests
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
-  return { binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value };
+  try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value])); } catch {}
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, sens: +$('sens').value, adsSens: +$('adsSens').value };
 }
 let saveTimer = 0;
 function saveSettings() {
@@ -1243,11 +1254,26 @@ function saveSettings() {
   saveTimer = setTimeout(() => { if (st.token) send({ t: 'settings', s: currentSettings() }); }, 400);
 }
 function applySettings(s) {
-  if (s.binds) applyBinds(s.binds);
-  for (const k of ['volMaster', 'volSfx', 'volMusic']) if (typeof s[k] === 'number') $(k).value = s[k];
+  if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
+  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = s[k];
+  showSens();
   applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100);
   saveVol(); try { localStorage.setItem('r62d-music', $('volMusic').value); } catch {}
   renderSettings(); renderControls();
 }
 onBindsChange(() => saveSettings());
 for (const id of ['volMaster', 'volSfx', 'volMusic']) $(id).addEventListener('change', saveSettings);
+
+// ---------------- captured mouse & sensitivity ----------------
+function playing() { const p = st.last && st.last.ph; return !!st.id && (p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END); }
+// Esc releases the mouse: treat that like pausing, as in CS2
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement && playing() && !menuOpen() && !st.quitting) $('pause').classList.remove('hidden');
+});
+// let go of the mouse whenever a menu is open or the match is over
+setInterval(() => { if (document.pointerLockElement && (menuOpen() || !playing())) document.exitPointerLock(); }, 150);
+$('pResume').addEventListener('click', () => { if (playing()) cv.requestPointerLock?.(); });
+const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; };
+for (const id of ['sens', 'adsSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
+try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; } } catch {}
+showSens();
