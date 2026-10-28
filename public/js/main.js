@@ -709,6 +709,7 @@ function frame(nowMs) {
       st.lastCam = view.cam.id; st.aim = view.cam.ag || 0; view.ang = st.aim; audio.foley('camSwitch');
       mouse.x = VW / 2 + Math.cos(st.aim) * VH * 0.25; mouse.y = VH / 2 + Math.sin(st.aim) * VH * 0.25;
     } else if (Math.hypot(mouse.x - VW / 2, mouse.y - VH / 2) > 20 * DPR) st.aim = Math.atan2(mouse.y - VH / 2, mouse.x - VW / 2);
+    const c = view.cam; if (c.wn !== undefined) st.aim = c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(st.aim, c.wn))); // a wall camera can't look into its wall
     view.ang = st.aim;
   }
   if (!view || view.kind !== 'cam') st.lastCam = null;
@@ -986,7 +987,7 @@ function draw(s, view, now, dt) {
     if (e.ty === 'mine' && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < 140)) continue;
     drawGadget(ctx, e, now, ally);
   }
-  for (const e of ents) if (e.ty === 'cam' && (e.tm === side || seen(e.x, e.y))) drawCam(ctx, e, now);
+  for (const e of ents) if (e.ty === 'cam' && (e.tm === side || seen(e.x, e.y))) drawCam(ctx, e, now, e.tm === side);
 
   // players
   const drawn = [];

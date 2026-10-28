@@ -254,7 +254,8 @@ export function drawDrone(ctx, d, t, ally) {
   ctx.restore();
 }
 
-export function drawCam(ctx, c, t) {
+export function drawCam(ctx, c, t, ally) {
+  if (c.wn !== undefined) return drawWallCam(ctx, c, t, ally);
   ctx.save(); ctx.translate(c.x, c.y);
   ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.arc(1, 1.5, 5, 0, 7); ctx.fill();
   if (!c.hp) {
@@ -269,6 +270,28 @@ export function drawCam(ctx, c, t) {
     } else { ctx.fillStyle = '#d7d9db'; ctx.beginPath(); ctx.arc(0, 0, 4.4, 0, 7); ctx.fill(); }
     ctx.fillStyle = '#1b1d20'; ctx.beginPath(); ctx.arc(0, 0, 2.8, 0, 7); ctx.fill();
     ctx.fillStyle = c.off ? '#4060ff' : (Math.floor(t * 2) % 2 ? '#ff3030' : '#601010'); ctx.beginPath(); ctx.arc(2.6, -2.6, 0.9, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// a map camera hung on a wall (or up in a corner): small and dark like a fitting of the building, its
+// view cone shown only to defenders, a faint red light the only giveaway
+function drawWallCam(ctx, c, t, ally) {
+  ctx.save(); ctx.translate(c.x, c.y);
+  const ag = c.ag ?? c.wn;
+  if (ally && c.hp && !c.off) { ctx.save(); ctx.rotate(ag); const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 20); g.addColorStop(0, 'rgba(255,60,60,0.3)'); g.addColorStop(1, 'rgba(255,60,60,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 20, -0.95, 0.95); ctx.fill(); ctx.restore(); }
+  ctx.save(); ctx.rotate(c.wn); // mounting plate against the wall face, short arm out to the camera
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(-2.6, -2.4, 3.4, 5.4);
+  ctx.fillStyle = '#3a3d41'; ctx.fillRect(-3, -2.6, 1.4, 5.2); ctx.fillRect(-2, -0.5, 2, 1);
+  ctx.restore();
+  if (!c.hp) { // shot down: cracked housing hanging off its plate
+    ctx.fillStyle = '#222428'; ctx.beginPath(); ctx.arc(0.6, 0.8, 2.2, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#4a4d52'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(-0.8, -0.6); ctx.lineTo(1.8, 2); ctx.moveTo(1.6, -0.4); ctx.lineTo(0, 1.6); ctx.stroke();
+  } else {
+    ctx.save(); ctx.rotate(ag); ctx.fillStyle = '#26282c'; ctx.fillRect(0.4, -1.2, 2.6, 2.4); ctx.fillStyle = '#0d0e10'; ctx.fillRect(2.6, -0.8, 0.8, 1.6); ctx.restore();
+    ctx.fillStyle = '#34373c'; ctx.beginPath(); ctx.arc(0, 0, 2.3, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(-0.6, -0.7, 1, 0, 7); ctx.fill();
+    ctx.fillStyle = c.off ? 'rgba(80,110,255,0.8)' : (Math.floor(t * 1.2) % 2 ? 'rgba(255,50,40,0.75)' : 'rgba(110,20,20,0.6)'); ctx.beginPath(); ctx.arc(0, 0, 0.55, 0, 7); ctx.fill();
   }
   ctx.restore();
 }

@@ -1,7 +1,7 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
-import { buildMap, roomAt, MAPS, MAP_LIST } from '../shared/map.js';
+import { buildMap, roomAt, wallMount, MAPS, MAP_LIST } from '../shared/map.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
@@ -104,7 +104,7 @@ export class Game {
     if (m.t === 'input') {
       p.input = { ...EMPTY_INPUT, ...m.k };
       if (typeof m.a === 'number' && isFinite(m.a)) p.aim = m.a;
-      if (p.ctrl === 'cam') { const c = this.aliveCams()[p.camIdx]; if (c) c.ang = p.aim; }
+      if (p.ctrl === 'cam') { const c = this.aliveCams()[p.camIdx]; if (c) c.ang = c.wn === null || c.wn === undefined ? p.aim : c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(p.aim, c.wn))); } // a wall camera can't look into its wall
       if (typeof m.ax === 'number') { p.aimX = m.ax; p.aimY = m.ay; }
       if (typeof m.vt === 'number' && isFinite(m.vt)) p.viewTime = m.vt; // server time of the world this player is looking at
       this.applyMove(p, Math.max(0, Math.min(0.05, Number(m.dt) || 0)));
@@ -201,10 +201,11 @@ export class Game {
       }
       this.equip(p);
     }
-    for (const c of map.cams) { // each camera starts facing its longest view
-      let best = 0, bestD = -1;
-      for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, d = castSight(map, c.x, c.y, a, 600, null); if (d > bestD) { bestD = d; best = a; } }
-      this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, team: TEAM.DEF, hp: 1, offUntil: 0, ang: best });
+    for (const c0 of map.cams) { // each camera hangs on the nearest wall, starting with its longest view out of it
+      const c = wallMount(map, c0.x, c0.y);
+      let best = c.n ?? 0, bestD = -1;
+      for (let i = 0; i <= 16; i++) { const a = c.n === null ? i / 16 * Math.PI * 2 : c.n - c.sp + c.sp * 2 * i / 16, d = castSight(map, c.x, c.y, a, 600, null); if (d > bestD) { bestD = d; best = a; } }
+      this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, team: TEAM.DEF, hp: 1, offUntil: 0, ang: best, wn: c.n, ws: c.sp, wall: c.wall });
     }
     // defenders start on site, attackers at one spawn (their bodies wait while they drone)
     const site = map.sites[this.site];
@@ -626,6 +627,9 @@ export class Game {
     else if (m.openId[k] >= 0) m.tiles[k] = T.OPEN;
     else m.tiles[k] = (m.floor[k] === FL.GRASS || m.floor[k] === FL.ASPHALT) ? T.GROUND : T.FLOOR;
     m.hp[k] = 0; delete m.holes[k]; this.changed.add(k);
+    for (const e of this.ents) if (e.type === 'cam' && e.hp > 0 && e.wall && e.wall.includes(k)) { // its wall is gone: the camera falls with it
+      e.hp = 0; this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) });
+    }
   }
 
   damage(q, amount, src, wname, ang) {
@@ -1415,7 +1419,7 @@ export class Game {
       if (e.owner) o.ow = e.owner;
       if (e.kind) o.kd = e.kind;
       if (e.ang !== undefined) o.ag = r2(e.ang);
-      if (e.type === 'cam') { o.hp = e.hp; o.off = e.offUntil > this.time ? 1 : 0; if (e.tu) { o.tu = 1; if (e.coolUntil > this.time) o.hot = 1; } }
+      if (e.type === 'cam') { o.hp = e.hp; o.off = e.offUntil > this.time ? 1 : 0; if (e.tu) { o.tu = 1; if (e.coolUntil > this.time) o.hot = 1; } if (e.wn !== null && e.wn !== undefined) { o.wn = r2(e.wn); o.ws = r2(e.ws); } }
       if (e.type === 'decoy') { o.op = e.op; o.w = e.w; }
       if (e.type === 'plates') o.c = e.c;
       if (e.type === 'gascloud') { o.r = e.r; o.l = r1(e.life); }
