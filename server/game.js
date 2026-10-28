@@ -6,6 +6,7 @@ import { stepMove, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCe
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, publicProfile } from './store.js';
+import { matchScore } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '../shared/operators.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -271,8 +272,14 @@ export class Game {
       if (this.timer <= 0) {
         if (Math.max(...this.score) >= WIN_ROUNDS) {
           this.phase = PHASE.MATCH_END; this.timer = DUR.matchEnd;
-          this.events.push({ e: 'matchEnd', squad: this.score[0] > this.score[1] ? 0 : 1 });
-          this.saveMatch(this.score[0] > this.score[1] ? 0 : 1);
+          const win = this.score[0] > this.score[1] ? 0 : 1;
+          const mvp = [...this.players.values()].map(p => ({ p, sc: matchScore(p.ms || {}) })).sort((a, b) => b.sc - a.sc)[0];
+          this.events.push({ e: 'matchEnd', squad: win, mvp: mvp ? { id: mvp.p.id, name: mvp.p.name, op: mvp.p.op, ...(mvp.p.ms || {}), ops: undefined } : null });
+          const xp = this.saveMatch(win) || {};
+          for (const p of this.players.values()) if (p.sock && xp[p.pid]) {
+            const prof = store.byToken(p.token);
+            p.sock.send(JSON.stringify({ t: 'xp', ...xp[p.pid], stats: p.ms, profile: publicProfile(prof) }));
+          }
         } else this.nextRound();
       }
       return;
@@ -1024,12 +1031,12 @@ export class Game {
   }
   statLine(p, left = false) {
     const ms = p.ms || this.blankMatchStats();
-    return { name: p.name, bot: !!p.bot, pid: p.pid || null, token: p.token || null, squad: p.squad, left, ...ms, playSeconds: Math.round(ms.playSeconds) };
+    return { name: p.name, bot: !!p.bot, pid: p.pid || null, token: p.token || null, squad: p.squad, left, ...ms, damage: Math.round(ms.damage), playSeconds: Math.round(ms.playSeconds) };
   }
   saveMatch(winner) {
     const players = [...[...this.players.values()].map(p => this.statLine(p)), ...(this.departed || [])];
-    if (!players.some(p => p.token)) return; // nobody real played
-    store.recordMatch({
+    if (!players.some(p => p.token)) return null; // nobody real played
+    return store.recordMatch({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: Date.now(),
       duration: Math.round((Date.now() - (this.matchStart || Date.now())) / 1000),
       map: 'Harbor Office', mode: 'Quick Match', score: [...this.score], winner, rounds: this.roundLog || [], players,

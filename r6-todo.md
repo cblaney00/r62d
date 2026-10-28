@@ -10,6 +10,10 @@ New ideas from him get added to the bottom of **To do**.
 
 ## Done
 
+- [x] Premium feel: title screen with logo reveal, original menu music (dark, layered, not corny; own volume slider),
+      main menu with side navigation and sliding highlight, player card with level/XP, rotating tips, hover/click sounds and
+      ripples on every button, animated pages, operator cards that deal in and lock in, 3-2-1-GO countdown, sliding kill
+      feed and banners, end-of-match screen with MVP, stats counting up and an XP bar with level-ups.
 - [x] Pause screen (Esc or P). In fullscreen, Esc leaves fullscreen and opens the pause menu.
 - [x] Drone: small and low-key with one small red light; wheels spin, it leans and sways; can't drive under furniture
       (still fits through barricade gaps); soft electric motor sound instead of the whine.

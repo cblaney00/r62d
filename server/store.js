@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { OP_LIST, cleanLoadout } from '../shared/operators.js';
+import { matchXp, levelFor } from '../shared/progress.js';
 
 const DIR = process.env.R62D_DATA || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const PROFILES = path.join(DIR, 'profiles.json');
@@ -62,6 +63,7 @@ class Store {
 
   // A finished match: add it to history and to each player's lifetime stats.
   recordMatch(m) {
+    const xp = {};
     this.matches.unshift(m);
     if (this.matches.length > MAX_MATCHES) this.matches.length = MAX_MATCHES;
     for (const pl of m.players) {
@@ -74,14 +76,18 @@ class Store {
         for (const k in t) t[k] += o[k] || 0;
       }
       prof.history.unshift(m.id); if (prof.history.length > 200) prof.history.length = 200;
+      const before = prof.xp || 0, gain = matchXp(pl, won && !pl.left);
+      prof.xp = before + gain.total; pl.xp = gain.total;
+      xp[prof.id] = { lines: gain.lines, gain: gain.total, before, after: prof.xp };
     }
     for (const pl of m.players) delete pl.token; // tokens stay secret
     this.dirty.add('p'); this.dirty.add('m');
     this.flush();
+    return xp;
   }
   match(id) { return this.matches.find(m => m.id === id) || null; }
   matchesFor(profileId, limit = 30) { return this.matches.filter(m => m.players.some(p => p.pid === profileId)).slice(0, limit); }
 }
 
 export const store = new Store();
-export const publicProfile = p => p && ({ id: p.id, name: p.name, created: p.created, lastSeen: p.lastSeen, loadouts: p.loadouts, stats: p.stats });
+export const publicProfile = p => p && ({ id: p.id, name: p.name, created: p.created, lastSeen: p.lastSeen, loadouts: p.loadouts, stats: p.stats, xp: p.xp || 0, level: levelFor(p.xp || 0) });

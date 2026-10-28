@@ -11,6 +11,8 @@ import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
 import { openOps, closeOps, updateOpsProfile } from './ops.js';
 import { openProfile } from './profile.js';
+import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
+import { levelFor } from '/shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '/shared/operators.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label } from './keys.js';
 import { walkRay, tileAt } from '/shared/physics.js';
@@ -47,11 +49,12 @@ function connect() {
     const m = JSON.parse(ev.data);
     if (m.t === 'welcome') {
       st.id = m.id; loadMap(m.mapVersion, m.tiles, m.hp);
-      st.token = m.token; st.profile = m.profile;
+      st.token = m.token; st.profile = m.profile; updateCard();
       try { localStorage.setItem('r62d-token', m.token); } catch {}
       $('join').classList.add('hidden'); $('room').classList.remove('hidden');
     } else if (m.t === 'snap') onSnap(m);
     else if (m.t === 'full') alert('The game is full (10 players).');
+    else if (m.t === 'xp') { st.profile = m.profile; playXp(m); }
     else if (m.t === 'profile') { st.profile = m.profile; updateOpsProfile($('opsPage'), m.profile); st.selBuilt = null; }
   };
   ws.onclose = () => { $('conn').classList.remove('hidden'); $('conn').textContent = 'Disconnected — reconnecting…'; setTimeout(() => location.reload(), 2500); };
@@ -162,7 +165,7 @@ function onEvent(e, s, players) {
       banner(won ? 'ROUND WON' : 'ROUND LOST', e.reason, won ? 'var(--ally)' : 'var(--enemy)');
       break;
     }
-    case 'matchEnd': st.endT = now; showEnd(e.squad); break;
+    case 'matchEnd': st.endT = now; st.mvp = e.mvp; showEnd(e.squad); break;
     case 'stun': if (st.me && e.id === st.me.id) st.flashUntil = now + e.dur; break;
     case 'hurt': if (st.me && e.id === st.me.id) { st.hurtT = now; st.hurtFrom = e.from; } break;
     case 'hitmark': if (e.to === st.id) { st.hitT = now; st.hitKill = e.kill; audio.ui(e.kill ? 'kill' : 'hit'); } break;
@@ -257,14 +260,14 @@ $('joinBtn').onclick = () => {
   let token = null; try { token = localStorage.getItem('r62d-token'); } catch {}
   send({ t: 'join', name: n, token });
 };
-document.querySelectorAll('[data-bot]').forEach(b => b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'addBot', squad: +b.dataset.bot }); });
-document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'removeBot', squad: +b.dataset.unbot }); });
-$('switchBtn').onclick = () => { audio.ui(); send({ t: 'lobby', a: 'switch' }); };
-$('fillBtn').onclick = () => { audio.ui(); send({ t: 'lobby', a: 'fillBots' }); };
-$('startBtn').onclick = () => { audio.ui(); send({ t: 'lobby', a: 'start' }); };
+document.querySelectorAll('[data-bot]').forEach(b => b.onclick = () => { send({ t: 'lobby', a: 'addBot', squad: +b.dataset.bot }); });
+document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { send({ t: 'lobby', a: 'removeBot', squad: +b.dataset.unbot }); });
+$('switchBtn').onclick = () => { send({ t: 'lobby', a: 'switch' }); };
+$('fillBtn').onclick = () => { send({ t: 'lobby', a: 'fillBots' }); };
+$('startBtn').onclick = () => { send({ t: 'lobby', a: 'start' }); };
 $('leaveBtn').onclick = () => { if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
 $('fsBtn').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); };
-$('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); $('muteBtn').textContent = st.muted ? '🔇' : '🔊'; };
+$('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100); $('muteBtn').textContent = st.muted ? '🔇' : '🔊'; };
 function renderControls() {
   const L = id => keyName(bindsFor(id)[0]);
   const rows = [[`${L('up')}${L('left')}${L('down')}${L('right')}`, 'Move'], ['Mouse', 'Aim'], ['Left click', 'Shoot'], ['Right click', 'Aim down sights'],
@@ -313,14 +316,16 @@ function buildSelect(s) {
         <div class="ab">${o.ability.name}${o.ability.count ? ' ×' + o.ability.count : ''}</div><div>${o.ability.desc}</div>`;
       d.appendChild(info);
       info.querySelector('.lo').onclick = e => { e.stopPropagation(); showOps(k); };
-      d.onclick = () => { audio.ui(); send({ t: 'pick', op: k }); };
+      d.onclick = () => { send({ t: 'pick', op: k }); };
       grid.appendChild(d);
     }
   }
   const mates = s.players.filter(p => p.sq === me.sq);
   for (const d of document.querySelectorAll('#opgrid .op')) {
     const who = mates.find(p => p.op === d.dataset.op);
-    d.classList.toggle('mine', !!who && who.id === me.id);
+    const mineNow = !!who && who.id === me.id;
+    if (mineNow && !d.classList.contains('mine')) { d.classList.add('locked'); audio.ui('lock'); setTimeout(() => d.classList.remove('locked'), 700); }
+    d.classList.toggle('mine', mineNow);
     d.classList.toggle('taken', !!who && who.id !== me.id);
     d.querySelector('.who').textContent = who ? who.n : '';
     d.querySelector('.who').style.display = who ? '' : 'none';
@@ -352,6 +357,38 @@ function showEnd(squad) {
   e.querySelector('.t').textContent = won ? 'VICTORY' : 'DEFEAT'; e.querySelector('.t').className = 't ' + (won ? 'win' : 'lose');
   const sc = st.last.sc; e.querySelector('.s').textContent = me ? `${sc[me.sq]} — ${sc[1 - me.sq]}` : '';
   e.querySelector('.board').innerHTML = scoreTable(st.last);
+  audio.ui(won ? 'victory' : 'defeat');
+  const mv = st.mvp;
+  $('mvp').innerHTML = mv ? `<div class="badge">MVP</div><canvas width="400" height="400"></canvas><div class="nm">${esc(mv.name)}</div>
+    <div class="st">${mv.kills || 0} KILLS · ${mv.deaths || 0} DEATHS · ${Math.round(mv.damage || 0)} DMG</div>` : '';
+  if (mv && mv.op) portrait($('mvp').querySelector('canvas'), mv.op);
+  $('xpLines').innerHTML = ''; $('eTiles').innerHTML = '';
+  const lv = levelFor(st.profile ? st.profile.xp : 0);
+  $('eLevel').textContent = lv.level; $('eXp').style.width = (lv.into / lv.need * 100) + '%'; $('eXpText').textContent = `${lv.into} / ${lv.need} XP`;
+}
+// count stats and XP up on the end screen
+async function playXp(m) {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const st0 = m.stats || {};
+  const tiles = [['KILLS', st0.kills || 0], ['DEATHS', st0.deaths || 0], ['DAMAGE', Math.round(st0.damage || 0)], ['ACCURACY', st0.shots ? Math.round(st0.hits / st0.shots * 100) : 0, '%']];
+  $('eTiles').innerHTML = tiles.map(([l]) => `<div><b>0</b>${l}</div>`).join('');
+  const els = [...$('eTiles').querySelectorAll('b')];
+  await sleep(900);
+  for (let k = 0; k <= 20; k++) { tiles.forEach(([, v, suf], i) => els[i].textContent = Math.round(v * k / 20) + (suf || '')); if (k % 4 === 0) audio.ui('xp'); await sleep(30); }
+  let xp = m.before;
+  for (const [label, amt] of m.lines) {
+    await sleep(350);
+    const d = document.createElement('div'); d.innerHTML = `<span>${esc(label)}</span><b>+${amt} XP</b>`; $('xpLines').appendChild(d);
+    const from = xp; xp += amt;
+    for (let k = 1; k <= 10; k++) {
+      const cur = from + amt * k / 10, L = levelFor(cur), prevL = levelFor(from + amt * (k - 1) / 10);
+      $('eLevel').textContent = L.level; $('eXp').style.width = (L.into / L.need * 100) + '%'; $('eXpText').textContent = `${Math.round(L.into)} / ${L.need} XP`;
+      if (L.level > prevL.level) { audio.ui('level'); $('eLevel').classList.remove('up'); void $('eLevel').offsetWidth; $('eLevel').classList.add('up'); }
+      else if (k % 3 === 0) audio.ui('xp');
+      await sleep(28);
+    }
+  }
+  updateCard();
 }
 function scoreTable(s) {
   const me = st.me;
@@ -855,10 +892,18 @@ function camOverlay(view, now) {
 function screens(s, phase, now) {
   const show = (id, on) => $(id).classList.toggle('hidden', !on);
   const joined = !!st.id;
-  show('lobby', phase === PHASE.LOBBY || !joined);
+  show('splash', !st.started);
+  show('lobby', st.started && (phase === PHASE.LOBBY || !joined));
+  // music in the menus, silence in the field
+  if (st.started) {
+    const want = !joined || phase === PHASE.LOBBY || phase === PHASE.SELECT || phase === PHASE.MATCH_END;
+    if (want !== st.music) { st.music = want; want ? startMusic(phase === PHASE.SELECT ? 'select' : 'menu') : stopMusic(); }
+    if (want) setMood(phase === PHASE.SELECT ? 'select' : 'menu');
+  }
+  countdown(s, phase);
   show('select', joined && phase === PHASE.SELECT);
   show('hud', joined && (phase === PHASE.PREP || phase === PHASE.ACTION || phase === PHASE.ROUND_END));
-  show('endscreen', joined && phase === PHASE.MATCH_END);
+  show('endscreen', joined && (phase === PHASE.MATCH_END || st.forceEnd));
   show('leaveBtn', joined && phase !== PHASE.LOBBY);
   if (st.bannerT && now > st.bannerT) { $('banner').classList.remove('show'); st.bannerT = 0; }
   if (!s || now - st.lastHud < 0.08) return;
@@ -968,6 +1013,7 @@ function promptText(s, me) {
 }
 
 $('conn').classList.add('hidden');
+loadMap(-1); // the map drifts behind the title screen and menus
 connect();
 requestAnimationFrame(frame);
 
@@ -1071,8 +1117,8 @@ function revealAll() { if (!st.unseen) return; for (const k of st.unseen) applyK
 const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'pause'];
 function menuOpen() { return OVERLAYS.some(id => !$(id).classList.contains('hidden')); }
 function inMatch() { const p = st.last && st.last.ph; return p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END || p === PHASE.SELECT; }
-function showOps(op) { openOps($('opsPage'), { profile: st.profile, send, op }); }
-function showProfile() { if (st.token) openProfile($('profilePage'), { token: st.token }); }
+function showOps(op) { audio.ui('open'); openOps($('opsPage'), { profile: st.profile, send, op }); }
+function showProfile() { audio.ui('open'); if (st.token) openProfile($('profilePage'), { token: st.token }); }
 // Esc closes whatever is open, otherwise opens/closes the pause menu during a match.
 function escape() {
   for (const id of ['settings', 'opsPage', 'profilePage']) if (!$(id).classList.contains('hidden')) {
@@ -1092,3 +1138,81 @@ $('pEnd').onclick = () => { if (confirm('End the match for everyone and go back 
 $('lobbyOpsBtn').onclick = () => showOps();
 $('lobbyProfBtn').onclick = () => showProfile();
 for (const id of ['opsPage', 'profilePage']) $(id).querySelector('.close').onclick = () => { if (id === 'opsPage') closeOps($(id)); else $(id).classList.add('hidden'); };
+
+// ---------------- title screen, main menu, little touches ----------------
+st.started = false;
+$('splash').addEventListener('click', () => {
+  if (st.started) return;
+  audio.initAudio(); audio.ui('open');
+  st.started = true; updateNav();
+  let saved = ''; try { saved = localStorage.getItem('r62d-name') || ''; } catch {}
+  if (saved) { $('name').value = saved; setTimeout(() => $('joinBtn').click(), 250); } // returning player: straight in
+  else setTimeout(() => $('name').focus(), 300);
+});
+function setTab(tab) {
+  if ((tab === 'ops' || tab === 'profile') && !st.token) { audio.ui('back'); $('name').focus(); tab = 'play'; }
+  if (tab === 'ops') { showOps(); return; }
+  if (tab === 'profile') { showProfile(); return; }
+  if (tab === 'settings') { toggleSettings(); return; }
+  for (const b of $('mnav').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);
+  for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t.id === 'tab-' + tab);
+  if (tab === 'controls') renderControls();
+  updateNav();
+}
+function updateNav() {
+  const on = $('mnav').querySelector('button.on'), ind = $('navInd');
+  if (on) { ind.style.top = on.offsetTop + 8 + 'px'; ind.style.height = (on.offsetHeight - 16) + 'px'; }
+}
+for (const b of $('mnav').querySelectorAll('button')) b.onclick = () => setTab(b.dataset.tab);
+addEventListener('resize', updateNav);
+function updateCard() {
+  const p = st.profile; if (!p) return;
+  const L = levelFor(p.xp || 0);
+  $('pcard').classList.remove('hidden');
+  $('pcName').textContent = p.name; $('pcLevel').textContent = L.level;
+  $('pcXp').style.width = (L.into / L.need * 100) + '%'; $('pcXpText').textContent = `LEVEL ${L.level} · ${L.into} / ${L.need} XP`;
+}
+const TIPS = [
+  'Hold your slow-walk key to move without making footstep noise.',
+  'Broken glass under windows crunches loudly — listen for it.',
+  'Defenders: reinforce the walls of the objective room before the action phase starts.',
+  'Attackers: use your drone in preparation to find the objective before you go in.',
+  'Bullets go through soft walls. If you can hear them, you can shoot them.',
+  'A downed teammate can be revived — hold interact next to them.',
+  'Mark enemies with the middle mouse button or T so your whole team sees them.',
+  'Cameras see a cone: aim them with the mouse and switch with A and D.',
+  'Change your loadout for every operator on the Operators page.',
+  'Smashed barricades leave splinters that crack underfoot.',
+];
+let tipI = Math.floor(Math.random() * TIPS.length);
+const nextTip = () => { const el = $('tip'); el.textContent = TIPS[tipI++ % TIPS.length]; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; };
+nextTip(); setInterval(nextTip, 8000);
+// every button: soft hover tick, click sound and a ripple from where you clicked
+let lastHover = 0;
+document.addEventListener('pointerover', e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b || b.contains(e.relatedTarget)) return;
+  const t = performance.now(); if (t - lastHover > 45) { lastHover = t; audio.ui('hover'); }
+});
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b) return;
+  audio.initAudio();
+  const r = b.getBoundingClientRect(), sp = document.createElement('span');
+  sp.className = 'ripple'; sp.style.left = (e.clientX - r.left) + 'px'; sp.style.top = (e.clientY - r.top) + 'px';
+  b.appendChild(sp); setTimeout(() => sp.remove(), 520);
+  audio.ui(b.classList.contains('close') || b.id === 'setClose' || b.id === 'pResume' ? 'back' : 'click');
+});
+// 3-2-1 before the action phase, then GO
+function countdown(s, phase) {
+  const el = $('countdown'); if (!s) return;
+  if (phase === PHASE.PREP && s.tm <= 3.05 && s.tm > 0) {
+    const n = Math.ceil(s.tm);
+    if (n !== st.cd) { st.cd = n; el.textContent = n; el.className = ''; void el.offsetWidth; el.className = 'go'; audio.ui('count'); }
+  } else if (phase === PHASE.ACTION && st.cd && st.cd !== 'GO') {
+    st.cd = 'GO'; el.textContent = 'GO'; el.className = ''; void el.offsetWidth; el.className = 'go'; audio.ui('go');
+  } else if (phase !== PHASE.PREP && phase !== PHASE.ACTION) st.cd = null;
+}
+// music volume
+try { const v = JSON.parse(localStorage.getItem('r62d-music') || 'null'); if (v !== null) $('volMusic').value = v; } catch {}
+setMusicVolume($('volMusic').value / 100);
+$('volMusic').oninput = () => { setMusicVolume(st.muted ? 0 : $('volMusic').value / 100); try { localStorage.setItem('r62d-music', $('volMusic').value); } catch {} };
+window.__r62d = { st, showEnd, playXp }; // for automated screenshot tests

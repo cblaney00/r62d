@@ -334,11 +334,27 @@ export function play(name, x, y) {
   }
 }
 
+export function getAudio() { return ac && ac.state !== 'closed' && !ac.offline ? { ac, master } : null; }
+
 export function ui(kind = 'click') {
   C = 'ui';
-  const g = out(undefined, undefined, 0.22, 0, 0); if (!g) return;
+  const g = out(undefined, undefined, 0.22, 0, 0.15); if (!g) return;
   const t = ac.currentTime;
-  if (kind === 'hover') tone(g, t, 0.03, 2200, 2200, 'triangle', 0.2);
+  if (kind === 'hover') { tone(g, t, 0.025, 3100, 3000, 'sine', 0.12); noise(g, t, 0.02, 'highpass', 6000, 0.7, 0.05); }
+  else if (kind === 'click') { click(g, t, 3200, 0.35, 0.01); tone(g, t, 0.06, 1500, 1350, 'triangle', 0.35); tone(g, t + 0.01, 0.05, 90, 60, 'sine', 0.4); }
+  else if (kind === 'back') { tone(g, t, 0.07, 1100, 800, 'triangle', 0.3); }
+  else if (kind === 'open') { noise(g, t, 0.22, 'bandpass', 600, 1, 0.3, 0.12, 3500); tone(g, t + 0.15, 0.08, 1800, 1800, 'sine', 0.15); }
+  else if (kind === 'close') { noise(g, t, 0.18, 'bandpass', 3000, 1, 0.25, 0.05, 500); }
+  else if (kind === 'lock') { // operator locked in
+    tone(g, t, 0.12, 140, 55, 'sine', 0.9); click(g, t, 2500, 0.6, 0.02); noise(g, t, 0.35, 'highpass', 4000, 0.6, 0.15, 0.01);
+    for (const [i, f] of [[0, 880], [1, 1320], [2, 1760]]) tone(g, t + 0.05 + i * 0.05, 0.4, f, f, 'sine', 0.12);
+  }
+  else if (kind === 'count') { tone(g, t, 0.12, 880, 880, 'sine', 0.35); tone(g, t, 0.12, 1760, 1760, 'sine', 0.08); }
+  else if (kind === 'go') { tone(g, t, 0.5, 220, 110, 'sawtooth', 0.15); tone(g, t, 0.3, 1320, 1320, 'sine', 0.3); noise(g, t, 0.4, 'lowpass', 600, 0.6, 0.5, 0.005); }
+  else if (kind === 'xp') tone(g, t, 0.03, 2400 + Math.random() * 400, 2400, 'sine', 0.12);
+  else if (kind === 'level') { for (const [i, f] of [[0, 587], [1, 740], [2, 880], [3, 1175]]) tone(g, t + i * 0.09, 0.6, f, f, 'triangle', 0.25); noise(g, t + 0.3, 0.6, 'highpass', 6000, 0.5, 0.15, 0.05); }
+  else if (kind === 'victory') { for (const [i, f] of [[0, 293], [0, 440], [1, 349], [1, 523], [2, 440], [2, 659]]) tone(g, t + i * 0.22, 1.4, f, f, 'sawtooth', 0.07); tone(g, t, 1.2, 73, 73, 'sine', 0.5); }
+  else if (kind === 'defeat') { for (const [i, f] of [[0, 293], [0, 349], [1, 277], [1, 330]]) tone(g, t + i * 0.35, 1.6, f, f * 0.98, 'sawtooth', 0.06); tone(g, t, 1.5, 55, 50, 'sine', 0.5); }
   else if (kind === 'round') { tone(g, t, 0.6, 220, 220, 'sawtooth', 0.12); tone(g, t, 0.6, 330, 330, 'sawtooth', 0.1); noise(g, t, 0.6, 'lowpass', 400, 0.5, 0.3, 0.1); }
   else if (kind === 'hit') tone(g, t, 0.05, 2600, 2400, 'triangle', 0.55);
   else if (kind === 'kill') { tone(g, t, 0.07, 1800, 1800, 'triangle', 0.55); tone(g, t + 0.06, 0.1, 2400, 2400, 'triangle', 0.55); }

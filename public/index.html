@@ -12,34 +12,52 @@
 <body>
 <canvas id="game"></canvas>
 <div id="ui">
+  <!-- Title screen -->
+  <div id="splash" class="screen">
+    <div class="splashLogo"><span>R</span><span>6</span><span>2</span><span>D</span></div>
+    <div class="tag">TACTICAL 5V5 · HARBOR OFFICE</div>
+    <div class="press">CLICK ANYWHERE TO START</div>
+  </div>
+
   <!-- Main menu / lobby -->
-  <div id="lobby" class="screen">
-    <div class="logo"><span>R62D</span><small>TACTICAL 5V5 · QUICK MATCH</small></div>
-    <div id="join">
-      <input id="name" maxlength="16" placeholder="Your name" autocomplete="off">
-      <button id="joinBtn" class="primary">PLAY</button>
-    </div>
-    <div id="room" class="hidden">
-      <div class="squads">
-        <div class="squad" id="sq0"><h3>TEAM ALPHA</h3><ul></ul><div class="row"><button data-bot="0">+ Bot</button><button data-unbot="0">− Bot</button></div></div>
-        <div class="squad" id="sq1"><h3>TEAM BRAVO</h3><ul></ul><div class="row"><button data-bot="1">+ Bot</button><button data-unbot="1">− Bot</button></div></div>
-      </div>
-      <div class="row center">
-        <button id="switchBtn">Switch team</button>
-        <button id="fillBtn">Fill empty slots with bots</button>
-        <button id="startBtn" class="primary">START MATCH</button>
-      </div>
-      <div class="row center">
-        <button id="lobbyOpsBtn">Operators &amp; loadouts</button>
-        <button id="lobbyProfBtn">Profile &amp; match history</button>
-      </div>
-      <p class="hint">Map: <b>Harbor Office</b> · First to 3 rounds · Sides swap every round</p>
-    </div>
-    <div class="controls">
-      <h4>CONTROLS</h4>
-      <div class="grid" id="ctlGrid"></div>
-      <div class="row center"><button id="lobbySetBtn">⚙ Settings &amp; keys</button></div>
-    </div>
+  <div id="lobby" class="screen hidden">
+    <header class="mtop">
+      <div class="mlogo">R62D<small>QUICK MATCH</small></div>
+      <div class="pcard hidden" id="pcard"><div class="lv" id="pcLevel">1</div><div><div class="pn" id="pcName"></div><div class="xpbar"><i id="pcXp"></i></div><div class="pxp" id="pcXpText"></div></div></div>
+    </header>
+    <nav class="mnav" id="mnav">
+      <button data-tab="play" class="on">PLAY</button>
+      <button data-tab="ops">OPERATORS</button>
+      <button data-tab="profile">PROFILE</button>
+      <button data-tab="settings">SETTINGS</button>
+      <button data-tab="controls">CONTROLS</button>
+      <i class="ind" id="navInd"></i>
+    </nav>
+    <main class="mbody">
+      <section class="tab on" id="tab-play">
+        <div id="join" class="joinCard">
+          <h2>WHO ARE YOU?</h2>
+          <p class="hint">Your name is how your friends will see you. Your stats and loadouts are saved to it on this computer.</p>
+          <div class="row"><input id="name" maxlength="16" placeholder="Your name" autocomplete="off"><button id="joinBtn" class="primary">ENTER</button></div>
+        </div>
+        <div id="room" class="hidden">
+          <div class="roomHead"><div><h2>LOBBY</h2><div class="hint">Harbor Office · First to 3 rounds · Sides swap every round</div></div>
+            <button id="startBtn" class="primary big">START MATCH</button></div>
+          <div class="squads">
+            <div class="squad" id="sq0"><h3>TEAM ALPHA</h3><ul></ul><div class="row"><button data-bot="0">+ Bot</button><button data-unbot="0">− Bot</button></div></div>
+            <div class="vs">VS</div>
+            <div class="squad" id="sq1"><h3>TEAM BRAVO</h3><ul></ul><div class="row"><button data-bot="1">+ Bot</button><button data-unbot="1">− Bot</button></div></div>
+          </div>
+          <div class="row center"><button id="switchBtn">Switch team</button><button id="fillBtn">Fill empty slots with bots</button>
+            <button id="lobbyOpsBtn" class="hidden">Operators</button><button id="lobbyProfBtn" class="hidden">Profile</button></div>
+        </div>
+      </section>
+      <section class="tab" id="tab-controls">
+        <div class="controls"><h4>CONTROLS</h4><div class="grid" id="ctlGrid"></div>
+          <div class="row center"><button id="lobbySetBtn">Change keys</button></div></div>
+      </section>
+    </main>
+    <footer class="mfoot"><span class="tipLabel">TIP</span><span id="tip"></span></footer>
   </div>
 
   <!-- Operator select -->
@@ -68,10 +86,19 @@
     <div id="cambar"></div>
     <div id="scoreboard" class="hidden"></div>
   </div>
-  <div id="endscreen" class="hidden"><div class="t"></div><div class="s"></div><div class="board"></div></div>
+  <div id="endscreen" class="hidden">
+    <div class="t"></div><div class="s"></div>
+    <div class="endGrid">
+      <div class="mvp" id="mvp"></div>
+      <div class="mine"><h3>YOUR MATCH</h3><div class="etiles" id="eTiles"></div>
+        <h3>EXPERIENCE</h3><div id="xpLines"></div><div class="xpRow"><div class="lv" id="eLevel">1</div><div class="xpbar big"><i id="eXp"></i></div><div id="eXpText"></div></div></div>
+    </div>
+    <div class="board"></div>
+  </div>
+  <div id="countdown"></div>
   <div id="help" class="hidden"></div>
   <div id="settings" class="hidden"><h2>SETTINGS</h2>
-    <div class="vols"><label>Master volume <input type="range" id="volMaster" min="0" max="100" value="60"></label><label>Effects volume <input type="range" id="volSfx" min="0" max="100" value="100"></label></div>
+    <div class="vols"><label>Master volume <input type="range" id="volMaster" min="0" max="100" value="60"></label><label>Effects volume <input type="range" id="volSfx" min="0" max="100" value="100"></label><label>Music volume <input type="range" id="volMusic" min="0" max="100" value="50"></label></div>
     <p class="hint">Click a key to change it, then press the new key (Esc cancels).</p>
     <div class="tablewrap"><table id="bindTable"></table></div>
     <div class="row center"><button id="setReset">Reset to defaults</button><button id="setClose" class="primary">Done</button></div>

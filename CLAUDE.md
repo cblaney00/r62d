@@ -59,4 +59,5 @@ His wishes so far:
   barricades, destruction, defuser, DBNO, bots, lobby, operator select, HUD, scoreboard.
   **His idea list is `r6-todo.md` — work through it top to bottom, tick items off, keep going.**
   Other ideas are in `docs/roadmap.md`. Sound mix notes: `docs/sound.md`.
+- **Menus/presentation:** title screen (`#splash`, first click starts audio), menu music is composed live in `public/js/music.js`, levels/XP in `shared/progress.js` (awarded in `store.recordMatch`, sent to players as an `xp` message), end screen in `showEnd`/`playXp` (main.js). `window.__r62d` is a hook for screenshot tests (`st.forceEnd` shows the end screen).
 - **Saved data:** `server/store.js` keeps `data/profiles.json` and `data/matches.json` (gitignored; on the machine running the server). Browsers keep a secret login token in localStorage (`r62d-token`). `/api/profile`, `/api/match`, `/api/players` feed the Profile page. Loadouts per operator live in `shared/operators.js` (`LOADOUTS`).
