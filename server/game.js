@@ -1098,7 +1098,7 @@ export class Game {
         }
         case 'decoy': { // runs straight on, turning away from walls
           e.life -= dt; if (e.life <= 0) { this.removeEnt(e); break; }
-          const o = { x: e.x, y: e.y }, sp = 135 * dt;
+          const o = { x: e.x, y: e.y }, sp = BASE_SPEED * dt; // runs like a real attacker
           moveCircle(this.map, o, Math.cos(e.ang) * sp, Math.sin(e.ang) * sp, PLAYER_R);
           if (Math.hypot(o.x - e.x, o.y - e.y) < sp * 0.4) {
             const l = castSight(this.map, e.x, e.y, e.ang - Math.PI / 2, 300, null), r = castSight(this.map, e.x, e.y, e.ang + Math.PI / 2, 300, null);

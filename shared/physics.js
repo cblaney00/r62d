@@ -1,5 +1,5 @@
 // Movement, collision, line of sight and ray casting on the tile grid.
-import { CELL, T, HOLE_R, blocksMove, blocksDrone, blocksSight } from './constants.js';
+import { CELL, PX_PER_M, T, HOLE_R, blocksMove, blocksDrone, blocksSight } from './constants.js';
 
 export function tileAt(map, cx, cy) {
   if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return T.VOID;
@@ -37,8 +37,14 @@ export function moveCircle(map, o, dx, dy, r, drone = false) {
   }
 }
 
-// Movement speed in world px/s
-export const BASE_SPEED = 118; // running is the default, like CS2 (no sprint); slowed from 140 to feel more deliberate
+// Movement speeds, in real metres per second (x PX_PER_M gives world px/s). Based on how fast people
+// and small recon robots actually move indoors:
+//   running (the default, like CS2 — no sprint) is a tactical jog with a gun up, 2.6 m/s for a 2-speed
+//   operator (2.3 heavy, 3.0 light); walking (Shift) 1.4 m/s, a normal walk; aiming down sights 1.5 m/s;
+//   crouch-walking 0.9 m/s; crawling while downed 0.5 m/s; a drone 3.2 m/s, a little quicker than a jog.
+export const M_S = { run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, downed: 0.5, drone: 3.2 };
+export const BASE_SPEED = M_S.run * PX_PER_M;   // ~94 px/s (was 118)
+export const DRONE_SPEED = M_S.drone * PX_PER_M; // ~115 px/s (was 200)
 export const ARMOR_SPEED = { 1: 0.88, 2: 1.0, 3: 1.14 };
 
 // Apply one input step to whatever the player controls. Shared so the client
@@ -50,18 +56,18 @@ export function stepMove(map, o, input, dt, mods) {
   const len = Math.hypot(mx, my);
   if (len > 0) { mx /= len; my /= len; }
   let spd;
-  if (mods.drone) spd = 200;
+  if (mods.drone) spd = DRONE_SPEED;
   else {
     spd = BASE_SPEED * (ARMOR_SPEED[mods.armor] || 1) * (mods.mul || 1);
-    if (mods.downed) spd = 28;
-    else if (input.crouch) spd *= 0.36;   // crouch: slowest, silent, most accurate
-    else if (input.walk) spd *= 0.52;     // walk (Shift): silent
-    else if (input.ads) spd *= 0.58;      // aiming down sights: slow and steady
+    if (mods.downed) spd = M_S.downed * PX_PER_M;
+    else if (input.crouch) spd *= M_S.crouch / M_S.run; // crouch: slowest, silent, most accurate
+    else if (input.walk) spd *= M_S.walk / M_S.run;     // walk (Shift): silent
+    else if (input.ads) spd *= M_S.ads / M_S.run;       // aiming down sights: slow and steady
   }
   // Weight: velocity eases toward where you want to go instead of jumping there.
   o.vx = o.vx || 0; o.vy = o.vy || 0;
   if (mods.frozen) { o.vx = 0; o.vy = 0; return false; }
-  const accel = mods.drone ? 1400 : len > 0 ? 620 : 950;
+  const accel = mods.drone ? 800 : len > 0 ? 500 : 760; // eased down with the slower speeds: same sense of weight
   let dvx = mx * spd - o.vx, dvy = my * spd - o.vy;
   const dl = Math.hypot(dvx, dvy), maxd = accel * dt;
   if (dl > maxd) { dvx *= maxd / dl; dvy *= maxd / dl; }
@@ -70,7 +76,8 @@ export function stepMove(map, o, input, dt, mods) {
   // the legs and the footstep sounds; the body itself glides at a steady speed, like a real person's hips.
   if (!mods.drone) {
     const v = Math.hypot(o.vx, o.vy);
-    const stride = mods.downed ? 13 : v > BASE_SPEED * 0.78 ? 28 : v > BASE_SPEED * 0.42 ? 21 : 16;
+    // real step lengths: ~0.95 m jogging, ~0.7 m walking, ~0.45 m crouched, ~0.35 m crawling
+    const stride = mods.downed ? 13 : v > BASE_SPEED * 0.78 ? 34 : v > BASE_SPEED * 0.42 ? 25 : 16;
     o.gait = (o.gait || 0) + v * dt / stride * Math.PI;
   }
   const bx = o.x, by = o.y;

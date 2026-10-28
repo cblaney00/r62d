@@ -218,7 +218,7 @@ export function drawCorpse(ctx, c) {
 }
 
 export function drawDrone(ctx, d, t, ally) {
-  const spd = d.spd || 0, wheel = d.wheel || 0, lean = Math.min(1, spd / 200);
+  const spd = d.spd || 0, wheel = d.wheel || 0, lean = Math.min(1, spd / 115); // 115 = drone top speed (DRONE_SPEED)
   const rel = (d.mvAng ?? d.ag) - (d.ag || 0);
   ctx.save(); ctx.translate(d.x, d.y);
   if (ally) { ctx.strokeStyle = 'rgba(70,170,255,0.45)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, 7); ctx.stroke(); }

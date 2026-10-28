@@ -2,7 +2,7 @@
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST } from '/shared/map.js';
-import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED } from '/shared/physics.js';
+import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
@@ -997,13 +997,13 @@ function draw(s, view, now, dt) {
     const x = own ? st.pred.x : e.x, y = own ? st.pred.y : e.y;
     const a = anim(e.id), mx = x - (a.dx ?? x), my = y - (a.dy ?? y), dist = Math.hypot(mx, my); a.dx = x; a.dy = y;
     const sp = dist / Math.max(dt, 0.001);
-    a.spd = (a.spd || 0) + (Math.min(240, sp) - (a.spd || 0)) * Math.min(1, dt * 10);
+    a.spd = (a.spd || 0) + (Math.min(DRONE_SPEED * 1.2, sp) - (a.spd || 0)) * Math.min(1, dt * 10);
     a.wheel = (a.wheel || 0) + dist; if (dist > 0.05) a.mvAng = Math.atan2(my, mx);
     // the body turns to face the way it is driving (smoothly, like a little car); parked, it keeps its last heading
     if (a.heading === undefined) a.heading = own ? st.aim : (e.ag || 0);
     if (a.spd > 12 && a.mvAng !== undefined) a.heading += angDiff(a.mvAng, a.heading) * Math.min(1, dt * 10);
-    a.sway = (a.sway || 0) + ((a.spd / 200) * 0.6 - (a.sway || 0)) * Math.min(1, dt * 4);
-    if (a.spd > 110 && Math.random() < dt * 12 && surfaceAt(x, y) !== 'carpet')
+    a.sway = (a.sway || 0) + ((a.spd / DRONE_SPEED) * 0.6 - (a.sway || 0)) * Math.min(1, dt * 4);
+    if (a.spd > DRONE_SPEED * 0.55 && Math.random() < dt * 12 && surfaceAt(x, y) !== 'carpet')
       fx.add({ type: 'smoke', x: x - Math.cos(a.mvAng) * 5, y: y - Math.sin(a.mvAng) * 5, vx: -Math.cos(a.mvAng) * 15, vy: -Math.sin(a.mvAng) * 15, life: 0.5, max: 0.5, size: 1.2, grow: 5, col: '170,160,140', a: 0.25 });
     audio.droneLoop(e.id, x, y, a.spd, own);
     if (e.tm === side || seen(x, y)) drawDrone(ctx, { ...e, x, y, ag: a.heading, wheel: a.wheel, spd: a.spd, mvAng: a.mvAng ?? a.heading, sway: a.sway }, now, e.tm === side);

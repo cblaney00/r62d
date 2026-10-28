@@ -22,6 +22,7 @@ His wishes so far:
   Quick Match only (first to 3 rounds, sides swap every round). Defenders choose the site during operator select.
 - Out of sight = dull grey "remembered" map; shared team vision (teammates, drones, cameras) is live colour; enemy changes out of sight stay hidden until seen (`st.known` vs `st.map` in main.js).
 - Controls are CS2-style (players come from CS2): run default, Shift walk, Ctrl crouch (hold), E use, Q skill, 3 melee, 4 gadget. Walking/crouching are silent to others. Running spreads shots (server `fire`). Mouse is pointer-locked in matches with sensitivity + ADS multiplier settings.
+- Movement uses real-world speeds (`M_S` in shared/physics.js, 1 m = 36 px = `PX_PER_M`): jog 2.6 m/s (2.3 heavy, 3.0 light), walk 1.4, ADS 1.5, crouch 0.9, downed crawl 0.5, drone 3.2. He asked for everything slower and realistic.
 - FOV like a modern FPS (103°, 70° ADS). Zoom adapts: close indoors, wide outside / long sightlines.
 - Abilities all work. Floors are joined by stairs only (no shooting or seeing between floors yet; no hatches).
 - Graphics detailed enough to interest people used to modern games; fills a fullscreen

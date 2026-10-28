@@ -1,6 +1,9 @@
 // Shared numbers and tile rules used by both the server and the browser.
 
 export const CELL = 16;            // world pixels per map cell
+// Real-world scale: a body (20 px across) is ~0.55 m at the shoulders and a 2-cell door ~0.9 m,
+// so 1 metre = 36 world px (a cell is ~0.44 m). Movement speeds are written in m/s and converted.
+export const PX_PER_M = 36;
 export const TICK_RATE = 30;       // server simulation steps per second
 export const SNAP_RATE = 20;       // snapshots sent per second
 export const PLAYER_R = 10;
