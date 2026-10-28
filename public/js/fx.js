@@ -2,10 +2,11 @@
 const MAX = 1400;
 
 export class FX {
-  constructor() { this.parts = []; this.tracers = []; this.lights = []; this.rings = []; this.shake = 0; }
+  constructor() { this.parts = []; this.tracers = []; this.lights = []; this.rings = []; this.shake = 0; this.quality = 1; }
   clear() { this.parts = []; this.tracers = []; this.lights = []; this.rings = []; }
 
-  add(p) { if (this.parts.length < MAX) this.parts.push(p); }
+  // lower graphics quality keeps only a share of the particles
+  add(p) { if (this.parts.length < MAX * this.quality && (this.quality >= 1 || Math.random() < this.quality)) this.parts.push(p); }
 
   tracer(x, y, x2, y2, col = '255,220,150') { this.tracers.push({ x, y, x2, y2, life: 0.07, max: 0.07, col }); }
 
@@ -119,9 +120,9 @@ export class FX {
 }
 
 // Billowing smoke grenade cloud
-export function drawSmoke(ctx, s, t) {
+export function drawSmoke(ctx, s, t, puffs = 22) {
   const fade = Math.min(1, s.l / 2) * Math.min(1, (12 - s.l) * 2 + 0.2);
-  for (let i = 0; i < 22; i++) {
+  for (let i = 0; i < puffs; i++) {
     const a = i * 2.4 + t * 0.15 * (i % 2 ? 1 : -1), d = (i % 5) / 5 * s.r * 0.75;
     const x = s.x + Math.cos(a) * d, y = s.y + Math.sin(a) * d, r = s.r * (0.38 + (i % 3) * 0.08);
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);

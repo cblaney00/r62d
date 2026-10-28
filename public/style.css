@@ -6,6 +6,10 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #050607; color: var(--text); font-family: var(--body); user-select: none; }
 canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: none; }
+#mapLayer { position: fixed; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
+canvas#fog, canvas#over, #vignette { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; }
+canvas#fog { visibility: hidden; }
+#vignette { background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.5) 100%); }
 #ui { position: fixed; inset: 0; pointer-events: none; }
 #ui .screen, #ui button, #ui input, #corner { pointer-events: auto; }
 .hidden { display: none !important; }
@@ -136,6 +140,13 @@ tr.me { color: var(--gold); } tr.dead { opacity: 0.5; }
 #settings .vols { display: flex; gap: 30px; font: 600 15px var(--head); letter-spacing: 0.08em; }
 #settings .vols input { width: 180px; vertical-align: middle; padding: 0; }
 #settings .tablewrap { overflow: auto; }
+#settings .gfx { align-items: center; }
+#settings .gfx button { padding: 4px 12px; font-size: 14px; }
+#settings .tog { min-width: 64px; }
+#settings .tog.on, #settings .seg button.on { background: var(--gold); color: #000; border-color: var(--gold); }
+#settings .seg { display: inline-flex; gap: 0; margin-left: 8px; }
+#settings .seg button { border-radius: 0; margin: 0; }
+#settings .tog:disabled { opacity: 0.6; cursor: default; }
 #settings td { padding: 3px 8px; font-size: 15px; }
 #settings td button { width: 130px; padding: 4px 8px; font-size: 14px; }
 #settings td button.wait { background: var(--gold); color: #000; }

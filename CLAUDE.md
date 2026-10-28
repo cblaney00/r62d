@@ -46,9 +46,16 @@ His wishes so far:
     `server/bots.js` — bots (A* pathing, fighting, plant/defuse, site fortifying).
   - `public/` — `index.html`, `style.css`, `js/main.js` (network, prediction of your own
     movement, camera, vision blackout, HUD, menus), `js/mapdraw.js` (map pre-rendered to a
-    big off-screen canvas with procedural textures; only changed cells are redrawn),
+    big off-screen canvas with procedural textures; only changed cells are redrawn; shown as
+    1024px tile canvases inside `#mapLayer` that the browser moves/scales with a CSS transform),
     `js/textures.js`, `js/sprites.js` (operators/gadgets drawn in code), `js/fx.js`
     (particles/explosions/smoke), `js/audio.js` (all sounds synthesised, no files).
+- **Rendering & speed:** layers bottom to top: `#mapLayer` (map tiles, CSS transform), `#game` (people,
+  gadgets, effects), `#fog` (line-of-sight blackout drawn small, stretched by the browser), `#over` (markers,
+  crosshair, screen effects), `#vignette` (CSS). Graphics quality presets (`GFX` in main.js: Low/Medium/High/Ultra,
+  saved per computer in localStorage `r62d-gfx`) set render scale, fog resolution, particles, smoke puffs, sight
+  rays and sprite shading. `window.__r62d.PF` holds per-section frame timings (ms, summed; divide by `frames`).
+  Measured 1600×900 headless: Low 3.7 ms, High 7.3 ms, Ultra 11.3 ms per frame (was 19.7 before the layers).
 - **Networking:** server ticks at 30/s, sends a JSON snapshot to everyone 20/s. Clients send
   input every frame; server applies movement per input message (with its dt) and echoes the
   last sequence number, client replays unacknowledged inputs (prediction + reconciliation).

@@ -6,7 +6,7 @@ import { stepMove, castSight, canSee, facingCell, angDiff } from '/shared/physic
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam } from '/shared/operators.js';
 import { MapRenderer } from './mapdraw.js';
 import { S } from './textures.js';
-import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait } from './sprites.js';
+import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading } from './sprites.js';
 import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
 import { openOps, closeOps, updateOpsProfile } from './ops.js';
@@ -19,15 +19,38 @@ import { walkRay, tileAt } from '/shared/physics.js';
 import { blocksSight, FL } from '/shared/constants.js';
 
 const $ = id => document.getElementById(id);
-const cv = $('game'), ctx = cv.getContext('2d');
-const fog = document.createElement('canvas'), fctx = fog.getContext('2d');
+// Stacked layers: the map (moved and scaled by the browser, see MapRenderer.mount), the people and effects, the line-of-sight blackout (drawn small and stretched by
+// the browser for free) and markers/crosshair on top. 'ctx' points at whichever is being drawn.
+const cv = $('game'), ctx0 = cv.getContext('2d'), mapLayer = $('mapLayer');
+let ctx = ctx0;
+const fog = $('fog'), fctx = fog.getContext('2d');
+const over = $('over'), octx = over.getContext('2d');
 let DPR = 1, VW = 0, VH = 0;
+
+// Graphics quality (saved per computer): how many pixels get drawn and how many extras are added.
+const GFX = {
+  low:    { scale: 0.6,  fog: 0.3,  parts: 0.35, smoke: 7,  shade: false, rays: 0.5 },
+  medium: { scale: 0.8,  fog: 0.4,  parts: 0.6,  smoke: 11, shade: true, rays: 0.7 },
+  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1 },
+  ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2 },
+};
+let gfxName = (() => { try { return localStorage.getItem('r62d-gfx') || 'high'; } catch { return 'high'; } })();
+if (!GFX[gfxName]) gfxName = 'high';
+let gq = GFX[gfxName];
 function resize() {
-  DPR = Math.min(window.devicePixelRatio || 1, 1.5);
-  VW = cv.width = Math.round(innerWidth * DPR); VH = cv.height = Math.round(innerHeight * DPR);
-  fog.width = Math.ceil(VW / 2); fog.height = Math.ceil(VH / 2);
+  const oldW = VW || 1, oldH = VH || 1;
+  DPR = Math.min(2, Math.min(window.devicePixelRatio || 1, 1.5) * gq.scale);
+  VW = cv.width = over.width = Math.round(innerWidth * DPR); VH = cv.height = over.height = Math.round(innerHeight * DPR);
+  fog.width = Math.ceil(VW * gq.fog); fog.height = Math.ceil(VH * gq.fog);
+  mouse.x *= VW / oldW; mouse.y *= VH / oldH;
 }
-addEventListener('resize', resize); resize();
+function setGfx(name) {
+  if (!GFX[name]) return;
+  gfxName = name; gq = GFX[name];
+  try { localStorage.setItem('r62d-gfx', name); } catch {}
+  fx.quality = gq.parts; setShading(gq.shade);
+  resize(); renderGfx();
+}
 
 // ---------------- state ----------------
 const st = {
@@ -40,6 +63,8 @@ const st = {
 const fx = new FX();
 const keys = new Set();
 const mouse = { x: 0, y: 0, l: false, r: false, wl: 0, wr: 0 };
+addEventListener('resize', resize); resize();
+fx.quality = gq.parts; setShading(gq.shade);
 
 // ---------------- network ----------------
 function connect() {
@@ -73,7 +98,7 @@ function loadMap(mv, tiles, hp) {
   // broken glass lies in and just around every window; splinters appear where barricades get smashed
   st.glass = new Set(); st.splinters = new Set();
   for (const o of st.map.openings) if (o.kind === 'window') for (const k of o.cells) for (const d of [0, 1, -1, st.map.W, -st.map.W]) st.glass.add(k + d);
-  st.rend = new MapRenderer(st.known, st.base);
+  st.rend = new MapRenderer(st.known, st.base); st.rend.mount(mapLayer);
   st.rend.splinters = st.splinters;
   st.corpses = []; fx.clear(); st.pending = [];
 }
@@ -253,6 +278,19 @@ function renderSettings() {
   for (const b of $('bindTable').querySelectorAll('button')) b.onclick = () => { rebinding = { id: b.dataset.id, slot: +b.dataset.slot }; renderSettings(); };
 }
 $('setReset').onclick = () => { resetBinds(); renderSettings(); };
+// graphics: fullscreen switch + quality presets
+const GFX_HINT = { low: 'Low — for weak computers: fewer pixels, fewer particles, flat lighting.', medium: 'Medium — a little softer picture, runs well on most computers.', high: 'High — full sharpness. Recommended.', ultra: 'Ultra — extra-sharp, smoothest edges and most effects. Needs a strong computer.' };
+function renderGfx() {
+  for (const b of $('gfxSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.q === gfxName);
+  const app = new URLSearchParams(location.search).has('app'), on = app || !!document.fullscreenElement;
+  const t = $('fsToggle'); t.textContent = on ? 'ON' : 'OFF'; t.classList.toggle('on', on); t.disabled = app;
+  t.title = app ? 'The desktop app always runs full screen' : '';
+  $('gfxHint').textContent = GFX_HINT[gfxName] + (app ? '  (The desktop app is always full screen.)' : '');
+}
+for (const b of $('gfxSeg').querySelectorAll('button')) b.onclick = () => { audio.ui(); setGfx(b.dataset.q); };
+$('fsToggle').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); };
+document.addEventListener('fullscreenchange', renderGfx);
+renderGfx();
 $('setClose').onclick = () => toggleSettings();
 $('setBtn').onclick = () => toggleSettings();
 $('lobbySetBtn').onclick = () => toggleSettings();
@@ -435,6 +473,7 @@ function frame(nowMs) {
   const now = nowMs / 1000;
   const s = st.last;
   const T0 = performance.now(); PF.frames++;
+  if (overDirty) { octx.setTransform(1, 0, 0, 1, 0, 0); octx.clearRect(0, 0, VW, VH); overDirty = false; }
   fx.update(dt);
   if (!st.map) { ctx.fillStyle = '#050607'; ctx.fillRect(0, 0, VW, VH); return; }
   const phase = s ? s.ph : PHASE.LOBBY;
@@ -513,8 +552,10 @@ function frame(nowMs) {
   st.viewers = teamViewers(s, view, me, inGame);
   revealSeen(); t1 = pfa('viewers', t1);
   bodySounds(me, dt);
-  draw(s, view, now, dt); pfa('total', T0);
+  draw(s, view, now, dt); ctx = ctx0; pfa('total', T0);
 }
+let overDirty = false, fogShown = false;
+function showFog(on) { if (on !== fogShown) { fogShown = on; fog.style.visibility = on ? 'visible' : 'hidden'; } }
 const PF = { frames: 0 }; function pfa(k, t) { const n = performance.now(); PF[k] = (PF[k] || 0) + n - t; return n; }
 
 function screenToWorld(sx, sy) { const z = st.zoom || 1; return { x: (sx - VW / 2) / z + st.cam.x, y: (sy - VH / 2) / z + st.cam.y }; }
@@ -648,7 +689,7 @@ function playerFoley(p, a, moved, own, dt) {
 function visionPolygon(v, sm, rays = 0) {
   const pts = [];
   const full = v.fov >= Math.PI * 2 - 0.01;
-  const n = rays || (full ? 360 : 300);
+  const n = rays || Math.round((full ? 360 : 300) * gq.rays);
   if (!full) pts.push(v.x, v.y);
   for (let i = 0; i <= n; i++) {
     const a = v.ang - v.fov / 2 + v.fov * i / n;
@@ -673,18 +714,17 @@ function draw(s, view, now, dt) {
   const shake = fx.shake;
   const ox = VW / 2 - st.cam.x * z + (Math.random() - 0.5) * shake * DPR, oy = VH / 2 - st.cam.y * z + (Math.random() - 0.5) * shake * DPR;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, VH);
+  ctx.clearRect(0, 0, VW, VH);
   ctx.setTransform(z, 0, 0, z, ox, oy);
   ctx.imageSmoothingEnabled = true;
-  // visible window of the map picture
+  // the map layer: copy over any changed spots, then let the browser place and scale it
+  st.rend.flush();
+  mapLayer.style.transform = `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / (S * DPR)})`;
+  // visible window of the map (for the grey remembered copy)
   const wx0 = Math.max(0, st.cam.x - VW / 2 / z - 20), wy0 = Math.max(0, st.cam.y - VH / 2 / z - 20);
   const wx1 = Math.min(m.W * CELL, st.cam.x + VW / 2 / z + 20), wy1 = Math.min(m.H * CELL, st.cam.y + VH / 2 / z + 20);
-  if (wx1 > wx0 && wy1 > wy0) {
-    ctx.drawImage(st.rend.c, wx0 * S, wy0 * S, (wx1 - wx0) * S, (wy1 - wy0) * S, wx0, wy0, wx1 - wx0, wy1 - wy0);
-    ctx.drawImage(st.rend.decal, wx0, wy0, wx1 - wx0, wy1 - wy0, wx0, wy0, wx1 - wx0, wy1 - wy0);
-  }
   tq = pfa('mapblit', tq);
-  if (!s) return;
+  if (!s) { showFog(false); return; }
   const me = st.me, side = me ? me.tm : null;
   const inGame = s.ph === PHASE.PREP || s.ph === PHASE.ACTION || s.ph === PHASE.ROUND_END;
   const sm = smokes(s);
@@ -756,15 +796,17 @@ function draw(s, view, now, dt) {
   }
   audio.pruneLoops(); tq = pfa('actors', tq);
   fx.draw(ctx);
-  for (const e of ents) if (e.ty === 'smoke') drawSmoke(ctx, e, now);
+  for (const e of ents) if (e.ty === 'smoke') drawSmoke(ctx, e, now, gq.smoke);
   fx.drawLights(ctx); tq = pfa('fx', tq);
 
   // --- line-of-sight blackout ---
+  showFog(!!(view && inGame));
   if (view && inGame) {
+    const fk = fog.width / VW;
     fctx.setTransform(1, 0, 0, 1, 0, 0);
     fctx.globalCompositeOperation = 'source-over';
     fctx.fillStyle = '#000'; fctx.fillRect(0, 0, fog.width, fog.height);
-    fctx.setTransform(z / 2, 0, 0, z / 2, ox / 2, oy / 2);
+    fctx.setTransform(z * fk, 0, 0, z * fk, ox * fk, oy * fk);
     // the dull grey remembered map
     const G = st.rend.G;
     if (wx1 > wx0 && wy1 > wy0) fctx.drawImage(st.rend.grey, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
@@ -776,10 +818,10 @@ function draw(s, view, now, dt) {
       fctx.fillStyle = '#000'; fillPoly(fctx, visionPolygon(v, sm, v === view ? 0 : 140));
     }
     fctx.globalCompositeOperation = 'source-over';
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(fog, 0, 0, VW, VH);
-    ctx.setTransform(z, 0, 0, z, ox, oy);
   }
+  // everything from here on goes on the top layer, above the blackout
+  ctx = octx; overDirty = true;
+  ctx.setTransform(z, 0, 0, z, ox, oy);
 
   tq = pfa('fog', tq);
   // --- markers drawn above the blackout ---
@@ -829,9 +871,6 @@ function draw(s, view, now, dt) {
   tq = pfa('markers', tq);
   // --- screen-space effects ---
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const vg = ctx.createRadialGradient(VW / 2, VH / 2, VH * 0.45, VW / 2, VH / 2, VH * 0.95);
-  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.5)');
-  ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
   if (view && view.kind === 'drone') droneOverlay(now, ents);
   if (view && view.kind === 'cam') camOverlay(view, now);
   if (me && me.a && me.sc) { ctx.fillStyle = 'rgba(70,90,255,0.12)'; ctx.fillRect(0, 0, VW, VH); }

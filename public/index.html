@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<canvas id="game"></canvas>
+<div id="mapLayer"></div><canvas id="game"></canvas><canvas id="fog"></canvas><canvas id="over"></canvas><div id="vignette"></div>
 <div id="ui">
   <!-- Title screen -->
   <div id="splash" class="screen">
@@ -105,6 +105,9 @@
     <div class="vols"><label>Master volume <input type="range" id="volMaster" min="0" max="100" value="60"></label><label>Effects volume <input type="range" id="volSfx" min="0" max="100" value="100"></label><label>Music volume <input type="range" id="volMusic" min="0" max="100" value="50"></label></div>
     <div class="vols"><label>Mouse sensitivity <input type="range" id="sens" min="20" max="300" value="100"> <b id="sensVal">1.00</b></label>
       <label>Aim-down-sights sensitivity <input type="range" id="adsSens" min="20" max="100" value="60"> <b id="adsSensVal">0.60×</b></label></div>
+    <div class="vols gfx"><label>Fullscreen <button id="fsToggle" class="tog">ON</button></label>
+      <label>Graphics quality <span class="seg" id="gfxSeg"><button data-q="low">Low</button><button data-q="medium">Medium</button><button data-q="high">High</button><button data-q="ultra">Ultra</button></span></label></div>
+    <p class="hint" id="gfxHint"></p>
     <p class="hint">Click a key to change it, then press the new key (Esc cancels).</p>
     <div class="tablewrap"><table id="bindTable"></table></div>
     <div class="row center"><button id="setReset">Reset to defaults</button><button id="setClose" class="primary">Done</button></div>

@@ -11,9 +11,8 @@ export class MapRenderer {
     this.map = map; this.base = baseTiles;
     this.Wp = map.W * CELL; this.Hp = map.H * CELL;
     this.c = canvas(this.Wp * S, this.Hp * S);
-    this.decal = canvas(this.Wp, this.Hp);
     this.ctx = this.c.getContext('2d'); this.ctx.scale(S, S);
-    this.dctx = this.decal.getContext('2d');
+    this.dctx = this.ctx; // blood and scorch marks are painted straight onto the floor
     this.pat = floorPatterns(this.ctx);
     // a dull grey copy used for the parts of the map your team can't currently see
     this.G = 1.5;
@@ -117,11 +116,44 @@ export class MapRenderer {
       if (SOLID.has(t) || t === T.DSHIELD) this.wall(x, y, k, t);
     }
     ctx.restore();
+    this.mark(X, Y, X + Wd, Y + Hd);
     const G = this.G, gx = this.gctx;
     gx.filter = 'grayscale(1) brightness(0.42) contrast(1.15)';
     gx.clearRect(X * G, Y * G, Wd * G, Hd * G);
     gx.drawImage(this.c, X * S, Y * S, Wd * S, Hd * S, X * G, Y * G, Wd * G, Hd * G);
     gx.filter = 'none';
+  }
+
+  // The map is shown by the browser itself as a stack of tiles that it moves and scales on the
+  // graphics card, so the game never copies the whole picture each frame. Changed spots are
+  // copied into the tiles once per frame (flush).
+  mount(el) {
+    el.textContent = '';
+    const TS = 1024, W = this.c.width, H = this.c.height;
+    this.tiles = [];
+    for (let y = 0; y < H; y += TS) for (let x = 0; x < W; x += TS) {
+      const w = Math.min(TS + 2, W - x), h = Math.min(TS + 2, H - y); // 2px overlap hides seams
+      const c = canvas(w, h); c.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+      el.appendChild(c); this.tiles.push({ c, x, y, w, h, ctx: c.getContext('2d') });
+    }
+    this.dirty = [[0, 0, W, H]];
+    this.flush();
+  }
+  mark(x0, y0, x1, y1) { // world pixels
+    const r = [Math.floor(x0 * S), Math.floor(y0 * S), Math.ceil(x1 * S), Math.ceil(y1 * S)];
+    if (!this.dirty) this.dirty = [];
+    if (this.dirty.length < 24) this.dirty.push(r);
+    else { const d = this.dirty[23]; this.dirty[23] = [Math.min(d[0], r[0]), Math.min(d[1], r[1]), Math.max(d[2], r[2]), Math.max(d[3], r[3])]; }
+  }
+  flush() {
+    if (!this.dirty || !this.tiles) return;
+    for (const d of this.dirty) for (const t of this.tiles) {
+      const x0 = Math.max(t.x, d[0]), y0 = Math.max(t.y, d[1]), x1 = Math.min(t.x + t.w, d[2]), y1 = Math.min(t.y + t.h, d[3]);
+      if (x1 <= x0 || y1 <= y0) continue;
+      t.ctx.clearRect(x0 - t.x, y0 - t.y, x1 - x0, y1 - y0);
+      t.ctx.drawImage(this.c, x0, y0, x1 - x0, y1 - y0, x0 - t.x, y0 - t.y, x1 - x0, y1 - y0);
+    }
+    this.dirty = null;
   }
 
   cellChanged(k) { const x = k % this.map.W, y = Math.floor(k / this.map.W); this.region(x - 1, y - 1, x + 1, y + 1); }
@@ -244,7 +276,7 @@ export class MapRenderer {
 
   // ---- decals (blood, scorch marks) ----
   blood(x, y, ang) {
-    const d = this.dctx;
+    const d = this.dctx; this.mark(x - 13, y - 13, x + 13, y + 13);
     for (let i = 0; i < 7; i++) {
       const r = Math.random() * 10, a = ang + (Math.random() - 0.5) * 0.9;
       d.fillStyle = `rgba(${90 + Math.random() * 40},8,8,${0.35 + Math.random() * 0.35})`;
@@ -252,17 +284,19 @@ export class MapRenderer {
     }
   }
   pool(x, y) {
+    this.mark(x - 15, y - 15, x + 15, y + 15);
     const d = this.dctx, g = d.createRadialGradient(x, y, 0, x, y, 14);
     g.addColorStop(0, 'rgba(110,8,8,0.75)'); g.addColorStop(0.7, 'rgba(90,5,5,0.55)'); g.addColorStop(1, 'rgba(80,5,5,0)');
     d.fillStyle = g; d.beginPath(); d.ellipse(x, y, 14, 11, Math.random() * 3, 0, 7); d.fill();
   }
   scorch(x, y, r) {
+    this.mark(x - r, y - r, x + r, y + r);
     const d = this.dctx, g = d.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, 'rgba(15,12,10,0.7)'); g.addColorStop(0.6, 'rgba(20,16,12,0.35)'); g.addColorStop(1, 'rgba(0,0,0,0)');
     d.fillStyle = g; d.fillRect(x - r, y - r, r * 2, r * 2);
   }
   hole(x, y) {
-    const d = this.dctx;
+    const d = this.dctx; this.mark(x - 2, y - 2, x + 2, y + 2);
     d.fillStyle = 'rgba(20,20,20,0.7)'; d.beginPath(); d.arc(x, y, 0.8, 0, 7); d.fill();
   }
 }

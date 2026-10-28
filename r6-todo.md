@@ -6,9 +6,6 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-- [ ] Realistic footsteps (the current ones sound tacky).
-- [ ] Speed: the game is slow and laggy — make it smooth.
-- [ ] Graphics settings: Fullscreen on/off and one quality choice (Low / Medium / High / Ultra).
 - [ ] Crosshair settings: players adjust their own crosshair (shape, size, gap, colour…).
 - [ ] Armory: a place to try out and inspect every gun.
 - [ ] Defenders set up their site like in R6 (more fortifying options during prep).
@@ -18,6 +15,9 @@ New ideas from him get added to the bottom of **To do**.
 
 ## Done
 
+- [x] Realistic footsteps: heel + toe strikes ringing each floor material, sole scuff, crunch grains on gravel/grass/glass.
+- [x] Speed: map drawn by the browser as moving tiles, blackout and markers on their own layers — frame time 20 ms → 7 ms.
+- [x] Graphics settings: Fullscreen on/off and one quality choice (Low / Medium / High / Ultra).
 - [x] R6 aiming: headshots one-tap, ADS accurate even moving (with aim-in time per weapon), recoil you pull against,
       damage drop-off. Peeker's advantage like R6: server judges shots by what the shooter saw (~125 ms + ping).
 - [x] Chat: Y opens team chat, / switches team ⇄ all, Enter sends, Esc closes.

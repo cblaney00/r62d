@@ -21,6 +21,11 @@ Targets and measured results (2026-10-28):
 | Heartbeat / hit marker | -26 / -26 | -31.3 / -25.5 |
 
 Footsteps are deliberately loud enough to locate enemies — the game is built around hearing them.
+Footsteps are pre-built recordings (6 per surface and pace, never the same twice in a row), synthesised
+in `buildStep`: heel then ball-of-foot contact pulses ring the floor's resonant modes (`SURF[...].modes`),
+a filtered sole slap, a scuff, and grain layers (gravel, grit, grass, glass, wood cracks, carpet fuzz).
+They are levelled by loudness, then by `SURF[...].v` and MIX.steps (re-measured 2026-10-28: enemy run
+-24…-30 dB by surface, own run -32, own walk -44).
 Each footstep plays exactly when the walk cycle plants a foot (`gait` in shared/physics.js).
 Surfaces: wood, tile, marble, carpet, concrete, asphalt, grass, metal (server room), rubble,
 glass (around windows), splinters (where a barricade was smashed).

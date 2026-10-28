@@ -19,7 +19,10 @@ function limb(ctx, pts, w, col) { // outlined, two-segment limb
   ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = w * 0.35;
   ctx.beginPath(); ctx.moveTo(pts[0] + LX * w * 0.25, pts[1] + LY * w * 0.25); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i] + LX * w * 0.25, pts[i + 1] + LY * w * 0.25); ctx.stroke();
 }
+let SHADE = true; // off on Low graphics: flat colours instead of per-part lighting
+export function setShading(on) { SHADE = on; }
 function shaded(ctx, x, y, r, col) { // radial shading lit from the top-left
+  if (!SHADE) return col;
   const g = ctx.createRadialGradient(x + LX * r * 0.45, y + LY * r * 0.45, r * 0.1, x, y, r * 1.15);
   g.addColorStop(0, shade(col, 1.5)); g.addColorStop(0.55, col); g.addColorStop(1, shade(col, 0.68));
   return g;
