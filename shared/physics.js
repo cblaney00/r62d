@@ -138,6 +138,21 @@ export function canSee(map, v, px, py, smokes) {
   return los(map, v.x, v.y, px, py, smokes);
 }
 
+// The first non-floor cell a player is facing (used for reinforcing, barricading, placing charges).
+export function facingCell(map, px, py, aim, reach) {
+  for (let d = 4; d <= reach; d += 3) {
+    for (const off of [0, -0.35, 0.35]) {
+      const x = px + Math.cos(aim + off) * d, y = py + Math.sin(aim + off) * d;
+      const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+      const t = tileAt(map, cx, cy);
+      if (t === T.FLOOR || t === T.GROUND || t === T.LOW) continue;
+      if (off !== 0 && t === T.HARD) continue;
+      return { k: cy * map.W + cx, t, cx, cy };
+    }
+  }
+  return null;
+}
+
 export function rayCircle(x0, y0, dx, dy, cx, cy, r) {
   const fx = x0 - cx, fy = y0 - cy;
   const b = fx * dx + fy * dy, c = fx * fx + fy * fy - r * r;

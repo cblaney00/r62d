@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R62D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui">
+  <!-- Main menu / lobby -->
+  <div id="lobby" class="screen">
+    <div class="logo"><span>R62D</span><small>TACTICAL 5V5 · QUICK MATCH</small></div>
+    <div id="join">
+      <input id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+      <button id="joinBtn" class="primary">PLAY</button>
+    </div>
+    <div id="room" class="hidden">
+      <div class="squads">
+        <div class="squad" id="sq0"><h3>TEAM ALPHA</h3><ul></ul><div class="row"><button data-bot="0">+ Bot</button><button data-unbot="0">− Bot</button></div></div>
+        <div class="squad" id="sq1"><h3>TEAM BRAVO</h3><ul></ul><div class="row"><button data-bot="1">+ Bot</button><button data-unbot="1">− Bot</button></div></div>
+      </div>
+      <div class="row center">
+        <button id="switchBtn">Switch team</button>
+        <button id="fillBtn">Fill empty slots with bots</button>
+        <button id="startBtn" class="primary">START MATCH</button>
+      </div>
+      <p class="hint">Map: <b>Harbor Office</b> · First to 3 rounds · Sides swap every round</p>
+    </div>
+    <div class="controls">
+      <h4>CONTROLS</h4>
+      <div class="grid">
+        <span>WASD</span>Move <span>Mouse</span>Aim <span>Left click</span>Shoot <span>Right click</span>Aim down sights
+        <span>Shift</span>Sprint <span>C</span>Crouch <span>R</span>Reload <span>1 / 2 · Wheel</span>Switch weapon
+        <span>E (hold)</span>Interact: reinforce, barricade, plant, defuse, revive
+        <span>Z or Q</span>Operator ability <span>G</span>Secondary gadget <span>V or F</span>Melee
+        <span>5</span>Drone (attack) / Cameras (defence) <span>Tab</span>Scoreboard <span>H</span>Show controls
+      </div>
+    </div>
+  </div>
+
+  <!-- Operator select -->
+  <div id="select" class="screen hidden">
+    <div class="selhead"><div><div id="selSide"></div><div id="selInfo"></div></div><div id="selTime"></div></div>
+    <div id="opgrid"></div>
+    <div id="picks"></div>
+  </div>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden">
+    <div id="topbar">
+      <div class="icons" id="tiL"></div><div class="sc" id="scL">0</div>
+      <div id="clock"><div id="phase"></div><div id="time"></div><div id="roundNo"></div></div>
+      <div class="sc enemy" id="scR">0</div><div class="icons" id="tiR"></div>
+    </div>
+    <div id="objective"></div>
+    <div id="killfeed"></div>
+    <div id="feed"></div>
+    <div id="bl"><div id="opname"></div><div id="hpwrap"><div id="hpnum"></div><div id="hpbar"><i></i></div></div><div id="status"></div></div>
+    <div id="br"><div id="gadgets"></div><div id="wname"></div><div id="ammo"><b id="mag"></b><span id="res"></span></div></div>
+    <div id="prompt"></div>
+    <div id="progress"><div class="label"></div><div class="bar"><i></i></div></div>
+    <div id="banner"><div class="t"></div><div class="s"></div></div>
+    <div id="viewlabel"></div>
+    <div id="scoreboard" class="hidden"></div>
+  </div>
+  <div id="endscreen" class="hidden"><div class="t"></div><div class="s"></div><div class="board"></div></div>
+  <div id="help" class="hidden"></div>
+  <div id="corner"><button id="fsBtn" title="Fullscreen">⛶ Fullscreen</button><button id="muteBtn">🔊</button><button id="leaveBtn" class="hidden">End match</button></div>
+  <div id="conn" class="hidden">Connecting…</div>
+</div>
+<script type="module" src="/js/main.js"></script>
+</body>
+</html>

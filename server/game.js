@@ -2,7 +2,7 @@
 import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
 import { buildMap, roomAt } from '../shared/map.js';
-import { stepMove, walkRay, rayCircle, los, tileAt, angDiff, castSight } from '../shared/physics.js';
+import { stepMove, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
 
@@ -13,6 +13,9 @@ const r2 = v => Math.round(v * 100) / 100;
 const BOT_NAMES = ['Viper', 'Moss', 'Rook-7', 'Static', 'Juno', 'Kilo', 'Brine', 'Ozone', 'Pike', 'Wick', 'Saber', 'Flint'];
 const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, sprint: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
 const JAM_R = 90;
+
+// R62D_FAST=1 shortens the menus, for quick testing.
+if (typeof process !== 'undefined' && process.env.R62D_FAST) { DUR.select = 3; DUR.prep = 6; }
 
 export class Game {
   constructor() {
@@ -544,19 +547,7 @@ export class Game {
     } else if (b.k === 'barricade') this.barricade(this.map.openId[b.cell], T.BARRI);
   }
 
-  facingCell(p, reach) {
-    for (let d = 4; d <= reach; d += 3) {
-      for (const off of [0, -0.35, 0.35]) {
-        const x = p.x + Math.cos(p.aim + off) * d, y = p.y + Math.sin(p.aim + off) * d;
-        const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
-        const t = tileAt(this.map, cx, cy);
-        if (t === T.FLOOR || t === T.GROUND || t === T.LOW) continue;
-        if (off !== 0 && t === T.HARD) continue;
-        return { k: cy * this.map.W + cx, t, cx, cy };
-      }
-    }
-    return null;
-  }
+  facingCell(p, reach) { return facingCell(this.map, p.x, p.y, p.aim, reach); }
 
   reinforceWall(k) {
     const m = this.map, W = m.W, x = k % W, y = Math.floor(k / W);

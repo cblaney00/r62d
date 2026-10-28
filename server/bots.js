@@ -111,13 +111,14 @@ export function botThink(game, p, dt) {
   // --- fight ---
   const enemy = p.downed ? null : visibleEnemy(game, p);
   if (enemy) {
-    if (ai.seen !== enemy.id) { ai.seen = enemy.id; ai.react = 0; ai.err = (Math.random() - 0.5) * 0.5; }
-    ai.react += dt; ai.err *= Math.exp(-dt * 2.5);
+    if (ai.seen !== enemy.id) { ai.seen = enemy.id; ai.react = -Math.random() * 0.35; ai.err = (Math.random() < 0.5 ? -1 : 1) * (0.25 + Math.random() * 0.35); }
+    ai.react += dt; ai.err *= Math.exp(-dt * 1.3);
+    ai.err += (Math.random() - 0.5) * dt * 0.6; // hands are never perfectly steady
     const want = Math.atan2(enemy.y - p.y, enemy.x - p.x) + ai.err;
     p.aim += Math.max(-dt * 7, Math.min(dt * 7, angDiff(want, p.aim)));
     inp.ads = 1;
     if (gun && gun.ammo === 0) game.startReload(p);
-    else if (ai.react > 0.4 && Math.abs(angDiff(want, p.aim)) < 0.15) {
+    else if (ai.react > 0.55 && Math.abs(angDiff(want, p.aim)) < 0.2) {
       const w = gun && WEAPONS[gun.w];
       inp.fire = w && !w.auto ? (ai.semi = !ai.semi) ? 1 : 0 : 1;
     }
