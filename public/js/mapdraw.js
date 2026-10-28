@@ -15,6 +15,10 @@ export class MapRenderer {
     this.ctx = this.c.getContext('2d'); this.ctx.scale(S, S);
     this.dctx = this.decal.getContext('2d');
     this.pat = floorPatterns(this.ctx);
+    // a dull grey copy used for the parts of the map your team can't currently see
+    this.G = 1.5;
+    this.grey = canvas(Math.ceil(this.Wp * this.G), Math.ceil(this.Hp * this.G));
+    this.gctx = this.grey.getContext('2d');
     this.region(0, 0, map.W - 1, map.H - 1);
   }
 
@@ -104,6 +108,11 @@ export class MapRenderer {
       if (SOLID.has(t) || t === T.DSHIELD) this.wall(x, y, k, t);
     }
     ctx.restore();
+    const G = this.G, gx = this.gctx;
+    gx.filter = 'grayscale(1) brightness(0.42) contrast(1.15)';
+    gx.clearRect(X * G, Y * G, Wd * G, Hd * G);
+    gx.drawImage(this.c, X * S, Y * S, Wd * S, Hd * S, X * G, Y * G, Wd * G, Hd * G);
+    gx.filter = 'none';
   }
 
   cellChanged(k) { const x = k % this.map.W, y = Math.floor(k / this.map.W); this.region(x - 1, y - 1, x + 1, y + 1); }

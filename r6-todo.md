@@ -6,27 +6,23 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-- [ ] **Grey "remembered" map instead of black.** Anything nobody on your team can see
-      shows as a dull grey map, so the map is easier to learn. Shared vision: whatever you,
-      a teammate (or their drone) or a working defender camera can see is shown live in colour.
-      Enemies and enemy gadgets only show inside that shared vision. Map changes made by
-      the other team out of your team's sight (holes, reinforced walls, barricades) are not
-      shown until someone on your team sees them.
-
-## In progress
-
-- [ ] Security cameras you aim with the mouse and switch between (A/D, arrows, wheel, camera bar).
-- [ ] More keys like Siege: slow walk (Alt), 4 = operator skill, 3 = gadget, F = interact,
-      plus a settings screen to change any key and the volume.
-- [ ] Much better sound: footsteps per floor surface, small sounds for nearly everything
-      (turning on the spot, aiming, crouching, reload stages, swaps, hammering…), muffled
-      through walls, room echo, bullets whizzing past.
-- [ ] Legs move when a character turns on the spot.
-- [ ] More detailed characters.
-- [ ] Zoom in closer; only zoom out outside or down long hallways.
-- [ ] Field of view like a modern shooter (≈103°, narrower when aiming down sights).
+*(nothing waiting — add your next idea!)*
 
 ## Done
 
+- [x] Grey "remembered" map instead of black: out-of-sight areas show as a dull grey map.
+      Shared vision (you, teammates, their drones, working defender cameras) shows live in colour.
+      Enemies/enemy gadgets only show inside shared vision. Enemy-made map changes out of
+      your team's sight stay hidden until someone on your team sees them.
+- [x] Security cameras you aim with the mouse and switch between (A/D, arrows, wheel, camera bar).
+- [x] More keys like Siege: slow walk (Alt), 4 = operator skill, 3 = gadget, F = interact,
+      T / middle click = mark enemy, plus a settings screen (O) to change any key and the volume.
+- [x] Much better sound: footsteps per floor surface, small sounds for nearly everything
+      (turning on the spot, aiming, crouching, reload stages, swaps, hammering…), muffled
+      through walls, room echo, bullets whizzing past, drone motors, heartbeat when hurt.
+- [x] Legs move when a character turns on the spot.
+- [x] More detailed characters.
+- [x] Zoom in closer; only zoom out outside or down long hallways. Camera stops at the map edge.
+- [x] Field of view like a modern shooter (≈103°, narrower when aiming down sights).
 - [x] First playable version (5v5 Quick Match, 10 operators, Harbor Office, bots).
 - [x] Desktop / app-menu shortcut.

@@ -19,7 +19,8 @@ operators/maps/art (it would be recreating a specific existing game); keep it th
 His wishes so far:
 - One small map to start (Harbor Office), 10 operators (5 attack, 5 defence), Quick Match only
   (first to 3 rounds, sides swap every round).
-- Anything you can't see is **black** (line of sight / vision cone).
+- Out of sight = dull grey "remembered" map; shared team vision (teammates, drones, cameras) is live colour; enemy changes out of sight stay hidden until seen (`st.known` vs `st.map` in main.js).
+- FOV like a modern FPS (103°, 70° ADS). Zoom adapts: close indoors, wide outside / long sightlines.
 - Abilities all work; no verticality.
 - Graphics detailed enough to interest people used to modern games; fills a fullscreen
   16:9 monitor; must not lag; it's a multi-day project.

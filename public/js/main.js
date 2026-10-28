@@ -55,7 +55,11 @@ const send = o => { if (st.ws && st.ws.readyState === 1) st.ws.send(JSON.stringi
 function loadMap(mv, tiles, hp) {
   st.map = buildMap(); st.base = st.map.tiles.slice(); st.mv = mv;
   if (tiles) { st.map.tiles.set(tiles); st.map.hp.set(hp); }
-  st.rend = new MapRenderer(st.map, st.base);
+  // What your team remembers of the map. It only catches up with the real map when
+  // someone on your team actually sees the changed spot.
+  st.known = { ...st.map, tiles: st.map.tiles.slice(), hp: st.map.hp.slice() };
+  st.unseen = new Set();
+  st.rend = new MapRenderer(st.known, st.base);
   st.corpses = []; fx.clear(); st.pending = [];
 }
 
@@ -64,13 +68,11 @@ function onSnap(s) {
   const m = st.map, now = performance.now() / 1000;
   const changed = [];
   for (let i = 0; i < s.cells.length; i += 3) {
-    const k = s.cells[i], prev = m.tiles[k];
-    m.tiles[k] = s.cells[i + 1]; m.hp[k] = s.cells[i + 2]; changed.push(k);
-    const wasWall = prev === T.SOFT || prev === T.BARRI || prev === T.REINF || prev === T.PANEL || prev === T.DSHIELD;
-    const isWall = m.tiles[k] === T.SOFT || m.tiles[k] === T.BARRI || m.tiles[k] === T.REINF || m.tiles[k] === T.PANEL || m.tiles[k] === T.DSHIELD;
-    if (wasWall && !isWall) fx.wallBreak((k % m.W + 0.5) * CELL, (Math.floor(k / m.W) + 0.5) * CELL, prev === T.BARRI ? '150,100,55' : m.mat[k] === MAT.BRICK ? '150,80,60' : '210,205,190');
+    const k = s.cells[i];
+    m.tiles[k] = s.cells[i + 1]; m.hp[k] = s.cells[i + 2];
+    st.unseen.add(k);
   }
-  for (const k of changed) st.rend.cellChanged(k);
+  if (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION && s.ph !== PHASE.ROUND_END) revealAll();
   const players = new Map(s.players.map(p => [p.id, p]));
   const ents = new Map(s.ents.map(e => [e.id, e]));
   st.snaps.push({ t: now, players, ents }); if (st.snaps.length > 12) st.snaps.shift();
@@ -138,7 +140,7 @@ function onEvent(e, s, players) {
       const v = players.get(e.victim), k = e.killer ? players.get(e.killer) : null;
       const prev = st.snaps.length > 1 ? st.snaps[st.snaps.length - 2].players.get(e.victim) : null;
       const pos = prev && prev.x !== undefined ? prev : null;
-      if (pos && v) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide() }); st.rend.pool(pos.x, pos.y); }
+      if (pos && v && (v.tm === mySide() || teamSees(pos.x, pos.y))) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide() }); st.rend.pool(pos.x, pos.y); }
       addKill(k, v, e.w);
       break;
     }
@@ -434,8 +436,15 @@ function frame(nowMs) {
   st.viewH += (want - st.viewH) * (1 - Math.exp(-dt * 2.2));
   st.zoom = VH / st.viewH;
   if (view && view.kind === 'cam') { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
+  { // never look past the edge of the map
+    const hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom, mw = st.map.W * CELL, mh = st.map.H * CELL;
+    st.cam.x = mw > hw * 2 ? Math.max(hw, Math.min(mw - hw, st.cam.x)) : mw / 2;
+    st.cam.y = mh > hh * 2 ? Math.max(hh, Math.min(mh - hh, st.cam.y)) : mh / 2;
+  }
   if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
 
+  st.viewers = teamViewers(s, view, me, inGame);
+  revealSeen();
   bodySounds(me, dt);
   draw(s, view, now, dt);
 }
@@ -561,10 +570,10 @@ function playerFoley(p, a, moved, own, dt) {
 }
 
 // ---------------- drawing ----------------
-function visionPolygon(v, sm) {
+function visionPolygon(v, sm, rays = 0) {
   const pts = [];
   const full = v.fov >= Math.PI * 2 - 0.01;
-  const n = full ? 360 : 300;
+  const n = rays || (full ? 360 : 300);
   if (!full) pts.push(v.x, v.y);
   for (let i = 0; i <= n; i++) {
     const a = v.ang - v.fov / 2 + v.fov * i / n;
@@ -603,7 +612,7 @@ function draw(s, view, now, dt) {
   const me = st.me, side = me ? me.tm : null;
   const inGame = s.ph === PHASE.PREP || s.ph === PHASE.ACTION || s.ph === PHASE.ROUND_END;
   const sm = smokes(s);
-  const seen = (x, y) => !view || canSee(m, view, x, y, sm);
+  const seen = (x, y) => !view || teamSees(x, y);
   const spotted = new Set(side && s.spots[side] ? s.spots[side] : []);
 
   // objective
@@ -674,10 +683,15 @@ function draw(s, view, now, dt) {
     fctx.globalCompositeOperation = 'source-over';
     fctx.fillStyle = '#000'; fctx.fillRect(0, 0, fog.width, fog.height);
     fctx.setTransform(z / 2, 0, 0, z / 2, ox / 2, oy / 2);
+    // the dull grey remembered map
+    const G = st.rend.G;
+    if (wx1 > wx0 && wy1 > wy0) fctx.drawImage(st.rend.grey, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
+    // cut out everything your team can see right now
     fctx.globalCompositeOperation = 'destination-out';
-    if (!view.off) {
-      if (view.near) { fctx.fillStyle = 'rgba(0,0,0,0.42)'; fillPoly(fctx, nearPolygon(view, sm)); }
-      fctx.fillStyle = '#000'; fillPoly(fctx, visionPolygon(view, sm));
+    for (const v of st.viewers) {
+      if (v.off) continue;
+      if (v.near) { fctx.fillStyle = v === view ? 'rgba(0,0,0,0.5)' : '#000'; fillPoly(fctx, nearPolygon(v, sm)); }
+      fctx.fillStyle = '#000'; fillPoly(fctx, visionPolygon(v, sm, v === view ? 0 : 140));
     }
     fctx.globalCompositeOperation = 'source-over';
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -962,3 +976,64 @@ function camBar(s, me) {
     for (const b of bar.querySelectorAll('button')) b.onclick = e => { e.stopPropagation(); if (+b.dataset.n >= 0) st.evq.push({ k: 'camSet', n: +b.dataset.n }); };
   }
 }
+
+// ---------------- shared team vision ----------------
+// Everything that can see for your team: you, teammates, their drones, and (defence) working cameras.
+function teamViewers(s, view, me, inGame) {
+  const vs = [];
+  if (view) vs.push(view);
+  if (!s || !me || !inGame) return vs;
+  const side = me.tm;
+  for (const sp of s.players) {
+    if (!sp.a || sp.tm !== side || sp.x === undefined) continue;
+    if (sp.id === me.id && view && view.kind === 'body') continue;
+    const p = sp.id === me.id ? { ...sp, x: st.pred.x, y: st.pred.y } : interp(sp.id, 'players');
+    if (!p || p.x === undefined) continue;
+    if (view && view.kind === 'spect' && Math.hypot(view.x - p.x, view.y - p.y) < 1) continue;
+    if (sp.id === me.id && me.ct === 'drone') { vs.push({ x: me.x, y: me.y, ang: me.ag, fov: fovFor(me), range: 1100, near: 26, kind: 'mate' }); continue; }
+    vs.push({ x: p.x, y: p.y, ang: p.ag, fov: fovFor(p), range: 1100, near: 26, kind: 'mate' });
+  }
+  for (const e of s.ents) {
+    if (e.tm !== side) continue;
+    const ie = interp(e.id, 'ents') || e;
+    if (e.ty === 'drone') {
+      if (view && view.kind === 'drone' && me.did === e.id) continue;
+      vs.push({ x: ie.x, y: ie.y, ang: 0, fov: Math.PI * 2, range: 230, near: 0, kind: 'drone' });
+    } else if (e.ty === 'cam' && e.hp > 0 && !e.off && side === 'def') {
+      if (view && view.kind === 'cam' && view.cam.id === e.id) continue;
+      vs.push({ x: e.x, y: e.y, ang: e.ag || 0, fov: 1.9, range: 650, near: 14, kind: 'cam' });
+    }
+  }
+  return vs;
+}
+function teamSees(x, y) {
+  const sm = smokes(st.last);
+  for (const v of st.viewers || []) if (!v.off && canSee(st.map, v, x, y, sm)) return true;
+  return false;
+}
+// Is this map cell (often a wall, which blocks the line itself) visible to the team?
+function cellSeen(k) {
+  const m = st.map, x = (k % m.W + 0.5) * CELL, y = (Math.floor(k / m.W) + 0.5) * CELL;
+  for (const v of st.viewers || []) {
+    if (v.off) continue;
+    const d = Math.hypot(x - v.x, y - v.y);
+    if (d > v.range) continue;
+    const a = Math.atan2(y - v.y, x - v.x);
+    if (d > v.near + 12 && Math.abs(angDiff(a, v.ang)) > v.fov / 2 + 0.12) continue;
+    if (d < 14 || castSight(m, v.x, v.y, a, d, null) >= d - 13) return true;
+  }
+  return false;
+}
+function applyKnown(k) {
+  const m = st.map, K = st.known, prev = K.tiles[k];
+  if (prev === m.tiles[k] && K.hp[k] === m.hp[k]) return;
+  K.tiles[k] = m.tiles[k]; K.hp[k] = m.hp[k];
+  st.rend.cellChanged(k);
+  const wall = t => t === T.SOFT || t === T.BARRI || t === T.REINF || t === T.PANEL || t === T.DSHIELD;
+  if (wall(prev) && !wall(m.tiles[k])) fx.wallBreak((k % m.W + 0.5) * CELL, (Math.floor(k / m.W) + 0.5) * CELL, prev === T.BARRI ? '150,100,55' : m.mat[k] === MAT.BRICK ? '150,80,60' : '210,205,190');
+}
+function revealSeen() {
+  if (!st.unseen || !st.unseen.size) return;
+  for (const k of st.unseen) if (cellSeen(k)) { applyKnown(k); st.unseen.delete(k); }
+}
+function revealAll() { if (!st.unseen) return; for (const k of st.unseen) applyKnown(k); st.unseen.clear(); }
