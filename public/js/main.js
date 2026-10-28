@@ -740,8 +740,16 @@ function frame(nowMs) {
     want = Math.max(240, Math.min(470, avg * 1.15 + 110));
     want = Math.max(want, Math.min(view.kind === 'cam' ? 580 : 520, aimD * (view.kind === 'cam' ? 0.75 : 0.6)));
   }
-  st.viewH = st.viewH || want;
-  st.viewH += (want - st.viewH) * (1 - Math.exp(-dt * 2.2));
+  // the room-size zoom only moves for a real change (a new room, a long corridor), not every small turn of
+  // your aim, and then settles quickly, so the view isn't always slowly drifting in and out (he asked for less slow panning)
+  if (!st.envWant || Math.abs(want - st.envWant) > st.envWant * 0.15 || (view && view.kind !== 'body')) st.envWant = want;
+  st.envH = st.envH || st.envWant;
+  st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * 6));
+  // aiming down sights zooms in, fast (a scope zooms less but looks further ahead)
+  const adsZ = view && view.kind === 'body' && me && me.ad ? (String(me.aa).includes('scope') ? 0.9 : 0.82) : 1;
+  st.adsZ = st.adsZ || 1;
+  st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18));
+  st.viewH = st.envH * st.adsZ;
   st.zoom = VH / st.viewH;
   if (view && view.kind === 'cam') { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
   { // never look past the edge of the floor you are on (other floors sit beside it in the map grid)
@@ -1364,7 +1372,7 @@ const FOV_HIP = 103 * Math.PI / 180, FOV_ADS = 70 * Math.PI / 180, FOV_SCOPE = 5
 function fovFor(p) {
   const target = !p || !p.ad ? FOV_HIP : (WEAPONS[p.w] && WEAPONS[p.w].cls === 'DMR' ? FOV_SCOPE : FOV_ADS);
   const a = anim(p ? p.id : 'none');
-  a.fov = a.fov === undefined ? target : a.fov + (target - a.fov) * 0.2; // smooth zoom in/out
+  a.fov = a.fov === undefined ? target : a.fov + (target - a.fov) * 0.35; // quick zoom in/out
   return a.fov;
 }
 

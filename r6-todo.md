@@ -11,6 +11,8 @@ New ideas from him get added to the bottom of **To do**.
 
 ## Done
 
+- [x] Faster aiming: aiming down sights takes about half the time and zooms the view in quickly; the view no longer slowly drifts in and out as you turn.
+
 - [x] Balance pass from ~300-round bot simulations (tests/balance.js, docs/balance.md): Bulwark reworked (pistols, hip-fire, melee knocks the
       shield aside), shotgun pellets can't one-tap headshot, Mule/Hornet/pistols toned down, traps and a few gadgets softened. All operators 39–59%.
 - [x] Slower movement, calmer bots that react to sound, loading screens so nothing loads mid-match.

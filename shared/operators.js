@@ -273,7 +273,7 @@ export const BIOS = {
 };
 
 // ---- R6-style gun handling, by weapon class ----
-export const ADS_TIME = { Pistol: 0.18, MP: 0.2, SMG: 0.24, Shotgun: 0.28, AR: 0.32, DMR: 0.4, LMG: 0.5 }; // seconds to fully aim
+export const ADS_TIME = { Pistol: 0.1, MP: 0.11, SMG: 0.13, Shotgun: 0.15, AR: 0.17, DMR: 0.22, LMG: 0.28 }; // seconds to fully aim (he asked for much faster)
 // recoil per shot (radians): kick drifts one way with some sway; you pull against it with the mouse
 export const RECOIL = {
   AR: { kick: 0.010, sway: 0.006, max: 0.11 }, SMG: { kick: 0.009, sway: 0.009, max: 0.13 }, MP: { kick: 0.011, sway: 0.012, max: 0.15 },
