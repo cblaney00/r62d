@@ -386,7 +386,7 @@ addEventListener('mouseup', e => { if (e.button === 0) mouse.l = false; if (e.bu
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => {
   if (!st.me || !st.me.a) return;
-  if (st.me.ct === 'cam') st.evq.push({ k: e.deltaY > 0 ? 'camNext' : 'camPrev' });
+  if (st.me.ct === 'cam' || st.me.ct === 'drone') st.evq.push({ k: e.deltaY > 0 ? 'camNext' : 'camPrev' }); // flip through the team's cameras / drones
   else st.evq.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 });
 }, { passive: true });
 cv.addEventListener('mousedown', e => { if (e.button === 1) { e.preventDefault(); st.spotReq = true; } });
@@ -679,10 +679,9 @@ function frame(nowMs) {
 
   // --- view source ---
   let view = null, ctrl = me && me.a ? me.ct : null;
-  const camsAlive = s ? s.ents.filter(e => e.ty === 'cam' && e.hp > 0) : [];
   if (inGame && me && me.a) {
     if (ctrl === 'drone') view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: 230, near: 0, kind: 'drone' };
-    else if (ctrl === 'cam') { const c = camsAlive[me.ci % Math.max(1, camsAlive.length)]; if (c) view = { x: c.x, y: c.y, ang: st.aim, fov: 1.9, range: 650, near: 14, kind: 'cam', off: c.off, cam: c }; }
+    else if (ctrl === 'cam') { const c = s.ents.find(e => e.id === me.fi); if (c) view = feedView(c, me); }
     else view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: fovFor(me), range: 1100, near: 26, kind: 'body' };
   } else if (inGame && me) {
     const mates = s.players.filter(p => p.a && p.sq === me.sq && p.id !== me.id);
@@ -708,8 +707,9 @@ function frame(nowMs) {
     if (st.lastCam !== view.cam.id) { // switching cameras: start from that camera's current direction
       st.lastCam = view.cam.id; st.aim = view.cam.ag || 0; view.ang = st.aim; audio.foley('camSwitch');
       mouse.x = VW / 2 + Math.cos(st.aim) * VH * 0.25; mouse.y = VH / 2 + Math.sin(st.aim) * VH * 0.25;
-    } else if (Math.hypot(mouse.x - VW / 2, mouse.y - VH / 2) > 20 * DPR) st.aim = Math.atan2(mouse.y - VH / 2, mouse.x - VW / 2);
-    const c = view.cam; if (c.wn !== undefined) st.aim = c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(st.aim, c.wn))); // a wall camera can't look into its wall
+    } else if (!view.ro && Math.hypot(mouse.x - VW / 2, mouse.y - VH / 2) > 20 * DPR) st.aim = Math.atan2(mouse.y - VH / 2, mouse.x - VW / 2);
+    if (view.ro) st.aim = view.ang; // a teammate's drone or gadget: you only watch, it looks where its owner points it
+    else { const c = view.cam; if (c.wn !== undefined) st.aim = c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(st.aim, c.wn))); } // a wall camera can't look into its wall
     view.ang = st.aim;
   }
   if (!view || view.kind !== 'cam') st.lastCam = null;
@@ -733,7 +733,7 @@ function frame(nowMs) {
   if (view && view.kind !== 'body') { st.cam.x = cx; st.cam.y = cy; }
   // zoom: close in tight rooms, wider outside or when looking down a long sightline
   let want = 600; // world px shown top to bottom; he asked twice for a closer view
-  if (view && view.kind === 'drone') want = 240;
+  if (view && (view.kind === 'drone' || view.dr)) want = 240;
   else if (view) {
     let sum = 0;
     for (let i = 0; i < 24; i++) sum += castSight(st.map, view.x, view.y, i / 24 * Math.PI * 2, 700, null);
@@ -752,7 +752,7 @@ function frame(nowMs) {
   st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18));
   st.viewH = st.envH * st.adsZ;
   st.zoom = VH / st.viewH;
-  if (view && view.kind === 'cam') { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
+  if (view && view.kind === 'cam' && !view.dr) { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
   { // never look past the edge of the floor you are on (other floors sit beside it in the map grid)
     const fi = view ? Math.max(0, floorAt(st.map, view.x, view.y)) : 0, F = st.map.floors[fi];
     if (st.camFloor !== fi) { // changed floor: jump straight there
@@ -801,8 +801,8 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (ctrl === 'cam' || ctrl === 'drone') {
     if (mouse.wl) trySpot();
     if (ctrl === 'cam') { k.up = k.down = k.left = k.right = 0; }
-    const cams = s ? s.ents.filter(e => e.ty === 'cam' && e.hp > 0) : [], cam = cams[(me && me.ci || 0) % Math.max(1, cams.length)];
-    if (!(ctrl === 'cam' && cam && cam.tu)) k.fire = 0; // a turret camera fires its laser
+    const cam = ctrl === 'cam' && view && view.kind === 'cam' ? view.cam : null;
+    if (!(cam && cam.tu && !view.ro)) k.fire = 0; // a turret camera fires its laser (only for whoever placed it)
     k.ads = 0;
   }
   if (st.spotReq) { trySpot(); st.spotReq = false; }
@@ -1137,7 +1137,7 @@ function draw(s, view, now, dt) {
   // --- screen-space effects ---
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (view && view.kind === 'drone') droneOverlay(now, ents);
-  if (view && view.kind === 'cam') camOverlay(view, now);
+  if (view && view.kind === 'cam') { if (view.dr) droneOverlay(now, ents, view.cam); else camOverlay(view, now); }
   if (me && me.a && me.sc) { ctx.fillStyle = 'rgba(70,90,255,0.12)'; ctx.fillRect(0, 0, VW, VH); }
   const hurtK = Math.max(0, 1 - (now - st.hurtT) / 0.8);
   if (hurtK > 0) {
@@ -1207,8 +1207,7 @@ function crosshair(me, now) {
   }
 }
 
-function droneOverlay(now, ents) {
-  const d = ents.find(e => st.me && e.id === st.me.did);
+function droneOverlay(now, ents, d = ents.find(e => st.me && e.id === st.me.did)) {
   ctx.strokeStyle = 'rgba(160,255,200,0.6)'; ctx.lineWidth = 2 * DPR;
   const p = 60 * DPR, L = 40 * DPR;
   for (const [x, y, sx, sy] of [[p, p, 1, 1], [VW - p, p, -1, 1], [p, VH - p, 1, -1], [VW - p, VH - p, -1, -1]]) {
@@ -1224,7 +1223,7 @@ function camOverlay(view, now) {
   ctx.fillStyle = 'rgba(255,255,255,0.035)'; for (let y = (now * 40 * DPR) % (4 * DPR); y < VH; y += 4 * DPR) ctx.fillRect(0, y, VW, DPR);
   ctx.fillStyle = Math.floor(now * 2) % 2 ? '#ff3030' : 'rgba(255,48,48,0.3)'; ctx.beginPath(); ctx.arc(80 * DPR, 120 * DPR, 7 * DPR, 0, 7); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.font = `700 ${18 * DPR}px Barlow Condensed`; ctx.textAlign = 'left'; ctx.fillText('REC', 94 * DPR, 126 * DPR);
-  if (view.cam && view.cam.tu) { ctx.fillStyle = '#ff6060'; ctx.font = `700 ${16 * DPR}px Barlow Condensed`; ctx.fillText(view.cam.hot ? 'TURRET · OVERHEATED, COOLING DOWN' : 'TURRET · CLICK TO FIRE THE LASER', 80 * DPR, 150 * DPR); }
+  if (view.cam && view.cam.tu) { ctx.fillStyle = '#ff6060'; ctx.font = `700 ${16 * DPR}px Barlow Condensed`; ctx.fillText(view.cam.hot ? 'TURRET · OVERHEATED, COOLING DOWN' : view.ro ? 'TURRET · ONLY ITS OWNER CAN FIRE IT' : 'TURRET · CLICK TO FIRE THE LASER', 80 * DPR, 150 * DPR); }
   if (view.off) { for (let i = 0; i < 900; i++) { ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.4})`; ctx.fillRect(Math.random() * VW, Math.random() * VH, 4 * DPR, 2 * DPR); } }
 }
 
@@ -1318,8 +1317,14 @@ function hud(s) {
     `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label
   let vl = '';
-  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); vl = d && d.j ? 'DRONE JAMMED' : `DRONE · CLICK TO MARK ENEMIES · ${label('view')} TO EXIT`; }
-  else if (me.ct === 'cam') { const cams = s.ents.filter(e => e.ty === 'cam' && e.hp > 0); const c = cams[me.ci % Math.max(1, cams.length)]; vl = c ? `CAMERA ${me.ci % cams.length + 1}/${cams.length} · ${roomAt(st.map, c.x, c.y).toUpperCase()} · MOUSE LOOK · ${label('left')} ${label('right')} SWITCH · CLICK MARK${c.off ? ' · DISRUPTED' : ''}` : ''; }
+  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); vl = d && d.j ? 'DRONE JAMMED' : `YOUR DRONE · CLICK TO MARK ENEMIES · WHEEL: TEAM DRONES · ${label('view')} TO EXIT`; }
+  else if (me.ct === 'cam') {
+    const list = feedList(s, me), c = list.find(e => e.id === me.fi);
+    if (c) {
+      const ro = c.ow && c.ow !== me.id, who = ro ? `${ownerName(s, c.ow).toUpperCase()}'S ` : c.ow ? 'YOUR ' : '';
+      vl = `${who}${feedKind(c)} ${list.indexOf(c) + 1}/${list.length} · ${(roomAt(st.map, c.x, c.y) || 'outside').toUpperCase()} · ${ro || c.ty !== 'cam' ? 'WATCH ONLY' : 'MOUSE LOOK'} · ${label('left')} ${label('right')} SWITCH · CLICK MARK${c.off || c.j ? ' · DISRUPTED' : ''}`;
+    }
+  }
   $('viewlabel').textContent = vl;
   camBar(s, me);
   // interaction
@@ -1385,20 +1390,35 @@ function bodySounds(me, dt) {
   if (me.hp < 35 && !me.dn && st.brT <= 0) { audio.foley('breath'); st.brT = 3.2; }
 }
 
-// Clickable list of cameras along the bottom while you're watching them.
+// Everything your team can look through (the server's feeds()): defence every working camera, map,
+// turret or sticky; attack every drone and wall scope. Only your own drone/gadget is yours to steer.
+function feedList(s, me) {
+  return s.ents.filter(e => e.tm === me.tm && (me.tm === 'def' ? e.ty === 'cam' && e.hp > 0 : e.ty === 'drone' || e.ty === 'scope'));
+}
+function feedKind(c) { return c.ty === 'drone' ? 'DRONE' : c.ty === 'scope' ? 'WALL SCOPE' : c.tu ? 'TURRET' : c.ow ? 'STICKY CAM' : 'CAMERA'; }
+function ownerName(s, id) { const p = s.players.find(p => p.id === id); return p ? p.n.replace(/^\[BOT\] /, '') : 'TEAMMATE'; }
+function feedView(c, me) {
+  const ro = c.ow && c.ow !== me.id ? 1 : 0;
+  if (c.ty === 'drone') { const ic = interp(c.id, 'ents') || c; return { x: ic.x, y: ic.y, ang: ic.ag || c.ag || 0, fov: Math.PI * 2, range: 230, near: 0, kind: 'cam', cam: c, dr: 1, ro: 1 }; }
+  if (c.ty === 'scope') return { x: c.x, y: c.y, ang: c.ag || 0, fov: 1.3, range: 420, near: 6, kind: 'cam', cam: c, ro: 1 };
+  return { x: c.x, y: c.y, ang: ro ? c.ag || 0 : st.aim, fov: 1.9, range: 650, near: 14, kind: 'cam', off: c.off, cam: c, ro };
+}
+
+// Clickable list of the team's cameras / drones along the bottom while you're looking through them.
 function camBar(s, me) {
   const bar = $('cambar');
-  if (me.ct !== 'cam') { if (bar.innerHTML) bar.innerHTML = ''; return; }
-  const cams = s.ents.filter(e => e.ty === 'cam');
-  let alive = -1;
-  const html = cams.map(c => {
-    if (c.hp > 0) alive++;
-    const on = c.hp > 0 && alive === me.ci % Math.max(1, cams.filter(x => x.hp > 0).length);
-    return `<button data-n="${c.hp > 0 ? alive : -1}" class="${on ? 'on' : ''} ${c.hp > 0 ? '' : 'dead'}">CAM ${cams.indexOf(c) + 1}<small>${esc(roomAt(st.map, c.x, c.y).toUpperCase() || 'OUTSIDE')}${c.off ? ' · DISRUPTED' : ''}</small></button>`;
+  if (me.ct !== 'cam' && me.ct !== 'drone') { if (bar.innerHTML) bar.innerHTML = ''; return; }
+  const def = me.tm === 'def', list = def ? s.ents.filter(e => e.ty === 'cam' && e.tm === 'def') : feedList(s, me); // broken cameras stay listed, greyed
+  const cur = me.ct === 'drone' ? me.did : me.fi;
+  let n = 0;
+  const html = list.map(c => {
+    const live = !def || c.hp > 0, mine = c.ow === me.id;
+    const name = c.ow ? (mine ? 'MY ' : `${ownerName(s, c.ow).toUpperCase()}'S `) + (c.ty === 'cam' ? (c.tu ? 'TURRET' : 'STICKY') : c.ty === 'scope' ? 'SCOPE' : 'DRONE') : `CAM ${++n}`;
+    return `<button data-id="${live ? c.id : ''}" class="${c.id === cur ? 'on' : ''} ${live ? '' : 'dead'}">${esc(name)}<small>${esc((roomAt(st.map, c.x, c.y) || 'outside').toUpperCase())}${c.off || c.j ? ' · DISRUPTED' : ''}</small></button>`;
   }).join('');
   if (bar.innerHTML !== html) {
     bar.innerHTML = html;
-    for (const b of bar.querySelectorAll('button')) b.onclick = e => { e.stopPropagation(); if (+b.dataset.n >= 0) st.evq.push({ k: 'camSet', n: +b.dataset.n }); };
+    for (const b of bar.querySelectorAll('button')) b.onclick = e => { e.stopPropagation(); if (b.dataset.id) st.evq.push({ k: 'camSet', id: b.dataset.id }); };
   }
 }
 

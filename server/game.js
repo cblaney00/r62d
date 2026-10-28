@@ -86,7 +86,7 @@ export class Game {
   blankPlayer(name, bot, squad) {
     return { id: 'p' + (this.nextId++), name, bot, squad, op: null, alive: false, downed: false, hp: 0, maxHp: 100,
       x: 0, y: 0, aim: 0, input: { ...EMPTY_INPUT }, prevInput: { ...EMPTY_INPUT }, lastSeq: 0, slot: 0, guns: [],
-      fireCd: 0, reloadT: 0, bloom: 0, abilityCount: 0, gadgetCount: 0, drones: 0, ctrl: 'body', droneId: null, camIdx: 0,
+      fireCd: 0, reloadT: 0, bloom: 0, abilityCount: 0, gadgetCount: 0, drones: 0, ctrl: 'body', droneId: null, feedId: null,
       busy: null, hasDefuser: false, slowUntil: 0, stunUntil: 0, battery: 0, scanning: false, bracing: false,
       meleeCd: 0, kills: 0, deaths: 0, downedBy: null, moving: 0, lastShot: 0, nitroId: null, ai: {} };
   }
@@ -104,7 +104,7 @@ export class Game {
     if (m.t === 'input') {
       p.input = { ...EMPTY_INPUT, ...m.k };
       if (typeof m.a === 'number' && isFinite(m.a)) p.aim = m.a;
-      if (p.ctrl === 'cam') { const c = this.aliveCams()[p.camIdx]; if (c) c.ang = c.wn === null || c.wn === undefined ? p.aim : c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(p.aim, c.wn))); } // a wall camera can't look into its wall
+      if (p.ctrl === 'cam') { const c = this.feed(p); if (c && this.operates(p, c)) c.ang = c.wn === null || c.wn === undefined ? p.aim : c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(p.aim, c.wn))); } // a wall camera can't look into its wall
       if (typeof m.ax === 'number') { p.aimX = m.ax; p.aimY = m.ay; }
       if (typeof m.vt === 'number' && isFinite(m.vt)) p.viewTime = m.vt; // server time of the world this player is looking at
       this.applyMove(p, Math.max(0, Math.min(0.05, Number(m.dt) || 0)));
@@ -389,6 +389,10 @@ export class Game {
       p.adsT = Math.max(0, Math.min(1, (p.adsT || 0) + (canAds ? dt * rate : -dt * rate * 1.6)));
       if (this.time - p.lastShot > 0.14) { p.rc = (p.rc || 0) * Math.exp(-dt * 7); p.shots = 0; } }
 
+    if (p.ctrl === 'cam' && !this.feed(p)) { // the feed you were watching broke: go to the next one
+      const list = this.feeds(team);
+      if (list.length && !p.downed) this.watch(p, list[0]); else p.ctrl = 'body';
+    }
     if (p.downed) {
       p.hp -= dt; p.busy = null;
       if (p.hp <= 0) this.kill(p, this.players.get(p.downedBy), 'Bled out');
@@ -459,9 +463,9 @@ export class Game {
 
     // a defender looking through a turret camera fires its laser
     if (p.ctrl === 'cam' && inp.fire && p.turretCd <= 0) {
-      const c = this.aliveCams()[p.camIdx];
-      if (c && c.tu) c.heat = Math.max(0, (c.heat || 0) - (this.time - (c.heatT ?? this.time)) * 2), c.heatT = this.time;
-      if (c && c.tu && !(c.offUntil > this.time) && !(c.coolUntil > this.time)) {
+      const c = this.feed(p);
+      if (c && c.tu && this.operates(p, c)) c.heat = Math.max(0, (c.heat || 0) - (this.time - (c.heatT ?? this.time)) * 2), c.heatT = this.time;
+      if (c && c.tu && this.operates(p, c) && !(c.offUntil > this.time) && !(c.coolUntil > this.time)) {
         p.turretCd = 0.45;
         if ((c.heat += 1) >= 12) { c.coolUntil = this.time + 4; c.heat = 0; } // overheated
         const a = c.ang || 0, dx = Math.cos(a), dy = Math.sin(a);
@@ -784,8 +788,8 @@ export class Game {
       case 'ability': if (!p.downed && p.ctrl === 'body' && !p.busy) this.useAbility(p); break;
       case 'gadget': if (!p.downed && p.ctrl === 'body' && !p.busy) this.useGadget(p); break;
       case 'view': this.toggleView(p); break;
-      case 'camNext': case 'camPrev': if (p.ctrl === 'cam') this.cycleCam(p, e.k === 'camNext' ? 1 : -1); break;
-      case 'camSet': if (p.ctrl === 'cam') { const n = this.aliveCams().length; if (n) p.camIdx = Math.max(0, Math.min(n - 1, e.n | 0)); } break;
+      case 'camNext': case 'camPrev': if (p.ctrl === 'cam' || p.ctrl === 'drone') this.cycleCam(p, e.k === 'camNext' ? 1 : -1); break;
+      case 'camSet': if (p.ctrl === 'cam' || p.ctrl === 'drone') { const f = this.feeds(team).find(f => f.id === e.id); if (f) this.watch(p, f); } break;
       case 'spot': {
         const q = this.players.get(e.id);
         if (q && q.alive && this.side(q) !== team) this.spot(team, q.id, DUR.spot);
@@ -799,31 +803,44 @@ export class Game {
     const team = this.side(p);
     if (team === TEAM.ATK) {
       if (this.phase === PHASE.PREP) return;
-      if (p.ctrl === 'drone') { p.ctrl = 'body'; return; }
+      if (p.ctrl === 'drone' || p.ctrl === 'cam') { p.ctrl = 'body'; return; }
       if (p.ctrl !== 'body' || p.busy) return;
-      if (!this.ent(p.droneId)) {
-        if (p.drones <= 0) return;
+      if (!this.ent(p.droneId) && p.drones > 0) {
         p.drones--;
         const pos = this.freeSpotNear(p.x + Math.cos(p.aim) * 12, p.y + Math.sin(p.aim) * 12, 10, true);
         const d = { id: this.eid(), type: 'drone', owner: p.id, team: TEAM.ATK, x: pos.x, y: pos.y, hp: 1, ang: p.aim };
         this.ents.push(d); p.droneId = d.id;
       }
-      p.ctrl = 'drone';
+      if (this.ent(p.droneId)) { p.ctrl = 'drone'; return; }
+      const list = this.feeds(team); // no drone of your own left: watch a teammate's
+      if (list.length) this.watch(p, list[0]);
     } else {
       if (p.ctrl === 'cam') { p.ctrl = 'body'; return; }
       if (p.ctrl !== 'body' || p.busy) return;
-      const cams = this.ents.filter(e => e.type === 'cam' && e.hp > 0);
-      if (!cams.length) return;
-      p.ctrl = 'cam'; p.camIdx = 0;
+      const list = this.feeds(team);
+      if (list.length) this.watch(p, list.find(f => f.id === p.feedId) || list[0]);
     }
   }
 
-  aliveCams() { return this.ents.filter(e => e.type === 'cam' && e.hp > 0); }
+  // Everything a team can look through, flipped through with left/right or the mouse wheel:
+  // defence every working camera (map, turret, sticky); attack every drone and wall scope.
+  feeds(team) {
+    return this.ents.filter(e => e.team === team && (team === TEAM.DEF ? e.type === 'cam' && e.hp > 0 : e.type === 'drone' || e.type === 'scope'));
+  }
+  feed(p) { const f = this.ent(p.feedId); return f && this.feeds(this.side(p)).includes(f) ? f : null; }
+  // only the one who placed a gadget camera can turn it or fire its laser; map cameras are anyone's
+  operates(p, c) { return c.type === 'cam' && (!c.owner || c.owner === p.id); }
+  // look through a feed: your own drone you drive, anything else you only watch (and mark from)
+  watch(p, f) {
+    if (f.type === 'drone' && f.id === p.droneId) { p.ctrl = 'drone'; return; }
+    p.ctrl = 'cam'; p.feedId = f.id;
+  }
 
   cycleCam(p, dir) {
-    const cams = this.aliveCams();
-    if (!cams.length) { p.ctrl = 'body'; return; }
-    p.camIdx = (p.camIdx + dir + cams.length) % cams.length;
+    const list = this.feeds(this.side(p));
+    if (!list.length) { p.ctrl = 'body'; return; }
+    const i = list.indexOf(p.ctrl === 'drone' ? this.ent(p.droneId) : this.feed(p));
+    this.watch(p, list[i < 0 ? 0 : (i + dir + list.length) % list.length]);
   }
 
   melee(p) {
@@ -1407,7 +1424,7 @@ export class Game {
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,
       });
       if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
-        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, ci: p.camIdx, did: p.droneId,
+        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 1000) / 1000, at: r2(p.adsT || 0),
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         m: this.mods(p), fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0,
