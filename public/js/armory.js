@@ -1,7 +1,7 @@
 // The Armory: a private shooting range in the menus. Pick any gun, shoot dummies at different
 // distances and read its numbers. Runs only in your browser (nobody else sees it), using the same
 // damage, drop-off, spread, aim-in time, recoil and headshot rules as the server.
-import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods } from '/shared/operators.js';
+import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -56,7 +56,7 @@ function pick(el, w) {
 
 function resetRange(el) {
   const d = S.dist * M;
-  S.dummies = [-46, 0, 46].map((ox, i) => ({ x: ox, y: -d, hp: ARMOR_HP[[3, 2, 1][i]], max: ARMOR_HP[[3, 2, 1][i]], label: ['Light', 'Medium', 'Heavy'][i], deadT: 0, flash: 0 }));
+  S.dummies = [-46, 0, 46].map((ox, i) => ({ x: ox, y: -d, a: [3, 2, 1][i], hp: ARMOR_HP[[3, 2, 1][i]], max: ARMOR_HP[[3, 2, 1][i]], label: ['Light', 'Medium', 'Heavy'][i], deadT: 0, flash: 0 }));
   S.holes = []; S.pops = []; S.tracers = []; S.hits = 0; S.fired = 0; S.first = null; S.kills = 0;
   for (const b of el.querySelectorAll('#armDist button')) b.classList.toggle('on', +b.dataset.d === S.dist);
   stats(el);
@@ -106,7 +106,7 @@ function fire(w, cv) {
     let best = null, bt = w.range;
     for (const d of S.dummies) {
       if (d.hp <= 0) continue;
-      const b = -(d.x * dx + d.y * dy), c = d.x * d.x + d.y * d.y - 100, disc = b * b - c;
+      const b = -(d.x * dx + d.y * dy), c = d.x * d.x + d.y * d.y - HIT_R[d.a] * HIT_R[d.a], disc = b * b - c;
       if (disc < 0) continue;
       const t = -b - Math.sqrt(disc);
       if (t > 0 && t < bt) { bt = t; best = d; }
@@ -148,9 +148,9 @@ function draw(cv) {
     c.save(); c.translate(d.x, d.y);
     c.globalAlpha = alive ? 1 : 0.35;
     c.fillStyle = d.flash > 0 ? `rgb(255,${200 - d.flash * 120},${150 - d.flash * 120})` : '#c9a77a';
-    c.beginPath(); c.arc(0, 0, 10, 0, 7); c.fill();
+    c.beginPath(); c.arc(0, 0, HIT_R[d.a], 0, 7); c.fill();
     c.strokeStyle = '#5a4128'; c.lineWidth = 0.8; c.stroke();
-    c.strokeStyle = 'rgba(160,30,30,0.8)'; c.beginPath(); c.arc(0, 0, 6, 0, 7); c.stroke();
+    c.strokeStyle = 'rgba(160,30,30,0.8)'; c.beginPath(); c.arc(0, 0, 4.2, 0, 7); c.stroke();
     c.fillStyle = '#a01e1e'; c.beginPath(); c.arc(0, 0, HEAD_R, 0, 7); c.fill();
     c.globalAlpha = 1;
     c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillRect(-11, 13, 22, 3);

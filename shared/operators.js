@@ -13,6 +13,12 @@ export const WEAPONS = {
 
 // armor: 1 = heavy/slow, 2 = medium, 3 = light/fast. HP follows armor.
 export const ARMOR_HP = { 1: 125, 2: 110, 3: 100 };
+// build follows armor too: heavies stay broad, mediums and lights are skinnier (drawn narrower AND harder to hit).
+// HIT_R is how close (px) a bullet must pass to a body's centre to hit it; walls still use PLAYER_R for bumping.
+export const BODY_W = { 1: 0.95, 2: 0.84, 3: 0.76 };
+export const HIT_R = { 1: 7.5, 2: 6.8, 3: 6.2 };
+export const hitR = (op) => HIT_R[OPERATORS[op]?.armor] ?? 6.8;
+export const bodyW = (op) => BODY_W[OPERATORS[op]?.armor] ?? 0.84;
 
 export const GADGETS = {
   smoke:   { name: 'Smoke Grenade',    kind: 'throw' },

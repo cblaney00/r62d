@@ -1,5 +1,5 @@
 // Top-down drawings of operators, drones, gadgets and the objective.
-import { OPERATORS, WEAPONS } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, bodyW } from '/shared/operators.js';
 import { shade } from './textures.js';
 
 const UNIFORM = {
@@ -89,6 +89,8 @@ export function drawOperator(ctx, p, t) {
   }
 
   // ---- legs (they step when walking AND when turning on the spot) ----
+  const bw = bodyW(p.op); // skinnier build: legs, back gear and torso squeezed sideways (not the head)
+  ctx.save(); ctx.scale(1, bw);
   const walk = p.walk || 0, st = Math.sin(walk), cr = !!p.crouch;
   const stride = st * (cr ? 2.2 : 4.6) * (p.legs ?? 1); // feet come back together when standing still
   const feet = cr ? [[5.5 + stride * 0.3, 4.2], [4 - stride * 0.3, -4.6]] : [[stride, 4.8], [-stride, -4.8]];
@@ -125,6 +127,8 @@ export function drawOperator(ctx, p, t) {
   if (id === 'stim') { ctx.fillStyle = '#fff'; ctx.fillRect(-3, 6.6, 2.4, 1.6); ctx.fillStyle = '#c22'; ctx.fillRect(-2.2, 6.7, 0.8, 1.4); ctx.fillRect(-2.8, 7.1, 2, 0.6); }
   if (id === 'panel') { for (const yy of [-1, 1]) { ctx.save(); ctx.scale(1, yy); box(ctx, -4.5, 6.5, 6, 3.4, 1.5, '#5d666f'); ctx.restore(); } }
 
+  ctx.restore();
+
   // ---- weapon & arms ----
   const shield = id === 'brace' && p.brace, shieldBack = id === 'brace' && !p.brace;
   const pistol = WEAPONS[p.w] && (WEAPONS[p.w].cls === 'Pistol' || WEAPONS[p.w].cls === 'MP');
@@ -135,15 +139,15 @@ export function drawOperator(ctx, p, t) {
   ctx.translate(p.ads ? 2 : 0, p.ads ? 0 : 1.4);
   const glove = (x, y) => { ell(ctx, x, y, 1.7, 1.6, '#1f1f20'); };
   if (shield) {
-    limb(ctx, [-0.5, 7, 3, 6.5, 8.5 - rec, 2.6], 3.1, u.cloth); drawGun(ctx, p.w, rec); glove(8.5 - rec, 2.6);
-    limb(ctx, [-0.5, -7, 4, -8, 9, -7.5], 3.1, u.cloth); glove(9, -7.5);
+    limb(ctx, [-0.5, 7 * bw, 3, 6.5, 8.5 - rec, 2.6], 3.1, u.cloth); drawGun(ctx, p.w, rec); glove(8.5 - rec, 2.6);
+    limb(ctx, [-0.5, -7 * bw, 4, -8 * bw, 9, -7.5 * bw], 3.1, u.cloth); glove(9, -7.5 * bw);
   } else if (pistol) {
-    limb(ctx, [-0.5, 7, 3, 5.5, 7 - rec, 1.4], 3.1, u.cloth); limb(ctx, [-0.5, -7, 3, -5.5, 7 - rec, 1.2], 3.1, u.cloth);
+    limb(ctx, [-0.5, 7 * bw, 3, 5.5, 7 - rec, 1.4], 3.1, u.cloth); limb(ctx, [-0.5, -7 * bw, 3, -5.5, 7 - rec, 1.2], 3.1, u.cloth);
     drawGun(ctx, p.w, rec); glove(7 - rec, 1.4); glove(7.3 - rec, 0.4);
   } else {
-    limb(ctx, [-0.5, 7.2, 2.2, 7.8, 5.5 - rec, 2.6], 3.2, u.cloth);
+    limb(ctx, [-0.5, 7.2 * bw, 2.2, 7.8, 5.5 - rec, 2.6], 3.2, u.cloth);
     drawGun(ctx, p.w, rec);
-    limb(ctx, [-0.5, -7, 4, -6.5, 4 + L * 0.52 - rec, 0.9], 3.2, u.cloth);
+    limb(ctx, [-0.5, -7 * bw, 4, -6.5, 4 + L * 0.52 - rec, 0.9], 3.2, u.cloth);
     glove(5.5 - rec, 2.6); glove(4 + L * 0.52 - rec, 0.9);
   }
   if (id === 'dart') { box(ctx, 5 + L * 0.2, -4.8, 3.5, 1.8, 0.5, '#2b3a38'); ctx.fillStyle = '#4fb3a9'; ctx.fillRect(7.6 + L * 0.2, -4.4, 0.8, 0.8); }

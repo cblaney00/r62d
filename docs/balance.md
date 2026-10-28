@@ -27,3 +27,6 @@ one-shot "headshots" (any of its 8 pellets could insta-kill); traps did the most
   **Rivet's** torch makes noise bots can hear.
 
 After: every operator 39–59%, attackers 47%.
+
+## 2026-10-28 — smaller hitboxes, skinnier builds
+Bullet hit radius per armor: heavy 7.5, medium 6.8, light 6.2 px (was 10 for everyone; head stays 2.3). Medium/light bodies drawn 84%/76% as wide. Expect fewer hits per shot fired, longer fights.

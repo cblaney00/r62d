@@ -7,7 +7,7 @@ import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, cleanAtt, gunMods, attachFor, attCode } from '../shared/operators.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode } from '../shared/operators.js';
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -467,7 +467,7 @@ export class Game {
         let bt = castSight(this.map, c.x, c.y, a, 520, this.smokeList()), hit = null;
         for (const q of this.players.values()) {
           if (!q.alive || this.side(q) === team) continue;
-          const t = rayCircle(c.x, c.y, dx, dy, q.x, q.y, PLAYER_R);
+          const t = rayCircle(c.x, c.y, dx, dy, q.x, q.y, hitR(q.op));
           if (t !== null && t < bt) { bt = t; hit = q; }
         }
         if (hit) this.damage(hit, 7, p, 'Turret Camera', a);
@@ -554,12 +554,12 @@ export class Game {
     for (const q of this.players.values()) {
       if (q === src || !q.alive) continue; // friendly fire: teammates get hit too
       const at = src.viewTime !== null && src.viewTime !== undefined ? this.posAt(q, src.viewTime) : q; // favour the shooter
-      const t = rayCircle(x0, y0, dx, dy, at.x, at.y, PLAYER_R);
+      const t = rayCircle(x0, y0, dx, dy, at.x, at.y, hitR(q.op));
       if (t !== null && t < bestT) { bestT = t; best = { q, at }; }
     }
     for (const e of this.ents) {
       if (!e.hp || e.team === team || e.tu) continue; // turret cameras are bulletproof
-      const t = rayCircle(x0, y0, dx, dy, e.x, e.y, e.type === 'decoy' ? PLAYER_R : 6);
+      const t = rayCircle(x0, y0, dx, dy, e.x, e.y, e.type === 'decoy' ? hitR(e.op) : 6);
       if (t !== null && t < bestT) { bestT = t; best = { e }; }
     }
     let mult = 1, stopT = bestT, kind = best ? 'flesh' : 'none', pens = 0;
@@ -933,7 +933,7 @@ export class Game {
       }
       for (const q of this.players.values()) {
         if (!q.alive || this.side(q) === team) continue;
-        const t = rayCircle(p.x, p.y, ca, sa, q.x, q.y, PLAYER_R);
+        const t = rayCircle(p.x, p.y, ca, sa, q.x, q.y, hitR(q.op));
         if (t !== null && t < bt) { bt = t; hitQ = q; hitE = null; }
       }
       if (hitE) { if (hitE.tu) hitE.offUntil = this.time + 10; else this.hitEnt(hitE, p); }
@@ -1081,7 +1081,7 @@ export class Game {
           let hitT = null;
           for (const q of this.players.values()) {
             if (!q.alive || this.side(q) === e.team) continue;
-            const t = rayCircle(e.x, e.y, dx, dy, q.x, q.y, PLAYER_R);
+            const t = rayCircle(e.x, e.y, dx, dy, q.x, q.y, hitR(q.op));
             if (t !== null && t <= step && (hitT === null || t < hitT)) hitT = t;
           }
           const wallT = walkRay(e.x, e.y, dx, dy, step, (cx, cy) => blocksDrone(tileAt(this.map, cx, cy)) || tileAt(this.map, cx, cy) === T.BARRI);
