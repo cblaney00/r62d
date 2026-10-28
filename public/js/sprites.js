@@ -126,7 +126,7 @@ export function drawOperator(ctx, p, t) {
   if (id === 'panel') { for (const yy of [-1, 1]) { ctx.save(); ctx.scale(1, yy); box(ctx, -4.5, 6.5, 6, 3.4, 1.5, '#5d666f'); ctx.restore(); } }
 
   // ---- weapon & arms ----
-  const shield = id === 'brace';
+  const shield = id === 'brace' && p.brace, shieldBack = id === 'brace' && !p.brace;
   const pistol = WEAPONS[p.w] && (WEAPONS[p.w].cls === 'Pistol' || WEAPONS[p.w].cls === 'MP');
   const rec = p.recoil || 0, mel = p.melee || 0, L = WEAPONS[p.w] ? WEAPONS[p.w].len : 12;
   ctx.save();
@@ -159,8 +159,11 @@ export function drawOperator(ctx, p, t) {
     ctx.globalCompositeOperation = 'source-over';
   }
   ctx.restore();
+  if (shieldBack) { // slung on the back while the pistol is out
+    ctx.strokeStyle = '#22252a'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.arc(2, 0, 11, Math.PI - 0.8, Math.PI + 0.8); ctx.stroke();
+  }
   if (shield) {
-    const arc = p.brace ? 1.4 : 0.9;
+    const arc = 0.95;
     ctx.lineCap = 'butt';
     ctx.strokeStyle = OUT; ctx.lineWidth = 5.4; ctx.beginPath(); ctx.arc(-2, 0, 14, -arc, arc); ctx.stroke();
     ctx.strokeStyle = '#22252a'; ctx.lineWidth = 4.4; ctx.beginPath(); ctx.arc(-2, 0, 14, -arc, arc); ctx.stroke();

@@ -41,7 +41,7 @@ export const OPERATORS = {
              ability: { id: 'emp', name: 'EMP Grenade', count: 2, desc: 'Destroys jammers, traps and enemy gadgets nearby, and blinds cameras for 12 seconds.' },
              gadget: 'breach', gadgetCount: 2, color: '#a46ad6', helmet: '#4a5164', look: 'goggles' },
   bulwark: { team: 'atk', name: 'BULWARK', role: 'Shield',        armor: 1, primary: 'p10',     secondary: null,
-             ability: { id: 'brace', name: 'Ballistic Shield', count: 0, desc: 'Your shield always stops bullets from the front. Hold the ability to brace it wide, moving slowly. One hand holds the shield, so you carry a pistol and fire from the hip; firing shows more of you, and a melee hit knocks the shield aside for a moment.' },
+             ability: { id: 'brace', name: 'Ballistic Shield', count: 0, desc: 'Shield up: bullets cannot get through the front, but you cannot shoot; melee is a shield bash that staggers (a miss leaves you open). Press to put the shield on your back and draw your pistol (takes a moment); it then guards your back.' },
              gadget: 'stun', gadgetCount: 2, color: '#d84a4a', helmet: '#46484c', look: 'visor' },
   rivet   : { team: 'atk', name: 'RIVET', role: 'Hard Breacher', armor: 2, primary: 'k4', secondary: 'p10',
              ability: {id: "lance",name: "Thermal Lance",count: 0,battery: 14,desc: "Hold facing a wall to burn through it one block at a time — even reinforced walls and steel panels. Quiet, but the glow gives you away."},

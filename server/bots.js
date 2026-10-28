@@ -167,7 +167,10 @@ export function botThink(game, p, dt) {
     inp.ads = 1;
     if (gun && gun.ammo === 0) game.startReload(p);
     // a shield facing us: circle round it and only shoot once its side shows (as people do)
-    const shieldUp = OPERATORS[enemy.op].ability.id === 'brace' && !enemy.downed && Math.abs(angDiff(Math.atan2(p.y - enemy.y, p.x - enemy.x), enemy.aim)) < 0.8;
+    if (p.bracing && Math.hypot(enemy.x - p.x, enemy.y - p.y) < 32) { p.aim = Math.atan2(enemy.y - p.y, enemy.x - p.x); game.event(p, { k: 'melee' }); return; } // shield bash
+    if (p.bracing && Math.random() < dt * 0.8) inp.ability = 1; // now and then put the shield away to shoot
+    if (!p.bracing && OPERATORS[p.op].ability.id === 'brace' && Math.hypot(enemy.x - p.x, enemy.y - p.y) < 45 && Math.random() < dt) inp.ability = 1;
+    const shieldUp = enemy.bracing && !enemy.downed && Math.abs(angDiff(Math.atan2(p.y - enemy.y, p.x - enemy.x), enemy.aim)) < 0.8;
     if (shieldUp && Math.hypot(enemy.x - p.x, enemy.y - p.y) < 26) { p.aim = Math.atan2(enemy.y - p.y, enemy.x - p.x); game.event(p, { k: 'melee' }); return; } // knock the shield aside
     if (shieldUp && !(game.time < (enemy.shieldDownUntil || 0))) { ai.strafe = ai.strafe || (Math.random() < 0.5 ? -1 : 1); const sa = Math.atan2(enemy.y - p.y, enemy.x - p.x) + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); return; }
     else if (ai.react > 0.55 && Math.abs(angDiff(want, p.aim)) < 0.2) {

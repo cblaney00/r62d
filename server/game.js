@@ -383,7 +383,7 @@ export class Game {
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
     p.bloom = Math.max(0, p.bloom - dt * 0.15);
     { const g = p.guns[p.slot], cls = g ? WEAPONS[g.w].cls : 'AR', rate = (1 / (ADS_TIME[cls] || 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
-      const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && OPERATORS[p.op].ability.id !== 'brace'; // behind a shield you can only hip-fire
+      const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time);
       p.adsT = Math.max(0, Math.min(1, (p.adsT || 0) + (canAds ? dt * rate : -dt * rate * 1.6)));
       if (this.time - p.lastShot > 0.14) { p.rc = (p.rc || 0) * Math.exp(-dt * 7); p.shots = 0; } }
 
@@ -412,7 +412,11 @@ export class Game {
 
     // held abilities
     const op = OPERATORS[p.op];
-    p.bracing = op.ability.id === 'brace' && !!inp.ability && p.ctrl === 'body';
+    if (op.ability.id === 'brace') { // shield up (can't shoot) or pistol out (shield on the back); Q switches, which takes a moment
+      if (p.shieldMode === undefined) p.shieldMode = 'shield';
+      if (inp.ability && !prev.ability && p.ctrl === 'body' && !p.downed && !(p.switchUntil > this.time)) { p.switchUntil = this.time + 0.6; p.shieldMode = p.shieldMode === 'shield' ? 'gun' : 'shield'; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); }
+      p.bracing = p.shieldMode === 'shield' && !(p.switchUntil > this.time);
+    }
     if (op.ability.id === 'scan') {
       if (inp.ability && p.battery > 0 && p.ctrl === 'body') {
         p.scanning = true; p.battery = Math.max(0, p.battery - dt);
@@ -472,7 +476,7 @@ export class Game {
 
     // shooting
     const canShoot = p.ctrl === 'body' && !p.busy && p.reloadT <= 0 && !p.scanning && !p.bracing && gun &&
-      true;
+      !(p.switchUntil > this.time) && !(p.staggerUntil > this.time);
     if (canShoot && inp.fire) {
       const w = WEAPONS[gun.w];
       const edge = !prev.fire;
@@ -504,7 +508,7 @@ export class Game {
     // hip fire is a loose cone that widens while moving; aimed fire is accurate even on the move (R6 rules)
     const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED), at = p.adsT || 0;
     const m = gun.m || gunMods(gun.w);
-    const hip = (w.spread * (p.input.crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip * (OPERATORS[p.op].ability.id === 'brace' ? 1.35 : 1), ads = w.ads * m.adsSpread; // firing round a shield is loose
+    const hip = (w.spread * (p.input.crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip, ads = w.ads * m.adsSpread;
     const spread = (hip + (ads - hip) * at + p.bloom * (1 - 0.7 * at)) * (this.time < (p.dazeUntil || 0) ? 1.7 : 1); // dazed: shaky aim
     p.bloom = Math.min(0.08, p.bloom + w.bloom);
     // recoil: drifts one way for a burst, then the other, with sway; pull against it
@@ -547,7 +551,7 @@ export class Game {
     const dx = Math.cos(ang), dy = Math.sin(ang), team = this.side(src);
     let best = null, bestT = range;
     for (const q of this.players.values()) {
-      if (q === src || !q.alive || this.side(q) === team) continue;
+      if (q === src || !q.alive) continue; // friendly fire: teammates get hit too
       const at = src.viewTime !== null && src.viewTime !== undefined ? this.posAt(q, src.viewTime) : q; // favour the shooter
       const t = rayCircle(x0, y0, dx, dy, at.x, at.y, PLAYER_R);
       if (t !== null && t < bestT) { bestT = t; best = { q, at }; }
@@ -575,8 +579,8 @@ export class Game {
     if (best && best.q) {
       const q = best.q;
       if (OPERATORS[q.op].ability.id === 'brace' && !q.downed && q.ctrl === 'body' && !(this.time < (q.shieldDownUntil || 0))) {
-        const arc = q.bracing ? 1.4 : this.time - (q.lastShot || -9) < 0.5 ? 0.45 : 0.8; // while shooting round the shield, more of you shows
-        if (Math.abs(angDiff(Math.atan2(y0 - q.y, x0 - q.x), q.aim)) < arc) {
+        const off = Math.abs(angDiff(Math.atan2(y0 - q.y, x0 - q.x), q.aim)), switching = q.switchUntil > this.time;
+        if (!switching && (q.bracing ? off < 0.95 : off > Math.PI - 0.8)) {
           this.events.push({ e: 'hit', k: 'shield', x: r1(ex), y: r1(ey) });
           return { x: ex, y: ey, k: 'shield' };
         }
@@ -634,7 +638,8 @@ export class Game {
     if (!q.alive) return;
     q.alive = false; q.downed = false; q.hp = 0; q.deaths++; q.busy = null; q.scanning = false; q.bracing = false;
     if (q.ctrl !== 'body') q.ctrl = 'body';
-    if (src && src !== q) { src.kills++; if (src.ms && this.side(src) !== this.side(q)) { src.ms.kills++; this.opStat(src).kills++; } }
+    if (src && src !== q && this.side(src) !== this.side(q)) { src.kills++; if (src.ms) { src.ms.kills++; this.opStat(src).kills++; } }
+    else if (src && src !== q) src.kills--; // a teamkill costs you
     if (q.ms) { q.ms.deaths++; this.opStat(q).deaths++; }
     if (src && src.sock) this.events.push({ e: 'hitmark', to: src.id, kill: true });
     this.events.push({ e: 'kill', killer: src ? src.id : null, victim: q.id, w: wname || '', hs: this.headshot ? 1 : 0 });
@@ -795,16 +800,22 @@ export class Game {
 
   melee(p) {
     if (p.meleeCd > 0 || p.downed || p.ctrl !== 'body') return;
-    p.meleeCd = 0.75;
+    p.meleeCd = 0.75; p.fireCd = Math.max(p.fireCd, 0.45); // a swing takes a moment to recover from
     this.events.push({ e: 'melee', id: p.id });
     const team = this.side(p);
+    if (p.bracing) { // shield bash: staggers whoever it hits; a miss leaves the shield down for a while
+      const q = [...this.players.values()].find(q => q.alive && this.side(q) !== team && Math.hypot(q.x - p.x, q.y - p.y) < 34 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.0);
+      if (q) { this.damage(q, 30, p, 'Shield Bash', p.aim); q.staggerUntil = this.time + 0.7; q.slowUntil = Math.max(q.slowUntil, this.time + 1); p.meleeCd = 0.8; }
+      else { p.meleeCd = 1.4; p.shieldDownUntil = this.time + 1.2; }
+      return;
+    }
     for (const q of this.players.values()) {
       if (!q.alive || this.side(q) === team) continue;
       const d = Math.hypot(q.x - p.x, q.y - p.y);
       if (d < 28 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.1 && los(this.map, p.x, p.y, q.x, q.y)) {
         // hitting a shield from the front knocks it aside for a moment instead of hurting
         if (OPERATORS[q.op].ability.id === 'brace' && !q.downed && q.ctrl === 'body' && Math.abs(angDiff(Math.atan2(p.y - q.y, p.x - q.x), q.aim)) < 0.8 && !(this.time < (q.shieldDownUntil || 0))) {
-          q.shieldDownUntil = this.time + 1.2; this.events.push({ e: 'hit', k: 'shield', x: r1(q.x), y: r1(q.y) }); this.events.push({ e: 'snd', s: 'panel', x: r1(q.x), y: r1(q.y) }); return;
+          q.shieldDownUntil = this.time + 1.0; p.meleeCd = 1.3; p.fireCd = Math.max(p.fireCd, 0.9); this.events.push({ e: 'hit', k: 'shield', x: r1(q.x), y: r1(q.y) }); this.events.push({ e: 'snd', s: 'panel', x: r1(q.x), y: r1(q.y) }); return;
         }
         this.damage(q, q.downed ? 999 : 55, p, 'Melee', p.aim); return;
       }
@@ -1163,9 +1174,9 @@ export class Game {
     const kind = e.type === 'nade' ? e.kind : e.type;
     const SOFTISH = [T.SOFT, T.BARRI];
     switch (kind) {
-      case 'frag': this.explode(e, { r: 75, dmg: 130, cellR: 14, cells: SOFTISH, kind: 'frag' }); break;
-      case 'impact': this.explode(e, { r: 34, dmg: 40, cellR: 22, cells: SOFTISH, kind: 'impact' }); break;
-      case 'nitro': this.explode(e, { r: 70, dmg: 140, cellR: 20, cells: SOFTISH, kind: 'nitro' }); break;
+      case 'frag': this.explode(e, { r: 75, dmg: 130, cellR: 14, cells: SOFTISH, kind: 'frag', ff: 1 }); break;
+      case 'impact': this.explode(e, { r: 34, dmg: 40, cellR: 22, cells: SOFTISH, kind: 'impact', ff: 1 }); break;
+      case 'nitro': this.explode(e, { r: 70, dmg: 140, cellR: 20, cells: SOFTISH, kind: 'nitro', ff: 1 }); break;
       case 'slug': this.explode(e, { r: 36, dmg: 75, cellR: 21, cells: SOFTISH, kind: 'slug', selfMul: 0.3 }); break;
       case 'breach': this.explode(e, { r: 40, dmg: 60, cellR: 21, cells: SOFTISH, kind: 'breach', at: e.cell }); break;
       case 'claymore': this.explode(e, { r: 50, dmg: 95, cellR: 0, cells: [], kind: 'frag', cone: e.ang }); break;
@@ -1248,7 +1259,7 @@ export class Game {
     for (const q of this.players.values()) {
       if (!q.alive) continue;
       const self = owner && q === owner;
-      if (!self && this.side(q) === e.team) continue;
+      if (!self && this.side(q) === e.team && !o.ff) continue; // thrown/placed explosives hurt teammates; traps don't
       const d = Math.hypot(q.x - e.x, q.y - e.y);
       if (d > o.r) continue;
       if (o.cone !== undefined && Math.abs(angDiff(Math.atan2(q.y - e.y, q.x - e.x), o.cone)) > 0.8) continue;
@@ -1363,7 +1374,7 @@ export class Game {
         sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ct: p.ctrl,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
-        gt: r2(p.gait || 0), mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sc: p.scanning ? 1 : 0,
+        gt: r2(p.gait || 0), mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
         aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,

@@ -1110,7 +1110,7 @@ function draw(s, view, now, dt) {
   if (me && me.a && me.dn) { ctx.fillStyle = 'rgba(90,0,0,0.25)'; ctx.fillRect(0, 0, VW, VH); }
   const fl = st.flashUntil - now;
   if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(1, fl / 1.2)})`; ctx.fillRect(0, 0, VW, VH); }
-  if (inGame && me && me.a && (me.ct === 'body')) crosshair(me, now);
+  if (inGame && me && me.a && me.ct === 'body' && !me.br) crosshair(me, now);
   else if (inGame) { ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 2 * DPR, 0, 7); ctx.fill(); }
 }
 
