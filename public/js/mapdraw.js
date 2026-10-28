@@ -321,8 +321,13 @@ export class MapRenderer {
   }
 
   // ---- decals (blood, scorch marks) ----
+  // cells under blood and scorch marks, so the next round on this map can wipe just those
+  decalAt(x0, y0, x1, y1) {
+    const W = this.map.W, D = this.decalCells || (this.decalCells = new Set());
+    for (let y = Math.floor(y0 / CELL); y <= Math.floor(y1 / CELL); y++) for (let x = Math.floor(x0 / CELL); x <= Math.floor(x1 / CELL); x++) D.add(y * W + x);
+  }
   blood(x, y, ang) {
-    const d = this.dctx; this.mark(x - 13, y - 13, x + 13, y + 13);
+    const d = this.dctx; this.mark(x - 13, y - 13, x + 13, y + 13); this.decalAt(x - 13, y - 13, x + 13, y + 13);
     for (let i = 0; i < 7; i++) {
       const r = Math.random() * 10, a = ang + (Math.random() - 0.5) * 0.9;
       d.fillStyle = `rgba(${90 + Math.random() * 40},8,8,${0.35 + Math.random() * 0.35})`;
@@ -330,19 +335,19 @@ export class MapRenderer {
     }
   }
   pool(x, y) {
-    this.mark(x - 15, y - 15, x + 15, y + 15);
+    this.mark(x - 15, y - 15, x + 15, y + 15); this.decalAt(x - 15, y - 15, x + 15, y + 15);
     const d = this.dctx, g = d.createRadialGradient(x, y, 0, x, y, 14);
     g.addColorStop(0, 'rgba(110,8,8,0.75)'); g.addColorStop(0.7, 'rgba(90,5,5,0.55)'); g.addColorStop(1, 'rgba(80,5,5,0)');
     d.fillStyle = g; d.beginPath(); d.ellipse(x, y, 14, 11, Math.random() * 3, 0, 7); d.fill();
   }
   scorch(x, y, r) {
-    this.mark(x - r, y - r, x + r, y + r);
+    this.mark(x - r, y - r, x + r, y + r); this.decalAt(x - r, y - r, x + r, y + r);
     const d = this.dctx, g = d.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, 'rgba(15,12,10,0.7)'); g.addColorStop(0.6, 'rgba(20,16,12,0.35)'); g.addColorStop(1, 'rgba(0,0,0,0)');
     d.fillStyle = g; d.fillRect(x - r, y - r, r * 2, r * 2);
   }
   hole(x, y) {
-    const d = this.dctx; this.mark(x - 2, y - 2, x + 2, y + 2);
+    const d = this.dctx; this.mark(x - 2, y - 2, x + 2, y + 2); this.decalAt(x - 2, y - 2, x + 2, y + 2);
     d.fillStyle = 'rgba(20,20,20,0.7)'; d.beginPath(); d.arc(x, y, 0.8, 0, 7); d.fill();
   }
 }

@@ -111,7 +111,16 @@ function connect() {
   ws.onmessage = ev => {
     const m = JSON.parse(ev.data);
     if (m.t === 'welcome') {
-      st.id = m.id; loadMap(m.mapVersion, m.tiles, m.hp, m.mapId);
+      st.id = m.id;
+      if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
+        resetMap(m.mapVersion);
+        for (let k = 0; k < m.tiles.length; k++) if (m.tiles[k] !== st.map.tiles[k] || m.hp[k] !== st.map.hp[k]) {
+          st.map.tiles[k] = st.known.tiles[k] = m.tiles[k]; st.map.hp[k] = st.known.hp[k] = m.hp[k]; st.rend.cellChanged(k);
+        }
+      } else {
+        st.mapLoading = true;
+        runLoading('LOADING MAP', [['Building the map', () => loadMap(m.mapVersion, m.tiles, m.hp, m.mapId)], ['Getting every floor ready', () => frames(6)]]).then(() => { st.mapLoading = false; });
+      }
       st.token = m.token; st.profile = m.profile; updateCard();
       if (m.profile.settings) applySettings(m.profile.settings); else saveSettings(); // first time: keep what this browser had
       try { localStorage.setItem('r62d-token', m.token); } catch {}
@@ -143,8 +152,56 @@ function loadMap(mv, tiles, hp, id) {
   st.loadMs = Math.round(performance.now() - t0); // map build + picture (shown in __r62d for speed checks)
 }
 
+// A new round on the same map: instead of redrawing the whole map picture (a visible stall), only
+// the spots that changed last round (broken walls, barricades, blood, splinters) are redrawn, a few per frame.
+function resetMap(mv) {
+  const fresh = buildMap(st.mapId), K = st.known, R = st.rend;
+  const dirty = new Set(R.decalCells || []); R.decalCells = new Set();
+  for (const k of st.splinters) dirty.add(k);
+  for (let k = 0; k < fresh.tiles.length; k++) if (K.tiles[k] !== fresh.tiles[k] || K.hp[k] !== fresh.hp[k]) dirty.add(k);
+  st.map = fresh; st.base = fresh.tiles.slice(); st.mv = mv;
+  st.known = { ...fresh, tiles: fresh.tiles.slice(), hp: fresh.hp.slice() };
+  st.unseen = new Set(); st.splinters = new Set();
+  R.map = st.known; R.base = st.base; R.splinters = st.splinters;
+  for (const k of dirty) R.cellChanged(k);
+  st.corpses = []; fx.clear(); st.pending = [];
+}
+
+// ---------------- loading screen ----------------
+const frames = n => new Promise(r => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+let loadingChain = Promise.resolve();
+function runLoading(title, steps) { // one loading screen at a time; each step gets a painted frame first
+  loadingChain = loadingChain.then(async () => {
+    const el = $('loading'); el.classList.remove('hidden'); $('loadTitle').textContent = title;
+    for (let i = 0; i < steps.length; i++) {
+      $('loadStep').textContent = steps[i][0]; $('loadBar').style.width = Math.round(i / steps.length * 100) + '%';
+      await frames(2);
+      await steps[i][1]();
+    }
+    $('loadBar').style.width = '100%'; $('loadStep').textContent = 'Ready';
+    await frames(4);
+    el.classList.add('hidden');
+  });
+  return loadingChain;
+}
+// the same thing split into many small jobs, a slice per frame, so the bar keeps moving
+const jobsStep = (jobs, perFrame) => async () => { for (let i = 0; i < jobs.length; i += perFrame) { jobs.slice(i, i + perFrame).forEach(j => j()); await frames(1); } };
+const portraitCache = new Map();
+function portraitCached(c, k) { // operator portraits are drawn once and copied after that
+  let p = portraitCache.get(k);
+  if (!p) { p = document.createElement('canvas'); p.width = 240; p.height = 240; portrait(p, k); portraitCache.set(k, p); }
+  const x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height); x.drawImage(p, 0, 0, c.width, c.height);
+}
+
 function onSnap(s) {
-  if (s.mv !== st.mv || (s.mp && s.mp !== st.mapId)) loadMap(s.mv, null, null, s.mp);
+  if (st.mapLoading) return; // a new map is being got ready behind the loading screen
+  if (s.mp && s.mp !== st.mapId) { // a different map: build it behind a loading screen
+    st.mapLoading = true;
+    const name = MAPS[s.mp] ? MAPS[s.mp].name.toUpperCase() : 'MAP';
+    runLoading(`LOADING ${name}`, [['Building the map', () => loadMap(s.mv, null, null, s.mp)], ['Getting every floor ready', () => frames(6)]]).then(() => { st.mapLoading = false; });
+    return;
+  }
+  if (s.mv !== st.mv) { if (st.rend) resetMap(s.mv); else loadMap(s.mv, null, null, s.mp); } // same map, new round
   const m = st.map, now = performance.now() / 1000;
   const changed = [];
   for (let i = 0; i < s.cells.length; i += 3) {
@@ -451,7 +508,7 @@ function buildSelect(s) {
     for (const k of opsForTeam(side)) {
       const o = OPERATORS[k];
       const d = document.createElement('div'); d.className = 'op'; d.dataset.op = k;
-      const c = document.createElement('canvas'); c.width = 240; c.height = 240; portrait(c, k);
+      const c = document.createElement('canvas'); c.width = 240; c.height = 240; portraitCached(c, k);
       const speed = o.armor, armor = 4 - o.armor;
       const pips = n => [1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('');
       const lo = cleanLoadout(k, st.profile && st.profile.loadouts[k]);
@@ -1242,7 +1299,14 @@ function promptText(s, me) {
 }
 
 $('conn').classList.add('hidden');
-loadMap(-1); // the map drifts behind the title screen and menus
+// Everything the game draws is prepared up front, behind a loading screen, so nothing has to be made mid-match.
+runLoading('LOADING', [
+  ['Loading fonts', () => document.fonts.ready],
+  ['Building the map', () => loadMap(-1)], // the map drifts behind the title screen and menus
+  ['Drawing the guns', jobsStep(Object.keys(WEAPONS).flatMap(w => [[270, 84], [210, 74], [150, 49], [160, 50], [300, 100]].map(([a, b]) => () => gunPicture(w, {}, a, b))), 8)],
+  ['Drawing the operators', jobsStep(Object.keys(OPERATORS).map(k => () => portraitCached(document.createElement('canvas'), k)), 6)],
+  ['Getting the graphics card ready', () => frames(6)],
+]);
 connect();
 requestAnimationFrame(frame);
 
@@ -1396,6 +1460,7 @@ st.started = false;
 $('splash').addEventListener('click', () => {
   if (st.started) return;
   audio.initAudio(); audio.ui('open');
+  runLoading('PREPARING SOUNDS', [['Recording gunshots and footsteps', jobsStep(audio.soundJobs(), 6)]]); // built now, not the first time you hear them
   if (!document.fullscreenElement && !inApp()) document.documentElement.requestFullscreen().catch(() => {});
   st.started = true; updateNav();
   let saved = ''; try { saved = localStorage.getItem('r62d-name') || ''; } catch {}

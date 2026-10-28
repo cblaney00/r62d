@@ -12,6 +12,13 @@ const loops = new Map();
 export const MIX = { guns: 2.6, explosions: 2.8, steps: 1.36, foley: 2.25, body: 0.4, impacts: 11.5, gadgets: 3.6, ui: 27, loops: 1.4 };
 let C = 'foley'; // category of the sound currently being built
 
+// Every recording the game uses, as a list of small jobs (the loading screen runs them before you play).
+export function soundJobs() {
+  if (!ac) return [];
+  const jobs = Object.keys(GUN).map(c => () => gunBuf(c));
+  for (const s of Object.keys(SURF)) { for (const p of [2, 0, 3, 1]) jobs.push(() => stepBuf(s, p)); jobs.push(() => stepBuf(s, 0, true)); }
+  return jobs;
+}
 export function initAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
   buildGraph(new (window.AudioContext || window.webkitAudioContext)());

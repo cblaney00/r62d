@@ -7,6 +7,13 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: #050607; color: var(--text); font-family: var(--body); user-select: none; }
 canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: none; }
 #objective .flr { color: var(--gold); margin-right: 4px; }
+#loading { position: fixed; inset: 0; z-index: 100; background: radial-gradient(ellipse at center, #10151c, #050607 70%); display: flex; align-items: center; justify-content: center; transition: opacity 0.35s; }
+#loading.hidden { display: flex !important; opacity: 0; pointer-events: none; }
+#loading .lbox { width: min(520px, 80vw); text-align: center; }
+#loading .lt { font: 800 84px/1 var(--head); letter-spacing: 0.06em; color: #f2f2f2; } #loading .lt span { color: #3aa0ff; }
+#loadTitle { font: 700 16px var(--head); letter-spacing: 0.4em; color: var(--dim); margin: 14px 0 22px; }
+#loading .lbar { height: 4px; background: rgba(255,255,255,0.1); overflow: hidden; } #loadBar { display: block; height: 100%; width: 0; background: #3aa0ff; transition: width 0.2s; }
+#loadStep { font: 600 14px var(--head); letter-spacing: 0.15em; color: var(--dim); margin-top: 12px; min-height: 18px; }
 #mapLayer { position: fixed; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 canvas#fog, canvas#over, #vignette { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; }
 canvas#fog { visibility: hidden; }
