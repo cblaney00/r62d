@@ -11,6 +11,7 @@ import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
 import { openOps, closeOps, updateOpsProfile } from './ops.js';
 import { openProfile } from './profile.js';
+import { openArmory, closeArmory } from './armory.js';
 import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './crosshair.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor } from '/shared/progress.js';
@@ -1193,15 +1194,15 @@ function revealSeen() {
 function revealAll() { if (!st.unseen) return; for (const k of st.unseen) applyKnown(k); st.unseen.clear(); }
 
 // ---------------- pause menu & pages ----------------
-const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'pause', 'quitDlg'];
+const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'armoryPage', 'pause', 'quitDlg'];
 function menuOpen() { return OVERLAYS.some(id => !$(id).classList.contains('hidden')); }
 function inMatch() { const p = st.last && st.last.ph; return p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END || p === PHASE.SELECT; }
 function showOps(op) { audio.ui('open'); openOps($('opsPage'), { profile: st.profile, send, op }); }
 function showProfile() { audio.ui('open'); if (st.token) openProfile($('profilePage'), { token: st.token }); }
 // Esc closes whatever is open, otherwise opens/closes the pause menu during a match.
 function escape() {
-  for (const id of ['settings', 'opsPage', 'profilePage']) if (!$(id).classList.contains('hidden')) {
-    if (id === 'opsPage') closeOps($(id)); else $(id).classList.add('hidden');
+  for (const id of ['settings', 'opsPage', 'profilePage', 'armoryPage']) if (!$(id).classList.contains('hidden')) {
+    if (id === 'opsPage') closeOps($(id)); else if (id === 'armoryPage') closeArmory($(id)); else $(id).classList.add('hidden');
     return;
   }
   if (!$('quitDlg').classList.contains('hidden')) { $('quitDlg').classList.add('hidden'); audio.ui('back'); return; }
@@ -1229,6 +1230,7 @@ $('pFs').onclick = () => { if (document.fullscreenElement) document.exitFullscre
 $('pEnd').onclick = () => { if (confirm('End the match for everyone and go back to the lobby?')) { send({ t: 'lobby', a: 'end' }); $('pause').classList.add('hidden'); } };
 $('lobbyOpsBtn').onclick = () => showOps();
 $('lobbyProfBtn').onclick = () => showProfile();
+$('armoryPage').querySelector('.close').onclick = () => closeArmory($('armoryPage'));
 for (const id of ['opsPage', 'profilePage']) $(id).querySelector('.close').onclick = () => { if (id === 'opsPage') closeOps($(id)); else $(id).classList.add('hidden'); };
 
 // ---------------- title screen, main menu, little touches ----------------
@@ -1246,6 +1248,7 @@ function setTab(tab) {
   if ((tab === 'ops' || tab === 'profile') && !st.token) { audio.ui('back'); $('name').focus(); tab = 'play'; }
   if (tab === 'ops') { showOps(); return; }
   if (tab === 'profile') { showProfile(); return; }
+  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage')); return; }
   if (tab === 'settings') { toggleSettings(); return; }
   if (tab === 'quit') { $('quitDlg').classList.remove('hidden'); audio.ui('open'); return; }
   for (const b of $('mnav').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);

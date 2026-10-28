@@ -30,6 +30,7 @@
     <nav class="mnav" id="mnav">
       <button data-tab="play" class="on">PLAY</button>
       <button data-tab="ops">OPERATORS</button>
+      <button data-tab="armory">ARMORY</button>
       <button data-tab="profile">PROFILE</button>
       <button data-tab="settings">SETTINGS</button>
       <button data-tab="controls">CONTROLS</button>
@@ -128,6 +129,8 @@
   <div id="quitDlg" class="overlay hidden"><div class="menu"><h2>QUIT?</h2><p class="hint">Close R62D and go back to the desktop.</p>
     <button id="qYes" class="primary">Quit to desktop</button><button id="qNo">Cancel</button></div></div>
   <div id="opsPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>OPERATORS</h2><button class="close">Close</button></div><div class="opsWrap"><div id="opsList"></div><div id="opsDetail"></div></div></div></div>
+  <div id="armoryPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>ARMORY</h2><span class="hint">Your private shooting range — try any gun</span><button class="close">Close</button></div>
+    <div class="armWrap"><div id="armList"></div><div class="armMid"><div class="armBar"><span>Distance</span><span id="armDist" class="seg"><button data-d="5">5 m</button><button data-d="10">10 m</button><button data-d="20">20 m</button><button data-d="30">30 m</button><button data-d="45">45 m</button></span><button id="armReset">Reset targets</button></div><canvas id="armCanvas"></canvas></div><div id="armStats"></div></div></div></div>
   <div id="profilePage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>PROFILE</h2><button class="close">Close</button></div><div id="profBody"></div></div></div>
   <div id="corner"><button id="fsBtn" title="Fullscreen">⛶ Fullscreen</button><button id="setBtn">⚙ Settings</button><button id="muteBtn">🔊</button><button id="leaveBtn" class="hidden">End match</button></div>
   <div id="conn" class="hidden">Connecting…</div>
