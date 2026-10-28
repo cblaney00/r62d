@@ -536,8 +536,8 @@ function renderMapPick(s) {
 function renderLobby(s) {
   renderControls(); renderMapPick(s);
   // the address friends type to join (the first network card is the wired one)
-  if (st.addr === undefined) { st.addr = null; fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
-  const jt = st.addr && st.addr.urls.length ? `Friends join at ${st.addr.urls[0]}` : '';
+  if (st.addr === undefined || (st.addrT && performance.now() - st.addrT > 15000)) { st.addr = st.addr || null; st.addrT = performance.now(); fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
+  const u = st.addr && st.addr.urls[0], jt = !u ? '' : u.vpn ? `Friends on the homelab VPN join at ${u.url}` : `Friends join at ${u.url} · turn on homelab-vpn to play over the VPN`;
   if ($('joinAddr').textContent !== jt) $('joinAddr').textContent = jt;
   for (const sq of [0, 1]) {
     const ul = document.querySelector(`#sq${sq} ul`);

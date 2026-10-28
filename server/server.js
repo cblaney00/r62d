@@ -49,7 +49,8 @@ function api(req, res) {
   // the addresses friends type to join this server (shown in the lobby)
   if (u.pathname === '/api/addr') {
     const urls = [];
-    for (const list of Object.values(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) urls.push(`http://${a.address}:${PORT}`);
+    for (const [dev, list] of Object.entries(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) urls.push({ url: `http://${a.address}:${PORT}`, vpn: /^wg|^tun/.test(dev) || a.address.startsWith('10.10.') });
+    urls.sort((a, b) => b.vpn - a.vpn); // the homelab VPN address first: that's how friends join from outside
     return json(200, { urls });
   }
   if (u.pathname === '/api/match') { const m = store.match(q('id')); return m ? json(200, m) : json(404, { error: 'no such match' }); }
