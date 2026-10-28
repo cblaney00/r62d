@@ -1,0 +1,10 @@
+{
+  "name": "r62d",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server/server.js",
+    "start": "node server/server.js",
+    "test": "node tests/sim.js"
+  }
+}
