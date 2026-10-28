@@ -6,11 +6,13 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-- [ ] R6 aiming rules (headshots one-tap, accurate ADS, ADS time, recoil, damage drop-off) and R6-level peeker's advantage.
-- [ ] Chat: Y opens team chat; / switches between team chat and all chat.
+*(nothing waiting — add your next idea!)*
 
 ## Done
 
+- [x] R6 aiming: headshots one-tap, ADS accurate even moving (with aim-in time per weapon), recoil you pull against,
+      damage drop-off. Peeker's advantage like R6: server judges shots by what the shooter saw (~125 ms + ping).
+- [x] Chat: Y opens team chat, / switches team ⇄ all, Enter sends, Esc closes.
 - [x] CS2-style controls for players coming from Counter-Strike: run by default (no sprint), Shift = silent walk,
       Ctrl (hold) = silent crouch, E = use, 3 = melee, 4 = gadget, Q = operator skill, 5 = drone/cams, middle mouse = mark.
       Accuracy drops while running (stop or crouch to shoot straight). Ctrl can't close the full-screen window.

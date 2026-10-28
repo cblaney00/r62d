@@ -15,6 +15,7 @@ export const ACTIONS = [
   ['view', 'Drone / Cameras', 'Digit5', ''],
   ['melee', 'Melee (knife)', 'Digit3', 'KeyV'],
   ['spot', 'Mark enemy under cursor', 'KeyT', ''],
+  ['chat', 'Chat (opens team chat; / switches team ⇄ all)', 'KeyY', 'Enter'],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['settings', 'Settings', 'KeyO', 'F1'],
   ['pause', 'Pause menu', 'Escape', 'KeyP'],

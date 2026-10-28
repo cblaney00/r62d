@@ -319,3 +319,15 @@ button.big { font-size: 22px; padding: 14px 34px; }
 @keyframes riseCentered { from { opacity: 0; transform: translate(-50%, calc(-50% + 16px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
 #settings:not(.hidden) { animation: riseCentered 0.3s cubic-bezier(.2,.8,.2,1) both; }
 #killfeed .hs { color: #ff5a5a; font-size: 12px; letter-spacing: 0.12em; margin-left: 4px; }
+
+/* ---------- chat ---------- */
+#chat { position: absolute; left: 18px; bottom: 210px; width: 440px; pointer-events: none; z-index: 3; font: 500 15px var(--body); }
+#chatLog { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow: hidden; justify-content: flex-end; }
+#chatLog div { background: rgba(0,0,0,0.55); padding: 3px 8px; animation: rise 0.2s both; transition: opacity 0.6s; text-shadow: 0 1px 2px #000; }
+#chatLog div.old { opacity: 0; } #chat.open #chatLog div.old { opacity: 0.85; }
+#chatLog .tag { font: 800 11px var(--head); letter-spacing: 0.15em; padding: 0 5px; margin-right: 6px; }
+#chatLog .tag.team, #chatMode.team { background: var(--ally); color: #fff; } #chatLog .tag.all, #chatMode.all { background: #d9d9d9; color: #111; }
+#chatLog b.a { color: #8fc8ff; } #chatLog b.e { color: #ffb27a; } #chatLog .dead { color: var(--dim); font-size: 12px; }
+#chatBar { display: flex; margin-top: 4px; pointer-events: auto; animation: rise 0.15s both; }
+#chatMode { font: 800 13px var(--head); letter-spacing: 0.15em; padding: 8px 10px; }
+#chatIn { flex: 1; width: auto; font: 500 15px var(--body); padding: 7px 10px; background: rgba(0,0,0,0.75); }

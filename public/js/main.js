@@ -55,6 +55,7 @@ function connect() {
       $('join').classList.add('hidden'); $('room').classList.remove('hidden');
     } else if (m.t === 'snap') onSnap(m);
     else if (m.t === 'full') alert('The game is full (10 players).');
+    else if (m.t === 'chat') addChat(m);
     else if (m.t === 'xp') { st.profile = m.profile; playXp(m); }
     else if (m.t === 'profile') { st.profile = m.profile; updateOpsProfile($('opsPage'), m.profile); st.selBuilt = null; }
   };
@@ -186,6 +187,7 @@ let rebinding = null;
 addEventListener('keydown', e => {
   if (rebinding) { e.preventDefault(); if (e.code !== 'Escape') setBind(rebinding.id, rebinding.slot, e.code); rebinding = null; renderSettings(); return; }
   if (e.code === 'Escape' && document.activeElement && document.activeElement.tagName === 'INPUT') document.activeElement.blur();
+  if (document.activeElement === $('chatIn')) { chatKey(e); return; }
   if (document.activeElement && document.activeElement.tagName === 'INPUT') { if (e.key === 'Enter') $('joinBtn').click(); return; }
   const a = actionFor(e.code);
   if (a || e.code === 'AltLeft' || e.code === 'AltRight' || e.code === 'Tab') e.preventDefault();
@@ -204,6 +206,7 @@ addEventListener('keydown', e => {
     case 'settings': toggleSettings(); break;
     case 'pause': escape(); break;
     case 'spot': st.spotReq = true; break;
+    case 'chat': if (st.id) { e.preventDefault(); keys.delete('chat'); openChat(true); } break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
   }
 });
@@ -1296,3 +1299,35 @@ function viewServerTime() {
   }
   return snaps[0].st;
 }
+
+// ---------------- chat ----------------
+// Y opens team chat; while typing, / flips between team and all chat. Enter sends, Esc closes.
+st.chatTeam = true;
+function openChat(team) {
+  st.chatTeam = team; $('chatMode').textContent = team ? 'TEAM' : 'ALL'; $('chatMode').className = team ? 'team' : 'all';
+  $('chatBar').classList.remove('hidden'); $('chat').classList.add('open');
+  for (const k of [...keys]) keys.delete(k); // stop walking while you type
+  setTimeout(() => $('chatIn').focus(), 0);
+}
+function closeChat() { $('chatIn').value = ''; $('chatIn').blur(); $('chatBar').classList.add('hidden'); $('chat').classList.remove('open'); }
+function chatKey(e) {
+  if (e.key === '/') { e.preventDefault(); openChat(!st.chatTeam); audio.ui('hover'); return; }
+  if (e.key === 'Escape') { e.preventDefault(); closeChat(); return; }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const text = $('chatIn').value.trim();
+    if (text) send({ t: 'chat', text, team: st.chatTeam });
+    closeChat();
+  }
+}
+function addChat(m) {
+  const me = st.me, mine = me && m.squad === me.sq;
+  const d = document.createElement('div');
+  d.innerHTML = `<span class="tag ${m.team ? 'team' : 'all'}">${m.team ? 'TEAM' : 'ALL'}</span>${m.dead ? '<span class="dead">(dead)</span> ' : ''}<b class="${mine ? 'a' : 'e'}">${esc(m.name)}:</b> ${esc(m.text)}`;
+  $('chatLog').appendChild(d);
+  while ($('chatLog').children.length > 30) $('chatLog').firstChild.remove();
+  d.dataset.t = performance.now();
+  audio.ui('chat');
+}
+// older lines fade out unless the chat is open
+setInterval(() => { const now = performance.now(); for (const d of $('chatLog').children) d.classList.toggle('old', now - d.dataset.t > 12000); }, 500);

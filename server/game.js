@@ -117,6 +117,7 @@ export class Game {
       else if (m.a === 'end' && this.phase !== PHASE.LOBBY) { this.msg(`${p.name} ended the match`); this.resetToLobby(); }
     } else if (m.t === 'pick') this.pickOp(p, m.op);
     else if (m.t === 'settings') store.setSettings(p.token, m.s);
+    else if (m.t === 'chat') this.chat(p, m);
     else if (m.t === 'loadout') {
       const l = store.setLoadout(p.token, m.op, m.l);
       const prof = store.byToken(p.token);
@@ -1060,6 +1061,19 @@ export class Game {
   }
 
   msg(text, team) { this.events.push({ e: 'msg', text, team }); }
+
+  // ---------------- chat ----------------
+  // Team chat goes only to your own team; all chat goes to everyone. A little rate limit stops spam.
+  chat(p, m) {
+    const text = String(m.text || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 140);
+    if (!text) return;
+    const now = this.time; p.chatTimes = (p.chatTimes || []).filter(t => now - t < 5);
+    if (p.chatTimes.length >= 5) return;
+    p.chatTimes.push(now);
+    const team = !!m.team;
+    const msg = JSON.stringify({ t: 'chat', from: p.id, name: p.name, text, team, squad: p.squad, dead: !p.alive && this.phase === PHASE.ACTION });
+    for (const q of this.players.values()) if (q.sock && q.sock.open && (!team || q.squad === p.squad)) q.sock.send(msg);
+  }
 
   // ---------------- saved stats ----------------
   blankMatchStats() { return { rounds: 0, roundsWon: 0, kills: 0, deaths: 0, downs: 0, revives: 0, plants: 0, defuses: 0, shots: 0, hits: 0, damage: 0, playSeconds: 0, ops: {} }; }

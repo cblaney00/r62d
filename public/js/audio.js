@@ -360,6 +360,7 @@ export function ui(kind = 'click') {
     case 'victory': for (const [i, fq] of [[0, 147], [0, 220], [1, 175], [1, 262], [2, 220], [2, 330]]) tone(g, t + i * 0.22, 1.5, fq, fq, 'sawtooth', 0.009, 0.03); tone(g, t, 1.4, 73, 73, 'sine', 0.075); break;
     case 'defeat': for (const [i, fq] of [[0, 147], [0, 175], [1, 139], [1, 165]]) tone(g, t + i * 0.35, 1.7, fq, fq * 0.98, 'sawtooth', 0.008, 0.04); tone(g, t, 1.5, 55, 50, 'sine', 0.075); break;
     case 'round': tone(g, t, 0.7, 110, 110, 'sawtooth', 0.025, 0.05); tone(g, t, 0.7, 165, 165, 'sawtooth', 0.02, 0.05); noise(g, t, 0.6, 'lowpass', 350, 0.5, 0.06, 0.1); break;
+    case 'chat': tone(g, t, 0.08, 330, 300, 'sine', 0.16, 0.004); tone(g, t + 0.06, 0.1, 440, 420, 'sine', 0.1, 0.004); break;
     case 'headshot': tone(g, t, 0.09, 620, 600, 'triangle', 0.45, 0.002); tone(g, t, 0.12, 95, 60, 'sine', 0.5); noise(g, t, 0.04, 'lowpass', 1500, 0.8, 0.3); break;
     case 'hit': tone(g, t, 0.05, 900, 800, 'triangle', 0.52, 0.002); noise(g, t, 0.02, 'bandpass', 1200, 1, 0.3); break;     // dull "tok"
     case 'kill': tone(g, t, 0.07, 700, 680, 'triangle', 0.4, 0.002); tone(g, t + 0.07, 0.12, 520, 500, 'triangle', 0.4, 0.002); break;
