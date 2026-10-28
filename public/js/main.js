@@ -2,7 +2,7 @@
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST } from '/shared/map.js';
-import { stepMove, castSight, canSee, facingCell, angDiff } from '/shared/physics.js';
+import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
@@ -1076,7 +1076,7 @@ function crosshair(me, now) {
   const w = WEAPONS[me.w];
   const gm = gunMods(me.w, attFromCode(me.aa)), hipS = w ? w.spread * gm.hip : 0.05;
   const at = me.at || 0, base = w ? hipS + (w.ads * gm.adsSpread - hipS) * at : 0.05; // tightens as you settle into your sights
-  const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / 140);
+  const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
   const spread = xh.dynamic ? Math.max(0, base * 160 + Math.pow(run, 1.4) * 15 + (me.cr && run < 0.15 ? -2 : 0)) : 0; // opens up while you run
   // recoil kicks the crosshair round your character: pull the mouse against it
   const px = (st.pred.x - st.cam.x) * st.zoom + VW / 2, py = (st.pred.y - st.cam.y) * st.zoom + VH / 2;

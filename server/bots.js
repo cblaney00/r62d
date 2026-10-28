@@ -1,7 +1,10 @@
-// Simple computer players: they path to the objective, fight what they see,
-// plant / defuse, and set up the site during preparation.
+// Computer players. They play patiently: attackers take their time and walk once they're close,
+// defenders hold an angle on a doorway, and both react to what they HEAR (running footsteps,
+// gunfire, explosions) by turning to face it and checking it out — not by knowing where you are.
+// They fight what they see, after a human-like moment to react.
 import { CELL, T, TEAM, PHASE, blocksMove } from '../shared/constants.js';
 import { tileAt, los, angDiff } from '../shared/physics.js';
+import { floorAt } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam } from '../shared/operators.js';
 
 export function botPickOp(game, p) {
@@ -140,15 +143,27 @@ export function botThink(game, p, dt) {
     if (ai.abT <= 0) { ai.abT = 10 + Math.random() * 12; game.event(p, { k: 'ability' }); }
   }
 
+  // --- hearing: the most recent enemy noise this bot could hear ---
+  for (const n of game.noises || []) {
+    if (n.team === team || game.time - n.t > 1.5 || (ai.heard && ai.heard.t >= n.t)) continue;
+    const r = n.r * (floorAt(map, n.x, n.y) === floorAt(map, p.x, p.y) ? 1 : 0.5);
+    if (Math.hypot(n.x - p.x, n.y - p.y) < r) ai.heard = { x: n.x, y: n.y, t: n.t };
+  }
+  const heardRecently = ai.heard && game.time - ai.heard.t < 4;
+
   // --- fight ---
   const enemy = p.downed ? null : visibleEnemy(game, p);
   if (enemy && abId === 'adrenal' && p.abilityCount > 0 && !(game.time < (p.boostUntil || 0))) game.event(p, { k: 'ability' });
   if (enemy) {
-    if (ai.seen !== enemy.id) { ai.seen = enemy.id; ai.ox = (Math.random() - 0.5) * 12; ai.oy = (Math.random() - 0.5) * 12; ai.react = -Math.random() * 0.35; ai.err = (Math.random() < 0.5 ? -1 : 1) * (0.25 + Math.random() * 0.35); }
+    if (ai.seen !== enemy.id) { // a surprise takes longer to react to than something they were listening for
+      const expected = heardRecently && Math.hypot(ai.heard.x - enemy.x, ai.heard.y - enemy.y) < 200;
+      ai.seen = enemy.id; ai.ox = (Math.random() - 0.5) * 12; ai.oy = (Math.random() - 0.5) * 12;
+      ai.react = -(expected ? 0.15 : 0.45) - Math.random() * 0.45; ai.err = (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.4);
+    }
     ai.react += dt; ai.err *= Math.exp(-dt * 1.3);
     ai.err += (Math.random() - 0.5) * dt * 0.6; // hands are never perfectly steady
     const want = Math.atan2(enemy.y + (ai.oy || 0) - p.y, enemy.x + (ai.ox || 0) - p.x) + ai.err; // bots aim somewhere on the body, not always the head
-    p.aim += Math.max(-dt * 7, Math.min(dt * 7, angDiff(want, p.aim)));
+    p.aim += Math.max(-dt * 4.5, Math.min(dt * 4.5, angDiff(want, p.aim)));
     inp.ads = 1;
     if (gun && gun.ammo === 0) game.startReload(p);
     else if (ai.react > 0.55 && Math.abs(angDiff(want, p.aim)) < 0.2) {
@@ -156,9 +171,8 @@ export function botThink(game, p, dt) {
       inp.fire = w && !w.auto ? (ai.semi = !ai.semi) ? 1 : 0 : 1;
     }
     ai.strafeT = (ai.strafeT || 0) - dt;
-    if (ai.strafeT <= 0) { ai.strafeT = 0.5 + Math.random(); ai.strafe = Math.random() < 0.5 ? -1 : 1; }
-    const sa = p.aim + Math.PI / 2 * ai.strafe;
-    setDir(inp, Math.cos(sa), Math.sin(sa));
+    if (ai.strafeT <= 0) { ai.strafeT = 0.6 + Math.random(); ai.strafe = Math.random() < 0.45 ? 0 : Math.random() < 0.5 ? -1 : 1; } // often just stand and shoot
+    if (ai.strafe) { const sa = p.aim + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); inp.walk = 1; }
     if (Math.random() < dt * 0.6) game.spot(team, enemy.id, 3);
     return;
   }
@@ -182,6 +196,24 @@ export function botThink(game, p, dt) {
   if (act) { inp.interact = 1; inp.crouch = 1; return; }
   if (!goal) return;
 
+  // heard something and can't see it: stop, turn to face it and listen for a moment
+  if (heardRecently && game.time - ai.heard.t < 1.6 && !p.hasDefuser && !(team === TEAM.DEF && game.planted)) {
+    const a = Math.atan2(ai.heard.y - p.y, ai.heard.x - p.x);
+    p.aim += Math.max(-dt * 3, Math.min(dt * 3, angDiff(a, p.aim)));
+    inp.crouch = team === TEAM.DEF ? 1 : 0;
+    return;
+  }
+  if (team === TEAM.ATK && !game.planted) {
+    if (ai.startWait === undefined) ai.startWait = 2 + Math.random() * 7; // as if droning first
+    if ((ai.startWait -= dt) > 0) { p.aim += dt * 0.5 * (ai.look || (ai.look = Math.random() < 0.5 ? -1 : 1)); return; }
+    // close to the objective: walk (quiet), and now and then stop to check the angles
+    if (Math.hypot(goal.x - p.x, goal.y - p.y) < 360) {
+      inp.walk = 1;
+      ai.pauseT = (ai.pauseT ?? 2 + Math.random() * 3) - dt;
+      if (ai.pauseT < 0) { if (ai.pauseT < -(0.6 + Math.random())) ai.pauseT = 2 + Math.random() * 4; p.aim += dt * 1.2 * (ai.look || 1); return; }
+    }
+  }
+
   const gx = Math.floor(goal.x / CELL), gy = Math.floor(goal.y / CELL);
   const sx = Math.floor(p.x / CELL), sy = Math.floor(p.y / CELL);
   ai.pathT = (ai.pathT || 0) - dt;
@@ -191,7 +223,12 @@ export function botThink(game, p, dt) {
   { const i = ai.path.indexOf(sy * map.W + sx); if (i >= 0 && i < 6) ai.path.splice(0, i + 1); } // also skips the stair end after being carried to the other floor
   if (!ai.path.length) {
     if (Math.hypot(goal.x - p.x, goal.y - p.y) > 6) setDir(inp, goal.x - p.x, goal.y - p.y);
-    else if (team === TEAM.DEF) { p.aim += dt * 0.6 * (ai.look || (ai.look = Math.random() < 0.5 ? -1 : 1)); inp.crouch = 1; }
+    else if (team === TEAM.DEF) { // hold an angle on the nearest way into the site
+      if (!ai.watch) ai.watch = watchPoint(game, p);
+      const a = ai.watch ? Math.atan2(ai.watch.y - p.y, ai.watch.x - p.x) : p.aim + dt;
+      p.aim += Math.max(-dt * 2, Math.min(dt * 2, angDiff(a + Math.sin(game.time * 0.5 + p.x) * 0.25, p.aim)));
+      inp.crouch = 1;
+    }
     return;
   }
   const next = ai.path[0];
@@ -206,6 +243,19 @@ export function botThink(game, p, dt) {
   if (Math.hypot(p.x - (ai.lx || 0), p.y - (ai.ly || 0)) < 0.5) { ai.stuck = (ai.stuck || 0) + dt; if (ai.stuck > 1) { ai.path = null; ai.stuck = 0; } }
   else ai.stuck = 0;
   ai.lx = p.x; ai.ly = p.y;
+}
+
+// a doorway or window of the defended site, the one nearest to this defender (to hold an angle on)
+function watchPoint(game, p) {
+  const m = game.map, site = m.sites[game.site];
+  let best = null, bd = Infinity;
+  for (const o of m.openings) {
+    const k = o.cells[0], x = (k % m.W + 0.5) * CELL, y = (Math.floor(k / m.W) + 0.5) * CELL;
+    const inSite = m.rooms.some(r => site.rooms.includes(r.name) && k % m.W >= r.x - 1 && k % m.W <= r.x + r.w && Math.floor(k / m.W) >= r.y - 1 && Math.floor(k / m.W) <= r.y + r.h);
+    const d = Math.hypot(x - p.x, y - p.y);
+    if (inSite && d < bd && d > 40 && los(m, p.x, p.y, x, y)) { bd = d; best = { x, y }; }
+  }
+  return best;
 }
 
 function nearBomb(game, site, d) {

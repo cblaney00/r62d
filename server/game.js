@@ -2,7 +2,7 @@
 import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
 import { buildMap, roomAt, MAPS, MAP_LIST } from '../shared/map.js';
-import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell } from '../shared/physics.js';
+import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, publicProfile } from './store.js';
@@ -177,7 +177,7 @@ export class Game {
   nextRound() {
     this.round++;
     this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear();
-    this.ents = []; this.planted = null; this.winner = null; this.reason = '';
+    this.ents = []; this.planted = null; this.winner = null; this.reason = ''; this.noises = [];
     this.site = Math.floor(Math.random() * this.map.sites.length);
     this.siteRevealed = false;
     this.spots = { atk: new Map(), def: new Map() };
@@ -373,6 +373,7 @@ export class Game {
     stepMove(this.map, p, p.input, dt, m);
     const moved = Math.hypot(p.x - before.x, p.y - before.y) / dt;
     p.moving = moved < 5 ? 0 : (p.input.crouch || p.input.walk) ? 1 : 2;
+    if (p.moving === 2 && !this.ghost(p) && this.time - (p.noiseT || 0) > 0.3) { p.noiseT = this.time; this.noise(p.x, p.y, this.side(p), 320); } // running footsteps
   }
 
   tickPlayer(p, dt) {
@@ -487,11 +488,18 @@ export class Game {
     this.events.push({ e: 'snd', s: 'reload', x: r1(p.x), y: r1(p.y), id: p.id });
   }
 
+  // Something bots can hear: where, who made it, and how far it carries (px). Another floor halves it.
+  noise(x, y, team, r) {
+    (this.noises || (this.noises = [])).push({ x, y, team, r, t: this.time });
+    if (this.noises.length > 80) this.noises.splice(0, this.noises.length - 80);
+  }
+
   fire(p, gun, w) {
+    this.noise(p.x, p.y, this.side(p), (gun.m && gun.m.quiet) ? 260 : 950);
     gun.ammo--; p.fireCd = 60 / w.rpm; p.lastShot = this.time;
     if (p.ms) p.ms.shots += w.pellets;
     // hip fire is a loose cone that widens while moving; aimed fire is accurate even on the move (R6 rules)
-    const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / 140), at = p.adsT || 0;
+    const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED), at = p.adsT || 0;
     const m = gun.m || gunMods(gun.w);
     const hip = (w.spread * (p.input.crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip, ads = w.ads * m.adsSpread;
     const spread = (hip + (ads - hip) * at + p.bloom * (1 - 0.7 * at)) * (this.time < (p.dazeUntil || 0) ? 2.2 : 1); // dazed: shaky aim
@@ -1214,6 +1222,7 @@ export class Game {
 
   explode(e, o) {
     const owner = this.players.get(e.owner);
+    this.noise(e.x, e.y, e.team, 1100);
     let cx = e.x, cy = e.y;
     if (o.at !== undefined) { cx = (o.at % this.map.W + 0.5) * CELL; cy = (Math.floor(o.at / this.map.W) + 0.5) * CELL; }
     this.events.push({ e: 'boom', x: r1(e.x), y: r1(e.y), r: o.r, kind: o.kind });
