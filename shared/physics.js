@@ -1,5 +1,5 @@
 // Movement, collision, line of sight and ray casting on the tile grid.
-import { CELL, PX_PER_M, T, HOLE_R, blocksMove, blocksDrone, blocksSight } from './constants.js';
+import { CELL, PX_PER_M, T, HOLE_R, PLAYER_R, DRONE_R, blocksMove, blocksDrone, blocksSight } from './constants.js';
 
 export function tileAt(map, cx, cy) {
   if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return T.VOID;
@@ -12,7 +12,7 @@ function resolve(map, o, r, blockFn) {
   const x0 = Math.floor((o.x - r) / CELL), x1 = Math.floor((o.x + r) / CELL);
   const y0 = Math.floor((o.y - r) / CELL), y1 = Math.floor((o.y + r) / CELL);
   for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
-    if (!blockFn(tileAt(map, cx, cy))) continue;
+    if (!blockFn(tileAt(map, cx, cy), cy * map.W + cx)) continue;
     const rx = cx * CELL, ry = cy * CELL;
     const nx = Math.max(rx, Math.min(o.x, rx + CELL)), ny = Math.max(ry, Math.min(o.y, ry + CELL));
     let dx = o.x - nx, dy = o.y - ny; const d2 = dx * dx + dy * dy;
@@ -29,7 +29,8 @@ function resolve(map, o, r, blockFn) {
 }
 
 export function moveCircle(map, o, dx, dy, r, drone = false) {
-  const fn = drone ? blocksDrone : blocksMove;
+  // drones also slip through the drone holes at the foot of plain walls (gone once the wall is reinforced)
+  const fn = drone ? (t, k) => blocksDrone(t) && !(t === T.SOFT && map.dhole && map.dhole[k]) : blocksMove;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (r * 0.5)));
   for (let s = 0; s < steps; s++) {
     o.x += dx / steps; resolve(map, o, r, fn);
@@ -81,7 +82,7 @@ export function stepMove(map, o, input, dt, mods) {
     o.gait = (o.gait || 0) + v * dt / stride * Math.PI;
   }
   const bx = o.x, by = o.y;
-  moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? 5 : 10, !!mods.drone);
+  moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? DRONE_R : PLAYER_R, !!mods.drone);
   takeStairs(map, o);
   // walking into a wall soaks up the velocity in that direction
   if (dt > 0) {

@@ -74,7 +74,7 @@ function findPath(map, sx, sy, gx, gy) {
     // keep a little away from walls so the bot's body fits
     const x = k % W, y = (k / W) | 0;
     const bl = (dx, dy) => blocksMove(tileAt(map, x + dx, y + dy));
-    if ((bl(1, 0) && bl(-1, 0)) || (bl(0, 1) && bl(0, -1))) return Infinity; // a one-cell gap: a body is wider than that
+    if ((bl(1, 0) && bl(-1, 0)) || (bl(0, 1) && bl(0, -1))) return 3; // a one-cell gap: a body just squeezes through
     let near = 0;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (blocksMove(tileAt(map, x + dx, y + dy)) && tileAt(map, x + dx, y + dy) !== T.BARRI) near++;
     return 1 + near * 0.6;

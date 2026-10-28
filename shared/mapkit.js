@@ -19,6 +19,7 @@ export function makeMap({ id, name, floors }) {
   const W = gx - GAP, H = Math.max(...floors.map(f => f.h)), N = W * H;
   const tiles = new Uint8Array(N).fill(T.VOID), floor = new Uint8Array(N).fill(FL.VOID);
   const mat = new Uint8Array(N).fill(MAT.DRYWALL), hp = new Int16Array(N);
+  const dhole = new Uint8Array(N); // 1 = a drone hole at the foot of this (soft) wall cell
   const openId = new Int16Array(N).fill(-1), portal = new Int32Array(N).fill(-1), flAt = new Uint8Array(N).fill(255);
   const props = [], openings = [], rooms = [], stairs = [], decor = [];
   for (const f of fl) for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) {
@@ -46,6 +47,8 @@ export function makeMap({ id, name, floors }) {
       // a rectangle of walls around (and including the edge of) x0..x1, y0..y1
       box(x0, y0, x1, y1, t = T.SOFT, m = MAT.DRYWALL) { K.wall(x0, y0, x1, y0, t, m); K.wall(x0, y1, x1, y1, t, m); K.wall(x0, y0, x0, y1, t, m); K.wall(x1, y0, x1, y1, t, m); },
       pillar(list) { for (const [x, y] of list) K.wall(x, y, x, y, T.HARD, MAT.CONCRETE); },
+      // a hand-placed drone hole in a soft wall cell (finish() also adds one between neighbouring rooms)
+      droneHole(x, y) { const k = idx(x, y); if (k >= 0) dhole[k] = 1; },
       open(x0, y0, x1, y1, kind, ext = false) {
         const cells = [];
         each(x0, y0, x1, y1, k => { tiles[k] = T.OPEN; hp[k] = 0; openId[k] = openings.length; cells.push(k); });
@@ -84,6 +87,30 @@ export function makeMap({ id, name, floors }) {
     stairs.push({ a, b, x, y, w, h, dir, ga: A.idx(x, y), gb: B.idx(x, y) });
   };
 
+  // Drone holes, like the small gaps at the foot of walls in R6: a drone (radius 5) fits, a body doesn't.
+  // One per pair of rooms (or room and outside) that share a plain wall, near the middle of that wall,
+  // only where there is clear floor on both sides for a drone to drive up to it.
+  const droneHoles = () => {
+    const rid = new Int16Array(N).fill(-1);
+    rooms.forEach((r, i) => { for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) rid[y * W + x] = i; });
+    const at = (x, y) => x < 0 || y < 0 || x >= W || y >= H ? T.VOID : tiles[y * W + x];
+    const clear = t => t === T.FLOOR || t === T.GROUND;
+    const side = (x, y) => tiles[y * W + x] === T.GROUND ? -2 : rid[y * W + x];
+    const pairs = new Map();
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (tiles[y * W + x] !== T.SOFT) continue;
+      for (const [dx, dy] of [[0, 1], [1, 0]]) { // the hole runs along dx,dy through the wall
+        if (![1, 2].every(d => clear(at(x + dx * d, y + dy * d)) && clear(at(x - dx * d, y - dy * d)))) continue;
+        if (at(x + dy, y + dx) !== T.SOFT || at(x - dy, y - dx) !== T.SOFT) continue; // a straight run of wall, not a corner or door edge
+        const a = side(x + dx, y + dy), b = side(x - dx, y - dy);
+        if (a === b || a === -1 || b === -1) continue;
+        const key = `${Math.min(a, b)},${Math.max(a, b)},${dx}`;
+        (pairs.get(key) || pairs.set(key, []).get(key)).push(y * W + x);
+      }
+    }
+    for (const c of pairs.values()) if (c.length >= 3) dhole[c[c.length >> 1]] = 1;
+  };
+
   const finish = (extra) => {
     // walls take the floor of the room next to them, so a hole shows the right floor
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -95,8 +122,9 @@ export function makeMap({ id, name, floors }) {
         if (tiles[ny * W + nx] === T.FLOOR) { floor[k] = floor[ny * W + nx]; break; }
       }
     }
+    droneHoles();
     return {
-      id, name, W, H, tiles, floor, mat, hp, holes: {}, openId, props, openings, rooms, portal, flAt, stairs, decor,
+      id, name, W, H, tiles, floor, mat, hp, holes: {}, openId, dhole, props, openings, rooms, portal, flAt, stairs, decor,
       floors: fl.map(f => ({ name: f.name, i: f.i, gx: f.gx, w: f.w, h: f.h, x0: f.x0, y0: f.y0 })),
       ...extra,
     };

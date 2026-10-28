@@ -298,6 +298,16 @@ export class MapRenderer {
       ctx.fillStyle = '#59626b'; ctx.fillRect(X, Y, CELL, 2); ctx.fillRect(X, Y + CELL - 2, CELL, 2);
       ctx.fillStyle = '#7fb6d6'; ctx.fillRect(X + 4, Y + 6.5, 8, 2.5);
     }
+    // a drone hole: a small dark gap through the foot of the wall, with a lit rim
+    if (t === T.SOFT && m.dhole && m.dhole[k]) {
+      const horiz = s(-1, 0) || s(1, 0); // wall runs left-right, so the hole goes up-down through it
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      if (horiz) ctx.fillRect(X + 3.5, Y, 9, CELL); else ctx.fillRect(X, Y + 3.5, CELL, 9);
+      ctx.fillStyle = '#17140f';
+      if (horiz) ctx.fillRect(X + 4.5, Y, 7, CELL); else ctx.fillRect(X, Y + 4.5, CELL, 7);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      if (horiz) ctx.fillRect(X + 4.5, Y, 1.5, CELL); else ctx.fillRect(X, Y + 4.5, CELL, 1.5);
+    }
     // bullet holes from rifles, SMGs and pistols: tiny dark pits with a pin of light through them
     const holes = t === T.SOFT && m.holes && m.holes[k];
     if (holes) for (let i = 0; i < holes.length; i += 2) {

@@ -6,8 +6,11 @@ export const CELL = 16;            // world pixels per map cell
 export const PX_PER_M = 36;
 export const TICK_RATE = 30;       // server simulation steps per second
 export const SNAP_RATE = 20;       // snapshots sent per second
-export const PLAYER_R = 10;
-export const DRONE_R = 5;
+// Body radius for bumping into walls and people. 7 px (14 across, ~0.4 m: a person turned a little
+// sideways) so a body fits through every one-cell gap beside furniture and round door frames; at 10 a
+// lot of rooms had corners and gaps behind bookcases nobody could get into. Bullets use HIT_R instead.
+export const PLAYER_R = 7;
+export const DRONE_R = 5;           // small enough for the drone holes at the foot of walls (map.dhole)
 export const MAX_PLAYERS = 10;
 export const TEAM_SIZE = 5;
 export const WIN_ROUNDS = 3;       // Quick Match: first to 3

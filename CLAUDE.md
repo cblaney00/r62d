@@ -46,8 +46,11 @@ His wishes so far:
     side in ONE grid separated by void, joined by stairs — `map.portal` sends you to the other floor when you
     walk off a staircase's end; maps are written in a shared building frame so floors line up),
     `maps/*.js` (one file per map; `node tests/sim.js --map <id>` prints every floor as ASCII). Map rules
-    learned the hard way: doors at least 2 cells wide, 2 free rows beyond both ends of every staircase, no
-    1-cell gaps beside furniture — a body (radius 10) is wider than a cell (16). `physics.js` (movement, collision, line of sight, ray casting),
+    learned the hard way: doors at least 2 cells wide, 2 free rows beyond both ends of every staircase. A body is
+    `PLAYER_R` 7 (he asked that people fit everywhere; at 10 a body couldn't pass 1-cell gaps beside bookcases), so a
+    1-cell gap is a squeeze bots also take. `node tests/reach.js` must print 0 unreachable cells on every map.
+    Drone holes (`map.dhole`): `mapkit.js droneHoles()` puts one in the middle of each plain wall two rooms share
+    (`K.droneHole(x, y)` adds one by hand); drones (radius 5) pass, people don't, reinforcing the wall closes it. `physics.js` (movement, collision, line of sight, ray casting),
     `operators.js` (weapons + the 10 operators).
   - `server/game.js` — authoritative match: lobby, rounds/phases, shooting (hitscan,
     bullets go through soft walls; pistols/SMGs/MPs/ARs/LMGs only leave small see-through holes (`map.holes`, `HOLE_ONLY` in constants.js, sight checks in physics `castSight`), shotguns/DMRs/melee/explosives break them), gadgets, explosions, defuser, downed state, snapshots.
@@ -81,6 +84,7 @@ His wishes so far:
   Defending bots place their gadgets in `botPrep`; attacking bots use a few abilities in `botThink`.
 - **Tests:** `node tests/abilities.js` has every operator use their ability in a live match.
   `node tests/sim.js` plays a bot-only match on every map (must print PASS; `--only <id>` for one).
+  `node tests/reach.js` checks a body can reach every floor cell and every drone hole passes a drone but not a body.
   `node tests/stairs.js` walks a body up and down every staircase with real physics + bot path finding.
   `node tests/balance.js 12` is the balance report (see docs/balance.md for how to read it and past changes).
   `tests/shoot.mjs` drives a hidden Firefox (run as insideabush, via WebDriver BiDi,
