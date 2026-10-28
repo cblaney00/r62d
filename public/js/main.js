@@ -434,6 +434,7 @@ function frame(nowMs) {
   const dt = Math.min(0.05, (nowMs - lastT) / 1000); lastT = nowMs;
   const now = nowMs / 1000;
   const s = st.last;
+  const T0 = performance.now(); PF.frames++;
   fx.update(dt);
   if (!st.map) { ctx.fillStyle = '#050607'; ctx.fillRect(0, 0, VW, VH); return; }
   const phase = s ? s.ph : PHASE.LOBBY;
@@ -508,11 +509,13 @@ function frame(nowMs) {
   }
   if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
 
+  let t1 = pfa('logic', T0);
   st.viewers = teamViewers(s, view, me, inGame);
-  revealSeen();
+  revealSeen(); t1 = pfa('viewers', t1);
   bodySounds(me, dt);
-  draw(s, view, now, dt);
+  draw(s, view, now, dt); pfa('total', T0);
 }
+const PF = { frames: 0 }; function pfa(k, t) { const n = performance.now(); PF[k] = (PF[k] || 0) + n - t; return n; }
 
 function screenToWorld(sx, sy) { const z = st.zoom || 1; return { x: (sx - VW / 2) / z + st.cam.x, y: (sy - VH / 2) / z + st.cam.y }; }
 
@@ -666,7 +669,7 @@ function nearPolygon(v, sm) {
 function fillPoly(c, pts) { c.beginPath(); c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.closePath(); c.fill(); }
 
 function draw(s, view, now, dt) {
-  const z = st.zoom, m = st.map;
+  const z = st.zoom, m = st.map; let tq = performance.now();
   const shake = fx.shake;
   const ox = VW / 2 - st.cam.x * z + (Math.random() - 0.5) * shake * DPR, oy = VH / 2 - st.cam.y * z + (Math.random() - 0.5) * shake * DPR;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -680,6 +683,7 @@ function draw(s, view, now, dt) {
     ctx.drawImage(st.rend.c, wx0 * S, wy0 * S, (wx1 - wx0) * S, (wy1 - wy0) * S, wx0, wy0, wx1 - wx0, wy1 - wy0);
     ctx.drawImage(st.rend.decal, wx0, wy0, wx1 - wx0, wy1 - wy0, wx0, wy0, wx1 - wx0, wy1 - wy0);
   }
+  tq = pfa('mapblit', tq);
   if (!s) return;
   const me = st.me, side = me ? me.tm : null;
   const inGame = s.ph === PHASE.PREP || s.ph === PHASE.ACTION || s.ph === PHASE.ROUND_END;
@@ -750,10 +754,10 @@ function draw(s, view, now, dt) {
     audio.droneLoop(e.id, x, y, a.spd, own);
     if (e.tm === side || seen(x, y)) drawDrone(ctx, { ...e, x, y, ag: own ? st.aim : e.ag, wheel: a.wheel, spd: a.spd, mvAng: a.mvAng ?? e.ag, sway: a.sway }, now, e.tm === side);
   }
-  audio.pruneLoops();
+  audio.pruneLoops(); tq = pfa('actors', tq);
   fx.draw(ctx);
   for (const e of ents) if (e.ty === 'smoke') drawSmoke(ctx, e, now);
-  fx.drawLights(ctx);
+  fx.drawLights(ctx); tq = pfa('fx', tq);
 
   // --- line-of-sight blackout ---
   if (view && inGame) {
@@ -777,6 +781,7 @@ function draw(s, view, now, dt) {
     ctx.setTransform(z, 0, 0, z, ox, oy);
   }
 
+  tq = pfa('fog', tq);
   // --- markers drawn above the blackout ---
   if (inGame && me) {
     ctx.font = '600 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
@@ -821,6 +826,7 @@ function draw(s, view, now, dt) {
     }
   }
 
+  tq = pfa('markers', tq);
   // --- screen-space effects ---
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const vg = ctx.createRadialGradient(VW / 2, VH / 2, VH * 0.45, VW / 2, VH / 2, VH * 0.95);
@@ -1248,7 +1254,7 @@ function countdown(s, phase) {
 try { const v = JSON.parse(localStorage.getItem('r62d-music') || 'null'); if (v !== null) $('volMusic').value = v; } catch {}
 setMusicVolume($('volMusic').value / 100);
 $('volMusic').oninput = () => { setMusicVolume(st.muted ? 0 : $('volMusic').value / 100); try { localStorage.setItem('r62d-music', $('volMusic').value); } catch {} };
-window.__r62d = { st, showEnd, playXp }; // for automated screenshot tests
+window.__r62d = { PF, st, showEnd, playXp }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.

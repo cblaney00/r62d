@@ -6,13 +6,13 @@ let vol = { master: 0.6, sfx: 1 };
 const loops = new Map();
 
 // ---- THE MIX: one volume per kind of sound (measured with measureMix, see docs/sound.md) ----
-export const MIX = { guns: 2.6, explosions: 2.8, steps: 7.2, foley: 2.25, body: 0.4, impacts: 11.5, gadgets: 3.6, ui: 27, loops: 1.4 };
+export const MIX = { guns: 2.6, explosions: 2.8, steps: 1.36, foley: 2.25, body: 0.4, impacts: 11.5, gadgets: 3.6, ui: 27, loops: 1.4 };
 let C = 'foley'; // category of the sound currently being built
 
 export function initAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
   buildGraph(new (window.AudioContext || window.webkitAudioContext)());
-  setTimeout(prewarmGuns, 50); // build the gunshot recordings once, right after sound starts
+  setTimeout(prewarmGuns, 50); setTimeout(prewarmSteps, 400); // build the gunshot recordings once, right after sound starts
 }
 
 function buildGraph(context) {
@@ -96,58 +96,133 @@ function ring(d, t, base, v = 0.3, dur = 0.25) { // small metal object: a few in
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 // --- footsteps by surface ---
-// surfaces: wood, tile, marble, carpet, concrete, grass, asphalt, metal, rubble
+// Each footstep is a pre-built recording, synthesised sample by sample like the gunshots:
+// the heel strikes, then the ball of the foot rolls down; each contact rings the floor's own
+// resonances (hollow boards, hard tile, dull slab, raised metal panels), the sole scuffs a little,
+// and loose surfaces (gravel, grass, glass, splinters) add hundreds of tiny crunch grains.
+// surfaces: wood, tile, marble, carpet, concrete, grass, asphalt, metal, rubble, glass, splinters
+// modes: [Hz, decay s, gain]; pulse: contact time of the sole (ms); slap: brightness of the sole hit
 const SURF = {
-  wood:     { f: 480,  q: 1.2, lp: 1600, body: 110, v: 0.9 },
-  tile:     { f: 2600, q: 1.6, lp: 6000, body: 0,   v: 0.7 },
-  marble:   { f: 3200, q: 1.8, lp: 7000, body: 0,   v: 0.75 },
-  carpet:   { f: 320,  q: 0.8, lp: 700,  body: 80,  v: 0.55 },
-  concrete: { f: 1300, q: 1.0, lp: 4000, body: 70,  v: 0.8 },
-  grass:    { f: 4200, q: 0.5, lp: 9000, body: 0,   v: 0.5 },
-  asphalt:  { f: 1700, q: 0.8, lp: 5000, body: 60,  v: 0.75 },
-  metal:    { f: 900,  q: 3,   lp: 6000, body: 0,   v: 0.8 },
-  rubble:   { f: 2200, q: 0.6, lp: 8000, body: 0,   v: 0.8 },
-  glass:    { f: 3800, q: 0.9, lp: 12000, body: 0,  v: 0.85 },
-  splinters:{ f: 1100, q: 1.0, lp: 5000, body: 120, v: 0.85 },
+  wood:     { modes: [[92, 0.085, 1], [186, 0.06, 0.7], [410, 0.035, 0.5], [870, 0.02, 0.32], [1650, 0.011, 0.18]], pulse: 2.2, slap: 2600, slapG: 0.45, scuff: 0.35, v: 0.9 },
+  tile:     { modes: [[170, 0.018, 0.5], [2350, 0.011, 0.45], [3900, 0.007, 0.35]], pulse: 0.9, slap: 7500, slapG: 0.9, scuff: 0.5, squeak: 0.12, v: 1.02 },
+  marble:   { modes: [[150, 0.02, 0.45], [2900, 0.018, 0.4], [4700, 0.012, 0.3]], pulse: 0.8, slap: 8500, slapG: 0.95, scuff: 0.45, squeak: 0.15, v: 1.17 },
+  carpet:   { modes: [[105, 0.03, 0.7], [240, 0.015, 0.25]], pulse: 6, slap: 650, slapG: 0.5, scuff: 0.2, fuzz: 1, v: 0.66 },
+  concrete: { modes: [[118, 0.024, 0.8], [310, 0.014, 0.4], [1250, 0.006, 0.2]], pulse: 1.8, slap: 3800, slapG: 0.7, scuff: 0.6, grit: 0.25, v: 0.84 },
+  asphalt:  { modes: [[105, 0.022, 0.75], [290, 0.012, 0.35]], pulse: 2, slap: 3200, slapG: 0.6, scuff: 0.65, grit: 0.55, v: 0.93 },
+  grass:    { modes: [[75, 0.028, 0.5]], pulse: 7, slap: 420, slapG: 0.35, scuff: 0, grass: 1, v: 0.69 },
+  metal:    { modes: [[205, 0.13, 0.8], [520, 0.095, 0.6], [1270, 0.06, 0.4], [2880, 0.035, 0.22], [4400, 0.02, 0.12]], pulse: 1.4, slap: 4200, slapG: 0.55, scuff: 0.4, v: 0.79 },
+  rubble:   { modes: [[115, 0.022, 0.7], [300, 0.012, 0.3]], pulse: 2, slap: 3000, slapG: 0.5, scuff: 0.3, gravel: 1, v: 1.32 },
+  glass:    { modes: [[160, 0.018, 0.5], [2400, 0.01, 0.3]], pulse: 1, slap: 6000, slapG: 0.6, scuff: 0.3, gravel: 0.5, glass: 1, v: 1.01 },
+  splinters:{ modes: [[95, 0.07, 0.9], [400, 0.03, 0.45], [880, 0.018, 0.3]], pulse: 2.2, slap: 2600, slapG: 0.45, scuff: 0.3, crack: 1, v: 0.72 },
 };
+// paces: 0 walk (Shift), 1 crouch, 2 run, 3 run (heavy)
+const GAIT = [
+  { heel: 0.55, toe: 0.45, gap: [0.1, 0.14], soft: 1.6, scuff: 0.6 },
+  { heel: 0.38, toe: 0.4, gap: [0.13, 0.18], soft: 2.0, scuff: 0.9 },
+  { heel: 1, toe: 0.6, gap: [0.03, 0.05], soft: 1, scuff: 1 },
+  { heel: 1.15, toe: 0.55, gap: [0.025, 0.04], soft: 0.9, scuff: 1.1 },
+];
+function buildStep(surf, pace, seed, scuffOnly = false) {
+  const S = SURF[surf], G = GAIT[pace], sr = ac.sampleRate, N = Math.floor(sr * 0.32);
+  const buf = ac.createBuffer(1, N, sr), out = buf.getChannelData(0);
+  let r = seed * 7919 + 104729; const rand = () => { r = (r * 16807) % 2147483647; return r / 2147483647; }; // 0..1
+  const nz = () => rand() * 2 - 1;
+  const ex = new Float32Array(N); // excitation: the sole hitting the floor
+  const contacts = scuffOnly ? [] : [[0.004 + rand() * 0.004, G.heel], [0.004 + G.gap[0] + rand() * (G.gap[1] - G.gap[0]), G.toe * (0.8 + rand() * 0.4)]];
+  for (const [t0, a] of contacts) {
+    const w = Math.max(3, Math.floor(S.pulse * G.soft * (0.85 + rand() * 0.3) / 1000 * sr)), i0 = Math.floor(t0 * sr);
+    for (let i = 0; i < w && i0 + i < N; i++) ex[i0 + i] += a * Math.sin(Math.PI * i / w);   // half-sine contact pulse
+  }
+  // floor resonances, slightly detuned every time
+  const modes = S.modes.map(([f, tau, g]) => { const fr = f * (0.93 + rand() * 0.14), rr = Math.exp(-1 / (tau * sr)); return { c1: 2 * rr * Math.cos(2 * Math.PI * fr / sr), c2: -rr * rr, g: g * (1 - Math.exp(-2 * Math.PI * fr / sr)) * 6, y1: 0, y2: 0 }; });
+  const slapA = 1 - Math.exp(-2 * Math.PI * S.slap / G.soft / sr);
+  let slapLo = 0, slapEnv = 0, scuffLo = 0, scuffBp = 0, scuffLow = 0;
+  // sole scuff: friction noise as the foot slides and rolls off
+  const scT0 = scuffOnly ? 0.01 : contacts[0][0] + 0.01, scLen = scuffOnly ? 0.16 + rand() * 0.08 : 0.05 + rand() * 0.06;
+  const scA = S.scuff * G.scuff * (scuffOnly ? 0.5 : 0.18) * (0.6 + rand() * 0.8);
+  const scF = 2 * Math.sin(Math.PI * (900 + rand() * 1400) / sr);
+  for (let i = 0; i < N; i++) {
+    const t = i / sr, e = ex[i];
+    let v = 0;
+    for (const m of modes) { const y = m.c1 * m.y1 + m.c2 * m.y2 + e * m.g; m.y2 = m.y1; m.y1 = y; v += y; }
+    // the sole slap itself: a burst of noise following the contact
+    slapEnv = Math.max(slapEnv * Math.exp(-1 / (0.0035 * G.soft * sr)), Math.abs(e));
+    slapLo += slapA * (nz() * slapEnv - slapLo); v += slapLo * S.slapG * 1.6;
+    if (scA > 0 && t > scT0 && t < scT0 + scLen) {
+      const k = (t - scT0) / scLen, env = Math.sin(Math.PI * k) ** 2;
+      scuffLow += scF * scuffBp; const hi = nz() - scuffLow - 1.2 * scuffBp; scuffBp += scF * hi;
+      v += scuffBp * env * scA;
+    }
+    out[i] = v;
+  }
+  // grains: tiny damped clicks — gravel crunch, grass blades, glass, wood splinters
+  const grains = (count, t0, spread, fLo, fHi, tLo, tHi, amp) => {
+    for (let n = 0; n < count; n++) {
+      const t = t0 + spread * Math.pow(rand(), 1.6), f = fLo * Math.pow(fHi / fLo, rand()), tau = tLo + rand() * (tHi - tLo);
+      const a = amp * -Math.log(1 - rand() * 0.98) * 0.35 * (rand() < 0.5 ? -1 : 1);
+      const i0 = Math.floor(t * sr), len = Math.min(N - i0, Math.floor(tau * 5 * sr)), w = 2 * Math.PI * f / sr, ph = rand() * 6.28;
+      for (let i = 0; i < len; i++) out[i0 + i] += a * Math.exp(-i / (tau * sr)) * Math.sin(w * i + ph);
+    }
+  };
+  const press = (scuffOnly ? 0.5 : 1) * (pace >= 2 ? 1 : 0.6), c0 = scuffOnly ? 0.01 : contacts[0][0];
+  if (S.gravel) { grains(Math.floor(140 * S.gravel * press), c0, 0.13, 700, 4500, 0.0008, 0.003, 0.5 * S.gravel); grains(Math.floor(40 * press), c0, 0.09, 250, 900, 0.002, 0.006, 0.35); }
+  if (S.grit) grains(Math.floor(60 * S.grit * press), c0, 0.08, 2000, 7000, 0.0004, 0.0012, 0.18 * S.grit);
+  if (S.grass) { grains(Math.floor(260 * press), c0, 0.17, 2500, 9000, 0.0003, 0.0009, 0.22); grains(Math.floor(30 * press), c0 + 0.01, 0.14, 900, 2500, 0.001, 0.003, 0.12); }
+  if (S.glass) { grains(Math.floor(70 * press), c0, 0.1, 3000, 9000, 0.0006, 0.002, 0.6); grains(Math.floor(6 + 6 * rand()), c0, 0.12, 4500, 9500, 0.012, 0.04, 0.25); }
+  if (S.crack) grains(Math.floor(5 + 6 * rand() * press), c0, 0.09, 1100, 3200, 0.002, 0.006, 0.9);
+  if (S.fuzz) grains(Math.floor(90 * press), c0, 0.12, 3000, 7000, 0.0003, 0.0008, 0.05);
+  if (S.squeak && !scuffOnly && rand() < S.squeak * (pace >= 2 ? 1.5 : 0.5)) { // rubber sole squeak on polished floors
+    const t0 = contacts[1][0] + 0.01, len = 0.03 + rand() * 0.04, f0 = 1600 + rand() * 1600;
+    let ph = 0; for (let i = 0; i < len * sr; i++) { const k = i / (len * sr); ph += 2 * Math.PI * f0 * (1 + 0.15 * k) / sr; out[Math.floor(t0 * sr) + i] += 0.08 * Math.sin(Math.PI * k) * (Math.sin(ph) + 0.3 * Math.sin(2 * ph)); }
+  }
+  // gentle fade-out, then level by loudness (loudest 50 ms), so every surface and pace starts equal before its own volume
+  let peak = 0, acc = 0, loud = 0; const win = Math.floor(sr * 0.05);
+  for (let i = 0; i < N; i++) {
+    if (i > N - 2000) out[i] *= (N - i) / 2000;
+    peak = Math.max(peak, Math.abs(out[i])); acc += out[i] * out[i]; if (i >= win) acc -= out[i - win] * out[i - win]; loud = Math.max(loud, acc);
+  }
+  const norm = Math.min(0.25 / Math.sqrt(loud / win || 1e-9), 0.98 / (peak || 1)); for (let i = 0; i < N; i++) out[i] *= norm;
+  return buf;
+}
+const stepBufs = new Map(); // `${surf}:${pace}` -> [recordings]
+function stepBuf(surf, pace, scuff = false) {
+  const key = `${surf}:${scuff ? 's' : pace}:${ac.sampleRate}`;
+  let list = stepBufs.get(key), last = list && list.last;
+  if (!list) { list = [1, 2, 3, 4, 5, 6].map(sd => buildStep(surf, pace, sd * 31 + surf.length * 7 + pace * 101 + (scuff ? 5000 : 0), scuff)); stepBufs.set(key, list); }
+  let i; do i = Math.floor(Math.random() * list.length); while (i === last && list.length > 1); // never the same recording twice in a row
+  list.last = i; return list[i];
+}
+// build the common footstep recordings a few at a time, so nothing stutters when someone first walks on a surface
+export function prewarmSteps() {
+  if (!ac) return;
+  const jobs = [];
+  for (const s of Object.keys(SURF)) for (const p of [2, 0, 3, 1]) jobs.push([s, p]);
+  const next = () => { const j = jobs.shift(); if (!j) return; stepBuf(j[0], j[1]); setTimeout(next, 30); };
+  next();
+}
+function playBuf(g, buf, rate) { const src = ac.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate; src.connect(g); src.start(ac.currentTime + rnd(0, 0.004)); }
 
 export function step(x, y, surf, pace, own) {
   C = 'steps';
-  // pace: 0 walk (Shift), 1 crouch, 2 run, 3 run (heavy)
   if (pace <= 1 && !own) return; // silent movement, like CS2
-  const s = SURF[surf] || SURF.concrete;
-  const loud = [0.2, 0.32, 0.92, 1][pace] * s.v;
+  const s = SURF[surf] || SURF.concrete; if (!SURF[surf]) surf = 'concrete';
+  const loud = [0.16, 0.22, 0.92, 1][pace] * s.v;
   const range = [160, 220, 580, 620][pace];
   const g = out(own ? undefined : x, own ? undefined : y, loud * (own ? 0.42 : 1), range, 0.12); if (!g) return;
-  const t = ac.currentTime + rnd(0, 0.01);
-  noise(g, t, 0.05, 'bandpass', s.f * rnd(0.85, 1.15), s.q, 0.9);                    // heel
-  noise(g, t + rnd(0.035, 0.06), 0.07, 'bandpass', s.f * rnd(0.7, 1.0), s.q, 0.5);    // toe
-  if (s.body) tone(g, t, 0.07, s.body * rnd(0.9, 1.1), s.body * 0.6, 'sine', 0.5);
-  if (surf === 'grass' || surf === 'rubble') noise(g, t + 0.02, 0.14, 'highpass', surf === 'grass' ? 3500 : 2500, 0.5, 0.35, 0.02);
-  if (surf === 'rubble') for (let i = 0; i < 3; i++) click(g, t + rnd(0.01, 0.07), rnd(1500, 3000), 0.3, 0.012);   // grit shifting
-  if (surf === 'glass') {                                                                    // shards crunching and tinkling
-    for (let i = 0; i < 6; i++) click(g, t + rnd(0, 0.06), rnd(3500, 8000), rnd(0.3, 0.7), 0.006);
-    for (let i = 0; i < 3; i++) ring(g, t + rnd(0.01, 0.08), rnd(4000, 7500), 0.12, 0.09);
-  }
-  if (surf === 'splinters') for (let i = 0; i < 3; i++) noise(g, t + rnd(0, 0.06), 0.03, 'bandpass', rnd(1400, 2600), 3, 0.6, 0.002); // dry snaps
-  if (surf === 'metal') { ring(g, t, rnd(320, 420), 0.35, 0.18); tone(g, t, 0.09, 180, 120, 'sine', 0.4); }          // hollow raised floor
-  if (surf === 'marble') ring(g, t + 0.002, rnd(1800, 2400), 0.06, 0.06);
-  if (surf === 'asphalt' || surf === 'concrete') noise(g, t + 0.04, 0.09, 'bandpass', 2600, 0.8, 0.18, 0.03);       // scuff
-  if (surf === 'wood' && Math.random() < 0.12) tone(g, t + 0.05, 0.22, rnd(300, 500), rnd(250, 420), 'triangle', 0.06, 0.05); // creak
-  if (pace >= 2 && Math.random() < 0.45) gear(g, t + 0.02, 0.28);
+  playBuf(g, stepBuf(surf, pace), 0.96 + Math.random() * 0.08);
+  if (pace >= 2 && Math.random() < 0.45) gear(g, ac.currentTime + 0.02, 0.28);
 }
-function gear(g, t, v) { // equipment rattle: buckles, mags, sling
-  noise(g, t, 0.06, 'bandpass', rnd(2500, 4000), 3, v * 0.5, 0.004);
-  if (Math.random() < 0.5) ring(g, t + rnd(0.01, 0.04), rnd(2200, 3200), v * 0.12, 0.08);
+function gear(g, t, v) { // equipment: vest fabric and a soft knock of mags/buckles
+  noise(g, t, 0.09, 'bandpass', rnd(1800, 3200), 0.8, v * 0.35, 0.02);
+  if (Math.random() < 0.35) ring(g, t + rnd(0.01, 0.04), rnd(1800, 2600), v * 0.06, 0.05);
 }
 
 export function shuffle(x, y, surf, own) {
   C = 'steps'; // turning on the spot
-  const s = SURF[surf] || SURF.concrete;
-  const g = out(own ? undefined : x, own ? undefined : y, 0.14 * s.v, 180, 0.1); if (!g) return;
-  const t = ac.currentTime;
-  noise(g, t, 0.12, 'bandpass', s.f * 0.8, 0.7, 0.6, 0.03);
-  noise(g, t + 0.02, 0.16, 'bandpass', 1800, 1.2, 0.25, 0.04); // cloth
+  if (!SURF[surf]) surf = 'concrete';
+  const g = out(own ? undefined : x, own ? undefined : y, 0.06 * SURF[surf].v, 180, 0.1); if (!g) return;
+  playBuf(g, stepBuf(surf, 0, true), 0.95 + Math.random() * 0.1);
+  noise(g, ac.currentTime + 0.02, 0.16, 'bandpass', 1800, 1.2, 0.12, 0.04); // cloth
 }
 
 // --- foley: small sounds for nearly everything a player does ---

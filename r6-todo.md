@@ -6,7 +6,15 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-*(nothing waiting — add your next idea!)*
+- [ ] Realistic footsteps (the current ones sound tacky).
+- [ ] Speed: the game is slow and laggy — make it smooth.
+- [ ] Graphics settings: Fullscreen on/off and one quality choice (Low / Medium / High / Ultra).
+- [ ] Crosshair settings: players adjust their own crosshair (shape, size, gap, colour…).
+- [ ] Armory: a place to try out and inspect every gun.
+- [ ] Defenders set up their site like in R6 (more fortifying options during prep).
+- [ ] 2–3 floors per map (stairs, hatches, hearing and shooting between floors).
+- [ ] 5 more maps (each 2–3 floors), picked at the start of a game.
+- [ ] 30 attackers and 30 defenders (all original).
 
 ## Done
 
