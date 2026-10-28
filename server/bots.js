@@ -53,9 +53,12 @@ function findPath(map, sx, sy, gx, gy) {
     const t = map.tiles[k];
     if (t === T.BARRI) return 8;
     if (t === T.SOFT && map.hp[k] > 0) return 30; // a plain wall: attackers will knock a hole in it if there's no other way
+    if (t === T.PANEL) return 70; // a steel panel: very slow to hammer through, only when there is no other way in
     if (blocksMove(t)) return Infinity;
     // keep a little away from walls so the bot's body fits
     const x = k % W, y = (k / W) | 0;
+    const bl = (dx, dy) => blocksMove(tileAt(map, x + dx, y + dy));
+    if ((bl(1, 0) && bl(-1, 0)) || (bl(0, 1) && bl(0, -1))) return Infinity; // a one-cell gap: a body is wider than that
     let near = 0;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (blocksMove(tileAt(map, x + dx, y + dy)) && tileAt(map, x + dx, y + dy) !== T.BARRI) near++;
     return 1 + near * 0.6;
@@ -174,7 +177,7 @@ export function botThink(game, p, dt) {
   const nx = (next % map.W + 0.5) * CELL, ny = (Math.floor(next / map.W) + 0.5) * CELL;
   const dirA = Math.atan2(ny - p.y, nx - p.x);
   p.aim += Math.max(-dt * 6, Math.min(dt * 6, angDiff(dirA, p.aim)));
-  if (map.tiles[next] === T.BARRI || map.tiles[next] === T.SOFT) {
+  if (map.tiles[next] === T.BARRI || map.tiles[next] === T.SOFT || map.tiles[next] === T.PANEL) {
     if (Math.hypot(nx - p.x, ny - p.y) < 26) { p.aim = dirA; game.event(p, { k: 'melee' }); return; }
   }
   setDir(inp, nx - p.x, ny - p.y);

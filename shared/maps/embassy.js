@@ -90,7 +90,7 @@ export function build() {
   B.prop('tank', 15, 31, 4, 4, T.TALL); B.prop('tank', 21, 31, 4, 3, T.TALL); B.prop('console', 22, 42, 5, 1, T.LOW);
   B.prop('shelf', 31, 30, 1, 7, T.TALL); B.prop('shelf', 34, 30, 1, 7, T.TALL); B.prop('crates', 40, 31, 3, 2, T.TALL); B.prop('crates', 33, 40, 2, 2, T.TALL);
   for (const cx of [48, 52]) { B.wall(cx + 3, 39, cx + 3, 44, T.SOFT); B.prop('bench', cx, 43, 2, 1, T.LOW); }
-  B.wall(48, 38, 55, 38, T.SOFT); B.door(49, 38, 49, 38); B.door(53, 38, 53, 38);
+  B.wall(48, 38, 55, 38, T.SOFT); B.door(49, 38, 50, 38); B.door(53, 38, 54, 38);
 
   // ================= stairs =================
   stair(1, 2, 14, 14, 2, 6, 'n', FL.CARPET);             // waiting room -> conference room
