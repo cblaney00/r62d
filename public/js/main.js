@@ -10,7 +10,7 @@ import { S, setMapScale } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading } from './sprites.js';
 import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
-import { openOps, closeOps, updateOpsProfile } from './ops.js';
+import { openOps, closeOps, updateOpsProfile, showLoadout } from './ops.js';
 import { openProfile } from './profile.js';
 import { openArmory, closeArmory } from './armory.js';
 import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './crosshair.js';
@@ -148,7 +148,7 @@ function connect() {
     else if (m.t === 'full') alert('The game is full (10 players).');
     else if (m.t === 'chat') addChat(m);
     else if (m.t === 'xp') { st.profile = m.profile; playXp(m); }
-    else if (m.t === 'profile') { st.profile = m.profile; updateOpsProfile($('opsPage'), m.profile); st.selBuilt = null; }
+    else if (m.t === 'profile') { st.profile = m.profile; updateOpsProfile($('opsPage'), m.profile); st.loDirty = true; }
   };
   ws.onclose = () => { $('conn').classList.remove('hidden'); $('conn').textContent = 'Disconnected — reconnecting…'; setTimeout(() => location.reload(), 2500); };
 }
@@ -520,11 +520,12 @@ function renderLobby(s) {
 }
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function showOpInfo(html) {
-  const el = $('opInfo'); if (el.dataset.h === html) return;
-  el.dataset.h = html; el.innerHTML = html;
-  for (const g of el.querySelectorAll('.gp')) g.appendChild(gunPicture(g.dataset.w, attFromCode(g.dataset.a), 210, 74));
-  const b = el.querySelector('.lo'); if (b) b.onclick = () => showOps(b.dataset.op);
+// the big loadout panel beside the operator cards: your pick once you have one, before that whichever card the mouse is on
+function showSelLoadout(op, mine) {
+  $('loNote').textContent = mine ? '' : 'PREVIEW · CLICK THE CARD TO PICK';
+  if (st.loShown === op && !st.loDirty) return;
+  st.loShown = op; st.loDirty = false;
+  showLoadout($('selLoBody'), { profile: st.profile, send, op });
 }
 function buildSelect(s) {
   const me = st.me; if (!me) return;
@@ -536,26 +537,17 @@ function buildSelect(s) {
       const o = OPERATORS[k];
       const d = document.createElement('div'); d.className = 'op'; d.dataset.op = k;
       const c = document.createElement('canvas'); c.width = 240; c.height = 240; portraitCached(c, k);
-      const speed = o.armor, armor = 4 - o.armor;
-      const pips = n => [1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('');
-      const lo = cleanLoadout(k, st.profile && st.profile.loadouts[k]);
-      const g = GADGETS[lo.gadget];
       d.innerHTML = `<div class="who"></div>`;
       d.appendChild(c);
       const info = document.createElement('div'); info.className = 'info';
       info.innerHTML = `<div class="nm">${o.name}</div><div class="role">${o.role}</div><div class="ab">${o.ability.name}</div>`;
       d.appendChild(info);
-      // the full details show in the strip under the cards, for whichever card the mouse is on (or yours)
-      d.dataset.full = `<span class="gp" data-w="${lo.primary}" data-a="${[lo.att[lo.primary] || {}].map(a => [a.barrel, a.grip, a.sight].join(','))[0]}"></span><div class="nm">${o.name}<span>${o.role}</span></div>
-        <div><span class="pips"><span>ARMOR ${pips(armor)}</span><span>SPEED ${pips(speed)}</span></span> ·
-        ${WEAPONS[lo.primary].name} <span style="color:var(--dim)">${CLASS_NAME[WEAPONS[lo.primary].cls]}</span>${lo.secondary ? ' · ' + WEAPONS[lo.secondary].name : ''} · ${g.name} ×${GADGET_COUNT[lo.gadget]}
-        <button class="lo" data-op="${k}" title="Change loadout">LOADOUT</button></div>
-        <div><span class="ab">${o.ability.name}${o.ability.count ? ' ×' + o.ability.count : ''}</span> — ${o.ability.desc}</div>`;
-      d.onmouseenter = () => showOpInfo(d.dataset.full);
+      d.onmouseenter = () => { if (!document.querySelector('#opgrid .op.mine')) showSelLoadout(k, false); };
       d.onclick = () => { send({ t: 'pick', op: k }); };
       grid.appendChild(d);
     }
-    if (grid.firstChild) showOpInfo(grid.firstChild.dataset.full);
+    st.loShown = null;
+    if (grid.firstChild) showSelLoadout(grid.firstChild.dataset.op, false);
   }
   const mates = s.players.filter(p => p.sq === me.sq);
   for (const d of document.querySelectorAll('#opgrid .op')) {
@@ -563,11 +555,12 @@ function buildSelect(s) {
     const mineNow = !!who && who.id === me.id;
     if (mineNow && !d.classList.contains('mine')) { d.classList.add('locked'); audio.ui('lock'); setTimeout(() => d.classList.remove('locked'), 700); }
     d.classList.toggle('mine', mineNow);
-    if (mineNow && !d.matches(':hover') && !document.querySelector('#opgrid .op:hover')) showOpInfo(d.dataset.full);
+    if (mineNow) showSelLoadout(d.dataset.op, true);
     d.classList.toggle('taken', !!who && who.id !== me.id);
     d.querySelector('.who').textContent = who ? who.n : '';
     d.querySelector('.who').style.display = who ? '' : 'none';
   }
+  if (st.loDirty && st.loShown && !document.querySelector('#opgrid .op.mine')) showSelLoadout(st.loShown, false);
   $('selSide').textContent = `ROUND ${s.rd} — ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`;
   $('selSide').style.color = side === 'atk' ? '#ffb27a' : '#8fc8ff';
   const site = st.map.sites[s.site];

@@ -23,6 +23,13 @@ export function openOps(el, { profile, send, op }) {
 export function updateOpsProfile(el, profile) { state.profile = profile; if (!el.classList.contains('hidden')) renderDetail(el); }
 export function closeOps(el) { el.classList.add('hidden'); cancelAnimationFrame(state.raf); }
 
+// The same gear choices, drawn big inside the operator-select screen (no bio or stats, just what you take in).
+const panel = { raf: 0 };
+export function showLoadout(d, { profile, send, op }) {
+  state.profile = profile; state.send = send;
+  fillDetail(d, op, panel, true, () => showLoadout(d, { profile: state.profile, send, op }));
+}
+
 function loadoutOf(op) { return cleanLoadout(op, state.profile && state.profile.loadouts && state.profile.loadouts[op]); }
 
 function render(el) {
@@ -46,8 +53,10 @@ function bars(w) {
     stat('Accuracy', 100 - W.ads * 1500) + stat('Range', W.range / 13);
 }
 
-function renderDetail(el) {
-  const k = state.sel, o = OPERATORS[k], bio = BIOS[k], L = LOADOUTS[k], cur = loadoutOf(k);
+function renderDetail(el) { fillDetail(el.querySelector('#opsDetail'), state.sel, state, false, () => renderDetail(el)); }
+
+function fillDetail(d, k, anim, compact, again) {
+  const o = OPERATORS[k], bio = BIOS[k], L = LOADOUTS[k], cur = loadoutOf(k);
   const s = state.profile && state.profile.stats && state.profile.stats.ops[k];
   const pips = n => [1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('');
   const weaponCard = (w, slot) => `<button class="wcard ${cur[slot] === w ? 'on' : ''}" data-slot="${slot}" data-v="${w}">
@@ -63,42 +72,43 @@ function renderDetail(el) {
   };
   const gadgetCard = g => `<button class="wcard g ${cur.gadget === g ? 'on' : ''}" data-slot="gadget" data-v="${g}">
       <div class="wn">${GADGETS[g].name}<small>×${GADGET_COUNT[g]}</small></div><p>${GADGET_DESC[g]}</p></button>`;
-  const d = el.querySelector('#opsDetail');
+  const keepScroll = d.dataset.op === k ? d.scrollTop : 0; d.dataset.op = k;
   d.style.setProperty('--c', o.color);
   d.innerHTML = `
-    <div class="ophero"><canvas id="opBig" width="420" height="420"></canvas>
+    <div class="ophero"><canvas class="opBig" width="420" height="420"></canvas>
       <div class="opinfo">
         <div class="side ${o.team}">${o.team === 'atk' ? 'ATTACKER' : 'DEFENDER'}</div>
         <h1>${o.name}</h1><div class="role">${o.role}</div>
-        <div class="real">${esc(bio.real)} · ${esc(bio.from)}</div>
-        <p class="bio">${esc(bio.text)}</p>
+        ${compact ? '' : `<div class="real">${esc(bio.real)} · ${esc(bio.from)}</div>
+        <p class="bio">${esc(bio.text)}</p>`}
         <div class="pips"><span>ARMOR ${pips(4 - o.armor)}</span><span>SPEED ${pips(o.armor)}</span></div>
         <div class="ability"><b>${o.ability.name}${o.ability.count ? ' ×' + o.ability.count : ''}</b><p>${o.ability.desc}</p></div>
-        <div class="mystats">${s ? `<div><b>${s.rounds}</b>ROUNDS</div><div><b>${s.rounds ? Math.round(s.roundsWon / s.rounds * 100) : 0}%</b>ROUNDS WON</div><div><b>${s.kills}</b>KILLS</div><div><b>${s.deaths}</b>DEATHS</div><div><b>${(s.kills / Math.max(1, s.deaths)).toFixed(2)}</b>K/D</div>` : '<div class="none">You haven\'t played this operator yet.</div>'}</div>
+        ${compact ? '' : `<div class="mystats">${s ? `<div><b>${s.rounds}</b>ROUNDS</div><div><b>${s.rounds ? Math.round(s.roundsWon / s.rounds * 100) : 0}%</b>ROUNDS WON</div><div><b>${s.kills}</b>KILLS</div><div><b>${s.deaths}</b>DEATHS</div><div><b>${(s.kills / Math.max(1, s.deaths)).toFixed(2)}</b>K/D</div>` : '<div class="none">You haven\'t played this operator yet.</div>'}</div>`}
       </div></div>
     <h3>PRIMARY WEAPON</h3><div class="cards">${L.primaries.map(w => weaponCard(w, 'primary')).join('')}</div>${attRows('primary')}
     ${L.secondaries.length ? `<h3>SECONDARY WEAPON</h3><div class="cards">${L.secondaries.map(w => weaponCard(w, 'secondary')).join('')}</div>${attRows('secondary')}` : ''}
     <h3>GADGET</h3><div class="cards">${L.gadgets.map(gadgetCard).join('')}</div>
     <p class="hint">Your choices are saved to your profile and used every time you pick ${o.name}.</p>`;
+  d.scrollTop = keepScroll;
   for (const p of d.querySelectorAll('.wpic')) p.appendChild(gunPicture(p.dataset.w, cleanAtt(p.dataset.w, cur.att[p.dataset.w]), 270, 84));
   for (const b of d.querySelectorAll('.att')) b.onclick = () => {
     const l = loadoutOf(k), w = b.dataset.w;
     l.att = { ...l.att, [w]: { ...cleanAtt(w, l.att[w]), [b.dataset.s]: b.dataset.v } };
     if (state.profile) { state.profile.loadouts = { ...state.profile.loadouts, [k]: l }; }
     if (state.send) state.send({ t: 'loadout', op: k, l });
-    renderDetail(el);
+    again();
   };
   for (const b of d.querySelectorAll('.wcard')) b.onclick = () => {
     const l = { ...loadoutOf(k), [b.dataset.slot]: b.dataset.v };
     if (state.profile) { state.profile.loadouts = { ...state.profile.loadouts, [k]: l }; }
     if (state.send) state.send({ t: 'loadout', op: k, l });
-    renderDetail(el);
+    again();
   };
   // slowly animated big portrait
-  cancelAnimationFrame(state.raf);
-  const cv = d.querySelector('#opBig'), x = cv.getContext('2d');
+  cancelAnimationFrame(anim.raf);
+  const cv = d.querySelector('.opBig'), x = cv.getContext('2d');
   const loop = t => {
-    if (el.classList.contains('hidden') || !cv.isConnected) return;
+    if (!cv.isConnected || d.offsetParent === null) return;
     const g = x.createRadialGradient(210, 210, 20, 210, 210, 300);
     g.addColorStop(0, shade(o.color, 0.5)); g.addColorStop(1, '#07090c');
     x.fillStyle = g; x.fillRect(0, 0, 420, 420);
@@ -108,7 +118,7 @@ function renderDetail(el) {
     const s = t / 1000;
     drawOperator(x, { x: 20, y: 20, aim: -0.5 + Math.sin(s * 0.6) * 0.5, op: k, w: cur.primary, ally: true, walk: s * 3, ads: Math.sin(s * 0.4) > 0.6 }, s);
     x.restore();
-    state.raf = requestAnimationFrame(loop);
+    anim.raf = requestAnimationFrame(loop);
   };
-  state.raf = requestAnimationFrame(loop);
+  anim.raf = requestAnimationFrame(loop);
 }
