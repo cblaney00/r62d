@@ -332,6 +332,53 @@ export function drawProp(ctx, p, m) {
   const X = p.x * CELL, Y = p.y * CELL, W = p.w * CELL, H = p.h * CELL;
   const h = (i) => hash(p.x, p.y, i);
   switch (p.kind) {
+    case 'bed': {
+      shadowRect(ctx, X + 1, Y + 1, W - 2, H - 2);
+      ctx.fillStyle = '#4a3322'; rr(ctx, X + 1, Y + 1, W - 2, H - 2, 2); ctx.fill();
+      ctx.fillStyle = '#e9e6de'; rr(ctx, X + 2.5, Y + 2.5, W - 5, H - 5, 2); ctx.fill();
+      ctx.fillStyle = shade(['#6b7fa6', '#9a5a4a', '#5b7f62', '#8a7aa8'][Math.floor(h(1) * 4)], 1); rr(ctx, X + 2.5, Y + 2.5 + (H - 5) * 0.32, W - 5, (H - 5) * 0.68, 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'; for (let i = 1; i < 4; i++) ctx.fillRect(X + 3, Y + 2.5 + (H - 5) * (0.32 + i * 0.17), W - 6, 0.6);
+      ctx.fillStyle = '#f6f4ee'; const pw = (W - 8) / 2; rr(ctx, X + 3.5, Y + 4, pw, 5, 2); ctx.fill(); rr(ctx, X + 4.5 + pw, Y + 4, pw, 5, 2); ctx.fill();
+      break;
+    }
+    case 'pool': {
+      ctx.fillStyle = '#d9d6cc'; ctx.fillRect(X, Y, W, H);
+      const g = ctx.createLinearGradient(X, Y, X + W, Y + H); g.addColorStop(0, '#2f8fb8'); g.addColorStop(1, '#1d5f86');
+      ctx.fillStyle = g; ctx.fillRect(X + 3, Y + 3, W - 6, H - 6);
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 0.7;
+      for (let i = 0; i < 9; i++) { const yy = Y + 6 + h(i) * (H - 12), xx = X + 6 + h(i + 9) * (W - 30); ctx.beginPath(); ctx.moveTo(xx, yy); ctx.quadraticCurveTo(xx + 8, yy - 2, xx + 16, yy); ctx.stroke(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(X + 3, Y + 3, W - 6, 1);
+      break;
+    }
+    case 'locker': {
+      shadowRect(ctx, X, Y, W, H, 0.5);
+      const n = Math.max(1, Math.round((W >= H ? W : H) / 7));
+      for (let i = 0; i < n; i++) {
+        const hor = W >= H, lx = hor ? X + i * W / n : X, ly = hor ? Y : Y + i * H / n, lw = hor ? W / n : W, lh = hor ? H : H / n;
+        ctx.fillStyle = shade('#566a7a', 0.9 + h(i) * 0.2); ctx.fillRect(lx + 0.3, ly + 0.3, lw - 0.6, lh - 0.6);
+        ctx.fillStyle = 'rgba(0,0,0,0.35)'; for (let j = 0; j < 3; j++) ctx.fillRect(lx + 1.5, ly + 1.5 + j * 1.6, lw - 3, 0.6);
+      }
+      break;
+    }
+    case 'train': {
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(X + 3, Y + 4, W, H);
+      const hor = W >= H;
+      ctx.fillStyle = h(1) < 0.5 ? '#7a2f25' : '#2f4a63'; rr(ctx, X, Y, W, H, 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; if (hor) ctx.fillRect(X, Y + 1, W, 2); else ctx.fillRect(X + 1, Y, 2, H);
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      for (let i = 1; i < (hor ? p.w : p.h); i += 2) { if (hor) ctx.fillRect(X + i * CELL, Y + 2, 0.8, H - 4); else ctx.fillRect(X + 2, Y + i * CELL, W - 4, 0.8); }
+      ctx.fillStyle = '#c9b037'; if (hor) { ctx.fillRect(X + 1, Y + H / 2 - 0.5, 3, 1); ctx.fillRect(X + W - 4, Y + H / 2 - 0.5, 3, 1); } else { ctx.fillRect(X + W / 2 - 0.5, Y + 1, 1, 3); ctx.fillRect(X + W / 2 - 0.5, Y + H - 4, 1, 3); }
+      break;
+    }
+    case 'tank': { // boiler / generator / water tank
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(X + W / 2 + 2, Y + H / 2 + 3, W / 2, H / 2, 0, 0, 7); ctx.fill();
+      const g = ctx.createRadialGradient(X + W * 0.35, Y + H * 0.35, 1, X + W / 2, Y + H / 2, Math.max(W, H) / 1.6);
+      g.addColorStop(0, '#b9c0c4'); g.addColorStop(1, '#4f575d');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(X + W / 2, Y + H / 2, W / 2 - 0.5, H / 2 - 0.5, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.8; ctx.stroke();
+      ctx.fillStyle = '#d23a2a'; ctx.beginPath(); ctx.arc(X + W / 2, Y + H / 2, 1.5, 0, 7); ctx.fill();
+      break;
+    }
     case 'railing': { // waist-high metal rail round a stairwell
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(X + 2, Y + 2, W - 2, H - 2);
       const hor = W >= H, cx = X + W / 2, cy = Y + H / 2;

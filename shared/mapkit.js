@@ -38,6 +38,8 @@ export function makeMap({ id, name, floors }) {
       // walkable floor that is not a room (balcony, roof, basement corridor without a name)
       slab(x0, y0, w, h, fType) { each(x0, y0, x0 + w - 1, y0 + h - 1, k => { tiles[k] = T.FLOOR; floor[k] = fType; }); },
       room(rname, x, y, w, h, fType) { rooms.push({ name: rname, fl: f.i, x: f.gx + x - f.x0, y: y - f.y0, w, h }); K.slab(x, y, w, h, fType); },
+      // a room with its own walls one cell outside it (neighbouring rooms leave a one-cell gap: the shared wall)
+      area(rname, x, y, w, h, fType, t = T.SOFT, m = MAT.DRYWALL) { K.room(rname, x, y, w, h, fType); K.box(x - 1, y - 1, x + w, y + h, t, m); },
       wall(x0, y0, x1, y1, t = T.SOFT, m = MAT.DRYWALL) { each(x0, y0, x1, y1, k => { tiles[k] = t; mat[k] = m; hp[k] = CELL_HP[t] || 0; }); },
       // a rectangle of walls around (and including the edge of) x0..x1, y0..y1
       box(x0, y0, x1, y1, t = T.SOFT, m = MAT.DRYWALL) { K.wall(x0, y0, x1, y0, t, m); K.wall(x0, y1, x1, y1, t, m); K.wall(x0, y0, x0, y1, t, m); K.wall(x1, y0, x1, y1, t, m); },

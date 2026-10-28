@@ -1,8 +1,12 @@
 // All maps. Each map file builds its floors with the kit in mapkit.js.
 import { CELL, T } from './constants.js';
 import { build as harbor } from './maps/harbor.js';
+import { build as villa } from './maps/villa.js';
 
-export const MAPS = { harbor: { name: 'Harbor Office', build: harbor } };
+export const MAPS = {
+  harbor: { name: 'Harbor Office', floors: '1F · 2F', desc: 'Offices and a garage by the docks.', build: harbor },
+  villa: { name: 'Cliffside Villa', floors: 'B · 1F · 2F', desc: 'A luxury house on a cliff, wine cellar and panic room below.', build: villa },
+};
 export const MAP_LIST = Object.keys(MAPS);
 
 const cache = new Map();
