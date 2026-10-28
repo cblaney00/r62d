@@ -66,21 +66,19 @@ export function stepMove(map, o, input, dt, mods) {
   const dl = Math.hypot(dvx, dvy), maxd = accel * dt;
   if (dl > maxd) { dvx *= maxd / dl; dvy *= maxd / dl; }
   o.vx += dvx; o.vy += dvy;
-  // Real steps: speed dips as each foot plants and surges mid-stride (averages out to full speed).
-  // o.gait counts half-strides; a foot plants every time it passes a multiple of PI.
-  let pulse = 1;
+  // Steps: o.gait counts half-strides (a foot plants every time it passes a multiple of PI). It only drives
+  // the legs and the footstep sounds; the body itself glides at a steady speed, like a real person's hips.
   if (!mods.drone) {
     const v = Math.hypot(o.vx, o.vy);
     const stride = mods.downed ? 13 : v > BASE_SPEED * 0.78 ? 28 : v > BASE_SPEED * 0.42 ? 21 : 16;
     o.gait = (o.gait || 0) + v * dt / stride * Math.PI;
-    pulse = v > 5 ? 0.74 + 0.52 * Math.sin(o.gait) ** 2 : 1;
   }
   const bx = o.x, by = o.y;
-  moveCircle(map, o, o.vx * pulse * dt, o.vy * pulse * dt, mods.drone ? 5 : 10, !!mods.drone);
+  moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? 5 : 10, !!mods.drone);
   takeStairs(map, o);
   // walking into a wall soaks up the velocity in that direction
   if (dt > 0) {
-    const ax = (o.x - bx) / (dt * pulse), ay = (o.y - by) / (dt * pulse);
+    const ax = (o.x - bx) / dt, ay = (o.y - by) / dt;
     if (Math.abs(ax) < Math.abs(o.vx) - 1) o.vx = ax;
     if (Math.abs(ay) < Math.abs(o.vy) - 1) o.vy = ay;
   }
