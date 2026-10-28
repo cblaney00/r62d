@@ -14,6 +14,7 @@ import { openOps, closeOps, updateOpsProfile, showLoadout } from './ops.js';
 import { openProfile } from './profile.js';
 import { openArmory, closeArmory } from './armory.js';
 import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './crosshair.js';
+import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor } from '/shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '/shared/operators.js';
@@ -102,13 +103,36 @@ const st = {
 const fx = new FX();
 const keys = new Set();
 const mouse = { x: 0, y: 0, l: false, r: false, wl: 0, wr: 0 };
-// Aim pad (default): a ring on the right of the screen works like a joystick. Where the mouse sits in
+// Aim pad (default): a ring on the right of the screen works like a joystick. Where the knob sits in
 // the ring sets which way you aim (and how far ahead you look), so turning round is a short flick
 // across the ring instead of dragging the cursor all the way round your character.
+// There is no dead middle: moving sideways always turns you (near the middle at the same rate as a
+// little way out), and moving straight through the middle comes out the other side, aiming that way.
+// "Turn" is FPS-style: mouse left/right turns you, up/down pushes the crosshair further/nearer.
 // "Cursor" is the old way: you aim at wherever the cursor is.
-let aimMode = (() => { try { return localStorage.getItem('r62d-aim') || 'pad'; } catch { return 'pad'; } })();
+// A controller's right stick always aims like the pad (see gamepad.js).
+const AIM_MODES = ['pad', 'turn', 'cursor'];
+let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return AIM_MODES.includes(m) ? m : 'pad'; } catch { return 'pad'; } })();
 const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
 let padOn = false, padAng = 0, padReach = 0.6;
+const wrapAng = a => Math.atan2(Math.sin(a), Math.cos(a));
+function padMove(dx, dy) { // a captured-mouse move, in screen pixels, applied to the knob
+  const R = pad().r, c = Math.cos(padAng), sn = Math.sin(padAng);
+  const along = dx * c + dy * sn, across = -dx * sn + dy * c;
+  let r = padReach * R;
+  padAng += across / Math.max(r, R * 0.25); // turning speed is capped near the middle so it never spins wildly
+  r += along;
+  if (r < 0) { r = -r; padAng += Math.PI; } // straight through the middle: out the other side
+  padAng = wrapAng(padAng); padReach = Math.min(1, r / R);
+}
+function turnMove(dx, dy) {
+  padAng = wrapAng(padAng + dx * 0.004);
+  padReach = Math.max(0, Math.min(1, padReach - dy / (VH * 0.45)));
+}
+// controller state (merged with the keyboard and mouse in sendInput)
+const gpk = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0 };
+let gpT = -1e9, mouseT = 0, gpLastL = 0, gpName = '';
+const gpRecent = () => gpT > mouseT && performance.now() - gpT < 4000;
 // the point you aim at, in screen pixels (with the aim pad this sits ahead of your character)
 function cursor() {
   if (!padOn) return mouse;
@@ -370,6 +394,9 @@ addEventListener('keydown', e => {
   const a = actionFor(e.code);
   if (a || e.code === 'AltLeft' || e.code === 'AltRight' || e.code === 'Tab') e.preventDefault();
   if (!a || keys.has(a)) return;
+  pressAction(a, e);
+});
+function pressAction(a, e) {
   keys.add(a);
   audio.initAudio();
   const ev = st.evq;
@@ -384,19 +411,59 @@ addEventListener('keydown', e => {
     case 'settings': toggleSettings(); break;
     case 'pause': escape(); break;
     case 'spot': st.spotReq = true; break;
-    case 'chat': if (st.id) { e.preventDefault(); keys.delete('chat'); openChat(true); } break;
+    case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
+    case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
+    case 'camPrev': case 'camNext': if (st.me && (st.me.ct === 'cam' || st.me.ct === 'drone')) ev.push({ k: a }); break;
   }
-});
+}
+// Read the controller once a frame and turn it into the same actions as the keyboard and mouse.
+function pollPad(dt, view) {
+  const gp = readPad();
+  if (!gp) { if (gpName) { for (const k in gpk) gpk[k] = 0; gpName = ''; renderSettings(); } return; }
+  if (!gpName) { gpName = gp.name; renderSettings(); }
+  const { ls, rs } = gp;
+  if (ls.l || rs.l || gp.lt > 0.2 || gp.rt > 0.2 || gp.held.some(Boolean)) gpT = performance.now();
+  if (menuOpen()) { // only Menu works in menus (to close the pause menu)
+    if (gp.pressed[9]) escape();
+    gpk.fire = gpk.ads = 0; return;
+  }
+  for (let i = 0; i < gp.pressed.length; i++) {
+    const a = PAD_ACTIONS[i]; if (!a) continue;
+    if (gp.pressed[i]) {
+      if (a === 'crouch') gpk.crouch = gpk.crouch ? 0 : 1;
+      else if (a === 'pause') escape();
+      else pressAction(a);
+    }
+    if (gp.released[i] && a !== 'crouch') keys.delete(a);
+  }
+  // left stick: 8 directions like WASD; a light push walks (silent)
+  const nx = ls.l ? ls.x / ls.l : 0, ny = ls.l ? ls.y / ls.l : 0;
+  gpk.right = ls.l && nx > 0.38 ? 1 : 0; gpk.left = ls.l && nx < -0.38 ? 1 : 0;
+  gpk.down = ls.l && ny > 0.38 ? 1 : 0; gpk.up = ls.l && ny < -0.38 ? 1 : 0;
+  gpk.walk = ls.l && ls.l < 0.55 ? 1 : 0;
+  if (gp.rt > 0.35 && !gpk.fire) mouse.wl++; // a trigger pull also counts as a click (next teammate, ping in a camera)
+  gpk.fire = gp.rt > 0.35 ? 1 : 0; gpk.ads = gp.lt > 0.35 ? 1 : 0;
+  // right stick: aim. A stick snapping back to the middle when let go is ignored, so the aim stays put.
+  const falling = (gpLastL - rs.l) / Math.max(dt, 1e-3) > 4;
+  if (rs.l > 0.05 && !falling) {
+    if (view && view.kind === 'cam') { mouse.x = VW / 2 + rs.x / rs.l * VH * 0.25; mouse.y = VH / 2 + rs.y / rs.l * VH * 0.25; }
+    else { padAng = Math.atan2(rs.y, rs.x); padReach = rs.l; }
+  }
+  gpLastL = rs.l;
+}
 addEventListener('keyup', e => {
   if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault(); // stop Firefox's menu bar popping up
   const a = actionFor(e.code); if (a) keys.delete(a);
 });
 addEventListener('blur', () => { keys.clear(); mouse.l = mouse.r = false; });
 cv.addEventListener('mousemove', e => {
+  mouseT = performance.now();
   if (document.pointerLockElement === cv) {
     const ads = mouse.r && st.me && st.me.a && st.me.ct === 'body';
     const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * DPR;
+    if (padOn && aimMode === 'pad') { padMove(e.movementX * k, e.movementY * k); return; }
+    if (padOn && aimMode === 'turn') { turnMove(e.movementX * k, e.movementY * k); return; }
     mouse.x = Math.max(0, Math.min(VW, mouse.x + e.movementX * k));
     mouse.y = Math.max(0, Math.min(VH, mouse.y + e.movementY * k));
   } else { mouse.x = e.clientX * DPR; mouse.y = e.clientY * DPR; }
@@ -427,7 +494,9 @@ function renderSettings() {
   }).join('');
   $('bindTable').innerHTML = `<tr><th>ACTION</th><th>KEY</th><th>ALTERNATE</th></tr>${rows}
     <tr><td>Shoot / Aim down sights</td><td>Left mouse</td><td>Right mouse</td></tr>
-    <tr><td>Ping</td><td>Middle mouse</td><td></td></tr>`;
+    <tr><td>Ping</td><td>Middle mouse</td><td></td></tr>
+    <tr><th>XBOX CONTROLLER</th><th colspan="2">${gpName ? 'CONNECTED' : 'NOT CONNECTED (plug it in and press a button)'}</th></tr>
+    ${PAD_HELP.map(([n, b]) => `<tr><td>${n}</td><td colspan="2">${b}</td></tr>`).join('')}`;
   for (const b of $('bindTable').querySelectorAll('button')) b.onclick = () => { rebinding = { id: b.dataset.id, slot: +b.dataset.slot }; renderSettings(); };
 }
 $('setReset').onclick = () => { resetBinds(); renderSettings(); };
@@ -716,11 +785,11 @@ function frame(nowMs) {
   }
 
   // --- input & prediction ---
-  padOn = aimMode === 'pad' && !!view && (view.kind === 'body' || view.kind === 'drone');
-  if (padOn) { // keep the mouse inside the ring and read the aim from it
+  pollPad(dt, view);
+  padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
+  if (padOn && aimMode === 'pad' && document.pointerLockElement !== cv && !gpRecent()) { // mouse not captured yet: read the ring from the cursor
     const P = pad(), dx = mouse.x - P.x, dy = mouse.y - P.y, l = Math.hypot(dx, dy);
-    if (l > P.r) { mouse.x = P.x + dx / l * P.r; mouse.y = P.y + dy / l * P.r; }
-    if (l > P.r * 0.12) { padAng = Math.atan2(dy, dx); padReach = Math.min(1, l / P.r); }
+    if (l > 1) { padAng = Math.atan2(dy, dx); padReach = Math.min(1, l / P.r); }
   }
   if (view && (view.kind === 'body' || view.kind === 'drone')) {
     const c = cursor(), mw = screenToWorld(c.x, c.y);
@@ -805,8 +874,8 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const ev = st.evq; st.evq = [];
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
   const k = {
-    up: keys.has('up') ? 1 : 0, down: keys.has('down') ? 1 : 0, left: keys.has('left') ? 1 : 0, right: keys.has('right') ? 1 : 0,
-    walk: keys.has('walk') ? 1 : 0, crouch: keys.has('crouch') ? 1 : 0, fire: mouse.l ? 1 : 0, ads: mouse.r ? 1 : 0,
+    up: keys.has('up') || gpk.up ? 1 : 0, down: keys.has('down') || gpk.down ? 1 : 0, left: keys.has('left') || gpk.left ? 1 : 0, right: keys.has('right') || gpk.right ? 1 : 0,
+    walk: keys.has('walk') || gpk.walk ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
   };
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
@@ -1257,7 +1326,7 @@ function draw(s, view, now, dt) {
   if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(1, fl / 1.2)})`; ctx.fillRect(0, 0, VW, VH); }
   if (inGame && me && me.a && me.ct === 'body' && !me.br) crosshair(me, now);
   else if (inGame) { const c = cursor(); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(c.x, c.y, 2 * DPR, 0, 7); ctx.fill(); }
-  if (inGame && padOn && !menuOpen()) aimPad();
+  if (inGame && padOn && aimMode === 'pad' && !gpRecent() && !menuOpen()) aimPad();
 }
 
 function marker(x, y, label, col, view) {
@@ -1283,10 +1352,10 @@ function aimPad() {
   ctx.save(); ctx.globalAlpha = near ? 0.35 : 1;
   ctx.lineWidth = 1.5 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.fillStyle = 'rgba(10,16,24,0.18)';
   ctx.beginPath(); ctx.arc(P.x, P.y, P.r, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.arc(P.x, P.y, P.r * 0.12, 0, 7); ctx.stroke();
   ctx.strokeStyle = 'rgba(120,180,255,0.55)'; ctx.lineWidth = 3 * DPR;
   ctx.beginPath(); ctx.arc(P.x, P.y, P.r, padAng - 0.18, padAng + 0.18); ctx.stroke();
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 5 * DPR, 0, 7); ctx.fill();
+  const kx = P.x + Math.cos(padAng) * padReach * P.r, ky = P.y + Math.sin(padAng) * padReach * P.r;
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(kx, ky, 5 * DPR, 0, 7); ctx.fill();
   ctx.restore();
 }
 
@@ -1736,7 +1805,7 @@ function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
   for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = s[k];
   if (s.xh) setXhair(s.xh, false);
-  if (s.aim === 'pad' || s.aim === 'cursor') setAim(s.aim, false);
+  if (AIM_MODES.includes(s.aim)) setAim(s.aim, false);
   showSens();
   applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100);
   saveVol(); try { localStorage.setItem('r62d-music', $('volMusic').value); } catch {}
@@ -1761,7 +1830,10 @@ showSens();
 function setAim(m, save = true) {
   aimMode = m; try { localStorage.setItem('r62d-aim', m); } catch {}
   for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
-  if (m === 'pad') { const P = pad(); mouse.x = P.x + Math.cos(st.aim || 0) * P.r * 0.6; mouse.y = P.y + Math.sin(st.aim || 0) * P.r * 0.6; }
+  if (m !== 'cursor') { padAng = st.aim || 0; padReach = 0.6; }
+  $('aimHint').textContent = { pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
+    turn: 'Turn: like an FPS. Mouse left / right turns you, mouse up / down moves the crosshair further / nearer.',
+    cursor: 'Cursor: you aim at wherever the mouse pointer is.' }[m];
   if (save) saveSettings();
 }
 for (const b of $('aimSeg').querySelectorAll('button')) b.onclick = () => { audio.ui(); setAim(b.dataset.a); };
