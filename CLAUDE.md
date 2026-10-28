@@ -31,7 +31,7 @@ His wishes so far:
 - **Language:** JavaScript. Node 22 server (no npm packages at all — a tiny hand-written
   WebSocket server in `server/ws.js`) + plain browser JavaScript with Canvas 2D.
   Dev shell: `vibe-web` (see `.vibe-project`, `.envrc`).
-- **Run:** `nix develop /home/insideabush/nixos-config#vibe-web --command node server/server.js`
+- **Run:** his desktop shortcut runs `play.sh` (starts the server if not running, opens Firefox). Manually: `nix develop /home/insideabush/nixos-config#vibe-web --command node server/server.js`
   then open `http://localhost:6262`. Friends use `http://<this machine's VPN IP>:6262`.
   `R62D_FAST=1` shortens operator-select and prep to a few seconds for testing. `PORT=` changes port.
 - **Layout:**

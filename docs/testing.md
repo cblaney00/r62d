@@ -14,3 +14,4 @@ Plays 10 bots through a full match (25 sim-minutes max). Prints each round's win
    `{"url":..}`, `{"js": "...", "wait": ms, "shot": "name"}`. Keys/mouse are simulated by
    dispatching `KeyboardEvent` on `window` and `MouseEvent` on `#game`. A Firefox instance only
    allows one BiDi session, so restart Firefox for each run.
+- Shortcut for this app lives in ~/.local/share/applications/r62d.desktop and ~/Desktop/R62D.desktop, both running play.sh (starts server if needed, opens Firefox).
