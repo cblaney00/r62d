@@ -114,6 +114,7 @@ export class Game {
       else if (m.a === 'start' && this.phase === PHASE.LOBBY) this.startMatch();
       else if (m.a === 'end' && this.phase !== PHASE.LOBBY) { this.msg(`${p.name} ended the match`); this.resetToLobby(); }
     } else if (m.t === 'pick') this.pickOp(p, m.op);
+    else if (m.t === 'settings') store.setSettings(p.token, m.s);
     else if (m.t === 'loadout') {
       const l = store.setLoadout(p.token, m.op, m.l);
       const prof = store.byToken(p.token);

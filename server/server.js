@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
 import { attachWebSocket } from './ws.js';
 import { Game } from './game.js';
 import { store, publicProfile } from './store.js';
@@ -36,6 +37,14 @@ function api(req, res) {
     const p = q('token') ? store.byToken(q('token')) : store.byId(q('id'));
     if (!p) return json(404, { error: 'no such profile' });
     return json(200, { profile: publicProfile(p), matches: store.matchesFor(p.id, 40).map(summary) });
+  }
+  // "Quit to desktop": closes the full-screen game window on this computer only (the server keeps running for friends).
+  if (u.pathname === '/api/quit') {
+    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    if (!local) return json(403, { error: 'only on the game computer' });
+    json(200, { ok: true });
+    setTimeout(() => execFile('pkill', ['-f', 'r62d/firefox-kiosk'], () => {}), 300);
+    return;
   }
   if (u.pathname === '/api/match') { const m = store.match(q('id')); return m ? json(200, m) : json(404, { error: 'no such match' }); }
   if (u.pathname === '/api/players') return json(200, Object.values(store.profiles).map(p => ({ id: p.id, name: p.name, matches: p.stats.matches, wins: p.stats.wins, kills: p.stats.kills, deaths: p.stats.deaths })));

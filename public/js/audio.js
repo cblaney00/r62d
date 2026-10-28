@@ -166,20 +166,20 @@ export function foley(kind, x, y, own) {
     case 'bolt': g = out(fx, fy, 0.5, 420, 0.12); if (g) { noise(g, t, 0.06, 'bandpass', 2600, 2, 0.6, 0.003, 1800); click(g, t + 0.11, 3200, 0.9, 0.02); ring(g, t + 0.11, 2900, 0.1, 0.12); } break;
     case 'shell': g = out(fx, fy, 0.35, 320, 0.1); if (g) { click(g, t, 1800, 0.6, 0.02); noise(g, t + 0.02, 0.06, 'bandpass', 900, 1.5, 0.3); } break;
     case 'magDrop': g = out(fx, fy, 0.3, 300, 0.1); if (g) { tone(g, t, 0.06, 220, 150, 'triangle', 0.5); click(g, t, 1500, 0.4, 0.03); click(g, t + 0.09, 1200, 0.2, 0.02); } break;
-    case 'empty': g = out(fx, fy, 0.35, 260, 0.05); if (g) { click(g, t, 3600, 0.8, 0.008); ring(g, t, 3300, 0.06, 0.06); } break;
+    case 'empty': g = out(fx, fy, 0.35, 260, 0.05); if (g) { click(g, t, 1700, 0.8, 0.012); tone(g, t, 0.04, 260, 200, 'sine', 0.3); } break;
     case 'melee': g = out(fx, fy, 0.6, 450, 0.15); if (g) { noise(g, t, 0.16, 'bandpass', 600, 0.6, 0.6, 0.06, 1800); noise(g, t + 0.13, 0.1, 'lowpass', 700, 0.8, 0.9); tone(g, t + 0.13, 0.09, 140, 60, 'sine', 0.8); } break;
     case 'gadget': g = out(fx, fy, 0.3, 260, 0.08); if (g) { noise(g, t, 0.1, 'bandpass', 1300, 1, 0.5, 0.02); click(g, t + 0.1, 2400, 0.5); } break;
     case 'place': g = out(fx, fy, 1.1, 380, 0.12); if (g) { noise(g, t, 0.07, 'bandpass', 900, 1.3, 0.5); click(g, t + 0.06, 2000, 0.7, 0.02); tone(g, t + 0.18, 0.06, 1800, 1800, 'square', 0.06); } break;
     case 'throw': g = out(fx, fy, 0.35, 360, 0.1); if (g) { click(g, t, 4000, 0.5); noise(g, t + 0.05, 0.22, 'bandpass', 800, 0.6, 0.6, 0.08, 2000); } break;
     case 'bounce': g = out(fx, fy, 0.3, 450, 0.15); if (g) { tone(g, t, 0.05, rnd(900, 1300), 600, 'triangle', 0.5); click(g, t, 1800, 0.4); } break;
-    case 'pin': g = out(fx, fy, 0.3, 260, 0.05); if (g) { ring(g, t, 3600, 0.18, 0.15); click(g, t + 0.08, 4500, 0.3); } break;
-    case 'camSwitch': g = out(undefined, undefined, 0.22); if (g) { click(g, t, 2500, 0.6); noise(g, t + 0.01, 0.12, 'bandpass', 5000, 0.6, 0.25, 0.005); } break;
+    case 'pin': g = out(fx, fy, 0.3, 260, 0.05); if (g) { ring(g, t, 1500, 0.14, 0.15); click(g, t + 0.08, 2000, 0.3); } break;
+    case 'camSwitch': g = out(undefined, undefined, 0.22); if (g) { tone(g, t, 0.07, 160, 100, 'sine', 0.5); noise(g, t + 0.01, 0.14, 'bandpass', 1400, 0.6, 0.18, 0.01); } break;
     case 'droneThrow': g = out(fx, fy, 0.35, 400, 0.1); if (g) { noise(g, t, 0.1, 'bandpass', 1000, 1, 0.5); tone(g, t + 0.1, 0.06, 160, 110, 'sine', 0.5); click(g, t + 0.1, 1500, 0.5); } break;
-    case 'spot': g = out(undefined, undefined, 0.25); if (g) { tone(g, t, 0.06, 1760, 1760, 'square', 0.15); tone(g, t + 0.07, 0.08, 2350, 2350, 'square', 0.12); } break;
+    case 'spot': g = out(undefined, undefined, 0.25); if (g) { tone(g, t, 0.08, 440, 440, 'triangle', 0.3, 0.004); tone(g, t + 0.08, 0.12, 587, 587, 'triangle', 0.25, 0.004); } break;
     case 'hammer': g = out(fx, fy, 0.75, 650, 0.25); if (g) { tone(g, t, 0.12, rnd(150, 190), 90, 'square', 0.25); ring(g, t, rnd(700, 900), 0.3, 0.35); noise(g, t, 0.08, 'bandpass', 1500, 1, 0.6); } break;
     case 'nail': g = out(fx, fy, 0.55, 520, 0.2); if (g) { tone(g, t, 0.07, rnd(220, 260), 160, 'triangle', 0.5); noise(g, t, 0.06, 'bandpass', 900, 1.5, 0.6); } break;
-    case 'beep': g = out(fx, fy, 0.35, 700, 0.15); if (g) tone(g, t, 0.07, 1900, 1900, 'square', 0.18); break;
-    case 'tick': g = out(fx, fy, 0.3, 500, 0.1); if (g) click(g, t, 2800, 0.7, 0.01); break;
+    case 'beep': g = out(fx, fy, 0.35, 700, 0.15); if (g) { tone(g, t, 0.08, 880, 880, 'triangle', 0.3, 0.003); tone(g, t, 0.08, 440, 440, 'sine', 0.2, 0.003); } break;
+    case 'tick': g = out(fx, fy, 0.3, 500, 0.1); if (g) click(g, t, 1300, 0.7, 0.012); break;
     case 'revive': g = out(fx, fy, 0.3, 300, 0.1); if (g) { noise(g, t, 0.3, 'bandpass', 1400, 0.8, 0.5, 0.08); tone(g, t + 0.1, 0.3, 500, 800, 'sine', 0.15); } break;
     case 'heartbeat': g = out(undefined, undefined, 0.5); if (g) { tone(g, t, 0.12, 60, 40, 'sine', 1); tone(g, t + 0.16, 0.14, 55, 38, 'sine', 0.8); } break;
     case 'breath': g = out(undefined, undefined, 0.12); if (g) { noise(g, t, 0.55, 'bandpass', 750, 0.7, 0.6, 0.25); noise(g, t + 0.7, 0.6, 'bandpass', 600, 0.7, 0.45, 0.2); } break;
@@ -215,7 +215,7 @@ export function casing(x, y, surf, shotgun) {
     const tt = t + i * rnd(0.06, 0.11), v = 0.5 / (i + 1);
     if (soft) noise(g, tt, 0.04, 'bandpass', 900, 1, v * 0.6);
     else if (shotgun) { tone(g, tt, 0.04, rnd(500, 700), 400, 'triangle', v * 0.6); click(g, tt, 1500, v * 0.5); }
-    else ring(g, tt, rnd(4200, 6200), v * 0.35, 0.09);
+    else ring(g, tt, rnd(2300, 3400), v * 0.22, 0.08);
   }
 }
 
@@ -329,36 +329,40 @@ export function play(name, x, y) {
     case 'dart': { const g = out(x, y, 0.5, 600, 0.15); if (!g) return; const t = ac.currentTime; noise(g, t, 0.06, 'bandpass', 2800, 1, 0.8); click(g, t + 0.15, 3000, 0.5); return; }
     case 'launcher': { const g = out(x, y, 1, 1200, 0.4); if (!g) return; const t = ac.currentTime; tone(g, t, 0.15, 170, 60, 'sine', 1); noise(g, t, 0.18, 'lowpass', 900, 0.8, 0.8); return; }
     case 'plantStart': return foley('beep', x, y);
-    case 'planted': { const g = out(undefined, undefined, 0.5); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 3; i++) tone(g, t + i * 0.18, 0.12, 880 + i * 220, 880 + i * 220, 'square', 0.22); return; }
+    case 'planted': { const g = out(undefined, undefined, 0.5); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 3; i++) tone(g, t + i * 0.2, 0.18, 330 + i * 110, 330 + i * 110, 'triangle', 0.3, 0.005); return; }
     case 'revive': return foley('revive', x, y);
   }
 }
 
 export function getAudio() { return ac && ac.state !== 'closed' && !ac.offline ? { ac, master } : null; }
 
+// Menu and HUD sounds: low, soft and warm — no shrill beeps.
 export function ui(kind = 'click') {
   C = 'ui';
-  const g = out(undefined, undefined, 0.22, 0, 0.15); if (!g) return;
+  const g = out(undefined, undefined, 0.22, 0, 0.12); if (!g) return;
   const t = ac.currentTime;
-  if (kind === 'hover') { tone(g, t, 0.025, 3100, 3000, 'sine', 0.12); noise(g, t, 0.02, 'highpass', 6000, 0.7, 0.05); }
-  else if (kind === 'click') { click(g, t, 3200, 0.35, 0.01); tone(g, t, 0.06, 1500, 1350, 'triangle', 0.35); tone(g, t + 0.01, 0.05, 90, 60, 'sine', 0.4); }
-  else if (kind === 'back') { tone(g, t, 0.07, 1100, 800, 'triangle', 0.3); }
-  else if (kind === 'open') { noise(g, t, 0.22, 'bandpass', 600, 1, 0.3, 0.12, 3500); tone(g, t + 0.15, 0.08, 1800, 1800, 'sine', 0.15); }
-  else if (kind === 'close') { noise(g, t, 0.18, 'bandpass', 3000, 1, 0.25, 0.05, 500); }
-  else if (kind === 'lock') { // operator locked in
-    tone(g, t, 0.12, 140, 55, 'sine', 0.9); click(g, t, 2500, 0.6, 0.02); noise(g, t, 0.35, 'highpass', 4000, 0.6, 0.15, 0.01);
-    for (const [i, f] of [[0, 880], [1, 1320], [2, 1760]]) tone(g, t + 0.05 + i * 0.05, 0.4, f, f, 'sine', 0.12);
+  const thock = (f0, f1, v, dur = 0.09) => { tone(g, t, dur, f0, f1, 'sine', v); noise(g, t, 0.03, 'lowpass', 900, 0.7, v * 0.35, 0.002); };
+  switch (kind) {
+    case 'hover': tone(g, t, 0.05, 210, 180, 'sine', 0.083, 0.006); break;                           // barely-there thup
+    case 'click': thock(170, 95, 0.24); tone(g, t + 0.005, 0.08, 420, 380, 'triangle', 0.035); break; // soft wooden thock
+    case 'back': thock(130, 80, 0.2); break;
+    case 'open': noise(g, t, 0.3, 'lowpass', 300, 0.8, 0.022, 0.12, 1400); tone(g, t + 0.05, 0.25, 110, 150, 'sine', 0.016, 0.08); break; // low whoosh up
+    case 'close': noise(g, t, 0.25, 'lowpass', 1300, 0.8, 0.12, 0.03, 250); break;
+    case 'lock': // operator locked in: deep thunk + warm low chord
+      tone(g, t, 0.18, 120, 48, 'sine', 0.26); noise(g, t, 0.06, 'lowpass', 700, 0.7, 0.11);
+      for (const [i, fq] of [[0, 220], [1, 277], [2, 330]]) tone(g, t + 0.04 + i * 0.04, 0.7, fq, fq, 'triangle', 0.026, 0.03);
+      break;
+    case 'count': tone(g, t, 0.18, 330, 330, 'sine', 0.145, 0.004); tone(g, t, 0.18, 165, 165, 'sine', 0.08, 0.004); break;
+    case 'go': tone(g, t, 0.6, 110, 55, 'sine', 0.1); tone(g, t, 0.45, 220, 220, 'triangle', 0.02, 0.01); noise(g, t, 0.4, 'lowpass', 500, 0.6, 0.05, 0.005); break;
+    case 'xp': tone(g, t, 0.06, 360 + Math.random() * 40, 340, 'sine', 0.12, 0.003); break;
+    case 'level': for (const [i, fq] of [[0, 196], [1, 247], [2, 294], [3, 392]]) tone(g, t + i * 0.1, 0.9, fq, fq, 'triangle', 0.038, 0.02); break;
+    case 'victory': for (const [i, fq] of [[0, 147], [0, 220], [1, 175], [1, 262], [2, 220], [2, 330]]) tone(g, t + i * 0.22, 1.5, fq, fq, 'sawtooth', 0.009, 0.03); tone(g, t, 1.4, 73, 73, 'sine', 0.075); break;
+    case 'defeat': for (const [i, fq] of [[0, 147], [0, 175], [1, 139], [1, 165]]) tone(g, t + i * 0.35, 1.7, fq, fq * 0.98, 'sawtooth', 0.008, 0.04); tone(g, t, 1.5, 55, 50, 'sine', 0.075); break;
+    case 'round': tone(g, t, 0.7, 110, 110, 'sawtooth', 0.025, 0.05); tone(g, t, 0.7, 165, 165, 'sawtooth', 0.02, 0.05); noise(g, t, 0.6, 'lowpass', 350, 0.5, 0.06, 0.1); break;
+    case 'hit': tone(g, t, 0.05, 900, 800, 'triangle', 0.52, 0.002); noise(g, t, 0.02, 'bandpass', 1200, 1, 0.3); break;     // dull "tok"
+    case 'kill': tone(g, t, 0.07, 700, 680, 'triangle', 0.4, 0.002); tone(g, t + 0.07, 0.12, 520, 500, 'triangle', 0.4, 0.002); break;
+    default: thock(160, 95, 0.18);
   }
-  else if (kind === 'count') { tone(g, t, 0.12, 880, 880, 'sine', 0.35); tone(g, t, 0.12, 1760, 1760, 'sine', 0.08); }
-  else if (kind === 'go') { tone(g, t, 0.5, 220, 110, 'sawtooth', 0.15); tone(g, t, 0.3, 1320, 1320, 'sine', 0.3); noise(g, t, 0.4, 'lowpass', 600, 0.6, 0.5, 0.005); }
-  else if (kind === 'xp') tone(g, t, 0.03, 2400 + Math.random() * 400, 2400, 'sine', 0.12);
-  else if (kind === 'level') { for (const [i, f] of [[0, 587], [1, 740], [2, 880], [3, 1175]]) tone(g, t + i * 0.09, 0.6, f, f, 'triangle', 0.25); noise(g, t + 0.3, 0.6, 'highpass', 6000, 0.5, 0.15, 0.05); }
-  else if (kind === 'victory') { for (const [i, f] of [[0, 293], [0, 440], [1, 349], [1, 523], [2, 440], [2, 659]]) tone(g, t + i * 0.22, 1.4, f, f, 'sawtooth', 0.07); tone(g, t, 1.2, 73, 73, 'sine', 0.5); }
-  else if (kind === 'defeat') { for (const [i, f] of [[0, 293], [0, 349], [1, 277], [1, 330]]) tone(g, t + i * 0.35, 1.6, f, f * 0.98, 'sawtooth', 0.06); tone(g, t, 1.5, 55, 50, 'sine', 0.5); }
-  else if (kind === 'round') { tone(g, t, 0.6, 220, 220, 'sawtooth', 0.12); tone(g, t, 0.6, 330, 330, 'sawtooth', 0.1); noise(g, t, 0.6, 'lowpass', 400, 0.5, 0.3, 0.1); }
-  else if (kind === 'hit') tone(g, t, 0.05, 2600, 2400, 'triangle', 0.55);
-  else if (kind === 'kill') { tone(g, t, 0.07, 1800, 1800, 'triangle', 0.55); tone(g, t + 0.06, 0.1, 2400, 2400, 'triangle', 0.55); }
-  else tone(g, t, 0.04, 1300, 1300, 'triangle', 0.45);
 }
 
 // Continuous drone motor whine, keyed by drone id.
@@ -420,3 +424,14 @@ export async function measureMix(tests) {
 const module = { gunshot: (...a) => gunshot(...a), explosion: (...a) => explosion(...a), step: (...a) => step(...a), shuffle: (...a) => shuffle(...a),
   foley: (...a) => foley(...a), impact: (...a) => impact(...a), casing: (...a) => casing(...a), whiz: (...a) => whiz(...a), debris: (...a) => debris(...a),
   play: (...a) => play(...a), ui: (...a) => ui(...a) };
+
+// Ears ringing after a flashbang: a high whine that fades with the flash.
+export function tinnitus(dur) {
+  if (!ac || ac.state !== 'running') return;
+  const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine'; o.frequency.value = 3600 + Math.random() * 400;
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.05 * vol.sfx, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 1.5);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 1.6);
+  // muffle everything else while deafened
+  sfx.gain.cancelScheduledValues(t); sfx.gain.setValueAtTime(vol.sfx * 0.25, t); sfx.gain.linearRampToValueAtTime(vol.sfx, t + dur + 1);
+}

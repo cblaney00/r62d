@@ -14,7 +14,7 @@ import { openProfile } from './profile.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor } from '/shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '/shared/operators.js';
-import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label } from './keys.js';
+import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange } from './keys.js';
 import { walkRay, tileAt } from '/shared/physics.js';
 import { blocksSight, FL } from '/shared/constants.js';
 
@@ -50,6 +50,7 @@ function connect() {
     if (m.t === 'welcome') {
       st.id = m.id; loadMap(m.mapVersion, m.tiles, m.hp);
       st.token = m.token; st.profile = m.profile; updateCard();
+      if (m.profile.settings) applySettings(m.profile.settings); else saveSettings(); // first time: keep what this browser had
       try { localStorage.setItem('r62d-token', m.token); } catch {}
       $('join').classList.add('hidden'); $('room').classList.remove('hidden');
     } else if (m.t === 'snap') onSnap(m);
@@ -166,7 +167,7 @@ function onEvent(e, s, players) {
       break;
     }
     case 'matchEnd': st.endT = now; st.mvp = e.mvp; showEnd(e.squad); break;
-    case 'stun': if (st.me && e.id === st.me.id) st.flashUntil = now + e.dur; break;
+    case 'stun': if (st.me && e.id === st.me.id) { st.flashUntil = now + e.dur; audio.tinnitus(e.dur); } break;
     case 'hurt': if (st.me && e.id === st.me.id) { st.hurtT = now; st.hurtFrom = e.from; } break;
     case 'hitmark': if (e.to === st.id) { st.hitT = now; st.hitKill = e.kill; audio.ui(e.kill ? 'kill' : 'hit'); } break;
     case 'ping': if (e.team === mySide()) { fx.ping(e.x, e.y, e.any ? '255,90,60' : '79,179,169'); audio.foley('beep', e.x, e.y); } break;
@@ -1114,7 +1115,7 @@ function revealSeen() {
 function revealAll() { if (!st.unseen) return; for (const k of st.unseen) applyKnown(k); st.unseen.clear(); }
 
 // ---------------- pause menu & pages ----------------
-const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'pause'];
+const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'pause', 'quitDlg'];
 function menuOpen() { return OVERLAYS.some(id => !$(id).classList.contains('hidden')); }
 function inMatch() { const p = st.last && st.last.ph; return p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END || p === PHASE.SELECT; }
 function showOps(op) { audio.ui('open'); openOps($('opsPage'), { profile: st.profile, send, op }); }
@@ -1125,8 +1126,20 @@ function escape() {
     if (id === 'opsPage') closeOps($(id)); else $(id).classList.add('hidden');
     return;
   }
+  if (!$('quitDlg').classList.contains('hidden')) { $('quitDlg').classList.add('hidden'); audio.ui('back'); return; }
   if (inMatch() || !$('pause').classList.contains('hidden')) $('pause').classList.toggle('hidden');
+  else { $('quitDlg').classList.remove('hidden'); audio.ui('open'); } // title screen / menus: offer to quit
 }
+const APP = new URLSearchParams(location.search).has('app'); // opened from the desktop icon (full-screen window)
+async function quitGame() {
+  stopMusic();
+  if (APP) { try { await fetch('/api/quit', { method: 'POST' }); } catch {} }
+  window.close();
+  setTimeout(() => { document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;font:700 28px Barlow Condensed,sans-serif;letter-spacing:.2em;color:#93a0ad">YOU CAN CLOSE THIS TAB NOW</div>'; }, 600);
+}
+$('qYes').onclick = () => quitGame();
+$('qNo').onclick = () => $('quitDlg').classList.add('hidden');
+$('pQuit').onclick = () => { $('pause').classList.add('hidden'); $('quitDlg').classList.remove('hidden'); };
 // In fullscreen the browser uses Esc to leave fullscreen, so open the pause menu when that happens.
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && inMatch() && !menuOpen()) $('pause').classList.remove('hidden'); });
 $('pResume').onclick = () => $('pause').classList.add('hidden');
@@ -1144,6 +1157,7 @@ st.started = false;
 $('splash').addEventListener('click', () => {
   if (st.started) return;
   audio.initAudio(); audio.ui('open');
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
   st.started = true; updateNav();
   let saved = ''; try { saved = localStorage.getItem('r62d-name') || ''; } catch {}
   if (saved) { $('name').value = saved; setTimeout(() => $('joinBtn').click(), 250); } // returning player: straight in
@@ -1154,6 +1168,7 @@ function setTab(tab) {
   if (tab === 'ops') { showOps(); return; }
   if (tab === 'profile') { showProfile(); return; }
   if (tab === 'settings') { toggleSettings(); return; }
+  if (tab === 'quit') { $('quitDlg').classList.remove('hidden'); audio.ui('open'); return; }
   for (const b of $('mnav').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);
   for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t.id === 'tab-' + tab);
   if (tab === 'controls') renderControls();
@@ -1216,3 +1231,23 @@ try { const v = JSON.parse(localStorage.getItem('r62d-music') || 'null'); if (v 
 setMusicVolume($('volMusic').value / 100);
 $('volMusic').oninput = () => { setMusicVolume(st.muted ? 0 : $('volMusic').value / 100); try { localStorage.setItem('r62d-music', $('volMusic').value); } catch {} };
 window.__r62d = { st, showEnd, playXp }; // for automated screenshot tests
+
+// ---------------- settings saved per profile ----------------
+// Keys and volumes live in your profile on the game computer, so they follow you to any browser.
+function currentSettings() {
+  return { binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value };
+}
+let saveTimer = 0;
+function saveSettings() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { if (st.token) send({ t: 'settings', s: currentSettings() }); }, 400);
+}
+function applySettings(s) {
+  if (s.binds) applyBinds(s.binds);
+  for (const k of ['volMaster', 'volSfx', 'volMusic']) if (typeof s[k] === 'number') $(k).value = s[k];
+  applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100);
+  saveVol(); try { localStorage.setItem('r62d-music', $('volMusic').value); } catch {}
+  renderSettings(); renderControls();
+}
+onBindsChange(() => saveSettings());
+for (const id of ['volMaster', 'volSfx', 'volMusic']) $(id).addEventListener('change', saveSettings);

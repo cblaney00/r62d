@@ -309,3 +309,9 @@ button.big { font-size: 22px; padding: 14px 34px; }
 .xpRow { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
 .xpRow .lv.up { animation: lockFlash 0.8s ease-out; }
 #eXpText { font: 700 14px var(--head); color: var(--dim); min-width: 110px; text-align: right; }
+
+#splash .escq { position: absolute; bottom: 30px; font: 600 13px var(--head); letter-spacing: 0.35em; color: var(--dim); animation: fadeIn 0.6s 1.6s both; }
+.mnav .quitNav { margin-top: auto; color: #b77; } .mnav .quitNav:hover { color: #ff8a8a; }
+#quitDlg .menu { display: flex; flex-direction: column; gap: 8px; width: 340px; background: var(--panel); border: 1px solid var(--line); padding: 22px; }
+#quitDlg h2 { margin: 0; font: 800 44px var(--head); letter-spacing: 0.2em; }
+#quitDlg button { font-size: 18px; padding: 11px; text-align: left; }

@@ -32,7 +32,7 @@ His wishes so far:
 - **Language:** JavaScript. Node 22 server (no npm packages at all — a tiny hand-written
   WebSocket server in `server/ws.js`) + plain browser JavaScript with Canvas 2D.
   Dev shell: `vibe-web` (see `.vibe-project`, `.envrc`).
-- **Run:** his desktop shortcut runs `play.sh` (starts the server if not running, opens Firefox). Manually: `nix develop /home/insideabush/nixos-config#vibe-web --command node server/server.js`
+- **Run:** his desktop shortcut runs `play.sh` (starts the server if not running, opens Firefox in kiosk mode with its own profile at ~/.local/share/r62d/firefox-kiosk, URL `?app=1`; "Quit to desktop" calls `/api/quit`, localhost only, which pkills that window). Manually: `nix develop /home/insideabush/nixos-config#vibe-web --command node server/server.js`
   then open `http://localhost:6262`. Friends use `http://<this machine's VPN IP>:6262`.
   `R62D_FAST=1` shortens operator-select and prep to a few seconds for testing. `PORT=` changes port.
 - **Layout:**
@@ -60,4 +60,4 @@ His wishes so far:
   **His idea list is `r6-todo.md` — work through it top to bottom, tick items off, keep going.**
   Other ideas are in `docs/roadmap.md`. Sound mix notes: `docs/sound.md`.
 - **Menus/presentation:** title screen (`#splash`, first click starts audio), menu music is composed live in `public/js/music.js`, levels/XP in `shared/progress.js` (awarded in `store.recordMatch`, sent to players as an `xp` message), end screen in `showEnd`/`playXp` (main.js). `window.__r62d` is a hook for screenshot tests (`st.forceEnd` shows the end screen).
-- **Saved data:** `server/store.js` keeps `data/profiles.json` and `data/matches.json` (gitignored; on the machine running the server). Browsers keep a secret login token in localStorage (`r62d-token`). `/api/profile`, `/api/match`, `/api/players` feed the Profile page. Loadouts per operator live in `shared/operators.js` (`LOADOUTS`).
+- **Saved data:** `server/store.js` keeps `data/profiles.json` and `data/matches.json` (gitignored; on the machine running the server). Browsers keep a secret login token in localStorage (`r62d-token`). Key bindings + volumes are saved in the profile (`settings`), applied on join. `/api/profile`, `/api/match`, `/api/players` feed the Profile page. Loadouts per operator live in `shared/operators.js` (`LOADOUTS`).

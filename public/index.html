@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>R62D</title>
 <link rel="icon" href="/icon.svg">
+<meta name="darkreader-lock">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
@@ -17,6 +18,7 @@
     <div class="splashLogo"><span>R</span><span>6</span><span>2</span><span>D</span></div>
     <div class="tag">TACTICAL 5V5 · HARBOR OFFICE</div>
     <div class="press">CLICK ANYWHERE TO START</div>
+    <div class="escq">ESC — QUIT TO DESKTOP</div>
   </div>
 
   <!-- Main menu / lobby -->
@@ -31,6 +33,7 @@
       <button data-tab="profile">PROFILE</button>
       <button data-tab="settings">SETTINGS</button>
       <button data-tab="controls">CONTROLS</button>
+      <button data-tab="quit" class="quitNav">QUIT</button>
       <i class="ind" id="navInd"></i>
     </nav>
     <main class="mbody">
@@ -105,7 +108,9 @@
   </div>
   <div id="pause" class="overlay hidden"><div class="menu"><h2>PAUSED</h2><p class="hint">The match keeps running for everyone else.</p>
     <button id="pResume" class="primary">Resume</button><button id="pOps">Operators &amp; loadouts</button><button id="pProf">Profile &amp; match history</button>
-    <button id="pSet">Settings &amp; keys</button><button id="pFs">Fullscreen</button><button id="pEnd">End match for everyone</button></div></div>
+    <button id="pSet">Settings &amp; keys</button><button id="pFs">Fullscreen</button><button id="pEnd">End match for everyone</button><button id="pQuit">Quit to desktop</button></div></div>
+  <div id="quitDlg" class="overlay hidden"><div class="menu"><h2>QUIT?</h2><p class="hint">Close R62D and go back to the desktop.</p>
+    <button id="qYes" class="primary">Quit to desktop</button><button id="qNo">Cancel</button></div></div>
   <div id="opsPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>OPERATORS</h2><button class="close">Close</button></div><div class="opsWrap"><div id="opsList"></div><div id="opsDetail"></div></div></div></div>
   <div id="profilePage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>PROFILE</h2><button class="close">Close</button></div><div id="profBody"></div></div></div>
   <div id="corner"><button id="fsBtn" title="Fullscreen">⛶ Fullscreen</button><button id="setBtn">⚙ Settings</button><button id="muteBtn">🔊</button><button id="leaveBtn" class="hidden">End match</button></div>

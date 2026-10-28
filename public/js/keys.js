@@ -29,8 +29,17 @@ export function loadBinds() {
   try { const saved = JSON.parse(localStorage.getItem(KEY) || '{}'); for (const id in saved) if (binds[id]) binds[id] = saved[id]; } catch {}
   return binds;
 }
-export function saveBinds() { try { localStorage.setItem(KEY, JSON.stringify(binds)); } catch {} }
-export function resetBinds() { try { localStorage.removeItem(KEY); } catch {} loadBinds(); }
+let onChange = null;
+export function onBindsChange(fn) { onChange = fn; }
+export function saveBinds() { try { localStorage.setItem(KEY, JSON.stringify(binds)); } catch {} if (onChange) onChange(binds); }
+export const getBinds = () => JSON.parse(JSON.stringify(binds));
+// load a profile's saved keys (unknown actions ignored, missing ones keep defaults)
+export function applyBinds(saved) {
+  loadBinds();
+  if (saved && typeof saved === 'object') for (const id in saved) if (binds[id] && Array.isArray(saved[id])) binds[id] = saved[id].slice(0, 2).map(c => (typeof c === 'string' ? c.slice(0, 24) : ''));
+  try { localStorage.setItem(KEY, JSON.stringify(binds)); } catch {}
+}
+export function resetBinds() { try { localStorage.removeItem(KEY); } catch {} loadBinds(); if (onChange) onChange(binds); }
 export function setBind(id, slot, code) {
   for (const k in binds) binds[k] = binds[k].map(c => (c === code ? '' : c)); // one key, one action
   binds[id][slot] = code; saveBinds();

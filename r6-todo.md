@@ -10,6 +10,12 @@ New ideas from him get added to the bottom of **To do**.
 
 ## Done
 
+- [x] Opens straight into fullscreen: the desktop icon starts its own Firefox window in kiosk mode (no browser bars,
+      separate profile). In a normal browser it goes fullscreen on the first click.
+- [x] Quit to desktop: Esc on the title screen / menus, QUIT in the side menu, and in the pause menu.
+- [x] Softer sounds: all menu sounds reworked to low, warm clicks and whooshes (measured and balanced); in-game chirps
+      lowered (hit marker, plant beeps, marking, camera switch, empty click, casings). Flashbangs now ring your ears.
+- [x] Settings and key bindings are saved per profile (follow you to any browser/computer).
 - [x] Premium feel: title screen with logo reveal, original menu music (dark, layered, not corny; own volume slider),
       main menu with side navigation and sliding highlight, player card with level/XP, rotating tips, hover/click sounds and
       ripples on every button, animated pages, operator cards that deal in and lock in, 3-2-1-GO countdown, sliding kill
