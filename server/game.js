@@ -250,7 +250,7 @@ export class Game {
     const L = p.bot ? this.botLoadout(p.op) : store.loadout(p.token, p.op);
     p.loadout = L; p.gadget = L.gadget;
     p.guns = [L.primary, L.secondary].filter(Boolean).map(w => ({ w, ammo: WEAPONS[w].mag, reserve: WEAPONS[w].reserve }));
-    p.slot = 0; p.fireCd = 0; p.reloadT = 0; p.bloom = 0;
+    p.slot = 0; p.fireCd = 0; p.reloadT = 0; p.bloom = 0; p.vx = 0; p.vy = 0; p.gait = 0;
     p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false;
     p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0;
@@ -1052,7 +1052,7 @@ export class Game {
         sl: p.slot, w: g ? g.w : null, am: g ? g.ammo : 0, rs: g ? g.reserve : 0, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, ct: p.ctrl, ci: p.camIdx, did: p.droneId,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
-        mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sc: p.scanning ? 1 : 0,
+        vx: r1(p.vx || 0), vy: r1(p.vy || 0), gt: r2(p.gait || 0), mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sc: p.scanning ? 1 : 0,
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         m: this.mods(p), fs: r2(this.time - p.lastShot),
       });
@@ -1066,7 +1066,7 @@ export class Game {
       if (e.type === 'cam') { o.hp = e.hp; o.off = e.offUntil > this.time ? 1 : 0; }
       if (e.type === 'smoke') { o.r = e.r; o.l = r1(e.life); }
       if (e.type === 'cutter' || e.type === 'breach') { o.t = r1(e.t); o.j = this.jammedAt(e.x, e.y) ? 1 : 0; }
-      if (e.type === 'drone') o.j = this.jammedAt(e.x, e.y) ? 1 : 0;
+      if (e.type === 'drone') { o.j = this.jammedAt(e.x, e.y) ? 1 : 0; o.vx = r1(e.vx || 0); o.vy = r1(e.vy || 0); }
       return o;
     });
     const spots = { atk: [...this.spots.atk.keys()], def: [...this.spots.def.keys()] };

@@ -6,15 +6,22 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-- [ ] Pause screen when Esc is pressed.
-- [ ] Better drone animation, and a drone sound that is much less annoying.
-- [ ] More realistic gunshots.
-- [ ] An Operators page (who each operator is, their gear, your stats with them).
-- [ ] Saved profiles for everyone who has played: their loadouts and lifetime stats.
-- [ ] Match history: every past game and the stats from it.
+*(nothing waiting — add your next idea!)*
 
 ## Done
 
+- [x] Pause screen (Esc or P). In fullscreen, Esc leaves fullscreen and opens the pause menu.
+- [x] Drone: small and low-key with one small red light; wheels spin, it leans and sways; can't drive under furniture
+      (still fits through barricade gaps); soft electric motor sound instead of the whine.
+- [x] Realistic gunshots: pre-built recordings per weapon (crack, blast, boom, echo off walls, action click).
+- [x] Operators page: bio, armor/speed, skill, loadout choices (primary, secondary, gadget), your stats with them.
+- [x] Saved profiles for everyone who plays: loadouts and lifetime stats (Profile page).
+- [x] Match history: every finished match with each player's stats and round-by-round results.
+- [x] Sound mix balanced by measurement (see docs/sound.md).
+- [x] Weighty movement with real steps: you speed up/slow down, speed pulses with each stride, and each footstep sound
+      plays exactly when a foot plants.
+- [x] Footstep sounds for every surface: wood, tile, marble, carpet, concrete, asphalt, grass, metal floor, rubble,
+      broken glass under windows, splinters where barricades were smashed.
 - [x] Grey "remembered" map instead of black: out-of-sight areas show as a dull grey map.
       Shared vision (you, teammates, their drones, working defender cameras) shows live in colour.
       Enemies/enemy gadgets only show inside shared vision. Enemy-made map changes out of

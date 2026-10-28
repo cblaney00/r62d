@@ -37,7 +37,7 @@ export const MAT = { DRYWALL: 0, BRICK: 1, CONCRETE: 2 };
 export const CELL_HP = { [T.SOFT]: 60, [T.BARRI]: 60, [T.PANEL]: 400, [T.DSHIELD]: 300 };
 
 const MOVE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.LOW, T.TALL, T.PANEL, T.DSHIELD]);
-const DRONE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.TALL, T.PANEL, T.DSHIELD]);
+const DRONE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.TALL, T.PANEL, T.DSHIELD, T.LOW]); // drones fit through barricade gaps but not under furniture
 const SIGHT_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.TALL, T.PANEL]);
 const BULLET_STOP = new Set([T.HARD, T.REINF, T.TALL, T.PANEL, T.DSHIELD]);
 const BULLET_PEN = new Set([T.SOFT, T.BARRI]);

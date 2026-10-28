@@ -65,7 +65,11 @@ function loadMap(mv, tiles, hp) {
   // someone on your team actually sees the changed spot.
   st.known = { ...st.map, tiles: st.map.tiles.slice(), hp: st.map.hp.slice() };
   st.unseen = new Set();
+  // broken glass lies in and just around every window; splinters appear where barricades get smashed
+  st.glass = new Set(); st.splinters = new Set();
+  for (const o of st.map.openings) if (o.kind === 'window') for (const k of o.cells) for (const d of [0, 1, -1, st.map.W, -st.map.W]) st.glass.add(k + d);
   st.rend = new MapRenderer(st.known, st.base);
+  st.rend.splinters = st.splinters;
   st.corpses = []; fx.clear(); st.pending = [];
 }
 
@@ -90,8 +94,8 @@ function onSnap(s) {
 
 function myCtrlPos(me, s) {
   if (!me || !me.a) return null;
-  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); return d ? { x: d.x, y: d.y } : null; }
-  return { x: me.x, y: me.y };
+  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); return d ? { x: d.x, y: d.y, vx: d.vx, vy: d.vy, gait: 0 } : null; }
+  return { x: me.x, y: me.y, vx: me.vx, vy: me.vy, gait: me.gt };
 }
 
 function reconcile() {
@@ -100,7 +104,7 @@ function reconcile() {
   if (!pos) { st.pending = []; return; }
   if (st.predCtrl !== me.ct || st.predDid !== me.did) { st.predCtrl = me.ct; st.predDid = me.did; st.pending = []; }
   st.pending = st.pending.filter(i => i.s > me.ls);
-  st.pred.x = pos.x; st.pred.y = pos.y;
+  st.pred.x = pos.x; st.pred.y = pos.y; st.pred.vx = pos.vx || 0; st.pred.vy = pos.vy || 0; st.pred.gait = pos.gait || 0;
   const mods = me.m || {};
   for (const i of st.pending) stepMove(st.map, st.pred, i.k, i.dt, mods);
 }
@@ -370,6 +374,7 @@ function interp(id, kind) {
   const f = Math.max(0, Math.min(1, (rt - a.t) / (b.t - a.t || 1)));
   const o = { ...pb, x: pa.x + (pb.x - pa.x) * f, y: pa.y + (pb.y - pa.y) * f };
   if (pa.ag !== undefined && pb.ag !== undefined) o.ag = pa.ag + angDiff(pb.ag, pa.ag) * f;
+  if (pa.gt !== undefined && pb.gt !== undefined && pb.gt >= pa.gt) o.gt = pa.gt + (pb.gt - pa.gt) * f;
   return o;
 }
 
@@ -510,6 +515,8 @@ const FLOOR_SURF = { [FL.WOOD]: 'wood', [FL.TILE]: 'tile', [FL.SERVER]: 'metal',
 function cellAt(x, y) { const m = st.map, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return cx < 0 || cy < 0 || cx >= m.W || cy >= m.H ? -1 : cy * m.W + cx; }
 function surfaceAt(x, y) {
   const k = cellAt(x, y); if (k < 0) return 'concrete';
+  if (st.glass && st.glass.has(k)) return 'glass';
+  if (st.splinters && st.splinters.has(k)) return 'splinters';
   const b = st.base[k], t = st.map.tiles[k];
   if ((b === T.SOFT || b === T.HARD) && (t === T.FLOOR || t === T.GROUND || t === T.OPEN)) return 'rubble';
   return FLOOR_SURF[st.map.floor[k]] || 'concrete';
@@ -545,15 +552,19 @@ audio.setWorld(
 function playerFoley(p, a, moved, own, dt) {
   const w = WEAPONS[p.w], shotgun = w && w.cls === 'Shotgun';
   const pace = p.dn ? 1 : p.wk ? 0 : p.cr ? 1 : p.mv >= 3 ? 3 : 2;
-  const stride = [19, 22, 27, 34][pace];
-  a.stepAcc += moved;
-  if (a.stepAcc > stride) { a.stepAcc = 0; audio.step(p.x, p.y, surfaceAt(p.x, p.y), pace, own); }
-  // turning on the spot: legs shuffle
+  // legs follow the real step cycle; a foot plants each time the gait passes a multiple of PI
+  const gt = p.gt || 0, plant = Math.floor(gt / Math.PI);
+  if (a.plant !== undefined && plant > a.plant && moved > 0.05) audio.step(p.x, p.y, surfaceAt(p.x, p.y), pace, own);
+  if (a.plant === undefined || plant < a.plant - 1 || plant > a.plant) a.plant = plant;
+  // turning on the spot: feet shuffle round, each shuffle a little step
   const dAng = Math.abs(angDiff(p.ag, a.lag ?? p.ag)); a.lag = p.ag;
+  a.turn = a.turn || 0;
   if (moved < 0.3 && !p.dn) {
-    a.walk += dAng * 2.4; a.turnAcc = (a.turnAcc || 0) + dAng;
-    if (a.turnAcc > 0.8) { a.turnAcc = 0; audio.shuffle(p.x, p.y, surfaceAt(p.x, p.y), own); }
-  } else a.turnAcc = 0;
+    const before = Math.floor(a.turn / Math.PI);
+    a.turn += dAng * 2.4; a.turnAmp = Math.min(1, (a.turnAmp || 0) + dAng * 3);
+    if (Math.floor(a.turn / Math.PI) > before) audio.shuffle(p.x, p.y, surfaceAt(p.x, p.y), own);
+  }
+  a.walk = gt + Math.PI / 2 + a.turn;
   if (a.pAd !== undefined) {
     if (p.ad !== a.pAd && !p.dn) audio.foley(p.ad ? 'adsIn' : 'adsOut', p.x, p.y, own);
     if (p.cr !== a.pCr && !p.dn) audio.foley(p.cr ? 'crouch' : 'stand', p.x, p.y, own);
@@ -659,31 +670,37 @@ function draw(s, view, now, dt) {
     const isMe = me && sp.id === me.id;
     let p = isMe ? { ...sp } : interp(sp.id, 'players');
     if (!p || p.x === undefined) continue;
-    if (isMe && me.ct === 'body') { p.x = st.pred.x; p.y = st.pred.y; p.ag = st.aim; }
+    if (isMe && me.ct === 'body') { p.x = st.pred.x; p.y = st.pred.y; p.ag = st.aim; p.gt = st.pred.gait; }
     const ally = p.tm === side;
     const a = anim(p.id);
     const moved = Math.hypot(p.x - a.lx, p.y - a.ly);
-    a.walk += moved * 0.32; a.lx = p.x; a.ly = p.y;
+    a.lx = p.x; a.ly = p.y;
     playerFoley(p, a, moved, isMe, dt);
+    a.mvS = (a.mvS || 0) + (Math.min(1.4, moved / Math.max(dt, 0.001) / 95) - (a.mvS || 0)) * Math.min(1, dt * 10);
+    a.turnAmp = Math.max(0, (a.turnAmp || 0) - dt * 2.5);
     a.recoil = Math.max(0, a.recoil - dt * 12); a.melee = Math.max(0, a.melee - dt * 4);
     const vis = ally || isMe || seen(p.x, p.y);
     if (!vis) continue;
     drawOperator(ctx, {
-      x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, ads: p.ad, crouch: p.cr, downed: p.dn,
+      x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, downed: p.dn,
       recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, scan: p.sc, melee: a.melee,
     }, now);
     drawn.push(p);
   }
-  for (const e of ents) if (e.ty === 'drone') { // motor whine for every moving drone you can hear
-    const a = anim(e.id), sp = Math.hypot(e.x - (a.dx ?? e.x), e.y - (a.dy ?? e.y)) / Math.max(dt, 0.001); a.dx = e.x; a.dy = e.y;
+  for (const e of ents) if (e.ty === 'drone') { // motion, wheel spin, dust and motor sound for every drone
     const own = me && e.id === me.did && me.ct === 'drone';
-    audio.droneLoop(e.id, own ? st.pred.x : e.x, own ? st.pred.y : e.y, Math.min(240, own ? (keys.has('up') || keys.has('down') || keys.has('left') || keys.has('right') ? 200 : 0) : sp));
+    const x = own ? st.pred.x : e.x, y = own ? st.pred.y : e.y;
+    const a = anim(e.id), mx = x - (a.dx ?? x), my = y - (a.dy ?? y), dist = Math.hypot(mx, my); a.dx = x; a.dy = y;
+    const sp = dist / Math.max(dt, 0.001);
+    a.spd = (a.spd || 0) + (Math.min(240, sp) - (a.spd || 0)) * Math.min(1, dt * 10);
+    a.wheel = (a.wheel || 0) + dist; if (dist > 0.05) a.mvAng = Math.atan2(my, mx);
+    a.sway = (a.sway || 0) + ((a.spd / 200) * 0.6 - (a.sway || 0)) * Math.min(1, dt * 4);
+    if (a.spd > 110 && Math.random() < dt * 12 && surfaceAt(x, y) !== 'carpet')
+      fx.add({ type: 'smoke', x: x - Math.cos(a.mvAng) * 5, y: y - Math.sin(a.mvAng) * 5, vx: -Math.cos(a.mvAng) * 15, vy: -Math.sin(a.mvAng) * 15, life: 0.5, max: 0.5, size: 1.2, grow: 5, col: '170,160,140', a: 0.25 });
+    audio.droneLoop(e.id, x, y, a.spd, own);
+    if (e.tm === side || seen(x, y)) drawDrone(ctx, { ...e, x, y, ag: own ? st.aim : e.ag, wheel: a.wheel, spd: a.spd, mvAng: a.mvAng ?? e.ag, sway: a.sway }, now, e.tm === side);
   }
   audio.pruneLoops();
-  for (const e of ents) if (e.ty === 'drone' && (e.tm === side || seen(e.x, e.y))) {
-    const d = me && e.id === me.did && me.ct === 'drone' ? { ...e, x: st.pred.x, y: st.pred.y, ag: st.aim } : e;
-    drawDrone(ctx, d, now, e.tm === side);
-  }
   fx.draw(ctx);
   for (const e of ents) if (e.ty === 'smoke') drawSmoke(ctx, e, now);
   fx.drawLights(ctx);
@@ -1041,6 +1058,7 @@ function applyKnown(k) {
   K.tiles[k] = m.tiles[k]; K.hp[k] = m.hp[k];
   st.rend.cellChanged(k);
   const wall = t => t === T.SOFT || t === T.BARRI || t === T.REINF || t === T.PANEL || t === T.DSHIELD;
+  if (prev === T.BARRI && !wall(m.tiles[k])) for (const d of [0, 1, -1, m.W, -m.W]) st.splinters.add(k + d);
   if (wall(prev) && !wall(m.tiles[k])) fx.wallBreak((k % m.W + 0.5) * CELL, (Math.floor(k / m.W) + 0.5) * CELL, prev === T.BARRI ? '150,100,55' : m.mat[k] === MAT.BRICK ? '150,80,60' : '210,205,190');
 }
 function revealSeen() {

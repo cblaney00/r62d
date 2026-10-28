@@ -58,4 +58,5 @@ His wishes so far:
 - **Status:** first playable version — all 10 operators, gadgets, drones, cameras, reinforcement,
   barricades, destruction, defuser, DBNO, bots, lobby, operator select, HUD, scoreboard.
   **His idea list is `r6-todo.md` — work through it top to bottom, tick items off, keep going.**
-  Other ideas are in `docs/roadmap.md`.
+  Other ideas are in `docs/roadmap.md`. Sound mix notes: `docs/sound.md`.
+- **Saved data:** `server/store.js` keeps `data/profiles.json` and `data/matches.json` (gitignored; on the machine running the server). Browsers keep a secret login token in localStorage (`r62d-token`). `/api/profile`, `/api/match`, `/api/players` feed the Profile page. Loadouts per operator live in `shared/operators.js` (`LOADOUTS`).

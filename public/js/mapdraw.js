@@ -74,6 +74,15 @@ export class MapRenderer {
     ctx.beginPath(); ctx.rect(X, Y, Wd, Hd); ctx.clip();
     this.drawFloors(x0, y0, x1, y1);
     const ex0 = x0 - 2, ey0 = y0 - 2, ex1 = x1 + 2, ey1 = y1 + 2;
+    // splinters where a barricade was smashed (cell went from barricade back to open)
+    for (let y = ey0; y <= ey1; y++) for (let x = ex0; x <= ex1; x++) {
+      if (x < 0 || y < 0 || x >= m.W || y >= m.H) continue;
+      const k = y * m.W + x;
+      if (this.splinters && this.splinters.has(k)) for (let i = 0; i < 7; i++) {
+        ctx.save(); ctx.translate(x * CELL + hash(x, y, i + 70) * CELL, y * CELL + hash(y, x, i + 70) * CELL); ctx.rotate(hash(i, x, y + 3) * 6);
+        ctx.fillStyle = shade('#9a6a3a', 0.7 + hash(x, y, i) * 0.4); ctx.fillRect(-2.5, -0.4, 5, 0.9); ctx.restore();
+      }
+    }
     // rubble where walls used to be
     for (let y = ey0; y <= ey1; y++) for (let x = ex0; x <= ex1; x++) {
       if (x < 0 || y < 0 || x >= m.W || y >= m.H) continue;
@@ -139,9 +148,14 @@ export class MapRenderer {
     // threshold
     ctx.fillStyle = o && o.kind === 'window' ? '#5a5248' : 'rgba(70,60,50,0.55)';
     if (horiz) ctx.fillRect(X, Y + 5, CELL, 6); else ctx.fillRect(X + 5, Y, 6, CELL);
-    if (o && o.kind === 'window' && t === T.OPEN) { // broken glass glints
-      ctx.fillStyle = 'rgba(190,225,240,0.55)';
-      for (let i = 0; i < 5; i++) ctx.fillRect(X + hash(x, y, i) * 14, Y + hash(y, x, i) * 14, 1.2, 0.8);
+    if (o && o.kind === 'window') { // broken glass scattered in and around the window
+      for (let i = 0; i < 26; i++) {
+        const sx = X + (hash(x, y, i) - 0.5) * (horiz ? 18 : 44) + 8, sy = Y + (hash(y, x, i) - 0.5) * (horiz ? 44 : 18) + 8;
+        ctx.save(); ctx.translate(sx, sy); ctx.rotate(hash(i, x, y) * 6);
+        ctx.fillStyle = `rgba(${190 + hash(x, i, y) * 50 | 0},225,240,${0.35 + hash(y, i, x) * 0.4})`;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(1.4 + hash(i, y, x) * 1.6, 0.4); ctx.lineTo(0.5, 1.2); ctx.fill();
+        ctx.restore();
+      }
     }
     // frame posts next to solid wall
     ctx.fillStyle = '#3b3530';

@@ -59,7 +59,31 @@ export function stepMove(map, o, input, dt, mods) {
     else if (input.walk) spd *= 0.45;
     else if (input.ads) spd *= 0.65;
   }
-  moveCircle(map, o, mx * spd * dt, my * spd * dt, mods.drone ? 5 : 10, !!mods.drone);
+  // Weight: velocity eases toward where you want to go instead of jumping there.
+  o.vx = o.vx || 0; o.vy = o.vy || 0;
+  if (mods.frozen) { o.vx = 0; o.vy = 0; return false; }
+  const accel = mods.drone ? 1400 : len > 0 ? 620 : 950;
+  let dvx = mx * spd - o.vx, dvy = my * spd - o.vy;
+  const dl = Math.hypot(dvx, dvy), maxd = accel * dt;
+  if (dl > maxd) { dvx *= maxd / dl; dvy *= maxd / dl; }
+  o.vx += dvx; o.vy += dvy;
+  // Real steps: speed dips as each foot plants and surges mid-stride (averages out to full speed).
+  // o.gait counts half-strides; a foot plants every time it passes a multiple of PI.
+  let pulse = 1;
+  if (!mods.drone) {
+    const v = Math.hypot(o.vx, o.vy);
+    const stride = mods.downed ? 13 : v > 150 ? 31 : v > 90 ? 24 : 17;
+    o.gait = (o.gait || 0) + v * dt / stride * Math.PI;
+    pulse = v > 5 ? 0.74 + 0.52 * Math.sin(o.gait) ** 2 : 1;
+  }
+  const bx = o.x, by = o.y;
+  moveCircle(map, o, o.vx * pulse * dt, o.vy * pulse * dt, mods.drone ? 5 : 10, !!mods.drone);
+  // walking into a wall soaks up the velocity in that direction
+  if (dt > 0) {
+    const ax = (o.x - bx) / (dt * pulse), ay = (o.y - by) / (dt * pulse);
+    if (Math.abs(ax) < Math.abs(o.vx) - 1) o.vx = ax;
+    if (Math.abs(ay) < Math.abs(o.vy) - 1) o.vy = ay;
+  }
   return len > 0;
 }
 

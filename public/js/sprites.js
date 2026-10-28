@@ -87,7 +87,7 @@ export function drawOperator(ctx, p, t) {
 
   // ---- legs (they step when walking AND when turning on the spot) ----
   const walk = p.walk || 0, st = Math.sin(walk), cr = !!p.crouch;
-  const stride = st * (cr ? 2.2 : 4.6);
+  const stride = st * (cr ? 2.2 : 4.6) * (p.legs ?? 1); // feet come back together when standing still
   const feet = cr ? [[5.5 + stride * 0.3, 4.2], [4 - stride * 0.3, -4.6]] : [[stride, 4.8], [-stride, -4.8]];
   for (const [fx, fy] of feet) {
     const hip = [-1, fy > 0 ? 3.2 : -3.2];
@@ -212,16 +212,35 @@ export function drawCorpse(ctx, c) {
 }
 
 export function drawDrone(ctx, d, t, ally) {
-  ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.ag || 0);
-  ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(1, 1.5, 6.5, 5.5, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#121314';
-  for (const [wx, wy] of [[-3.5, -4.5], [3, -4.5], [-3.5, 4.5], [3, 4.5]]) { ctx.beginPath(); ctx.ellipse(wx, wy, 2.4, 1.6, 0, 0, 7); ctx.fill(); }
-  ctx.fillStyle = '#3b4046'; ctx.beginPath(); ctx.roundRect(-4.5, -3.2, 9, 6.4, 1.6); ctx.fill();
-  ctx.fillStyle = '#5b636b'; ctx.fillRect(-3.5, -2.2, 5, 4.4);
-  ctx.fillStyle = ally ? '#4ab0ff' : '#ff6a2a'; ctx.beginPath(); ctx.arc(4.2, 0, 1.4, 0, 7); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.arc(4.4, -0.4, 0.5, 0, 7); ctx.fill();
-  cap(ctx, -3, 0, -7, -2, 0.5, '#888');
-  if (d.j) { ctx.strokeStyle = `rgba(150,200,255,${0.4 + Math.random() * 0.5})`; ctx.lineWidth = 0.6; ctx.beginPath(); for (let i = 0; i < 4; i++) { ctx.moveTo((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12); ctx.lineTo((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12); } ctx.stroke(); }
+  const spd = d.spd || 0, wheel = d.wheel || 0, lean = Math.min(1, spd / 200);
+  const rel = (d.mvAng ?? d.ag) - (d.ag || 0);
+  ctx.save(); ctx.translate(d.x, d.y);
+  if (ally) { ctx.strokeStyle = 'rgba(70,170,255,0.45)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, 7); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(0.6, 1, 4.6, 3.6, 0, 0, 7); ctx.fill();
+  ctx.rotate(d.ag || 0);
+  ctx.scale(0.68, 0.68); // small and easy to miss
+  for (const [wx, wy] of [[-3.2, -4.2], [3, -4.2], [-3.2, 4.2], [3, 4.2]]) {
+    ctx.fillStyle = '#121314'; ctx.beginPath(); ctx.roundRect(wx - 2, wy - 1.3, 4, 2.6, 1); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; const off = (wheel * 1.6) % 1.4;
+    for (let i = -2 + off; i < 2; i += 1.4) ctx.fillRect(wx + i, wy - 1.3, 0.3, 2.6);
+  }
+  ctx.save(); ctx.translate(-Math.cos(rel) * lean * 0.5, -Math.sin(rel) * lean * 0.5 + (spd > 20 ? Math.sin(wheel) * 0.2 : 0));
+  const g = ctx.createLinearGradient(-4.5, -3, 4.5, 3); g.addColorStop(0, '#4a4f55'); g.addColorStop(1, '#2a2d31');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(-4.5, -3, 9, 6, 1.2); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 0.4; ctx.stroke();
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-2.6, -1.8, 0.4, 3.6); ctx.fillRect(-1.6, -1.8, 0.4, 3.6);
+  ctx.fillStyle = '#16181b'; ctx.beginPath(); ctx.arc(3.2, 0, 1.6, 0, 7); ctx.fill();           // camera
+  ctx.fillStyle = 'rgba(140,200,240,0.5)'; ctx.beginPath(); ctx.arc(3.5, -0.4, 0.45, 0, 7); ctx.fill();
+  // the giveaway: one small red light on top
+  ctx.fillStyle = `rgba(255,40,40,${0.75 + 0.25 * Math.sin(t * 4)})`; ctx.beginPath(); ctx.arc(0.6, 0, 0.75, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#6d7278'; ctx.lineWidth = 0.3; ctx.beginPath(); ctx.moveTo(-4, -1.2);
+  ctx.lineTo(-6 - (d.sway || 0) * 0.8, -1.2 - (d.sway || 0) * 2); ctx.stroke();
+  ctx.restore();
+  if (d.j) {
+    ctx.strokeStyle = `rgba(150,200,255,${0.4 + Math.random() * 0.5})`; ctx.lineWidth = 0.5; ctx.beginPath();
+    for (let i = 0; i < 4; i++) { ctx.moveTo((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12); ctx.lineTo((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12); }
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
