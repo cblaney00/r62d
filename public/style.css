@@ -450,7 +450,8 @@ button.big { font-size: 22px; padding: 14px 34px; }
 
 /* ---------- chat ---------- */
 #chat { position: absolute; left: 18px; bottom: 210px; width: 440px; pointer-events: none; z-index: 3; font: 500 15px var(--body); }
-#chatLog { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow: hidden; justify-content: flex-end; }
+#chatLog { display: flex; flex-direction: column; gap: 2px; justify-content: flex-end; }
+#chatLog div:not(:nth-last-child(-n+6)) { display: none; } /* short: the last 6 lines (he found it too long) */
 #chatLog div { background: rgba(0,0,0,0.55); padding: 3px 8px; animation: rise 0.2s both; transition: opacity 0.6s; text-shadow: 0 1px 2px #000; }
 #chatLog div.old { opacity: 0; } #chat.open #chatLog div.old { opacity: 0.85; }
 #chatLog .tag { font: 800 11px var(--head); letter-spacing: 0.15em; padding: 0 5px; margin-right: 6px; }
@@ -459,6 +460,10 @@ button.big { font-size: 22px; padding: 14px 34px; }
 #chatBar { display: flex; margin-top: 4px; pointer-events: auto; animation: rise 0.15s both; }
 #chatMode { font: 800 13px var(--head); letter-spacing: 0.15em; padding: 8px 10px; }
 #chatIn { flex: 1; width: auto; font: 500 15px var(--body); padding: 7px 10px; background: rgba(0,0,0,0.75); }
+/* operator select: a short chat in the strip under the role cards, never on top of them (he asked) */
+#select:not(.hidden) ~ #chat { bottom: 46px; width: min(440px, 30vw); font-size: 14px; }
+#select:not(.hidden) ~ #chat #chatLog div:not(:nth-last-child(-n+3)) { display: none; } /* the last 3 lines, never a cut-off one */
+#select:not(.hidden) ~ #chat #chatLog div { padding: 2px 8px; }
 
 /* free play: the menu page and the small key hint in the match */
 .freeH { font: 800 15px var(--head); letter-spacing: 0.18em; color: #f2c14e; margin: 18px 0 8px; }
