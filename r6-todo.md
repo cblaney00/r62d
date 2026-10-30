@@ -5,9 +5,6 @@ finished it gets ticked and moved to **Done**, then work continues on the next o
 Only ideas he asks for go in **To do** (added to the bottom). Claude never adds its own suggestions here.
 
 ## To do
-- [ ] Bullets should actually be very small, so you have to be perfectly precise with them. Tracers smaller too, or shown for a few less frames.
-- [ ] Armory: sort the guns by type, in folders (one per gun type).
-- [ ] Not all attacker bots seem to use their drone; every attacker bot should drone.
 - [ ] Aiming in the Armory should work exactly the same as in a match.
 - [ ] A way to look over each map and know where the bomb sites could be. A "Map knowledge" tab in the main menu, underneath the Armory.
 - [ ] Fights on the stairs are still a bit of a choke point. Look for a way to preview what you'd see at the top (or other end) of the stairs once you get close enough to them.
@@ -17,6 +14,10 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 
 ## Done
+
+- [x] Bullets look tiny: their streaks are thinner and flash for only 2-3 frames, and bullet marks in the Armory are smaller. (A shot was already a line with no width, so hitting someone still takes an exact aim.)
+- [x] Armory: guns sorted into a folder per type (Assault rifles, Submachine guns, ...), click a folder to open or close it.
+- [x] Every attacker bot drones in preparation. (None drove their drone before.) They head for the bomb sites, call out defenders they see, then park and watch.
 
 - [x] Long-range aiming: the crosshair goes anywhere your character can see. Push it past the edge of the screen and the view slides after it (and zooms out if needed), so a marksman can headshot down a long sightline. Aiming in now widens the view instead of zooming in (2× scope widest). Walls you can't see through hold the crosshair, but through a soft wall or barricade your aim carries on (dotted line and faint ring), so headshots through soft walls still work. The distance shows beside the crosshair, and while aiming in each enemy's head zone shows as a ring that turns red when your crosshair is on it.
 - [x] Headshots only count when your crosshair is on the head when you fire.

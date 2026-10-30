@@ -4,7 +4,7 @@
 // call out what they see, and react no faster than a fairly experienced player. The bot skill setting
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
-import { CELL, T, TEAM, PHASE, blocksMove } from '../shared/constants.js';
+import { CELL, T, TEAM, PHASE, blocksMove, blocksDrone } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
@@ -113,12 +113,17 @@ export function botPrep(game, p) {
 
 // ---- path finding (A* over cells; barricades are passable but costly) ----
 // avoid: cells this bot found it can't vault over (too deep, nowhere to land)
-function findPath(map, sx, sy, gx, gy, avoid) {
+function findPath(map, sx, sy, gx, gy, avoid, drone = false) {
   const W = map.W, H = map.H, N = W * H;
   const start = sy * W + sx, goal = gy * W + gx;
   const g = new Float32Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
   const heap = [[0, start]]; g[start] = 0;
-  const cost = k => {
+  const droneCost = k => { // a drone: through drone holes and barricade gaps, never over furniture or through walls
+    const t = map.tiles[k];
+    if (blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k])) return Infinity;
+    return 1;
+  };
+  const cost = drone ? droneCost : k => {
     const t = map.tiles[k];
     if (map.shape && map.shape[k] && map.shapeFill[k] < 10 && t !== T.VOID) return 2.5; // the open side of a sloped wall: a body slides along it
     if (t === T.BARRI) return 8;
@@ -155,7 +160,7 @@ function findPath(map, sx, sy, gx, gy, avoid) {
       const nx = x + dx, ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
       const nk = ny * W + nx;
-      if (dx && dy && (blocksMove(map.tiles[y * W + nx]) || blocksMove(map.tiles[ny * W + x]))) continue;
+      if (dx && dy && (drone ? droneCost(y * W + nx) === Infinity || droneCost(ny * W + x) === Infinity : blocksMove(map.tiles[y * W + nx]) || blocksMove(map.tiles[ny * W + x]))) continue;
       const c = cost(nk); if (c === Infinity) continue;
       const ng = g[k] + c * (dx && dy ? 1.414 : 1);
       if (ng < g[nk]) { g[nk] = ng; from[nk] = k; push(ng + h(nk), nk); }
@@ -334,6 +339,7 @@ export function botThink(game, p, dt) {
   const ai = p.ai;
   const inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
   p.input = inp;
+  if (p.alive && p.ctrl === 'drone') { botDrone(game, p, dt); return; }
   if (!p.alive || p.ctrl !== 'body') return;
   if (game.phase === PHASE.PREP && game.side(p) === TEAM.ATK) return;
   const team = game.side(p), map = game.map, site = map.sites[game.site], S = skill(game, p), me = persona(p);
@@ -630,6 +636,42 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   if (Math.hypot(p.x - (ai.lx || 0), p.y - (ai.ly || 0)) < 0.5) { ai.stuck = (ai.stuck || 0) + dt; if (ai.stuck > 1) { ai.path = null; ai.stuck = 0; } }
   else ai.stuck = 0;
   ai.lx = p.x; ai.ly = p.y;
+}
+
+// Every attacker bot drones in preparation (he asked: some never did; in fact none drove theirs). The drone heads for
+// a site room (sometimes another site first, like scouting), spots and calls out defenders it sees, then parks and
+// looks round. Stuck or slow: a new goal.
+function botDrone(game, p, dt) {
+  const ai = p.ai, inp = p.input, d = game.ent(p.droneId), map = game.map, team = game.side(p);
+  if (!d) return;
+  if (!ai.droneGoal || (ai.droneGoalT -= dt) <= 0) {
+    const sites = map.sites, s = !ai.droneVisits && Math.random() < 0.4 ? sites[Math.floor(Math.random() * sites.length)] : sites[game.site];
+    const name = s.rooms[Math.floor(Math.random() * s.rooms.length)], r = map.rooms.find(r => r.name === name);
+    ai.droneGoal = r ? game.freeSpotNear((r.x + r.w / 2) * CELL, (r.y + r.h / 2) * CELL, Math.min(r.w, r.h) * CELL * 0.3) : { x: d.x, y: d.y };
+    ai.droneVisits = (ai.droneVisits || 0) + 1; ai.dPath = null; ai.droneGoalT = 30; ai.dStuck = 0;
+  }
+  // defenders in the drone's sight: spotted for the team, and called out once if a person is on the team
+  const smokes = game.smokeList();
+  for (const q of game.players.values()) {
+    if (!q.alive || game.side(q) === team || q.shrouded || Math.hypot(q.x - d.x, q.y - d.y) > 320 || !los(map, d.x, d.y, q.x, q.y, smokes)) continue;
+    game.spot(team, q.id, 3);
+    if (!(ai.dCalled || (ai.dCalled = new Set())).has(q.id) && [...game.players.values()].some(o => !o.bot && o.squad === p.squad) && game.markOk(p)) {
+      ai.dCalled.add(q.id); game.mark(p, q.x, q.y, 'ENEMY ' + OPERATORS[q.op].name, q.id);
+    }
+  }
+  const g = ai.droneGoal, W = map.W, sk = Math.floor(d.y / CELL) * W + Math.floor(d.x / CELL);
+  if (Math.hypot(g.x - d.x, g.y - d.y) < 18) { p.aim += dt * 0.7; return; } // parked: look round the room
+  ai.dPathT = (ai.dPathT || 0) - dt;
+  if (!ai.dPath || ai.dPathT <= 0) { ai.dPath = findPath(map, Math.floor(d.x / CELL), Math.floor(d.y / CELL), Math.floor(g.x / CELL), Math.floor(g.y / CELL), null, true) || []; ai.dPathT = 2; }
+  { const i = ai.dPath.indexOf(sk); if (i >= 0 && i < 6) ai.dPath.splice(0, i + 1); }
+  const next = ai.dPath[0];
+  const tx = next === undefined ? g.x : (next % W + 0.5) * CELL, ty = next === undefined ? g.y : (Math.floor(next / W) + 0.5) * CELL;
+  if (next === undefined && !ai.dPath.length && ai.dPathT < 1.9 && Math.hypot(g.x - d.x, g.y - d.y) > 60) ai.droneGoalT = 0; // no way there: pick another
+  p.aim = Math.atan2(ty - d.y, tx - d.x);
+  setDir(inp, tx - d.x, ty - d.y);
+  if (Math.hypot(d.x - (ai.dlx ?? 0), d.y - (ai.dly ?? 0)) < 0.3) { if ((ai.dStuck = (ai.dStuck || 0) + dt) > 1.2) { ai.dPath = null; ai.dStuck = 0; ai.dStuckN = (ai.dStuckN || 0) + 1; if (ai.dStuckN > 3) { ai.droneGoalT = 0; ai.dStuckN = 0; } } }
+  else ai.dStuck = 0;
+  ai.dlx = d.x; ai.dly = d.y;
 }
 
 // the doorway or window nearest to this bot that it can see (to hold an angle on): the site's own when defending it
