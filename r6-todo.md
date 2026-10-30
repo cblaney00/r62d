@@ -18,6 +18,8 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Spawns and lock-in: several attacker spawn locations on every map, and attackers pick theirs. Attackers do not appear on the map until the
       action (battle) timer starts. Operator select no longer starts the round when its timer runs out: everyone "locks in" instead, so the
       round only starts when everyone is ready with their loadout.
+- [ ] Rework the stairs: going between levels kind of sucks right now. Fights should be possible between the top and bottom of a staircase in an
+      intuitive way, and sounds must obviously come from above or below you.
 
 ## Done
 
