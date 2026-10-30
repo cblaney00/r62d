@@ -161,11 +161,11 @@ export function castSight(map, x0, y0, ang, maxD, smokes) {
     const sh = shapeAt(map, cx, cy);
     if (sh) { // an angled or curved bit of wall: only its solid part stops sight
       const h = rayShape(sh, x0, y0, dx, dy);
-      if (h === null || (t === T.SOFT && throughHole(map, cy * map.W + cx, x0, y0, dx, dy))) return false;
+      if (h === null || ((t === T.SOFT || t === T.BARRI) && throughHole(map, cy * map.W + cx, x0, y0, dx, dy))) return false;
       exact = h; return true;
     }
     if (cx === startCx && cy === startCy) return false;
-    return !(t === T.SOFT && throughHole(map, cy * map.W + cx, x0, y0, dx, dy));
+    return !((t === T.SOFT || t === T.BARRI) && throughHole(map, cy * map.W + cx, x0, y0, dx, dy)); // look through bullet holes
   });
   if (exact >= 0) d = exact;
   if (smokes) for (const s of smokes) {

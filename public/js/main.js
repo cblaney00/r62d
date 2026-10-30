@@ -301,6 +301,7 @@ function onSnap(s) {
   const changed = [];
   for (let i = 0; i < s.cells.length; i += 3) {
     const k = s.cells[i];
+    if (s.cells[i + 1] === T.BARRI && m.tiles[k] !== T.BARRI) delete m.holes[k]; // freshly boarded up: no old bullet holes
     m.tiles[k] = s.cells[i + 1]; m.hp[k] = s.cells[i + 2];
     holePortal(m, k); // an opened hatch drops you through
     st.unseen.add(k);

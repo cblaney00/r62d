@@ -307,6 +307,17 @@ export class MapRenderer {
         ctx.fillStyle = '#c9c9c9'; ctx.fillRect(-7, -0.6 + (i - 1) * 3.3, 0.9, 0.9); ctx.fillRect(6, -0.6 + (i - 1) * 3.3, 0.9, 0.9);
         ctx.restore();
       }
+      if (hpF < 0.8) { // splintered by a melee hit
+        ctx.strokeStyle = 'rgba(40,22,10,0.8)'; ctx.lineWidth = 0.6; ctx.beginPath();
+        for (let i = 0; i < (hpF < 0.4 ? 4 : 2); i++) { const sx = X + 3 + hash(x, y, i + 70) * 10, sy = Y + 3 + hash(y, x, i + 80) * 10; ctx.moveTo(sx, sy); ctx.lineTo(sx + (hash(i, y, x) - 0.5) * 9, sy + (hash(x, i, y) - 0.5) * 9); }
+        ctx.stroke();
+      }
+      const holes = m.holes && m.holes[k]; // bullet holes: pins of light you can look and shoot through
+      if (holes) for (let i = 0; i < holes.length; i += 2) {
+        ctx.fillStyle = 'rgba(255,230,180,0.25)'; ctx.beginPath(); ctx.arc(holes[i], holes[i + 1], 1.8, 0, 7); ctx.fill();
+        ctx.fillStyle = '#120c06'; ctx.beginPath(); ctx.arc(holes[i], holes[i + 1], 1.2, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(255,236,190,0.6)'; ctx.beginPath(); ctx.arc(holes[i], holes[i + 1], 0.45, 0, 7); ctx.fill();
+      }
     }
     if (t === T.PANEL) {
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; if (horiz) ctx.fillRect(X, Y + 5.5, CELL, 7); else ctx.fillRect(X + 5.5, Y, 7, CELL);

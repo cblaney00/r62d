@@ -19,6 +19,7 @@ for (const id of MAP_LIST) {
   const p = [...g.players.values()][0], m = g.map, W = m.W;
   // every window: walking into it stops you; vaulting from in front of it lands you on the other side
   let wins = 0, ok = 0;
+  for (const o of m.openings) if (o.kind === 'window') for (const c of o.cells) if (m.tiles[c] === T.BARRI) g.destroyCell(c); // windows start boarded up: break the boards first
   for (const o of m.openings) {
     if (o.kind !== 'window' || m.tiles[o.cells[0]] !== T.OPEN) continue;
     const k = o.cells[0], cx = k % W, cy = Math.floor(k / W);
@@ -72,6 +73,7 @@ for (const id of MAP_LIST) {
     if (m.tiles[k] !== T.FLOOR) fail(id, 'a blast left', m.tiles[k], 'not floor');
     break;
   }
+  if (!wins) fail(id, "no windows were checked");
   console.log(`${id}: vaulted ${ok}/${wins} windows checked, ${stubs} wall stubs`);
 }
 console.log(fails ? `${fails} failure(s)` : 'PASS vault');

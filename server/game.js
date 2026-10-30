@@ -237,6 +237,7 @@ export class Game {
       for (let i = 0; i <= 16; i++) { const a = c.n === null ? i / 16 * Math.PI * 2 : c.n - c.sp + c.sp * 2 * i / 16, d = castSight(map, c.x, c.y, a, 600, null); if (d > bestD) { bestD = d; best = a; } }
       this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, team: TEAM.DEF, hp: 1, offUntil: 0, ang: best, wn: c.n, ws: c.sp, wall: c.wall });
     }
+    this.boardUp();
     // defenders start on site, attackers at one spawn (their bodies wait while they drone)
     const site = map.sites[this.site];
     const defCells = this.freeCellsInRooms(site.rooms);
@@ -659,8 +660,8 @@ export class Game {
       else if (cx === sx && cy === sy) return false;
       if (stopsBullet(tile)) { stopT = t; kind = tile === T.TALL ? 'prop' : 'hard'; best = null; return true; }
       if (penBullet(tile)) {
-        if (tile === T.SOFT && HOLE_ONLY.has(cls)) this.holeCell(k, cx, cy, x0, y0, dx, dy, t);
-        else this.damageCell(k, dmg * 0.6);
+        if ((tile === T.SOFT || tile === T.BARRI) && HOLE_ONLY.has(cls)) this.holeCell(k, cx, cy, x0, y0, dx, dy, t);
+        else this.damageCell(k, dmg * (tile === T.BARRI ? 0.35 : 0.6)); // a shotgun needs two blasts for a barricade
         // he asked: a wall takes damage off the bullet (how much depends on the gun and the wall), so spraying
         // through walls in someone's general direction doesn't win fights
         mult *= pen * (this.map.mat[k] === MAT.BRICK ? 0.7 : tile === T.BARRI ? 1.1 : 1); pens++; wallT = t;
@@ -930,12 +931,29 @@ export class Game {
     return false;
   }
 
-  barricade(openingId, type) {
+  // He asked for R6 barricades: every doorway and window starts boarded up. (The tutorial leaves the objective
+  // room's own doors open, so its defence lesson can teach boarding one up.)
+  boardUp() {
+    const m = this.map, site = m.sites[this.site], keep = new Set(), W = m.W;
+    const inSite = c => [1, -1, W, -W].some(d => site.rooms.includes(roomAt(m, ((c + d) % W + 0.5) * CELL, (Math.floor((c + d) / W) + 0.5) * CELL)));
+    if (this.tut && site) for (const o of m.openings) if (o.cells.some(inSite)) keep.add(o.id);
+    for (const o of this.map.openings) if (!keep.has(o.id) && o.cells.every(c => this.map.tiles[c] === T.OPEN)) this.barricade(o.id, T.BARRI, true);
+  }
+
+  // A melee hit on a barricade: three break it (the whole board across the doorway or window, like R6)
+  barriHit(k) {
+    const o = this.map.openings[this.map.openId[k]], cells = o ? o.cells.filter(c => this.map.tiles[c] === T.BARRI) : [k];
+    for (const c of cells) { this.map.hp[c] -= CELL_HP[T.BARRI] / 3 + 0.01; this.changed.add(c); }
+    if (cells.some(c => this.map.hp[c] <= 0)) for (const c of cells) this.destroyCell(c);
+  }
+
+  barricade(openingId, type, quiet = false) {
     const o = this.map.openings[openingId];
     if (!o) return false;
     if (o.cells.some(c => this.cellOccupied(c))) return false;
     if (type === T.BARRI && o.cells.some(c => this.map.tiles[c] !== T.OPEN)) return false;
-    for (const c of o.cells) { this.map.tiles[c] = type; this.map.hp[c] = CELL_HP[type]; this.changed.add(c); }
+    for (const c of o.cells) { this.map.tiles[c] = type; this.map.hp[c] = CELL_HP[type]; this.changed.add(c); if (this.map.holes[c]) delete this.map.holes[c]; }
+    if (quiet) return true;
     const c0 = o.cells[0], W = this.map.W;
     this.events.push({ e: 'snd', s: type === T.PANEL ? 'panel' : 'barricade', x: (c0 % W + 0.5) * CELL, y: (Math.floor(c0 / W) + 0.5) * CELL });
     return true;
@@ -1055,11 +1073,7 @@ export class Game {
     }
     if (!f) return;
     if (f.t === T.BARRI) {
-      const o = this.map.openings[this.map.openId[f.k]];
-      // a melee hit knocks out the struck plank plus a neighbour
-      this.destroyCell(f.k);
-      const rest = o ? o.cells.filter(c => this.map.tiles[c] === T.BARRI) : [];
-      if (rest.length) this.destroyCell(rest[0]);
+      this.barriHit(f.k);
       this.events.push({ e: 'hit', k: 'wood', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) });
     } else if (f.t === T.RUBBLE) { this.destroyCell(f.k); this.events.push({ e: 'hit', k: 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) }); }
     else if (f.t === T.SOFT) { this.damageCell(f.k, 25); this.events.push({ e: 'hit', k: 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) }); }

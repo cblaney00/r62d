@@ -9,9 +9,10 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
       Next: the other five maps the same way, after his feedback on Harbor.
-- [ ] Barricades like R6: every window and doorway starts boarded up. Three melee hits break one; bullets work differently — they only chew small holes in it that can be used on purpose (to look or shoot through). Work out how R6 does it and match that.
 
 ## Done
+
+- [x] Barricades like R6: every doorway and window starts boarded up. Three melee hits break one (it splinters as you hit it). Rifles, SMGs, LMGs and pistols only chew small holes in it, which you can look and shoot through on purpose; a shotgun needs two blasts; explosives clear it. Defenders can board a broken one up again (fresh boards, no holes).
 
 - [x] See as far as you can be shot from: the camera works out how far you can see in the way you face (ignoring thin slivers through doorways), zooms out only as much as needed and slides ahead so the far end of that sightline is on screen; in rooms it stays close. It widens quickly and narrows slowly so it doesn't jostle. An enemy your team can see but who is off your screen shows as a red ! at the screen edge.
 
