@@ -16,6 +16,9 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Sound is too loud: quieter by default (opening the game must never blast people's ears), a wider range on the volume slider, and gunshots less aggressive — loud sounds should mask other noises a little, not drown them out so the game feels uncomfortable.
 - [ ] More guns: the categories are great, we just need more guns. Every gun should have its own properties — none of them too similar.
       He plans to massively rework the aiming later, because it still doesn't feel right and guns are a big part of the game.
+- [ ] Spawns and lock-in: several attacker spawn locations on every map, and attackers pick theirs. Attackers do not appear on the map until the
+      action (battle) timer starts. Operator select no longer starts the round when its timer runs out: everyone "locks in" instead, so the
+      round only starts when everyone is ready with their loadout.
 
 ## Done
 
