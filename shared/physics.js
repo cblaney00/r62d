@@ -151,14 +151,15 @@ export function walkRay(x0, y0, dx, dy, maxT, cb) {
   return Math.min(t, maxT);
 }
 
-// Distance a ray travels before something opaque (or a smoke cloud) stops it.
-export function castSight(map, x0, y0, ang, maxD, smokes) {
+// Distance a ray travels before something opaque (or a smoke cloud) stops it. soft = true: soft walls and
+// barricades don't stop it (bullets go through them), so it ends at the first wall a bullet can't pass.
+export function castSight(map, x0, y0, ang, maxD, smokes, soft = false) {
   const dx = Math.cos(ang), dy = Math.sin(ang);
   const startCx = Math.floor(x0 / CELL), startCy = Math.floor(y0 / CELL);
   let exact = -1;
   let d = walkRay(x0, y0, dx, dy, maxD, (cx, cy) => {
     const t = tileAt(map, cx, cy);
-    if (!blocksSight(t)) return false;
+    if (!blocksSight(t) || (soft && (t === T.SOFT || t === T.BARRI))) return false;
     const sh = shapeAt(map, cx, cy);
     if (sh) { // an angled or curved bit of wall: only its solid part stops sight
       const h = rayShape(sh, x0, y0, dx, dy);

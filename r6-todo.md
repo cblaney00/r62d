@@ -15,9 +15,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] Rappelling: attackers need a quicker way up to the top floor.
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
 
-- [ ] Aiming in (right click) makes your view smaller; it should do the opposite, especially with a 2× scope. (The 2× scope might be a little too strong, but leave it as it is for now.)
 
 ## Done
+
+- [x] Long-range aiming: the crosshair goes anywhere your character can see. Push it past the edge of the screen and the view slides after it (and zooms out if needed), so a marksman can headshot down a long sightline. Aiming in now widens the view instead of zooming in (2× scope widest). Walls you can't see through hold the crosshair, but through a soft wall or barricade your aim carries on (dotted line and faint ring), so headshots through soft walls still work. The distance shows beside the crosshair, and while aiming in each enemy's head zone shows as a ring that turns red when your crosshair is on it.
+- [x] Headshots only count when your crosshair is on the head when you fire.
 
 - [x] Windows all start boarded up (doorways still start open). They do not use up anyone's 3 barricades.
 - [x] More hard walls, less wallbanging: about a quarter fewer breakable walls on every map. Away from the bomb sites only about one inside wall in five and one outside wall in ten can still be shot through; the bomb-site rooms keep their few breakable walls.

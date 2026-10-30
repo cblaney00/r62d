@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat, JOBS, jobOf } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
@@ -129,11 +129,18 @@ const mouse = { x: 0, y: 0, l: false, r: false, wl: 0, wr: 0 };
 // up/down sets how far ahead the crosshair sits, and W always walks up the screen (k.rot turns the keys).
 const AIM_MODES = ['free', 'spin', 'pad', 'turn', 'cursor'];
 let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return localStorage.getItem('r62d-aim2') && AIM_MODES.includes(m) ? m : 'free'; } catch { return 'free'; } })();
-let aimOff = { x: 200, y: 0 }; // Crosshair mode: where the crosshair sits from your character, in screen pixels
-const AIM_MIN = () => 46 * DPR, AIM_MAX = () => VH * 0.46;
+// Crosshair mode: where the crosshair sits from your character, in WORLD pixels. It can go anywhere you can see
+// (he asked: a marksman must be able to headshot down a long sightline, not only inside the room): pushing it past
+// the screen edge slides the camera after it (and zooms out if it has to), out to st.reachW. Nearer walls only hold
+// the crosshair on the wall while they are in the way; it comes back out when you aim past them.
+let aimOff = { x: 150, y: 0 };
+const AIM_MIN = () => 46 * DPR / (st.zoom || 1), AIM_MAX = () => st.reachW || 400;
+// how far a view can grow to fit you and your crosshair: further when aiming in, furthest with a 2x scope
+const FIT_H = me => me && me.ad ? (String(me.aa).includes('scope') ? 1000 : 820) : 700;
 function freeMove(dx, dy) {
+  const z = st.zoom || 1; dx /= z; dy /= z; // the mouse moves the crosshair 1:1 on screen
   const o = aimOff, n = { x: o.x + dx, y: o.y + dy }, l = Math.hypot(n.x, n.y), lo = AIM_MIN(), hi = AIM_MAX();
-  if (l > hi) { n.x *= hi / l; n.y *= hi / l; }
+  if (l > hi) { const L = Math.max(hi, Math.hypot(o.x, o.y)); n.x *= L / l; n.y *= L / l; } // no pushing past the reach (a reach that just shrank keeps your spot)
   else if (l < lo) { // too close to you: pushed out to the edge of the little circle, on whichever side it's now on
     const a = l > 0.01 ? Math.atan2(n.y, n.x) : Math.atan2(-o.y, -o.x);
     n.x = Math.cos(a) * lo; n.y = Math.sin(a) * lo;
@@ -173,15 +180,7 @@ function screenToWorld(sx, sy) {
 function cursor() {
   if (!padOn) return mouse;
   const z = st.zoom || 1, P0 = w2s(st.pred.x, st.pred.y), px = P0.x, py = P0.y;
-  if (aimMode === 'free' && !gpRecent()) { // kept on screen (it slides in along your aim if the screen edge is nearer)
-    const l = Math.hypot(aimOff.x, aimOff.y) || 1, cx = aimOff.x / l, cy = aimOff.y / l, m = 24 * DPR;
-    let d = l;
-    if (cx > 0.01) d = Math.min(d, (VW - m - px) / cx); else if (cx < -0.01) d = Math.min(d, (m - px) / cx);
-    if (cy > 0.01) d = Math.min(d, (VH - m - py) / cy); else if (cy < -0.01) d = Math.min(d, (m - py) / cy);
-    d = Math.max(d, AIM_MIN());
-    if (d < l - 1) aimOff = { x: cx * d, y: cy * d }; // stopped by the screen edge: no hidden travel to pull back
-    return { x: px + cx * d, y: py + cy * d };
-  }
+  if (aimMode === 'free' && !gpRecent()) { const q = freeAimPoint(); return w2s(q.x, q.y); }
   const cx = Math.cos(padAng + (st.rot || 0)), cy = Math.sin(padAng + (st.rot || 0)), m = 30 * DPR;
   const scoped = st.me && String(st.me.aa || '').includes('scope');
   let d = VH * 0.07 + padReach * (VH * 0.36 + (scoped ? 0 : 4 * PX_PER_M * z)); // +4 m without a scope (he asked); shortened if it would leave the screen
@@ -189,6 +188,24 @@ function cursor() {
   if (cy > 0.01) d = Math.min(d, (VH - m - py) / cy); else if (cy < -0.01) d = Math.min(d, (m - py) / cy);
   d = Math.max(d, 24 * DPR);
   return { x: px + cx * d, y: py + cy * d };
+}
+// Crosshair mode: the crosshair you see is held on the first thing along your aim you can't see through (x, y, d).
+// The point you really aim at (ax, ay, ad, sent to the server for headshots) goes on through soft walls and
+// barricades, which bullets pass, and stops only at a wall they can't (he asked: a headshot through a soft wall
+// must still be possible). When they differ, a faint marker shows where you aim behind the wall.
+function freeAimPoint() {
+  let l = Math.min(Math.hypot(aimOff.x, aimOff.y) || 1, AIM_MAX());
+  const a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), s = Math.sin(a);
+  if (st.map) { // never off the edge of the floor you are on (the camera can't follow it there)
+    const F = st.map.floors[Math.max(0, floorAt(st.map, st.pred.x, st.pred.y))], m = 10, x0 = F.gx * CELL + m, x1 = (F.gx + F.w) * CELL - m, y1 = F.h * CELL - m;
+    if (c > 1e-6) l = Math.min(l, (x1 - st.pred.x) / c); else if (c < -1e-6) l = Math.min(l, (x0 - st.pred.x) / c);
+    if (s > 1e-6) l = Math.min(l, (y1 - st.pred.y) / s); else if (s < -1e-6) l = Math.min(l, (m - st.pred.y) / s);
+    l = Math.max(1, l);
+  }
+  const lo = Math.min(l, AIM_MIN()), see = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null) + 2 : l;
+  const shot = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null, true) + 2 : l;
+  const d = Math.max(lo, Math.min(l, see)), ad = Math.max(d, Math.min(l, shot));
+  return { x: st.pred.x + c * d, y: st.pred.y + s * d, d, ax: st.pred.x + c * ad, ay: st.pred.y + s * ad, ad, through: ad > d + 4 };
 }
 addEventListener('resize', resize); resize();
 fx.quality = gq.parts; setShading(gq.shade);
@@ -1058,12 +1075,28 @@ function frame(nowMs) {
   if (!st.envWant || Math.abs(want - st.envWant) > st.envWant * 0.15 || (view && view.kind !== 'body')) st.envWant = want;
   st.envH = st.envH || st.envWant;
   st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * 6));
-  // aiming down sights zooms in, fast (a scope zooms less but looks further ahead)
-  const adsZ = view && view.kind === 'body' && me && me.ad ? (String(me.aa).includes('scope') ? 0.9 : 0.82) : 1;
+  // aiming down sights widens the view, fast (he asked: it used to zoom in, the opposite of what you want); a 2x scope widest
+  const adsZ = view && view.kind === 'body' && me && me.ad ? (String(me.aa).includes('scope') ? 1.3 : 1.12) : 1;
   st.adsZ = st.adsZ || 1;
   st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18));
   st.viewH = st.envH * st.adsZ;
+  // Crosshair mode: the crosshair can go anywhere you can see; if you and it don't fit on screen, the view grows
+  // (up to FIT_H) and st.reachW is how far it can go in the way you face at the largest view
+  const freeAim = view && view.kind === 'body' && padOn && aimMode === 'free' && !gpRecent();
+  if (freeAim) {
+    const q = freeAimPoint(), cA = Math.abs(Math.cos(st.aim)), sA = Math.abs(Math.sin(st.aim));
+    const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), mg = 86 * DPR / (st.zoom || 1);
+    const capH = FIT_H(me), need = Math.min(capH, (q.ad + mg) / (2 * e));
+    st.reachW = Math.max(160, capH * 2 * e - mg);
+    st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need;
+    st.viewH = Math.max(st.viewH, st.fitH);
+  } else st.fitH = 0;
   st.zoom = VH / st.viewH;
+  if (freeAim) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
+    const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
+    const keep = (x, y, m) => { st.cam.x = Math.min(x + hw - m, Math.max(x - hw + m, st.cam.x)); st.cam.y = Math.min(y + hh - m, Math.max(y - hh + m, st.cam.y)); };
+    keep(st.pred.x, st.pred.y, 50 * DPR / st.zoom); keep(q.ax, q.ay, 36 * DPR / st.zoom);
+  }
   if (view && view.kind === 'cam' && !view.dr) { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
   { // never look past the edge of the floor you are on (other floors sit beside it in the map grid)
     const fi = view ? Math.max(0, floorAt(st.map, view.x, view.y)) : 0, F = st.map.floors[fi];
@@ -1137,7 +1170,8 @@ function sendInput(dt, me, ctrl, view, s, now) {
     st.fireK = k.fire;
   }
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
-  const c = cursor(), mw = screenToWorld(c.x, c.y); msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
+  const c = cursor(), mw = aimMode === 'free' && padOn && !gpRecent() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
+  msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
   if (ev.length) msg.ev = ev;
   st.pending.push({ s: msg.s, k, dt: msg.dt });
@@ -1402,7 +1436,7 @@ function draw(s, view, now, dt) {
   for (const e of ents) if (e.ty === 'cam' && (e.tm === side || seen(e.x, e.y))) drawCam(ctx, e, now, e.tm === side);
 
   // players
-  const drawn = [];
+  const drawn = []; st.heads = []; // enemies you can see: their head zones show while you aim in
   for (const sp of s.players) {
     if (!sp.a || sp.sg) continue; // an attacker waiting off the map during preparation
     const isMe = me && sp.id === me.id;
@@ -1425,6 +1459,7 @@ function draw(s, view, now, dt) {
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x + u.x * 15, gh.y + u.y * 15);
+      if (!ally && !p.dn) st.heads.push({ x: gh.x, y: gh.y });
     }
     // Silent Shroud: drones and cameras can't see her, only eyes can
     const vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
@@ -1434,6 +1469,7 @@ function draw(s, view, now, dt) {
       recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, scan: p.sc, melee: a.melee,
     }, now);
     drawn.push(p);
+    if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x, y: p.y });
     if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see
       const L = Math.min(260, castSight(st.map, p.x, p.y, p.ag, 260, sm));
       ctx.strokeStyle = 'rgba(255,40,40,0.35)'; ctx.lineWidth = 0.5;
@@ -1653,7 +1689,32 @@ function crosshair(me, now) {
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
   const cone = w ? spreadCone(w, gm, { at: me.at || 0, run, crouch: !!me.cr, shots: gunHeat(me, w, now) }) : 0;
   const spread = xh.dynamic ? Math.tan(cone) * Math.hypot(m.x - px, m.y - py) / DPR : 0;
+  // aiming in: each enemy you can see shows the zone your crosshair must be on for a headshot; it lights red when it is
+  if (me.ad && st.heads) for (const h of st.heads) {
+    const H = w2s(h.x, h.y), r = Math.max(2.5 * DPR, HEAD_AIM * (st.zoom || 1)), on = Math.hypot(x - H.x, y - H.y) <= r;
+    ctx.lineWidth = (on ? 2 : 1.2) * DPR;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(H.x, H.y, r + 1.2 * DPR, 0, 7); ctx.stroke();
+    ctx.strokeStyle = on ? '#ff3b3b' : 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.arc(H.x, H.y, r, 0, 7); ctx.stroke();
+    if (on) { ctx.fillStyle = 'rgba(255,59,59,0.22)'; ctx.fill(); }
+  }
   drawXhair(ctx, x, y, xh, spread, DPR);
+  // far out: how far away the crosshair is (it can go anywhere you can see)
+  if (aimMode === 'free' && padOn && !gpRecent()) {
+    const q = freeAimPoint(), dm = q.ad / PX_PER_M;
+    if (q.through) { // held on a soft wall: a dotted line and a faint ring show where you really aim behind it
+      const G = w2s(q.ax, q.ay), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
+      ctx.setLineDash([2 * DPR, 3 * DPR]); ctx.lineWidth = 1.2 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(gx, gy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 3 * DPR; ctx.beginPath(); ctx.arc(gx, gy, 5 * DPR, 0, 7); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.3 * DPR; ctx.beginPath(); ctx.arc(gx, gy, 5 * DPR, 0, 7); ctx.stroke();
+    }
+    if (dm >= 8) {
+      ctx.font = `700 ${12 * DPR}px Barlow Condensed, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.lineWidth = 3 * DPR; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(`${Math.round(dm)} m`, x + 12 * DPR, y + 10 * DPR);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(`${Math.round(dm)} m`, x + 12 * DPR, y + 10 * DPR);
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
   const hk = 1 - (now - st.hitT) / 0.18;
   if (hk > 0) {
     ctx.strokeStyle = st.hitKill ? `rgba(255,60,60,${hk})` : `rgba(255,255,255,${hk})`; ctx.lineWidth = 2 * DPR;
@@ -2070,6 +2131,7 @@ function updateCard() {
   $('pcXp').style.width = (L.into / L.need * 100) + '%'; $('pcXpText').textContent = `LEVEL ${L.level} · ${L.into} / ${L.need} XP`;
 }
 const TIPS = [
+  'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',
   'Walk (Shift) or crouch (Ctrl) to move without footsteps — just like CS2.',
   'Stop before you shoot: running ruins your accuracy. Crouching still is the most accurate.',
   'Broken glass under windows crunches loudly — listen for it.',
@@ -2117,7 +2179,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, showEnd, playXp, freeMove, turnMove, setAim, aimOff: () => aimOff }; // for automated screenshot tests
+window.__r62d = { PF, st, showEnd, playXp, freeMove, turnMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
@@ -2162,8 +2224,8 @@ function setAim(m, save = true) {
   aimMode = m; try { localStorage.setItem('r62d-aim', m); localStorage.setItem('r62d-aim2', '1'); } catch {}
   for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
   if (m !== 'cursor') { padAng = st.aim || 0; padReach = 0.6; }
-  if (m === 'free') aimOff = { x: Math.cos(st.aim || 0) * VH * 0.25, y: Math.sin(st.aim || 0) * VH * 0.25 };
-  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Pull it through your character to turn round.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
+  if (m === 'free') aimOff = { x: Math.cos(st.aim || 0) * 150, y: Math.sin(st.aim || 0) * 150 };
+  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Push it past the edge of the screen to look further: it goes anywhere you can see. Pull it through your character to turn round.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
     turn: 'Turn: like an FPS. Mouse left / right turns you, mouse up / down moves the crosshair further / nearer.',
     cursor: 'Cursor: you aim at wherever the mouse pointer is.' }[m];
   if (save) saveSettings();
