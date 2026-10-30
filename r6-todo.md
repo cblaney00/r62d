@@ -2,23 +2,10 @@
 
 insideabush's list of next ideas. Claude works through it top to bottom: when one item is
 finished it gets ticked and moved to **Done**, then work continues on the next one.
-New ideas from him get added to the bottom of **To do**.
+Only ideas he asks for go in **To do** (added to the bottom). Claude never adds its own suggestions here.
 
 ## To do
-
-- [ ] Leaning: lean round a corner to peek and shoot without stepping out.
-- [ ] Players bump into each other instead of walking through one another (teammates too).
-- [ ] Smarter attacking bots: they win only about 3 rounds in 10 on attack; better droning, breaching and pushing together.
-- [ ] Hide enemy positions from players' computers until they could see or hear them (stops cheating).
-- [ ] Voice callouts for each operator (short lines like "Reloading!", "Drone spotted!").
-- [ ] Killcam: a short replay of how you died.
-- [ ] Round MVP card: the best player of each round shown when it ends.
-- [ ] New game mode: Secure Area (hold a room).
-- [ ] New game mode: Hostage (rescue or protect a hostage).
-- [ ] A seventh map.
-- [ ] More operators.
-- [ ] Minimap option in Settings, in case the grey out-of-sight map is too hard to read.
-- [ ] Run the game on Lando's server so friends on the VPN can play without your computer being on (needs Lando to set it up, can't be done from here).
+(empty — waiting for his next idea)
 
 ## Done
 
