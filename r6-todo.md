@@ -17,6 +17,8 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] New game mode: Hostage (rescue or protect a hostage).
 - [ ] A seventh map.
 - [ ] More operators.
+- [ ] Minimap option in Settings, in case the grey out-of-sight map is too hard to read.
+- [ ] Run the game on Lando's server so friends on the VPN can play without your computer being on (needs Lando to set it up, can't be done from here).
 
 ## Done
 
