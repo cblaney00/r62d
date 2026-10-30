@@ -44,3 +44,9 @@ Trident 0.22, Anvil 0.25, Pike 0.26 weakest. Small samples (60–120 each), so o
 Rook 42→40 dmg and more kick, Ox 34→31 dmg and slower to aim, Drummer 26→24, Marten 30→28; Trident 36→38 dmg
 and 0.32→0.2 s between bursts, Anvil 72→76 dmg and 70→85 rpm. The Pike is left alone: bots fire it from the hip,
 where it is meant to be hopeless.
+
+## 2026-10-30 — after wall penetration, roles, spawns and barricades
+12-match report: **attackers 37%** (up from 29%: spraying defenders through walls is much weaker now). Guns
+are closer together (kills per gun carried 0.41–0.80, shotguns and sidearms aside). Wasp SMG led at 0.80:
+damage 19→18. A separate 12-match look at how rounds end: 19 defenders eliminated, 15 attackers eliminated,
+13 defuser disabled, 5 time out; the defuser never ran out its 45 s — bot attackers don't guard a plant.
