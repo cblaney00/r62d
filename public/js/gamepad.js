@@ -7,11 +7,11 @@ const DZ = 0.1; // only enough to ignore a worn stick resting off-centre; past i
 export const PAD_HELP = [
   ['Move (light push = walk, silent)', 'Left stick'], ['Aim (push further = look further ahead)', 'Right stick'],
   ['Shoot', 'RT'], ['Aim down sights', 'LT'], ['Use (hold)', 'A'], ['Crouch on / off', 'B'], ['Reload', 'X'], ['Swap weapon', 'Y'],
-  ['Gadget', 'LB'], ['Operator skill', 'RB'], ['Melee', 'Click right stick'], ['Ping', 'D-pad up'], ['Drone / Cameras', 'D-pad down'],
+  ['Gadget', 'LB'], ['Operator skill', 'RB'], ['Melee', 'Click right stick'], ['Vault', 'Click left stick'], ['Ping', 'D-pad up'], ['Drone / Cameras', 'D-pad down'],
   ['Previous / next camera', 'D-pad left / right'], ['Scoreboard (hold)', 'View'], ['Pause', 'Menu'],
 ];
 // standard-layout button number → what it does (main.js turns these into game actions)
-export const PAD_ACTIONS = { 0: 'interact', 1: 'crouch', 2: 'reload', 3: 'swap', 4: 'gadget', 5: 'ability', 8: 'scoreboard', 9: 'pause', 11: 'melee', 12: 'spot', 13: 'view', 14: 'camPrev', 15: 'camNext' };
+export const PAD_ACTIONS = { 0: 'interact', 10: 'vault', 1: 'crouch', 2: 'reload', 3: 'swap', 4: 'gadget', 5: 'ability', 8: 'scoreboard', 9: 'pause', 11: 'melee', 12: 'spot', 13: 'view', 14: 'camPrev', 15: 'camNext' };
 
 function stick(x, y) {
   const l = Math.hypot(x, y);

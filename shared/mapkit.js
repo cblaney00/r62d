@@ -41,6 +41,7 @@ export function makeMap({ id, name, floors }) {
   const tiles = new Uint8Array(N).fill(T.VOID), floor = new Uint8Array(N).fill(FL.VOID);
   const mat = new Uint8Array(N).fill(MAT.DRYWALL), hp = new Int16Array(N);
   const dhole = new Uint8Array(N); // 1 = a drone hole at the foot of this (soft) wall cell
+  const win = new Uint8Array(N); // 1 = a window cell: bodies must vault through it
   const openId = new Int16Array(N).fill(-1), portal = new Int32Array(N).fill(-1), flAt = new Uint8Array(N).fill(255);
   const props = [], openings = [], rooms = [], stairs = [], decor = [];
   const shape = {}; // k -> solid parts of an angled/curved wall cell (see "angled and curved walls" below)
@@ -74,6 +75,7 @@ export function makeMap({ id, name, floors }) {
       open(x0, y0, x1, y1, kind, ext = false) {
         const cells = [];
         each(x0, y0, x1, y1, k => { tiles[k] = T.OPEN; hp[k] = 0; openId[k] = openings.length; cells.push(k); delete shape[k]; });
+        if (kind === "window") for (const k of cells) win[k] = 1; // a body vaults through a window, never walks
         openings.push({ id: openings.length, cells, kind, ext });
       },
       door: (x0, y0, x1, y1, ext) => K.open(x0, y0, x1, y1, 'door', ext),
@@ -292,7 +294,7 @@ export function makeMap({ id, name, floors }) {
     placeHatches(extra && extra.sites);
     return {
       id, name, W, H, tiles, floor, mat, hp, holes: {}, openId, dhole, props, openings, rooms, portal, flAt, stairs, decor, shape, shapeSide, shapeFill,
-      hatches, hatchAt, hatchBelow,
+      hatches, hatchAt, hatchBelow, win,
       floors: fl.map(f => ({ name: f.name, i: f.i, gx: f.gx, w: f.w, h: f.h, x0: f.x0, y0: f.y0 })),
       ...extra,
     };

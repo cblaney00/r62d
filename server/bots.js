@@ -3,7 +3,7 @@
 // gunfire, explosions) by turning to face it and checking it out — not by knowing where you are.
 // They fight what they see, after a human-like moment to react.
 import { CELL, T, TEAM, PHASE, blocksMove } from '../shared/constants.js';
-import { tileAt, los, angDiff } from '../shared/physics.js';
+import { tileAt, los, angDiff, vaultable } from '../shared/physics.js';
 import { floorAt } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam } from '../shared/operators.js';
 
@@ -60,7 +60,8 @@ export function botPrep(game, p) {
 }
 
 // ---- path finding (A* over cells; barricades are passable but costly) ----
-function findPath(map, sx, sy, gx, gy) {
+// avoid: cells this bot found it can't vault over (too deep, nowhere to land)
+function findPath(map, sx, sy, gx, gy, avoid) {
   const W = map.W, H = map.H, N = W * H;
   const start = sy * W + sx, goal = gy * W + gx;
   const g = new Float32Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
@@ -71,6 +72,8 @@ function findPath(map, sx, sy, gx, gy) {
     if (t === T.BARRI) return 8;
     if (t === T.SOFT && map.hp[k] > 0) return 30; // a plain wall: attackers will knock a hole in it if there's no other way
     if (t === T.PANEL) return 70; // a steel panel: very slow to hammer through, only when there is no other way in
+    if (avoid && avoid.has(k)) return Infinity;
+    if (vaultable(map, k)) return t === T.LOW ? 10 : 4; // vault over it (low furniture only when it saves a long way round)
     if (blocksMove(t)) return Infinity;
     // keep a little away from walls so the bot's body fits
     const x = k % W, y = (k / W) | 0;
@@ -267,7 +270,7 @@ export function botThink(game, p, dt) {
   const sx = Math.floor(p.x / CELL), sy = Math.floor(p.y / CELL);
   ai.pathT = (ai.pathT || 0) - dt;
   if (!ai.path || ai.pathT <= 0 || ai.goalK !== gy * map.W + gx) {
-    ai.path = findPath(map, sx, sy, gx, gy) || []; ai.pathT = 1.2; ai.goalK = gy * map.W + gx;
+    ai.path = findPath(map, sx, sy, gx, gy, ai.noVault) || []; ai.pathT = 1.2; ai.goalK = gy * map.W + gx;
   }
   { const i = ai.path.indexOf(sy * map.W + sx); if (i >= 0 && i < 6) ai.path.splice(0, i + 1); } // also skips the stair end after being carried to the other floor
   if (!ai.path.length) {
@@ -284,6 +287,10 @@ export function botThink(game, p, dt) {
   const nx = (next % map.W + 0.5) * CELL, ny = (Math.floor(next / map.W) + 0.5) * CELL;
   const dirA = Math.atan2(ny - p.y, nx - p.x);
   p.aim += Math.max(-dt * 6, Math.min(dt * 6, angDiff(dirA, p.aim)));
+  if (vaultable(map, next) && Math.hypot(nx - p.x, ny - p.y) < 24) { // climb over it, or note it can't be done and go round
+    if (!game.startVault(p, dirA)) { (ai.noVault || (ai.noVault = new Set())).add(next); ai.path = null; }
+    return;
+  }
   if (map.tiles[next] === T.BARRI || map.tiles[next] === T.SOFT || map.tiles[next] === T.PANEL) {
     if (Math.hypot(nx - p.x, ny - p.y) < 26) { p.aim = dirA; game.event(p, { k: 'melee' }); return; }
   }

@@ -9,9 +9,9 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
       Next: the other five maps the same way (and fewer breakable walls while at it), after his feedback on Harbor.
-- [ ] Vaulting like R6: you have to vault over things (low cover, windows, broken soft walls), and it leaves you open for a moment while you climb over and recover.
 - [ ] Fewer soft (breakable) walls: right now there are far too many ways into a site by just blowing open the whole room.
 - [ ] Much smarter bots: use their abilities properly, feel like real people with goals and some game knowledge, reactions no faster than a fairly experienced gamer, and a difficulty setting to tune them.
+      Bots should generally be reliable teammates, but with different personalities, the way people have different playstyles.
 - [ ] Sound is too loud: quieter by default (opening the game must never blast people's ears), a wider range on the volume slider, and gunshots less aggressive — loud sounds should mask other noises a little, not drown them out so the game feels uncomfortable.
 - [ ] More guns: the categories are great, we just need more guns. Every gun should have its own properties — none of them too similar.
       He plans to massively rework the aiming later, because it still doesn't feel right and guns are a big part of the game.
@@ -20,8 +20,12 @@ New ideas from him get added to the bottom of **To do**.
       round only starts when everyone is ready with their loadout.
 - [ ] Rework the stairs: going between levels kind of sucks right now. Fights should be possible between the top and bottom of a staircase in an
       intuitive way, and sounds must obviously come from above or below you.
+- [ ] Pick a role before each round: choosing a role (breacher, intel, support, entry, flank / anchor, roamer, trapper...) limits you to
+      that role's operators, so it is clearer to new players what their job is.
 
 ## Done
+
+- [x] Vaulting like R6: Space climbs over low furniture, windows and the low stub left when a wall is shot or knifed through. No shooting while you climb, and a moment before you can aim again. Bots vault too.
 
 - [x] Floors, part 2: hatches. Wooden trapdoors in upper floors (up to 3 a floor) above rooms below. Defenders reinforce them; melee, shotguns, the hammer, the torch and breach charges open them. You drop through an open one, see a little of the room on the other side, can shoot through it, and hear through it.
 

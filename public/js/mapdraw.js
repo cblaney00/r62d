@@ -140,7 +140,7 @@ export class MapRenderer {
     for (let y = ey0; y <= ey1; y++) for (let x = ex0; x <= ex1; x++) {
       if (x < 0 || y < 0 || x >= m.W || y >= m.H) continue;
       const k = y * m.W + x, b = this.base[k], t = m.tiles[k];
-      if ((b === T.SOFT || b === T.HARD) && (t === T.FLOOR || t === T.GROUND || t === T.OPEN)) this.rubble(x, y, m.mat[k]);
+      if ((b === T.SOFT || b === T.HARD) && (t === T.FLOOR || t === T.GROUND || t === T.OPEN || t === T.RUBBLE)) this.rubble(x, y, m.mat[k]);
     }
     // soft contact shadows on the floor beside walls
     for (let y = ey0; y <= ey1; y++) for (let x = ex0; x <= ex1; x++) {
@@ -175,6 +175,7 @@ export class MapRenderer {
       const k = y * m.W + x, t = m.tiles[k];
       if (m.openId[k] >= 0 || t === T.OPEN || t === T.BARRI || t === T.PANEL) this.opening(x, y, k);
       if (SOLID.has(t) || t === T.DSHIELD) this.wall(x, y, k, t);
+      if (t === T.RUBBLE) this.stub(x, y, k);
       if (m.hatchAt && (m.hatchAt[k] >= 0 || m.hatchBelow[k] >= 0) && x >= x0 && x <= x1 && y >= y0 && y <= y1) this.hatchCell(x, y, k);
     }
     ctx.restore();
@@ -244,6 +245,20 @@ export class MapRenderer {
 
   cellChanged(k) { (this.pending || (this.pending = new Set())).add(k); } // drawn by process()
 
+  // the waist-high stub of a soft wall knocked through (T.RUBBLE): a broken edge with the studs showing, rubble round it
+  stub(x, y, k) {
+    const ctx = this.ctx, X = x * CELL, Y = y * CELL, m = this.map, mat = m.mat[k];
+    const col = mat === MAT.BRICK ? '#9a5a42' : '#d6d0c2';
+    const horiz = SOLID.has(this.t(x - 1, y)) || SOLID.has(this.t(x + 1, y)) || this.t(x - 1, y) === T.RUBBLE || this.t(x + 1, y) === T.RUBBLE;
+    ctx.save(); ctx.translate(X + CELL / 2, Y + CELL / 2); if (!horiz) ctx.rotate(Math.PI / 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(-CELL / 2, -3, CELL, 7.5);
+    ctx.fillStyle = shade(col, 0.82); ctx.beginPath(); ctx.moveTo(-CELL / 2, -3.5);
+    for (let i = 0; i <= 6; i++) ctx.lineTo(-CELL / 2 + i * CELL / 6, -3.5 + (hash(x, y, i) - 0.5) * 2.4);
+    ctx.lineTo(CELL / 2, 3.5); ctx.lineTo(-CELL / 2, 3.5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(-CELL / 2, -1, CELL, 1);
+    if (mat !== MAT.BRICK) { ctx.fillStyle = '#8f949a'; ctx.fillRect(-1, -3, 1.4, 6.5); ctx.fillRect(-CELL / 2 + 1, -3, 1.2, 6.5); }
+    ctx.restore();
+  }
   rubble(x, y, mat) {
     const ctx = this.ctx, X = x * CELL, Y = y * CELL;
     const col = mat === MAT.BRICK ? '#8a4a36' : mat === MAT.CONCRETE ? '#7b8086' : '#cfc9bb';

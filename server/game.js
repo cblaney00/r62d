@@ -2,6 +2,7 @@
 import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
 import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint } from '../shared/map.js';
+import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
@@ -17,6 +18,7 @@ const r2 = v => Math.round(v * 100) / 100;
 const BOT_NAMES = ['Viper', 'Moss', 'Rook-7', 'Static', 'Juno', 'Kilo', 'Brine', 'Ozone', 'Pike', 'Wick', 'Saber', 'Flint'];
 const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
 const JAM_R = 90;
+const VAULT_TIME = 0.6, VAULT_RECOVER = 0.35; // climbing over (no shooting, gun down), then a moment before you can aim again
 const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free play's switching order
 
 // R62D_FAST=1 shortens the menus, for quick testing.
@@ -374,7 +376,7 @@ export class Game {
     if (this.time < (p.boostUntil || 0)) mul *= 1.25; // Adrenal Shot
     if (p.shrouded) mul *= 0.8;
     for (const e of this.ents) if (e.type === 'wire' && e.team !== this.side(p) && Math.hypot(e.x - p.x, e.y - p.y) < 24) { mul *= 0.3; break; }
-    const frozen = !p.alive || p.ctrl !== 'body' || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') ||
+    const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') ||
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
       (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK);
     return { armor: o.armor, mul, downed: p.downed, frozen };
@@ -398,12 +400,18 @@ export class Game {
 
   tickPlayer(p, dt) {
     if (!p.alive) return;
+    if (p.vault) { // carried over the obstacle along a fixed path
+      const v = p.vault; v.t += dt;
+      const f = Math.min(1, v.t / v.dur), e = f * f * (3 - 2 * f);
+      p.x = v.x0 + (v.x1 - v.x0) * e; p.y = v.y0 + (v.y1 - v.y0) * e; p.vx = p.vy = 0;
+      if (f >= 1 || p.downed) { p.vault = null; p.recoverUntil = this.time + VAULT_RECOVER; }
+    }
     const team = this.side(p);
     const inp = p.input, prev = p.prevInput;
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
     p.bloom = Math.max(0, p.bloom - dt * 0.15);
     { const g = p.guns[p.slot], cls = g ? WEAPONS[g.w].cls : 'AR', rate = (1 / (ADS_TIME[cls] || 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
-      const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time);
+      const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time) && !p.vault && !(p.recoverUntil > this.time);
       p.adsT = Math.max(0, Math.min(1, (p.adsT || 0) + (canAds ? dt * rate : -dt * rate * 1.6)));
       if (this.time - p.lastShot > 0.14) { p.rc = (p.rc || 0) * Math.exp(-dt * 7); p.shots = 0; } }
 
@@ -503,7 +511,7 @@ export class Game {
     }
 
     // shooting
-    const canShoot = p.ctrl === 'body' && !p.busy && p.reloadT <= 0 && !p.scanning && !p.bracing && gun &&
+    const canShoot = p.ctrl === "body" && !p.busy && !p.vault && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && !p.bracing && gun &&
       !(p.switchUntil > this.time) && !(p.staggerUntil > this.time);
     if (canShoot && inp.fire) {
       const w = WEAPONS[gun.w];
@@ -698,14 +706,15 @@ export class Game {
     const t = this.map.tiles[k];
     if (t !== T.SOFT && t !== T.BARRI && t !== T.PANEL && t !== T.DSHIELD) return;
     this.map.hp[k] -= amount;
-    if (this.map.hp[k] <= 0) this.destroyCell(k); else this.changed.add(k);
+    if (this.map.hp[k] <= 0) this.destroyCell(k, true); else this.changed.add(k);
   }
 
-  destroyCell(k) {
+  destroyCell(k, stub = false) { // stub: a soft wall knocked through by bullets or melee leaves a low stub to vault
     const m = this.map, t = m.tiles[k];
     if (m.hatchAt[k] >= 0) return this.breakHatch(m.hatchAt[k]);
     if (t === T.BARRI || t === T.PANEL) m.tiles[k] = T.OPEN;
     else if (m.openId[k] >= 0) m.tiles[k] = T.OPEN;
+    else if (stub && t === T.SOFT) m.tiles[k] = T.RUBBLE;
     else m.tiles[k] = (m.floor[k] === FL.GRASS || m.floor[k] === FL.ASPHALT) ? T.GROUND : T.FLOOR;
     m.hp[k] = 0; delete m.holes[k]; this.changed.add(k);
     for (const e of this.ents) if (e.type === 'cam' && e.hp > 0 && e.wall && e.wall.includes(k)) { // its wall is gone: the camera falls with it
@@ -819,6 +828,20 @@ export class Game {
     } else if (b.k === 'barricade') { if (this.barricade(this.map.openId[b.cell], T.BARRI) && this.tut && !p.bot) this.tut.info.barri++; }
   }
 
+  // Vault over the low thing in front of you (toward ang: where you're moving, else where you look).
+  startVault(p, ang) {
+    if (p.vault || p.downed || p.ctrl !== 'body' || p.busy || this.time < p.stunUntil || this.time < (p.clampUntil || 0)) return false;
+    if (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK) return false;
+    const to = findVault(this.map, p.x, p.y, ang);
+    if (!to) return false;
+    const d = Math.hypot(to.x - p.x, to.y - p.y);
+    p.vault = { x0: p.x, y0: p.y, x1: to.x, y1: to.y, t: 0, dur: VAULT_TIME * (0.8 + 0.2 * d / 40) };
+    p.reloadT = 0; p.adsT = 0; p.scanning = false; p.bracing = false;
+    this.noise(p.x, p.y, this.side(p), 320);
+    this.events.push({ e: 'snd', s: 'vault', x: r1(p.x), y: r1(p.y), id: p.id });
+    return true;
+  }
+
   facingCell(p, reach) { return facingCell(this.map, p.x, p.y, p.aim, reach); }
 
   reinforceWall(k) {
@@ -862,7 +885,9 @@ export class Game {
     const active = (this.phase === PHASE.PREP || this.phase === PHASE.ACTION) && p.alive;
     if (!active) return;
     const team = this.side(p);
+    if (p.vault && e.k !== 'spot' && e.k !== 'view') return; // busy climbing
     switch (e.k) {
+      case 'vault': this.startVault(p, typeof e.a === 'number' && isFinite(e.a) ? e.a : p.aim); break;
       case 'reload': if (!p.downed && p.ctrl === 'body') this.startReload(p); break;
       case 'slot': if (!p.downed && p.guns[e.n] && e.n !== p.slot) { p.slot = e.n; p.reloadT = 0; p.fireCd = 0.35; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); } break;
       case 'melee': this.melee(p); break;
@@ -963,7 +988,7 @@ export class Game {
     }
     const f = this.facingCell(p, 20);
     const hn = hatchNear(this.map, p.x, p.y, p.aim, 14);
-    if (hn && this.map.tiles[hn.cells[0]] === T.HATCH && (!f || Math.hypot(hn.x - p.x, hn.y - p.y) < 22)) { // a swing at the hatch at your feet
+    if (hn && this.map.tiles[hn.cells[0]] === T.HATCH && (!f || Math.hypot(hn.x - p.x, hn.y - p.y) < Math.hypot((f.cx + 0.5) * CELL - p.x, (f.cy + 0.5) * CELL - p.y))) { // a swing at the hatch at your feet
       this.hatchDamage(hn.id, 25); this.events.push({ e: 'hit', k: 'wood', x: r1(hn.x), y: r1(hn.y) }); return;
     }
     if (!f) return;
@@ -974,7 +999,8 @@ export class Game {
       const rest = o ? o.cells.filter(c => this.map.tiles[c] === T.BARRI) : [];
       if (rest.length) this.destroyCell(rest[0]);
       this.events.push({ e: 'hit', k: 'wood', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) });
-    } else if (f.t === T.SOFT) { this.damageCell(f.k, 25); this.events.push({ e: 'hit', k: 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) }); }
+    } else if (f.t === T.RUBBLE) { this.destroyCell(f.k); this.events.push({ e: 'hit', k: 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) }); }
+    else if (f.t === T.SOFT) { this.damageCell(f.k, 25); this.events.push({ e: 'hit', k: 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) }); }
     else if (f.t === T.PANEL) { this.damageCell(f.k, 30); this.events.push({ e: 'hit', k: 'spark', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) }); }
   }
 
@@ -1072,11 +1098,11 @@ export class Game {
       const f = this.facingCell(p, 30), hs = this.hatchSpot(p, [T.HATCH]);
       if (hs && !(f && (f.t === T.SOFT || f.t === T.BARRI) && Math.hypot((f.cx + 0.5) * CELL - p.x, (f.cy + 0.5) * CELL - p.y) < Math.hypot(hs.x - p.x, hs.y - p.y))) {
         this.breakHatch(hs.hatch);
-      } else if (f && (f.t === T.SOFT || f.t === T.BARRI)) {
+      } else if (f && (f.t === T.SOFT || f.t === T.BARRI || f.t === T.RUBBLE)) {
         const across = Math.abs(ca) > Math.abs(sa) ? [0, 1] : [1, 0];
         for (const d of [0, 1, -1]) {
           const k = (f.cy + across[1] * d) * this.map.W + f.cx + across[0] * d, t = this.map.tiles[k];
-          if (t === T.SOFT || t === T.BARRI) this.destroyCell(k);
+          if (t === T.SOFT || t === T.BARRI || t === T.RUBBLE) this.destroyCell(k);
         }
         this.events.push({ e: 'hit', k: f.t === T.BARRI ? 'wood' : 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) });
         this.events.push({ e: 'snd', s: 'break', x: r1(p.x), y: r1(p.y) });
@@ -1421,7 +1447,7 @@ export class Game {
   detonate(e) {
     this.removeEnt(e);
     const kind = e.type === 'nade' ? e.kind : e.type;
-    const SOFTISH = [T.SOFT, T.BARRI, T.HATCH];
+    const SOFTISH = [T.SOFT, T.BARRI, T.HATCH, T.RUBBLE];
     switch (kind) {
       case 'frag': this.explode(e, { r: 75, dmg: 130, cellR: 14, cells: SOFTISH, kind: 'frag' }); break;
       case 'impact': this.explode(e, { r: 34, dmg: 40, cellR: 22, cells: SOFTISH, kind: 'impact' }); break;
@@ -1436,7 +1462,7 @@ export class Game {
         }
         break;
       }
-      case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD, T.HATCH, T.HATCHR], kind: 'cutter', at: e.cell }); break;
+      case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD, T.HATCH, T.HATCHR, T.RUBBLE], kind: 'cutter', at: e.cell }); break;
       case 'sonar': {
         let any = false;
         for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 230) { this.spot(e.team, q.id, 2.5); any = true; }
@@ -1629,7 +1655,7 @@ export class Game {
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 1000) / 1000, at: r2(p.adsT || 0),
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
-        m: this.mods(p), fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0,
+        m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0,
       }));
       return o;
     });

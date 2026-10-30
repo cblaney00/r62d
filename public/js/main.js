@@ -19,7 +19,7 @@ import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor } from '/shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '/shared/operators.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
-import { walkRay, tileAt } from '/shared/physics.js';
+import { walkRay, tileAt, findVault } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
 import { blocksSight, FL } from '/shared/constants.js';
 
@@ -443,9 +443,15 @@ function pressAction(a, e) {
     case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
     case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
+    case 'vault': ev.push({ k: 'vault', a: Math.round(vaultDir() * 1000) / 1000 }); break;
     case 'opNext': case 'opPrev': if (st.last && st.last.fp) send({ t: 'free', a: 'op', dir: a === 'opNext' ? 1 : -1 }); break;
     case 'camPrev': case 'camNext': if (st.me && (st.me.ct === 'cam' || st.me.ct === 'drone')) ev.push({ k: a }); break;
   }
+}
+// Vaulting goes the way you're moving, or where you look when standing still.
+function vaultDir() {
+  const mx = (keys.has('right') || gpk.right ? 1 : 0) - (keys.has('left') || gpk.left ? 1 : 0), my = (keys.has('down') || gpk.down ? 1 : 0) - (keys.has('up') || gpk.up ? 1 : 0);
+  return mx || my ? Math.atan2(my, mx) : st.aim;
 }
 // Read the controller once a frame and turn it into the same actions as the keyboard and mouse.
 function pollPad(dt, view) {
@@ -931,6 +937,12 @@ function sendInput(dt, me, ctrl, view, s, now) {
     const mods = me.m || {};
     stepMove(st.map, st.pred, k, dt, mods);
   }
+  if (me.vt && ctrl === 'body') {
+    const [x0, y0, x1, y1, t, dur] = me.vt, nowS = performance.now() / 1000;
+    if (!st.vault || st.vault.x0 !== x0 || st.vault.y0 !== y0) st.vault = { x0, y0, t0: nowS - t };
+    const f = Math.min(1, (nowS - st.vault.t0) / dur), e = f * f * (3 - 2 * f);
+    st.pred.x = x0 + (x1 - x0) * e; st.pred.y = y0 + (y1 - y0) * e;
+  } else st.vault = null;
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 1000) / 1000, dt: Math.round(dt * 10000) / 10000 };
   const c = cursor(), mw = screenToWorld(c.x, c.y); msg.ax = Math.round(mw.x); msg.ay = Math.round(mw.y);
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
@@ -1568,6 +1580,7 @@ function promptText(s, me) {
     if (f.t === T.BARRI && me.op === 'mason' && me.ac > 0) return '<b>' + label('ability') + '</b>ARMOR PANEL';
   }
   if (f && f.t === T.BARRI) return '<b>' + label('melee') + '</b>MELEE TO BREAK BARRICADE';
+  if (!me.vt && findVault(m, x, y, vaultDir())) return '<b>' + label('vault') + '</b>VAULT';
   const h = hatchNear(m, x, y, st.aim, 14), ht = h && m.tiles[h.cells[0]];
   if (h && !(f && Math.hypot((f.cx + 0.5) * CELL - x, (f.cy + 0.5) * CELL - y) < Math.hypot(h.x - x, h.y - y))) {
     if (ht === T.HATCH && side === 'def' && s.rf > 0) return `<b>${label('interact')}</b>HOLD TO REINFORCE HATCH (${s.rf} LEFT)`;

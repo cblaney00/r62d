@@ -409,6 +409,7 @@ export function play(name, x, y) {
     case 'reload': return; // handled by the reload phases in foley
     case 'beep': return foley('beep', x, y);
     case 'ghost': return foley('cloth', x, y);
+    case 'vault': { foley('cloth', x, y); const g = out(x, y, 0.35, 380, 0.12); if (!g) return; const t = ac.currentTime; noise(g, t + 0.05, 0.14, 'lowpass', 600, 0.9, 0.6); noise(g, t + 0.45, 0.12, 'lowpass', 500, 1, 0.5); return; } // a hand on the ledge, then the landing
     case 'clamp': impact('metal', x, y); return foley('hurt', x, y);
     case 'swap': return;
     case 'empty': return foley('empty', x, y);

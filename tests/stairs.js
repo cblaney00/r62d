@@ -1,7 +1,7 @@
 // Walks a body (real movement physics + the bots' path finding) up and down every staircase on
 // every map, to prove each one can actually be reached and used. Run: node tests/stairs.js
 import { buildMap, MAP_LIST, floorAt } from '../shared/map.js';
-import { stepMove } from '../shared/physics.js';
+import { stepMove, vaultable, findVault } from '../shared/physics.js';
 import { CELL, T, blocksMove } from '../shared/constants.js';
 import { __findPath as findPath } from '../server/bots.js';
 
@@ -17,6 +17,7 @@ function walk(m, from, to, label) {
     const i = path.indexOf(cy * m.W + cx); if (i >= 0 && i < 6) path.splice(0, i + 1);
     const next = path[0]; if (next === undefined) return `${label}: no path`;
     const nx = (next % m.W + 0.5) * CELL - o.x, ny = (Math.floor(next / m.W) + 0.5) * CELL - o.y, d = Math.hypot(nx, ny) || 1;
+    if (vaultable(m, next) && d < 24) { const v = findVault(m, o.x, o.y, Math.atan2(ny, nx)); if (v) { o.x = v.x; o.y = v.y; t += 0.6; continue; } } // vault like a bot
     const k = { right: nx / d > 0.38, left: nx / d < -0.38, down: ny / d > 0.38, up: ny / d < -0.38 };
     stepMove(m, o, k, 1 / 30, { armor: 2 }); t += 1 / 30;
   }

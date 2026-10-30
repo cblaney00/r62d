@@ -1,5 +1,35 @@
 // Movement, collision, line of sight and ray casting on the tile grid.
-import { CELL, PX_PER_M, T, HOLE_R, PLAYER_R, DRONE_R, blocksMove, blocksDrone, blocksSight } from './constants.js';
+import { CELL, PX_PER_M, T, FL, HOLE_R, PLAYER_R, DRONE_R, blocksMove, blocksDrone, blocksSight } from './constants.js';
+
+// What stops a body: everything blocksMove says, plus window openings (you vault through those, see findVault).
+export const bodyBlocks = map => (t, k) => blocksMove(t) || (t === T.OPEN && !!map.win && map.win[k] === 1);
+// Can a body vault over this cell? Low furniture (not the open drop beside a balcony), a window, a knocked-through wall stub.
+export function vaultable(map, k) {
+  const t = map.tiles[k];
+  return (t === T.LOW && map.floor[k] !== FL.VOID) || t === T.RUBBLE || (t === T.OPEN && !!map.win && map.win[k] === 1);
+}
+export const VAULT_REACH = 12;   // how close (px beyond your body's edge) the obstacle must be
+export const VAULT_DEPTH = 2.2;  // the thickest thing you can vault over, in cells
+// Where a body at (x, y) vaulting toward ang would land, or null if there is nothing to vault there
+// (or no room on the far side). Everything crossed must be vaultable; walls or the void stop it.
+export function findVault(map, x, y, ang) {
+  const dx = Math.cos(ang), dy = Math.sin(ang), blk = bodyBlocks(map);
+  const cellK = d => { const cx = Math.floor((x + dx * d) / CELL), cy = Math.floor((y + dy * d) / CELL); return cx < 0 || cy < 0 || cx >= map.W || cy >= map.H ? -1 : cy * map.W + cx; };
+  let start = -1;
+  for (let d = 2; d <= PLAYER_R + VAULT_REACH; d += 1.5) {
+    const k = cellK(d); if (k < 0) return null;
+    if (vaultable(map, k)) { start = d; break; }
+    if (blk(map.tiles[k], k)) return null;
+  }
+  if (start < 0) return null;
+  for (let d = start + 2; d <= start + VAULT_DEPTH * CELL + PLAYER_R + 2; d += 1.5) {
+    const k = cellK(d); if (k < 0) return null;
+    if (blk(map.tiles[k], k) && !vaultable(map, k)) return null;
+    const px = x + dx * d, py = y + dy * d;
+    if (d > start + 4 && !circleBlocked(map, px, py, PLAYER_R, blk)) return { x: px, y: py };
+  }
+  return null;
+}
 
 export function tileAt(map, cx, cy) {
   if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return T.VOID;
@@ -32,7 +62,7 @@ function resolve(map, o, r, blockFn) {
 
 export function moveCircle(map, o, dx, dy, r, drone = false) {
   // drones also slip through the drone holes at the foot of plain walls (gone once the wall is reinforced)
-  const fn = drone ? (t, k) => blocksDrone(t) && !(t === T.SOFT && map.dhole && map.dhole[k]) : blocksMove;
+  const fn = drone ? (t, k) => blocksDrone(t) && !(t === T.SOFT && map.dhole && map.dhole[k]) : bodyBlocks(map);
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (r * 0.5)));
   for (let s = 0; s < steps; s++) {
     o.x += dx / steps; resolve(map, o, r, fn);
