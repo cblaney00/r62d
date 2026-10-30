@@ -9,13 +9,13 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
       Next: the other five maps the same way, after his feedback on Harbor.
-- [ ] Pick a role before each round: choosing a role (breacher, intel, support, entry, flank / anchor, roamer, trapper...) limits you to
-      that role's operators, so it is clearer to new players what their job is.
 - [ ] Shooting through walls takes damage off the bullet, so it is a little harder to just spray in the general direction of someone and win.
 - [ ] See as far as you can be shot from: you should always be able to see about as far as the furthest place someone could shoot you from, without just seeing the whole map down long hallways, and without the camera jostling around.
 - [ ] Barricades like R6: every window and doorway starts boarded up. Three melee hits break one; bullets work differently — they only chew small holes in it that can be used on purpose (to look or shoot through). Work out how R6 does it and match that.
 
 ## Done
+
+- [x] Pick a role before each round: the operator screen first shows five roles per side as big cards (what the job is and who plays it); after choosing, only that role's operators are shown, with tabs to switch until you lock in, and a count of teammates in each role. Attack: Breacher, Entry, Intel, Support, Flank. Defence: Anchor, Trapper, Roamer, Intel, Support.
 
 - [x] Rework the stairs: anyone on a staircase or on the landing at either end also shows on the other floor's steps (marked ▲ ABOVE / ▼ BELOW), so people at the top and bottom can see and shoot each other, both ways. Sound straight up or down the stairs is clear; sounds from another floor get a thud-through-the-ceiling or rumble-from-below colour, and footsteps and gunfire from the floor above or below show ▲ / ▼ arrows round you.
 

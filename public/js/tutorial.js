@@ -4,12 +4,13 @@
 // operator-select and preparation clocks while the coach talks (game.js tutAction).
 import { PHASE } from '/shared/constants.js';
 import { roomAt } from '/shared/map.js';
-import { OPERATORS } from '/shared/operators.js';
+import { OPERATORS, JOBS } from '/shared/operators.js';
 import { keyName, bindsFor } from './keys.js';
 
 const ORDER = [PHASE.SELECT, PHASE.PREP, PHASE.ACTION];
 const K = id => `<kbd>${keyName(bindsFor(id)[0])}</kbd>`;
-const ops = (team, roles) => Object.values(OPERATORS).filter(o => o.team === team && roles.includes(o.role)).map(o => o.name).join(', ');
+const roles = team => JOBS[team].map(j => `<li><b>${j.name}</b> — ${j.desc} ${j.ops.map(o => OPERATORS[o].name).join(', ')}</li>`).join('');
+const PICK = '<b>Click a role at the top, then one of its operators.</b>';
 const pingList = tu => tu.pings.length ? `<div class="cPings">${tu.pings.map(w => `<span>${w}</span>`).join('')}</div>` : '';
 
 // Each step: when it applies (phase), what the coach says, and when it is done.
@@ -25,13 +26,9 @@ const LESSONS = {
         <li><b>Action</b> (3 min) — attackers break in and plant the defuser; defenders stop them.</li></ol>
         In this lesson you <b>attack</b>. The clock is paused for you while you learn.` },
       { ph: PHASE.SELECT, t: 'Pick a role', b: () => `
-        Every operator has a role, and a good team mixes them:
-        <ul><li><b>Breachers</b> open walls: ${ops('atk', ['Hard Breacher', 'Soft Breacher'])}</li>
-        <li><b>Intel / recon</b> find the enemy: ${ops('atk', ['Intel', 'Recon'])}</li>
-        <li><b>Support</b> clears the way: ${ops('atk', ['Smoke Support', 'Disruptor', 'Gadget Denial', 'Area Denial', 'Deception'])}</li>
-        <li><b>Entry</b> goes in first: ${ops('atk', ['Entry Fragger', 'Shield'])}</li>
-        <li><b>Flank</b> catches roamers from behind: ${ops('atk', ['Silent Flank'])}</li></ul>
-        <b>Click any operator card to pick it.</b>`, done: c => !!c.me.op, go: true },
+        Every round you choose a <b>role</b>, then one of its operators. A good team mixes roles:
+        <ul>${roles('atk')}</ul>
+        ${PICK}`, done: c => !!c.me.op, go: true },
       { ph: PHASE.PREP, t: 'Information wins rounds', b: () => `
         You are driving a <b>drone</b>: small, quiet, and it costs you nothing to lose. Every defender you find now
         is one who can't surprise you later.<br><br>
@@ -78,12 +75,8 @@ const LESSONS = {
         defuser, or if they are all down. Defenders also choose <b>which objective to defend</b> at the top of this
         screen (this lesson keeps the first one).` },
       { ph: PHASE.SELECT, t: 'Defender roles', b: () => `
-        <ul><li><b>Anchors</b> stay on the objective and fortify it: ${ops('def', ['Fortifier', 'Anti-Breach', 'Support'])}</li>
-        <li><b>Trappers</b> hide traps in doorways: ${ops('def', ['Trapper', 'Area Denial'])}</li>
-        <li><b>Intel</b> watch with cameras and gadgets: ${ops('def', ['Intel'])}</li>
-        <li><b>Roamers</b> leave the objective to slow attackers and flank them: ${ops('def', ['Intel Roamer', 'Stealth Roamer'])}</li>
-        <li><b>Anti-gadget</b> and <b>medic</b>: ${ops('def', ['Anti-Gadget', 'Medic'])}</li></ul>
-        <b>Click any operator card to pick it.</b>`, done: c => !!c.me.op, go: true },
+        <ul>${roles('def')}</ul>
+        ${PICK}`, done: c => !!c.me.op, go: true },
       { ph: PHASE.PREP, t: 'Reinforce the walls', b: c => `
         The attackers are droning you right now. First, make the room hard to break into: <b>face a soft wall of the
         objective room and hold ${K('interact')}</b>. Reinforced walls can't be shot through and stop most

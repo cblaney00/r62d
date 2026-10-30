@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat, JOBS, jobOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
@@ -704,6 +704,20 @@ function buildSelect(s) {
     if (grid.firstChild) showSelLoadout(grid.firstChild.dataset.op, false);
   }
   const mates = s.players.filter(p => p.sq === me.sq);
+  // roles (he asked): choose one first, then only its operators are shown. Counts show how many teammates took each.
+  const jobs = JOBS[side], myJob = me.jb, rb = $('roleBar');
+  const rk = [s.rd, side, myJob, me.lk, ...mates.map(p => p.jb)].join(':');
+  if (rb.dataset.k !== rk) {
+    rb.dataset.k = rk; rb.classList.toggle('choose', !myJob);
+    rb.innerHTML = (myJob ? '' : '<div class="rbHead">CHOOSE YOUR ROLE</div>') + jobs.map(j => {
+      const n = mates.filter(p => p.jb === j.id).length;
+      return `<button data-r="${j.id}" class="${myJob === j.id ? 'on' : ''}" title="${esc(j.desc)}"><b>${j.name.toUpperCase()}</b>${n ? `<i>${n}</i>` : ''}`
+        + (myJob ? '' : `<span>${esc(j.desc)}</span><small>${j.ops.map(o => OPERATORS[o].name.toUpperCase()).join(' · ')}</small>`) + '</button>';
+    }).join('');
+    for (const b of rb.querySelectorAll('button')) b.onclick = () => { if (st.me && st.me.lk) return; audio.ui(); send({ t: 'role', r: b.dataset.r }); };
+  }
+  $('opgrid').classList.toggle('hidden', !myJob);
+  for (const d of document.querySelectorAll('#opgrid .op')) d.classList.toggle('hidden', !!myJob && jobOf(d.dataset.op) !== myJob);
   for (const d of document.querySelectorAll('#opgrid .op')) {
     const who = mates.find(p => p.op === d.dataset.op);
     const mineNow = !!who && who.id === me.id;
@@ -737,7 +751,7 @@ function buildSelect(s) {
   const lb = $('lockBtn');
   lb.classList.toggle('hidden', !!s.tu);
   lb.disabled = !me.op || !!me.lk;
-  lb.textContent = me.lk ? 'LOCKED IN' : me.op ? 'LOCK IN' : 'PICK AN OPERATOR';
+  lb.textContent = me.lk ? 'LOCKED IN' : me.op ? 'LOCK IN' : me.jb ? 'PICK AN OPERATOR' : 'CHOOSE A ROLE';
   lb.classList.toggle('done', !!me.lk);
   $('opgrid').classList.toggle('lockedIn', !!me.lk);
   $('picks').innerHTML = mates.map(p => `<span class="${p.lk ? 'lk' : ''}"><b>${esc(p.n)}</b> ${p.op ? OPERATORS[p.op].name : '…'}${p.lk ? ' ✓' : ''}</span>`).join('')

@@ -76,7 +76,21 @@ input { font: 600 20px var(--head); padding: 10px 14px; background: rgba(0,0,0,0
 #picks .lk b { color: #6fdc9a; } #picks .wait { color: var(--dim); font-style: italic; }
 /* operator select: the cards on the left, the big loadout of the pick (or the card under the mouse) on the right */
 .selBody { flex: 1; min-height: 0; display: flex; gap: 1.4vw; margin-right: max(0px, 130px - 4vw); }
-#opgrid { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: min-content; gap: 0.6vw; width: 38%; flex-shrink: 0; min-height: 0; overflow-y: auto; align-content: start; padding: 4px 4px 0 0; }
+.selLeft { width: 38%; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+#roleBar { display: flex; gap: 6px; }
+#roleBar button { flex: 1; padding: 7px 4px; font: 700 14px var(--head); letter-spacing: 0.12em; position: relative; }
+#roleBar button.on { background: var(--gold); color: #000; border-color: var(--gold); }
+#roleBar button i { position: absolute; top: -7px; right: -5px; background: #3aa0ff; color: #000; font: 700 11px var(--head); font-style: normal; border-radius: 9px; padding: 1px 6px; }
+#roleBar.choose { flex-direction: column; overflow-y: auto; min-height: 0; }
+#roleBar.choose .rbHead { font: 700 20px var(--head); letter-spacing: 0.2em; color: var(--gold); margin-bottom: 4px; }
+#roleBar.choose button { flex: none; text-align: left; padding: 12px 16px; display: grid; gap: 3px; }
+#roleBar.choose button b { font-size: 22px; letter-spacing: 0.14em; }
+#roleBar.choose button span { font: 500 15px var(--body, inherit); letter-spacing: 0; text-transform: none; color: #ddd; }
+#roleBar.choose button small { font: 600 12px var(--head); letter-spacing: 0.12em; color: var(--dim); }
+#roleBar.choose button:hover { border-color: var(--gold); }
+#roleBar.choose button i { top: 12px; right: 14px; font-size: 13px; padding: 2px 9px; }
+#opgrid .op.hidden { display: none; }
+#opgrid { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: min-content; gap: 0.6vw; width: 100%; flex-shrink: 1; min-height: 0; overflow-y: auto; align-content: start; padding: 4px 4px 0 0; }
 #selLo { flex: 1; min-width: 0; display: flex; flex-direction: column; background: rgba(9,12,16,0.92); border: 1px solid var(--line); border-top: 3px solid var(--gold); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
 #selLo .loHead { font: 800 20px var(--head); letter-spacing: 0.35em; color: var(--gold); padding: 10px 20px 8px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; }
 #selLo .loHead span { font: 600 12px var(--head); letter-spacing: 0.2em; color: var(--dim); }

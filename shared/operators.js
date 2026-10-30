@@ -217,6 +217,26 @@ export function cleanLoadout(op, l) {
   };
 }
 
+// ---- roles (he asked: pick a role before each round; it limits you to that role's operators, so new players
+// know their job). Every operator has exactly one.
+export const JOBS = {
+  atk: [
+    { id: 'breach', name: 'Breacher', desc: 'Open walls and hatches into the objective.', ops: ['ember', 'rivet', 'hammer', 'ferro'] },
+    { id: 'entry', name: 'Entry', desc: 'Go in first and win the opening fight.', ops: ['brisk', 'bulwark', 'onyx'] },
+    { id: 'intel', name: 'Intel', desc: 'Find the defenders and tell the team.', ops: ['kestrel', 'glint', 'tether'] },
+    { id: 'support', name: 'Support', desc: 'Smoke, clear traps and kill gadgets so others can push.', ops: ['haze', 'talon', 'volt'] },
+    { id: 'flank', name: 'Flank', desc: 'Sneak round and catch roamers from behind.', ops: ['strider', 'prism'] },
+  ],
+  def: [
+    { id: 'anchor', name: 'Anchor', desc: 'Hold the objective: fortify it and deny the area.', ops: ['mason', 'shunt', 'rampart', 'miasma'] },
+    { id: 'trapper', name: 'Trapper', desc: 'Hide traps where attackers will walk.', ops: ['lynx', 'bramble', 'snare', 'gravel'] },
+    { id: 'roamer', name: 'Roamer', desc: 'Leave the objective, slow the attack and flank.', ops: ['wraith', 'hush'] },
+    { id: 'intel', name: 'Intel', desc: 'Watch cameras and sensors and call out the attack.', ops: ['kite', 'shade', 'argus'] },
+    { id: 'support', name: 'Support', desc: 'Heal the team and stop breaching gadgets.', ops: ['solace', 'veil'] },
+  ],
+};
+export const jobOf = op => { for (const t of ['atk', 'def']) for (const j of JOBS[t]) if (j.ops.includes(op)) return j.id; return null; };
+
 // ---- weapons in plain words, and attachments ----
 export const CLASS_NAME = { AR: 'Assault rifle', SMG: 'Submachine gun', MP: 'Machine pistol', LMG: 'Light machine gun', DMR: 'Marksman rifle', Shotgun: 'Shotgun', Pistol: 'Pistol' };
 export const CLASS_TIP = {

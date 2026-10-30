@@ -4,7 +4,7 @@ import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS
 import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
-import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
@@ -144,6 +144,10 @@ export class Game {
       const sp = this.map && this.map.atkSpawns[m.n];
       if (sp && Number.isInteger(m.n) && this.side(p) === TEAM.ATK && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP)) p.spawn = sp.name;
     }
+    else if (m.t === 'role') { // choosing a role limits you to its operators
+      const team = this.side(p), job = JOBS[team] && JOBS[team].find(j => j.id === m.r);
+      if (job && this.phase === PHASE.SELECT && !p.locked) { p.job = job.id; if (p.op && !job.ops.includes(p.op)) p.op = null; }
+    }
     else if (m.t === 'lock') { if (this.phase === PHASE.SELECT && p.op) p.locked = true; }
     else if (m.t === 'site') { // like R6, the defenders choose which objective to defend while picking operators
       if (this.phase === PHASE.SELECT && this.side(p) === TEAM.DEF && Number.isInteger(m.n) && m.n >= 0 && m.n < this.map.sites.length && m.n !== this.site) {
@@ -185,8 +189,9 @@ export class Game {
   pickOp(p, op) {
     if (this.phase !== PHASE.SELECT || !OPERATORS[op] || p.locked) return; // locked in: no changing
     if (OPERATORS[op].team !== this.side(p)) return;
+    if (p.job && jobOf(op) !== p.job) return; // only your role's operators
     for (const q of this.players.values()) if (q !== p && q.squad === p.squad && q.op === op) return;
-    p.op = op;
+    p.op = op; p.job = jobOf(op);
   }
 
   // ---------------- match flow ----------------
@@ -207,7 +212,7 @@ export class Game {
     this.spots = { atk: new Map(), def: new Map() };
     this.reinforce = 10;
     this.spawnName = this.map.atkSpawns[Math.floor(Math.random() * this.map.atkSpawns.length)].name;
-    for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; p.locked = false; p.spawn = null; p.staged = false; }
+    for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; p.locked = false; p.spawn = null; p.staged = false; p.job = null; }
     this.phase = PHASE.SELECT; this.timer = DUR.select;
     this.events.push({ e: 'newmap', v: this.mapVersion });
     this.events.push({ e: 'banner', text: `ROUND ${this.round}`, sub: 'Choose your operator' });
@@ -220,7 +225,9 @@ export class Game {
       if (!p.op) { // random unpicked operator
         const taken = new Set([...this.players.values()].filter(q => q.squad === p.squad && q.op).map(q => q.op));
         const free = opsForTeam(team).filter(o => !taken.has(o));
-        p.op = free.length ? free[Math.floor(Math.random() * free.length)] : opsForTeam(team)[0];
+        const inJob = free.filter(o => !p.job || jobOf(o) === p.job); // stay in the role they chose, if there's room
+        p.op = inJob.length ? inJob[Math.floor(Math.random() * inJob.length)] : free.length ? free[Math.floor(Math.random() * free.length)] : opsForTeam(team)[0];
+        p.job = jobOf(p.op);
       }
       this.equip(p);
     }
@@ -1705,7 +1712,7 @@ export class Game {
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,
       });
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
-      if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; if (this.side(p) === TEAM.ATK) o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); }
+      if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); }
       if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
