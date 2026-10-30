@@ -5,7 +5,7 @@
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { store } from '../server/store.js';
-import { WEAPONS, gunMods, spreadCone, settleTime } from '../shared/operators.js';
+import { WEAPONS, gunMods, spreadCone, settleTime, shotOffset, SPRAY, recoilStep } from '../shared/operators.js';
 import { BASE_SPEED } from '../shared/physics.js';
 
 let fails = 0;
@@ -90,6 +90,14 @@ for (const [id, w] of Object.entries(WEAPONS)) {
 {
   const slug = Object.keys(WEAPONS).find(k => WEAPONS[k].cls === 'Shotgun' && WEAPONS[k].pellets === 1);
   if (!slug) fail('no slug gun');
+}
+// no gun leans to one side by itself (he found the Tusk always shot left: its pellet fan was lopsided). A shotgun's fan
+// is centred and as wide left as right; each gun's recoil drifts the way its SPRAY says (pull), never the other way.
+for (const [id, w] of Object.entries(WEAPONS)) {
+  const off = [...Array(w.pellets).keys()].map(i => shotOffset(w, 1, i, () => 0.5));
+  if (Math.abs(off.reduce((a, b) => a + b, 0)) > 1e-9 || Math.abs(Math.min(...off) + Math.max(...off)) > 1e-9) fail(id, 'pellet fan is lopsided', off.map(o => o.toFixed(2)).join(' '));
+  let r = 0; for (let n = 1; n <= 10; n++) r += recoilStep(w, { kick: 1, sway: 1, first: 1 }, n);
+  if (SPRAY[id] && SPRAY[id].pull && Math.sign(r) !== Math.sign(SPRAY[id].pull)) fail(id, 'recoil drifts the wrong way', r.toFixed(3));
 }
 console.log(fails ? `${fails} failure(s)` : 'PASS aim');
 process.exit(fails ? 1 : 0);

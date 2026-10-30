@@ -386,7 +386,8 @@ export function spreadCone(w, m, { at = 0, run = 0, crouch = false, shots = 0 } 
 }
 // where one bullet goes inside the cone: never outside it, most often near the middle; pellets in a fixed fan
 export function shotOffset(w, cone, i, rnd = Math.random) {
-  if (w.pellets > 1) return w.pellets === 1 ? 0 : cone * ((i / (w.pellets - 1)) * 2 - 1) * (i % 2 ? 0.75 : 1) + (rnd() - 0.5) * cone * 0.1;
+  // every other pellet (counted in from either edge, so the fan is the same both sides) sits a bit tighter
+  if (w.pellets > 1) return cone * ((i / (w.pellets - 1)) * 2 - 1) * (Math.min(i, w.pellets - 1 - i) % 2 ? 0.75 : 1) + (rnd() - 0.5) * cone * 0.1;
   return cone ? (rnd() + rnd() - 1) * cone : 0;
 }
 // Each gun's own spray (he asked: some pull left, some right, some much harder). Recoil turns your aim; + is to the
