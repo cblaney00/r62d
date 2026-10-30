@@ -66,6 +66,11 @@ His wishes so far:
     `PLAYER_R` 7 (he asked that people fit everywhere; at 10 a body couldn't pass 1-cell gaps beside bookcases), so a
     1-cell gap is a squeeze bots also take. `node tests/reach.js` must print 0 unreachable cells on every map.
     Drone holes (`map.dhole`): `mapkit.js droneHoles()` puts one in the middle of each plain wall two rooms share
+    Angled and curved walls: `K.walls(points, thickness)`, `K.seg`, `K.arc(cx, cy, r, a0, a1)`, `K.round(x, y, r, dir)` (rounded room
+    corner), `K.chamfer(x, y, n, dir)` (45° corner) and `K.outside(poly)` (cut a building corner back to outdoors) — all in building-frame
+    cell units (12.5 = middle of cell 12). The cell stays a wall tile, but `map.shape[k]` holds its solid parts (convex polygons, world px);
+    physics `resolve`/`castSight`, server `hitscan`, `pointSolid`/`circleBlocked`, mapdraw `wall`/`slopeEdges` all respect it. Never run a
+    shape through furniture, doors or stairs (the kit warns: it leaves a gap). `node tests/shapes.js` checks sight/bodies/bullets on Harbor.
     (`K.droneHole(x, y)` adds one by hand); drones (radius 3.5) pass, people don't, reinforcing the wall closes it. Drones have 1 hp (`hp: 1`): any bullet (lag-compensated like bodies via `recordHistory`), melee, arc or blast breaks one (`droneLost` puts the pilot back in their body); defender bots shoot drones in sight unless someone stands behind (`enemyDrone` in bots.js). `physics.js` (movement, collision, line of sight, ray casting),
     `operators.js` (weapons + the 10 operators).
   - `server/game.js` — authoritative match: lobby, rounds/phases, shooting (hitscan,

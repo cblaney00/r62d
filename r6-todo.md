@@ -7,6 +7,8 @@ New ideas from him get added to the bottom of **To do**.
 ## To do
 
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
+      *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
+      Next: the other five maps the same way (and fewer breakable walls while at it), after his feedback on Harbor.
 - [ ] Floors, part 2: hatches in floors/ceilings to break open, hearing/seeing through them.
 - [ ] Vaulting like R6: you have to vault over things (low cover, windows, broken soft walls), and it leaves you open for a moment while you climb over and recover.
 - [ ] Fewer soft (breakable) walls: right now there are far too many ways into a site by just blowing open the whole room.
