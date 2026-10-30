@@ -38,6 +38,13 @@ export function build() {
   G.prop('workbench', 52, 33, 6, 1, T.LOW); G.prop('workbench', 60, 33, 6, 1, T.LOW); G.prop('tank', 66, 38, 3, 3, T.TALL); G.prop('crates', 55, 39, 3, 2, T.TALL);
   G.prop('container', 22, 2, 8, 3, T.TALL, 1); G.prop('container', 2, 47, 8, 3, T.TALL, 1); G.prop('car', 74, 40, 3, 6, T.TALL); G.prop('van', 74, 48, 3, 7, T.TALL);
   G.prop('tree', 50, 2, 2, 2, T.TALL); G.prop('tree', 66, 3, 2, 2, T.TALL); G.prop('bush', 46, 48, 3, 2, T.LOW); G.prop('dumpster', 64, 46, 3, 2, T.TALL);
+  // shapes (he asked for less blocky maps): the office wing's south-east corner is cut at an angle, and a few rooms get
+  // rounded or angled corners (plastered structure, so they can't be blown open)
+  G.outside([[69, 44], [72, 44], [72, 41]], FL.ASPHALT); G.walls([[71.5, 41.5], [69.5, 43.5]], 1, T.SOFT, MAT.BRICK);
+  G.round(71, 31, 3, 'nw', T.HARD, MAT.DRYWALL);                                    // Canteen
+  G.round(71, 32, 3, 'sw', T.HARD, MAT.DRYWALL);                                    // Workshop
+  G.chamfer(46, 31, 2, 'ne', T.HARD, MAT.DRYWALL);                                  // Dispatch
+  G.round(45, 11, 3, 'sw', T.HARD, MAT.CONCRETE);                                   // Engine Shed
   G.decor((x, X, Y) => { // the rails, running in through the big doors
     for (const ty of [17.5, 33.5]) {
       x.fillStyle = 'rgba(60,45,30,0.55)'; for (let px = 0; px < 45; px += 0.75) x.fillRect(X(px), Y(ty) - 9, 5, 18);
@@ -73,6 +80,8 @@ export function build() {
   U.prop('rack', 61, 27, 1, 6, T.TALL); U.prop('rack', 64, 27, 1, 6, T.TALL); U.prop('rack', 67, 27, 1, 6, T.TALL);
   U.prop('counter', 60, 36, 9, 1, T.LOW); U.prop('fridge', 69, 36, 1, 2, T.TALL); U.prop('coffeetable', 62, 39, 4, 2, T.LOW);
   U.prop('crates', 30, 11, 2, 2, T.TALL); U.prop('crates', 20, 41, 2, 2, T.TALL);
+  U.outside([[69, 44], [72, 44], [72, 41]]); U.walls([[71.5, 41.5], [69.5, 43.5]], 1, T.SOFT, MAT.BRICK); // same corner as downstairs
+  U.chamfer(71, 21, 2, 'nw', T.HARD, MAT.DRYWALL);                                  // Records Office
 
   // ================= stairs =================
   stair(0, 1, 9, 20, 2, 6, 'n', FL.CONCRETE);            // shed -> west catwalk

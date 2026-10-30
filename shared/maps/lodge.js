@@ -40,6 +40,14 @@ export function build() {
   G.prop('crates', 49, 34, 2, 2, T.TALL); G.prop('shelf', 48, 39, 7, 1, T.TALL); G.prop('crates', 52, 35, 2, 2, T.TALL);
   for (const [tx, ty] of [[3, 12], [5, 22], [2, 33], [6, 44], [20, 2], [48, 3], [56, 3], [14, 48], [28, 50], [40, 48], [68, 2]]) G.prop('tree', tx, ty, 2, 2, T.TALL);
   G.prop('car', 48, 47, 3, 6, T.TALL); G.prop('car', 58, 47, 3, 6, T.TALL); G.prop('bush', 30, 44, 3, 2, T.LOW);
+  // shapes (he asked for less blocky maps): all four corners of the lodge are cut at an angle, and a few rooms get
+  // rounded or angled corners (log and plaster structure, so they can't be blown open)
+  G.outside([[10, 9], [12.8, 9], [10, 11.8]], FL.GRASS); G.walls([[10.5, 11.5], [12.5, 9.5]], 1, T.SOFT, MAT.BRICK);
+  G.outside([[59.2, 9], [62, 9], [62, 11.8]], FL.GRASS); G.walls([[59.5, 9.5], [61.5, 11.5]], 1, T.SOFT, MAT.BRICK);
+  G.outside([[10, 40.2], [10, 43], [12.8, 43]], FL.GRASS); G.walls([[10.5, 40.5], [12.5, 42.5]], 1, T.SOFT, MAT.BRICK);
+  G.outside([[62, 40.2], [62, 43], [59.2, 43]], FL.GRASS); G.walls([[61.5, 40.5], [59.5, 42.5]], 1, T.SOFT, MAT.BRICK);
+  G.chamfer(26, 10, 2, 'se', T.HARD, MAT.DRYWALL);                                  // Great Hall
+  G.round(26, 42, 3, 'ne', T.HARD, MAT.DRYWALL); G.round(46, 42, 3, 'nw', T.HARD, MAT.DRYWALL); // Dining Hall
   G.decor((x, X, Y) => { x.fillStyle = 'rgba(235,235,230,0.6)'; for (let py = 0; py < 54; py += 2.5) x.fillRect(X(68.9), Y(py), 2, 20); for (let px = 47; px < 64; px += 3.4) x.fillRect(X(px), Y(46.2), 1.2, Y(53.8) - Y(46.2)); });
 
   // ================= 2F =================
@@ -67,6 +75,11 @@ export function build() {
   U.prop('desk', 50, 23, 5, 2, T.LOW); U.prop('bookshelf', 59, 22, 1, 7, T.TALL); U.prop('console', 48, 29, 4, 1, T.LOW);
   U.prop('bookshelf', 27, 33, 1, 8, T.TALL); U.prop('bookshelf', 31, 36, 10, 1, T.TALL); U.prop('desk', 42, 33, 3, 2, T.LOW);
   U.prop('crates', 48, 38, 3, 2, T.TALL); U.prop('crates', 52, 34, 2, 2, T.TALL); U.prop('shelf', 49, 41, 7, 1, T.TALL);
+  U.outside([[10, 9], [12.8, 9], [10, 11.8]]); U.walls([[10.5, 11.5], [12.5, 9.5]], 1, T.SOFT, MAT.BRICK);
+  U.outside([[59.2, 9], [62, 9], [62, 11.8]]); U.walls([[59.5, 9.5], [61.5, 11.5]], 1, T.SOFT, MAT.BRICK);
+  U.outside([[10, 40.2], [10, 43], [12.8, 43]]); U.walls([[10.5, 40.5], [12.5, 42.5]], 1, T.SOFT, MAT.BRICK);
+  U.outside([[62, 40.2], [62, 43], [59.2, 43]]); U.walls([[61.5, 40.5], [59.5, 42.5]], 1, T.SOFT, MAT.BRICK);
+  U.round(46, 42, 2, 'nw', T.HARD, MAT.DRYWALL);                                    // Library
 
   // ================= stairs =================
   stair(0, 1, 27, 13, 2, 4, 'n', FL.WOOD);               // great hall -> gallery landing

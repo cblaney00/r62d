@@ -6,8 +6,8 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-- [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
-      *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
+- [x ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
+      Done for all six maps (Harbor first, he approved it; the other five after).
       Harbor approved by him ("looking very good"): next, the other five maps the same way.
 
 

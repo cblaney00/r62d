@@ -48,6 +48,12 @@ export function build() {
   G.prop('tree', 66, 46, 2, 2, T.TALL); G.prop('bush', 4, 22, 2, 2, T.LOW); G.prop('bush', 66, 30, 2, 2, T.LOW); G.prop('bush', 3, 34, 2, 2, T.LOW);
   G.prop('barrier', 0, 52, 72, 1, T.LOW);    // the cliff edge railing
   G.decor((x, X, Y) => { x.fillStyle = 'rgba(235,235,230,0.6)'; for (let px = 41; px < 71; px += 3) x.fillRect(X(px), Y(3.5), 18, 1.2); });
+  // shapes (he asked for less blocky maps): the house's north-west and south-east corners are cut at an angle,
+  // and a few rooms get rounded or angled corners (plastered structure, so they can't be blown open)
+  G.outside([[10, 8], [14.8, 8], [10, 12.8]]); G.walls([[10.5, 12.5], [14.5, 8.5]], 1, T.SOFT, MAT.BRICK);
+  G.outside([[58.2, 42], [62, 42], [62, 38.2]], FL.MARBLE); G.walls([[61.5, 38.5], [58.5, 41.5]], 1, T.SOFT, MAT.BRICK);
+  G.round(43, 33, 3, 'ne', T.HARD, MAT.DRYWALL);                                   // Kitchen
+  G.chamfer(43, 21, 2, 'ne', T.HARD, MAT.DRYWALL);                                  // Dining Room
 
   // ================= 2F =================
   U.slab(30, 42, 18, 3, FL.WOOD);            // south balcony over the terrace
@@ -73,6 +79,10 @@ export function build() {
   U.prop('bed', 13, 27, 4, 6, T.LOW); U.prop('bed', 22, 27, 4, 6, T.LOW); U.prop('crates', 13, 37, 2, 2, T.LOW); U.prop('desk', 21, 38, 4, 2, T.LOW);
   U.prop('pillar', 33, 30, 1, 1, T.TALL); U.prop('pillar', 38, 30, 1, 1, T.TALL); U.prop('pillar', 33, 36, 1, 1, T.TALL); U.prop('pillar', 38, 36, 1, 1, T.TALL);
   U.prop('shelf', 50, 35, 1, 5, T.TALL); U.prop('stall', 59, 35, 1, 3, T.TALL); U.prop('sink', 54, 39, 2, 1, T.LOW);
+  U.outside([[10, 8], [14.8, 8], [10, 12.8]]); U.walls([[10.5, 12.5], [14.5, 8.5]], 1, T.SOFT, MAT.BRICK);       // same corners as downstairs
+  U.outside([[58.2, 42], [62, 42], [62, 38.2]]); U.walls([[61.5, 38.5], [58.5, 41.5]], 1, T.SOFT, MAT.BRICK);
+  U.round(61, 21, 3, 'sw', T.HARD, MAT.DRYWALL);                                    // Study
+  U.round(29, 41, 3, 'nw', T.HARD, MAT.DRYWALL);                                    // Kids Room
 
   // ================= B =================
   B.area('Wine Cellar', 11, 9, 18, 14, FL.CONCRETE, T.HARD, MAT.CONCRETE);
@@ -91,6 +101,7 @@ export function build() {
   B.prop('shelf', 31, 23, 1, 7, T.TALL); B.prop('crates', 39, 25, 3, 2, T.TALL); B.prop('crates', 41, 30, 2, 2, T.TALL);
   B.prop('console', 49, 23, 5, 1, T.LOW); B.prop('rack', 59, 24, 1, 5, T.TALL); B.prop('cabinet', 49, 30, 3, 1, T.TALL);
   B.prop('tank', 49, 36, 4, 3, T.TALL); B.prop('tank', 55, 36, 4, 3, T.TALL);
+  B.chamfer(46, 41, 3, 'nw'); B.chamfer(61, 41, 2, 'nw');                             // Storage, Generator Room
 
   // ================= stairs =================
   stair(1, 2, 30, 19, 2, 4, 'n', FL.WOOD);             // hallway -> upper landing

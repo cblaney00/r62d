@@ -83,6 +83,7 @@ His wishes so far:
     `PLAYER_R` 7 (he asked that people fit everywhere; at 10 a body couldn't pass 1-cell gaps beside bookcases), so a
     1-cell gap is a squeeze bots also take. `node tests/reach.js` must print 0 unreachable cells on every map.
     Drone holes (`map.dhole`): `mapkit.js droneHoles()` puts one in the middle of each plain wall two rooms share
+    Every map now uses them (he asked for less blocky maps; a "shapes" block per floor in each map file: angled building corners matched on every floor, rounded/angled room corners, the Embassy courtyard and School gym rounded). Corner coordinates: a box (x0,y0,x1,y1) has its outside corner at x0 / x1+1 and y0 / y1+1.
     Angled and curved walls: `K.walls(points, thickness)`, `K.seg`, `K.arc(cx, cy, r, a0, a1)`, `K.round(x, y, r, dir)` (rounded room
     corner), `K.chamfer(x, y, n, dir)` (45° corner) and `K.outside(poly)` (cut a building corner back to outdoors) — all in building-frame
     cell units (12.5 = middle of cell 12). The cell stays a wall tile, but `map.shape[k]` holds its solid parts (convex polygons, world px);

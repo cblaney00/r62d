@@ -45,6 +45,14 @@ export function build() {
   for (const [tx, ty] of [[3, 10], [4, 20], [2, 42], [70, 22], [72, 30], [52, 50], [60, 52]]) G.prop('tree', tx, ty, 2, 2, T.TALL);
   G.prop('bench', 16, 49, 6, 1, T.LOW); G.prop('bench', 30, 51, 6, 1, T.LOW);
   G.prop('van', 2, 2, 10, 3, T.TALL, 1); G.prop('car', 68, 42, 3, 6, T.TALL); G.prop('car', 72, 47, 3, 6, T.TALL);
+  // shapes (he asked for less blocky maps): the school's north-west and south-east corners are cut at an angle, the
+  // gym's corners are rounded, and a few rooms get rounded or angled corners (plaster, so they can't be blown open)
+  G.outside([[10, 10], [12.8, 10], [10, 12.8]], FL.ASPHALT); G.walls([[10.5, 12.5], [12.5, 10.5]], 1, T.SOFT, MAT.BRICK);
+  G.outside([[66, 41.2], [66, 44], [63.2, 44]], FL.ASPHALT); G.walls([[65.5, 41.5], [63.5, 43.5]], 1, T.SOFT, MAT.BRICK);
+  G.round(11, 27, 2, 'se', T.HARD, MAT.DRYWALL); G.round(37, 27, 2, 'sw', T.HARD, MAT.DRYWALL);   // Gymnasium
+  G.round(11, 43, 3, 'ne', T.HARD, MAT.DRYWALL); G.round(37, 43, 2, 'nw', T.HARD, MAT.DRYWALL);
+  G.round(54, 27, 2, 'sw', T.HARD, MAT.DRYWALL);                                    // Cafeteria
+  G.chamfer(46, 21, 2, 'nw', T.HARD, MAT.DRYWALL);                                  // Entrance Hall
   G.decor((x, X, Y) => {
     x.fillStyle = 'rgba(235,235,230,0.7)'; for (let px = 0; px < 78; px += 2.5) x.fillRect(X(px), Y(3.5) - 1, 20, 2);
     x.strokeStyle = 'rgba(240,240,240,0.55)'; x.lineWidth = 1.4; x.strokeRect(X(14), Y(46.5), X(40) - X(14), Y(53.5) - Y(46.5)); // playground court
@@ -79,6 +87,9 @@ export function build() {
   U.prop('workbench', 40, 29, 6, 1, T.LOW); U.prop('workbench', 40, 34, 6, 1, T.LOW); U.prop('crates', 50, 40, 2, 2, T.TALL); U.prop('shelf', 52, 29, 1, 6, T.TALL);
   U.prop('desk', 58, 29, 4, 2, T.LOW); U.prop('bookshelf', 63, 28, 1, 5, T.TALL);
   U.prop('couch', 56, 41, 4, 1, T.LOW); U.prop('coffeetable', 57, 38, 2, 2, T.LOW);
+  U.outside([[10, 10], [12.8, 10], [10, 12.8]]); U.walls([[10.5, 12.5], [12.5, 10.5]], 1, T.SOFT, MAT.BRICK);     // same corners as downstairs
+  U.outside([[66, 41.2], [66, 44], [63.2, 44]]); U.walls([[65.5, 41.5], [63.5, 43.5]], 1, T.SOFT, MAT.BRICK);
+  U.round(38, 43, 3, 'ne', T.HARD, MAT.DRYWALL);                                    // Art Room
 
   // ================= 3F (the tower) =================
   C.area('Clock Room', 31, 11, 7, 10, FL.WOOD);
@@ -87,6 +98,7 @@ export function build() {
   C.door(38, 12, 38, 13); C.door(38, 18, 38, 19);
   C.window(33, 10, 35, 10); C.window(30, 14, 30, 16); C.window(45, 13, 45, 14); C.window(34, 21, 35, 21);
   C.prop('tank', 32, 14, 4, 4, T.TALL); C.prop('crates', 36, 19, 1, 1, T.TALL);
+  C.round(31, 11, 2, 'se', T.HARD, MAT.BRICK); C.round(31, 21, 2, 'ne', T.HARD, MAT.BRICK); // the Clock Room's rounded corners
 
   // ================= stairs =================
   stair(0, 1, 31, 13, 2, 4, 'n', FL.MARBLE);             // entrance hall -> library

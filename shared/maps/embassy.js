@@ -42,6 +42,13 @@ export function build() {
   G.prop('pillar', 32, 3, 1, 1, T.TALL); G.prop('pillar', 43, 3, 1, 1, T.TALL); G.prop('barrier', 33, 1, 10, 1, T.LOW);
   G.prop('car', 68, 14, 3, 6, T.TALL); G.prop('car', 68, 30, 3, 6, T.TALL); G.prop('van', 10, 52, 8, 3, T.TALL, 1); G.prop('car', 48, 52, 6, 3, T.TALL, 1);
   G.prop('tree', 4, 34, 2, 2, T.TALL); G.prop('tree', 20, 3, 2, 2, T.TALL); G.prop('tree', 54, 3, 2, 2, T.TALL); G.prop('bush', 4, 44, 3, 2, T.LOW);
+  // shapes (he asked for less blocky maps): the front corners are cut at an angle, the courtyard's corners are
+  // rounded, and a few rooms get rounded or angled corners (stone and plaster, so they can't be blown open)
+  G.outside([[12, 10], [14.8, 10], [12, 12.8]], FL.MARBLE); G.walls([[12.5, 12.5], [14.5, 10.5]], 1, T.SOFT, MAT.BRICK);
+  G.outside([[61.2, 10], [64, 10], [64, 12.8]], FL.MARBLE); G.walls([[61.5, 10.5], [63.5, 12.5]], 1, T.SOFT, MAT.BRICK);
+  G.round(30, 29, 3, 'se', T.HARD, MAT.BRICK); G.round(46, 29, 2, 'sw', T.HARD, MAT.BRICK);   // Courtyard
+  G.round(30, 45, 2, 'ne', T.HARD, MAT.BRICK); G.round(46, 45, 3, 'nw', T.HARD, MAT.BRICK);
+  G.round(29, 45, 3, 'nw', T.HARD, MAT.DRYWALL);                                    // Visa Office
   G.decor((x, X, Y) => {
     x.fillStyle = 'rgba(235,235,230,0.7)'; for (let px = 0; px < 76; px += 2.5) x.fillRect(X(px), Y(54) - 1, 20, 2);
     x.fillStyle = 'rgba(160,30,40,0.5)'; x.fillRect(X(35.5), Y(1.5), X(40.5) - X(35.5), Y(9.8) - Y(1.5)); // the red carpet
@@ -71,6 +78,10 @@ export function build() {
   U.prop('bed', 21, 31, 6, 7, T.LOW); U.prop('couch', 14, 40, 6, 1, T.LOW); U.prop('coffeetable', 15, 36, 3, 2, T.LOW); U.prop('cabinet', 27, 41, 1, 3, T.TALL);
   U.prop('bookshelf', 48, 30, 10, 1, T.TALL); U.prop('bookshelf', 48, 34, 7, 1, T.TALL);
   U.prop('bed', 49, 39, 5, 5, T.LOW); U.prop('cabinet', 56, 39, 2, 1, T.TALL);
+  U.outside([[12, 10], [14.8, 10], [12, 12.8]]); U.walls([[12.5, 12.5], [14.5, 10.5]], 1, T.SOFT, MAT.BRICK);     // same corners as downstairs
+  U.outside([[61.2, 10], [64, 10], [64, 12.8]]); U.walls([[61.5, 10.5], [63.5, 12.5]], 1, T.SOFT, MAT.BRICK);
+  U.round(46, 23, 3, 'nw', T.HARD, MAT.DRYWALL); U.round(30, 23, 2, 'ne', T.HARD, MAT.DRYWALL); // Ambassador Office
+  U.chamfer(29, 29, 2, 'sw', T.HARD, MAT.DRYWALL);                                  // Residence
 
   // ================= B =================
   B.area('Garage', 13, 11, 16, 12, FL.CONCRETE);
@@ -91,6 +102,7 @@ export function build() {
   B.prop('shelf', 31, 30, 1, 7, T.TALL); B.prop('shelf', 34, 30, 1, 7, T.TALL); B.prop('crates', 40, 31, 3, 2, T.TALL); B.prop('crates', 33, 40, 2, 2, T.TALL);
   for (const cx of [48, 52]) { B.wall(cx + 3, 39, cx + 3, 44, T.SOFT); B.prop('bench', cx, 43, 2, 1, T.LOW); }
   B.wall(48, 38, 55, 38, T.SOFT); B.door(49, 38, 50, 38); B.door(53, 38, 54, 38);
+  B.chamfer(46, 45, 3, 'nw');                                                       // Evidence Storage
 
   // ================= stairs =================
   stair(1, 2, 14, 14, 2, 6, 'n', FL.CARPET);             // waiting room -> conference room
