@@ -9,12 +9,13 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
       Harbor approved by him ("looking very good"): next, the other five maps the same way.
-- [ ] Side-specific weapons: defenders and attackers get their own guns, with no crossover in what the characters can use. No sniper or marksman rifles on defence, but defence should have a slug shotgun for a similar job.
 
 - [ ] Revamp the loading screen: if you watch it you can see it doesn't feel very crisp or premium.
 
 
 ## Done
+
+- [x] Side-specific weapons: no gun is carried by both sides now. Attack: the assault rifles, marksman rifles, bolt-action, Mule and Ox, Tusk shotgun, plus a new Javelin SMG and Halberd breaching shotgun (sidearms P10, Bison, Stub). Defence: the SMGs, Hornet, Drummer, Breaker, the Anvil slug for long shots (no marksman rifles), plus a new Sentry carbine and Sparrow pistol (sidearms Vex, Gnat, Sparrow). The Armory shows ATTACK or DEFENCE on each gun.
 
 - [x] Camera/crosshair bouncing before you click in: until you click into the game (or after tabbing out) your aim now stays still instead of following the loose pointer (that, with the camera sliding after it, was the bounce). A "CLICK TO TAKE CONTROL" sign shows; that first click only takes control, it doesn't fire. When you spawn or a round starts the camera is there at once instead of swooping, and the look-ahead outdoors settles more calmly.
 

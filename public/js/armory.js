@@ -1,7 +1,7 @@
 // The Armory: a private shooting range in the menus. Pick any gun, shoot dummies at different
 // distances and read its numbers. Runs only in your browser (nobody else sees it), using the same
 // damage, drop-off, spread, aim-in time, recoil and headshot rules as the server.
-import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY } from '/shared/operators.js';
+import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -42,8 +42,9 @@ export function closeArmory(el) {
 }
 
 function renderList(el) {
-  const keys = Object.keys(WEAPONS).sort((a, b) => CLASS_ORDER.indexOf(WEAPONS[a].cls) - CLASS_ORDER.indexOf(WEAPONS[b].cls));
-  el.querySelector('#armList').innerHTML = keys.map(k => `<button data-w="${k}" class="${k === S.w ? 'on' : ''}"><i class="pic"></i><b>${esc(WEAPONS[k].name)}</b><span>${CLASS_NAME[WEAPONS[k].cls]}</span></button>`).join('');
+  const sideN = k => gunSide(k) === 'def' ? 1 : 0; // attack guns first, then defence (no gun is on both sides)
+  const keys = Object.keys(WEAPONS).sort((a, b) => sideN(a) - sideN(b) || CLASS_ORDER.indexOf(WEAPONS[a].cls) - CLASS_ORDER.indexOf(WEAPONS[b].cls));
+  el.querySelector('#armList').innerHTML = keys.map(k => `<button data-w="${k}" class="${k === S.w ? 'on' : ''}"><i class="pic"></i><b>${esc(WEAPONS[k].name)}</b><span>${CLASS_NAME[WEAPONS[k].cls]} · <em class="${gunSide(k) === 'def' ? 'def' : 'atk'}">${gunSide(k) === 'def' ? 'DEFENCE' : 'ATTACK'}</em></span></button>`).join('');
   for (const b of el.querySelectorAll('#armList button')) b.querySelector('.pic').appendChild(gunPicture(b.dataset.w, attOf(b.dataset.w), 160, 50));
   for (const b of el.querySelectorAll('#armList button')) b.onclick = () => { audio.ui(); pick(el, b.dataset.w); };
 }

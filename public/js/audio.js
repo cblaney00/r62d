@@ -381,6 +381,10 @@ const GUN_OWN = {
   pike:    { crack: 1.1, blastTau: 0.02, boom: 45, boomTau: 0.14, drive: 3.2, mech: 0, v: 1.25 },
   heron:   { boom: 60, v: 1.05 },
   gnat:    { body: 1600, bodyTau: 0.02, boom: 105, v: 0.62 },
+  javelin: { body: 1150, boom: 82, v: 0.82 },
+  halberd: { boom: 46, boomTau: 0.14, v: 1.3 },
+  sentry:  { body: 1000, boom: 72, v: 0.9 },
+  sparrow: { body: 1250, boom: 90, v: 0.72 },
   bison:   { crack: 0.7, blastTau: 0.014, boom: 62, boomTau: 0.09, drive: 2.8, mech: 0, v: 1.05 },
 };
 // a weapon id (or a class name) to its sound recipe

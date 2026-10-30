@@ -42,9 +42,18 @@ export const WEAPONS = {
              kickMul: 1.2, swayMul: 1.4, fall: { from: 200, to: 450, min: 0.55 }, trait: 'A full-auto sidearm: 20 rounds gone in about a second, fierce recoil.' },
   bison:   { name: 'Bison Revolver', cls: 'Pistol', dmg: 64, rpm: 130, mag: 6, reserve: 30, reload: 3.0, spread: 0.05, ads: 0.006, bloom: 0.05, auto: false, pellets: 1, range: 1000, len: 9,
              pen: 0.55, kickMul: 1.8, settle: 0.6, fall: { from: 400, to: 700, min: 0.8 }, trait: 'Two body shots drop anyone. Six rounds, slow to fire and reload, very accurate.' },
+  // he asked for side-specific weapons (no gun on both sides), so attack and defence each got the guns they were missing
+  javelin: { name: 'Javelin SMG', cls: 'SMG', dmg: 25, rpm: 800, mag: 30, reserve: 180, reload: 2.2, spread: 0.065, ads: 0.019, bloom: 0.010, auto: true, pellets: 1, range: 950, len: 12,
+             adsMul: 0.85, fall: { from: 320, to: 620, min: 0.65 }, trait: 'The attackers\' SMG: quick to aim, steady, good on the move.' },
+  halberd: { name: 'Halberd Breaching Shotgun', cls: 'Shotgun', mode: 'pump-action', dmg: 16, rpm: 72, mag: 8, reserve: 48, reload: 3.3, spread: 0.14, ads: 0.10, bloom: 0, auto: false, pellets: 8, range: 440, len: 15,
+             kickMul: 1.1, trait: 'A heavy pump built for breaching: a tight blast that tears soft walls and hatches open.' },
+  sentry:  { name: 'Sentry Carbine', cls: 'AR', dmg: 30, rpm: 690, mag: 30, reserve: 150, reload: 2.3, spread: 0.058, ads: 0.016, bloom: 0.012, auto: true, pellets: 1, range: 900, len: 13,
+             adsMul: 0.9, fall: { from: 300, to: 600, min: 0.7 }, trait: 'A short defender\'s carbine for holding a room: quick to the shoulder, but its damage drops off sooner.' },
+  sparrow: { name: 'Sparrow Compact', cls: 'Pistol', dmg: 28, rpm: 520, mag: 17, reserve: 68, reload: 1.4, spread: 0.05, ads: 0.017, bloom: 0.018, auto: false, pellets: 1, range: 850, len: 6,
+             trait: 'A light, quick pistol: fast to fire and reload, but hits softer.' },
 };
 // guns only carried as a sidearm (second slot)
-export const SIDEARMS = new Set(['p10', 'vex50', 'bison', 'gnat', 'stub']);
+export const SIDEARMS = new Set(['p10', 'vex50', 'bison', 'gnat', 'stub', 'sparrow']);
 
 // armor: 1 = heavy/slow, 2 = medium, 3 = light/fast. HP follows armor.
 export const ARMOR_HP = { 1: 125, 2: 110, 3: 100 };
@@ -167,37 +176,39 @@ export const opsForTeam = team => OP_LIST.filter(k => OPERATORS[k].team === team
 
 // ---- loadouts: each operator's weapon and gadget choices ----
 export const GADGET_COUNT = { smoke: 2, frag: 2, claymore: 1, breach: 2, stun: 2, dshield: 1, nitro: 1, wire: 2, impact: 2 };
+// He asked for side-specific weapons: no gun is carried by both attackers and defenders, and defence has no marksman
+// or sniper rifles (the Anvil slug does that job). tests/weapons.js checks it.
 export const LOADOUTS = {
-  ember:   { primaries: ['k4', 'breaker', 'rook'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['smoke', 'breach'] },
-  kestrel: { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'vex50'], gadgets: ['frag', 'claymore'] },
-  hammer:  { primaries: ['breaker', 'v9', 'tusk'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['claymore', 'frag'] },
-  talon:   { primaries: ['v9', 'k4', 'trident'], secondaries: ['p10', 'vex50', 'gnat'], gadgets: ['breach', 'stun'] },
-  bulwark: { primaries: ['p10', 'vex50', 'bison'], secondaries: [], gadgets: ['stun', 'smoke'] }, // one hand on the shield: pistols only
-  mason:   { primaries: ['mule', 'breaker', 'ox'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['dshield', 'wire'] },
-  veil:    { primaries: ['v9', 'breaker', 'anvil'], secondaries: ['p10', 'vex50'], gadgets: ['nitro', 'impact'] },
-  lynx:    { primaries: ['v9', 'hornet', 'wasp'], secondaries: ['p10', 'vex50', 'gnat'], gadgets: ['wire', 'impact'] },
-  solace:  { primaries: ['breaker', 'v9', 'lark'], secondaries: ['p10', 'vex50'], gadgets: ['wire', 'dshield'] },
-  wraith:  { primaries: ['longbow', 'v9', 'heron'], secondaries: ['p10', 'vex50', 'bison'], gadgets: ['impact', 'nitro'] },
-  rivet:   { primaries: ['k4', 'v9', 'sabre'], secondaries: ['p10', 'vex50', 'bison'], gadgets: ['stun', 'smoke'] },
-  haze:    { primaries: ['k4', 'hornet', 'lark'], secondaries: ['p10', 'vex50', 'gnat'], gadgets: ['breach', 'frag'] },
-  glint:   { primaries: ['v9', 'longbow', 'heron'], secondaries: ['p10', 'vex50'], gadgets: ['frag', 'claymore'] },
-  brisk:   { primaries: ['hornet', 'breaker', 'wasp'], secondaries: ['vex50', 'p10', 'gnat'], gadgets: ['stun', 'smoke'] },
-  onyx:    { primaries: ['mule', 'k4', 'rook'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['smoke', 'breach'] },
-  prism:   { primaries: ['v9', 'k4', 'sabre'], secondaries: ['p10', 'vex50'], gadgets: ['smoke', 'stun'] },
-  volt:    { primaries: ['k4', 'v9', 'trident'], secondaries: ['p10', 'vex50', 'bison'], gadgets: ['breach', 'claymore'] },
-  tether:  { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'vex50'], gadgets: ['claymore', 'smoke'] },
-  strider: { primaries: ['v9', 'breaker', 'marten'], secondaries: ['vex50', 'p10'], gadgets: ['frag', 'stun'] },
-  ferro:   { primaries: ['breaker', 'mule', 'anvil'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['stun', 'claymore'] },
-  bramble: { primaries: ['v9', 'breaker', 'tusk'], secondaries: ['p10', 'vex50'], gadgets: ['wire', 'impact'] },
-  kite:    { primaries: ['hornet', 'v9', 'lark'], secondaries: ['p10', 'vex50', 'gnat'], gadgets: ['dshield', 'nitro'] },
-  gravel:  { primaries: ['v9', 'hornet', 'marten'], secondaries: ['vex50', 'p10'], gadgets: ['impact', 'wire'] },
-  shunt:   { primaries: ['mule', 'breaker', 'drummer'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['wire', 'dshield'] },
-  hush:    { primaries: ['v9', 'longbow', 'marten'], secondaries: ['p10', 'vex50'], gadgets: ['impact', 'nitro'] },
-  shade:   { primaries: ['breaker', 'v9', 'wasp'], secondaries: ['p10', 'vex50'], gadgets: ['nitro', 'wire'] },
-  rampart: { primaries: ['breaker', 'mule', 'drummer'], secondaries: ['p10', 'vex50', 'bison'], gadgets: ['dshield', 'wire'] },
-  miasma:  { primaries: ['v9', 'breaker', 'tusk'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['wire', 'impact'] },
-  snare:   { primaries: ['breaker', 'v9', 'anvil'], secondaries: ['vex50', 'p10'], gadgets: ['impact', 'nitro'] },
-  argus:   { primaries: ['hornet', 'v9', 'lark'], secondaries: ['p10', 'vex50', 'gnat'], gadgets: ['nitro', 'impact'] },
+  ember:   { primaries: ['k4', 'tusk', 'rook'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'breach'] },
+  kestrel: { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'claymore'] },
+  hammer:  { primaries: ['halberd', 'javelin', 'tusk'], secondaries: ['p10', 'stub'], gadgets: ['claymore', 'frag'] },
+  talon:   { primaries: ['sabre', 'k4', 'trident'], secondaries: ['p10', 'stub'], gadgets: ['breach', 'stun'] },
+  bulwark: { primaries: ['p10', 'bison'], secondaries: [], gadgets: ['stun', 'smoke'] }, // one hand on the shield: pistols only
+  rivet:   { primaries: ['k4', 'sabre', 'halberd'], secondaries: ['p10', 'bison'], gadgets: ['stun', 'smoke'] },
+  haze:    { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['breach', 'frag'] },
+  glint:   { primaries: ['javelin', 'longbow', 'heron'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'claymore'] },
+  brisk:   { primaries: ['javelin', 'tusk', 'sabre'], secondaries: ['p10', 'bison'], gadgets: ['stun', 'smoke'] },
+  onyx:    { primaries: ['mule', 'ox', 'rook'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'breach'] },
+  prism:   { primaries: ['javelin', 'k4', 'heron'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'stun'] },
+  volt:    { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['breach', 'claymore'] },
+  tether:  { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'bison'], gadgets: ['claymore', 'smoke'] },
+  strider: { primaries: ['javelin', 'sabre', 'halberd'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'stun'] },
+  ferro:   { primaries: ['halberd', 'mule', 'tusk'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'claymore'] },
+  mason:   { primaries: ['drummer', 'breaker', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
+  veil:    { primaries: ['v9', 'wasp', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['nitro', 'impact'] },
+  lynx:    { primaries: ['v9', 'hornet', 'wasp'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
+  solace:  { primaries: ['breaker', 'lark', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
+  wraith:  { primaries: ['lark', 'v9', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
+  bramble: { primaries: ['v9', 'breaker', 'anvil'], secondaries: ['sparrow', 'vex50'], gadgets: ['wire', 'impact'] },
+  kite:    { primaries: ['hornet', 'lark', 'sentry'], secondaries: ['vex50', 'gnat'], gadgets: ['dshield', 'nitro'] },
+  gravel:  { primaries: ['v9', 'hornet', 'marten'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'wire'] },
+  shunt:   { primaries: ['sentry', 'breaker', 'drummer'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'dshield'] },
+  hush:    { primaries: ['marten', 'v9', 'anvil'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'nitro'] },
+  shade:   { primaries: ['wasp', 'breaker', 'lark'], secondaries: ['vex50', 'sparrow'], gadgets: ['nitro', 'wire'] },
+  rampart: { primaries: ['breaker', 'drummer', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
+  miasma:  { primaries: ['v9', 'breaker', 'sentry'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
+  snare:   { primaries: ['breaker', 'v9', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['impact', 'nitro'] },
+  argus:   { primaries: ['hornet', 'lark', 'v9'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
 };
 export function defaultLoadout(op) {
   const L = LOADOUTS[op];
@@ -406,6 +417,10 @@ export const SPRAY = {
   heron:   { pull: -0.6, zig: 0.5, per: 3, flip: 0,  k: 1,   mx: 1 },
   gnat:    { pull: 0.6,  zig: 1.8, per: 2, flip: 0,  k: 1.5, mx: 1.8 },  // very hard to control
   bison:   { pull: -1,   zig: 0.3, per: 2, flip: 0,  k: 2,   mx: 1.6 },  // a big kick left every shot
+  javelin: { pull: 0.5,  zig: 0.6, per: 4, flip: 0,  k: 0.9, mx: 1 },
+  halberd: { pull: -0.6, zig: 0.3, per: 2, flip: 0,  k: 1.2, mx: 1.3 },
+  sentry:  { pull: -0.7, zig: 0.5, per: 5, flip: 12, k: 1,   mx: 1 },    // left, then right
+  sparrow: { pull: 0.5,  zig: 0.7, per: 3, flip: 0,  k: 0.9, mx: 1 },
 };
 for (const [k, w] of Object.entries(WEAPONS)) w.id = k;
 const sprayOf = w => SPRAY[w.id] || { pull: 0.6, zig: 0.6, per: 6, flip: 6, k: 1, mx: 1 };
@@ -422,3 +437,6 @@ export function sprayWords(w) {
   const how = S.pull === 0 ? 'Shakes side to side' : S.flip ? `Pulls ${side(S.pull)}, then ${side(-S.pull)} after ${S.flip} shots` : Math.abs(S.zig) > Math.abs(S.pull) * 1.5 ? `Shakes side to side, drifting ${side(S.pull)}` : `Pulls ${side(S.pull)}`;
   return how + (S.k >= 1.4 ? ', kicks very hard' : S.k >= 1.2 ? ', kicks hard' : '');
 }
+
+// which side carries a gun ('atk' / 'def'), from the loadouts
+export const gunSide = w => { for (const [op, L] of Object.entries(LOADOUTS)) if (L.primaries.includes(w) || L.secondaries.includes(w)) return OPERATORS[op].team; return null; };
