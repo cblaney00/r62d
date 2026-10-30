@@ -1,5 +1,5 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
-import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
+import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
 import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
@@ -46,6 +46,7 @@ export class Game {
     this.site = 0; this.siteRevealed = false; this.planted = null;
     this.spots = { atk: new Map(), def: new Map() };
     this.reinforce = 10;
+    this.botLevel = 1; // bot skill: 0 Easy, 1 Normal, 2 Hard, 3 Expert (BOT_LEVELS)
     this.winner = null; this.reason = '';
     this.revealCheck = 0;
     this.departed = []; this.roundLog = []; this.matchStart = 0;
@@ -130,6 +131,7 @@ export class Game {
       else if (m.a === 'removeBot') this.removeBot(m.squad);
       else if (m.a === 'fillBots') { for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); }
       else if (m.a === 'switch') this.switchSquad(p);
+      else if (m.a === 'botLevel' && BOT_LEVELS[m.lv] && m.lv !== this.botLevel) { this.botLevel = m.lv; this.msg(`${p.name} set the bot skill to ${BOT_LEVELS[m.lv]}`); }
       else if (m.a === 'map' && this.phase === PHASE.LOBBY && MAPS[m.id] && m.id !== this.mapId) {
         this.mapId = m.id; this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
         this.msg(`${p.name} chose the map ${MAPS[m.id].name}`);
@@ -1244,6 +1246,7 @@ export class Game {
     if (m.a === 'start') {
       for (const q of [...this.players.values()]) if (q.bot) this.players.delete(q.id);
       F.bots = Math.max(0, Math.min(TEAM_SIZE, m.bots | 0));
+      if (BOT_LEVELS[m.level]) this.botLevel = m.level;
       if (MAPS[m.map] && m.map !== this.mapId) { this.mapId = m.map; this.map = buildMap(this.mapId); }
       p.squad = 0;
       for (let i = 0; i < F.bots; i++) this.addBot(1);
@@ -1678,7 +1681,7 @@ export class Game {
     const common = JSON.stringify({
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId,
       site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
-      rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined,
+      rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel,
       players, ents, cells, holes, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];

@@ -157,7 +157,7 @@ function connect(mode = '') { // '' = the shared match, 'tut' / 'free' = a priva
     if (m.t === 'pong') { const r = performance.now() - m.c; st.rtt = st.rtt == null ? r : st.rtt * 0.7 + r * 0.3; return; }
     if (m.t === 'welcome') {
       if (st.tutorial) send({ t: 'tut', a: 'start', lesson: st.tutorial });
-      if (st.free) send({ t: 'free', a: 'start', map: st.free.map, bots: st.free.bots });
+      if (st.free) send({ t: 'free', a: 'start', map: st.free.map, bots: st.free.bots, level: st.free.level });
       st.id = m.id;
       if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
         resetMap(m.mapVersion);
@@ -203,7 +203,7 @@ for (const b of document.querySelectorAll('[data-lesson]')) b.onclick = () => sw
 
 // ---------------- free play page ----------------
 // Pick a map and how many enemy bots, then play alone with no clock, switching operator with N / B.
-const freePick = { map: 'harbor', bots: 0 };
+const freePick = { map: 'harbor', bots: 0, level: 1 };
 try { Object.assign(freePick, JSON.parse(localStorage.getItem('r62d-free') || '{}')); } catch {}
 if (!MAPS[freePick.map]) freePick.map = 'harbor';
 function renderFree() {
@@ -218,8 +218,10 @@ function renderFree() {
   }
   for (const b of el.children) b.classList.toggle('on', b.dataset.id === freePick.map);
   for (const b of $('freeBots').children) b.classList.toggle('on', +b.dataset.n === freePick.bots);
+  for (const b of $('freeLevel').children) b.classList.toggle('on', +b.dataset.lv === freePick.level);
 }
 for (const b of $('freeBots').children) b.onclick = () => { audio.ui(); freePick.bots = +b.dataset.n; renderFree(); };
+for (const b of $('freeLevel').children) b.onclick = () => { audio.ui(); freePick.level = +b.dataset.lv; renderFree(); };
 $('freeGo').onclick = () => {
   try { localStorage.setItem('r62d-free', JSON.stringify(freePick)); } catch {}
   switchMatch(null, { ...freePick });
@@ -593,6 +595,7 @@ document.querySelectorAll('[data-bot]').forEach(b => b.onclick = () => { send({ 
 document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { send({ t: 'lobby', a: 'removeBot', squad: +b.dataset.unbot }); });
 $('switchBtn').onclick = () => { send({ t: 'lobby', a: 'switch' }); };
 $('fillBtn').onclick = () => { send({ t: 'lobby', a: 'fillBots' }); };
+for (const b of $('botLevel').children) b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'botLevel', lv: +b.dataset.lv }); };
 $('startBtn').onclick = () => { send({ t: 'lobby', a: 'start' }); };
 $('leaveBtn').onclick = () => { if (st.tutorial || st.free) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
 $('fsBtn').onclick = () => toggleFullscreen();
@@ -639,6 +642,7 @@ function renderMapPick(s) {
 }
 function renderLobby(s) {
   renderControls(); renderMapPick(s);
+  for (const b of $('botLevel').children) b.classList.toggle('on', +b.dataset.lv === (s.bl ?? 1));
   // the address friends type to join (the first network card is the wired one)
   if (st.addr === undefined || (st.addrT && performance.now() - st.addrT > 15000)) { st.addr = st.addr || null; st.addrT = performance.now(); fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
   const u = st.addr && st.addr.urls[0], jt = !u ? '' : u.vpn ? `Friends on the homelab VPN join at ${u.url}` : `Friends join at ${u.url} · turn on homelab-vpn to play over the VPN`;

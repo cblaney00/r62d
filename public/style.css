@@ -432,7 +432,8 @@ button.big { font-size: 22px; padding: 14px 34px; }
 #freeMaps b { font: 700 14px var(--head); letter-spacing: 0.08em; }
 #freeMaps span { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
 #freeMaps button.on { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
-#freeBots button.on { border-color: var(--gold); color: var(--gold); }
+#freeBots button.on, #freeLevel button.on, #botLevel button.on { border-color: var(--gold); color: var(--gold); }
+.botLv { align-items: center; gap: 10px; } .botLv .seg { display: inline-flex; gap: 6px; }
 #tab-free .row { margin-top: 22px; }
 #freeHint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 4px 12px; background: rgba(0,0,0,0.6); border-radius: 3px;
   font: 600 13px var(--body); letter-spacing: 0.04em; color: #d9e0e6; white-space: nowrap; pointer-events: none; }

@@ -9,8 +9,6 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
       Next: the other five maps the same way, after his feedback on Harbor.
-- [ ] Much smarter bots: use their abilities properly, feel like real people with goals and some game knowledge, reactions no faster than a fairly experienced gamer, and a difficulty setting to tune them.
-      Bots should generally be reliable teammates, but with different personalities, the way people have different playstyles.
 - [ ] Sound is too loud: quieter by default (opening the game must never blast people's ears), a wider range on the volume slider, and gunshots less aggressive — loud sounds should mask other noises a little, not drown them out so the game feels uncomfortable.
 - [ ] More guns: the categories are great, we just need more guns. Every gun should have its own properties — none of them too similar.
       He plans to massively rework the aiming later, because it still doesn't feel right and guns are a big part of the game.
@@ -23,8 +21,12 @@ New ideas from him get added to the bottom of **To do**.
       that role's operators, so it is clearer to new players what their job is.
 - [ ] Shooting through walls takes damage off the bullet, so it is a little harder to just spray in the general direction of someone and win.
 - [ ] See as far as you can be shot from: you should always be able to see about as far as the furthest place someone could shoot you from, without just seeing the whole map down long hallways, and without the camera jostling around.
+- [ ] Barricades like R6: every window and doorway starts boarded up. Three melee hits break one; bullets work differently — they only chew small holes in it that can be used on purpose (to look or shoot through). Work out how R6 does it and match that.
+- [ ] Rework aiming for competitive play: comfortable and effective, precise to what each gun is designed to do and how accurate it is meant to be at different ranges. The first bullet always goes exactly where you aim.
 
 ## Done
+
+- [x] Smarter bots: a Bot skill setting (Easy / Normal / Hard / Expert) in the lobby and Free Play; each bot gets a job each round (entry, support, flanker, intel; anchor, roamer) and its own personality; they breach site walls with their gadgets, use every operator ability, revive and heal teammates, smoke plants, throw grenades at noises, and call out enemies they see.
 
 - [x] Fewer breakable walls: on every map each bomb-site room keeps only the wall to its partner room plus one more; elsewhere about a third of walls stay breakable. The rest are solid grey concrete. Drone holes can be in solid walls too.
 
