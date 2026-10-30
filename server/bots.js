@@ -7,7 +7,7 @@
 import { CELL, T, TEAM, PHASE, blocksMove } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks } from '../shared/map.js';
-import { OPERATORS, WEAPONS, opsForTeam } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
 
 // Per skill level. react: seconds before the first shot at someone who surprised them (plus up to reactX more);
 // expect: the same when they were already listening for that enemy. turn: how fast they swing their aim (radians/s).
@@ -38,7 +38,15 @@ export function botPickOp(game, p) {
   const team = game.side(p);
   const taken = new Set([...game.players.values()].filter(q => q.squad === p.squad && q.op).map(q => q.op));
   const free = opsForTeam(team).filter(o => !taken.has(o));
-  if (free.length) game.pickOp(p, free[Math.floor(Math.random() * free.length)]);
+  if (!free.length) return;
+  // he asked: bots lean toward roles nobody on the team has yet, so a team is roughly spread out (not strictly)
+  const count = {};
+  for (const q of game.players.values()) if (q !== p && q.squad === p.squad && (q.job || q.op)) { const j = q.job || jobOf(q.op); count[j] = (count[j] || 0) + 1; }
+  const roles = JOBS[team].filter(j => j.ops.some(o => free.includes(o))).map(j => ({ j, w: 1 / Math.pow(1 + (count[j.id] || 0), 2.5) }));
+  let r = Math.random() * roles.reduce((a, x) => a + x.w, 0), job = roles[roles.length - 1].j;
+  for (const x of roles) if ((r -= x.w) <= 0) { job = x.j; break; }
+  const pool = free.filter(o => job.ops.includes(o));
+  game.pickOp(p, pool[Math.floor(Math.random() * pool.length)]);
 }
 
 // is cell k inside (or in the wall round) one of the site's rooms?
@@ -55,7 +63,7 @@ export function botPrep(game, p) {
   const inSite = siteTest(m, site);
   const siteOpenings = m.openings.filter(o => o.cells.some(k => inSite(k % W, Math.floor(k / W))));
   const op = OPERATORS[p.op];
-  for (const o of siteOpenings) if (m.tiles[o.cells[0]] === T.OPEN && Math.random() < 0.6) game.barricade(o.id, T.BARRI);
+  for (const o of siteOpenings) if (p.barri > 0 && m.tiles[o.cells[0]] === T.OPEN && Math.random() < 0.6 && game.barricade(o.id, T.BARRI)) p.barri--; // 3 each, like a person
   // reinforce: hatches over the site first, then the site's breakable walls (outside-facing ones before the one
   // between the two site rooms), two each, like a team sharing out its reinforcements
   for (let n = 0; n < 2 && game.reinforce > 0; n++) {

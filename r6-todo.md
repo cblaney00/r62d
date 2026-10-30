@@ -9,6 +9,9 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Barricading was bugged and too quick: the hold-E prompt showed from a little further away than the game accepted, a doorway could end up half-boarded and then never be boarded again, and standing in the doorway wasted the whole hold. Fixed all three. A barricade now takes 2.5 s like R6, each defender has 3 a round (shown in the prompt and the objective line), and doorways and windows start open.
+- [x] Bots don't pick operators before you: on your team they wait until you (and every other person) have locked in, then pick, leaning toward roles nobody has taken yet (roughly even, not strictly).
+
 - [x] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       Done for all six maps (Harbor first, he approved it; the other five after).
 

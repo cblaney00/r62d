@@ -21,9 +21,12 @@ export const PHASE = {
   ROUND_END: 'roundEnd', MATCH_END: 'matchEnd',
 };
 
+// He asked: each defender can put up only 3 barricades a round (doorways and windows start open).
+export const BARRICADES_EACH = 3;
+
 export const DUR = {
   select: 15, prep: 40, action: 180, roundEnd: 7, matchEnd: 12,
-  plant: 7, defuse: 7, bomb: 45, reinforce: 3, barricade: 1.2, revive: 4,
+  plant: 7, defuse: 7, bomb: 45, reinforce: 3, barricade: 2.5, revive: 4, // a barricade takes about as long as in R6 (he asked)
   bleedout: 20, spot: 5,
 };
 

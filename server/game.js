@@ -1,5 +1,5 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
-import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS,
+import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS,
   MAT, stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
 import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
@@ -237,7 +237,6 @@ export class Game {
       for (let i = 0; i <= 16; i++) { const a = c.n === null ? i / 16 * Math.PI * 2 : c.n - c.sp + c.sp * 2 * i / 16, d = castSight(map, c.x, c.y, a, 600, null); if (d > bestD) { bestD = d; best = a; } }
       this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, team: TEAM.DEF, hp: 1, offUntil: 0, ang: best, wn: c.n, ws: c.sp, wall: c.wall });
     }
-    this.boardUp();
     // defenders start on site, attackers at one spawn (their bodies wait while they drone)
     const site = map.sites[this.site];
     const defCells = this.freeCellsInRooms(site.rooms);
@@ -315,6 +314,7 @@ export class Game {
     });
     p.slot = 0; p.fireCd = 0; p.reloadT = 0; p.bloom = 0; p.vx = 0; p.vy = 0; p.gait = 0;
     p.adsT = 0; p.rc = 0; p.shots = 0; p.rcDir = Math.random() < 0.5 ? 1 : -1; p.viewTime = null;
+    p.barri = o.team === TEAM.DEF ? BARRICADES_EACH : 0;
     p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false;
     p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0; p.staged = false;
@@ -330,7 +330,8 @@ export class Game {
     const held = (this.tut && this.tut.hold && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP)) || this.free;
     if (!held) this.timer -= dt;
     if (this.phase === PHASE.SELECT) {
-      for (const p of this.players.values()) if (p.bot && !p.op && Math.random() < dt * 0.8) botPickOp(this, p);
+      // he asked: bots never pick before you. They wait until every person on their team has locked in.
+      for (const p of this.players.values()) if (p.bot && !p.op && (this.tut || this.humansLocked(p.squad)) && Math.random() < dt * 2.5) botPickOp(this, p);
       for (const p of this.players.values()) if (p.bot && p.op && !p.locked) {
         p.locked = true;
         if (this.side(p) === TEAM.ATK && Math.random() < 0.3) p.spawn = this.map.atkSpawns[Math.floor(Math.random() * this.map.atkSpawns.length)].name; // most stay with the team
@@ -376,6 +377,7 @@ export class Game {
     else if (this.phase === PHASE.ACTION) this.checkWin();
   }
 
+  humansLocked(squad) { for (const p of this.players.values()) if (!p.bot && p.squad === squad && !p.locked && p.sock && p.sock.open) return false; return true; }
   allLocked() { for (const p of this.players.values()) if (!p.locked && (p.bot || (p.sock && p.sock.open))) return false; return true; }
 
   checkWin() {
@@ -772,6 +774,9 @@ export class Game {
   destroyCell(k, stub = false) { // stub: a soft wall knocked through by bullets or melee leaves a low stub to vault
     const m = this.map, t = m.tiles[k];
     if (m.hatchAt[k] >= 0) return this.breakHatch(m.hatchAt[k]);
+    if (t === T.BARRI && m.openId[k] >= 0) { // a barricade is one board: when any of it breaks, all of it goes (no half-boarded doors)
+      for (const c of m.openings[m.openId[k]].cells) if (m.tiles[c] === T.BARRI) { m.tiles[c] = T.OPEN; m.hp[c] = 0; delete m.holes[c]; this.changed.add(c); }
+    }
     if (t === T.BARRI || t === T.PANEL) m.tiles[k] = T.OPEN;
     else if (m.openId[k] >= 0) m.tiles[k] = T.OPEN;
     else if (stub && t === T.SOFT) m.tiles[k] = T.RUBBLE;
@@ -854,9 +859,9 @@ export class Game {
       if (q !== p && q.alive && q.downed && this.side(q) === team && Math.hypot(q.x - p.x, q.y - p.y) < 26)
         return { k: 'revive', t: 0, dur: DUR.revive, target: q.id };
     if (team === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION)) {
-      const f = this.facingCell(p, 26);
+      const f = this.facingCell(p, 28); // the same reach as the on-screen prompt
       if (f && f.t === T.SOFT && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce, cell: f.k };
-      if (f && f.t === T.OPEN && this.map.openId[f.k] >= 0) return { k: 'barricade', t: 0, dur: DUR.barricade, cell: f.k };
+      if (f && f.t === T.OPEN && this.map.openId[f.k] >= 0 && p.barri > 0 && this.canBarricade(this.map.openId[f.k])) return { k: 'barricade', t: 0, dur: DUR.barricade, cell: f.k };
       const h = hatchNear(this.map, p.x, p.y, p.aim, 14);
       if (h && this.map.tiles[h.cells[0]] === T.HATCH && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce, hatch: h.id };
     }
@@ -888,7 +893,9 @@ export class Game {
       if (this.map.tiles[this.map.hatches[b.hatch].cells[0]] === T.HATCH && this.reinforce > 0) { this.reinforceHatch(b.hatch); this.reinforce--; }
     } else if (b.k === 'reinforce') {
       if (this.map.tiles[b.cell] === T.SOFT && this.reinforce > 0) { this.reinforceWall(b.cell); this.reinforce--; if (this.tut && !p.bot) this.tut.info.reinf++; }
-    } else if (b.k === 'barricade') { if (this.barricade(this.map.openId[b.cell], T.BARRI) && this.tut && !p.bot) this.tut.info.barri++; }
+    } else if (b.k === 'barricade') {
+      if (p.barri > 0 && this.barricade(this.map.openId[b.cell], T.BARRI)) { p.barri--; if (this.tut && !p.bot) this.tut.info.barri++; }
+    }
   }
 
   // Vault over the low thing in front of you (toward ang: where you're moving, else where you look).
@@ -931,15 +938,6 @@ export class Game {
     return false;
   }
 
-  // He asked for R6 barricades: every doorway and window starts boarded up. (The tutorial leaves the objective
-  // room's own doors open, so its defence lesson can teach boarding one up.)
-  boardUp() {
-    const m = this.map, site = m.sites[this.site], keep = new Set(), W = m.W;
-    const inSite = c => [1, -1, W, -W].some(d => site.rooms.includes(roomAt(m, ((c + d) % W + 0.5) * CELL, (Math.floor((c + d) / W) + 0.5) * CELL)));
-    if (this.tut && site) for (const o of m.openings) if (o.cells.some(inSite)) keep.add(o.id);
-    for (const o of this.map.openings) if (!keep.has(o.id) && o.cells.every(c => this.map.tiles[c] === T.OPEN)) this.barricade(o.id, T.BARRI, true);
-  }
-
   // A melee hit on a barricade: three break it (the whole board across the doorway or window, like R6)
   barriHit(k) {
     const o = this.map.openings[this.map.openId[k]], cells = o ? o.cells.filter(c => this.map.tiles[c] === T.BARRI) : [k];
@@ -947,11 +945,17 @@ export class Game {
     if (cells.some(c => this.map.hp[c] <= 0)) for (const c of cells) this.destroyCell(c);
   }
 
+  // Can a barricade go up across this doorway/window now? (all of it open, nobody standing in it)
+  canBarricade(openingId) {
+    const o = this.map.openings[openingId];
+    return !!o && o.cells.every(c => this.map.tiles[c] === T.OPEN) && !o.cells.some(c => this.cellOccupied(c));
+  }
+
   barricade(openingId, type, quiet = false) {
     const o = this.map.openings[openingId];
     if (!o) return false;
     if (o.cells.some(c => this.cellOccupied(c))) return false;
-    if (type === T.BARRI && o.cells.some(c => this.map.tiles[c] !== T.OPEN)) return false;
+    if (type === T.BARRI && !this.canBarricade(openingId)) return false;
     for (const c of o.cells) { this.map.tiles[c] = type; this.map.hp[c] = CELL_HP[type]; this.changed.add(c); if (this.map.holes[c]) delete this.map.holes[c]; }
     if (quiet) return true;
     const c0 = o.cells[0], W = this.map.W;
@@ -1737,7 +1741,7 @@ export class Game {
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
       if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); }
       if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
-        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
+        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),

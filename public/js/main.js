@@ -1727,7 +1727,7 @@ function hud(s) {
   const where = me.a && me.x !== undefined ? roomAt(st.map, st.pred.x, st.pred.y) : '';
   if (side === 'def') {
     obj = s.pl ? 'DISABLE THE DEFUSER!' : s.ph === PHASE.PREP ? `FORTIFY: ${site.name}` : `DEFEND: ${site.name}`;
-    sub = s.ph === PHASE.PREP ? `Reinforcements left: ${s.rf} · hold E on walls to reinforce, E on doors/windows to barricade, melee soft walls for rotation holes` : `Reinforcements left: ${s.rf}`;
+    sub = s.ph === PHASE.PREP ? `Reinforcements left: ${s.rf} · your barricades: ${me.bx ?? 0} · hold E on walls to reinforce, E on doors/windows to barricade, melee soft walls for rotation holes` : `Reinforcements left: ${s.rf} · your barricades: ${me.bx ?? 0}`;
   } else {
     obj = s.pl ? 'PROTECT THE DEFUSER' : s.ph === PHASE.PREP ? 'LOCATE THE OBJECTIVE WITH YOUR DRONE' : s.rev ? `PLANT THE DEFUSER: ${site.name}` : 'FIND THE OBJECTIVE';
     if (me.df) sub = 'You are carrying the defuser';
@@ -1803,7 +1803,7 @@ function promptText(s, me) {
   const f = facingCell(m, x, y, st.aim, 28);
   if (side === 'def' && f) {
     if (f.t === T.SOFT && s.rf > 0) return `<b>${label('interact')}</b>HOLD TO REINFORCE WALL (${s.rf} LEFT)`;
-    if (f.t === T.OPEN && m.openId[f.k] >= 0) return `<b>${label('interact')}</b>BARRICADE${me.op === 'mason' && me.ac > 0 ? '  ·  <b>' + label('ability') + '</b>ARMOR PANEL' : ''}`;
+    if (f.t === T.OPEN && m.openId[f.k] >= 0) return (me.bx > 0 ? `<b>${label('interact')}</b>HOLD TO BARRICADE (${me.bx} LEFT)` : 'NO BARRICADES LEFT') + `${me.op === 'mason' && me.ac > 0 ? '  ·  <b>' + label('ability') + '</b>ARMOR PANEL' : ''}`;
     if (f.t === T.BARRI && me.op === 'mason' && me.ac > 0) return '<b>' + label('ability') + '</b>ARMOR PANEL';
   }
   if (f && f.t === T.BARRI) return '<b>' + label('melee') + '</b>MELEE TO BREAK BARRICADE';

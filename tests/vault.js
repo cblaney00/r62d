@@ -19,7 +19,7 @@ for (const id of MAP_LIST) {
   const p = [...g.players.values()][0], m = g.map, W = m.W;
   // every window: walking into it stops you; vaulting from in front of it lands you on the other side
   let wins = 0, ok = 0;
-  for (const o of m.openings) if (o.kind === 'window') for (const c of o.cells) if (m.tiles[c] === T.BARRI) g.destroyCell(c); // windows start boarded up: break the boards first
+  for (const o of m.openings) if (o.kind === 'window') for (const c of o.cells) if (m.tiles[c] === T.BARRI) g.destroyCell(c); // a defender may have boarded one up: break the boards first
   for (const o of m.openings) {
     if (o.kind !== 'window' || m.tiles[o.cells[0]] !== T.OPEN) continue;
     const k = o.cells[0], cx = k % W, cy = Math.floor(k / W);
