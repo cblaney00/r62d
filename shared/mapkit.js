@@ -180,6 +180,53 @@ export function makeMap({ id, name, floors }) {
     stairs.push({ a, b, x, y, w, h, dir, ga: A.idx(x, y), gb: B.idx(x, y) });
   };
 
+  // Fewer breakable walls (he asked: too many ways into a site by blowing the whole room open). Every straight wall
+  // between two spaces (two rooms, or a room and outside) is one "wall". Each site room keeps one breakable wall
+  // besides the one to its partner room (an inside one if it has one), so there are only a few ways to blow into a site;
+  // elsewhere about two in five inside walls and one in four outside walls stay breakable. The rest become solid concrete.
+  // Same choice every round (it hashes the map id). map.hardened marks the walls this turned solid.
+  const hardened = new Uint8Array(N);
+  const hardenWalls = (sites) => {
+    const rid = new Int16Array(N).fill(-1);
+    rooms.forEach((r, i) => { for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) rid[y * W + x] = i; });
+    const wallish = t => t === T.SOFT || t === T.HARD || t === T.REINF || t === T.BARRI || t === T.PANEL;
+    const side = k => rid[k] >= 0 ? rid[k] : -2;
+    const walls = new Map(), keyOf = new Map();
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const k = y * W + x; if (tiles[k] !== T.SOFT || shape[k]) continue;
+      for (const d of [W, 1]) {
+        if (wallish(tiles[k + d]) || wallish(tiles[k - d])) continue;
+        const a = side(k + d), b = side(k - d); if (a === b) continue;
+        const key = `${Math.min(a, b)},${Math.max(a, b)},${d === 1 ? 'x' + x : 'y' + y}`; // one straight stretch between two spaces
+        if (!walls.has(key)) walls.set(key, { a: Math.min(a, b), b: Math.max(a, b), cells: [] });
+        walls.get(key).cells.push(k); keyOf.set(k, key); break;
+      }
+    }
+    const hash = s => { let h = 2166136261; for (const c of id + s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
+    const soft = new Set(), decided = new Set();
+    const roomIdx = name => rooms.findIndex(r => r.name === name);
+    for (const s of sites || []) {
+      const [r1, r2] = (s.rooms || []).map(roomIdx);
+      const pair = `${Math.min(r1, r2)},${Math.max(r1, r2)},`, pks = [...walls.keys()].filter(key => key.startsWith(pair));
+      for (const pk of pks) { soft.add(pk); decided.add(pk); }
+      for (const r of [r1, r2]) {
+        if (r < 0) continue;
+        const mine = [...walls.keys()].filter(key => !decided.has(key) && (walls.get(key).a === r || walls.get(key).b === r));
+        // inside walls first (rotations and pushes), then outside ones; longer walls before short stubs
+        mine.sort((p, q) => (walls.get(p).a < 0) - (walls.get(q).a < 0) || walls.get(q).cells.length - walls.get(p).cells.length || hash(p) - hash(q));
+        const keep = mine.filter(key => walls.get(key).cells.length >= 3).slice(0, 1);
+        for (const key of mine) { decided.add(key); if (keep.includes(key)) soft.add(key); }
+      }
+    }
+    for (const [key, w] of walls) if (!decided.has(key) && hash(key) < (w.a < 0 ? 0.25 : 0.4)) soft.add(key);
+    const make = k => { tiles[k] = T.HARD; mat[k] = MAT.CONCRETE; hp[k] = 0; hardened[k] = 1; };
+    for (const [key, w] of walls) if (!soft.has(key)) w.cells.forEach(make);
+    // corners and joints between walls: solid unless they touch a wall that stayed breakable
+    const rest = [];
+    for (let k = 0; k < N; k++) if (tiles[k] === T.SOFT && !keyOf.has(k) && !shape[k]) rest.push(k);
+    for (const k of rest) if (![1, -1, W, -W].some(d => tiles[k + d] === T.SOFT && keyOf.has(k + d))) make(k);
+  };
+
   // Drone holes, like the small gaps at the foot of walls in R6: a drone (radius 5) fits, a body doesn't.
   // One per pair of rooms (or room and outside) that share a plain wall, near the middle of that wall,
   // only where there is clear floor on both sides for a drone to drive up to it.
@@ -188,13 +235,14 @@ export function makeMap({ id, name, floors }) {
     rooms.forEach((r, i) => { for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) rid[y * W + x] = i; });
     const at = (x, y) => x < 0 || y < 0 || x >= W || y >= H ? T.VOID : tiles[y * W + x];
     const clear = t => t === T.FLOOR || t === T.GROUND;
+    const plain = k => tiles[k] === T.SOFT || hardened[k]; // a breakable wall, or one hardenWalls made solid
     const side = (x, y) => tiles[y * W + x] === T.GROUND ? -2 : rid[y * W + x];
     const pairs = new Map();
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      if (tiles[y * W + x] !== T.SOFT || shape[y * W + x] || shape[y * W + x + 1] || shape[y * W + x - 1] || shape[(y + 1) * W + x] || shape[(y - 1) * W + x]) continue;
+      if (!plain(y * W + x) || shape[y * W + x] || shape[y * W + x + 1] || shape[y * W + x - 1] || shape[(y + 1) * W + x] || shape[(y - 1) * W + x]) continue;
       for (const [dx, dy] of [[0, 1], [1, 0]]) { // the hole runs along dx,dy through the wall
         if (![1, 2].every(d => clear(at(x + dx * d, y + dy * d)) && clear(at(x - dx * d, y - dy * d)))) continue;
-        if (at(x + dy, y + dx) !== T.SOFT || at(x - dy, y - dx) !== T.SOFT) continue; // a straight run of wall, not a corner or door edge
+        if (!plain((y + dx) * W + x + dy) || !plain((y - dx) * W + x - dy)) continue; // a straight run of wall, not a corner or door edge
         const a = side(x + dx, y + dy), b = side(x - dx, y - dy);
         if (a === b || a === -1 || b === -1) continue;
         const key = `${Math.min(a, b)},${Math.max(a, b)},${dx}`;
@@ -290,11 +338,12 @@ export function makeMap({ id, name, floors }) {
         if (tiles[ny * W + nx] === T.FLOOR) { floor[k] = floor[ny * W + nx]; break; }
       }
     }
+    hardenWalls(extra && extra.sites);
     droneHoles();
     placeHatches(extra && extra.sites);
     return {
       id, name, W, H, tiles, floor, mat, hp, holes: {}, openId, dhole, props, openings, rooms, portal, flAt, stairs, decor, shape, shapeSide, shapeFill,
-      hatches, hatchAt, hatchBelow, win,
+      hatches, hatchAt, hatchBelow, win, hardened,
       floors: fl.map(f => ({ name: f.name, i: f.i, gx: f.gx, w: f.w, h: f.h, x0: f.x0, y0: f.y0 })),
       ...extra,
     };

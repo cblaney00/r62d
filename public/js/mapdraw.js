@@ -389,7 +389,7 @@ export class MapRenderer {
       ctx.fillStyle = '#7fb6d6'; ctx.fillRect(X + 4, Y + 6.5, 8, 2.5);
     }
     // a drone hole: a small dark gap through the foot of the wall, with a lit rim
-    if (t === T.SOFT && m.dhole && m.dhole[k]) {
+    if ((t === T.SOFT || t === T.HARD) && m.dhole && m.dhole[k]) {
       const horiz = s(-1, 0) || s(1, 0); // wall runs left-right, so the hole goes up-down through it
       ctx.fillStyle = 'rgba(255,255,255,0.18)';
       if (horiz) ctx.fillRect(X + 3.5, Y, 9, CELL); else ctx.fillRect(X, Y + 3.5, CELL, 9);

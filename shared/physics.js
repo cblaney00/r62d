@@ -62,7 +62,7 @@ function resolve(map, o, r, blockFn) {
 
 export function moveCircle(map, o, dx, dy, r, drone = false) {
   // drones also slip through the drone holes at the foot of plain walls (gone once the wall is reinforced)
-  const fn = drone ? (t, k) => blocksDrone(t) && !(t === T.SOFT && map.dhole && map.dhole[k]) : bodyBlocks(map);
+  const fn = drone ? (t, k) => blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) : bodyBlocks(map);
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (r * 0.5)));
   for (let s = 0; s < steps; s++) {
     o.x += dx / steps; resolve(map, o, r, fn);

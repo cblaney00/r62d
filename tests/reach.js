@@ -34,7 +34,7 @@ for (const id of only ? [only] : MAP_LIST) {
   // every drone hole lets a drone through and stops a body
   let holesBad = 0;
   for (let k = 0; k < m.W * m.H; k++) if (m.dhole[k]) {
-    const cx = k % m.W, cy = (k / m.W) | 0, v = m.tiles[k - m.W] === T.SOFT || m.tiles[k + m.W] === T.SOFT; // wall runs up-down: go left-right
+    const cx = k % m.W, cy = (k / m.W) | 0, w = t => t === T.SOFT || t === T.HARD, v = w(m.tiles[k - m.W]) && w(m.tiles[k + m.W]); // wall runs up-down: go left-right
     const dx = v ? 1 : 0, dy = v ? 0 : 1;
     const go = (r, dr) => { const o = { x: (cx + 0.5 - 2 * dx) * CELL, y: (cy + 0.5 - 2 * dy) * CELL }; for (let i = 0; i < 40; i++) moveCircle(m, o, dx * 2, dy * 2, r, dr); return (o.x - (cx + 0.5) * CELL) * dx + (o.y - (cy + 0.5) * CELL) * dy > CELL; };
     if (!go(DRONE_R, true) || go(PLAYER_R, false)) { holesBad++; console.log(`   drone hole at cell ${cx},${cy} doesn't work`); }

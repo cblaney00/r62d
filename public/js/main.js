@@ -970,7 +970,7 @@ function cellName(k, t) {
   if (t === T.OPEN) return o ? ok : null;
   if (t === T.REINF) return 'REINFORCED WALL';
   if (t === T.SOFT) return m.dhole[k] ? 'DRONE HOLE' : 'SOFT WALL';
-  if (t === T.HARD) return 'HARD WALL';
+  if (t === T.HARD) return m.dhole[k] ? 'DRONE HOLE' : 'HARD WALL';
   if (t === T.PANEL) return 'ARMOR PANEL';
   if (t === T.DSHIELD) return 'DEPLOYABLE SHIELD';
   if (t === T.TALL) return 'COVER';

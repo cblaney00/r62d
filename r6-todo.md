@@ -8,8 +8,7 @@ New ideas from him get added to the bottom of **To do**.
 
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
-      Next: the other five maps the same way (and fewer breakable walls while at it), after his feedback on Harbor.
-- [ ] Fewer soft (breakable) walls: right now there are far too many ways into a site by just blowing open the whole room.
+      Next: the other five maps the same way, after his feedback on Harbor.
 - [ ] Much smarter bots: use their abilities properly, feel like real people with goals and some game knowledge, reactions no faster than a fairly experienced gamer, and a difficulty setting to tune them.
       Bots should generally be reliable teammates, but with different personalities, the way people have different playstyles.
 - [ ] Sound is too loud: quieter by default (opening the game must never blast people's ears), a wider range on the volume slider, and gunshots less aggressive — loud sounds should mask other noises a little, not drown them out so the game feels uncomfortable.
@@ -22,8 +21,12 @@ New ideas from him get added to the bottom of **To do**.
       intuitive way, and sounds must obviously come from above or below you.
 - [ ] Pick a role before each round: choosing a role (breacher, intel, support, entry, flank / anchor, roamer, trapper...) limits you to
       that role's operators, so it is clearer to new players what their job is.
+- [ ] Shooting through walls takes damage off the bullet, so it is a little harder to just spray in the general direction of someone and win.
+- [ ] See as far as you can be shot from: you should always be able to see about as far as the furthest place someone could shoot you from, without just seeing the whole map down long hallways, and without the camera jostling around.
 
 ## Done
+
+- [x] Fewer breakable walls: on every map each bomb-site room keeps only the wall to its partner room plus one more; elsewhere about a third of walls stay breakable. The rest are solid grey concrete. Drone holes can be in solid walls too.
 
 - [x] Vaulting like R6: Space climbs over low furniture, windows and the low stub left when a wall is shot or knifed through. No shooting while you climb, and a moment before you can aim again. Bots vault too.
 

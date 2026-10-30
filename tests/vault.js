@@ -51,16 +51,16 @@ for (const id of MAP_LIST) {
   // a soft wall knifed through leaves a stub: blocks walking, can be vaulted, a melee clears it
   g.ents = []; for (const q of g.players.values()) if (q !== p) q.alive = false; // nothing else for the knife to hit
   let stubs = 0;
-  for (let k = 0; k < m.tiles.length && stubs < 3; k++) {
-    if (m.tiles[k] !== T.SOFT || m.tiles[k - 1] !== T.SOFT || m.tiles[k + 1] !== T.SOFT) continue; // a wall running along x
-    if (m.tiles[k - W] !== T.FLOOR || m.tiles[k + W] !== T.FLOOR || m.tiles[k - 2 * W] !== T.FLOOR || m.tiles[k + 2 * W] !== T.FLOOR) continue;
-    const cx = k % W, cy = Math.floor(k / W);
-    ready(g, p); p.x = (cx + 0.5) * CELL; p.y = (cy - 0.6) * CELL; p.aim = Math.PI / 2;
+  for (const [a, c] of [[1, W], [W, 1]]) for (let k = W; k < m.tiles.length - W && stubs < 3; k++) { // a wall running along a, crossed along c
+    if (m.tiles[k] !== T.SOFT || m.tiles[k - a] !== T.SOFT || m.tiles[k + a] !== T.SOFT) continue;
+    if (m.tiles[k - c] !== T.FLOOR || m.tiles[k + c] !== T.FLOOR || m.tiles[k - 2 * c] !== T.FLOOR || m.tiles[k + 2 * c] !== T.FLOOR) continue;
+    const cx = k % W, cy = Math.floor(k / W), across = c === W;
+    ready(g, p); p.x = (cx + (across ? 0.5 : -0.6)) * CELL; p.y = (cy + (across ? -0.6 : 0.5)) * CELL; p.aim = across ? Math.PI / 2 : 0;
     for (let i = 0; i < 4 && m.tiles[k] === T.SOFT; i++) { p.meleeCd = 0; g.melee(p); }
     if (m.tiles[k] !== T.RUBBLE) { fail(id, 'knifed wall at', cx, cy, 'is', m.tiles[k]); continue; }
     if (!vaultable(m, k)) fail(id, 'stub not vaultable');
-    const to = findVault(m, p.x, p.y, Math.PI / 2);
-    if (!to || to.y < (cy + 1) * CELL) fail(id, 'cannot vault the stub at', cx, cy, to && Math.round(to.y - p.y));
+    const to = findVault(m, p.x, p.y, p.aim);
+    if (!to || (across ? to.y < (cy + 1) * CELL : to.x < (cx + 1) * CELL)) fail(id, 'cannot vault the stub at', cx, cy, to && Math.round(to.y - p.y));
     p.meleeCd = 0; g.melee(p);
     if (m.tiles[k] === T.RUBBLE) fail(id, 'melee did not clear the stub at', cx, cy);
     stubs++;
