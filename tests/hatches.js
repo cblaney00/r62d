@@ -4,7 +4,7 @@
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { MAP_LIST, buildMap, floorAt, roomAt } from '../shared/map.js';
-import { PHASE, T, CELL, TEAM } from '../shared/constants.js';
+import { PHASE, T, CELL, TEAM, CELL_HP } from '../shared/constants.js';
 import { WEAPONS } from '../shared/operators.js';
 
 let fails = 0, total = 0;
@@ -23,6 +23,7 @@ for (const id of MAP_LIST) {
   g.mapId = id; g.map = buildMap(id); g.startMatch();
   while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
   for (const q of g.players.values()) q.bot = false; // hold still: this test moves them by hand
+  for (const h of g.map.hatches) for (const k of h.cells) if (g.map.tiles[k] === T.HATCHR) { g.map.tiles[k] = T.HATCH; g.map.hp[k] = CELL_HP[T.HATCH]; } // bots reinforce hatches over the site in prep: start from plain ones
   const ps = [...g.players.values()], def = ps.find(q => g.side(q) === TEAM.DEF), atk = ps.find(q => g.side(q) === TEAM.ATK);
   const ready = q => { q.alive = true; q.downed = false; q.hp = 100; q.ctrl = 'body'; q.busy = null; q.meleeCd = 0; q.stunUntil = 0; q.input = { ...q.input, up: 0, down: 0, left: 0, right: 0, fire: 0, interact: 0 }; };
   for (const h of g.map.hatches) {

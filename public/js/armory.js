@@ -1,7 +1,7 @@
 // The Armory: a private shooting range in the menus. Pick any gun, shoot dummies at different
 // distances and read its numbers. Runs only in your browser (nobody else sees it), using the same
 // damage, drop-off, spread, aim-in time, recoil and headshot rules as the server.
-import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods } from '/shared/operators.js';
+import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -72,7 +72,8 @@ function tick(el, dt) {
   const w = WEAPONS[S.w], cv = el.querySelector('#armCanvas');
   S.t += dt; S.fireCd -= dt; S.bloom = Math.max(0, S.bloom - dt * 0.15);
   S.adsT = Math.max(0, Math.min(1, S.adsT + (S.mouse.r ? 1 : -2) * dt / ((ADS_TIME[w.cls] || 0.3) * modsOf(S.w).ads)));
-  if (S.t - S.lastShot > 0.14) { S.rc *= Math.exp(-dt * 7); S.shots = 0; }
+  if (S.t - S.lastShot > 0.1) S.rc *= Math.exp(-dt * 12);
+  if (S.shots && !aimHeat(w, S.shots, S.t - S.lastShot)) { S.rc = 0; S.shots = 0; } // settled: the next shot is exact
   if (S.reloadT > 0) { S.reloadT -= dt; if (S.reloadT <= 0) { S.ammo = w.mag; audio.foley(w.cls === 'Shotgun' ? 'shell' : 'magIn', undefined, undefined, true); } }
   if (S.mouse.l && S.reloadT <= 0 && S.fireCd <= 0 && (w.auto || S.mouse.edge)) {
     if (S.ammo > 0) fire(w, cv); else reload();
@@ -92,17 +93,15 @@ function view(cv) {
 function aimAngle(cv) { const v = view(cv); return Math.atan2((S.mouse.y - v.oy) / v.z, (S.mouse.x - v.ox) / v.z); }
 
 function fire(w, cv) {
-  S.ammo--; S.fireCd = 60 / w.rpm; S.lastShot = S.t; S.fired++;
-  const m = modsOf(S.w), at = S.adsT, hip = w.spread * m.hip, spread = hip + (w.ads * m.adsSpread - hip) * at + S.bloom * (1 - 0.7 * at);
-  S.bloom = Math.min(0.08, S.bloom + w.bloom);
-  const rc = RECOIL[w.cls] || RECOIL.AR; S.shots++;
-  const dir = (Math.floor((S.shots - 1) / 6) % 2 ? -1 : 1) * S.rcDir;
-  S.rc = Math.max(-rc.max, Math.min(rc.max, S.rc + dir * rc.kick * m.kick * (S.shots <= 3 ? m.first : 1) + (Math.random() - 0.5) * rc.sway * m.sway));
+  S.ammo--; S.fireCd = 60 / w.rpm; S.fired++;
+  const m = modsOf(S.w), cone = spreadCone(w, m, { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot) }), rc0 = S.rc;
+  S.lastShot = S.t; // same rules as a match
+  S.shots++; S.rc = Math.max(-recoilMax(w), Math.min(recoilMax(w), S.rc + recoilStep(w, m, S.shots)));
   audio.gunshot(w.cls, undefined, undefined, true, !!m.quiet);
   const base = aimAngle(cv);
   let hitAny = false;
   for (let i = 0; i < w.pellets; i++) {
-    const a = base + S.rc + gauss() * Math.max(0.002, spread), dx = Math.cos(a), dy = Math.sin(a);
+    const a = base + rc0 + shotOffset(w, cone, i), dx = Math.cos(a), dy = Math.sin(a);
     let best = null, bt = w.range;
     for (const d of S.dummies) {
       if (d.hp <= 0) continue;
@@ -170,10 +169,10 @@ function draw(cv) {
   }
   // crosshair, kicked by recoil like in a match
   c.setTransform(1, 0, 0, 1, 0, 0);
-  const at = S.adsT, spread = w.spread + (w.ads - w.spread) * at + S.bloom;
+  const cone = spreadCone(w, modsOf(S.w), { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot) });
   const px = ox, py = oy, rc = S.rc, cs = Math.cos(rc), sn = Math.sin(rc);
   const mx = px + (S.mouse.x - px) * cs - (S.mouse.y - py) * sn, my = py + (S.mouse.x - px) * sn + (S.mouse.y - py) * cs;
-  const gap = 4 + spread * Math.hypot(S.mouse.x - px, S.mouse.y - py);
+  const gap = 3 + Math.tan(cone) * Math.hypot(S.mouse.x - px, S.mouse.y - py); // shut when the next shot is exact
   c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 1.5; c.beginPath();
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { c.moveTo(mx + dx * gap, my + dy * gap); c.lineTo(mx + dx * (gap + 7), my + dy * (gap + 7)); }
   c.stroke(); c.fillStyle = '#fff'; c.fillRect(mx - 1, my - 1, 2, 2);

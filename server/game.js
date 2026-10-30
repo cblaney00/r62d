@@ -8,7 +8,7 @@ import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode } from '../shared/operators.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax } from '../shared/operators.js';
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -118,6 +118,7 @@ export class Game {
       if (p.ctrl === 'cam') { const c = this.feed(p); if (c && this.operates(p, c)) c.ang = c.wn === null || c.wn === undefined ? p.aim : c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(p.aim, c.wn))); } // a wall camera can't look into its wall
       if (typeof m.ax === 'number') { p.aimX = m.ax; p.aimY = m.ay; }
       if (typeof m.vt === 'number' && isFinite(m.vt)) p.viewTime = m.vt; // server time of the world this player is looking at
+      { const f = !!(m.k && m.k.fire); if (f && !p.msgFire && !p.click) p.click = { a: p.aim, vt: p.viewTime }; p.msgFire = f; } // a click keeps the aim it was made with, even if more input arrives before the next tick
       this.applyMove(p, Math.max(0, Math.min(0.05, Number(m.dt) || 0)));
       p.lastSeq = m.s | 0;
       if (Array.isArray(m.ev)) for (const e of m.ev.slice(0, 10)) this.event(p, e);
@@ -411,11 +412,12 @@ export class Game {
     const team = this.side(p);
     const inp = p.input, prev = p.prevInput;
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
-    p.bloom = Math.max(0, p.bloom - dt * 0.15);
     { const g = p.guns[p.slot], cls = g ? WEAPONS[g.w].cls : 'AR', rate = (1 / (ADS_TIME[cls] || 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
       const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time) && !p.vault && !(p.recoverUntil > this.time);
       p.adsT = Math.max(0, Math.min(1, (p.adsT || 0) + (canAds ? dt * rate : -dt * rate * 1.6)));
-      if (this.time - p.lastShot > 0.14) { p.rc = (p.rc || 0) * Math.exp(-dt * 7); p.shots = 0; } }
+      const idle = this.time - p.lastShot; // the crosshair drifts back after a burst; once the gun has settled the next shot is exact
+      if (idle > 0.1) p.rc = (p.rc || 0) * Math.exp(-dt * 12);
+      if (g && p.shots && !aimHeat(WEAPONS[g.w], p.shots, idle)) { p.rc = 0; p.shots = 0; } }
 
     if (p.ctrl === 'cam' && !this.feed(p)) { // the feed you were watching broke: go to the next one
       const list = this.feeds(team);
@@ -515,11 +517,12 @@ export class Game {
     // shooting
     const canShoot = p.ctrl === "body" && !p.busy && !p.vault && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && !p.bracing && gun &&
       !(p.switchUntil > this.time) && !(p.staggerUntil > this.time);
-    if (canShoot && inp.fire) {
+    const click = p.click; p.click = null;
+    if (canShoot && (inp.fire || click)) {
       const w = WEAPONS[gun.w];
-      const edge = !prev.fire;
+      const edge = !prev.fire || !!click;
       if (p.fireCd <= 0 && (w.auto || edge)) {
-        if (gun.ammo > 0) this.fire(p, gun, w);
+        if (gun.ammo > 0) this.fire(p, gun, w, click);
         else if (gun.reserve > 0) this.startReload(p);
         else if (edge) this.events.push({ e: 'snd', s: 'empty', x: r1(p.x), y: r1(p.y) });
       }
@@ -539,32 +542,32 @@ export class Game {
     if (this.noises.length > 80) this.noises.splice(0, this.noises.length - 80);
   }
 
-  fire(p, gun, w) {
+  fire(p, gun, w, click = null) {
     this.noise(p.x, p.y, this.side(p), (gun.m && gun.m.quiet) ? 260 : 950);
-    gun.ammo--; p.fireCd = 60 / w.rpm; p.lastShot = this.time;
+    gun.ammo--; p.fireCd = 60 / w.rpm;
     if (p.ms) p.ms.shots += w.pellets;
     // hip fire is a loose cone that widens while moving; aimed fire is accurate even on the move (R6 rules)
     const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED), at = p.adsT || 0;
     const m = gun.m || gunMods(gun.w);
-    const hip = (w.spread * (p.input.crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip, ads = w.ads * m.adsSpread;
-    const spread = (hip + (ads - hip) * at + p.bloom * (1 - 0.7 * at)) * (this.time < (p.dazeUntil || 0) ? 1.7 : 1); // dazed: shaky aim
-    p.bloom = Math.min(0.08, p.bloom + w.bloom);
-    // recoil: drifts one way for a burst, then the other, with sway; pull against it
-    const rc = RECOIL[w.cls] || RECOIL.AR;
-    p.shots = (p.shots || 0) + 1;
-    const dir = (Math.floor((p.shots - 1) / 6) % 2 ? -1 : 1) * (p.rcDir || 1);
-    const kick = rc.kick * m.kick * (p.shots <= 3 ? m.first : 1);
-    p.rc = Math.max(-rc.max, Math.min(rc.max, (p.rc || 0) + dir * kick + (Math.random() - 0.5) * rc.sway * m.sway));
+    // the aiming model (shared/operators.js): exact first shot, a fixed cone after that, a fixed recoil pattern
+    const cone = spreadCone(w, m, { at, run, crouch: !!p.input.crouch, shots: aimHeat(w, p.shots || 0, this.time - p.lastShot) }) * (this.time < (p.dazeUntil || 0) && p.shots ? 1.7 : 1); // dazed: shaky follow-ups
+    const aim = click ? click.a : p.aim, vt = p.viewTime;
+    if (click && click.vt !== undefined) p.viewTime = click.vt; // judged against what they saw when they clicked
+    const base = aim + (p.rc || 0);
     this.rangeMul = m.range;
-    const mx = p.x + Math.cos(p.aim) * (w.len + 6), my = p.y + Math.sin(p.aim) * (w.len + 6);
+    const mx = p.x + Math.cos(aim) * (w.len + 6), my = p.y + Math.sin(aim) * (w.len + 6);
     for (let i = 0; i < w.pellets; i++) {
-      const a = p.aim + p.rc + gauss() * Math.max(0.002, spread);
+      const a = base + shotOffset(w, cone, i);
       const into = this.aimedHatch(p, a); // aimed into a hatch: the bullet goes down (or up) there, not on across the room
       const end = this.hitscan(p, p.x, p.y, a, into ? into.ad : w.range, w.dmg * m.dmg, w.name, w.cls);
       if (into && end.k === 'none') this.shotThroughHatch(p, a, into, w.dmg * m.dmg, w.name, w.cls);
       if (i < 3) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });
+    p.viewTime = vt;
+    p.lastShot = this.time;
+    p.shots = (p.shots || 0) + 1; // recoil comes after the shot, so it moves the next one, never this one
+    p.rc = Math.max(-recoilMax(w), Math.min(recoilMax(w), (p.rc || 0) + recoilStep(w, m, p.shots)));
   }
 
   // Bullet: stops at the first enemy, goes through soft walls (damaging them), stops on hard ones.
@@ -1656,7 +1659,7 @@ export class Game {
       });
       if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
-        vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 1000) / 1000, at: r2(p.adsT || 0),
+        vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, bs: p.guns[p.slot] ? Math.round(aimHeat(WEAPONS[p.guns[p.slot].w], p.shots || 0, this.time - p.lastShot) * 100) / 100 : 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0,
       }));

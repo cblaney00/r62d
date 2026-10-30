@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
@@ -947,7 +947,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
     const f = Math.min(1, (nowS - st.vault.t0) / dur), e = f * f * (3 - 2 * f);
     st.pred.x = x0 + (x1 - x0) * e; st.pred.y = y0 + (y1 - y0) * e;
   } else st.vault = null;
-  const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 1000) / 1000, dt: Math.round(dt * 10000) / 10000 };
+  const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
   const c = cursor(), mw = screenToWorld(c.x, c.y); msg.ax = Math.round(mw.x); msg.ay = Math.round(mw.y);
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
   if (ev.length) msg.ev = ev;
@@ -1410,14 +1410,15 @@ function aimPad() {
 
 function crosshair(me, now) {
   const w = WEAPONS[me.w];
-  const gm = gunMods(me.w, attFromCode(me.aa)), hipS = w ? w.spread * gm.hip : 0.05;
-  const at = me.at || 0, base = w ? hipS + (w.ads * gm.adsSpread - hipS) * at : 0.05; // tightens as you settle into your sights
-  const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
-  const spread = xh.dynamic ? Math.max(0, base * 160 + Math.pow(run, 1.4) * 15 + (me.cr && run < 0.15 ? -2 : 0)) : 0; // opens up while you run
+  const gm = gunMods(me.w, attFromCode(me.aa));
   // recoil kicks the crosshair round your character: pull the mouse against it
   const px = (st.pred.x - st.cam.x) * st.zoom + VW / 2, py = (st.pred.y - st.cam.y) * st.zoom + VH / 2;
   const rc = me.rc || 0, c = Math.cos(rc), s2 = Math.sin(rc);
   const m = cursor(), x = px + (m.x - px) * c - (m.y - py) * s2, y = py + (m.x - px) * s2 + (m.y - py) * c;
+  // the gap is the true cone the next shot can land in, measured at the crosshair: shut when the next shot is exact
+  const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
+  const cone = w ? spreadCone(w, gm, { at: me.at || 0, run, crouch: !!me.cr, shots: me.bs || 0 }) : 0;
+  const spread = xh.dynamic ? Math.tan(cone) * Math.hypot(m.x - px, m.y - py) / DPR : 0;
   drawXhair(ctx, x, y, xh, spread, DPR);
   const hk = 1 - (now - st.hitT) / 0.18;
   if (hk > 0) {

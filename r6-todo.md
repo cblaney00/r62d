@@ -22,9 +22,10 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Shooting through walls takes damage off the bullet, so it is a little harder to just spray in the general direction of someone and win.
 - [ ] See as far as you can be shot from: you should always be able to see about as far as the furthest place someone could shoot you from, without just seeing the whole map down long hallways, and without the camera jostling around.
 - [ ] Barricades like R6: every window and doorway starts boarded up. Three melee hits break one; bullets work differently — they only chew small holes in it that can be used on purpose (to look or shoot through). Work out how R6 does it and match that.
-- [ ] Rework aiming for competitive play: comfortable and effective, precise to what each gun is designed to do and how accurate it is meant to be at different ranges. The first bullet always goes exactly where you aim.
 
 ## Done
+
+- [x] Aiming rework: the first shot goes exactly where the crosshair is (any gun, standing or running, aimed or hip) once the gun has settled; accuracy comes back gradually after each shot (a reset time per gun type, so one-taps can't be spammed); follow-ups stay inside a fixed cone shown truthfully by the crosshair gap (shut = next shot exact); each gun has its own fixed, learnable recoil pattern; shotgun pellets fan round the aim point; quick clicks are never lost and fire with the aim they were made with. The Armory uses the same rules.
 
 - [x] Smarter bots: a Bot skill setting (Easy / Normal / Hard / Expert) in the lobby and Free Play; each bot gets a job each round (entry, support, flanker, intel; anchor, roamer) and its own personality; they breach site walls with their gadgets, use every operator ability, revive and heal teammates, smoke plants, throw grenades at noises, and call out enemies they see.
 

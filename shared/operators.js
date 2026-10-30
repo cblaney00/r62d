@@ -287,3 +287,38 @@ export const FALLOFF = {
   Shotgun: { from: 70, to: 260, min: 0.25 },
 };
 export const HEAD_R = 2.3; // a bullet passing this close to the centre of a body is a headshot: instant kill
+
+// ---- the aiming model: one set of rules for the server, the crosshair and the Armory ----
+// The first shot after the gun has settled (no shot for settleTime) goes exactly where the crosshair is: no spread, no
+// recoil, standing, running, aimed or from the hip. Follow-up shots of a burst land somewhere inside a fixed cone that
+// they never leave (narrow when aimed, wider from the hip and while running, a little wider with every shot of the
+// burst), and the crosshair is pushed along each gun's own fixed recoil pattern, which you learn and pull against.
+// Shotgun pellets fly in a fixed fan round the aim point.
+// He asked for a reset time, so one-taps can't be spammed: accuracy comes back gradually after each shot and is only
+// perfect again after the gun's settle time (counted from when the next shot could first be fired).
+const SETTLE = { Pistol: 0.45, DMR: 0.55, AR: 0.4, SMG: 0.32, MP: 0.32, LMG: 0.45, Shotgun: 0.45 };
+export const settleTime = w => SETTLE[w.cls] || 0.4;
+// how "hot" the gun still is: the shots of this burst, cooling to 0 over the settle time (fractions make a smaller cone)
+export const aimHeat = (w, shots, idle) => shots * Math.max(0, 1 - Math.max(0, idle - 60 / w.rpm * 1.05) / settleTime(w));
+// half-width of the cone (radians) for the next shot; shots = shots already fired in this burst
+export function spreadCone(w, m, { at = 0, run = 0, crouch = false, shots = 0 } = {}) {
+  if (shots <= 0 && w.pellets === 1) return 0;
+  const f = w.pellets > 1 ? 1 : Math.min(1, shots); // partly cooled: a partly opened cone
+  const hip = (w.spread * (crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip;
+  const ads = w.ads * m.adsSpread * (1 + run * 0.5);
+  const burst = w.pellets > 1 ? 0 : Math.min(0.05, Math.max(0, shots - 1) * w.bloom * 0.5);
+  return (hip + (ads - hip) * at) * f + burst * (1 - 0.7 * at);
+}
+// where one bullet goes inside the cone: never outside it, most often near the middle; pellets in a fixed fan
+export function shotOffset(w, cone, i, rnd = Math.random) {
+  if (w.pellets > 1) return w.pellets === 1 ? 0 : cone * ((i / (w.pellets - 1)) * 2 - 1) * (i % 2 ? 0.75 : 1) + (rnd() - 0.5) * cone * 0.1;
+  return cone ? (rnd() + rnd() - 1) * cone : 0;
+}
+// the recoil added after shot number n of a burst (1 = the first): each gun has its own fixed pattern
+export function recoilStep(w, m, n) {
+  const rc = RECOIL[w.cls] || RECOIL.AR;
+  let seed = 0; for (const c of w.name) seed = (seed * 31 + c.charCodeAt(0)) % 997;
+  const dir = (Math.floor((n - 1) / 6) % 2 ? -1 : 1) * (seed % 2 ? 1 : -1);
+  return dir * rc.kick * m.kick * (n <= 3 ? m.first : 1) + Math.sin(n * 1.7 + seed) * rc.sway * m.sway * 0.5;
+}
+export const recoilMax = w => (RECOIL[w.cls] || RECOIL.AR).max;
