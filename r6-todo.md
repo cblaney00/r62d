@@ -5,7 +5,11 @@ finished it gets ticked and moved to **Done**, then work continues on the next o
 Only ideas he asks for go in **To do** (added to the bottom). Claude never adds its own suggestions here.
 
 ## To do
-(empty — waiting for his next idea)
+- [ ] The chat box is too long and covers the role cards between rounds.
+- [ ] Not all attacker bots seem to use their drone; every attacker bot should drone.
+- [ ] A way to look over each map and know where the bomb sites could be.
+- [ ] The Tusk Auto-12 shoots to the left every time (tested in the Armory). Check that no other gun has the same problem.
+- [ ] Fights on the stairs are still a bit of a choke point. Look for a way to preview what you'd see at the top (or other end) of the stairs once you get close enough to them.
 
 ## Done
 
