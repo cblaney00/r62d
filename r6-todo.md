@@ -6,10 +6,22 @@ New ideas from him get added to the bottom of **To do**.
 
 ## To do
 
-- [x] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
-      Done for all six maps (Harbor first, he approved it; the other five after).
+- [ ] Leaning: lean round a corner to peek and shoot without stepping out.
+- [ ] Players bump into each other instead of walking through one another (teammates too).
+- [ ] Smarter attacking bots: they win only about 3 rounds in 10 on attack; better droning, breaching and pushing together.
+- [ ] Hide enemy positions from players' computers until they could see or hear them (stops cheating).
+- [ ] Voice callouts for each operator (short lines like "Reloading!", "Drone spotted!").
+- [ ] Killcam: a short replay of how you died.
+- [ ] Round MVP card: the best player of each round shown when it ends.
+- [ ] New game mode: Secure Area (hold a room).
+- [ ] New game mode: Hostage (rescue or protect a hostage).
+- [ ] A seventh map.
+- [ ] More operators.
 
 ## Done
+
+- [x] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
+      Done for all six maps (Harbor first, he approved it; the other five after).
 
 - [x] Revamp the loading screen: when a map loads, a softened picture of it drifts slowly behind its name in big letters ("DEPLOYING TO CLIFFSIDE VILLA"), its floors and description; the bar glides smoothly (even while the map is being built) with a sheen running along it, a percentage, what it's doing and a tip; loading steps that follow each other share one screen instead of flickering.
 
