@@ -17,6 +17,7 @@ const r2 = v => Math.round(v * 100) / 100;
 const BOT_NAMES = ['Viper', 'Moss', 'Rook-7', 'Static', 'Juno', 'Kilo', 'Brine', 'Ozone', 'Pike', 'Wick', 'Saber', 'Flint'];
 const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
 const JAM_R = 90;
+const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free play's switching order
 
 // R62D_FAST=1 shortens the menus, for quick testing.
 if (typeof process !== 'undefined' && process.env.R62D_FAST) { DUR.select = 3; DUR.prep = 6; }
@@ -26,6 +27,8 @@ export class Game {
   // while the coach explains each step, and nothing saved to their profile.
   constructor(opts = {}) {
     this.tut = opts.tut ? { lesson: null, hold: true, info: this.blankTutInfo() } : null;
+    // opts.free: a private free-play match for one player: no clock, no rounds, switch operator any time (see freeAction)
+    this.free = opts.free ? { bots: 0 } : null;
     this.onEmpty = null;
     this.players = new Map();
     this.nextId = 1;
@@ -54,7 +57,7 @@ export class Game {
       if (m.t === 'join' && !p) {
         if (this.humanCount() >= MAX_PLAYERS) { sock.send(JSON.stringify({ t: 'full' })); return; }
         const login = store.login(cleanName(m.name));
-        if (!this.tut && [...this.players.values()].some(q => !q.bot && q.pid === login.profile.id)) { sock.send(JSON.stringify({ t: 'taken', name: login.profile.name })); return; }
+        if (!this.tut && !this.free && [...this.players.values()].some(q => !q.bot && q.pid === login.profile.id)) { sock.send(JSON.stringify({ t: 'taken', name: login.profile.name })); return; }
         p = this.addPlayer(login.profile.name, false);
         p.sock = sock;
         p.token = login.token; p.pid = login.profile.id;
@@ -119,7 +122,8 @@ export class Game {
       if (p.sock && p.sock.open) p.sock.send(JSON.stringify({ t: 'pong', c: m.c }));
       if (typeof m.rtt === 'number' && isFinite(m.rtt)) p.rtt = Math.max(0, Math.min(9999, Math.round(m.rtt)));
     } else if (m.t === 'tut') { if (this.tut) this.tutAction(p, m); }
-    else if (m.t === 'lobby' && !this.tut) {
+    else if (m.t === 'free') { if (this.free) this.freeAction(p, m); }
+    else if (m.t === 'lobby' && !this.tut && !this.free) {
       if (m.a === 'addBot') this.addBot(m.squad);
       else if (m.a === 'removeBot') this.removeBot(m.squad);
       else if (m.a === 'fillBots') { for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); }
@@ -252,6 +256,7 @@ export class Game {
   }
 
   endRound(winTeam, reason) {
+    if (this.free) { this.planted = null; this.events.push({ e: 'banner', text: reason.toUpperCase(), sub: 'Free play carries on' }); return; }
     if (this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END) return;
     const squad = this.squadOfSide(winTeam);
     this.score[squad]++;
@@ -293,7 +298,7 @@ export class Game {
   tick(dt) {
     this.time += dt;
     if (this.phase === PHASE.LOBBY) return;
-    const held = this.tut && this.tut.hold && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP);
+    const held = (this.tut && this.tut.hold && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP)) || this.free;
     if (!held) this.timer -= dt;
     if (this.phase === PHASE.SELECT) {
       for (const p of this.players.values()) if (p.bot && !p.op && Math.random() < dt * 0.8) botPickOp(this, p);
@@ -321,6 +326,7 @@ export class Game {
 
     // PREP / ACTION
     for (const p of this.players.values()) if (p.ms && p.alive) p.ms.playSeconds += dt;
+    if (this.free) this.freeRespawns();
     for (const p of this.players.values()) {
       if (p.bot) { botThink(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
       this.tickPlayer(p, dt);
@@ -346,9 +352,10 @@ export class Game {
     if (this.planted) {
       this.planted.t -= 1 / 30;
       if (this.planted.t <= 0) return this.endRound(TEAM.ATK, 'Defuser completed');
-      if (hasDef && up.def === 0) return this.endRound(TEAM.ATK, 'Defenders eliminated');
+      if (hasDef && up.def === 0 && !this.free) return this.endRound(TEAM.ATK, 'Defenders eliminated');
       return;
     }
+    if (this.free) return; // free play: nobody wins, the dead come back (freeRespawns)
     if (hasAtk && up.atk === 0) return this.endRound(TEAM.DEF, 'Attackers eliminated');
     if (hasDef && up.def === 0) return this.endRound(TEAM.ATK, 'Defenders eliminated');
     if (this.timer <= 0) return this.endRound(TEAM.DEF, 'Time ran out');
@@ -1135,6 +1142,75 @@ export class Game {
     }
   }
 
+  // ---------------- free play ----------------
+  // 'start' {map, bots}: you on the chosen map, straight into the action, against that many enemy bots.
+  // 'op' {dir: 1/-1}: switch to the next/previous operator (attackers, then defenders), right where you stand.
+  freeAction(p, m) {
+    const F = this.free;
+    if (m.a === 'start') {
+      for (const q of [...this.players.values()]) if (q.bot) this.players.delete(q.id);
+      F.bots = Math.max(0, Math.min(TEAM_SIZE, m.bots | 0));
+      if (MAPS[m.map] && m.map !== this.mapId) { this.mapId = m.map; this.map = buildMap(this.mapId); }
+      p.squad = 0;
+      for (let i = 0; i < F.bots; i++) this.addBot(1);
+      this.startMatch(); // round 1: squad 0 attacks
+      p.op = opsForTeam(TEAM.ATK)[0];
+      for (const q of this.players.values()) if (q.bot) botPickOp(this, q);
+      this.beginPrep(); this.beginAction();
+      p.hasDefuser = true;
+      this.events = [{ e: 'banner', text: 'FREE PLAY', sub: MAPS[this.mapId].name }];
+    } else if (m.a === 'op' && this.phase === PHASE.ACTION) {
+      const i = Math.max(0, FREE_OPS.indexOf(p.op)), n = FREE_OPS.length;
+      this.freeSwitch(p, FREE_OPS[(i + (m.dir < 0 ? -1 : 1) + n) % n]);
+    }
+  }
+  freeSwitch(p, op) {
+    const squad = OPERATORS[op].team === TEAM.ATK ? 0 : 1;
+    if (p.ctrl === 'drone' || p.ctrl === 'cam') p.ctrl = 'body';
+    if (p.hasDefuser) this.dropDefuser(p);
+    for (const e of [...this.ents]) if (e.owner === p.id) this.removeEnt(e); // your old drone and gadgets go with your old operator
+    const x = p.x, y = p.y, aim = p.aim, wasAlive = p.alive;
+    if (squad !== p.squad) { // changing sides: the bots swap to the other side and come back as fresh operators
+      p.squad = squad;
+      for (const q of this.players.values()) if (q.bot) {
+        if (q.hasDefuser) this.dropDefuser(q);
+        for (const e of [...this.ents]) if (e.owner === q.id) this.removeEnt(e);
+        q.squad = 1 - squad; q.op = null; this.freeSpawn(q, true);
+      }
+    }
+    p.op = op;
+    this.freeSpawn(p, !wasAlive);
+    if (wasAlive) { p.x = x; p.y = y; p.aim = aim; }
+    this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id });
+  }
+  // (re)equips a player; atSpawn also puts them at their side's starting spot
+  freeSpawn(p, atSpawn) {
+    p.respawnAt = 0;
+    if (!p.op) { // a random operator of their side that no teammate is playing
+      const taken = new Set([...this.players.values()].filter(q => q.squad === p.squad && q.op).map(q => q.op)), list = opsForTeam(this.side(p)).filter(o => !taken.has(o));
+      p.op = list[Math.floor(Math.random() * list.length)] || opsForTeam(this.side(p))[0];
+    }
+    this.equip(p);
+    const map = this.map, atk = this.side(p) === TEAM.ATK;
+    if (atSpawn) {
+      if (!atk) {
+        const cells = this.freeCellsInRooms(map.sites[this.site].rooms), k = cells[Math.floor(Math.random() * cells.length)];
+        p.x = (k % map.W + 0.5) * CELL; p.y = (Math.floor(k / map.W) + 0.5) * CELL; p.aim = Math.random() * Math.PI * 2;
+      } else {
+        const sp = map.atkSpawns.find(s => s.name === this.spawnName) || map.atkSpawns[0], pos = this.freeSpotNear(sp.x, sp.y, 46);
+        p.x = pos.x; p.y = pos.y; p.aim = Math.atan2(map.H * CELL / 2 - p.y, map.W * CELL / 2 - p.x);
+      }
+    }
+    if (atk) { p.drones = 2; if (!p.bot && !this.planted && !this.ents.some(e => e.type === 'defuser')) p.hasDefuser = true; }
+  }
+  freeRespawns() { // the dead come back at their side's start after 3 s
+    for (const p of this.players.values()) {
+      if (p.alive || !p.op) continue;
+      if (!p.respawnAt) p.respawnAt = this.time + 3;
+      else if (this.time >= p.respawnAt) this.freeSpawn(p, true);
+    }
+  }
+
   spot(team, id, dur) {
     const until = this.time + dur;
     if ((this.spots[team].get(id) || 0) < until) this.spots[team].set(id, until);
@@ -1449,7 +1525,7 @@ export class Game {
     return { name: p.name, bot: !!p.bot, pid: p.pid || null, token: p.token || null, squad: p.squad, left, ...ms, damage: Math.round(ms.damage), playSeconds: Math.round(ms.playSeconds) };
   }
   saveMatch(winner) {
-    if (this.tut) return null; // tutorials never count
+    if (this.tut || this.free) return null; // tutorials and free play never count
     const players = [...[...this.players.values()].map(p => this.statLine(p)), ...(this.departed || [])];
     if (!players.some(p => p.token)) return null; // nobody real played
     return store.recordMatch({
@@ -1508,7 +1584,7 @@ export class Game {
     const common = JSON.stringify({
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId,
       site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
-      rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName,
+      rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined,
       players, ents, cells, holes, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];

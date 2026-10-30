@@ -424,6 +424,21 @@ button.big { font-size: 22px; padding: 14px 34px; }
 #chatMode { font: 800 13px var(--head); letter-spacing: 0.15em; padding: 8px 10px; }
 #chatIn { flex: 1; width: auto; font: 500 15px var(--body); padding: 7px 10px; background: rgba(0,0,0,0.75); }
 
+/* free play: the menu page and the small key hint in the match */
+.freeH { font: 800 15px var(--head); letter-spacing: 0.18em; color: #f2c14e; margin: 18px 0 8px; }
+#freeMaps { display: flex; gap: 10px; flex-wrap: wrap; }
+#freeMaps button { width: 150px; padding: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; }
+#freeMaps canvas { width: 100%; height: 84px; display: block; background: #0a0c0f; }
+#freeMaps b { font: 700 14px var(--head); letter-spacing: 0.08em; }
+#freeMaps span { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
+#freeMaps button.on { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+#freeBots button.on { border-color: var(--gold); color: var(--gold); }
+#tab-free .row { margin-top: 22px; }
+#freeHint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 4px 12px; background: rgba(0,0,0,0.6); border-radius: 3px;
+  font: 600 13px var(--body); letter-spacing: 0.04em; color: #d9e0e6; white-space: nowrap; pointer-events: none; }
+#freeHint b { color: #f2c14e; font-weight: 700; }
+#freeHint kbd { font-size: 12px; }
+
 /* tutorial: the menu page and the coach box in the match */
 .tutPage { max-width: 1100px; }
 .tutLessons { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 18px 0 26px; }

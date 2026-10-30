@@ -19,6 +19,8 @@ New ideas from him get added to the bottom of **To do**.
 
 ## Done
 
+- [x] Free play for testing: pick a map (and enemy bots if you want), start straight in the action with no clock, switch to any operator any time with N / B (hint at the bottom of the screen), come back 3 s after dying.
+
 - [x] Defender cameras hang on walls and up in corners (same spots every round), small and dark so they blend in, and break from one bullet, a hit, a blast or their wall coming down.
 - [x] Faster aiming: aiming down sights takes about half the time and zooms the view in quickly; the view no longer slowly drifts in and out as you turn.
 

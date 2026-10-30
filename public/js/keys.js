@@ -17,6 +17,8 @@ export const ACTIONS = [
   ['spot', 'Ping what is under your aim (enemy, gadget, wall, door, place)', 'KeyT', ''],
   ['chat', 'Chat (opens team chat; / switches team ⇄ all)', 'KeyY', 'Enter'],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
+  ['opNext', 'Free play: next operator', 'KeyN', ''],
+  ['opPrev', 'Free play: previous operator', 'KeyB', ''],
   ['settings', 'Settings', 'KeyO', 'F1'],
   ['pause', 'Pause menu', 'Escape', 'KeyP'],
 ];

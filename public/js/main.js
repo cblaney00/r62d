@@ -148,8 +148,8 @@ addEventListener('resize', resize); resize();
 fx.quality = gq.parts; setShading(gq.shade);
 
 // ---------------- network ----------------
-function connect(tut = false) {
-  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws${tut ? '?tut=1' : ''}`);
+function connect(mode = '') { // '' = the shared match, 'tut' / 'free' = a private one
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws${mode ? `?${mode}=1` : ''}`);
   st.ws = ws;
   ws.onopen = () => { if (st.rejoin) { st.rejoin = false; $('joinBtn').click(); } };
   ws.onmessage = ev => {
@@ -157,6 +157,7 @@ function connect(tut = false) {
     if (m.t === 'pong') { const r = performance.now() - m.c; st.rtt = st.rtt == null ? r : st.rtt * 0.7 + r * 0.3; return; }
     if (m.t === 'welcome') {
       if (st.tutorial) send({ t: 'tut', a: 'start', lesson: st.tutorial });
+      if (st.free) send({ t: 'free', a: 'start', map: st.free.map, bots: st.free.bots });
       st.id = m.id;
       if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
         resetMap(m.mapVersion);
@@ -188,15 +189,41 @@ setInterval(() => send({ t: 'ping', c: performance.now(), rtt: st.rtt == null ? 
 // ---------------- tutorial ----------------
 // A lesson runs in its own private match on the server: leave the lobby, join a tutorial, come back after.
 const coach = createCoach({ el: $('coach'), send, getMap: () => st.map, onExit: () => switchMatch(null) });
-function switchMatch(lesson) {
+// free = { map, bots } for a free-play match (see the FREE PLAY page below)
+function switchMatch(lesson, free = null) {
   if (!st.token) { setTab('play'); $('name').focus(); return; }
-  st.tutorial = lesson; st.rejoin = true; st.marks = [];
+  st.tutorial = lesson; st.free = free; st.rejoin = true; st.marks = [];
   if (lesson) coach.start(lesson); else coach.stop();
-  $('pEnd').textContent = lesson ? 'Leave tutorial' : 'End match for everyone'; $('leaveBtn').textContent = lesson ? 'Leave tutorial' : 'End match';
-  const old = st.ws; connect(!!lesson); try { old.close(); } catch {}
+  const leave = lesson ? 'Leave tutorial' : free ? 'Leave free play' : '';
+  $('pEnd').textContent = leave || 'End match for everyone'; $('leaveBtn').textContent = leave || 'End match';
+  const old = st.ws; connect(lesson ? 'tut' : free ? 'free' : ''); try { old.close(); } catch {}
   $('pause').classList.add('hidden');
 }
 for (const b of document.querySelectorAll('[data-lesson]')) b.onclick = () => switchMatch(b.dataset.lesson);
+
+// ---------------- free play page ----------------
+// Pick a map and how many enemy bots, then play alone with no clock, switching operator with N / B.
+const freePick = { map: 'harbor', bots: 0 };
+try { Object.assign(freePick, JSON.parse(localStorage.getItem('r62d-free') || '{}')); } catch {}
+if (!MAPS[freePick.map]) freePick.map = 'harbor';
+function renderFree() {
+  const el = $('freeMaps');
+  if (!el.children.length) for (const id of MAP_LIST) {
+    const M = MAPS[id], b = document.createElement('button');
+    b.dataset.id = id; b.title = M.desc;
+    b.appendChild(mapThumb(id).cloneNode()); b.querySelector('canvas').getContext('2d').drawImage(mapThumb(id), 0, 0);
+    b.insertAdjacentHTML('beforeend', `<b>${esc(M.name)}</b><span>${esc(M.floors)}</span>`);
+    b.onclick = () => { audio.ui(); freePick.map = id; renderFree(); };
+    el.appendChild(b);
+  }
+  for (const b of el.children) b.classList.toggle('on', b.dataset.id === freePick.map);
+  for (const b of $('freeBots').children) b.classList.toggle('on', +b.dataset.n === freePick.bots);
+}
+for (const b of $('freeBots').children) b.onclick = () => { audio.ui(); freePick.bots = +b.dataset.n; renderFree(); };
+$('freeGo').onclick = () => {
+  try { localStorage.setItem('r62d-free', JSON.stringify(freePick)); } catch {}
+  switchMatch(null, { ...freePick });
+};
 
 function loadMap(mv, tiles, hp, id, holes) {
   const t0 = performance.now();
@@ -415,6 +442,7 @@ function pressAction(a, e) {
     case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
     case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
+    case 'opNext': case 'opPrev': if (st.last && st.last.fp) send({ t: 'free', a: 'op', dir: a === 'opNext' ? 1 : -1 }); break;
     case 'camPrev': case 'camNext': if (st.me && (st.me.ct === 'cam' || st.me.ct === 'drone')) ev.push({ k: a }); break;
   }
 }
@@ -559,7 +587,7 @@ document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { send(
 $('switchBtn').onclick = () => { send({ t: 'lobby', a: 'switch' }); };
 $('fillBtn').onclick = () => { send({ t: 'lobby', a: 'fillBots' }); };
 $('startBtn').onclick = () => { send({ t: 'lobby', a: 'start' }); };
-$('leaveBtn').onclick = () => { if (st.tutorial) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
+$('leaveBtn').onclick = () => { if (st.tutorial || st.free) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
 $('fsBtn').onclick = () => toggleFullscreen();
 $('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100); $('muteBtn').textContent = st.muted ? '🔇' : '🔊'; };
 function renderControls() {
@@ -1439,10 +1467,17 @@ function hud(s) {
   setHTML('tiL', icons(mine, true)); setHTML('tiR', icons(theirs, false));
   $('scL').textContent = s.sc[me.sq]; $('scR').textContent = s.sc[1 - me.sq];
   const t = s.pl ? s.pl.t : s.tm;
-  $('time').textContent = `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+  $('time').textContent = s.fp && !s.pl ? '∞' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   $('time').classList.toggle('planted', !!s.pl);
-  $('phase').textContent = s.pl ? 'DEFUSER' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER';
-  $('roundNo').textContent = `ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`;
+  $('phase').textContent = s.pl ? 'DEFUSER' : s.fp ? 'FREE PLAY' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER';
+  $('roundNo').textContent = s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`;
+  // free play: which keys switch operator, and who you'd get
+  $('freeHint').classList.toggle('hidden', !s.fp);
+  if (s.fp && me.op) {
+    const all = [...opsForTeam('atk'), ...opsForTeam('def')], i = all.indexOf(me.op), n = all.length;
+    const nm = k => `${OPERATORS[k].name}${OPERATORS[k].team !== side ? (OPERATORS[k].team === 'atk' ? ' (attack)' : ' (defence)') : ''}`;
+    setHTML('freeHint', `Switch operator: <kbd>${esc(label('opPrev'))}</kbd> ${esc(nm(all[(i - 1 + n) % n]))} · <b>${esc(OPERATORS[me.op].name)}</b> · ${esc(nm(all[(i + 1) % n]))} <kbd>${esc(label('opNext'))}</kbd>`);
+  }
   // objective
   let obj, sub = '';
   const where = me.a && me.x !== undefined ? roomAt(st.map, st.pred.x, st.pred.y) : '';
@@ -1700,7 +1735,7 @@ $('pOps').onclick = () => showOps(st.me && st.me.op);
 $('pProf').onclick = () => showProfile();
 $('pSet').onclick = () => toggleSettings();
 $('pFs').onclick = () => { toggleFullscreen(); $('pause').classList.add('hidden'); };
-$('pEnd').onclick = () => { if (st.tutorial) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) { send({ t: 'lobby', a: 'end' }); $('pause').classList.add('hidden'); } };
+$('pEnd').onclick = () => { if (st.tutorial || st.free) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) { send({ t: 'lobby', a: 'end' }); $('pause').classList.add('hidden'); } };
 $('lobbyOpsBtn').onclick = () => showOps();
 $('lobbyProfBtn').onclick = () => showProfile();
 $('armoryPage').querySelector('.close').onclick = () => closeArmory($('armoryPage'));
@@ -1728,6 +1763,7 @@ function setTab(tab) {
   for (const b of $('mnav').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);
   for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t.id === 'tab-' + tab);
   if (tab === 'controls') renderControls();
+  if (tab === 'free') renderFree();
   updateNav();
 }
 function updateNav() {

@@ -32,6 +32,7 @@
     <nav class="mnav" id="mnav">
       <button data-tab="play" class="on">PLAY</button>
       <button data-tab="tutorial">TUTORIAL</button>
+      <button data-tab="free">FREE PLAY</button>
       <button data-tab="ops">OPERATORS</button>
       <button data-tab="armory">ARMORY</button>
       <button data-tab="profile">PROFILE</button>
@@ -58,6 +59,17 @@
           </div>
           <div class="row center"><button id="switchBtn">Switch team</button><button id="fillBtn">Fill empty slots with bots</button>
             <button id="lobbyOpsBtn" class="hidden">Operators</button><button id="lobbyProfBtn" class="hidden">Profile</button></div>
+        </div>
+      </section>
+      <section class="tab" id="tab-free">
+        <div class="tutPage">
+          <h2>FREE PLAY</h2>
+          <p class="hint">A private match just for you, for trying things out. No clock and no rounds: you start straight in the action phase, come back 3 seconds after dying, and can switch to any operator at any time with <kbd>N</kbd> (next) and <kbd>B</kbd> (previous). Nothing counts towards your stats.</p>
+          <h4 class="freeH">MAP</h4>
+          <div id="freeMaps" class="mapRow"></div>
+          <h4 class="freeH">ENEMY BOTS</h4>
+          <div class="seg" id="freeBots"><button data-n="0">None</button><button data-n="1">1</button><button data-n="3">3</button><button data-n="5">5</button></div>
+          <div class="row"><button id="freeGo" class="primary big">START FREE PLAY</button></div>
         </div>
       </section>
       <section class="tab" id="tab-tutorial">
@@ -108,6 +120,7 @@
     <div id="banner"><div class="t"></div><div class="s"></div></div>
     <div id="viewlabel"></div>
     <div id="cambar"></div>
+    <div id="freeHint" class="hidden"></div>
     <div id="scoreboard" class="hidden"></div>
   </div>
   <div id="endscreen" class="hidden">

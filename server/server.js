@@ -59,11 +59,12 @@ function api(req, res) {
 }
 
 const game = new Game();
-// /ws?tut=1 gets its own private tutorial match, gone when that player leaves it
+// /ws?tut=1 gets its own private tutorial match (/ws?free=1 a free-play one), gone when that player leaves it
 const tutorials = new Set();
 attachWebSocket(server, '/ws', (sock, req) => {
-  if (!/[?&]tut=1/.test(req.url)) return game.connect(sock);
-  const g = new Game({ tut: true }); tutorials.add(g);
+  const tut = /[?&]tut=1/.test(req.url), free = /[?&]free=1/.test(req.url);
+  if (!tut && !free) return game.connect(sock);
+  const g = new Game({ tut, free }); tutorials.add(g);
   g.onEmpty = () => tutorials.delete(g);
   g.connect(sock);
 });
