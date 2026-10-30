@@ -1,6 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS,
-  stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
+  MAT, stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
 import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
@@ -8,7 +8,7 @@ import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf } from '../shared
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax, adsTime, falloffOf } from '../shared/operators.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -650,7 +650,8 @@ export class Game {
       const t = rayCircle(x0, y0, dx, dy, at.x, at.y, e.type === 'decoy' ? hitR(e.op) : 6);
       if (t !== null && t < bestT) { bestT = t; best = { e }; }
     }
-    let mult = 1, stopT = bestT, kind = best ? 'flesh' : 'none', pens = 0;
+    let mult = 1, stopT = bestT, kind = best ? 'flesh' : 'none', pens = 0, wallT = 0;
+    const pen = penOf(this.shotW && this.shotW.cls === cls ? this.shotW : { cls });
     const sx = Math.floor(x0 / CELL), sy = Math.floor(y0 / CELL);
     walkRay(x0, y0, dx, dy, bestT, (cx, cy, t) => {
       const k = cy * this.map.W + cx, tile = tileAt(this.map, cx, cy), sh = (stopsBullet(tile) || penBullet(tile)) && shapeAt(this.map, cx, cy);
@@ -660,12 +661,20 @@ export class Game {
       if (penBullet(tile)) {
         if (tile === T.SOFT && HOLE_ONLY.has(cls)) this.holeCell(k, cx, cy, x0, y0, dx, dy, t);
         else this.damageCell(k, dmg * 0.6);
-        mult *= 0.6; pens++;
+        // he asked: a wall takes damage off the bullet (how much depends on the gun and the wall), so spraying
+        // through walls in someone's general direction doesn't win fights
+        mult *= pen * (this.map.mat[k] === MAT.BRICK ? 0.7 : tile === T.BARRI ? 1.1 : 1); pens++; wallT = t;
         if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) });
         if (pens > 3) { stopT = t; kind = 'wall'; best = null; return true; }
       }
       return false;
     });
+    // a bullet that went through a wall is knocked a little off line: past the wall it can drift off the target
+    if (best && best.q && pens) {
+      const at = best.at || best.q, cx = at.x - x0, cy = at.y - y0, miss = Math.abs(cx * dy - cy * dx);
+      const drift = (Math.random() * 2 - 1) * 0.06 * Math.max(0, bestT - wallT);
+      if (Math.abs(miss + drift) > hitR(best.q.op)) { best = null; kind = 'none'; stopT = Math.min(range, bestT + 40); }
+    }
     const ex = x0 + dx * stopT, ey = y0 + dy * stopT;
     if (best && best.q) {
       const q = best.q;
@@ -682,8 +691,8 @@ export class Game {
       const W = this.shotW && this.shotW.cls === cls ? this.shotW : null, pellet = W ? W.pellets > 1 : cls === 'Shotgun';
       const F = W ? falloffOf(W) : FALLOFF[cls] || FALLOFF.AR, rm = this.rangeMul || 1, fo = { from: F.from * rm, to: F.to * rm, min: F.min };
       const fall = stopT <= fo.from ? 1 : stopT >= fo.to ? fo.min : 1 - (1 - fo.min) * (stopT - fo.from) / (fo.to - fo.from);
-      if (miss < HEAD_R && !q.downed && !pellet) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
-      else if (miss < HEAD_R && pellet) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
+      if (miss < HEAD_R && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
+      else if (miss < HEAD_R && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
       else this.damage(q, dmg * mult * fall, src, wname, ang);
     } else if (best && best.e) this.hitEnt(best.e, src);
     else if (kind === 'hard' || kind === 'prop') this.events.push({ e: 'hit', k: kind, x: r1(ex), y: r1(ey) });

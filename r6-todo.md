@@ -9,11 +9,12 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
       Next: the other five maps the same way, after his feedback on Harbor.
-- [ ] Shooting through walls takes damage off the bullet, so it is a little harder to just spray in the general direction of someone and win.
 - [ ] See as far as you can be shot from: you should always be able to see about as far as the furthest place someone could shoot you from, without just seeing the whole map down long hallways, and without the camera jostling around.
 - [ ] Barricades like R6: every window and doorway starts boarded up. Three melee hits break one; bullets work differently — they only chew small holes in it that can be used on purpose (to look or shoot through). Work out how R6 does it and match that.
 
 ## Done
+
+- [x] Shooting through walls takes damage off the bullet: each wall now leaves about half the damage for a rifle (less for SMGs, pistols and shotguns, more for LMGs and marksman rifles; brick takes more off), a bullet that went through a wall can drift off target, and a headshot through a wall is extra damage instead of an instant kill.
 
 - [x] Pick a role before each round: the operator screen first shows five roles per side as big cards (what the job is and who plays it); after choosing, only that role's operators are shown, with tabs to switch until you lock in, and a count of teammates in each role. Attack: Breacher, Entry, Intel, Support, Flank. Defence: Anchor, Trapper, Roamer, Intel, Support.
 
