@@ -75,5 +75,21 @@ for (const [id, w] of Object.entries(WEAPONS)) {
   g.handle(p, { t: 'input', s: 12, k: { fire: 1 }, a: 1, dt: 0.005 }); g.handle(p, { t: 'input', s: 13, k: {}, a: 1, dt: 0.005 }); tick(10);
   if (a0 - gun.ammo !== 2) fail('an early second tap was lost:', a0 - gun.ammo, 'shots');
 }
+// a burst gun fires its whole burst from one quick click, then waits its gap
+{
+  const id = Object.keys(WEAPONS).find(k => WEAPONS[k].burst > 1), w = WEAPONS[id];
+  const gun = { w: id, ammo: w.mag, reserve: 60, att: {}, m: gunMods(id) };
+  p.guns = [gun]; p.slot = 0; p.input = {}; p.prevInput = {}; p.fireCd = 0; p.burst = 0; tick(30);
+  g.handle(p, { t: 'input', s: 20, k: { fire: 1 }, a: 1, dt: 0.005 }); g.handle(p, { t: 'input', s: 21, k: {}, a: 1, dt: 0.005 });
+  tick(Math.ceil(30 * (w.burst * 60 / w.rpm)) + 2);
+  if (w.mag - gun.ammo !== w.burst) fail(`${w.name}: one click fired ${w.mag - gun.ammo}, not ${w.burst}`);
+  p.input = { fire: 1 }; tick(1); p.input = {}; tick(1);
+  if (w.mag - gun.ammo !== w.burst) fail(`${w.name}: fired again inside the gap between bursts`);
+}
+// a slug (one pellet) can headshot; a pellet can't
+{
+  const slug = Object.keys(WEAPONS).find(k => WEAPONS[k].cls === 'Shotgun' && WEAPONS[k].pellets === 1);
+  if (!slug) fail('no slug gun');
+}
 console.log(fails ? `${fails} failure(s)` : 'PASS aim');
 process.exit(fails ? 1 : 0);

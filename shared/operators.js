@@ -3,13 +3,48 @@
 export const WEAPONS = {
   k4:      { name: 'K4 Carbine',   cls: 'AR',      dmg: 31, rpm: 720, mag: 30, reserve: 150, reload: 2.4, spread: 0.06, ads: 0.014, bloom: 0.012, auto: true,  pellets: 1, range: 1100, len: 15 },
   v9:      { name: 'V9 SMG',       cls: 'SMG',     dmg: 24, rpm: 880, mag: 32, reserve: 192, reload: 2.0, spread: 0.07, ads: 0.022, bloom: 0.010, auto: true,  pellets: 1, range: 900,  len: 11 },
-  breaker: { name: 'Breaker-12',   cls: 'Shotgun', dmg: 15, rpm: 78,  mag: 7,  reserve: 42,  reload: 3.1, spread: 0.16, ads: 0.11,  bloom: 0,     auto: false, pellets: 8, range: 420,  len: 14 },
+  breaker: { name: 'Breaker-12',   cls: 'Shotgun', mode: 'pump-action', dmg: 15, rpm: 78,  mag: 7,  reserve: 42,  reload: 3.1, spread: 0.16, ads: 0.11,  bloom: 0,     auto: false, pellets: 8, range: 420,  len: 14 },
   mule:    { name: 'Mule LMG',     cls: 'LMG',     dmg: 29, rpm: 640, mag: 80, reserve: 160, reload: 4.4, spread: 0.09, ads: 0.024, bloom: 0.008, auto: true,  pellets: 1, range: 1100, len: 17 },
   longbow: { name: 'Longbow DMR',  cls: 'DMR',     dmg: 58, rpm: 360, mag: 12, reserve: 60,  reload: 2.7, spread: 0.06, ads: 0.004, bloom: 0.02,  auto: false, pellets: 1, range: 1300, len: 18 },
   hornet:  { name: 'Hornet MP',    cls: 'MP',      dmg: 20, rpm: 920, mag: 25, reserve: 150, reload: 1.9, spread: 0.08, ads: 0.03,  bloom: 0.010, auto: true,  pellets: 1, range: 800,  len: 8 },
   vex50:   { name: 'Vex .50',      cls: 'Pistol',  dmg: 50, rpm: 210, mag: 7,  reserve: 35,  reload: 2.0, spread: 0.06, ads: 0.012, bloom: 0.04,  auto: false, pellets: 1, range: 900,  len: 8 },
   p10:     { name: 'P10 Sidearm',  cls: 'Pistol',  dmg: 34, rpm: 420, mag: 15, reserve: 60,  reload: 1.6, spread: 0.05, ads: 0.016, bloom: 0.02,  auto: false, pellets: 1, range: 900,  len: 7 },
+  // More guns (he asked: "every gun should have its own properties, none of them too similar"). Besides the numbers
+  // above, a gun can change its class's handling: adsMul (time to aim), kickMul / swayMul (recoil), settle (s until
+  // the next shot is exact again), fall (damage drop-off), burst (shots per click), quiet (built-in suppressor).
+  rook:    { name: 'Rook Battle Rifle', cls: 'AR', dmg: 40, rpm: 540, mag: 20, reserve: 120, reload: 2.7, spread: 0.065, ads: 0.012, bloom: 0.016, auto: true, pellets: 1, range: 1300, len: 17,
+             adsMul: 1.15, kickMul: 1.8, swayMul: 0.7, fall: { from: 520, to: 900, min: 0.8 }, trait: 'Hits hard and keeps its damage far away, but kicks hard and holds only 20 rounds.' },
+  sabre:   { name: 'Sabre Bullpup', cls: 'AR', dmg: 28, rpm: 820, mag: 30, reserve: 180, reload: 2.9, spread: 0.055, ads: 0.016, bloom: 0.011, auto: true, pellets: 1, range: 1000, len: 12,
+             adsMul: 0.8, kickMul: 0.85, swayMul: 1.3, trait: 'Short, quick to aim and fast-firing; slow to reload, and its spray wanders sideways.' },
+  trident: { name: 'Trident Burst', cls: 'AR', dmg: 38, rpm: 900, mag: 30, reserve: 150, reload: 2.3, spread: 0.05, ads: 0.010, bloom: 0.010, auto: false, pellets: 1, range: 1150, len: 15,
+             burst: 3, burstGap: 0.2, kickMul: 0.8, trait: 'Three-round burst with every click: deadly accurate in bursts, but it can\'t spray.' },
+  wasp:    { name: 'Wasp SMG', cls: 'SMG', dmg: 19, rpm: 1100, mag: 40, reserve: 200, reload: 2.3, spread: 0.08, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 800, len: 11,
+             kickMul: 0.8, swayMul: 1.5, fall: { from: 220, to: 500, min: 0.55 }, trait: 'A frantic fire rate shreds up close; wild sideways recoil and weak at range.' },
+  marten:  { name: 'Marten .45', cls: 'SMG', dmg: 28, rpm: 640, mag: 25, reserve: 150, reload: 2.1, spread: 0.065, ads: 0.020, bloom: 0.010, auto: true, pellets: 1, range: 850, len: 13,
+             quiet: true, kickMul: 0.75, swayMul: 0.6, settle: 0.26, fall: { from: 240, to: 520, min: 0.6 }, trait: 'Built-in suppressor with no damage lost: quiet, steady and slow-firing.' },
+  lark:    { name: 'Lark PDW', cls: 'SMG', dmg: 22, rpm: 860, mag: 50, reserve: 200, reload: 2.6, spread: 0.07, ads: 0.018, bloom: 0.010, auto: true, pellets: 1, range: 1000, len: 12,
+             kickMul: 0.95, fall: { from: 380, to: 700, min: 0.75 }, trait: 'A 50-round magazine that keeps its damage at rifle range, but each bullet is weak.' },
+  tusk:    { name: 'Tusk Auto-12', cls: 'Shotgun', dmg: 11, rpm: 260, mag: 8, reserve: 48, reload: 3.4, spread: 0.17, ads: 0.13, bloom: 0, auto: false, pellets: 8, range: 380, len: 15,
+             kickMul: 0.7, settle: 0.3, trait: 'Semi-automatic: fires as fast as you click, but each blast is weaker and wider.' },
+  anvil:   { name: 'Anvil Slug', cls: 'Shotgun', mode: 'pump-action', dmg: 76, rpm: 85, mag: 6, reserve: 36, reload: 3.2, spread: 0.07, ads: 0.008, bloom: 0.03, auto: false, pellets: 1, range: 900, len: 15,
+             kickMul: 1.3, fall: { from: 200, to: 600, min: 0.5 }, trait: 'One heavy slug: accurate, huge damage and smashes walls, but very slow to fire.' },
+  stub:    { name: 'Stub Sawn-off', cls: 'Shotgun', mode: 'double-barrel', dmg: 13, rpm: 300, mag: 2, reserve: 20, reload: 2.4, spread: 0.22, ads: 0.18, bloom: 0, auto: false, pellets: 9, range: 260, len: 9,
+             fall: { from: 50, to: 200, min: 0.2 }, trait: 'A sidearm with two barrels: blow holes in walls and hatches, or end a fight at arm\'s length.' },
+  ox:      { name: 'Ox Belt-Fed', cls: 'LMG', dmg: 31, rpm: 540, mag: 100, reserve: 100, reload: 6.0, spread: 0.10, ads: 0.022, bloom: 0.009, auto: true, pellets: 1, range: 1200, len: 18,
+             adsMul: 1.35, kickMul: 1.1, swayMul: 0.6, trait: '100 heavy rounds that stay on target, but very slow to aim and an age to reload.' },
+  drummer: { name: 'Drummer LMG', cls: 'LMG', dmg: 24, rpm: 780, mag: 60, reserve: 180, reload: 3.6, spread: 0.085, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 1050, len: 16,
+             adsMul: 0.8, swayMul: 1.2, trait: 'A light, fast LMG: quick to aim and reload for its kind, but its bullets hit softer.' },
+  pike:    { name: 'Pike Bolt-Action', cls: 'DMR', mode: 'bolt-action', dmg: 112, rpm: 50, mag: 5, reserve: 30, reload: 3.2, spread: 0.09, ads: 0.002, bloom: 0.05, auto: false, pellets: 1, range: 1600, len: 20,
+             adsMul: 1.3, kickMul: 1.5, settle: 0.9, trait: 'One body shot drops any light or medium operator. A slow bolt between shots, slow to aim, hopeless from the hip.' },
+  heron:   { name: 'Heron Marksman', cls: 'DMR', dmg: 44, rpm: 480, mag: 20, reserve: 100, reload: 2.4, spread: 0.055, ads: 0.007, bloom: 0.014, auto: false, pellets: 1, range: 1200, len: 16,
+             adsMul: 0.85, kickMul: 0.7, settle: 0.4, trait: 'A quick-firing marksman rifle with light recoil: three fast hits drop anyone.' },
+  gnat:    { name: 'Gnat Machine Pistol', cls: 'MP', dmg: 17, rpm: 1050, mag: 20, reserve: 100, reload: 1.7, spread: 0.09, ads: 0.035, bloom: 0.011, auto: true, pellets: 1, range: 700, len: 7,
+             kickMul: 1.2, swayMul: 1.4, fall: { from: 200, to: 450, min: 0.55 }, trait: 'A full-auto sidearm: 20 rounds gone in about a second, fierce recoil.' },
+  bison:   { name: 'Bison Revolver', cls: 'Pistol', dmg: 64, rpm: 130, mag: 6, reserve: 30, reload: 3.0, spread: 0.05, ads: 0.006, bloom: 0.05, auto: false, pellets: 1, range: 1000, len: 9,
+             kickMul: 1.8, settle: 0.6, fall: { from: 400, to: 700, min: 0.8 }, trait: 'Two body shots drop anyone. Six rounds, slow to fire and reload, very accurate.' },
 };
+// guns only carried as a sidearm (second slot)
+export const SIDEARMS = new Set(['p10', 'vex50', 'bison', 'gnat', 'stub']);
 
 // armor: 1 = heavy/slow, 2 = medium, 3 = light/fast. HP follows armor.
 export const ARMOR_HP = { 1: 125, 2: 110, 3: 100 };
@@ -133,36 +168,36 @@ export const opsForTeam = team => OP_LIST.filter(k => OPERATORS[k].team === team
 // ---- loadouts: each operator's weapon and gadget choices ----
 export const GADGET_COUNT = { smoke: 2, frag: 2, claymore: 1, breach: 2, stun: 2, dshield: 1, nitro: 1, wire: 2, impact: 2 };
 export const LOADOUTS = {
-  ember:   { primaries: ['k4', 'breaker'],     secondaries: ['p10', 'vex50'], gadgets: ['smoke', 'breach'] },
-  kestrel: { primaries: ['longbow', 'k4'],     secondaries: ['p10', 'vex50'], gadgets: ['frag', 'claymore'] },
-  hammer:  { primaries: ['breaker', 'v9'],     secondaries: ['p10', 'vex50'], gadgets: ['claymore', 'frag'] },
-  talon:   { primaries: ['v9', 'k4'],          secondaries: ['p10', 'vex50'], gadgets: ['breach', 'stun'] },
-  bulwark: { primaries: ['p10', 'vex50'],      secondaries: [],               gadgets: ['stun', 'smoke'] }, // one hand on the shield: pistols only
-  mason:   { primaries: ['mule', 'breaker'],   secondaries: ['p10', 'vex50'], gadgets: ['dshield', 'wire'] },
-  veil:    { primaries: ['v9', 'breaker'],     secondaries: ['p10', 'vex50'], gadgets: ['nitro', 'impact'] },
-  lynx:    { primaries: ['v9', 'hornet'],      secondaries: ['p10', 'vex50'], gadgets: ['wire', 'impact'] },
-  solace:  { primaries: ['breaker', 'v9'],     secondaries: ['p10', 'vex50'], gadgets: ['wire', 'dshield'] },
-  wraith:  { primaries: ['longbow', 'v9'],     secondaries: ['p10', 'vex50'], gadgets: ['impact', 'nitro'] },
-  rivet:   { primaries: ['k4','v9'], secondaries: ['p10','vex50'], gadgets: ['stun','smoke'] },
-  haze:    { primaries: ['k4','hornet'], secondaries: ['p10','vex50'], gadgets: ['breach','frag'] },
-  glint:   { primaries: ['v9','longbow'], secondaries: ['p10','vex50'], gadgets: ['frag','claymore'] },
-  brisk:   { primaries: ['hornet','breaker'], secondaries: ['vex50','p10'], gadgets: ['stun','smoke'] },
-  onyx:    { primaries: ['mule','k4'], secondaries: ['p10','vex50'], gadgets: ['smoke','breach'] },
-  prism:   { primaries: ['v9','k4'], secondaries: ['p10','vex50'], gadgets: ['smoke','stun'] },
-  volt:    { primaries: ['k4','v9'], secondaries: ['p10','vex50'], gadgets: ['breach','claymore'] },
-  tether:  { primaries: ['longbow','k4'], secondaries: ['p10','vex50'], gadgets: ['claymore','smoke'] },
-  strider: { primaries: ['v9','breaker'], secondaries: ['vex50','p10'], gadgets: ['frag','stun'] },
-  ferro:   { primaries: ['breaker','mule'], secondaries: ['p10','vex50'], gadgets: ['stun','claymore'] },
-  bramble: { primaries: ['v9','breaker'], secondaries: ['p10','vex50'], gadgets: ['wire','impact'] },
-  kite:    { primaries: ['hornet','v9'], secondaries: ['p10','vex50'], gadgets: ['dshield','nitro'] },
-  gravel:  { primaries: ['v9','hornet'], secondaries: ['vex50','p10'], gadgets: ['impact','wire'] },
-  shunt:   { primaries: ['mule','breaker'], secondaries: ['p10','vex50'], gadgets: ['wire','dshield'] },
-  hush:    { primaries: ['v9','longbow'], secondaries: ['p10','vex50'], gadgets: ['impact','nitro'] },
-  shade:   { primaries: ['breaker','v9'], secondaries: ['p10','vex50'], gadgets: ['nitro','wire'] },
-  rampart: { primaries: ['breaker','mule'], secondaries: ['p10','vex50'], gadgets: ['dshield','wire'] },
-  miasma:  { primaries: ['v9','breaker'], secondaries: ['p10','vex50'], gadgets: ['wire','impact'] },
-  snare:   { primaries: ['breaker','v9'], secondaries: ['vex50','p10'], gadgets: ['impact','nitro'] },
-  argus:   { primaries: ['hornet','v9'], secondaries: ['p10','vex50'], gadgets: ['nitro','impact'] },
+  ember:   { primaries: ['k4', 'breaker', 'rook'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['smoke', 'breach'] },
+  kestrel: { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'vex50'], gadgets: ['frag', 'claymore'] },
+  hammer:  { primaries: ['breaker', 'v9', 'tusk'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['claymore', 'frag'] },
+  talon:   { primaries: ['v9', 'k4', 'trident'], secondaries: ['p10', 'vex50', 'gnat'], gadgets: ['breach', 'stun'] },
+  bulwark: { primaries: ['p10', 'vex50', 'bison'], secondaries: [], gadgets: ['stun', 'smoke'] }, // one hand on the shield: pistols only
+  mason:   { primaries: ['mule', 'breaker', 'ox'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['dshield', 'wire'] },
+  veil:    { primaries: ['v9', 'breaker', 'anvil'], secondaries: ['p10', 'vex50'], gadgets: ['nitro', 'impact'] },
+  lynx:    { primaries: ['v9', 'hornet', 'wasp'], secondaries: ['p10', 'vex50', 'gnat'], gadgets: ['wire', 'impact'] },
+  solace:  { primaries: ['breaker', 'v9', 'lark'], secondaries: ['p10', 'vex50'], gadgets: ['wire', 'dshield'] },
+  wraith:  { primaries: ['longbow', 'v9', 'heron'], secondaries: ['p10', 'vex50', 'bison'], gadgets: ['impact', 'nitro'] },
+  rivet:   { primaries: ['k4', 'v9', 'sabre'], secondaries: ['p10', 'vex50', 'bison'], gadgets: ['stun', 'smoke'] },
+  haze:    { primaries: ['k4', 'hornet', 'lark'], secondaries: ['p10', 'vex50', 'gnat'], gadgets: ['breach', 'frag'] },
+  glint:   { primaries: ['v9', 'longbow', 'heron'], secondaries: ['p10', 'vex50'], gadgets: ['frag', 'claymore'] },
+  brisk:   { primaries: ['hornet', 'breaker', 'wasp'], secondaries: ['vex50', 'p10', 'gnat'], gadgets: ['stun', 'smoke'] },
+  onyx:    { primaries: ['mule', 'k4', 'rook'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['smoke', 'breach'] },
+  prism:   { primaries: ['v9', 'k4', 'sabre'], secondaries: ['p10', 'vex50'], gadgets: ['smoke', 'stun'] },
+  volt:    { primaries: ['k4', 'v9', 'trident'], secondaries: ['p10', 'vex50', 'bison'], gadgets: ['breach', 'claymore'] },
+  tether:  { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'vex50'], gadgets: ['claymore', 'smoke'] },
+  strider: { primaries: ['v9', 'breaker', 'marten'], secondaries: ['vex50', 'p10'], gadgets: ['frag', 'stun'] },
+  ferro:   { primaries: ['breaker', 'mule', 'anvil'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['stun', 'claymore'] },
+  bramble: { primaries: ['v9', 'breaker', 'tusk'], secondaries: ['p10', 'vex50'], gadgets: ['wire', 'impact'] },
+  kite:    { primaries: ['hornet', 'v9', 'lark'], secondaries: ['p10', 'vex50', 'gnat'], gadgets: ['dshield', 'nitro'] },
+  gravel:  { primaries: ['v9', 'hornet', 'marten'], secondaries: ['vex50', 'p10'], gadgets: ['impact', 'wire'] },
+  shunt:   { primaries: ['mule', 'breaker', 'drummer'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['wire', 'dshield'] },
+  hush:    { primaries: ['v9', 'longbow', 'marten'], secondaries: ['p10', 'vex50'], gadgets: ['impact', 'nitro'] },
+  shade:   { primaries: ['breaker', 'v9', 'wasp'], secondaries: ['p10', 'vex50'], gadgets: ['nitro', 'wire'] },
+  rampart: { primaries: ['breaker', 'mule', 'drummer'], secondaries: ['p10', 'vex50', 'bison'], gadgets: ['dshield', 'wire'] },
+  miasma:  { primaries: ['v9', 'breaker', 'tusk'], secondaries: ['p10', 'vex50', 'stub'], gadgets: ['wire', 'impact'] },
+  snare:   { primaries: ['breaker', 'v9', 'anvil'], secondaries: ['vex50', 'p10'], gadgets: ['impact', 'nitro'] },
+  argus:   { primaries: ['hornet', 'v9', 'lark'], secondaries: ['p10', 'vex50', 'gnat'], gadgets: ['nitro', 'impact'] },
 };
 export function defaultLoadout(op) {
   const L = LOADOUTS[op];
@@ -213,11 +248,12 @@ export const ATTACH = {
 };
 export const ATTACH_SLOTS = [['barrel', 'Barrel'], ['grip', 'Grip'], ['sight', 'Sight']];
 export function attachFor(w) {
-  const cls = WEAPONS[w] ? WEAPONS[w].cls : 'AR';
+  const W = WEAPONS[w], cls = W ? W.cls : 'AR', side = SIDEARMS.has(w);
+  const barrel = cls === 'Shotgun' ? ['none', 'suppressor', 'extended'] : ['none', 'suppressor', 'compensator', 'brake', 'extended'];
   return {
-    barrel: cls === 'Shotgun' ? ['none', 'suppressor', 'extended'] : ['none', 'suppressor', 'compensator', 'brake', 'extended'],
-    grip: cls === 'Pistol' ? ['none', 'laser'] : ['none', 'vertical', 'angled', 'laser'],
-    sight: cls === 'Pistol' ? ['iron', 'reddot'] : ['iron', 'reddot', 'holo', 'scope'],
+    barrel: W && W.quiet ? barrel.filter(b => b !== 'suppressor') : barrel, // a built-in suppressor already
+    grip: side ? ['none', 'laser'] : ['none', 'vertical', 'angled', 'laser'],
+    sight: side ? ['iron', 'reddot'] : ['iron', 'reddot', 'holo', 'scope'],
   };
 }
 export function cleanAtt(w, a) {
@@ -229,6 +265,7 @@ export function cleanAtt(w, a) {
 export function gunMods(w, a) {
   const m = { dmg: 1, range: 1, ads: 1, hip: 1, adsSpread: 1, kick: 1, sway: 1, first: 1, quiet: 0, laser: 0, zoom: 0 };
   const c = cleanAtt(w, a);
+  if (WEAPONS[w] && WEAPONS[w].quiet) m.quiet = 1; // built in, no damage lost
   for (const [slot] of ATTACH_SLOTS) {
     const e = ATTACH[slot][c[slot]];
     for (const k of Object.keys(m)) if (e[k] !== undefined) m[k] = k === 'quiet' || k === 'laser' || k === 'zoom' ? 1 : m[k] * e[k];
@@ -297,7 +334,11 @@ export const HEAD_R = 2.3; // a bullet passing this close to the centre of a bod
 // He asked for a reset time, so one-taps can't be spammed: accuracy comes back gradually after each shot and is only
 // perfect again after the gun's settle time (counted from when the next shot could first be fired).
 const SETTLE = { Pistol: 0.45, DMR: 0.55, AR: 0.4, SMG: 0.32, MP: 0.32, LMG: 0.45, Shotgun: 0.45 };
-export const settleTime = w => SETTLE[w.cls] || 0.4;
+export const settleTime = w => w.settle || SETTLE[w.cls] || 0.4;
+// a gun's own handling: its class's numbers, changed by the gun's adsMul / kickMul / swayMul / fall
+export const adsTime = w => (ADS_TIME[w.cls] || 0.3) * (w.adsMul || 1);
+export const recoilOf = w => { const r = RECOIL[w.cls] || RECOIL.AR; return { kick: r.kick * (w.kickMul || 1), sway: r.sway * (w.swayMul || 1), max: r.max }; };
+export const falloffOf = w => w.fall || FALLOFF[w.cls] || FALLOFF.AR;
 // how "hot" the gun still is: the shots of this burst, cooling to 0 over the settle time (fractions make a smaller cone)
 export const aimHeat = (w, shots, idle) => shots * Math.max(0, 1 - Math.max(0, idle - 60 / w.rpm * 1.05) / settleTime(w));
 // half-width of the cone (radians) for the next shot; shots = shots already fired in this burst
@@ -316,7 +357,7 @@ export function shotOffset(w, cone, i, rnd = Math.random) {
 }
 // the recoil added after shot number n of a burst (1 = the first): each gun has its own fixed pattern
 export function recoilStep(w, m, n) {
-  const rc = RECOIL[w.cls] || RECOIL.AR;
+  const rc = recoilOf(w);
   let seed = 0; for (const c of w.name) seed = (seed * 31 + c.charCodeAt(0)) % 997;
   const dir = (Math.floor((n - 1) / 6) % 2 ? -1 : 1) * (seed % 2 ? 1 : -1);
   return dir * rc.kick * m.kick * (n <= 3 ? m.first : 1) + Math.sin(n * 1.7 + seed) * rc.sway * m.sway * 0.5;

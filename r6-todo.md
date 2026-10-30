@@ -9,8 +9,6 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
       Next: the other five maps the same way, after his feedback on Harbor.
-- [ ] More guns: the categories are great, we just need more guns. Every gun should have its own properties — none of them too similar.
-      He plans to massively rework the aiming later, because it still doesn't feel right and guns are a big part of the game.
 - [ ] Spawns and lock-in: several attacker spawn locations on every map, and attackers pick theirs. Attackers do not appear on the map until the
       action (battle) timer starts. Operator select no longer starts the round when its timer runs out: everyone "locks in" instead, so the
       round only starts when everyone is ready with their loadout.
@@ -23,6 +21,8 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Barricades like R6: every window and doorway starts boarded up. Three melee hits break one; bullets work differently — they only chew small holes in it that can be used on purpose (to look or shoot through). Work out how R6 does it and match that.
 
 ## Done
+
+- [x] More guns: 15 new ones (23 in all), each with its own handling and a one-line description: Rook battle rifle, Sabre bullpup, Trident 3-round burst, Wasp / Marten .45 (built-in suppressor) / Lark PDW SMGs, Tusk semi-auto shotgun, Anvil slug, Stub sawn-off sidearm, Ox belt-fed and Drummer LMGs, Pike bolt-action, Heron marksman, Gnat machine pistol, Bison revolver. Every operator got one new gun and some a new sidearm; each has its own sound and picture.
 
 - [x] Sound is too loud: quieter by default (opening the game must never blast people's ears), a wider range on the volume slider, and gunshots less aggressive — loud sounds should mask other noises a little, not drown them out so the game feels uncomfortable. *Done 2026-10-30:* volume sliders follow loudness and start ~10 dB quieter, the game fades in, gunshots ~4 dB softer and less harsh, explosions ~5 dB softer, other sounds dip a little under a bang instead of being drowned (docs/sound.md).
 

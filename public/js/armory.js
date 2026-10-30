@@ -1,7 +1,7 @@
 // The Armory: a private shooting range in the menus. Pick any gun, shoot dummies at different
 // distances and read its numbers. Runs only in your browser (nobody else sees it), using the same
 // damage, drop-off, spread, aim-in time, recoil and headshot rules as the server.
-import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax } from '/shared/operators.js';
+import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -11,7 +11,7 @@ const DISTS = [5, 10, 20, 30, 45];
 const CLASS_ORDER = ['AR', 'SMG', 'MP', 'LMG', 'DMR', 'Shotgun', 'Pistol'];
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-const fallAt = (cls, d, rm = 1) => { const F = FALLOFF[cls] || FALLOFF.AR, fo = { from: F.from * rm, to: F.to * rm, min: F.min }; return d <= fo.from ? 1 : d >= fo.to ? fo.min : 1 - (1 - fo.min) * (d - fo.from) / (fo.to - fo.from); };
+const fallAt = (w, d, rm = 1) => { const F = falloffOf(w), fo = { from: F.from * rm, to: F.to * rm, min: F.min }; return d <= fo.from ? 1 : d >= fo.to ? fo.min : 1 - (1 - fo.min) * (d - fo.from) / (fo.to - fo.from); };
 const attOf = w => cleanAtt(w, S.att[w]);
 const modsOf = w => gunMods(w, attOf(w));
 
@@ -23,7 +23,7 @@ export function openArmory(el) {
   renderList(el); pick(el, S.w);
   const cv = el.querySelector('#armCanvas');
   cv.onmousemove = e => { const r = cv.getBoundingClientRect(); S.mouse.x = (e.clientX - r.left) * cv.width / r.width; S.mouse.y = (e.clientY - r.top) * cv.height / r.height; };
-  cv.onmousedown = e => { audio.initAudio(); if (e.button === 0) { S.mouse.l = true; S.mouse.edge = true; } if (e.button === 2) S.mouse.r = true; };
+  cv.onmousedown = e => { audio.initAudio(); if (e.button === 0) { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; } if (e.button === 2) S.mouse.r = true; };
   cv.oncontextmenu = e => e.preventDefault();
   S.up = e => { if (e.button === 0) S.mouse.l = false; if (e.button === 2) S.mouse.r = false; };
   S.key = e => { if (e.code === 'KeyR') reload(); };
@@ -71,12 +71,15 @@ function reload() {
 function tick(el, dt) {
   const w = WEAPONS[S.w], cv = el.querySelector('#armCanvas');
   S.t += dt; S.fireCd -= dt; S.bloom = Math.max(0, S.bloom - dt * 0.15);
-  S.adsT = Math.max(0, Math.min(1, S.adsT + (S.mouse.r ? 1 : -2) * dt / ((ADS_TIME[w.cls] || 0.3) * modsOf(S.w).ads)));
+  S.adsT = Math.max(0, Math.min(1, S.adsT + (S.mouse.r ? 1 : -2) * dt / (adsTime(w) * modsOf(S.w).ads)));
   if (S.t - S.lastShot > 0.1) S.rc *= Math.exp(-dt * 12);
   if (S.shots && !aimHeat(w, S.shots, S.t - S.lastShot)) { S.rc = 0; S.shots = 0; } // settled: the next shot is exact
   if (S.reloadT > 0) { S.reloadT -= dt; if (S.reloadT <= 0) { S.ammo = w.mag; audio.foley(w.cls === 'Shotgun' ? 'shell' : 'magIn', undefined, undefined, true); } }
-  if (S.mouse.l && S.reloadT <= 0 && S.fireCd <= 0 && (w.auto || S.mouse.edge)) {
-    if (S.ammo > 0) fire(w, cv); else reload();
+  if (S.burst && (S.reloadT > 0 || S.ammo <= 0)) S.burst = 0;
+  if (S.burst) { if (S.fireCd <= 0) { fire(w, cv); if (!--S.burst) S.fireCd = Math.max(S.fireCd, w.burstGap || 0.3); } } // the rest of a burst fires by itself
+  else if (S.reloadT <= 0 && S.fireCd <= 0 && ((S.mouse.l && w.auto) || S.mouse.edge || S.t - (S.clickT ?? -9) < 0.15)) { // a click a hair early still fires
+    S.clickT = -9;
+    if (S.ammo > 0) { fire(w, cv); if (w.burst > 1 && S.ammo > 0) S.burst = w.burst - 1; else if (w.burst > 1) S.fireCd = Math.max(S.fireCd, w.burstGap || 0.3); } else reload();
   }
   S.mouse.edge = false;
   for (const d of S.dummies) { d.flash = Math.max(0, d.flash - dt * 4); if (d.hp <= 0 && (d.deadT -= dt) <= 0) { d.hp = d.max; } }
@@ -97,7 +100,7 @@ function fire(w, cv) {
   const m = modsOf(S.w), cone = spreadCone(w, m, { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot) }), rc0 = S.rc;
   S.lastShot = S.t; // same rules as a match
   S.shots++; S.rc = Math.max(-recoilMax(w), Math.min(recoilMax(w), S.rc + recoilStep(w, m, S.shots)));
-  audio.gunshot(w.cls, undefined, undefined, true, !!m.quiet);
+  audio.gunshot(S.w, undefined, undefined, true, !!m.quiet);
   const base = aimAngle(cv);
   let hitAny = false;
   for (let i = 0; i < w.pellets; i++) {
@@ -114,8 +117,8 @@ function fire(w, cv) {
     if (i < 3) S.tracers.push({ x2: ex, y2: ey, life: 0.07 });
     if (best) {
       hitAny = true; S.hits++;
-      const miss = Math.abs(best.x * dy - best.y * dx), head = miss < HEAD_R;
-      const dmg = head ? best.hp : Math.round(w.dmg * m.dmg * fallAt(w.cls, bt, m.range));
+      const miss = Math.abs(best.x * dy - best.y * dx), head = miss < HEAD_R && w.pellets === 1; // a pellet to the head only hurts more
+      const dmg = head ? best.hp : Math.round(w.dmg * m.dmg * fallAt(w, bt, m.range) * (miss < HEAD_R ? 1.8 : 1));
       best.hp -= dmg; best.flash = 1;
       S.pops.push({ x: best.x + (Math.random() - 0.5) * 14, y: best.y - 14, txt: head ? 'HEADSHOT' : String(dmg), head, life: 0.9 });
       if (best.hp <= 0) { best.deadT = 1.6; S.kills++; if (S.first === null) S.first = S.fired; audio.impact('flesh'); }
@@ -184,14 +187,14 @@ function draw(cv) {
 }
 
 function stats(el) {
-  const w = WEAPONS[S.w], m = modsOf(S.w), a = attOf(S.w), opts = attachFor(S.w), d = S.dist * M, f = fallAt(w.cls, d, m.range) * m.dmg;
+  const w = WEAPONS[S.w], m = modsOf(S.w), a = attOf(S.w), opts = attachFor(S.w), d = S.dist * M, f = fallAt(w, d, m.range) * m.dmg;
   const stk = hp => Math.ceil(hp / (w.dmg * f * (w.pellets > 1 ? w.pellets * 0.7 : 1)));
   const ttk = hp => ((stk(hp) - 1) * 60 / w.rpm).toFixed(2);
-  const fo = FALLOFF[w.cls] || FALLOFF.AR;
+  const fo = falloffOf(w), rk = recoilOf(w).kick;
   const bar = (v, max) => `<i style="width:${Math.min(100, v / max * 100)}%"></i>`;
   el.querySelector('#armStats').innerHTML = `
     <div class="bigpic"></div>
-    <h3>${esc(w.name)}</h3><p class="cls">${CLASS_NAME[w.cls]}${w.auto ? ' · full-auto' : ' · semi-auto'}${w.pellets > 1 ? ` · ${w.pellets} pellets` : ''} — ${CLASS_TIP[w.cls]}</p>
+    <h3>${esc(w.name)}</h3><p class="cls">${CLASS_NAME[w.cls]}${w.mode ? ` · ${w.mode}` : w.burst ? ` · ${w.burst}-round burst` : w.auto ? ' · full-auto' : ' · semi-auto'}${w.pellets > 1 ? ` · ${w.pellets} pellets` : ''} — ${esc(w.trait || CLASS_TIP[w.cls])}</p>
     <div class="atts">${ATTACH_SLOTS.map(([s, label]) => `<div class="attrow"><span>${label}</span>${opts[s].map(v => `<button class="att ${a[s] === v ? 'on' : ''}" data-s="${s}" data-v="${v}" title="${ATTACH[s][v].desc}">${ATTACH[s][v].short}</button>`).join('')}<em>${ATTACH[s][a[s]].desc}</em></div>`).join('')}</div>
     <div class="sbar"><span>Damage</span><b>${w.dmg}${w.pellets > 1 ? '×' + w.pellets : ''}</b><em>${bar(w.dmg * w.pellets, 110)}</em></div>
     <div class="sbar"><span>Fire rate</span><b>${w.rpm} rpm</b><em>${bar(w.rpm, 1000)}</em></div>
@@ -199,9 +202,9 @@ function stats(el) {
     <div class="sbar"><span>Reload</span><b>${w.reload}s</b><em>${bar(5 - w.reload, 4)}</em></div>
     <div class="sbar"><span>Hip accuracy</span><b>${(1 / (w.spread * m.hip)).toFixed(0)}</b><em>${bar(0.2 - w.spread * m.hip, 0.18)}</em></div>
     <div class="sbar"><span>Aimed accuracy</span><b>${(1 / (w.ads * m.adsSpread)).toFixed(0)}</b><em>${bar(0.12 - w.ads * m.adsSpread, 0.12)}</em></div>
-    <div class="sbar"><span>Aim-in time</span><b>${(ADS_TIME[w.cls] * m.ads).toFixed(2)}s</b><em>${bar(0.6 - ADS_TIME[w.cls] * m.ads, 0.5)}</em></div>
-    <div class="sbar"><span>Recoil</span><b>${((RECOIL[w.cls] || RECOIL.AR).kick * m.kick * 1000).toFixed(0)}</b><em>${bar((RECOIL[w.cls] || RECOIL.AR).kick * m.kick, 0.045)}</em></div>
-    ${m.quiet ? '<p class="note">Suppressed: much quieter, no muzzle flash.</p>' : ''}
+    <div class="sbar"><span>Aim-in time</span><b>${(adsTime(w) * m.ads).toFixed(2)}s</b><em>${bar(0.6 - adsTime(w) * m.ads, 0.5)}</em></div>
+    <div class="sbar"><span>Recoil</span><b>${(rk * m.kick * 1000).toFixed(0)}</b><em>${bar(rk * m.kick, 0.06)}</em></div>
+    ${m.quiet ? `<p class="note">${w.quiet ? 'Built-in suppressor' : 'Suppressed'}: much quieter, no muzzle flash.</p>` : ''}
     <p class="note">Full damage up to ${fo.from >= 9999 ? 'any range' : Math.round(fo.from * m.range / M) + ' m'}${fo.from >= 9999 ? '' : `, down to ${Math.round(fo.min * 100)}% by ${Math.round(fo.to * m.range / M)} m`}. A shot through the centre of the body is a headshot: instant kill.</p>
     <h4>At ${S.dist} m</h4>
     <table class="ttk"><tr><th></th><th>Light 100</th><th>Medium 110</th><th>Heavy 125</th></tr>

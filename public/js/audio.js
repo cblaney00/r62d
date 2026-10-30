@@ -1,3 +1,4 @@
+import { WEAPONS } from '/shared/operators.js';
 // R62D sound engine. Everything is synthesised (no audio files).
 // Each sound is positioned: distance fade, stereo pan, muffling through walls, and a room echo.
 let ac = null, master = null, sfx = null, rest = null, verb = null, verbIn = null, noiseBuf = null;
@@ -17,7 +18,7 @@ let C = 'foley'; // category of the sound currently being built
 // Every recording the game uses, as a list of small jobs (the loading screen runs them before you play).
 export function soundJobs() {
   if (!ac) return [];
-  const jobs = Object.keys(GUN).map(c => () => gunBuf(c));
+  const jobs = [...Object.keys(GUN), ...Object.keys(GUN_OWN)].map(c => () => gunBuf(c));
   for (const s of Object.keys(SURF)) { for (const p of [2, 0, 3, 1]) jobs.push(() => stepBuf(s, p)); jobs.push(() => stepBuf(s, 0, true)); }
   return jobs;
 }
@@ -357,9 +358,28 @@ const GUN = {
   Shotgun: { crack: 0.3, blastTau: 0.022, blastLP: 3600, body: 500,  bodyTau: 0.090, boom: 48, boomTau: 0.130, drive: 3.2, mech: 0.0,   v: 1.25 },
   Pistol:  { crack: 0.5, blastTau: 0.008, blastLP: 5500, body: 1100, bodyTau: 0.035, boom: 80, boomTau: 0.060, drive: 2.3, mech: 0.030, v: 0.8 },
 };
+// guns that sound different from the rest of their class: the class's recipe with these changes
+const GUN_OWN = {
+  rook:    { crack: 1.0, boom: 58, boomTau: 0.09, drive: 2.9, v: 1.05 },
+  sabre:   { body: 1050, boom: 76, v: 0.9 },
+  trident: { body: 980, mech: 0.03 },
+  wasp:    { body: 1450, bodyTau: 0.022, boom: 100, v: 0.72 },
+  lark:    { crack: 0.8, body: 1300, boom: 90, v: 0.78 },
+  tusk:    { mech: 0.03, boomTau: 0.1, v: 1.1 },
+  anvil:   { crack: 0.8, boom: 44, boomTau: 0.16, v: 1.3 },
+  stub:    { blastTau: 0.03, boom: 42, v: 1.3 },
+  ox:      { boom: 54, drive: 3.0, v: 1.05 },
+  drummer: { body: 950, boom: 70, v: 0.9 },
+  pike:    { crack: 1.1, blastTau: 0.02, boom: 45, boomTau: 0.14, drive: 3.2, mech: 0, v: 1.25 },
+  heron:   { boom: 60, v: 1.05 },
+  gnat:    { body: 1600, bodyTau: 0.02, boom: 105, v: 0.62 },
+  bison:   { crack: 0.7, blastTau: 0.014, boom: 62, boomTau: 0.09, drive: 2.8, mech: 0, v: 1.05 },
+};
+// a weapon id (or a class name) to its sound recipe
+const gunRecipe = key => WEAPONS[key] ? { ...(GUN[WEAPONS[key].cls] || GUN.AR), ...(GUN_OWN[key] || {}) } : GUN[key] || GUN.AR;
 const gunBufs = {};
-function buildGun(cls, seed) {
-  const P = GUN[cls], sr = ac.sampleRate, N = Math.floor(sr * 0.45);
+function buildGun(key, seed) {
+  const P = gunRecipe(key), sr = ac.sampleRate, N = Math.floor(sr * 0.45);
   const buf = ac.createBuffer(2, N, sr), L = buf.getChannelData(0), R = buf.getChannelData(1);
   let r = seed * 9301 + 49297; const rand = () => { r = (r * 9301 + 49297) % 233280; return r / 233280 * 2 - 1; };
   const svf = (fc, q) => { let lo = 0, bd = 0; const k = 2 * Math.sin(Math.PI * Math.min(fc, sr / 6) / sr); return x => { lo += k * bd; const hi = x - lo - q * bd; bd += k * hi; return bd; }; };
@@ -389,14 +409,14 @@ function buildGun(cls, seed) {
   for (let i = 0; i < N; i++) { L[i] *= 0.9 / peak; R[i] *= 0.9 / peak; }
   return buf;
 }
-function gunBuf(cls) {
-  if (!GUN[cls]) cls = 'AR';
-  if (!gunBufs[cls]) gunBufs[cls] = [1, 2, 3, 4].map(sd => buildGun(cls, sd + cls.length * 7));
-  const list = gunBufs[cls]; return list[Math.floor(Math.random() * list.length)];
+function gunBuf(key) {
+  if (!GUN[key] && !GUN_OWN[key]) key = WEAPONS[key] ? WEAPONS[key].cls : 'AR'; // sounds like its class
+  if (!gunBufs[key]) gunBufs[key] = [1, 2, 3, 4].map(sd => buildGun(key, sd + key.length * 7));
+  const list = gunBufs[key]; return list[Math.floor(Math.random() * list.length)];
 }
-export function gunshot(cls, x, y, own, quiet = false) {
+export function gunshot(cls, x, y, own, quiet = false) { // cls: a weapon id (or a class name)
   C = 'guns';
-  const P = GUN[cls] || GUN.AR;
+  const P = gunRecipe(cls);
   // suppressed: a muffled thump that carries much less far (the action still clacks)
   const g = out(own ? undefined : x, own ? undefined : y, P.v * (own ? 1.2 : 1) * (quiet ? 0.32 : 1), quiet ? 420 : 1100, own ? 0.3 : quiet ? 0.2 : 0.4); if (!g) return;
   const src = ac.createBufferSource(); src.buffer = gunBuf(cls); src.playbackRate.value = (quiet ? 0.8 : 0.96) + Math.random() * 0.08;
@@ -413,7 +433,7 @@ export function gunshot(cls, x, y, own, quiet = false) {
   }
 }
 // built one gun type at a time, so a slow computer doesn't freeze while sound starts
-export function prewarmGuns() { if (!ac) return; const todo = Object.keys(GUN); const next = () => { const c = todo.shift(); if (!c) return; gunBuf(c); setTimeout(next, 40); }; next(); }
+export function prewarmGuns() { if (!ac) return; const todo = [...Object.keys(GUN), ...Object.keys(GUN_OWN)]; const next = () => { const c = todo.shift(); if (!c) return; gunBuf(c); setTimeout(next, 40); }; next(); }
 
 export function explosion(x, y, kind) {
   C = 'explosions';

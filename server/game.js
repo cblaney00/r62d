@@ -8,7 +8,7 @@ import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax } from '../shared/operators.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax, adsTime, falloffOf } from '../shared/operators.js';
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -412,7 +412,7 @@ export class Game {
     const team = this.side(p);
     const inp = p.input, prev = p.prevInput;
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
-    { const g = p.guns[p.slot], cls = g ? WEAPONS[g.w].cls : 'AR', rate = (1 / (ADS_TIME[cls] || 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
+    { const g = p.guns[p.slot], rate = (1 / (g ? adsTime(WEAPONS[g.w]) : 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
       const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time) && !p.vault && !(p.recoverUntil > this.time);
       p.adsT = Math.max(0, Math.min(1, (p.adsT || 0) + (canAds ? dt * rate : -dt * rate * 1.6)));
       const idle = this.time - p.lastShot; // the crosshair drifts back after a burst; once the gun has settled the next shot is exact
@@ -520,11 +520,16 @@ export class Game {
     // a click made a hair before the gun is ready is kept until it is (up to 0.15 s), so fast tapping never loses a shot
     const click = p.click && !(this.time - (p.click.t ?? this.time) > 0.15) ? p.click : null; p.click = null;
     if (click && click.t === undefined) click.t = this.time;
-    if (canShoot && (inp.fire || click)) {
+    if (p.burst && !(canShoot && gun.w === p.burstW && gun.ammo > 0)) p.burst = 0; // a burst stops if you can't shoot
+    if (p.burst) { // the rest of a burst fires by itself
+      const w = WEAPONS[gun.w];
+      if (p.fireCd <= 0) { this.fire(p, gun, w); if (!--p.burst) p.fireCd = Math.max(p.fireCd, w.burstGap || 0.3); }
+      if (click) p.click = click; // clicking during a burst: the next burst follows
+    } else if (canShoot && (inp.fire || click)) {
       const w = WEAPONS[gun.w];
       const edge = !prev.fire || !!click;
       if (p.fireCd <= 0 && (w.auto || edge)) {
-        if (gun.ammo > 0) this.fire(p, gun, w, click);
+        if (gun.ammo > 0) { this.fire(p, gun, w, click); if (w.burst > 1) { p.burst = w.burst - 1; p.burstW = gun.w; if (!gun.ammo) { p.burst = 0; p.fireCd = Math.max(p.fireCd, w.burstGap || 0.3); } } }
         else if (gun.reserve > 0) this.startReload(p);
         else if (edge) this.events.push({ e: 'snd', s: 'empty', x: r1(p.x), y: r1(p.y) });
       } else if (click && !w.auto && p.fireCd > 0) p.click = click;
@@ -556,7 +561,7 @@ export class Game {
     const aim = click ? click.a : p.aim, vt = p.viewTime;
     if (click && click.vt !== undefined) p.viewTime = click.vt; // judged against what they saw when they clicked
     const base = aim + (p.rc || 0);
-    this.rangeMul = m.range;
+    this.rangeMul = m.range; this.shotW = w;
     const mx = p.x + Math.cos(aim) * (w.len + 6), my = p.y + Math.sin(aim) * (w.len + 6);
     for (let i = 0; i < w.pellets; i++) {
       const a = base + shotOffset(w, cone, i);
@@ -566,6 +571,7 @@ export class Game {
       if (i < 3) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });
+    this.shotW = null;
     p.viewTime = vt;
     p.lastShot = this.time;
     p.shots = (p.shots || 0) + 1; // recoil comes after the shot, so it moves the next one, never this one
@@ -637,10 +643,11 @@ export class Game {
       if (src.ms) src.ms.hits++;
       // headshot: the bullet passes through the very centre of the body — instant kill, no getting downed
       const at = best.at || q, cx = at.x - x0, cy = at.y - y0, miss = Math.abs(cx * dy - cy * dx);
-      const F = FALLOFF[cls] || FALLOFF.AR, rm = this.rangeMul || 1, fo = { from: F.from * rm, to: F.to * rm, min: F.min };
+      const W = this.shotW && this.shotW.cls === cls ? this.shotW : null, pellet = W ? W.pellets > 1 : cls === 'Shotgun';
+      const F = W ? falloffOf(W) : FALLOFF[cls] || FALLOFF.AR, rm = this.rangeMul || 1, fo = { from: F.from * rm, to: F.to * rm, min: F.min };
       const fall = stopT <= fo.from ? 1 : stopT >= fo.to ? fo.min : 1 - (1 - fo.min) * (stopT - fo.from) / (fo.to - fo.from);
-      if (miss < HEAD_R && !q.downed && cls !== 'Shotgun') { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
-      else if (miss < HEAD_R && cls === 'Shotgun') this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
+      if (miss < HEAD_R && !q.downed && !pellet) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
+      else if (miss < HEAD_R && pellet) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
       else this.damage(q, dmg * mult * fall, src, wname, ang);
     } else if (best && best.e) this.hitEnt(best.e, src);
     else if (kind === 'hard' || kind === 'prop') this.events.push({ e: 'hit', k: kind, x: r1(ex), y: r1(ey) });

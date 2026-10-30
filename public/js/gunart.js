@@ -12,6 +12,21 @@ const G = {
   hornet:  { body: '#2e3238', furn: '#25282c', stock: 'none', rec: [34, 62], bar: 76, guard: [62, 70], mag: 'grip', grip: 42, rail: true },
   vex50:   { body: '#585d63', furn: '#2a2c30', stock: 'none', rec: [38, 74], bar: 78, guard: [74, 74], mag: 'grip', grip: 44, pistol: true, big: true },
   p10:     { body: '#2f3237', furn: '#232528', stock: 'none', rec: [42, 70], bar: 73, guard: [70, 70], mag: 'grip', grip: 46, pistol: true },
+  rook:    { body: '#3a3a33', furn: '#5a4a36', stock: 'heavy', rec: [24, 54], bar: 98, guard: [54, 80], mag: 'short', grip: 34, rail: true },
+  sabre:   { body: '#34383e', furn: '#2a2d31', stock: 'bullpup', rec: [8, 60], bar: 86, guard: [60, 74], mag: 'bullpup', grip: 48, rail: true },
+  trident: { body: '#2d3237', furn: '#454a40', stock: 'adjust', rec: [26, 54], bar: 94, guard: [54, 80], mag: 'curved', grip: 34, rail: true },
+  wasp:    { body: '#2c2f35', furn: '#1f2226', stock: 'fold', rec: [26, 54], bar: 74, guard: [54, 64], mag: 'long', grip: 36, rail: true },
+  marten:  { body: '#383b40', furn: '#2a2c30', stock: 'fold', rec: [24, 52], bar: 70, guard: [52, 52], mag: 'straight', grip: 34, rail: true, can: true },
+  lark:    { body: '#6b6450', furn: '#3a3830', stock: 'adjust', rec: [22, 58], bar: 82, guard: [58, 72], mag: 'long', grip: 40, rail: true },
+  tusk:    { body: '#2b2d31', furn: '#33363a', stock: 'heavy', rec: [24, 48], bar: 96, guard: [50, 72], mag: 'box', grip: 32, rail: true },
+  anvil:   { body: '#45413b', furn: '#3d4a3a', stock: 'wood', rec: [24, 46], bar: 98, guard: [52, 72], mag: 'tube', grip: 30, rail: true, pump: true },
+  stub:    { body: '#3a3a3c', furn: '#6b4a2e', stock: 'none', rec: [30, 52], bar: 78, guard: [52, 66], mag: 'none', grip: 32, double: true },
+  ox:      { body: '#3a3d36', furn: '#2c2f2a', stock: 'heavy', rec: [20, 58], bar: 100, guard: [58, 84], mag: 'belt', grip: 32, rail: true, bipod: true, handle: true },
+  drummer: { body: '#33373a', furn: '#2a2d30', stock: 'adjust', rec: [24, 56], bar: 94, guard: [56, 78], mag: 'drum', grip: 34, rail: true, bipod: true },
+  pike:    { body: '#2e3230', furn: '#5a4630', stock: 'cheek', rec: [28, 52], bar: 102, guard: [52, 82], mag: 'short', grip: 34, rail: true, bolt: true },
+  heron:   { body: '#41443c', furn: '#55533f', stock: 'cheek', rec: [26, 52], bar: 96, guard: [52, 78], mag: 'straight', grip: 34, rail: true },
+  gnat:    { body: '#2a2d31', furn: '#1f2124', stock: 'none', rec: [38, 72], bar: 76, guard: [72, 72], mag: 'gripLong', grip: 44, pistol: true },
+  bison:   { body: '#6a6e73', furn: '#5a3d26', stock: 'none', rec: [36, 62], bar: 84, guard: [62, 62], mag: 'none', grip: 42, pistol: true, revolver: true },
 };
 
 function shadeCol(hex, k) {
@@ -40,23 +55,33 @@ export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   if (g.stock === 'fold') { box(ctx, 6, 16.5, r0 - 6, 1.6, '#1d1f22'); box(ctx, 6, 22, r0 - 6, 1.6, '#1d1f22'); box(ctx, 4, 15.5, 3, 9.5, g.furn); }
   if (g.stock === 'wood') part(ctx, [r0, 15, 10, 17, 2, 19, 2, 27, 9, 27, r0, 22], g.furn, 1.5);
   if (g.stock === 'heavy') part(ctx, [r0, 14, 4, 15, 2, 17, 2, 28, 6, 29, 12, 24, r0, 23], g.furn);
+  if (g.stock === 'bullpup') { part(ctx, [r0, 15, 4, 15, 2, 17, 2, 25, r0, 25], g.furn); box(ctx, 2, 16, 2, 9, '#15171a'); }
   if (g.stock === 'cheek') { part(ctx, [r0, 16, 10, 17, 3, 17, 2, 28, 8, 29, 14, 24, r0, 22], g.furn); box(ctx, 9, 13.5, 12, 3, shadeCol(g.furn, 1.15)); }
   // --- barrel and handguard ---
   box(ctx, r1 - 2, mid - 1.4, muzzle - r1 + 2, 2.8, '#1e2023', 1.6);
+  if (g.double) box(ctx, r1 - 2, mid - 4.4, muzzle - r1 + 2, 2.8, '#24262a', 1.6); // second barrel on top
+  if (g.can) { box(ctx, r1, mid - 3.2, muzzle - r1 + 12, 6.4, '#1a1c1f', 1.7); for (let i = r1 + 3; i < muzzle + 10; i += 3) box(ctx, i, mid - 3.2, 0.6, 6.4, '#2a2d31'); muzzle += 12; } // built-in suppressor
   if (g.pump) { box(ctx, r1, bot - 1, g.guard[1] - r1 + 8, 3, '#202225'); box(ctx, g.guard[0], bot - 1.8, g.guard[1] - g.guard[0], 5, g.furn, 1.5); for (let i = 0; i < 5; i++) box(ctx, g.guard[0] + 2 + i * 3.5, bot - 1.4, 0.7, 4.2, shadeCol(g.furn, 0.6)); }
   else if (g.guard[1] > g.guard[0]) { part(ctx, [g.guard[0], top + 0.5, g.guard[1], top + 1.5, g.guard[1], bot - 0.5, g.guard[0], bot], g.furn); for (let i = g.guard[0] + 3; i < g.guard[1] - 2; i += 4) box(ctx, i, mid - 0.6, 2.2, 1.2, shadeCol(g.furn, 0.55)); }
   // --- receiver / slide ---
   if (g.pistol) { part(ctx, [r0, top, r1, top, r1, bot - (g.big ? 0 : 1), r0, bot], g.body, 1.6); for (let i = r0 + 3; i < r0 + 10; i += 1.6) box(ctx, i, top + 1, 0.6, 4, shadeCol(g.body, 0.6)); box(ctx, r0 + 2, bot, r1 - r0 - 8, 2.4, g.furn); }
   else { part(ctx, [r0, top, r1, top, r1, bot, r0 + 4, bot + 1, r0, bot], g.body); box(ctx, r0 + 6, mid - 1.5, 7, 2, shadeCol(g.body, 0.6)); box(ctx, r0 + 16, top + 2, 2.5, 1.2, '#8a8f95'); }
+  if (g.revolver) { box(ctx, r0 + 5, top - 0.8, 13, bot - top + 2.6, shadeCol(g.body, 0.9), 1.5); for (let i = 0; i < 3; i++) box(ctx, r0 + 7 + i * 3.6, top + 0.8, 1.6, bot - top - 0.6, shadeCol(g.body, 0.6)); }
+  if (g.bolt) { ctx.strokeStyle = '#1b1d20'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(r0 + 14, mid); ctx.lineTo(r0 + 17, bot + 4); ctx.stroke(); ctx.fillStyle = '#2c2f33'; ctx.beginPath(); ctx.arc(r0 + 17, bot + 4.5, 1.8, 0, Math.PI * 2); ctx.fill(); }
   if (g.handle) { part(ctx, [r0 + 8, top, r0 + 10, top - 6, r0 + 24, top - 6, r0 + 26, top], g.body); box(ctx, r0 + 11, top - 4.2, 13, 3, '#0e0f11'); }
   // --- pistol grip and trigger ---
   const gx = g.grip;
   part(ctx, [gx, bot - 0.5, gx + 6, bot - 0.5, gx + 4 + (g.pistol ? 2 : 0), bot + 13, gx - 2 + (g.pistol ? 1 : 0), bot + 13], g.furn, 1.2);
   ctx.strokeStyle = '#15171a'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(gx + 9, bot + 2.5, 2.6, 0, Math.PI); ctx.stroke();
   // --- magazine ---
-  const mx = g.pistol ? gx - 1 : gx + 9;
+  const mx = g.pistol ? gx - 1 : g.mag === 'bullpup' ? r0 + 14 : gx + 9;
   const ribs = (x0, y0, n, dx) => { for (let i = 0; i < n; i++) box(ctx, x0 + i * dx * 0.25, y0 + i * 2.6, 6, 0.6, 'rgba(0,0,0,0.35)'); };
   if (g.mag === 'curved') { part(ctx, [mx, bot, mx + 8, bot, mx + 15, bot + 12, mx + 14, bot + 14, mx + 7, bot + 15], '#4a5058', 1.5); ribs(mx + 2, bot + 3, 4, 4); }
+  if (g.mag === 'bullpup') { part(ctx, [mx, bot, mx + 8, bot, mx + 14, bot + 11, mx + 13, bot + 13, mx + 6, bot + 14], '#4a5058', 1.5); ribs(mx + 2, bot + 3, 4, 4); }
+  if (g.mag === 'long') { part(ctx, [mx, bot, mx + 6, bot, mx + 8, bot + 20, mx + 2, bot + 20], '#4a5058', 1.5); ribs(mx + 0.5, bot + 3, 7, 0.6); }
+  if (g.mag === 'drum') { ctx.fillStyle = '#41464d'; ctx.beginPath(); ctx.arc(mx + 5, bot + 8, 7.5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.6; ctx.stroke(); ctx.beginPath(); ctx.arc(mx + 5, bot + 8, 3, 0, Math.PI * 2); ctx.stroke(); }
+  if (g.mag === 'belt') { box(ctx, mx - 2, bot, 16, 13, '#4a4f3a'); box(ctx, mx, bot + 2, 12, 1, 'rgba(0,0,0,0.3)'); ctx.fillStyle = '#b08a3e'; for (let i = 0; i < 4; i++) ctx.fillRect(mx - 3 - i * 2.2, bot - 1 + i * 0.6, 1.4, 3.4); }
+  if (g.mag === 'gripLong') box(ctx, gx - 1, bot + 13, 6, 8, '#26292d');
   if (g.mag === 'straight') { part(ctx, [mx, bot, mx + 6, bot, mx + 7, bot + 16, mx + 1, bot + 16], '#4a5058', 1.5); ribs(mx + 0.5, bot + 3, 5, 0.6); }
   if (g.mag === 'short') { part(ctx, [mx, bot, mx + 8, bot, mx + 8.5, bot + 7, mx + 0.5, bot + 7], '#4a5058', 1.5); ribs(mx + 1, bot + 2.5, 2, 0); }
   if (g.mag === 'box') { box(ctx, mx - 1, bot, 13, 11, '#4a4f3a'); box(ctx, mx + 1, bot + 2, 9, 1, 'rgba(0,0,0,0.3)'); }

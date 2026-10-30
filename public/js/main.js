@@ -349,7 +349,7 @@ function onEvent(e, s, players) {
       const w = WEAPONS[e.w]; const a = Math.atan2(e.y2 - e.y, e.x2 - e.x);
       fx.tracer(e.x, e.y, e.x2, e.y2);
       const an = anim(e.id);
-      if (an.lastShotSnd !== s.time) { if (!e.q) fx.muzzle(e.x, e.y, a); audio.gunshot(w ? w.cls : 'AR', e.x, e.y, e.id === st.id, !!e.q); audio.casing(e.x, e.y, surfaceAt(e.x, e.y), w && w.cls === 'Shotgun'); an.lastShotSnd = s.time; }
+      if (an.lastShotSnd !== s.time) { if (!e.q) fx.muzzle(e.x, e.y, a); audio.gunshot(w ? e.w : 'AR', e.x, e.y, e.id === st.id, !!e.q); audio.casing(e.x, e.y, surfaceAt(e.x, e.y), w && w.cls === 'Shotgun'); an.lastShotSnd = s.time; }
       an.recoil = 1.6; if (!e.q) an.flashT = now; // a suppressor hides the flash
       if (e.k === 'hard') { fx.impact(e.x2, e.y2, 'hard', a); audio.impact(hardMat(e.x2, e.y2, a), e.x2, e.y2); }
       else if (e.k === 'prop') { fx.impact(e.x2, e.y2, 'prop', a); audio.impact(Math.random() < 0.5 ? 'wood' : 'metal', e.x2, e.y2); }

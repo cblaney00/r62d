@@ -36,3 +36,11 @@ Before, every automatic fired ~600 rpm (the cooldown was rounded up to whole ser
 V9 880, Hornet 920, Mule 640. A 12-match report before and after shows no real change in gun ranking.
 **Open problem:** attackers win only ~29% of bot rounds in both reports (since the smarter bots and
 fewer breakable walls). Bots defend much better than they attack; worth a look.
+
+## 2026-10-30 — 15 new guns
+First 12-match report with the new guns (bots pick a random gun from their operator's list), kills per
+gun carried: Drummer 0.84, Ox 0.83, Rook 0.79, Marten 0.73 were strongest (V9 0.61, K4 0.46 for scale);
+Trident 0.22, Anvil 0.25, Pike 0.26 weakest. Small samples (60–120 each), so only clear outliers were touched:
+Rook 42→40 dmg and more kick, Ox 34→31 dmg and slower to aim, Drummer 26→24, Marten 30→28; Trident 36→38 dmg
+and 0.32→0.2 s between bursts, Anvil 72→76 dmg and 70→85 rpm. The Pike is left alone: bots fire it from the hip,
+where it is meant to be hopeless.

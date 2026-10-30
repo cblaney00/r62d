@@ -61,7 +61,7 @@ function fillDetail(d, k, anim, compact, again) {
   const pips = n => [1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('');
   const weaponCard = (w, slot) => `<button class="wcard ${cur[slot] === w ? 'on' : ''}" data-slot="${slot}" data-v="${w}">
       <div class="wpic" data-w="${w}"></div>
-      <div class="wn">${WEAPONS[w].name}<small>${CLASS_NAME[WEAPONS[w].cls]}</small></div><div class="wtip">${CLASS_TIP[WEAPONS[w].cls]}</div>${bars(w)}</button>`;
+      <div class="wn">${WEAPONS[w].name}<small>${CLASS_NAME[WEAPONS[w].cls]}</small></div><div class="wtip">${WEAPONS[w].trait || CLASS_TIP[WEAPONS[w].cls]}</div>${bars(w)}</button>`;
   // attachments for the gun chosen in that slot: three rows of choices, each with what it does
   const attRows = slot => {
     const w = cur[slot]; if (!w) return '';
