@@ -1,7 +1,7 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
-import { buildMap, roomAt, wallMount, MAPS, MAP_LIST } from '../shared/map.js';
+import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint } from '../shared/map.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
@@ -452,7 +452,11 @@ export class Game {
     if (op.ability.id === 'lance') { // Thermal Lance: burn the wall cell you face, one at a time
       p.lancing = false;
       if (inp.ability && p.battery > 0 && p.ctrl === 'body' && !p.downed) {
-        const f = this.facingCell(p, 30);
+        let f = this.facingCell(p, 30);
+        if (!f || ![T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD].includes(f.t)) { // or the hatch at your feet
+          const hs = this.hatchSpot(p, [T.HATCH, T.HATCHR]);
+          if (hs) f = { k: hs.k, t: T.SOFT, cx: hs.k % this.map.W, cy: Math.floor(hs.k / this.map.W) };
+        }
         if (f && [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD].includes(f.t)) {
           p.lancing = true; p.battery = Math.max(0, p.battery - dt);
           if (this.time - (p.noiseT || 0) > 0.4) { p.noiseT = this.time; this.noise(p.x, p.y, team, 260); } // the hiss of the torch
@@ -545,7 +549,9 @@ export class Game {
     const mx = p.x + Math.cos(p.aim) * (w.len + 6), my = p.y + Math.sin(p.aim) * (w.len + 6);
     for (let i = 0; i < w.pellets; i++) {
       const a = p.aim + p.rc + gauss() * Math.max(0.002, spread);
-      const end = this.hitscan(p, p.x, p.y, a, w.range, w.dmg * m.dmg, w.name, w.cls);
+      const into = this.aimedHatch(p, a); // aimed into a hatch: the bullet goes down (or up) there, not on across the room
+      const end = this.hitscan(p, p.x, p.y, a, into ? into.ad : w.range, w.dmg * m.dmg, w.name, w.cls);
+      if (into && end.k === 'none') this.shotThroughHatch(p, a, into, w.dmg * m.dmg, w.name, w.cls);
       if (i < 3) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });
@@ -637,7 +643,58 @@ export class Game {
     h.push(hx, hy); this.newHoles.push(k, hx, hy);
   }
 
+  // ---- hatches: one hp for the whole panel (kept on all four cells so clients see it) ----
+  hatchDamage(id, amount) {
+    const h = this.map.hatches[id];
+    if (!h || this.map.tiles[h.cells[0]] !== T.HATCH) return;
+    for (const c of h.cells) { this.map.hp[c] -= amount; this.changed.add(c); }
+    if (this.map.hp[h.cells[0]] <= 0) this.breakHatch(id);
+  }
+  breakHatch(id) {
+    const h = this.map.hatches[id];
+    if (!h || this.map.tiles[h.cells[0]] === T.HOLE) return;
+    for (const c of openHatch(this.map, id)) this.changed.add(c);
+    for (const e of [...this.ents]) if (e.hatch === id && e.type !== 'breach' && e.type !== 'cutter') this.removeEnt(e);
+    this.events.push({ e: 'hit', k: 'wood', x: r1(h.x), y: r1(h.y) }); this.events.push({ e: 'hit', k: 'wall', x: r1(h.bx), y: r1(h.by) });
+    this.events.push({ e: 'snd', s: 'break', x: r1(h.x), y: r1(h.y) });
+    this.noise(h.x, h.y, null, 500);
+  }
+  reinforceHatch(id) {
+    const h = this.map.hatches[id];
+    for (const c of h.cells) { this.map.tiles[c] = T.HATCHR; this.map.hp[c] = 0; this.changed.add(c); }
+    this.events.push({ e: 'snd', s: 'reinforce', x: r1(h.x), y: r1(h.y) });
+  }
+  // a breaching charge set on the hatch you stand on: { k, x, y } like wallInFront
+  hatchSpot(p, types) {
+    const h = hatchNear(this.map, p.x, p.y, p.aim, 14);
+    return h && types.includes(this.map.tiles[h.cells[0]]) ? { k: h.cells[0], x: h.x, y: h.y, hatch: h.id } : null;
+  }
+  // A shot aimed right into an open hatch (nothing in the way on your floor) carries on to the other floor and
+  // hits whoever is at that spot; aimed at a shut one, a shotgun or marksman rifle chews it open.
+  // Is this pellet (angle ang) aimed into a hatch within reach? Shut hatches only count from above.
+  aimedHatch(p, ang) {
+    if (p.aimX === undefined || p.aimX === null) return null;
+    const ad = Math.hypot(p.aimX - p.x, p.aimY - p.y);
+    if (ad > 260 || ad < 4) return null;
+    const ax = p.x + Math.cos(ang) * ad, ay = p.y + Math.sin(ang) * ad, at = hatchAtPoint(this.map, ax, ay);
+    if (!at || (!at.up && this.map.tiles[at.h.cells[0]] !== T.HOLE)) return null;
+    return { ...at, ad, ax, ay };
+  }
+  shotThroughHatch(p, ang, at, dmg, wname, cls) {
+    const { ax, ay } = at, h = at.h, t = this.map.tiles[h.cells[0]];
+    if (t === T.HATCH && at.up && (cls === 'Shotgun' || cls === 'DMR')) { this.hatchDamage(h.id, dmg * 0.6); this.events.push({ e: 'hit', k: 'wood', x: r1(ax), y: r1(ay) }); return; }
+    if (t !== T.HOLE) return;
+    const tx = ax + (at.up ? h.bx - h.x : h.x - h.bx), ty = ay + (at.up ? h.by - h.y : h.y - h.by); // the same spot on the other floor
+    const ox = at.up ? h.bx : h.x, oy = at.up ? h.by : h.y;
+    for (const q of this.players.values()) {
+      if (!q.alive || q === p) continue;
+      if (Math.hypot(q.x - tx, q.y - ty) < hitR(q.op) + 3 && los(this.map, ox, oy, q.x, q.y)) { this.damage(q, dmg * 0.8, p, wname, ang); return; }
+    }
+    this.events.push({ e: 'hit', k: 'hard', x: r1(tx), y: r1(ty) });
+  }
+
   damageCell(k, amount) {
+    if (this.map.hatchAt[k] >= 0) return this.hatchDamage(this.map.hatchAt[k], amount);
     const t = this.map.tiles[k];
     if (t !== T.SOFT && t !== T.BARRI && t !== T.PANEL && t !== T.DSHIELD) return;
     this.map.hp[k] -= amount;
@@ -646,6 +703,7 @@ export class Game {
 
   destroyCell(k) {
     const m = this.map, t = m.tiles[k];
+    if (m.hatchAt[k] >= 0) return this.breakHatch(m.hatchAt[k]);
     if (t === T.BARRI || t === T.PANEL) m.tiles[k] = T.OPEN;
     else if (m.openId[k] >= 0) m.tiles[k] = T.OPEN;
     else m.tiles[k] = (m.floor[k] === FL.GRASS || m.floor[k] === FL.ASPHALT) ? T.GROUND : T.FLOOR;
@@ -727,6 +785,8 @@ export class Game {
       const f = this.facingCell(p, 26);
       if (f && f.t === T.SOFT && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce, cell: f.k };
       if (f && f.t === T.OPEN && this.map.openId[f.k] >= 0) return { k: 'barricade', t: 0, dur: DUR.barricade, cell: f.k };
+      const h = hatchNear(this.map, p.x, p.y, p.aim, 14);
+      if (h && this.map.tiles[h.cells[0]] === T.HATCH && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce, hatch: h.id };
     }
     return null;
   }
@@ -752,6 +812,8 @@ export class Game {
     } else if (b.k === 'revive') {
       const q = this.players.get(b.target);
       q.downed = false; q.hp = 25; if (p.ms) p.ms.revives++; this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) });
+    } else if (b.k === 'reinforce' && b.hatch !== undefined) {
+      if (this.map.tiles[this.map.hatches[b.hatch].cells[0]] === T.HATCH && this.reinforce > 0) { this.reinforceHatch(b.hatch); this.reinforce--; }
     } else if (b.k === 'reinforce') {
       if (this.map.tiles[b.cell] === T.SOFT && this.reinforce > 0) { this.reinforceWall(b.cell); this.reinforce--; if (this.tut && !p.bot) this.tut.info.reinf++; }
     } else if (b.k === 'barricade') { if (this.barricade(this.map.openId[b.cell], T.BARRI) && this.tut && !p.bot) this.tut.info.barri++; }
@@ -900,6 +962,10 @@ export class Game {
       if (Math.hypot(e.x - p.x, e.y - p.y) < 26) { this.hitEnt(e, p); return; }
     }
     const f = this.facingCell(p, 20);
+    const hn = hatchNear(this.map, p.x, p.y, p.aim, 14);
+    if (hn && this.map.tiles[hn.cells[0]] === T.HATCH && (!f || Math.hypot(hn.x - p.x, hn.y - p.y) < 22)) { // a swing at the hatch at your feet
+      this.hatchDamage(hn.id, 25); this.events.push({ e: 'hit', k: 'wood', x: r1(hn.x), y: r1(hn.y) }); return;
+    }
     if (!f) return;
     if (f.t === T.BARRI) {
       const o = this.map.openings[this.map.openId[f.k]];
@@ -937,9 +1003,9 @@ export class Game {
     const through = w => { const cx = (w.cx + 0.5) * CELL, cy = (w.cy + 0.5) * CELL, dx = Math.sign(Math.round(cx - w.x)), dy = Math.sign(Math.round(cy - w.y)); return { dx, dy, x: cx + dx * (CELL / 2 + 5), y: cy + dy * (CELL / 2 + 5) }; };
     const used = () => { p.abilityCount--; };
     if (id === 'cutter') {
-      const w = this.wallInFront(p, [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD]);
+      const w = this.wallInFront(p, [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD]) || this.hatchSpot(p, [T.HATCH, T.HATCHR]);
       if (!w) return;
-      this.ents.push({ id: this.eid(), type: 'cutter', x: w.x, y: w.y, cell: w.k, team, owner: p.id, t: 5, hp: 1 });
+      this.ents.push({ id: this.eid(), type: 'cutter', x: w.x, y: w.y, cell: w.k, hatch: w.hatch, team, owner: p.id, t: 5, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
     } else if (id === 'dart') {
       const d = castSight(this.map, p.x, p.y, p.aim, 380, null);
@@ -1003,8 +1069,10 @@ export class Game {
       used(); this.events.push({ e: 'arc', x: r1(p.x), y: r1(p.y), x2: r1(p.x + ca * bt), y2: r1(p.y + sa * bt) });
     } else if (id === 'hammer') { // smash soft walls and barricades open, or flatten someone in reach
       if (p.meleeCd > 0) return;
-      const f = this.facingCell(p, 30);
-      if (f && (f.t === T.SOFT || f.t === T.BARRI)) {
+      const f = this.facingCell(p, 30), hs = this.hatchSpot(p, [T.HATCH]);
+      if (hs && !(f && (f.t === T.SOFT || f.t === T.BARRI) && Math.hypot((f.cx + 0.5) * CELL - p.x, (f.cy + 0.5) * CELL - p.y) < Math.hypot(hs.x - p.x, hs.y - p.y))) {
+        this.breakHatch(hs.hatch);
+      } else if (f && (f.t === T.SOFT || f.t === T.BARRI)) {
         const across = Math.abs(ca) > Math.abs(sa) ? [0, 1] : [1, 0];
         for (const d of [0, 1, -1]) {
           const k = (f.cy + across[1] * d) * this.map.W + f.cx + across[0] * d, t = this.map.tiles[k];
@@ -1057,9 +1125,9 @@ export class Game {
       const n = this.throwNade(p, g); p.gadgetCount--;
       if (g === 'nitro') p.nitroId = n.id;
     } else if (g === 'breach') {
-      const w = this.wallInFront(p, [T.SOFT, T.BARRI]);
+      const w = this.wallInFront(p, [T.SOFT, T.BARRI]) || this.hatchSpot(p, [T.HATCH]);
       if (!w) return;
-      this.ents.push({ id: this.eid(), type: 'breach', x: w.x, y: w.y, cell: w.k, team, owner: p.id, t: 2.5, hp: 1 });
+      this.ents.push({ id: this.eid(), type: 'breach', x: w.x, y: w.y, cell: w.k, hatch: w.hatch, team, owner: p.id, t: 2.5, hp: 1 });
       p.gadgetCount--; this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
     } else if (g === 'claymore') {
       this.ents.push({ id: this.eid(), type: 'claymore', x: p.x + Math.cos(p.aim) * 10, y: p.y + Math.sin(p.aim) * 10, ang: p.aim, team, owner: p.id, arm: 1.5, hp: 1 });
@@ -1353,7 +1421,7 @@ export class Game {
   detonate(e) {
     this.removeEnt(e);
     const kind = e.type === 'nade' ? e.kind : e.type;
-    const SOFTISH = [T.SOFT, T.BARRI];
+    const SOFTISH = [T.SOFT, T.BARRI, T.HATCH];
     switch (kind) {
       case 'frag': this.explode(e, { r: 75, dmg: 130, cellR: 14, cells: SOFTISH, kind: 'frag' }); break;
       case 'impact': this.explode(e, { r: 34, dmg: 40, cellR: 22, cells: SOFTISH, kind: 'impact' }); break;
@@ -1368,7 +1436,7 @@ export class Game {
         }
         break;
       }
-      case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD], kind: 'cutter', at: e.cell }); break;
+      case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD, T.HATCH, T.HATCHR], kind: 'cutter', at: e.cell }); break;
       case 'sonar': {
         let any = false;
         for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 230) { this.spot(e.team, q.id, 2.5); any = true; }

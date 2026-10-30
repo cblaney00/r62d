@@ -32,6 +32,10 @@ export const T = {
   LOW: 7, TALL: 8, PANEL: 9, DSHIELD: 10,
   VOID: 11,  // outside a floor: open air above ground, solid earth below — nothing passes
   STAIR: 12, // staircase: walkable; the far end takes you to the other floor (map.portal)
+  // Hatches: 2x2 trapdoors in an upper floor above a room on the floor below (map.hatches). Walkable floor
+  // while shut; defenders reinforce them, explosives / shotguns / melee open them. HOLE = opened: you drop
+  // through it (map.portal), and you can look and shoot through it to the other floor.
+  HATCH: 13, HATCHR: 14, HOLE: 15,
 };
 
 // Floor looks
@@ -42,10 +46,10 @@ export const FL = {
 // Wall materials (for drawing)
 export const MAT = { DRYWALL: 0, BRICK: 1, CONCRETE: 2 };
 
-export const CELL_HP = { [T.SOFT]: 60, [T.BARRI]: 60, [T.PANEL]: 400, [T.DSHIELD]: 300 };
+export const CELL_HP = { [T.HATCH]: 60, [T.SOFT]: 60, [T.BARRI]: 60, [T.PANEL]: 400, [T.DSHIELD]: 300 };
 
 const MOVE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.LOW, T.TALL, T.PANEL, T.DSHIELD, T.VOID]);
-const DRONE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.TALL, T.PANEL, T.DSHIELD, T.LOW, T.VOID]); // drones fit through barricade gaps but not under furniture
+const DRONE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.TALL, T.PANEL, T.DSHIELD, T.LOW, T.VOID, T.HOLE]); // drones fit through barricade gaps but not under furniture
 const SIGHT_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.TALL, T.PANEL, T.VOID]);
 const BULLET_STOP = new Set([T.HARD, T.REINF, T.TALL, T.PANEL, T.DSHIELD, T.VOID]);
 const BULLET_PEN = new Set([T.SOFT, T.BARRI]);
@@ -61,7 +65,8 @@ export const blocksDrone = t => DRONE_BLOCK.has(t);
 export const blocksSight = t => SIGHT_BLOCK.has(t);
 export const stopsBullet = t => BULLET_STOP.has(t);
 export const penBullet = t => BULLET_PEN.has(t);
-export const walkable = t => t === T.FLOOR || t === T.GROUND || t === T.STAIR || t === T.OPEN;
+export const walkable = t => t === T.FLOOR || t === T.GROUND || t === T.STAIR || t === T.OPEN || t === T.HATCH || t === T.HATCHR || t === T.HOLE;
+export const isHatch = t => t === T.HATCH || t === T.HATCHR || t === T.HOLE;
 export const isWall = t => t === T.HARD || t === T.SOFT || t === T.REINF || t === T.BARRI || t === T.PANEL;
 
 export const TEAM = { ATK: 'atk', DEF: 'def' };

@@ -175,6 +175,7 @@ export class MapRenderer {
       const k = y * m.W + x, t = m.tiles[k];
       if (m.openId[k] >= 0 || t === T.OPEN || t === T.BARRI || t === T.PANEL) this.opening(x, y, k);
       if (SOLID.has(t) || t === T.DSHIELD) this.wall(x, y, k, t);
+      if (m.hatchAt && (m.hatchAt[k] >= 0 || m.hatchBelow[k] >= 0) && x >= x0 && x <= x1 && y >= y0 && y <= y1) this.hatchCell(x, y, k);
     }
     ctx.restore();
     this.mark(X, Y, X + Wd, Y + Hd);
@@ -432,6 +433,48 @@ export class MapRenderer {
     const d = this.dctx, g = d.createRadialGradient(x, y, 0, x, y, 14);
     g.addColorStop(0, 'rgba(110,8,8,0.75)'); g.addColorStop(0.7, 'rgba(90,5,5,0.55)'); g.addColorStop(1, 'rgba(80,5,5,0)');
     d.fillStyle = g; d.beginPath(); d.ellipse(x, y, 14, 11, Math.random() * 3, 0, 7); d.fill();
+  }
+  // A floor hatch (2x2 cells; each cell draws its quarter, clipped). Shut: a framed wooden trapdoor; reinforced: a riveted
+  // steel plate over it; open: a splintered black hole. Under an open hatch, light and debris on the floor below.
+  hatchCell(x, y, k) {
+    const m = this.map, ctx = this.ctx, up = m.hatchAt[k] >= 0, h = m.hatches[up ? m.hatchAt[k] : m.hatchBelow[k]];
+    const t = m.tiles[h.cells[0]], X = (up ? h.x : h.bx) - CELL, Y = (up ? h.y : h.by) - CELL, D = CELL * 2, r = (i) => hash(h.id, i, 91);
+    if (!up && t !== T.HOLE) return;
+    ctx.save(); ctx.beginPath(); ctx.rect(x * CELL, y * CELL, CELL, CELL); ctx.clip();
+    if (!up) { // light falling through, and bits of the broken hatch
+      const g = ctx.createRadialGradient(X + D / 2, Y + D / 2, 2, X + D / 2, Y + D / 2, D * 0.75);
+      g.addColorStop(0, 'rgba(255,240,205,0.16)'); g.addColorStop(1, 'rgba(255,240,205,0)');
+      ctx.fillStyle = g; ctx.fillRect(X - 8, Y - 8, D + 16, D + 16);
+      for (let i = 0; i < 14; i++) {
+        ctx.save(); ctx.translate(X + r(i) * D, Y + r(i + 30) * D); ctx.rotate(r(i + 60) * 6);
+        ctx.fillStyle = shade(i % 3 ? '#6b5236' : '#3d3f44', 0.75 + r(i + 90) * 0.4); ctx.fillRect(-2, -0.5, 3 + r(i + 5) * 3, 1.1); ctx.restore();
+      }
+      ctx.restore(); return;
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(X + 1, Y + 1.5, D, D); // the frame's shadow
+    ctx.fillStyle = '#2b2d31'; ctx.fillRect(X, Y, D, D);                       // steel frame
+    if (t === T.HOLE) {
+      const g = ctx.createRadialGradient(X + D / 2, Y + D / 2, 2, X + D / 2, Y + D / 2, D * 0.7);
+      g.addColorStop(0, '#0a0b0d'); g.addColorStop(1, '#16181b');
+      ctx.fillStyle = g; ctx.fillRect(X + 2, Y + 2, D - 4, D - 4);
+      ctx.fillStyle = '#6b5236'; // splintered plank stubs round the edge
+      for (let i = 0; i < 10; i++) {
+        const s = i % 4, u = 3 + r(i) * (D - 6), l = 2 + r(i + 20) * 5;
+        if (s === 0) ctx.fillRect(X + u, Y + 2, 1.6, l); else if (s === 1) ctx.fillRect(X + D - 2 - l, Y + u, l, 1.6);
+        else if (s === 2) ctx.fillRect(X + u, Y + D - 2 - l, 1.6, l); else ctx.fillRect(X + 2, Y + u, l, 1.6);
+      }
+    } else {
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = shade('#7a5c3c', 0.85 + r(i) * 0.25); ctx.fillRect(X + 2, Y + 2 + i * (D - 4) / 4, D - 4, (D - 4) / 4 - 0.6); }
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; for (let i = 1; i < 4; i++) ctx.fillRect(X + 2, Y + 2 + i * (D - 4) / 4 - 0.6, D - 4, 0.6);
+      ctx.fillStyle = '#1b1c1f'; ctx.fillRect(X + 5, Y + 2, 3, 2); ctx.fillRect(X + D - 8, Y + 2, 3, 2); // hinges
+      ctx.fillStyle = '#9aa0a6'; ctx.fillRect(X + D / 2 - 3, Y + D - 5, 6, 1.4);                        // pull handle
+      if (t === T.HATCHR) {
+        ctx.fillStyle = '#5d646c'; ctx.fillRect(X + 3, Y + 3, D - 6, D - 6);
+        ctx.strokeStyle = '#3c4148'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(X + 4, Y + 4); ctx.lineTo(X + D - 4, Y + D - 4); ctx.moveTo(X + D - 4, Y + 4); ctx.lineTo(X + 4, Y + D - 4); ctx.stroke();
+        ctx.fillStyle = '#a7aeb5'; for (const [a, b] of [[5, 5], [D - 5, 5], [5, D - 5], [D - 5, D - 5]]) { ctx.beginPath(); ctx.arc(X + a, Y + b, 0.9, 0, 7); ctx.fill(); }
+      }
+    }
+    ctx.restore();
   }
   scorch(x, y, r) {
     this.mark(x - r, y - r, x + r, y + r); this.decalAt(x - r, y - r, x + r, y + r);

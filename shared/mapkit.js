@@ -234,6 +234,48 @@ export function makeMap({ id, name, floors }) {
     }
   };
 
+  // Hatches, like R6's trapdoors: a 2x2 panel in the floor of an upper room with a room straight below it.
+  // Up to MAX_HATCHES per floor, in the biggest rooms, as near the middle as fits: every cell round the
+  // panel is clear floor on both floors (no furniture, door, stairs or wall), and not near a defuser spot.
+  // map.hatches[i] = { id, fl, cells (upper grid cells), below (the same spots one floor down), x, y, bx, by (centres, world px) }.
+  const hatches = [], hatchAt = new Int16Array(N).fill(-1), hatchBelow = new Int16Array(N).fill(-1);
+  const MAX_HATCHES = 3;
+  const placeHatches = (sites) => {
+    const bombs = []; for (const s of sites || []) for (const b of s.bombs || []) bombs.push(b);
+    const propAt = new Uint8Array(N);
+    for (const p of props) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) propAt[y * W + x] = 1;
+    for (const f of fl) {
+      if (f.i === 0) continue;
+      const b = fl[f.i - 1];
+      const down = k => { // the same building-frame spot one floor down, or -1
+        const lx = (k % W) - f.gx + f.x0 - b.x0, ly = Math.floor(k / W) + f.y0 - b.y0;
+        return lx < 0 || ly < 0 || lx >= b.w || ly >= b.h ? -1 : ly * W + b.gx + lx;
+      };
+      const clear = k => k >= 0 && tiles[k] === T.FLOOR && !shape[k] && !propAt[k] && portal[k] < 0 && hatchAt[k] < 0 && hatchBelow[k] < 0;
+      const list = rooms.filter(r => r.fl === f.i && r.w >= 5 && r.h >= 5).sort((p, q) => q.w * q.h - p.w * p.h);
+      let n = 0;
+      for (const r of list) {
+        if (n >= MAX_HATCHES) break;
+        const spots = [];
+        for (let y = r.y + 1; y <= r.y + r.h - 3; y++) for (let x = r.x + 1; x <= r.x + r.w - 3; x++)
+          spots.push([x, y, Math.hypot(x + 1 - (r.x + r.w / 2), y + 1 - (r.y + r.h / 2))]);
+        spots.sort((p, q) => p[2] - q[2]);
+        for (const [x, y] of spots) {
+          let ok = true;
+          for (let j = -1; j <= 2 && ok; j++) for (let i = -1; i <= 2 && ok; i++) { const k = (y + j) * W + x + i; if (!clear(k) || !clear(down(k))) ok = false; }
+          const cx = (x + 1) * CELL, cy = (y + 1) * CELL;
+          if (!ok || bombs.some(bb => Math.hypot(bb.x - cx, bb.y - cy) < CELL * 4)) continue;
+          const id = hatches.length, cells = [y * W + x, y * W + x + 1, (y + 1) * W + x, (y + 1) * W + x + 1], below = cells.map(down);
+          for (const k of cells) { tiles[k] = T.HATCH; hp[k] = CELL_HP[T.HATCH]; hatchAt[k] = id; }
+          for (const k of below) hatchBelow[k] = id;
+          const bk = below[0];
+          hatches.push({ id, fl: f.i, cells, below, x: cx, y: cy, bx: (bk % W + 1) * CELL, by: (Math.floor(bk / W) + 1) * CELL });
+          n++; break;
+        }
+      }
+    }
+  };
+
   const finish = (extra) => {
     finishShapes();
     // walls take the floor of the room next to them, so a hole shows the right floor
@@ -247,8 +289,10 @@ export function makeMap({ id, name, floors }) {
       }
     }
     droneHoles();
+    placeHatches(extra && extra.sites);
     return {
       id, name, W, H, tiles, floor, mat, hp, holes: {}, openId, dhole, props, openings, rooms, portal, flAt, stairs, decor, shape, shapeSide, shapeFill,
+      hatches, hatchAt, hatchBelow,
       floors: fl.map(f => ({ name: f.name, i: f.i, gx: f.gx, w: f.w, h: f.h, x0: f.x0, y0: f.y0 })),
       ...extra,
     };

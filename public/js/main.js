@@ -1,7 +1,7 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT } from '/shared/constants.js';
-import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST } from '/shared/map.js';
+import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -162,7 +162,7 @@ function connect(mode = '') { // '' = the shared match, 'tut' / 'free' = a priva
       if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
         resetMap(m.mapVersion);
         for (let k = 0; k < m.tiles.length; k++) if (m.tiles[k] !== st.map.tiles[k] || m.hp[k] !== st.map.hp[k]) {
-          st.map.tiles[k] = st.known.tiles[k] = m.tiles[k]; st.map.hp[k] = st.known.hp[k] = m.hp[k]; st.rend.cellChanged(k);
+          st.map.tiles[k] = st.known.tiles[k] = m.tiles[k]; st.map.hp[k] = st.known.hp[k] = m.hp[k]; holePortal(st.map, k); st.rend.cellChanged(k);
         }
         for (const k in m.holes || {}) { st.map.holes[k] = m.holes[k]; st.known.holes[k] = m.holes[k].slice(); st.rend.cellChanged(+k); }
       } else {
@@ -228,7 +228,7 @@ $('freeGo').onclick = () => {
 function loadMap(mv, tiles, hp, id, holes) {
   const t0 = performance.now();
   st.map = buildMap(id || st.mapId); st.mapId = st.map.id; st.base = st.map.tiles.slice(); st.mv = mv;
-  if (tiles) { st.map.tiles.set(tiles); st.map.hp.set(hp); }
+  if (tiles) { st.map.tiles.set(tiles); st.map.hp.set(hp); for (const h of st.map.hatches) holePortal(st.map, h.cells[0]); }
   if (holes) Object.assign(st.map.holes, holes);
   // What your team remembers of the map. It only catches up with the real map when
   // someone on your team actually sees the changed spot.
@@ -300,6 +300,7 @@ function onSnap(s) {
   for (let i = 0; i < s.cells.length; i += 3) {
     const k = s.cells[i];
     m.tiles[k] = s.cells[i + 1]; m.hp[k] = s.cells[i + 2];
+    holePortal(m, k); // an opened hatch drops you through
     st.unseen.add(k);
   }
   for (let i = 0; i < (s.holes || []).length; i += 3) { // new bullet holes in soft walls
@@ -1051,7 +1052,11 @@ audio.setWorld(
   (x, y) => { // how many walls between you and the sound (0-3); another floor counts as 2
     const L = st.listen; if (!L || !st.map) return 0;
     const fa = floorAt(st.map, L.x, L.y), fb = floorAt(st.map, x, y);
-    if (fa !== fb) return Math.min(3, 1 + Math.abs(fa - fb));
+    if (fa !== fb) { // an open hatch near both of you lets the sound through
+      const lo = Math.min(fa, fb), up = fa > fb ? L : { x, y }, dn = fa > fb ? { x, y } : L;
+      for (const h of st.map.hatches) if (h.fl === lo + 1 && st.map.tiles[h.cells[0]] === T.HOLE && Math.hypot(up.x - h.x, up.y - h.y) < 160 && Math.hypot(dn.x - h.bx, dn.y - h.by) < 220) return 1;
+      return Math.min(3, 1 + Math.abs(fa - fb));
+    }
     const d = Math.hypot(x - L.x, y - L.y); if (d < 1) return 0;
     let n = 0; const sk = cellAt(L.x, L.y), ek = cellAt(x, y);
     walkRay(L.x, L.y, (x - L.x) / d, (y - L.y) / d, d, (cx, cy) => {
@@ -1563,6 +1568,12 @@ function promptText(s, me) {
     if (f.t === T.BARRI && me.op === 'mason' && me.ac > 0) return '<b>' + label('ability') + '</b>ARMOR PANEL';
   }
   if (f && f.t === T.BARRI) return '<b>' + label('melee') + '</b>MELEE TO BREAK BARRICADE';
+  const h = hatchNear(m, x, y, st.aim, 14), ht = h && m.tiles[h.cells[0]];
+  if (h && !(f && Math.hypot((f.cx + 0.5) * CELL - x, (f.cy + 0.5) * CELL - y) < Math.hypot(h.x - x, h.y - y))) {
+    if (ht === T.HATCH && side === 'def' && s.rf > 0) return `<b>${label('interact')}</b>HOLD TO REINFORCE HATCH (${s.rf} LEFT)`;
+    if (ht === T.HATCH) return `<b>${label('melee')}</b>MELEE TO BREAK HATCH${side === 'atk' && me.op === 'talon' && me.gc > 0 ? '  ·  <b>' + label('gadget') + '</b>BREACH CHARGE' : ''}`;
+    if (ht === T.HATCHR && side === 'atk' && me.op === 'ember' && me.ac > 0) return '<b>' + label('ability') + '</b>PLACE PLASMA CUTTER ON HATCH';
+  }
   if (side === 'atk' && f && me.op === 'ember' && me.ac > 0 && [T.SOFT, T.REINF, T.BARRI, T.PANEL].includes(f.t)) return '<b>' + label('ability') + '</b>PLACE PLASMA CUTTER';
   if (side === 'atk' && f && me.op === 'talon' && me.gc > 0 && [T.SOFT, T.BARRI].includes(f.t)) return '<b>' + label('gadget') + '</b>PLACE BREACH CHARGE';
   return '';
@@ -1658,6 +1669,15 @@ function teamViewers(s, view, me, inGame) {
       vs.push({ x: e.x, y: e.y, ang: e.ag || 0, fov: 1.9, range: 650, near: 14, kind: 'cam' });
     }
   }
+  // an open hatch someone can see into shows a little of the room on the other side of it
+  const m = st.map, sm = smokes(s), n = vs.length;
+  for (const h of m.hatches || []) {
+    if (m.tiles[h.cells[0]] !== T.HOLE) continue;
+    let up = false, down = false;
+    for (let i = 0; i < n; i++) { const v = vs[i]; if (!up && canSee(m, v, h.x, h.y, sm)) up = true; if (!down && canSee(m, v, h.bx, h.by, sm)) down = true; }
+    if (up) vs.push({ x: h.bx, y: h.by, ang: 0, fov: Math.PI * 2, range: 72, near: 72, kind: 'hatch' });
+    if (down) vs.push({ x: h.x, y: h.y, ang: 0, fov: Math.PI * 2, range: 40, near: 40, kind: 'hatch' });
+  }
   return vs;
 }
 function teamSeesBody(x, y) { // seen by someone's own eyes (not a drone, camera or scope)
@@ -1689,6 +1709,7 @@ function applyKnown(k) {
   K.tiles[k] = m.tiles[k]; K.hp[k] = m.hp[k];
   if (nh && m.tiles[k] === T.SOFT) K.holes[k] = m.holes[k].slice(); else delete K.holes[k];
   st.rend.cellChanged(k);
+  if (m.hatchAt[k] >= 0) for (const b of m.hatches[m.hatchAt[k]].below) st.rend.cellChanged(b); // the hole shows in the ceiling below too
   const wall = t => t === T.SOFT || t === T.BARRI || t === T.REINF || t === T.PANEL || t === T.DSHIELD;
   if (prev === T.BARRI && !wall(m.tiles[k])) for (const d of [0, 1, -1, m.W, -m.W]) st.splinters.add(k + d);
   if (wall(prev) && !wall(m.tiles[k])) fx.wallBreak((k % m.W + 0.5) * CELL, (Math.floor(k / m.W) + 0.5) * CELL, prev === T.BARRI ? '150,100,55' : m.mat[k] === MAT.BRICK ? '150,80,60' : '210,205,190');

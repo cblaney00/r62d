@@ -211,7 +211,7 @@ export function facingCell(map, px, py, aim, reach) {
       const x = px + Math.cos(aim + off) * d, y = py + Math.sin(aim + off) * d;
       const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
       const t = tileAt(map, cx, cy);
-      if (t === T.FLOOR || t === T.GROUND || t === T.LOW) continue;
+      if (t === T.FLOOR || t === T.GROUND || t === T.LOW || t === T.HATCH || t === T.HATCHR || t === T.HOLE) continue; // hatches are floor here (see hatchNear)
       if (off !== 0 && t === T.HARD) continue;
       return { k: cy * map.W + cx, t, cx, cy };
     }

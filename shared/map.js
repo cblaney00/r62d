@@ -79,3 +79,37 @@ export function wallMount(map, x, y) {
   for (const [dx, dy] of best.d) { mx += dx * inset; my += dy * inset; nx -= dx; ny -= dy; }
   return { x: mx, y: my, n: Math.atan2(ny, nx), sp: best.corner ? 0.85 : 1.45, wall: best.d.map(([dx, dy]) => (best.cy + dy) * W + best.cx + dx) };
 }
+
+// ---- hatches (see placeHatches in mapkit.js) ----
+// Open hatch `id`: its cells become holes that drop you to the same spot one floor down. Returns the cells changed.
+export function openHatch(map, id) {
+  const h = map.hatches[id]; if (!h) return [];
+  h.cells.forEach((k, i) => { map.tiles[k] = T.HOLE; map.hp[k] = 0; map.portal[k] = h.below[i]; });
+  return h.cells;
+}
+// After a cell update arrives from the server: keep the drop-through link of an opened hatch.
+export function holePortal(map, k) {
+  const id = map.hatchAt ? map.hatchAt[k] : -1;
+  if (id >= 0 && map.tiles[k] === T.HOLE) map.portal[k] = map.hatches[id].below[map.hatches[id].cells.indexOf(k)];
+}
+// The hatch under or just in front of someone standing at (x, y) facing aim (within reach px), or null.
+export function hatchNear(map, x, y, aim, reach = 18) {
+  if (!map.hatchAt) return null;
+  for (let d = 0; d <= reach; d += 3) {
+    const cx = Math.floor((x + Math.cos(aim) * d) / CELL), cy = Math.floor((y + Math.sin(aim) * d) / CELL);
+    if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) continue;
+    const id = map.hatchAt[cy * map.W + cx];
+    if (id >= 0) return map.hatches[id];
+  }
+  return null;
+}
+// Which hatch (and which side of it) a point is over: { h, up: true } on the upper floor, up: false underneath it.
+export function hatchAtPoint(map, x, y) {
+  if (!map.hatchAt) return null;
+  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return null;
+  const k = cy * map.W + cx;
+  if (map.hatchAt[k] >= 0) return { h: map.hatches[map.hatchAt[k]], up: true };
+  if (map.hatchBelow[k] >= 0) return { h: map.hatches[map.hatchBelow[k]], up: false };
+  return null;
+}
