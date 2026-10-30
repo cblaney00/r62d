@@ -115,7 +115,7 @@ function fire(w, cv) {
       if (t > 0 && t < bt) { bt = t; best = d; }
     }
     const ex = dx * bt, ey = dy * bt;
-    if (tracerPellet(w, i)) S.tracers.push({ x2: ex, y2: ey, life: 0.07 });
+    if (tracerPellet(w, i)) S.tracers.push({ x2: ex, y2: ey, life: 0.04 });
     if (best) {
       hitAny = true; S.hits++;
       const v = view(cv), onH = onHead((S.mouse.x - v.ox) / v.z, (S.mouse.y - v.oy) / v.z, best.x, best.y); // same rule as a match: crosshair on the head
@@ -145,7 +145,7 @@ function draw(cv) {
   c.font = `${11 / z}px Barlow Condensed, sans-serif`; c.fillStyle = 'rgba(255,255,255,0.35)'; c.textAlign = 'left';
   for (let m = 5; m * M < far; m += 5) { c.beginPath(); c.moveTo(-100, -m * M); c.lineTo(100, -m * M); c.stroke(); c.fillText(m + ' m', -98, -m * M - 2 / z); }
   c.fillStyle = '#5b4a36'; c.fillRect(-100, -far - 14, 200, 8);
-  c.fillStyle = 'rgba(15,15,15,0.8)'; for (const h of S.holes) { c.beginPath(); c.arc(h.x, h.y, 0.9, 0, 7); c.fill(); }
+  c.fillStyle = 'rgba(15,15,15,0.8)'; for (const h of S.holes) { c.beginPath(); c.arc(h.x, h.y, 0.55, 0, 7); c.fill(); }
   // dummies
   for (const d of S.dummies) {
     const alive = d.hp > 0;
@@ -163,7 +163,7 @@ function draw(cv) {
     c.fillText(`${d.label} · ${d.max} HP`, 0, 23);
     c.restore();
   }
-  for (const t of S.tracers) { c.strokeStyle = `rgba(255,220,150,${t.life / 0.07 * 0.6})`; c.lineWidth = 0.9; c.beginPath(); c.moveTo(0, 0); c.lineTo(t.x2, t.y2); c.stroke(); }
+  for (const t of S.tracers) { c.strokeStyle = `rgba(255,220,150,${t.life / 0.04 * 0.6})`; c.lineWidth = 0.45; c.beginPath(); c.moveTo(0, 0); c.lineTo(t.x2, t.y2); c.stroke(); }
   // shooter
   const op = OP_LIST.find(k => OPERATORS[k].primary === S.w || OPERATORS[k].secondary === S.w) || 'ember';
   drawOperator(c, { x: 0, y: 0, aim: aimAngle(cv), op, w: S.w, ally: true, walk: 0, legs: 0, ads: S.adsT > 0.5, recoil: S.t - S.lastShot < 0.06 ? 1 : 0, reload: S.reloadT > 0 }, S.t);

@@ -8,7 +8,8 @@ export class FX {
   // lower graphics quality keeps only a share of the particles
   add(p) { if (this.parts.length < MAX * this.quality && (this.quality >= 1 || Math.random() < this.quality)) this.parts.push(p); }
 
-  tracer(x, y, x2, y2, col = '255,220,150') { this.tracers.push({ x, y, x2, y2, life: 0.07, max: 0.07, col }); }
+  // thin and brief (he asked: bullets are tiny, so their streaks should be too): about 2-3 frames
+  tracer(x, y, x2, y2, col = '255,220,150') { this.tracers.push({ x, y, x2, y2, life: 0.04, max: 0.04, col }); }
 
   muzzle(x, y, a) {
     this.lights.push({ x, y, r: 70, life: 0.05, max: 0.05, col: '255,190,110', a: 0.35 });
@@ -101,7 +102,7 @@ export class FX {
     }
     for (const t of this.tracers) {
       const k = t.life / t.max;
-      ctx.strokeStyle = `rgba(${t.col},${0.55 * k})`; ctx.lineWidth = 0.9;
+      ctx.strokeStyle = `rgba(${t.col},${0.6 * k})`; ctx.lineWidth = 0.45;
       ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(t.x2, t.y2); ctx.stroke();
     }
     for (const r of this.rings) { ctx.strokeStyle = `rgba(${r.col},${0.6 * r.life / r.maxL})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, 7); ctx.stroke(); }
