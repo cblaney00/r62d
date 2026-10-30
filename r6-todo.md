@@ -6,13 +6,14 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 - [ ] A way to look over each map and know where the bomb sites could be. A "Map knowledge" tab in the main menu, underneath the Armory.
-- [ ] Fights on the stairs are still a bit of a choke point. Look for a way to preview what you'd see at the top (or other end) of the stairs once you get close enough to them.
 - [ ] A new attacker with an RPG-style launcher, not too far off from Ash in R6 (our own operator: own name, look and twist).
 - [ ] Rappelling: attackers need a quicker way up to the top floor.
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
 
 
 ## Done
+
+- [x] Stairs preview: when you can see a staircase and are within a few metres of it (or on it), a live window in the top-left corner shows the other end ("▲ TOP OF THE STAIRS" / "▼ BOTTOM OF THE STAIRS"): everything visible all round the landing, with anyone standing there and their gadgets (hidden traps stay hidden), and a dashed ring where you come out. It fades away when you step back. Enemies on another floor no longer get a misleading red ! at the screen edge.
 
 - [x] Aiming in the Armory works exactly as in a match: the first click captures the mouse (Esc lets go), your sensitivity, aiming mode and your own crosshair are used, distances are real metres (5–25 m), the view widens when you aim in and follows the crosshair out, head zones show while aiming in, and the distance shows beside the crosshair. (Before, the range was drawn at about half scale, so its "20 m" was really 11 m.)
 

@@ -520,3 +520,8 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 @keyframes clickPulse { 50% { opacity: 0.55; } }
 #armList span em { font-style: normal; } #armList span em.atk { color: #ffb27a; } #armList span em.def { color: #8fc8ff; }
 #loading.hidden .lshine, #loading.hidden #loadBg { animation-play-state: paused; }
+/* stairs preview: a live corner window onto the other end of the stairs you are close to */
+#stairPip { position: absolute; top: 84px; left: 18px; width: 260px; height: 260px; border: 2px solid rgba(255,255,255,0.25); border-radius: 6px; overflow: hidden; background: #050607; box-shadow: 0 6px 24px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+#stairPip.on { opacity: 1; }
+#stairPip canvas { width: 100%; height: 100%; display: block; }
+#stairPip b { position: absolute; left: 0; right: 0; top: 0; padding: 4px 8px; font: 700 14px var(--head); letter-spacing: 0.12em; color: #fff; background: linear-gradient(rgba(0,0,0,0.7), transparent); }

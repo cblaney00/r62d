@@ -1,7 +1,7 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M } from '/shared/constants.js';
-import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks } from '/shared/map.js';
+import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -1113,9 +1113,11 @@ function frame(nowMs) {
 
   let t1 = pfa('logic', T0);
   st.viewers = teamViewers(s, view, me, inGame);
+  st.pip = stairPeek(view, me, inGame); if (st.pip) st.viewers.push(st.pip);
   revealSeen(); t1 = pfa('viewers', t1);
   bodySounds(me, dt);
-  draw(s, view, now, dt); ctx = ctx0; pfa('total', T0);
+  draw(s, view, now, dt); ctx = ctx0;
+  drawStairPip(s, me, now); pfa('total', T0);
   watchPerf(rawGap, performance.now() - T0);
 }
 let overDirty = false, fogShown = false;
@@ -1571,7 +1573,7 @@ function draw(s, view, now, dt) {
     // an enemy your team can see who is off the edge of your screen: a mark at the edge, so nobody shoots you unseen
     for (const p of drawn) if (p.tm !== side) {
       const { x: sx, y: sy } = w2s(p.x, p.y);
-      if (sx < 0 || sy < 0 || sx > VW || sy > VH) marker(p.x, p.y, '!', '#ff5040', view);
+      if ((sx < 0 || sy < 0 || sx > VW || sy > VH) && (!view || floorAt(st.map, p.x, p.y) === floorAt(st.map, view.x, view.y))) marker(p.x, p.y, '!', '#ff5040', view); // another floor (seen in the stairs window): no edge mark
     }
     // footstep direction hints around you
     if (view && view.kind === 'body') for (const p of drawn) { /* visible: no hint */ }
@@ -2004,6 +2006,88 @@ function floorHint(view, a, al, fd, shot = false) {
     ctx.fillText((fd > 0 ? '▲' : '▼') + (shot ? (fd > 0 ? ' SHOTS ABOVE' : ' SHOTS BELOW') : ''), view.x + Math.cos(a) * 40, view.y + Math.sin(a) * 40);
     ctx.textBaseline = 'alphabetic';
   }
+}
+// ---------------- stairs preview (he asked: stairs were a choke point) ----------------
+// Close to a staircase (on its steps, or within a few metres of its open end) a live corner window shows the other
+// end: what you would see standing at the top (or bottom) landing looking out. It is your own eyes for this, so
+// anything it shows is also seen on your side of the screen (marks, the remembered map).
+const PIP_R = 160; // world px from the middle of the window to its edge
+function stairPeek(view, me, inGame) {
+  if (!view || view.kind !== 'body' || !me || !me.a || me.dn || !st.map || !(st.map.stairs || []).length) return null;
+  const fl = floorAt(st.map, view.x, view.y);
+  let best = null;
+  for (let i = 0; i < st.map.stairs.length; i++) {
+    const s = st.map.stairs[i];
+    if (!stairLooks(st.map, i, view.x, view.y)) continue;
+    const e = stairEnds(st.map, i, 0), up = fl === s.a; // downstairs: show the top; upstairs: show the bottom
+    if (!up && fl !== s.b) continue;
+    // a landing: just off the end of the steps, but never inside a wall (some stairs end right against one)
+    const land = (p, a) => { const free = castSight(st.map, p.x, p.y, a, CELL * 1.2 + 8, null) - 8; const l = Math.max(2, Math.min(CELL * 1.2, free)); return { x: p.x + Math.cos(a) * l, y: p.y + Math.sin(a) * l }; };
+    e.top = land(e.top, e.up); e.bottom = land(e.bottom, e.up + Math.PI);
+    const near = up ? e.bottom : e.top, d = Math.hypot(view.x - near.x, view.y - near.y);
+    if (d > 12 && castSight(st.map, view.x, view.y, Math.atan2(near.y - view.y, near.x - view.x), d, null) < d - 6) continue; // only with a clear view of this end of the stairs
+    if (!best || d < best.d) best = { d, i, up, at: up ? e.top : e.bottom, ang: up ? e.up : e.up + Math.PI };
+  }
+  if (!best) return null;
+  // all round the landing (some stairs come out sideways into a corridor), centred on the open space it looks into
+  const v = { x: best.at.x, y: best.at.y, ang: best.ang, fov: Math.PI * 2, range: 330, near: 30, kind: 'stairs', up: best.up, s: best.i };
+  let sx = 0, sy = 0; const n = 24;
+  for (let j = 0; j < n; j++) { const a = j / n * Math.PI * 2, d = Math.min(220, castSight(st.map, v.x, v.y, a, 220, null)); sx += Math.cos(a) * d; sy += Math.sin(a) * d; }
+  const l = Math.hypot(sx / n, sy / n), cap = Math.min(80, l);
+  v.cx = v.x + (l > 0.01 ? sx / n / l * cap : 0); v.cy = v.y + (l > 0.01 ? sy / n / l * cap : 0);
+  v.fwd = Math.atan2(v.cy - v.y, v.cx - v.x); if (l < 0.01) v.fwd = best.ang;
+  return v;
+}
+function drawStairPip(s, me, now) {
+  const box = $('stairPip'), pv = st.pip;
+  box.classList.toggle('on', !!pv);
+  if (!pv) return;
+  const cvp = box.querySelector('canvas'), px = Math.round(260 * DPR);
+  if (cvp.width !== px) { cvp.width = px; cvp.height = px; }
+  const c = cvp.getContext('2d'), z = px / (PIP_R * 2), R = st.rend, k = R.c.width / R.Wp, sm = smokes(s);
+  // the window is centred a little past the landing, turned the same way as your own view
+  const cx = pv.cx, cy = pv.cy, rot = st.rot || 0;
+  const F = st.map.floors[Math.max(0, floorAt(st.map, pv.x, pv.y))], fx0 = F.gx * CELL, fx1 = (F.gx + F.w) * CELL, fy1 = F.h * CELL;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#050607'; c.fillRect(0, 0, px, px);
+  const cs = Math.cos(rot), sn = Math.sin(rot);
+  c.setTransform(z * cs, z * sn, -z * sn, z * cs, px / 2 - z * (cs * cx - sn * cy), px / 2 - z * (sn * cx + cs * cy));
+  const D = PIP_R * 1.5, x0 = Math.max(fx0, cx - D), x1 = Math.min(fx1, cx + D), y0 = Math.max(0, cy - D), y1 = Math.min(fy1, cy + D);
+  if (x1 <= x0 || y1 <= y0) return;
+  c.save(); c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip(); // only this floor
+  c.drawImage(R.grey, x0 * R.G, y0 * R.G, (x1 - x0) * R.G, (y1 - y0) * R.G, x0, y0, x1 - x0, y1 - y0); // remembered
+  c.save(); c.beginPath(); // what the landing can see right now, in colour
+  const poly = visionPolygon(pv, sm, 160), near = nearPolygon(pv, sm);
+  for (const pts of [poly, near]) { c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.closePath(); }
+  c.clip('nonzero');
+  c.drawImage(R.c, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0);
+  c.restore();
+  // people and gadgets there: your team always, the other side only where your team can see them
+  const side = me.tm, inBox = (x, y) => x >= x0 && x < x1 && y >= y0 && y < y1;
+  for (const e0 of s.ents) {
+    const e = interp(e0.id, 'ents') || e0, ally = e.tm === side;
+    if (!inBox(e.x, e.y) || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud') continue;
+    if (!ally && !teamSees(e.x, e.y)) continue;
+    if ((e.ty === 'clamp' || e.ty === 'prox' || e.ty === 'concuss' || e.ty === 'mine') && !ally) continue; // hidden traps stay hidden
+    if (e.ty === 'drone') drawDrone(c, { ...e, ag: e.ag || 0, wheel: 0, spd: 0, mvAng: e.ag || 0, sway: 0 }, now, ally);
+    else if (e.ty === 'cam') drawCam(c, e, now, ally);
+    else drawGadget(c, e, now, ally);
+  }
+  for (const sp of s.players) {
+    if (!sp.a || sp.sg || sp.id === me.id) continue;
+    const p = interp(sp.id, 'players'); if (!p || p.x === undefined || !inBox(p.x, p.y)) continue;
+    const ally = p.tm === side;
+    if (!ally && (p.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue;
+    const a = anim(p.id);
+    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br }, now);
+  }
+  c.restore();
+  // where you come out of the stairs: a dashed white ring
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  const dx = (pv.x - cx) * z, dy = (pv.y - cy) * z, Lx = px / 2 + dx * cs - dy * sn, Ly = px / 2 + dx * sn + dy * cs;
+  c.setLineDash([4 * DPR, 3 * DPR]); c.lineWidth = 2 * DPR; c.strokeStyle = 'rgba(255,255,255,0.85)';
+  c.beginPath(); c.arc(Lx, Ly, 11 * DPR, 0, 7); c.stroke(); c.setLineDash([]);
+  const t = box.querySelector('b'), label = pv.up ? '▲ TOP OF THE STAIRS' : '▼ BOTTOM OF THE STAIRS';
+  if (t.textContent !== label) t.textContent = label;
 }
 function ghostSeen(gh) {
   const sm = smokes(st.last);
