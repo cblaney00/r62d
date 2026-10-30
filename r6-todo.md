@@ -5,12 +5,6 @@ finished it gets ticked and moved to **Done**, then work continues on the next o
 Only ideas he asks for go in **To do** (added to the bottom). Claude never adds its own suggestions here.
 
 ## To do
-- [ ] Windows all start boarded up by default (doorways still start open).
-- [ ] More hard (unbreakable) walls: there is too much shooting through walls right now.
-- [ ] The chat box is too long and covers the role cards between rounds.
-- [ ] A reloading circle around your character that shows how far the reload has got.
-- [ ] The Tusk Auto-12 shoots to the left every time (tested in the Armory). Check that no other gun has the same problem.
-- [ ] Editing a loadout jitters: the panel refreshes with a jump whenever something is clicked.
 - [ ] Bullets should actually be very small, so you have to be perfectly precise with them. Tracers smaller too, or shown for a few less frames.
 - [ ] Armory: sort the guns by type, in folders (one per gun type).
 - [ ] Not all attacker bots seem to use their drone; every attacker bot should drone.
@@ -22,6 +16,13 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
 
 ## Done
+
+- [x] Windows all start boarded up (doorways still start open). They do not use up anyone's 3 barricades.
+- [x] More hard walls, less wallbanging: about a quarter fewer breakable walls on every map. Away from the bomb sites only about one inside wall in five and one outside wall in ten can still be shot through; the bomb-site rooms keep their few breakable walls.
+- [x] Shorter chat box: the last 6 lines in a match; during operator select only the last 3, in the empty strip under the role cards instead of on top of them.
+- [x] A reloading circle round your character fills up as the reload goes on.
+- [x] The Tusk Auto-12 shot left: its pellet spread was lopsided (a full width to the left, three quarters to the right). The Breaker-12 and Halberd had the same fault; all fixed. Every other gun checked: each one drifts the way its spray pattern says, and a test now checks this.
+- [x] The loadout panel no longer jumps when you click: only the parts that changed are updated.
 
 - [x] Barricading was bugged and too quick: the hold-E prompt showed from a little further away than the game accepted, a doorway could end up half-boarded and then never be boarded again, and standing in the doorway wasted the whole hold. Fixed all three. A barricade now takes 2.5 s like R6, each defender has 3 a round (shown in the prompt and the objective line), and doorways and windows start open.
 - [x] Bots don't pick operators before you: on your team they wait until you (and every other person) have locked in, then pick, leaning toward roles nobody has taken yet (roughly even, not strictly).
