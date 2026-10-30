@@ -5,7 +5,9 @@ let ac = null, master = null, sfx = null, rest = null, verb = null, verbIn = nul
 let listener = { x: 0, y: 0 }, occlude = () => 0, indoorAt = () => true, localize = null;
 // distance between a sound and the listener, measured in the shared building frame (floors stack)
 const L = (x, y) => (localize ? localize(x, y) : { x, y });
-const distTo = (x, y) => { const a = L(x, y), b = L(listener.x, listener.y); return { d: Math.hypot(a.x - b.x, a.y - b.y), dx: a.x - b.x }; };
+const distTo = (x, y) => { const a = L(x, y), b = L(listener.x, listener.y); return { d: Math.hypot(a.x - b.x, a.y - b.y), dx: a.x - b.x, dy: a.y - b.y }; };
+let lrot = 0; // how far the view is turned (Rotate aiming), so left and right stay left and right on screen
+export function setListenerRot(r) { lrot = r || 0; }
 let vol = { master: sliderGain(70), sfx: 1 };
 // a volume slider (0–100) to gain: 0.5 dB a step, so the slider covers 50 dB and every step sounds the same size
 export function sliderGain(v) { return v <= 0 ? 0 : Math.pow(10, (Math.min(100, v) - 100) * 0.5 / 20); }
@@ -95,7 +97,7 @@ function out(x, y, gain, range = 900, wet = 0.25) {
     vert = (L(x, y).f ?? 0) - (L(listener.x, listener.y).f ?? 0); // +: from the floor above, -: from below
     gain *= Math.max(0, 1 - d / range) ** 1.7;
     if (gain < 0.003) return null;
-    pan = Math.max(-0.9, Math.min(0.9, dd.dx / 260));
+    pan = Math.max(-0.9, Math.min(0.9, (dd.dx * Math.cos(lrot) - dd.dy * Math.sin(lrot)) / 260));
     walls = d > 20 ? occlude(x, y) : 0;
   }
   const g = ac.createGain(); g.gain.value = gain * Math.pow(0.55, walls);

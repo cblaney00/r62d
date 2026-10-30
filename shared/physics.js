@@ -85,6 +85,7 @@ export const ARMOR_SPEED = { 1: 0.88, 2: 1.0, 3: 1.14 };
 export function stepMove(map, o, input, dt, mods) {
   let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   let my = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+  if (input.rot && isFinite(input.rot) && (mx || my)) { const c = Math.cos(input.rot), s = Math.sin(input.rot); [mx, my] = [mx * c - my * s, mx * s + my * c]; } // keys relative to a turned view
   if (mods.frozen) { mx = 0; my = 0; }
   const len = Math.hypot(mx, my);
   if (len > 0) { mx /= len; my /= len; }

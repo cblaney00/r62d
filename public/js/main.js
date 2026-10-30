@@ -114,7 +114,9 @@ const mouse = { x: 0, y: 0, l: false, r: false, wl: 0, wr: 0 };
 // 1:1 like a pointer, but it is fixed to your character, so walking never changes your aim and the camera can slide
 // around freely. It can't sit right on top of you: pulling it through the middle comes out the other side.
 // A controller's right stick always aims like the pad (see gamepad.js).
-const AIM_MODES = ['free', 'pad', 'turn', 'cursor'];
+// "Rotate" (spin): like an FPS — the view turns with you so you always face up the screen; mouse left/right turns,
+// up/down sets how far ahead the crosshair sits, and W always walks up the screen (k.rot turns the keys).
+const AIM_MODES = ['free', 'spin', 'pad', 'turn', 'cursor'];
 let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return localStorage.getItem('r62d-aim2') && AIM_MODES.includes(m) ? m : 'free'; } catch { return 'free'; } })();
 let aimOff = { x: 200, y: 0 }; // Crosshair mode: where the crosshair sits from your character, in screen pixels
 const AIM_MIN = () => 46 * DPR, AIM_MAX = () => VH * 0.46;
@@ -147,10 +149,19 @@ function turnMove(dx, dy) {
 const gpk = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0 };
 let gpT = -1e9, mouseT = 0, gpLastL = 0, gpName = '';
 const gpRecent = () => gpT > mouseT && performance.now() - gpT < 4000;
+// world <-> screen pixels, allowing for a turned view (st.rot, Rotate aiming)
+function w2s(x, y) {
+  const z = st.zoom || 1, c = Math.cos(st.rot || 0), s = Math.sin(st.rot || 0), dx = (x - st.cam.x) * z, dy = (y - st.cam.y) * z;
+  return { x: dx * c - dy * s + VW / 2, y: dx * s + dy * c + VH / 2 };
+}
+function screenToWorld(sx, sy) {
+  const z = st.zoom || 1, c = Math.cos(st.rot || 0), s = Math.sin(st.rot || 0), dx = (sx - VW / 2) / z, dy = (sy - VH / 2) / z;
+  return { x: dx * c + dy * s + st.cam.x, y: -dx * s + dy * c + st.cam.y };
+}
 // the point you aim at, in screen pixels (with the aim pad this sits ahead of your character)
 function cursor() {
   if (!padOn) return mouse;
-  const z = st.zoom || 1, px = (st.pred.x - st.cam.x) * z + VW / 2, py = (st.pred.y - st.cam.y) * z + VH / 2;
+  const z = st.zoom || 1, P0 = w2s(st.pred.x, st.pred.y), px = P0.x, py = P0.y;
   if (aimMode === 'free' && !gpRecent()) { // kept on screen (it slides in along your aim if the screen edge is nearer)
     const l = Math.hypot(aimOff.x, aimOff.y) || 1, cx = aimOff.x / l, cy = aimOff.y / l, m = 24 * DPR;
     let d = l;
@@ -160,7 +171,7 @@ function cursor() {
     if (d < l - 1) aimOff = { x: cx * d, y: cy * d }; // stopped by the screen edge: no hidden travel to pull back
     return { x: px + cx * d, y: py + cy * d };
   }
-  const cx = Math.cos(padAng), cy = Math.sin(padAng), m = 30 * DPR;
+  const cx = Math.cos(padAng + (st.rot || 0)), cy = Math.sin(padAng + (st.rot || 0)), m = 30 * DPR;
   let d = VH * 0.07 + padReach * VH * 0.36; // shortened if it would leave the screen (near the edge of a map)
   if (cx > 0.01) d = Math.min(d, (VW - m - px) / cx); else if (cx < -0.01) d = Math.min(d, (m - px) / cx);
   if (cy > 0.01) d = Math.min(d, (VH - m - py) / cy); else if (cy < -0.01) d = Math.min(d, (m - py) / cy);
@@ -485,7 +496,7 @@ function pressAction(a, e) {
 // Vaulting goes the way you're moving, or where you look when standing still.
 function vaultDir() {
   const mx = (keys.has('right') || gpk.right ? 1 : 0) - (keys.has('left') || gpk.left ? 1 : 0), my = (keys.has('down') || gpk.down ? 1 : 0) - (keys.has('up') || gpk.up ? 1 : 0);
-  return mx || my ? Math.atan2(my, mx) : st.aim;
+  return mx || my ? Math.atan2(my, mx) - (st.rot || 0) : st.aim;
 }
 // Read the controller once a frame and turn it into the same actions as the keyboard and mouse.
 function pollPad(dt, view) {
@@ -534,7 +545,7 @@ cv.addEventListener('mousemove', e => {
     const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * DPR;
     if (padOn && aimMode === 'free') { freeMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'pad') { padMove(e.movementX * k, e.movementY * k); return; }
-    if (padOn && aimMode === 'turn') { turnMove(e.movementX * k, e.movementY * k); return; }
+    if (padOn && (aimMode === 'turn' || aimMode === 'spin')) { turnMove(e.movementX * k, e.movementY * k); return; }
     mouse.x = Math.max(0, Math.min(VW, mouse.x + e.movementX * k));
     mouse.y = Math.max(0, Math.min(VH, mouse.y + e.movementY * k));
   } else { mouse.x = e.clientX * DPR; mouse.y = e.clientY * DPR; }
@@ -936,9 +947,11 @@ function frame(nowMs) {
   // --- input & prediction ---
   pollPad(dt, view);
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
+  st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
+  audio.setListenerRot(st.rot);
   if (padOn && aimMode === 'free' && document.pointerLockElement !== cv && !gpRecent() && mouseT) { // mouse not captured yet: the crosshair is the pointer
-    const z = st.zoom || 1, px = (st.pred.x - st.cam.x) * z + VW / 2, py = (st.pred.y - st.cam.y) * z + VH / 2;
-    aimOff = { x: 0, y: 0 }; freeMove(mouse.x - px, mouse.y - py);
+    const P0 = w2s(st.pred.x, st.pred.y);
+    aimOff = { x: 0, y: 0 }; freeMove(mouse.x - P0.x, mouse.y - P0.y);
   }
   if (padOn && aimMode === 'pad' && document.pointerLockElement !== cv && !gpRecent()) { // mouse not captured yet: read the ring from the cursor
     const P = pad(), dx = mouse.x - P.x, dy = mouse.y - P.y, l = Math.hypot(dx, dy);
@@ -1026,8 +1039,9 @@ function frame(nowMs) {
       st.camFloor = fi; if (view) { st.cam.x = cx; st.cam.y = cy; }
     }
     const hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom, x0 = F.gx * CELL, mw = F.w * CELL, mh = F.h * CELL;
+    if (st.rot) { /* a turned view isn't kept inside the floor's edges; the blackout hides what's beyond */ } else
     st.cam.x = mw > hw * 2 ? Math.max(x0 + hw, Math.min(x0 + mw - hw, st.cam.x)) : x0 + mw / 2;
-    st.cam.y = mh > hh * 2 ? Math.max(hh, Math.min(mh - hh, st.cam.y)) : mh / 2;
+    if (!st.rot) st.cam.y = mh > hh * 2 ? Math.max(hh, Math.min(mh - hh, st.cam.y)) : mh / 2;
     st.floorRect = [x0, 0, x0 + mw, mh];
   }
   if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
@@ -1043,7 +1057,7 @@ let overDirty = false, fogShown = false;
 function showFog(on) { if (on !== fogShown) { fogShown = on; fog.style.visibility = on ? 'visible' : 'hidden'; } }
 const PF = { frames: 0 }; function pfa(k, t) { const n = performance.now(); PF[k] = (PF[k] || 0) + n - t; return n; }
 
-function screenToWorld(sx, sy) { const z = st.zoom || 1; return { x: (sx - VW / 2) / z + st.cam.x, y: (sy - VH / 2) / z + st.cam.y }; }
+
 
 function sendInput(dt, me, ctrl, view, s, now) {
   const ev = st.evq; st.evq = [];
@@ -1054,6 +1068,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
   };
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
+  if (st.rot) k.rot = Math.round(-st.rot * 1000) / 1000; // Rotate aiming: W walks up the screen
   // ping whatever is under your aim: an enemy you can see, else a gadget, camera or the objective, else the wall, door or floor you point at
   const trySpot = () => {
     if (!view || !me) return;
@@ -1164,9 +1179,9 @@ function drawMarks(view, now) {
   const z = st.zoom, pad = 40 * DPR;
   for (const k of st.marks) {
     const age = now - k.t, al = age > 5 ? 6 - age : 1, pop = Math.min(1, age / 0.15), col = k.w.startsWith('ENEMY') ? '255,70,70' : '255,210,74';
-    const sx = (k.x - st.cam.x) * z + VW / 2, sy = (k.y - st.cam.y) * z + VH / 2;
+    const S0 = w2s(k.x, k.y), sx = S0.x, sy = S0.y;
     const cx = Math.max(pad, Math.min(VW - pad, sx)), cy = Math.max(pad + 60 * DPR, Math.min(VH - pad - 60 * DPR, sy));
-    const wx = (cx - VW / 2) / z + st.cam.x, wy = (cy - VH / 2) / z + st.cam.y, r = 5 * (2 - pop);
+    const W0 = screenToWorld(cx, cy), wx = W0.x, wy = W0.y, r = 5 * (2 - pop);
     ctx.save(); ctx.translate(wx, wy); ctx.globalAlpha = al;
     ctx.fillStyle = `rgba(${col},0.25)`; ctx.strokeStyle = `rgb(${col})`; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -1300,10 +1315,11 @@ function fillPoly(c, pts) { c.beginPath(); c.moveTo(pts[0], pts[1]); for (let i 
 function draw(s, view, now, dt) {
   const z = st.zoom, m = st.map; let tq = performance.now();
   const shake = fx.shake;
-  const ox = VW / 2 - st.cam.x * z + (Math.random() - 0.5) * shake * DPR, oy = VH / 2 - st.cam.y * z + (Math.random() - 0.5) * shake * DPR;
+  const cr = Math.cos(st.rot || 0), sr = Math.sin(st.rot || 0), TA = z * cr, TB = z * sr, TC = -z * sr, TD = z * cr; // world -> screen (turned with Rotate aiming)
+  const ox = VW / 2 - (TA * st.cam.x + TC * st.cam.y) + (Math.random() - 0.5) * shake * DPR, oy = VH / 2 - (TB * st.cam.x + TD * st.cam.y) + (Math.random() - 0.5) * shake * DPR;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, VW, VH);
-  ctx.setTransform(z, 0, 0, z, ox, oy);
+  ctx.setTransform(TA, TB, TC, TD, ox, oy);
   ctx.imageSmoothingEnabled = true;
   // the map layer: copy over any changed spots, then let the browser place and scale it
   st.rend.process(gfxLevel() === 'low' ? 2.5 : 4, st.cam.x, st.cam.y);
@@ -1313,10 +1329,11 @@ function draw(s, view, now, dt) {
     const k = Math.min(innerWidth / (m.W * CELL * S), innerHeight / (m.H * CELL * S));
     mapLayer.style.opacity = st.warm > 0 ? '0.02' : '';
     mapLayer.style.transform = st.warm > 0 ? `scale(${k})` : '';
-  } else mapLayer.style.transform = `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / (S * DPR)})`;
+  } else { const q = S * DPR; mapLayer.style.transform = st.rot ? `matrix(${TA / q}, ${TB / q}, ${TC / q}, ${TD / q}, ${ox / DPR}, ${oy / DPR})` : `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / q})`; }
   // visible window of the map (for the grey remembered copy)
-  const wx0 = Math.max(0, st.cam.x - VW / 2 / z - 20), wy0 = Math.max(0, st.cam.y - VH / 2 / z - 20);
-  const wx1 = Math.min(m.W * CELL, st.cam.x + VW / 2 / z + 20), wy1 = Math.min(m.H * CELL, st.cam.y + VH / 2 / z + 20);
+  const ex = st.rot ? Math.hypot(VW, VH) / 2 / z : VW / 2 / z, ey = st.rot ? ex : VH / 2 / z, fr = st.rot && st.floorRect; // a turned view reaches further across the map
+  const wx0 = Math.max(fr ? fr[0] : 0, st.cam.x - ex - 20), wy0 = Math.max(fr ? fr[1] : 0, st.cam.y - ey - 20);
+  const wx1 = Math.min(fr ? fr[2] : m.W * CELL, st.cam.x + ex + 20), wy1 = Math.min(fr ? fr[3] : m.H * CELL, st.cam.y + ey + 20);
   tq = pfa('mapblit', tq);
   if (!s) { showFog(false); return; }
   const me = st.me, side = me ? me.tm : null;
@@ -1435,7 +1452,7 @@ function draw(s, view, now, dt) {
     fctx.setTransform(1, 0, 0, 1, 0, 0);
     fctx.globalCompositeOperation = 'source-over';
     fctx.fillStyle = '#000'; fctx.fillRect(0, 0, fog.width, fog.height);
-    fctx.setTransform(z * fk, 0, 0, z * fk, ox * fk, oy * fk);
+    fctx.setTransform(TA * fk, TB * fk, TC * fk, TD * fk, ox * fk, oy * fk);
     // the dull grey remembered map
     const G = st.rend.G;
     if (wx1 > wx0 && wy1 > wy0) fctx.drawImage(st.rend.grey, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
@@ -1450,11 +1467,11 @@ function draw(s, view, now, dt) {
   }
   // everything from here on goes on the top layer, above the blackout
   ctx = octx; overDirty = true;
-  ctx.setTransform(z, 0, 0, z, ox, oy);
+  ctx.setTransform(TA, TB, TC, TD, ox, oy);
   if (st.floorRect) { // hide the neighbouring floors that sit beside this one in the map grid
     const [a, b, c, d] = st.floorRect;
     ctx.fillStyle = '#050607';
-    const L = st.cam.x - VW / 2 / z - 50, R = st.cam.x + VW / 2 / z + 50, Tp = st.cam.y - VH / 2 / z - 50, B = st.cam.y + VH / 2 / z + 50;
+    const L = st.cam.x - ex - 50, R = st.cam.x + ex + 50, Tp = st.cam.y - ey - 50, B = st.cam.y + ey + 50;
     if (L < a) ctx.fillRect(L, Tp, a - L, B - Tp);
     if (R > c) ctx.fillRect(c, Tp, R - c, B - Tp);
     if (B > d) ctx.fillRect(a, d, c - a, B - d);
@@ -1484,7 +1501,7 @@ function draw(s, view, now, dt) {
     drawMarks(view, now);
     // an enemy your team can see who is off the edge of your screen: a mark at the edge, so nobody shoots you unseen
     for (const p of drawn) if (p.tm !== side) {
-      const sx = (p.x - st.cam.x) * st.zoom + VW / 2, sy = (p.y - st.cam.y) * st.zoom + VH / 2;
+      const { x: sx, y: sy } = w2s(p.x, p.y);
       if (sx < 0 || sy < 0 || sx > VW || sy > VH) marker(p.x, p.y, '!', '#ff5040', view);
     }
     // footstep direction hints around you
@@ -1541,9 +1558,9 @@ function draw(s, view, now, dt) {
 function marker(x, y, label, col, view) {
   const z = st.zoom;
   // clamp to screen edges so you can always find it
-  const sx = (x - st.cam.x) * z + VW / 2, sy = (y - st.cam.y) * z + VH / 2, pad = 40 * DPR;
+  const S0 = w2s(x, y), sx = S0.x, sy = S0.y, pad = 40 * DPR;
   const cx = Math.max(pad, Math.min(VW - pad, sx)), cy = Math.max(pad + 60 * DPR, Math.min(VH - pad - 60 * DPR, sy));
-  const wx = (cx - VW / 2) / z + st.cam.x, wy = (cy - VH / 2) / z + st.cam.y;
+  const W0 = screenToWorld(cx, cy), wx = W0.x, wy = W0.y;
   ctx.save(); ctx.translate(wx, wy - (cx === sx && cy === sy ? 14 : 0));
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(0, 0, 5.5, 0, 7); ctx.fill();
   ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.stroke();
@@ -1557,7 +1574,7 @@ function marker(x, y, label, col, view) {
 function aimPad() {
   const P = pad(), z = st.zoom || 1;
   // fade right down when your own character is underneath it
-  const near = Math.hypot((st.pred.x - st.cam.x) * z + VW / 2 - P.x, (st.pred.y - st.cam.y) * z + VH / 2 - P.y) < P.r * 1.3;
+  const P0 = w2s(st.pred.x, st.pred.y), near = Math.hypot(P0.x - P.x, P0.y - P.y) < P.r * 1.3;
   ctx.save(); ctx.globalAlpha = near ? 0.35 : 1;
   ctx.lineWidth = 1.5 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.fillStyle = 'rgba(10,16,24,0.18)';
   ctx.beginPath(); ctx.arc(P.x, P.y, P.r, 0, 7); ctx.fill(); ctx.stroke();
@@ -1580,7 +1597,7 @@ function crosshair(me, now) {
   const w = WEAPONS[me.w];
   const gm = gunMods(me.w, attFromCode(me.aa));
   // recoil kicks the crosshair round your character: pull the mouse against it
-  const px = (st.pred.x - st.cam.x) * st.zoom + VW / 2, py = (st.pred.y - st.cam.y) * st.zoom + VH / 2;
+  const P0 = w2s(st.pred.x, st.pred.y), px = P0.x, py = P0.y;
   // glides to the server's recoil (it arrives 20 times a second) instead of jumping; 25 ms behind at most
   const dtx = Math.min(0.1, now - (st.rcT || now)); st.rcT = now;
   st.rcShow = Math.abs((me.rc || 0) - (st.rcShow || 0)) > 0.3 ? me.rc || 0 : (st.rcShow || 0) + ((me.rc || 0) - (st.rcShow || 0)) * (1 - Math.exp(-dtx / 0.025));
@@ -2054,7 +2071,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, showEnd, playXp, freeMove, setAim, aimOff: () => aimOff }; // for automated screenshot tests
+window.__r62d = { PF, st, showEnd, playXp, freeMove, turnMove, setAim, aimOff: () => aimOff }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
@@ -2099,7 +2116,7 @@ function setAim(m, save = true) {
   for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
   if (m !== 'cursor') { padAng = st.aim || 0; padReach = 0.6; }
   if (m === 'free') aimOff = { x: Math.cos(st.aim || 0) * VH * 0.25, y: Math.sin(st.aim || 0) * VH * 0.25 };
-  $('aimHint').textContent = { free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Pull it through your character to turn round.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
+  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Pull it through your character to turn round.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
     turn: 'Turn: like an FPS. Mouse left / right turns you, mouse up / down moves the crosshair further / nearer.',
     cursor: 'Cursor: you aim at wherever the mouse pointer is.' }[m];
   if (save) saveSettings();
