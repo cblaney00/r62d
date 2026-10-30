@@ -9,9 +9,6 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
       Next: the other five maps the same way, after his feedback on Harbor.
-- [ ] Spawns and lock-in: several attacker spawn locations on every map, and attackers pick theirs. Attackers do not appear on the map until the
-      action (battle) timer starts. Operator select no longer starts the round when its timer runs out: everyone "locks in" instead, so the
-      round only starts when everyone is ready with their loadout.
 - [ ] Rework the stairs: going between levels kind of sucks right now. Fights should be possible between the top and bottom of a staircase in an
       intuitive way, and sounds must obviously come from above or below you.
 - [ ] Pick a role before each round: choosing a role (breacher, intel, support, entry, flank / anchor, roamer, trapper...) limits you to
@@ -21,6 +18,8 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Barricades like R6: every window and doorway starts boarded up. Three melee hits break one; bullets work differently — they only chew small holes in it that can be used on purpose (to look or shoot through). Work out how R6 does it and match that.
 
 ## Done
+
+- [x] Spawns and lock-in: every map has 4 attacker spawns and each attacker picks theirs on the operator screen (buttons and a small map showing where teammates start). Attackers are not on the map during preparation (only their drones, which leave from their spawn) and appear at their spawn when the action phase starts. Operator select has no clock: a LOCK IN button, a READY count, and the round starts once everyone is locked in.
 
 - [x] More guns: 15 new ones (23 in all), each with its own handling and a one-line description: Rook battle rifle, Sabre bullpup, Trident 3-round burst, Wasp / Marten .45 (built-in suppressor) / Lark PDW SMGs, Tusk semi-auto shotgun, Anvil slug, Stub sawn-off sidearm, Ox belt-fed and Drummer LMGs, Pike bolt-action, Heron marksman, Gnat machine pistol, Bison revolver. Every operator got one new gun and some a new sidearm; each has its own sound and picture.
 

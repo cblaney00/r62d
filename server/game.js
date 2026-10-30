@@ -140,6 +140,11 @@ export class Game {
       else if (m.a === 'start' && this.phase === PHASE.LOBBY) this.startMatch();
       else if (m.a === 'end' && this.phase !== PHASE.LOBBY) { this.msg(`${p.name} ended the match`); this.resetToLobby(); }
     } else if (m.t === 'pick') this.pickOp(p, m.op);
+    else if (m.t === 'spawn') { // attackers choose where they start (operator select or preparation)
+      const sp = this.map && this.map.atkSpawns[m.n];
+      if (sp && Number.isInteger(m.n) && this.side(p) === TEAM.ATK && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP)) p.spawn = sp.name;
+    }
+    else if (m.t === 'lock') { if (this.phase === PHASE.SELECT && p.op) p.locked = true; }
     else if (m.t === 'site') { // like R6, the defenders choose which objective to defend while picking operators
       if (this.phase === PHASE.SELECT && this.side(p) === TEAM.DEF && Number.isInteger(m.n) && m.n >= 0 && m.n < this.map.sites.length && m.n !== this.site) {
         this.site = m.n; this.msg(`${p.name} chose to defend ${this.map.sites[m.n].name}`, TEAM.DEF);
@@ -178,7 +183,7 @@ export class Game {
   }
 
   pickOp(p, op) {
-    if (this.phase !== PHASE.SELECT || !OPERATORS[op]) return;
+    if (this.phase !== PHASE.SELECT || !OPERATORS[op] || p.locked) return; // locked in: no changing
     if (OPERATORS[op].team !== this.side(p)) return;
     for (const q of this.players.values()) if (q !== p && q.squad === p.squad && q.op === op) return;
     p.op = op;
@@ -202,7 +207,7 @@ export class Game {
     this.spots = { atk: new Map(), def: new Map() };
     this.reinforce = 10;
     this.spawnName = this.map.atkSpawns[Math.floor(Math.random() * this.map.atkSpawns.length)].name;
-    for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; }
+    for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; p.locked = false; p.spawn = null; p.staged = false; }
     this.phase = PHASE.SELECT; this.timer = DUR.select;
     this.events.push({ e: 'newmap', v: this.mapVersion });
     this.events.push({ e: 'banner', text: `ROUND ${this.round}`, sub: 'Choose your operator' });
@@ -228,7 +233,6 @@ export class Game {
     // defenders start on site, attackers at one spawn (their bodies wait while they drone)
     const site = map.sites[this.site];
     const defCells = this.freeCellsInRooms(site.rooms);
-    const spawn = map.atkSpawns.find(s => s.name === this.spawnName);
     const atkers = [];
     for (const p of this.players.values()) {
       if (this.side(p) === TEAM.DEF) {
@@ -236,10 +240,12 @@ export class Game {
         p.x = (k % map.W + 0.5) * CELL; p.y = (Math.floor(k / map.W) + 0.5) * CELL;
         p.aim = Math.random() * Math.PI * 2;
       } else {
-        const pos = this.freeSpotNear(spawn.x, spawn.y, 46);
-        p.x = pos.x; p.y = pos.y;
-        p.aim = Math.atan2(map.H * CELL / 2 - p.y, map.W * CELL / 2 - p.x);
-        const d = { id: this.eid(), type: 'drone', owner: p.id, team: TEAM.ATK, x: p.x + Math.cos(p.aim) * 14, y: p.y + Math.sin(p.aim) * 14, hp: 1, ang: p.aim };
+        // he asked: attackers aren't on the map until the action phase. Until then the body waits off the map
+        // (nothing can see, hit or hear it) and only the drone is out, leaving from the spawn they chose.
+        const spawn = this.spawnOf(p), pos = this.freeSpotNear(spawn.x, spawn.y, 46);
+        p.aim = Math.atan2(map.H * CELL / 2 - pos.y, map.W * CELL / 2 - pos.x);
+        p.staged = true; p.x = -4000 - atkers.length * 80; p.y = -4000;
+        const d = { id: this.eid(), type: 'drone', owner: p.id, team: TEAM.ATK, x: pos.x + Math.cos(p.aim) * 14, y: pos.y + Math.sin(p.aim) * 14, hp: 1, ang: p.aim };
         this.ents.push(d); p.droneId = d.id; p.ctrl = 'drone'; p.drones = this.tut && !p.bot ? 3 : 1; // spares in the tutorial, in case a defender shoots it
         atkers.push(p);
       }
@@ -250,9 +256,19 @@ export class Game {
     this.events.push({ e: 'banner', text: 'PREPARATION PHASE', sub: '' });
   }
 
+  // the spawn an attacker chose (or the team's default for this round)
+  spawnOf(p) { const S = this.map.atkSpawns; return S.find(s => s.name === p.spawn) || S.find(s => s.name === this.spawnName) || S[0]; }
+
   beginAction() {
     for (const p of this.players.values()) {
-      if (this.side(p) === TEAM.ATK) { p.ctrl = 'body'; p.drones += 1; }
+      if (this.side(p) === TEAM.ATK) {
+        if (p.staged) { // out of hiding: onto the map at their spawn
+          const sp = this.spawnOf(p), pos = this.freeSpotNear(sp.x, sp.y, 46);
+          p.x = pos.x; p.y = pos.y; p.vx = p.vy = 0; p.staged = false;
+          p.aim = Math.atan2(this.map.H * CELL / 2 - p.y, this.map.W * CELL / 2 - p.x);
+        }
+        p.ctrl = 'body'; p.drones += 1;
+      }
       else if (p.ctrl === 'cam') p.ctrl = 'body';
       p.busy = null;
     }
@@ -293,7 +309,7 @@ export class Game {
     p.adsT = 0; p.rc = 0; p.shots = 0; p.rcDir = Math.random() < 0.5 ? 1 : -1; p.viewTime = null;
     p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false;
-    p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0;
+    p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0; p.staged = false;
     p.downedBy = null; p.nitroId = null; p.ai = {};
     p.boostUntil = 0; p.ghostUntil = 0; p.dazeUntil = 0; p.clampUntil = 0; p.plated = false; p.gasId = null;
     p.lanceT = 0; p.lancing = false; p.shrouded = false; p.turretCd = 0; p.shockT = 0;
@@ -307,7 +323,12 @@ export class Game {
     if (!held) this.timer -= dt;
     if (this.phase === PHASE.SELECT) {
       for (const p of this.players.values()) if (p.bot && !p.op && Math.random() < dt * 0.8) botPickOp(this, p);
-      if (this.timer <= 0) this.beginPrep();
+      for (const p of this.players.values()) if (p.bot && p.op && !p.locked) {
+        p.locked = true;
+        if (this.side(p) === TEAM.ATK && Math.random() < 0.3) p.spawn = this.map.atkSpawns[Math.floor(Math.random() * this.map.atkSpawns.length)].name; // most stay with the team
+      }
+      // he asked: no clock. The round starts when everyone has locked in (anyone who has left counts as ready)
+      if (this.tut ? this.timer <= 0 : this.allLocked()) this.beginPrep();
       return;
     }
     if (this.phase === PHASE.ROUND_END) {
@@ -346,6 +367,8 @@ export class Game {
     if (this.phase === PHASE.PREP && this.timer <= 0) this.beginAction();
     else if (this.phase === PHASE.ACTION) this.checkWin();
   }
+
+  allLocked() { for (const p of this.players.values()) if (!p.locked && (p.bot || (p.sock && p.sock.open))) return false; return true; }
 
   checkWin() {
     const up = { atk: 0, def: 0 };
@@ -788,7 +811,10 @@ export class Game {
   droneLost(e) {
     const o = this.players.get(e.owner);
     if (!o) return;
-    if (o.droneId === e.id) { o.droneId = null; if (o.ctrl === 'drone') o.ctrl = 'body'; }
+    if (o.droneId === e.id) {
+      o.droneId = null;
+      if (o.ctrl === 'drone') { o.ctrl = 'body'; const list = o.staged ? this.feeds(this.side(o)) : []; if (list.length) this.watch(o, list[0]); }
+    }
     this.msg(`${o.name}'s drone was destroyed`, e.team);
   }
 
@@ -1657,7 +1683,7 @@ export class Game {
         op: p.op, a: p.alive ? 1 : 0, k: p.kills, d: p.deaths, ms: p.rtt,
       };
       if (p.alive) Object.assign(o, {
-        dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim),
+        dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
         sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ct: p.ctrl,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
@@ -1666,10 +1692,13 @@ export class Game {
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,
       });
+      if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
+      if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; if (this.side(p) === TEAM.ATK) o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); }
       if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
+        ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
         m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0,
       }));
       return o;

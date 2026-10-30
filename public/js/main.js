@@ -710,16 +710,70 @@ function buildSelect(s) {
   $('selSide').textContent = `ROUND ${s.rd} — ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`;
   $('selSide').style.color = side === 'atk' ? '#ffb27a' : '#8fc8ff';
   const site = st.map.sites[s.site];
-  const sc = $('siteChoice'), sk = side === 'def' ? s.rd + ':' + s.site : '';
+  const spawns = st.map.atkSpawns, mySpawn = spawns[me.spn] || spawns[0];
+  const sc = $('siteChoice'), sk = side === 'def' ? s.rd + ':' + s.site : 'atk:' + s.rd + ':' + me.spn;
   if (sc.dataset.k !== sk) {
     sc.dataset.k = sk;
-    sc.innerHTML = side === 'def' ? '<span>CHOOSE THE SITE TO DEFEND</span>' + st.map.sites.map((x, i) => `<button data-n="${i}" class="${i === s.site ? 'on' : ''}">${esc(x.name)}</button>`).join('') : '';
-    for (const b of sc.querySelectorAll('button')) b.onclick = () => { audio.ui(); send({ t: 'site', n: +b.dataset.n }); };
+    // defenders pick the site; each attacker picks where they start (he asked)
+    sc.innerHTML = side === 'def' ? '<span>CHOOSE THE SITE TO DEFEND</span>' + st.map.sites.map((x, i) => `<button data-n="${i}" class="${i === s.site ? 'on' : ''}">${esc(x.name)}</button>`).join('')
+      : '<span>CHOOSE YOUR SPAWN</span>' + spawns.map((x, i) => `<button data-n="${i}" class="${i === me.spn ? 'on atk' : 'atk'}">${esc(x.name)}</button>`).join('');
+    for (const b of sc.querySelectorAll('button')) b.onclick = () => { audio.ui(); send(side === 'def' ? { t: 'site', n: +b.dataset.n } : { t: 'spawn', n: +b.dataset.n }); };
   }
+  drawSpawnMap(side === 'atk' ? mates : null, me);
   const mapName = st.map.name.toUpperCase();
-  $('selInfo').textContent = side === 'def' ? `DEFEND: ${site.name.toUpperCase()}  ·  ${mapName}` : `SPAWN: ${String(s.spawn).toUpperCase()}  ·  OBJECTIVE UNKNOWN  ·  ${mapName}`;
-  $('selTime').textContent = Math.ceil(s.tm);
-  $('picks').innerHTML = mates.map(p => `<span><b>${esc(p.n)}</b> ${p.op ? OPERATORS[p.op].name : '…'}</span>`).join('');
+  $('selInfo').textContent = side === 'def' ? `DEFEND: ${site.name.toUpperCase()}  ·  ${mapName}` : `SPAWN: ${mySpawn.name.toUpperCase()}  ·  OBJECTIVE UNKNOWN  ·  ${mapName}`;
+  // no clock (he asked): the round starts once everyone has locked in. The tutorial still counts down for its coach.
+  const humans = s.players.filter(p => !p.b), ready = s.players.filter(p => p.lk).length;
+  if (s.tu) $('selTime').textContent = Math.ceil(s.tm);
+  else $('selTime').innerHTML = `<small>READY</small>${ready}<small>/${s.players.length}</small>`;
+  const lb = $('lockBtn');
+  lb.classList.toggle('hidden', !!s.tu);
+  lb.disabled = !me.op || !!me.lk;
+  lb.textContent = me.lk ? 'LOCKED IN' : me.op ? 'LOCK IN' : 'PICK AN OPERATOR';
+  lb.classList.toggle('done', !!me.lk);
+  $('opgrid').classList.toggle('lockedIn', !!me.lk);
+  $('picks').innerHTML = mates.map(p => `<span class="${p.lk ? 'lk' : ''}"><b>${esc(p.n)}</b> ${p.op ? OPERATORS[p.op].name : '…'}${p.lk ? ' ✓' : ''}</span>`).join('')
+    + (humans.some(p => !p.lk) ? `<span class="wait">Waiting for ${humans.filter(p => !p.lk).map(p => esc(p.n)).join(', ')}</span>` : '');
+}
+$('lockBtn').onclick = () => { if (st.me && st.me.op && !st.me.lk) { audio.ui('lock'); send({ t: 'lock' }); } };
+
+// A small map of the ground floor with the attacker spawns: yours ringed in gold, a number for teammates starting there.
+// Click a spawn to start there.
+function drawSpawnMap(mates, me) {
+  const c = $('spawnMap'); c.classList.toggle('hidden', !mates);
+  if (!mates || !st.map) return;
+  const m = st.map, spawns = m.atkSpawns, f = Math.max(0, floorAt(m, spawns[0].x, spawns[0].y));
+  if (!st.spawnBase || st.spawnBase.v !== st.mv) { // the floor picture, drawn once per map
+    let x0 = m.W, y0 = m.H, x1 = 0, y1 = 0;
+    for (let k = 0; k < m.tiles.length; k++) if (m.flAt[k] === f) { const x = k % m.W, y = (k / m.W) | 0; if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, img = document.createElement('canvas'); img.width = w; img.height = h;
+    const g = img.getContext('2d'), id = g.createImageData(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = (y + y0) * m.W + x + x0, t = m.tiles[k], i = (y * w + x) * 4;
+      const col = m.flAt[k] !== f ? [11, 14, 18] : t === T.GROUND ? [34, 46, 38] : t === T.HARD || t === T.SOFT || t === T.REINF || t === T.PANEL ? [150, 158, 168]
+        : t === T.STAIR ? [90, 96, 104] : t === T.OPEN || t === T.BARRI ? [120, 90, 60] : [58, 64, 72];
+      id.data[i] = col[0]; id.data[i + 1] = col[1]; id.data[i + 2] = col[2]; id.data[i + 3] = 255;
+    }
+    g.putImageData(id, 0, 0);
+    st.spawnBase = { v: st.mv, img, x0, y0, w, h };
+  }
+  const B = st.spawnBase, g = c.getContext('2d'), sc = Math.min(c.width / B.w, c.height / B.h), ox = (c.width - B.w * sc) / 2, oy = (c.height - B.h * sc) / 2;
+  const at = sp => ({ x: ox + (sp.x / CELL - B.x0) * sc, y: oy + (sp.y / CELL - B.y0) * sc });
+  g.fillStyle = '#0b0e12'; g.fillRect(0, 0, c.width, c.height);
+  g.imageSmoothingEnabled = false; g.drawImage(B.img, ox, oy, B.w * sc, B.h * sc);
+  g.textAlign = 'center'; g.font = '600 20px Barlow Condensed, sans-serif';
+  spawns.forEach((sp, i) => {
+    const p = at(sp), here = mates.filter(q => q.spn === i).length, mine = me.spn === i;
+    g.fillStyle = mine ? '#f2c14e' : '#ff8a3d'; g.beginPath(); g.arc(p.x, p.y, mine ? 13 : 10, 0, 7); g.fill();
+    g.lineWidth = 3; g.strokeStyle = '#000'; g.stroke();
+    if (here) { g.fillStyle = '#000'; g.fillText(String(here), p.x, p.y + 7); }
+    g.fillStyle = mine ? '#f2c14e' : '#e8e8e8'; g.fillText(sp.name.toUpperCase(), Math.max(60, Math.min(c.width - 60, p.x)), p.y > c.height - 40 ? p.y - 20 : p.y + 34);
+  });
+  c.onclick = e => {
+    const r = c.getBoundingClientRect(), mx = (e.clientX - r.left) / r.width * c.width, my = (e.clientY - r.top) / r.height * c.height;
+    let best = -1, bd = 60; spawns.forEach((sp, i) => { const p = at(sp), d = Math.hypot(p.x - mx, p.y - my); if (d < bd) { bd = d; best = i; } });
+    if (best >= 0) { audio.ui(); send({ t: 'spawn', n: best }); }
+  };
 }
 
 function banner(text, sub, color) {
@@ -1227,7 +1281,7 @@ function draw(s, view, now, dt) {
   // players
   const drawn = [];
   for (const sp of s.players) {
-    if (!sp.a) continue;
+    if (!sp.a || sp.sg) continue; // an attacker waiting off the map during preparation
     const isMe = me && sp.id === me.id;
     let p = isMe ? { ...sp } : interp(sp.id, 'players');
     if (!p || p.x === undefined) continue;
@@ -1692,7 +1746,7 @@ function teamViewers(s, view, me, inGame) {
   if (!s || !me || !inGame) return vs;
   const side = me.tm;
   for (const sp of s.players) {
-    if (!sp.a || sp.tm !== side || sp.x === undefined) continue;
+    if (!sp.a || sp.sg || sp.tm !== side || sp.x === undefined) continue;
     if (sp.id === me.id && view && view.kind === 'body') continue;
     const p = sp.id === me.id ? { ...sp, x: st.pred.x, y: st.pred.y } : interp(sp.id, 'players');
     if (!p || p.x === undefined) continue;
