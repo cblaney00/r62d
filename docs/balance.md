@@ -30,3 +30,9 @@ After: every operator 39–59%, attackers 47%.
 
 ## 2026-10-28 — smaller hitboxes, skinnier builds
 Bullet hit radius per armor: heavy 7.5, medium 6.8, light 6.2 px (was 10 for everyone; head stays 2.3). Medium/light bodies drawn 84%/76% as wide. Expect fewer hits per shot fired, longer fights.
+
+## 2026-10-30 — guns fire at their real rate
+Before, every automatic fired ~600 rpm (the cooldown was rounded up to whole server ticks); now K4 720,
+V9 880, Hornet 920, Mule 640. A 12-match report before and after shows no real change in gun ranking.
+**Open problem:** attackers win only ~29% of bot rounds in both reports (since the smarter bots and
+fewer breakable walls). Bots defend much better than they attack; worth a look.

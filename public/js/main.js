@@ -576,9 +576,18 @@ renderGfx();
 $('setClose').onclick = () => toggleSettings();
 $('setBtn').onclick = () => toggleSettings();
 $('lobbySetBtn').onclick = () => toggleSettings();
-const saveVol = () => { try { localStorage.setItem('r62d-vol', JSON.stringify([+$('volMaster').value, +$('volSfx').value])); } catch {} };
-try { const v = JSON.parse(localStorage.getItem('r62d-vol') || 'null'); if (v) { $('volMaster').value = v[0]; $('volSfx').value = v[1]; } } catch {}
-const applyVol = () => audio.setVolume(st.muted ? 0 : $('volMaster').value / 100, $('volSfx').value / 100);
+// Volume sliders follow loudness, not raw gain: each step is 0.5 dB, so the whole slider spans 50 dB (audio.sliderGain).
+// He asked for a quieter start: the default master (70) is about a third as loud as full.
+const VOL_DEF = { volMaster: 70, volSfx: 100, volMusic: 88 };
+// a slider saved before the curve was straight gain: convert it, and never come back louder than the new default
+const fromOld = (k, v) => Math.min(VOL_DEF[k], v <= 0 ? 0 : Math.max(0, Math.round(100 + 40 * Math.log10(v / 100))));
+const saveVol = () => { try { localStorage.setItem('r62d-vol2', JSON.stringify([+$('volMaster').value, +$('volSfx').value])); } catch {} };
+try {
+  const v = JSON.parse(localStorage.getItem('r62d-vol2') || 'null'), o = JSON.parse(localStorage.getItem('r62d-vol') || 'null');
+  if (v) { $('volMaster').value = v[0]; $('volSfx').value = v[1]; } else if (o) { $('volMaster').value = fromOld('volMaster', o[0]); $('volSfx').value = fromOld('volSfx', o[1]); }
+} catch {}
+const applyVol = () => audio.setVolume(st.muted ? 0 : audio.sliderGain(+$('volMaster').value), audio.sliderGain(+$('volSfx').value));
+const musicVol = () => st.muted ? 0 : audio.sliderGain(+$('volMusic').value);
 $('volMaster').oninput = () => { applyVol(); saveVol(); };
 $('volSfx').oninput = () => { applyVol(); saveVol(); };
 applyVol();
@@ -599,7 +608,7 @@ for (const b of $('botLevel').children) b.onclick = () => { audio.ui(); send({ t
 $('startBtn').onclick = () => { send({ t: 'lobby', a: 'start' }); };
 $('leaveBtn').onclick = () => { if (st.tutorial || st.free) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
 $('fsBtn').onclick = () => toggleFullscreen();
-$('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100); $('muteBtn').textContent = st.muted ? '🔇' : '🔊'; };
+$('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(musicVol()); $('muteBtn').textContent = st.muted ? '🔇' : '🔊'; };
 function renderControls() {
   const L = id => keyName(bindsFor(id)[0]);
   const rows = [[`${L('up')}${L('left')}${L('down')}${L('right')}`, 'Move'], ['Mouse', 'Aim'], ['Left click', 'Shoot'], ['Right click', 'Aim down sights'],
@@ -1877,16 +1886,19 @@ function countdown(s, phase) {
   } else if (phase !== PHASE.PREP && phase !== PHASE.ACTION) st.cd = null;
 }
 // music volume
-try { const v = JSON.parse(localStorage.getItem('r62d-music') || 'null'); if (v !== null) $('volMusic').value = v; } catch {}
-setMusicVolume($('volMusic').value / 100);
-$('volMusic').oninput = () => { setMusicVolume(st.muted ? 0 : $('volMusic').value / 100); try { localStorage.setItem('r62d-music', $('volMusic').value); } catch {} };
+try {
+  const v = JSON.parse(localStorage.getItem('r62d-music2') || 'null'), o = JSON.parse(localStorage.getItem('r62d-music') || 'null');
+  if (v !== null) $('volMusic').value = v; else if (o !== null) $('volMusic').value = fromOld('volMusic', o);
+} catch {}
+setMusicVolume(musicVol());
+$('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
 window.__r62d = { PF, st, showEnd, playXp }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
   try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, xh };
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, xh };
 }
 let saveTimer = 0;
 function saveSettings() {
@@ -1895,12 +1907,13 @@ function saveSettings() {
 }
 function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
-  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = s[k];
+  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
+  if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.xh) setXhair(s.xh, false);
   if (AIM_MODES.includes(s.aim)) setAim(s.aim, false);
   showSens();
-  applyVol(); setMusicVolume(st.muted ? 0 : $('volMusic').value / 100);
-  saveVol(); try { localStorage.setItem('r62d-music', $('volMusic').value); } catch {}
+  applyVol(); setMusicVolume(musicVol());
+  saveVol(); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {}
   renderSettings(); renderControls();
 }
 onBindsChange(() => saveSettings());

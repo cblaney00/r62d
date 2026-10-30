@@ -1,15 +1,17 @@
 // R62D sound engine. Everything is synthesised (no audio files).
 // Each sound is positioned: distance fade, stereo pan, muffling through walls, and a room echo.
-let ac = null, master = null, sfx = null, verb = null, verbIn = null, noiseBuf = null;
+let ac = null, master = null, sfx = null, rest = null, verb = null, verbIn = null, noiseBuf = null;
 let listener = { x: 0, y: 0 }, occlude = () => 0, indoorAt = () => true, localize = null;
 // distance between a sound and the listener, measured in the shared building frame (floors stack)
 const L = (x, y) => (localize ? localize(x, y) : { x, y });
 const distTo = (x, y) => { const a = L(x, y), b = L(listener.x, listener.y); return { d: Math.hypot(a.x - b.x, a.y - b.y), dx: a.x - b.x }; };
-let vol = { master: 0.6, sfx: 1 };
+let vol = { master: sliderGain(70), sfx: 1 };
+// a volume slider (0–100) to gain: 0.5 dB a step, so the slider covers 50 dB and every step sounds the same size
+export function sliderGain(v) { return v <= 0 ? 0 : Math.pow(10, (Math.min(100, v) - 100) * 0.5 / 20); }
 const loops = new Map();
 
 // ---- THE MIX: one volume per kind of sound (measured with measureMix, see docs/sound.md) ----
-export const MIX = { guns: 2.6, explosions: 2.8, steps: 1.36, foley: 2.25, body: 0.4, impacts: 11.5, gadgets: 3.6, ui: 27, loops: 1.4 };
+export const MIX = { guns: 0.95, explosions: 0.9, steps: 1.36, foley: 2.25, body: 0.4, impacts: 11.5, gadgets: 3.6, ui: 27, loops: 1.4 };
 let C = 'foley'; // category of the sound currently being built
 
 // Every recording the game uses, as a list of small jobs (the loading screen runs them before you play).
@@ -27,11 +29,18 @@ export function initAudio() {
 
 function buildGraph(context) {
   ac = context;
-  master = ac.createGain(); master.gain.value = vol.master;
+  // effects → gentle glue compressor → master volume → speakers. The volume comes after the compressor, so the mix
+  // behaves the same at any volume, and it fades in when sound starts (opening the game never blasts anyone).
+  master = ac.createGain(); master.gain.value = 0;
+  if (ac.offline) master.gain.value = 1; // measureMix: a fixed level, so readings compare with docs/sound.md
+  else { master.gain.setValueAtTime(0, ac.currentTime); master.gain.linearRampToValueAtTime(vol.master, ac.currentTime + 1.2); }
   const comp = ac.createDynamicsCompressor();
   comp.threshold.value = -9; comp.knee.value = 6; comp.ratio.value = 4; comp.attack.value = 0.002; comp.release.value = 0.2;
-  master.connect(comp); comp.connect(ac.destination);
-  sfx = ac.createGain(); sfx.gain.value = vol.sfx; sfx.connect(master);
+  const pre = ac.createGain(); pre.gain.value = 0.6; // the level the mix was balanced at (docs/sound.md)
+  pre.connect(comp); comp.connect(master); master.connect(ac.destination);
+  sfx = ac.createGain(); sfx.gain.value = vol.sfx; sfx.connect(pre);
+  // everything except gunshots and explosions goes through 'rest', which dips a little under a loud bang (duck)
+  rest = ac.createGain(); rest.gain.value = 1; rest.connect(sfx);
   // room echo: a generated impulse response
   verb = ac.createConvolver();
   const len = ac.sampleRate * 1.4, ir = ac.createBuffer(2, len, ac.sampleRate);
@@ -57,7 +66,22 @@ function buildGraph(context) {
 
 export function setListener(x, y) { listener = { x, y }; }
 export function setWorld(occFn, indoorFn, locFn) { occlude = occFn; indoorAt = indoorFn; localize = locFn || null; }
-export function setVolume(m, s) { if (m !== undefined) vol.master = m; if (s !== undefined) vol.sfx = s; if (master) { master.gain.value = vol.master; sfx.gain.value = vol.sfx; } }
+export function setVolume(m, s) {
+  if (m !== undefined) vol.master = m; if (s !== undefined) vol.sfx = s;
+  if (master) { const t = ac.currentTime; master.gain.cancelScheduledValues(t); master.gain.setTargetAtTime(vol.master, t, 0.03); sfx.gain.value = vol.sfx; }
+}
+// A loud sound masks the others a little, the way ears do, instead of drowning them: the rest of the mix dips by
+// up to db (scaled by how loud the bang reached you) and comes back over a quarter of a second.
+let duckUntil = 0, duckDepth = 0;
+function duck(db, strength = 1) {
+  if (!rest) return;
+  const t = ac.currentTime, d = Math.min(db, db * strength);
+  if (d < 0.5 || (t < duckUntil && d <= duckDepth)) return;
+  const g = Math.pow(10, -d / 20);
+  rest.gain.cancelScheduledValues(t); rest.gain.setValueAtTime(rest.gain.value, t);
+  rest.gain.linearRampToValueAtTime(g, t + 0.012); rest.gain.setTargetAtTime(1, t + 0.08, 0.12);
+  duckUntil = t + 0.08; duckDepth = d;
+}
 export const now = () => (ac ? ac.currentTime : 0);
 
 // Build the output chain for one sound at (x, y). Returns null if inaudible.
@@ -76,7 +100,7 @@ function out(x, y, gain, range = 900, wet = 0.25) {
   const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
   lp.frequency.value = walls === 0 ? 18000 - Math.min(12000, d * 10) : walls === 1 ? 1400 : 650;
   const p = ac.createStereoPanner(); p.pan.value = pan;
-  g.connect(lp); lp.connect(p); p.connect(sfx);
+  g.connect(lp); lp.connect(p); p.connect(C === 'guns' || C === 'explosions' || !rest ? sfx : rest);
   const send = ac.createGain();
   send.gain.value = wet * (indoorAt(listener.x, listener.y) ? 1 : 0.35) * (1 + Math.min(0.6, d / 800) + walls * 0.4);
   p.connect(send); send.connect(verbIn);
@@ -376,10 +400,13 @@ export function gunshot(cls, x, y, own, quiet = false) {
   // suppressed: a muffled thump that carries much less far (the action still clacks)
   const g = out(own ? undefined : x, own ? undefined : y, P.v * (own ? 1.2 : 1) * (quiet ? 0.32 : 1), quiet ? 420 : 1100, own ? 0.3 : quiet ? 0.2 : 0.4); if (!g) return;
   const src = ac.createBufferSource(); src.buffer = gunBuf(cls); src.playbackRate.value = (quiet ? 0.8 : 0.96) + Math.random() * 0.08;
+  if (!quiet) { // takes the ear-piercing edge off the crack, keeps the body
+    const sh = ac.createBiquadFilter(); sh.type = 'highshelf'; sh.frequency.value = 3800; sh.gain.value = -5;
+    sh.connect(g); src.connect(sh); src.start();
+    duck(own ? 3 : 3.5, own ? 1 : Math.min(1, g.gain.value / (P.v * MIX.guns * 0.5)));
+  }
   if (quiet) { const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500; src.connect(lp); lp.connect(g); click(g, ac.currentTime + 0.012, 2600, 0.5); }
-  else src.connect(g);
-  src.start();
-  if (quiet) return;
+  if (quiet) { src.start(); return; }
   if (x !== undefined && !own) { // far away: the crack fades and the boom rolls on
     const d = distTo(x, y).d;
     if (d > 500) { const t = ac.currentTime; tone(g, t + d / 3400, 0.5, P.boom * 0.8, P.boom * 0.5, 'sine', 0.25, 0.02); }
@@ -393,6 +420,7 @@ export function explosion(x, y, kind) {
   const big = kind === 'frag' || kind === 'nitro' || kind === 'cutter';
   const g = out(x, y, big ? 1.5 : 1.05, 2000, 0.6); if (!g) return;
   const t = ac.currentTime;
+  duck(big ? 7 : 5, Math.min(1, g.gain.value / (MIX.explosions * 0.6)));
   if (kind === 'stun') { noise(g, t, 0.05, 'highpass', 3000, 0.7, 1); noise(g, t, 0.8, 'highpass', 6000, 0.5, 0.4, 0.002); tone(g, t, 0.3, 90, 40, 'sine', 0.6); return; }
   if (kind === 'emp') { tone(g, t, 0.6, 120, 40, 'sawtooth', 0.35); noise(g, t, 0.5, 'bandpass', 4000, 2, 0.4, 0.01); for (let i = 0; i < 8; i++) click(g, t + rnd(0, 0.5), rnd(3000, 6000), 0.3); return; }
   if (kind === 'cutter') { noise(g, t, 1.8, 'bandpass', 2600, 0.4, 0.5, 0.3); }
@@ -499,7 +527,7 @@ export function pruneLoops() {
 // ---- measuring the mix ----
 // Renders each sound offline (silently) and reports its loudness, so levels can be balanced by numbers.
 export async function measureMix(tests) {
-  const saved = { ac, master, sfx, verb, verbIn, noiseBuf, listener, occlude, indoorAt, C };
+  const saved = { ac, master, sfx, rest, verb, verbIn, noiseBuf, listener, occlude, indoorAt, C };
   const res = [];
   for (const [name, fn] of tests) {
     const off = new OfflineAudioContext(2, 48000 * 2, 48000); off.offline = true;
@@ -515,7 +543,7 @@ export async function measureMix(tests) {
     }
     res.push({ name, loudDb: Math.round(10 * Math.log10(loud + 1e-12) * 10) / 10, peakDb: Math.round(20 * Math.log10(peak + 1e-12) * 10) / 10 });
   }
-  ({ ac, master, sfx, verb, verbIn, noiseBuf, listener, occlude, indoorAt, C } = saved);
+  ({ ac, master, sfx, rest, verb, verbIn, noiseBuf, listener, occlude, indoorAt, C } = saved);
   return res;
 }
 const module = { droneLoop: (...a) => droneLoop(...a), gunshot: (...a) => gunshot(...a), explosion: (...a) => explosion(...a), step: (...a) => step(...a), shuffle: (...a) => shuffle(...a),
