@@ -12,6 +12,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] Fights on the stairs are still a bit of a choke point. Look for a way to preview what you'd see at the top (or other end) of the stairs once you get close enough to them.
 - [ ] Bullets should actually be very small, so you have to be perfectly precise with them. Tracers smaller too, or shown for a few less frames.
 - [ ] A new attacker with an RPG-style launcher, not too far off from Ash in R6 (our own operator: own name, look and twist).
+- [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
 
 ## Done
 
