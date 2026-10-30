@@ -15,6 +15,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
 - [ ] A reloading circle around your character that shows how far the reload has got.
 - [ ] More hard (unbreakable) walls: there is too much shooting through walls right now.
+- [ ] Armory: sort the guns by type, in folders (one per gun type).
+- [ ] Aiming in the Armory should work exactly the same as in a match.
 
 ## Done
 
