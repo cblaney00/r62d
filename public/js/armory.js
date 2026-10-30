@@ -1,7 +1,7 @@
 // The Armory: a private shooting range in the menus. Pick any gun, shoot dummies at different
 // distances and read its numbers. Runs only in your browser (nobody else sees it), using the same
 // damage, drop-off, spread, aim-in time, recoil and headshot rules as the server.
-import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf } from '/shared/operators.js';
+import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -186,11 +186,21 @@ function draw(cv) {
   c.fillText('Left mouse: shoot   ·   Right mouse: aim down sights   ·   R: reload', 14, cv.height - 18);
 }
 
+// the gun's spray as a little picture: each dot is where the next shot goes (first at the bottom), drift left/right
+function sprayPic(w, m) {
+  let r = 0; const pts = [], n = Math.min(w.mag, 24), mx = recoilMax(w);
+  for (let i = 1; i <= n; i++) { pts.push(r); r = Math.max(-mx, Math.min(mx, r + recoilStep(w, m, i))); }
+  const X = v => 60 + v / 0.18 * 55, Y = i => 96 - i * (88 / Math.max(1, n - 1));
+  return `<svg viewBox="0 0 120 100" width="120" height="100"><line x1="60" y1="2" x2="60" y2="98" stroke="rgba(255,255,255,0.15)"/>` +
+    `<polyline fill="none" stroke="rgba(242,193,78,0.5)" stroke-width="1" points="${pts.map((v, i) => X(v).toFixed(1) + ',' + Y(i).toFixed(1)).join(' ')}"/>` +
+    pts.map((v, i) => `<circle cx="${X(v).toFixed(1)}" cy="${Y(i).toFixed(1)}" r="${i ? 1.6 : 2.4}" fill="${i ? '#f2c14e' : '#fff'}"/>`).join('') + '</svg>';
+}
+
 function stats(el) {
   const w = WEAPONS[S.w], m = modsOf(S.w), a = attOf(S.w), opts = attachFor(S.w), d = S.dist * M, f = fallAt(w, d, m.range) * m.dmg;
   const stk = hp => Math.ceil(hp / (w.dmg * f * (w.pellets > 1 ? w.pellets * 0.7 : 1)));
   const ttk = hp => ((stk(hp) - 1) * 60 / w.rpm).toFixed(2);
-  const fo = falloffOf(w), rk = recoilOf(w).kick;
+  const fo = falloffOf(w), rk = recoilOf(w).kick * ((SPRAY[w.id] || {}).k || 1);
   const bar = (v, max) => `<i style="width:${Math.min(100, v / max * 100)}%"></i>`;
   el.querySelector('#armStats').innerHTML = `
     <div class="bigpic"></div>
@@ -204,6 +214,7 @@ function stats(el) {
     <div class="sbar"><span>Aimed accuracy</span><b>${(1 / (w.ads * m.adsSpread)).toFixed(0)}</b><em>${bar(0.12 - w.ads * m.adsSpread, 0.12)}</em></div>
     <div class="sbar"><span>Aim-in time</span><b>${(adsTime(w) * m.ads).toFixed(2)}s</b><em>${bar(0.6 - adsTime(w) * m.ads, 0.5)}</em></div>
     <div class="sbar"><span>Recoil</span><b>${(rk * m.kick * 1000).toFixed(0)}</b><em>${bar(rk * m.kick, 0.06)}</em></div>
+    <div class="spray">${sprayPic(w, m)}<p>${sprayWords(w)}. Pull your mouse the other way to keep on target.</p></div>
     ${m.quiet ? `<p class="note">${w.quiet ? 'Built-in suppressor' : 'Suppressed'}: much quieter, no muzzle flash.</p>` : ''}
     <p class="note">Full damage up to ${fo.from >= 9999 ? 'any range' : Math.round(fo.from * m.range / M) + ' m'}${fo.from >= 9999 ? '' : `, down to ${Math.round(fo.min * 100)}% by ${Math.round(fo.to * m.range / M)} m`}. A shot through the centre of the body is a headshot: instant kill.</p>
     <h4>At ${S.dist} m</h4>

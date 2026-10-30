@@ -110,9 +110,23 @@ const mouse = { x: 0, y: 0, l: false, r: false, wl: 0, wr: 0 };
 // little way out), and moving straight through the middle comes out the other side, aiming that way.
 // "Turn" is FPS-style: mouse left/right turns you, up/down pushes the crosshair further/nearer.
 // "Cursor" is the old way: you aim at wherever the cursor is.
+// "Crosshair" (the default since he found the pad horrible): the crosshair itself moves the way the mouse moves,
+// 1:1 like a pointer, but it is fixed to your character, so walking never changes your aim and the camera can slide
+// around freely. It can't sit right on top of you: pulling it through the middle comes out the other side.
 // A controller's right stick always aims like the pad (see gamepad.js).
-const AIM_MODES = ['pad', 'turn', 'cursor'];
-let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return AIM_MODES.includes(m) ? m : 'pad'; } catch { return 'pad'; } })();
+const AIM_MODES = ['free', 'pad', 'turn', 'cursor'];
+let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return localStorage.getItem('r62d-aim2') && AIM_MODES.includes(m) ? m : 'free'; } catch { return 'free'; } })();
+let aimOff = { x: 200, y: 0 }; // Crosshair mode: where the crosshair sits from your character, in screen pixels
+const AIM_MIN = () => 46 * DPR, AIM_MAX = () => VH * 0.46;
+function freeMove(dx, dy) {
+  const o = aimOff, n = { x: o.x + dx, y: o.y + dy }, l = Math.hypot(n.x, n.y), lo = AIM_MIN(), hi = AIM_MAX();
+  if (l > hi) { n.x *= hi / l; n.y *= hi / l; }
+  else if (l < lo) { // too close to you: pushed out to the edge of the little circle, on whichever side it's now on
+    const a = l > 0.01 ? Math.atan2(n.y, n.x) : Math.atan2(-o.y, -o.x);
+    n.x = Math.cos(a) * lo; n.y = Math.sin(a) * lo;
+  }
+  aimOff = n;
+}
 const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
 let padOn = false, padAng = 0, padReach = 0.6;
 const wrapAng = a => Math.atan2(Math.sin(a), Math.cos(a));
@@ -137,6 +151,15 @@ const gpRecent = () => gpT > mouseT && performance.now() - gpT < 4000;
 function cursor() {
   if (!padOn) return mouse;
   const z = st.zoom || 1, px = (st.pred.x - st.cam.x) * z + VW / 2, py = (st.pred.y - st.cam.y) * z + VH / 2;
+  if (aimMode === 'free' && !gpRecent()) { // kept on screen (it slides in along your aim if the screen edge is nearer)
+    const l = Math.hypot(aimOff.x, aimOff.y) || 1, cx = aimOff.x / l, cy = aimOff.y / l, m = 24 * DPR;
+    let d = l;
+    if (cx > 0.01) d = Math.min(d, (VW - m - px) / cx); else if (cx < -0.01) d = Math.min(d, (m - px) / cx);
+    if (cy > 0.01) d = Math.min(d, (VH - m - py) / cy); else if (cy < -0.01) d = Math.min(d, (m - py) / cy);
+    d = Math.max(d, AIM_MIN());
+    if (d < l - 1) aimOff = { x: cx * d, y: cy * d }; // stopped by the screen edge: no hidden travel to pull back
+    return { x: px + cx * d, y: py + cy * d };
+  }
   const cx = Math.cos(padAng), cy = Math.sin(padAng), m = 30 * DPR;
   let d = VH * 0.07 + padReach * VH * 0.36; // shortened if it would leave the screen (near the edge of a map)
   if (cx > 0.01) d = Math.min(d, (VW - m - px) / cx); else if (cx < -0.01) d = Math.min(d, (m - px) / cx);
@@ -509,6 +532,7 @@ cv.addEventListener('mousemove', e => {
   if (document.pointerLockElement === cv) {
     const ads = mouse.r && st.me && st.me.a && st.me.ct === 'body';
     const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * DPR;
+    if (padOn && aimMode === 'free') { freeMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'pad') { padMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'turn') { turnMove(e.movementX * k, e.movementY * k); return; }
     mouse.x = Math.max(0, Math.min(VW, mouse.x + e.movementX * k));
@@ -912,6 +936,10 @@ function frame(nowMs) {
   // --- input & prediction ---
   pollPad(dt, view);
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
+  if (padOn && aimMode === 'free' && document.pointerLockElement !== cv && !gpRecent() && mouseT) { // mouse not captured yet: the crosshair is the pointer
+    const z = st.zoom || 1, px = (st.pred.x - st.cam.x) * z + VW / 2, py = (st.pred.y - st.cam.y) * z + VH / 2;
+    aimOff = { x: 0, y: 0 }; freeMove(mouse.x - px, mouse.y - py);
+  }
   if (padOn && aimMode === 'pad' && document.pointerLockElement !== cv && !gpRecent()) { // mouse not captured yet: read the ring from the cursor
     const P = pad(), dx = mouse.x - P.x, dy = mouse.y - P.y, l = Math.hypot(dx, dy);
     if (l > 1) { padAng = Math.atan2(dy, dx); padReach = Math.min(1, l / P.r); }
@@ -2026,13 +2054,13 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, showEnd, playXp }; // for automated screenshot tests
+window.__r62d = { PF, st, showEnd, playXp, freeMove, setAim, aimOff: () => aimOff }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
   try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, xh };
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, aimV: 2, xh };
 }
 let saveTimer = 0;
 function saveSettings() {
@@ -2044,7 +2072,7 @@ function applySettings(s) {
   for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.xh) setXhair(s.xh, false);
-  if (AIM_MODES.includes(s.aim)) setAim(s.aim, false);
+  if (AIM_MODES.includes(s.aim)) setAim(s.aimV === 2 ? s.aim : s.aim === 'pad' ? 'free' : s.aim, s.aimV !== 2); // the old default pad becomes the new Crosshair once
   showSens();
   applyVol(); setMusicVolume(musicVol());
   saveVol(); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {}
@@ -2067,10 +2095,11 @@ for (const id of ['sens', 'adsSens']) { $(id).addEventListener('input', showSens
 try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; } } catch {}
 showSens();
 function setAim(m, save = true) {
-  aimMode = m; try { localStorage.setItem('r62d-aim', m); } catch {}
+  aimMode = m; try { localStorage.setItem('r62d-aim', m); localStorage.setItem('r62d-aim2', '1'); } catch {}
   for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
   if (m !== 'cursor') { padAng = st.aim || 0; padReach = 0.6; }
-  $('aimHint').textContent = { pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
+  if (m === 'free') aimOff = { x: Math.cos(st.aim || 0) * VH * 0.25, y: Math.sin(st.aim || 0) * VH * 0.25 };
+  $('aimHint').textContent = { free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Pull it through your character to turn round.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
     turn: 'Turn: like an FPS. Mouse left / right turns you, mouse up / down moves the crosshair further / nearer.',
     cursor: 'Cursor: you aim at wherever the mouse pointer is.' }[m];
   if (save) saveSettings();

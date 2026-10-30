@@ -378,11 +378,47 @@ export function shotOffset(w, cone, i, rnd = Math.random) {
   if (w.pellets > 1) return w.pellets === 1 ? 0 : cone * ((i / (w.pellets - 1)) * 2 - 1) * (i % 2 ? 0.75 : 1) + (rnd() - 0.5) * cone * 0.1;
   return cone ? (rnd() + rnd() - 1) * cone : 0;
 }
-// the recoil added after shot number n of a burst (1 = the first): each gun has its own fixed pattern
+// Each gun's own spray (he asked: some pull left, some right, some much harder). Recoil turns your aim; + is to the
+// right (clockwise), - to the left. pull: steady drift per shot (×kick); zig: side-to-side shake (×sway) repeating every
+// per shots; flip: the steady drift changes side every flip shots (0 = never); k: how hard it kicks overall; mx: how
+// far it can drag your aim before topping out (×class).
+export const SPRAY = {
+  k4:      { pull: 0.8,  zig: 0.4, per: 5, flip: 10, k: 1,   mx: 1 },    // right, then back left
+  v9:      { pull: -0.6, zig: 0.8, per: 4, flip: 0,  k: 1,   mx: 1 },    // drifts left, a little shaky
+  breaker: { pull: 0.6,  zig: 0.3, per: 2, flip: 0,  k: 1,   mx: 1 },
+  mule:    { pull: 1,    zig: 0.3, per: 8, flip: 0,  k: 1.1, mx: 1.3 },  // a long steady climb to the right
+  longbow: { pull: -0.7, zig: 0.6, per: 2, flip: 0,  k: 1,   mx: 1 },
+  hornet:  { pull: 0.3,  zig: 1.4, per: 3, flip: 0,  k: 1,   mx: 1 },    // shakes both ways
+  vex50:   { pull: 1,    zig: 0.5, per: 2, flip: 0,  k: 1.6, mx: 1.4 },  // big kick right
+  p10:     { pull: -0.4, zig: 0.6, per: 3, flip: 0,  k: 1,   mx: 1 },
+  rook:    { pull: -1,   zig: 0.5, per: 4, flip: 0,  k: 1.4, mx: 1.6 },  // hard and to the left
+  sabre:   { pull: 0.2,  zig: 1.3, per: 3, flip: 0,  k: 1,   mx: 1 },    // wanders side to side
+  trident: { pull: 0.7,  zig: 0.4, per: 3, flip: 0,  k: 1,   mx: 1 },
+  wasp:    { pull: -0.3, zig: 1.6, per: 3, flip: 0,  k: 1.1, mx: 1.3 },  // wild shake
+  marten:  { pull: 0.5,  zig: 0.3, per: 6, flip: 0,  k: 1,   mx: 0.8 },  // gentle
+  lark:    { pull: -0.7, zig: 0.5, per: 5, flip: 15, k: 1,   mx: 1 },    // left, then right late in the mag
+  tusk:    { pull: 0.4,  zig: 0.9, per: 2, flip: 0,  k: 1,   mx: 1.2 },  // bucks left-right each blast
+  anvil:   { pull: -1,   zig: 0.2, per: 2, flip: 0,  k: 1.3, mx: 1.4 },
+  stub:    { pull: 1,    zig: 0,   per: 2, flip: 0,  k: 1.5, mx: 1.5 },
+  ox:      { pull: 1,    zig: 0.2, per: 6, flip: 0,  k: 1.3, mx: 1.7 },  // heavy, steady right: hold it left
+  drummer: { pull: -0.8, zig: 0.9, per: 5, flip: 12, k: 1,   mx: 1.2 },  // left, then right
+  pike:    { pull: 1,    zig: 0,   per: 2, flip: 0,  k: 1.3, mx: 1.5 },
+  heron:   { pull: -0.6, zig: 0.5, per: 3, flip: 0,  k: 1,   mx: 1 },
+  gnat:    { pull: 0.6,  zig: 1.8, per: 2, flip: 0,  k: 1.5, mx: 1.8 },  // very hard to control
+  bison:   { pull: -1,   zig: 0.3, per: 2, flip: 0,  k: 2,   mx: 1.6 },  // a big kick left every shot
+};
+for (const [k, w] of Object.entries(WEAPONS)) w.id = k;
+const sprayOf = w => SPRAY[w.id] || { pull: 0.6, zig: 0.6, per: 6, flip: 6, k: 1, mx: 1 };
+// the recoil added after shot number n of a burst (1 = the first): the gun's own fixed pattern
 export function recoilStep(w, m, n) {
-  const rc = recoilOf(w);
-  let seed = 0; for (const c of w.name) seed = (seed * 31 + c.charCodeAt(0)) % 997;
-  const dir = (Math.floor((n - 1) / 6) % 2 ? -1 : 1) * (seed % 2 ? 1 : -1);
-  return dir * rc.kick * m.kick * (n <= 3 ? m.first : 1) + Math.sin(n * 1.7 + seed) * rc.sway * m.sway * 0.5;
+  const rc = recoilOf(w), S = sprayOf(w);
+  const dir = S.flip && Math.floor((n - 1) / S.flip) % 2 ? -1 : 1;
+  return dir * S.pull * rc.kick * S.k * m.kick * (n <= 3 ? m.first : 1) + Math.sin((n - 1) * 2 * Math.PI / (S.per || 4) + 0.6) * S.zig * rc.sway * S.k * m.sway;
 }
-export const recoilMax = w => (RECOIL[w.cls] || RECOIL.AR).max;
+export const recoilMax = w => (RECOIL[w.cls] || RECOIL.AR).max * (sprayOf(w).mx || 1);
+// the shape of a gun's spray in plain words (for the menus)
+export function sprayWords(w) {
+  const S = sprayOf(w), side = d => d > 0 ? 'right' : 'left';
+  const how = S.pull === 0 ? 'Shakes side to side' : S.flip ? `Pulls ${side(S.pull)}, then ${side(-S.pull)} after ${S.flip} shots` : Math.abs(S.zig) > Math.abs(S.pull) * 1.5 ? `Shakes side to side, drifting ${side(S.pull)}` : `Pulls ${side(S.pull)}`;
+  return how + (S.k >= 1.4 ? ', kicks very hard' : S.k >= 1.2 ? ', kicks hard' : '');
+}

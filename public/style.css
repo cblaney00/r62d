@@ -486,3 +486,7 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 #chatLog .tag.ping { background: #f2c14e; color: #111; } #chatLog .pingTxt { color: #f2c14e; font-weight: 600; }
 .hint.addr { color: #f2c14e; margin-top: 4px; }
 #coach.sel { top: auto; bottom: 74px; left: auto; right: 140px; transform: none; width: 600px; }
+
+#armStats .spray { display: flex; gap: 12px; align-items: center; margin: 8px 0; }
+#armStats .spray svg { flex: none; background: rgba(0,0,0,0.3); border: 1px solid var(--line); }
+#armStats .spray p { margin: 0; color: var(--dim); font-size: 13px; }

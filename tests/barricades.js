@@ -18,7 +18,7 @@ for (const id of MAP_LIST) {
   const m = g.map, W = m.W;
   const open = m.openings.filter(o => o.cells.some(c => m.tiles[c] !== T.BARRI && m.tiles[c] !== T.PANEL)); // (a defender may have put a steel panel up)
   if (open.length) fail(id, open.length, 'of', m.openings.length, 'doorways/windows not boarded up at the start');
-  for (const q of g.players.values()) { q.bot = false; q.alive = true; q.staged = false; q.ctrl = 'body'; q.downed = false; q.bracing = false; }
+  for (const q of g.players.values()) { q.bot = false; q.alive = true; q.staged = false; q.ctrl = 'body'; q.downed = false; q.bracing = false; if (q.op === 'bulwark') q.op = 'ember'; } // the shield's melee is a bash
   const p = [...g.players.values()][0];
   // a 2-cell doorway in a straight wall, floor on both sides
   const o = m.openings.find(o => o.cells.length === 2 && o.cells.every(c => m.tiles[c] === T.BARRI) && o.cells.every(c => [W, -W].every(d => m.tiles[c + d] === T.FLOOR || m.tiles[c + d] === T.GROUND)));
