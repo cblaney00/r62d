@@ -275,6 +275,25 @@ function planBreach(game, p, tool) {
       if (dist < bd) { bd = dist; best = { k, d, sx, sy, wx: (k % W + 0.5) * CELL, wy: (Math.floor(k / W) + 0.5) * CELL }; }
     }
   }
+  // nothing left on the site itself (defenders reinforced it all): open a breakable wall next to the site instead,
+  // for a new way in or a line of sight onto it, from whichever side this bot is on
+  if (!best) {
+    const b = site.bombs[0];
+    for (let k = W; k < m.tiles.length - W; k++) {
+      if (!types.includes(m.tiles[k]) || m.shape[k] || game.botClaims.has(k)) continue;
+      const wx = (k % W + 0.5) * CELL, wy = (Math.floor(k / W) + 0.5) * CELL;
+      if (floorAt(m, wx, wy) !== floorAt(m, b.x, b.y) || Math.hypot(wx - b.x, wy - b.y) > 320) continue;
+      for (const d of [1, -1, W, -W]) {
+        const out = k - d, out2 = k - 2 * d, inK = k + d, along = d === 1 || d === -1 ? W : 1;
+        const ok = q => m.tiles[q] === T.FLOOR || m.tiles[q] === T.GROUND;
+        if (!ok(out) || !ok(out2) || !ok(inK) || ![k + along, k - along].every(q => [T.SOFT, T.REINF, T.HARD].includes(m.tiles[q]))) continue;
+        const sx = (out % W + 0.5) * CELL, sy = (Math.floor(out / W) + 0.5) * CELL;
+        if (Math.hypot((inK % W + 0.5) * CELL - b.x, (Math.floor(inK / W) + 0.5) * CELL - b.y) > Math.hypot(sx - b.x, sy - b.y)) continue; // stand on the far side from the site
+        const dist = Math.hypot(sx - p.x, sy - p.y) + (floorAt(m, sx, sy) !== fl ? 400 : 0);
+        if (dist < bd) { bd = dist; best = { k, d, sx, sy, wx, wy }; }
+      }
+    }
+  }
   if (best) game.botClaims.add(best.k);
   return best;
 }
@@ -435,6 +454,12 @@ export function botThink(game, p, dt) {
   if (!atk && abId === 'gas' && action) {
     if (p.gasId) { const g = game.ent(p.gasId); if (g && [...game.players.values()].some(q => q.alive && game.side(q) !== team && Math.hypot(q.x - g.x, q.y - g.y) < 70)) useAbility(); }
     else if (p.abilityCount > 0 && heardRecently && Math.hypot(ai.heard.x - p.x, ai.heard.y - p.y) < 280 && los(map, p.x, p.y, ai.heard.x, ai.heard.y)) { aimAt(p, ai.heard.x, ai.heard.y); useAbility(); }
+  }
+
+  // a defender's remote charge works the same way: thrown at a noise, set off when someone is beside it
+  if (!atk && p.gadget === 'nitro' && action) {
+    if (p.nitroId) { const g = game.ent(p.nitroId); if (g && [...game.players.values()].some(q => q.alive && game.side(q) !== team && Math.hypot(q.x - g.x, q.y - g.y) < 45)) game.event(p, { k: 'gadget' }); }
+    else if (p.gadgetCount > 0 && heardRecently && Math.hypot(ai.heard.x - p.x, ai.heard.y - p.y) < 240 && Math.hypot(ai.heard.x - p.x, ai.heard.y - p.y) > 90 && los(map, p.x, p.y, ai.heard.x, ai.heard.y)) { aimAt(p, ai.heard.x, ai.heard.y); game.event(p, { k: 'gadget' }); }
   }
 
   // heard something and can't see it: stop, turn to face it and listen for a moment (pushy bots don't stop as long)
