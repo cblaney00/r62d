@@ -41,17 +41,29 @@ export function closeArmory(el) {
   S.mouse.l = S.mouse.r = false;
 }
 
+// The guns sorted into a folder per type (he asked); click a folder to open or close it. The folder holding the gun
+// you are trying starts open. Inside a folder: attack guns first, then defence (no gun is on both sides).
 function renderList(el) {
-  const sideN = k => gunSide(k) === 'def' ? 1 : 0; // attack guns first, then defence (no gun is on both sides)
-  const keys = Object.keys(WEAPONS).sort((a, b) => sideN(a) - sideN(b) || CLASS_ORDER.indexOf(WEAPONS[a].cls) - CLASS_ORDER.indexOf(WEAPONS[b].cls));
-  el.querySelector('#armList').innerHTML = keys.map(k => `<button data-w="${k}" class="${k === S.w ? 'on' : ''}"><i class="pic"></i><b>${esc(WEAPONS[k].name)}</b><span>${CLASS_NAME[WEAPONS[k].cls]} · <em class="${gunSide(k) === 'def' ? 'def' : 'atk'}">${gunSide(k) === 'def' ? 'DEFENCE' : 'ATTACK'}</em></span></button>`).join('');
-  for (const b of el.querySelectorAll('#armList button')) b.querySelector('.pic').appendChild(gunPicture(b.dataset.w, attOf(b.dataset.w), 160, 50));
-  for (const b of el.querySelectorAll('#armList button')) b.onclick = () => { audio.ui(); pick(el, b.dataset.w); };
+  const sideN = k => gunSide(k) === 'def' ? 1 : 0;
+  if (!S.open) S.open = new Set([WEAPONS[S.w].cls]);
+  const gunBtn = k => `<button data-w="${k}" class="gun ${k === S.w ? 'on' : ''}"><i class="pic"></i><b>${esc(WEAPONS[k].name)}</b><span>${CLASS_NAME[WEAPONS[k].cls]} · <em class="${gunSide(k) === 'def' ? 'def' : 'atk'}">${gunSide(k) === 'def' ? 'DEFENCE' : 'ATTACK'}</em></span></button>`;
+  el.querySelector('#armList').innerHTML = CLASS_ORDER.map(cls => {
+    const keys = Object.keys(WEAPONS).filter(k => WEAPONS[k].cls === cls).sort((a, b) => sideN(a) - sideN(b));
+    if (!keys.length) return '';
+    return `<div class="armFolder ${S.open.has(cls) ? 'open' : ''}" data-cls="${cls}"><button class="armFolderHead"><i></i>${esc(CLASS_NAME[cls])}s<small>${keys.length}</small></button><div class="armFolderBody">${keys.map(gunBtn).join('')}</div></div>`;
+  }).join('');
+  for (const b of el.querySelectorAll('#armList button.gun')) b.querySelector('.pic').appendChild(gunPicture(b.dataset.w, attOf(b.dataset.w), 160, 50));
+  for (const b of el.querySelectorAll('#armList button.gun')) b.onclick = () => { audio.ui(); pick(el, b.dataset.w); };
+  for (const f of el.querySelectorAll('.armFolder')) f.querySelector('.armFolderHead').onclick = () => {
+    audio.ui(); const cls = f.dataset.cls;
+    if (S.open.has(cls)) S.open.delete(cls); else S.open.add(cls);
+    f.classList.toggle('open', S.open.has(cls));
+  };
 }
 
 function pick(el, w) {
   S.w = w; S.ammo = WEAPONS[w].mag; S.reloadT = 0; S.rc = 0; S.bloom = 0; S.adsT = 0;
-  for (const b of el.querySelectorAll('#armList button')) b.classList.toggle('on', b.dataset.w === w);
+  for (const b of el.querySelectorAll('#armList button.gun')) b.classList.toggle('on', b.dataset.w === w);
   resetRange(el);
 }
 
