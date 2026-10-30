@@ -939,7 +939,14 @@ function frame(nowMs) {
       const c = cursor(), mw = screenToWorld(c.x, c.y);
       const vh = st.viewH || 400;
       const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? (String(me.aa).includes('scope') ? 0.46 : 0.32) : 0.2); // a scope looks further ahead
-      cx += l > mx ? lx / l * mx : lx; cy += l > mx ? ly / l * mx : ly;
+      let ax = l > mx ? lx / l * mx : lx, ay = l > mx ? ly / l * mx : ly;
+      // he asked to always see about as far as someone could shoot you from: down a long sightline the view slides
+      // ahead far enough that its far end is on screen (st.sightLead, worked out with the zoom below)
+      const sl = st.sightLead || 0, al = Math.hypot(ax, ay);
+      if (sl > al) { ax = Math.cos(view.ang) * sl; ay = Math.sin(view.ang) * sl; }
+      st.leadV = st.leadV || { x: ax, y: ay }; const kl = 1 - Math.exp(-dt * 7); // the lead swings round smoothly when you turn
+      st.leadV.x += (ax - st.leadV.x) * kl; st.leadV.y += (ay - st.leadV.y) * kl;
+      cx += st.leadV.x; cy += st.leadV.y;
     }
   } else { // menus: slow drift over the map
     cx = st.map.W * CELL / 2 + Math.cos(now * 0.05) * 300; cy = st.map.H * CELL / 2 + Math.sin(now * 0.07) * 160;
@@ -956,6 +963,21 @@ function frame(nowMs) {
     const avg = sum / 24, aimD = castSight(st.map, view.x, view.y, view.ang, 900, null);
     want = Math.max(240, Math.min(470, avg * 1.15 + 110));
     want = Math.max(want, Math.min(view.kind === 'cam' ? 580 : 520, aimD * (view.kind === 'cam' ? 0.75 : 0.6)));
+    if (view.kind === 'body') {
+      // how far you can be seen (and so shot) from in the way you face: the 80th-percentile sightline across your
+      // view cone, so one sliver through a doorway doesn't count. It grows quickly and shrinks slowly (no jumpy camera).
+      const n = 15, fov = Math.min(view.fov || 1.8, 1.9), ds = [];
+      for (let i = 0; i < n; i++) ds.push(castSight(st.map, view.x, view.y, view.ang - fov / 2 + fov * i / (n - 1), 1100, null));
+      ds.sort((a, b) => a - b);
+      const far = ds[Math.floor(n * 0.8)];
+      st.farS = st.farS === undefined ? far : st.farS + (far - st.farS) * (1 - Math.exp(-dt * (far > st.farS ? 4 : 1.2)));
+      // the screen must hold you and that far point: its reach along your aim is viewH * e (e from the screen's shape)
+      const cA = Math.abs(Math.cos(view.ang)), sA = Math.abs(Math.sin(view.ang));
+      const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), m1 = 70, m2 = 40;
+      want = Math.max(want, Math.min(680, (st.farS + m1 + m2) / (2 * e)));
+      const reach = (st.viewH || want) * e; // how far the screen reaches from its middle along your aim, right now
+      st.sightLead = Math.max(0, Math.min(reach - m1, st.farS - (reach - m2)));
+    } else st.sightLead = 0;
   }
   // the room-size zoom only moves for a real change (a new room, a long corridor), not every small turn of
   // your aim, and then settles quickly, so the view isn't always slowly drifting in and out (he asked for less slow panning)
@@ -1431,6 +1453,11 @@ function draw(s, view, now, dt) {
     if (s.pl) marker(s.pl.x, s.pl.y, '!', '#ff4040', view);
     if (side === 'atk') for (const e of ents) if (e.ty === 'defuser') marker(e.x, e.y, 'D', '#f2c14e', view);
     drawMarks(view, now);
+    // an enemy your team can see who is off the edge of your screen: a mark at the edge, so nobody shoots you unseen
+    for (const p of drawn) if (p.tm !== side) {
+      const sx = (p.x - st.cam.x) * st.zoom + VW / 2, sy = (p.y - st.cam.y) * st.zoom + VH / 2;
+      if (sx < 0 || sy < 0 || sx > VW || sy > VH) marker(p.x, p.y, '!', '#ff5040', view);
+    }
     // footstep direction hints around you
     if (view && view.kind === 'body') for (const p of drawn) { /* visible: no hint */ }
     // measured in the shared building frame, so steps on the floor above or below show too, marked ▲ / ▼ (he asked)
