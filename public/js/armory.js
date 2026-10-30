@@ -1,13 +1,16 @@
 // The Armory: a private shooting range in the menus. Pick any gun, shoot dummies at different
 // distances and read its numbers. Runs only in your browser (nobody else sees it), using the same
-// damage, drop-off, spread, aim-in time, recoil and headshot rules as the server.
-import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide } from '/shared/operators.js';
+// damage, drop-off, spread, aim-in time, recoil and headshot rules as the server, and aiming works exactly as in a
+// match (he asked): the mouse is captured on the first click, the crosshair moves with your sensitivity and aiming mode,
+// it is your own crosshair, distances are real metres, the view widens when you aim in and follows the crosshair out.
+import { PX_PER_M } from '/shared/constants.js';
+import { drawXhair } from './crosshair.js';
+import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
 
-const M = 20; // world pixels per metre (same scale as the in-game distance markers)
-const DISTS = [5, 10, 20, 30, 45];
+const M = PX_PER_M; // world pixels per metre, the same as a match
 const CLASS_ORDER = ['AR', 'SMG', 'MP', 'LMG', 'DMR', 'Shotgun', 'Pistol'];
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
@@ -16,28 +19,52 @@ const attOf = w => cleanAtt(w, S.att[w]);
 const modsOf = w => gunMods(w, attOf(w));
 
 let S = null; // range state while open
+window.__armory = () => S; // for screenshot tests
+let O = { sens: () => 1, xh: () => null, mode: () => 'free', dpr: () => 1 }; // the match's settings, from main.js
 
-export function openArmory(el) {
+// Esc while the mouse is captured only lets go of it (as in a match); it doesn't close the Armory
+export function armoryHoldsEsc() {
+  if (!S || !S.cv) return false;
+  if (document.pointerLockElement === S.cv) { document.exitPointerLock(); return true; }
+  return performance.now() - (S.unlockT || -1e9) < 400;
+}
+
+export function openArmory(el, opts) {
   el.classList.remove('hidden');
+  if (opts) O = opts;
   if (!S) S = { att: {}, w: 'k4', dist: 10, dummies: [], holes: [], pops: [], tracers: [], ammo: 0, reloadT: 0, fireCd: 0, adsT: 0, bloom: 0, rc: 0, shots: 0, rcDir: 1, lastShot: -9, mouse: { x: 0, y: 0, l: false, r: false, edge: false }, t: 0, hits: 0, fired: 0, first: null, kills: 0 };
+  S.aim = { x: 0, y: -150 }; S.cam = null; S.envH = 0; S.adsZ = 1; S.fitH = 0; S.leadV = null; S.lockAsked = false;
   renderList(el); pick(el, S.w);
-  const cv = el.querySelector('#armCanvas');
-  cv.onmousemove = e => { const r = cv.getBoundingClientRect(); S.mouse.x = (e.clientX - r.left) * cv.width / r.width; S.mouse.y = (e.clientY - r.top) * cv.height / r.height; };
-  cv.onmousedown = e => { audio.initAudio(); if (e.button === 0) { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; } if (e.button === 2) S.mouse.r = true; };
+  const cv = el.querySelector('#armCanvas'); S.cv = cv;
+  cv.onmousemove = e => {
+    const dpr = O.dpr();
+    if (document.pointerLockElement === cv) {
+      const k = O.sens(S.mouse.r) * dpr;
+      if (O.mode() === 'cursor') { S.mouse.x = Math.max(0, Math.min(cv.width, S.mouse.x + e.movementX * k)); S.mouse.y = Math.max(0, Math.min(cv.height, S.mouse.y + e.movementY * k)); }
+      else freeMove(e.movementX * k, e.movementY * k);
+    } else { const r = cv.getBoundingClientRect(); S.mouse.x = (e.clientX - r.left) * dpr; S.mouse.y = (e.clientY - r.top) * dpr; }
+  };
+  cv.onmousedown = e => {
+    audio.initAudio();
+    if (document.pointerLockElement !== cv && !S.lockAsked) { S.lockAsked = true; cv.requestPointerLock?.(); return; } // the first click just takes control
+    if (e.button === 0) { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; } if (e.button === 2) S.mouse.r = true;
+  };
   cv.oncontextmenu = e => e.preventDefault();
   S.up = e => { if (e.button === 0) S.mouse.l = false; if (e.button === 2) S.mouse.r = false; };
   S.key = e => { if (e.code === 'KeyR') reload(); };
-  addEventListener('mouseup', S.up); addEventListener('keydown', S.key);
+  S.lock = () => { S.lockAsked = false; if (document.pointerLockElement !== cv) { S.unlockT = performance.now(); S.mouse.l = S.mouse.r = false; } };
+  addEventListener('mouseup', S.up); addEventListener('keydown', S.key); document.addEventListener('pointerlockchange', S.lock);
   for (const b of el.querySelectorAll('#armDist button')) b.onclick = () => { audio.ui(); S.dist = +b.dataset.d; resetRange(el); };
   el.querySelector('#armReset').onclick = () => { audio.ui(); resetRange(el); };
   let last = performance.now();
-  const loop = now => { S.raf = requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000); last = now; tick(el, dt); draw(cv); };
+  const loop = now => { S.raf = requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000); last = now; tick(el, dt); draw(cv, dt); };
   S.raf = requestAnimationFrame(loop);
 }
 export function closeArmory(el) {
   el.classList.add('hidden');
   if (!S) return;
-  cancelAnimationFrame(S.raf); removeEventListener('mouseup', S.up); removeEventListener('keydown', S.key);
+  cancelAnimationFrame(S.raf); removeEventListener('mouseup', S.up); removeEventListener('keydown', S.key); document.removeEventListener('pointerlockchange', S.lock);
+  if (document.pointerLockElement === S.cv) document.exitPointerLock();
   S.mouse.l = S.mouse.r = false;
 }
 
@@ -69,7 +96,7 @@ function pick(el, w) {
 
 function resetRange(el) {
   const d = S.dist * M;
-  S.dummies = [-46, 0, 46].map((ox, i) => ({ x: ox, y: -d, a: [3, 2, 1][i], hp: ARMOR_HP[[3, 2, 1][i]], max: ARMOR_HP[[3, 2, 1][i]], label: ['Light', 'Medium', 'Heavy'][i], deadT: 0, flash: 0 }));
+  S.dummies = [-80, 0, 80].map((ox, i) => ({ x: ox, y: -d, a: [3, 2, 1][i], hp: ARMOR_HP[[3, 2, 1][i]], max: ARMOR_HP[[3, 2, 1][i]], label: ['Light', 'Medium', 'Heavy'][i], deadT: 0, flash: 0 }));
   S.holes = []; S.pops = []; S.tracers = []; S.hits = 0; S.fired = 0; S.first = null; S.kills = 0;
   for (const b of el.querySelectorAll('#armDist button')) b.classList.toggle('on', +b.dataset.d === S.dist);
   stats(el);
@@ -101,12 +128,64 @@ function tick(el, dt) {
   if ((S.statT = (S.statT || 0) - dt) <= 0) { S.statT = 0.2; liveStats(el); }
 }
 
-// world: shooter at (0, 0), dummies straight ahead (up the screen)
-function view(cv) {
-  const z = Math.min(cv.height * 0.8 / (S.dist * M + 60), cv.width / 220, 4);
-  return { z, ox: cv.width / 2, oy: cv.height * 0.88 };
+// world: shooter at (0, 0), dummies straight ahead (up the screen), in the same pixels as a match.
+// The camera works like a match's: the room-size view, sliding ahead down the lane, widening when you aim in (2x scope
+// most) and growing / sliding to keep you and the crosshair on screen (main.js camera, FIT_H, keep).
+const ROOM_W = 330; // the range is this wide either side of you
+const farEnd = () => S.dist * M + 60; // the backstop
+const scoped = () => String(attOf(S.w).sight || '').includes('scope');
+const fitCap = () => S.mouse.r ? (scoped() ? 1000 : 820) : 700;
+const aimMin = () => 46 * O.dpr() / (S.z || 1), aimMax = () => S.reachW || 400;
+function freeMove(dx, dy) { // the match's Crosshair mode: 1:1 with the mouse on screen, fixed to you, never on top of you
+  const z = S.z || 1; dx /= z; dy /= z;
+  const o = S.aim, n = { x: o.x + dx, y: o.y + dy }, l = Math.hypot(n.x, n.y), lo = aimMin(), hi = aimMax();
+  if (l > hi) { const L = Math.max(hi, Math.hypot(o.x, o.y)); n.x *= L / l; n.y *= L / l; }
+  else if (l < lo) { const a = l > 0.01 ? Math.atan2(n.y, n.x) : Math.atan2(-o.y, -o.x); n.x = Math.cos(a) * lo; n.y = Math.sin(a) * lo; }
+  S.aim = n;
 }
-function aimAngle(cv) { const v = view(cv); return Math.atan2((S.mouse.y - v.oy) / v.z, (S.mouse.x - v.ox) / v.z); }
+function screenToWorld(cv, x, y) { return { x: (x - cv.width / 2) / S.z + S.cam.x, y: (y - cv.height / 2) / S.z + S.cam.y }; }
+function w2s(cv, x, y) { return { x: (x - S.cam.x) * S.z + cv.width / 2, y: (y - S.cam.y) * S.z + cv.height / 2 }; }
+// the point you aim at, held at the range's walls like a wall holds it in a match
+function aimPoint(cv) {
+  let x, y;
+  if (O.mode() === 'cursor') { const p = screenToWorld(cv, S.mouse.x, S.mouse.y); x = p.x; y = p.y; }
+  else { x = S.aim.x; y = S.aim.y; }
+  let l = Math.hypot(x, y) || 1; const c = x / l, s = y / l;
+  if (s < -1e-6) l = Math.min(l, farEnd() / -s); if (s > 1e-6) l = Math.min(l, 60 / s);
+  if (Math.abs(c) > 1e-6) l = Math.min(l, ROOM_W / Math.abs(c));
+  return { x: c * l, y: s * l, d: l };
+}
+function aimAngle(cv) { const p = aimPoint(cv); return Math.atan2(p.y, p.x); }
+function camera(cv, dt) {
+  const H = cv.height, e = Math.min(cv.width / H / 2, 0.5), mg = 86 * O.dpr() / (S.z || 1), q = aimPoint(cv);
+  // looking up a long lane, like down a sightline in a match: the view grows up to 680 and slides ahead
+  const far = farEnd(), want = Math.max(470, Math.min(680, (far + 110) / (2 * 0.5)));
+  if (!S.envH || Math.abs(want - S.envH) > S.envH * 0.15) S.envH = S.envH || want, S.envWant = want;
+  S.envH += ((S.envWant || want) - S.envH) * (1 - Math.exp(-dt * 6));
+  S.adsZ += ((S.mouse.r ? (scoped() ? 1.3 : 1.12) : 1) - S.adsZ) * (1 - Math.exp(-dt * 18));
+  let vh = S.envH * S.adsZ;
+  if (O.mode() !== 'cursor') {
+    const cap = fitCap(), need = Math.min(cap, (q.d + mg) / (2 * e));
+    S.reachW = Math.max(160, cap * 2 * e - mg);
+    S.fitH = S.fitH ? S.fitH + (need - S.fitH) * (1 - Math.exp(-dt * 8)) : need;
+    vh = Math.max(vh, S.fitH);
+  }
+  S.z = H / vh;
+  const reach = vh * 0.5, lead = Math.max(0, Math.min(reach - 70, far - (reach - 40)));
+  const lx = q.x * 0.22, ly = q.y * 0.22, ll = Math.hypot(lx, ly), mx = vh * (S.mouse.r ? (scoped() ? 0.46 : 0.32) : 0.2);
+  let ax = ll > mx ? lx / ll * mx : lx, ay = ll > mx ? ly / ll * mx : ly;
+  if (lead > Math.hypot(ax, ay)) { ax = 0; ay = -lead; }
+  S.leadV = S.leadV || { x: ax, y: ay }; const kl = 1 - Math.exp(-dt * 4);
+  S.leadV.x += (ax - S.leadV.x) * kl; S.leadV.y += (ay - S.leadV.y) * kl;
+  if (!S.cam) S.cam = { x: S.leadV.x, y: S.leadV.y };
+  const k = 1 - Math.exp(-dt * 14);
+  S.cam.x += (S.leadV.x - S.cam.x) * k; S.cam.y += (S.leadV.y - S.cam.y) * k;
+  if (O.mode() !== 'cursor') {
+    const hw = cv.width / 2 / S.z, hh = H / 2 / S.z;
+    const keep = (x, y, m) => { S.cam.x = Math.min(x + hw - m, Math.max(x - hw + m, S.cam.x)); S.cam.y = Math.min(y + hh - m, Math.max(y - hh + m, S.cam.y)); };
+    keep(0, 0, 50 * O.dpr() / S.z); keep(q.x, q.y, 36 * O.dpr() / S.z);
+  }
+}
 
 function fire(w, cv) {
   S.ammo--; S.fireCd = Math.max(S.fireCd, -0.02) + 60 / w.rpm; S.fired++;
@@ -130,7 +209,7 @@ function fire(w, cv) {
     if (tracerPellet(w, i)) S.tracers.push({ x2: ex, y2: ey, life: 0.04 });
     if (best) {
       hitAny = true; S.hits++;
-      const v = view(cv), onH = onHead((S.mouse.x - v.ox) / v.z, (S.mouse.y - v.oy) / v.z, best.x, best.y); // same rule as a match: crosshair on the head
+      const q = aimPoint(cv), onH = onHead(q.x, q.y, best.x, best.y); // same rule as a match: crosshair on the head
       const miss = Math.abs(best.x * dy - best.y * dx), head = miss < HEAD_R && onH && w.pellets === 1; // a pellet to the head only hurts more
       const dmg = head ? best.hp : Math.round(w.dmg * m.dmg * fallAt(w, bt, m.range) * (miss < HEAD_R && onH ? 1.8 : 1));
       best.hp -= dmg; best.flash = 1;
@@ -143,20 +222,26 @@ function fire(w, cv) {
   if (S.holes.length > 200) S.holes.splice(0, S.holes.length - 200);
 }
 
-function draw(cv) {
-  const r = cv.getBoundingClientRect();
-  if (cv.width !== Math.round(r.width) || cv.height !== Math.round(r.height)) { cv.width = Math.round(r.width); cv.height = Math.round(r.height); }
-  const c = cv.getContext('2d'), { z, ox, oy } = view(cv), w = WEAPONS[S.w];
+function draw(cv, dt) {
+  const r = cv.getBoundingClientRect(), dpr = O.dpr();
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+  camera(cv, dt);
+  const c = cv.getContext('2d'), z = S.z, w = WEAPONS[S.w], O0 = w2s(cv, 0, 0);
+  const label = (txt, x, y, px, col, align = 'center') => { // text drawn at screen size, so it reads at any zoom
+    const P = w2s(cv, x, y); c.font = `700 ${px * dpr}px Barlow Condensed, sans-serif`; c.textAlign = align;
+    c.lineWidth = 3 * dpr; c.strokeStyle = 'rgba(0,0,0,0.6)'; c.strokeText(txt, P.x, P.y); c.fillStyle = col; c.fillText(txt, P.x, P.y);
+  };
   c.setTransform(1, 0, 0, 1, 0, 0);
-  c.fillStyle = '#2a2d31'; c.fillRect(0, 0, cv.width, cv.height);
-  c.setTransform(z, 0, 0, z, ox, oy);
-  const far = S.dist * M + 30;
-  // lane floor, distance lines and the backstop
-  c.fillStyle = '#3a3e43'; c.fillRect(-100, -far - 10, 200, far + 40);
+  c.fillStyle = '#1d2024'; c.fillRect(0, 0, cv.width, cv.height);
+  c.setTransform(z, 0, 0, z, O0.x, O0.y);
+  const far = farEnd();
+  // the range: concrete floor, the lane in front of you, metre lines and the backstop
+  c.fillStyle = '#34383d'; c.fillRect(-ROOM_W, -far, ROOM_W * 2, far + 60);
+  c.fillStyle = '#3c4147'; c.fillRect(-90, -far, 180, far + 60);
   c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 1 / z;
-  c.font = `${11 / z}px Barlow Condensed, sans-serif`; c.fillStyle = 'rgba(255,255,255,0.35)'; c.textAlign = 'left';
-  for (let m = 5; m * M < far; m += 5) { c.beginPath(); c.moveTo(-100, -m * M); c.lineTo(100, -m * M); c.stroke(); c.fillText(m + ' m', -98, -m * M - 2 / z); }
-  c.fillStyle = '#5b4a36'; c.fillRect(-100, -far - 14, 200, 8);
+  for (let m = 5; m * M < far; m += 5) { c.beginPath(); c.moveTo(-ROOM_W, -m * M); c.lineTo(ROOM_W, -m * M); c.stroke(); }
+  c.fillStyle = '#5b4a36'; c.fillRect(-ROOM_W, -far - 10, ROOM_W * 2, 10);
+  c.fillStyle = '#4a4f55'; c.fillRect(-ROOM_W - 10, -far - 10, 10, far + 80); c.fillRect(ROOM_W, -far - 10, 10, far + 80); c.fillRect(-ROOM_W - 10, 60, ROOM_W * 2 + 20, 10);
   c.fillStyle = 'rgba(15,15,15,0.8)'; for (const h of S.holes) { c.beginPath(); c.arc(h.x, h.y, 0.55, 0, 7); c.fill(); }
   // dummies
   for (const d of S.dummies) {
@@ -166,38 +251,51 @@ function draw(cv) {
     c.fillStyle = d.flash > 0 ? `rgb(255,${200 - d.flash * 120},${150 - d.flash * 120})` : '#c9a77a';
     c.beginPath(); c.arc(0, 0, HIT_R[d.a], 0, 7); c.fill();
     c.strokeStyle = '#5a4128'; c.lineWidth = 0.8; c.stroke();
-    c.strokeStyle = 'rgba(160,30,30,0.8)'; c.beginPath(); c.arc(0, 0, 4.2, 0, 7); c.stroke();
     c.fillStyle = '#a01e1e'; c.beginPath(); c.arc(0, 0, HEAD_R, 0, 7); c.fill();
     c.globalAlpha = 1;
-    c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillRect(-11, 13, 22, 3);
-    c.fillStyle = alive ? '#7fe07f' : '#e05050'; c.fillRect(-11, 13, 22 * Math.max(0, d.hp) / d.max, 3);
-    c.fillStyle = 'rgba(255,255,255,0.7)'; c.font = '6px Barlow Condensed, sans-serif'; c.textAlign = 'center';
-    c.fillText(`${d.label} · ${d.max} HP`, 0, 23);
+    c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillRect(-11, 11, 22, 2.5);
+    c.fillStyle = alive ? '#7fe07f' : '#e05050'; c.fillRect(-11, 11, 22 * Math.max(0, d.hp) / d.max, 2.5);
     c.restore();
   }
   for (const t of S.tracers) { c.strokeStyle = `rgba(255,220,150,${t.life / 0.04 * 0.6})`; c.lineWidth = 0.45; c.beginPath(); c.moveTo(0, 0); c.lineTo(t.x2, t.y2); c.stroke(); }
   // shooter
   const op = OP_LIST.find(k => OPERATORS[k].primary === S.w || OPERATORS[k].secondary === S.w) || 'ember';
   drawOperator(c, { x: 0, y: 0, aim: aimAngle(cv), op, w: S.w, ally: true, walk: 0, legs: 0, ads: S.adsT > 0.5, recoil: S.t - S.lastShot < 0.06 ? 1 : 0, reload: S.reloadT > 0 }, S.t);
-  for (const p of S.pops) {
-    c.globalAlpha = Math.min(1, p.life * 2); c.fillStyle = p.head ? '#ff4040' : '#fff';
-    c.font = `700 ${(p.head ? 9 : 8)}px Barlow Condensed, sans-serif`; c.textAlign = 'center';
-    c.fillText(p.txt, p.x, p.y - (0.9 - p.life) * 18); c.globalAlpha = 1;
-  }
-  // crosshair, kicked by recoil like in a match
+  // reload ring round you, like a match
+  if (S.reloadT > 0) { c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 1.6; c.beginPath(); c.arc(0, 0, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - S.reloadT / w.reload)); c.stroke(); }
   c.setTransform(1, 0, 0, 1, 0, 0);
-  const cone = spreadCone(w, modsOf(S.w), { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot) });
-  const px = ox, py = oy, rc = S.rc, cs = Math.cos(rc), sn = Math.sin(rc);
-  const mx = px + (S.mouse.x - px) * cs - (S.mouse.y - py) * sn, my = py + (S.mouse.x - px) * sn + (S.mouse.y - py) * cs;
-  const gap = 3 + Math.tan(cone) * Math.hypot(S.mouse.x - px, S.mouse.y - py); // shut when the next shot is exact
-  c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 1.5; c.beginPath();
-  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { c.moveTo(mx + dx * gap, my + dy * gap); c.lineTo(mx + dx * (gap + 7), my + dy * (gap + 7)); }
-  c.stroke(); c.fillStyle = '#fff'; c.fillRect(mx - 1, my - 1, 2, 2);
-  // ammo
-  c.textAlign = 'right'; c.font = '700 30px Barlow Condensed, sans-serif'; c.fillStyle = '#fff';
-  c.fillText(S.reloadT > 0 ? 'RELOADING' : `${S.ammo} / ${w.mag}`, cv.width - 16, cv.height - 16);
-  c.textAlign = 'left'; c.font = '600 14px Barlow Condensed, sans-serif'; c.fillStyle = 'rgba(255,255,255,0.6)';
-  c.fillText('Left mouse: shoot   ·   Right mouse: aim down sights   ·   R: reload', 14, cv.height - 18);
+  for (let m = 5; m * M < far; m += 5) label(m + ' m', -ROOM_W + 4, -m * M - 3 / z, 12, 'rgba(255,255,255,0.4)', 'left');
+  for (const d of S.dummies) label(`${d.label} ${d.max}`, d.x, d.y + 24 / z, 11, 'rgba(255,255,255,0.75)');
+  for (const p of S.pops) { c.globalAlpha = Math.min(1, p.life * 2); label(p.txt, p.x, p.y - (0.9 - p.life) * 30 / z, p.head ? 15 : 13, p.head ? '#ff4040' : '#fff'); c.globalAlpha = 1; }
+  // crosshair: your own one, kicked round you by recoil and with the true spread gap, exactly as in a match
+  const q = aimPoint(cv), Q = w2s(cv, q.x, q.y), rc = S.rc, cs = Math.cos(rc), sn = Math.sin(rc);
+  const x = O0.x + (Q.x - O0.x) * cs - (Q.y - O0.y) * sn, y = O0.y + (Q.x - O0.x) * sn + (Q.y - O0.y) * cs;
+  if (S.mouse.r) for (const d of S.dummies) { // aiming in: each target's head zone, red when the crosshair is on it
+    if (d.hp <= 0) continue;
+    const H = w2s(cv, d.x, d.y), hr = Math.max(2.5 * dpr, HEAD_AIM * z), on = Math.hypot(x - H.x, y - H.y) <= hr;
+    c.lineWidth = (on ? 2 : 1.2) * dpr;
+    c.strokeStyle = 'rgba(0,0,0,0.6)'; c.beginPath(); c.arc(H.x, H.y, hr + 1.2 * dpr, 0, 7); c.stroke();
+    c.strokeStyle = on ? '#ff3b3b' : 'rgba(255,255,255,0.55)'; c.beginPath(); c.arc(H.x, H.y, hr, 0, 7); c.stroke();
+    if (on) { c.fillStyle = 'rgba(255,59,59,0.22)'; c.fill(); }
+  }
+  const cone = spreadCone(w, modsOf(S.w), { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot) }), xh = O.xh();
+  if (xh) drawXhair(c, x, y, xh, xh.dynamic ? Math.tan(cone) * Math.hypot(Q.x - O0.x, Q.y - O0.y) / dpr : 0, dpr);
+  const dm = q.d / M;
+  if (dm >= 8) {
+    c.font = `700 ${12 * dpr}px Barlow Condensed, sans-serif`; c.textAlign = 'left'; c.textBaseline = 'top';
+    c.lineWidth = 3 * dpr; c.strokeStyle = 'rgba(0,0,0,0.7)'; c.strokeText(`${Math.round(dm)} m`, x + 12 * dpr, y + 10 * dpr);
+    c.fillStyle = 'rgba(255,255,255,0.85)'; c.fillText(`${Math.round(dm)} m`, x + 12 * dpr, y + 10 * dpr); c.textBaseline = 'alphabetic';
+  }
+  // ammo and help
+  c.textAlign = 'right'; c.font = `700 ${30 * dpr}px Barlow Condensed, sans-serif`; c.fillStyle = '#fff';
+  c.fillText(S.reloadT > 0 ? 'RELOADING' : `${S.ammo} / ${w.mag}`, cv.width - 16 * dpr, cv.height - 16 * dpr);
+  c.textAlign = 'left'; c.font = `600 ${14 * dpr}px Barlow Condensed, sans-serif`; c.fillStyle = 'rgba(255,255,255,0.6)';
+  c.fillText('Left mouse: shoot   ·   Right mouse: aim in   ·   R: reload   ·   Esc: let go of the mouse', 14 * dpr, cv.height - 18 * dpr);
+  if (document.pointerLockElement !== cv) { // not captured yet: the first click only takes control, as in a match
+    const a = 0.65 + 0.35 * Math.sin(performance.now() / 260);
+    c.textAlign = 'center'; c.font = `700 ${26 * dpr}px Barlow Condensed, sans-serif`; c.fillStyle = `rgba(255,255,255,${a})`;
+    c.lineWidth = 4 * dpr; c.strokeStyle = 'rgba(0,0,0,0.6)'; c.strokeText('CLICK TO TAKE CONTROL', cv.width / 2, cv.height * 0.42); c.fillText('CLICK TO TAKE CONTROL', cv.width / 2, cv.height * 0.42);
+  }
 }
 
 // the gun's spray as a little picture: each dot is where the next shot goes (first at the bottom), drift left/right
@@ -230,7 +328,7 @@ function stats(el) {
     <div class="sbar"><span>Recoil</span><b>${(rk * m.kick * 1000).toFixed(0)}</b><em>${bar(rk * m.kick, 0.06)}</em></div>
     <div class="spray">${sprayPic(w, m)}<p>${sprayWords(w)}. Pull your mouse the other way to keep on target.</p></div>
     ${m.quiet ? `<p class="note">${w.quiet ? 'Built-in suppressor' : 'Suppressed'}: much quieter, no muzzle flash.</p>` : ''}
-    <p class="note">Full damage up to ${fo.from >= 9999 ? 'any range' : Math.round(fo.from * m.range / M) + ' m'}${fo.from >= 9999 ? '' : `, down to ${Math.round(fo.min * 100)}% by ${Math.round(fo.to * m.range / M)} m`}. A shot through the centre of the body is a headshot: instant kill.</p>
+    <p class="note">Full damage up to ${fo.from >= 9999 ? 'any range' : Math.round(fo.from * m.range / M) + ' m'}${fo.from >= 9999 ? '' : `, down to ${Math.round(fo.min * 100)}% by ${Math.round(fo.to * m.range / M)} m`}. A shot through the centre of the body with your crosshair on the head is a headshot: instant kill.</p>
     <h4>At ${S.dist} m</h4>
     <table class="ttk"><tr><th></th><th>Light 100</th><th>Medium 110</th><th>Heavy 125</th></tr>
       <tr><td>Hits to down</td><td>${stk(100)}</td><td>${stk(110)}</td><td>${stk(125)}</td></tr>

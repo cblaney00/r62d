@@ -12,7 +12,7 @@ import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
 import { openOps, closeOps, updateOpsProfile, showLoadout } from './ops.js';
 import { openProfile } from './profile.js';
-import { openArmory, closeArmory } from './armory.js';
+import { openArmory, closeArmory, armoryHoldsEsc } from './armory.js';
 import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './crosshair.js';
 import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
@@ -2060,6 +2060,7 @@ function showOps(op) { audio.ui('open'); openOps($('opsPage'), { profile: st.pro
 function showProfile() { audio.ui('open'); if (st.token) openProfile($('profilePage'), { token: st.token }); }
 // Esc closes whatever is open, otherwise opens/closes the pause menu during a match.
 function escape() {
+  if (!$('armoryPage').classList.contains('hidden') && armoryHoldsEsc()) return; // Esc first lets go of the captured mouse, as in a match
   for (const id of ['settings', 'opsPage', 'profilePage', 'armoryPage']) if (!$(id).classList.contains('hidden')) {
     if (id === 'opsPage') closeOps($(id)); else if (id === 'armoryPage') closeArmory($(id)); else $(id).classList.add('hidden');
     return;
@@ -2108,7 +2109,7 @@ function setTab(tab) {
   if ((tab === 'ops' || tab === 'profile') && !st.token) { audio.ui('back'); $('name').focus(); tab = 'play'; }
   if (tab === 'ops') { showOps(); return; }
   if (tab === 'profile') { showProfile(); return; }
-  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage')); return; }
+  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR }); return; }
   if (tab === 'settings') { toggleSettings(); return; }
   if (tab === 'quit') { $('quitDlg').classList.remove('hidden'); audio.ui('open'); return; }
   for (const b of $('mnav').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);
@@ -2214,7 +2215,7 @@ document.addEventListener('pointerlockchange', () => {
   if (!document.pointerLockElement && playing() && !menuOpen() && !st.quitting) $('pause').classList.remove('hidden');
 });
 // let go of the mouse whenever a menu is open or the match is over
-setInterval(() => { if (document.pointerLockElement && (menuOpen() || !playing())) document.exitPointerLock(); }, 150);
+setInterval(() => { if (document.pointerLockElement && document.pointerLockElement !== $('armCanvas') && (menuOpen() || !playing())) document.exitPointerLock(); }, 150);
 $('pResume').addEventListener('click', () => { if (playing()) cv.requestPointerLock?.(); });
 const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; };
 for (const id of ['sens', 'adsSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }

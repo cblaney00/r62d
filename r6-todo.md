@@ -5,7 +5,6 @@ finished it gets ticked and moved to **Done**, then work continues on the next o
 Only ideas he asks for go in **To do** (added to the bottom). Claude never adds its own suggestions here.
 
 ## To do
-- [ ] Aiming in the Armory should work exactly the same as in a match.
 - [ ] A way to look over each map and know where the bomb sites could be. A "Map knowledge" tab in the main menu, underneath the Armory.
 - [ ] Fights on the stairs are still a bit of a choke point. Look for a way to preview what you'd see at the top (or other end) of the stairs once you get close enough to them.
 - [ ] A new attacker with an RPG-style launcher, not too far off from Ash in R6 (our own operator: own name, look and twist).
@@ -14,6 +13,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 
 ## Done
+
+- [x] Aiming in the Armory works exactly as in a match: the first click captures the mouse (Esc lets go), your sensitivity, aiming mode and your own crosshair are used, distances are real metres (5–25 m), the view widens when you aim in and follows the crosshair out, head zones show while aiming in, and the distance shows beside the crosshair. (Before, the range was drawn at about half scale, so its "20 m" was really 11 m.)
 
 - [x] Bullets look tiny: their streaks are thinner and flash for only 2-3 frames, and bullet marks in the Armory are smaller. (A shot was already a line with no width, so hitting someone still takes an exact aim.)
 - [x] Armory: guns sorted into a folder per type (Assault rifles, Submachine guns, ...), click a folder to open or close it.
