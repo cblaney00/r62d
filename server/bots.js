@@ -6,7 +6,7 @@
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, T, TEAM, PHASE, blocksMove } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight } from '../shared/physics.js';
-import { floorAt, localPos } from '../shared/map.js';
+import { floorAt, localPos, stairGhost, stairLooks } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam } from '../shared/operators.js';
 
 // Per skill level. react: seconds before the first shot at someone who surprised them (plus up to reactX more);
@@ -171,6 +171,18 @@ function visibleEnemy(game, p, see) {
     if (d > 70 && Math.abs(angDiff(a, p.aim)) > 1.2) continue;
     if (!los(game.map, p.x, p.y, q.x, q.y, smokes)) continue;
     best = q; bd = d;
+  }
+  // up or down a staircase: someone on its steps or landing shows on this floor's steps too
+  const fl = floorAt(game.map, p.x, p.y);
+  for (const q of game.players.values()) {
+    if (!q.alive || q.staged || game.side(q) === team || q.shrouded) continue;
+    const gh = stairGhost(game.map, q.x, q.y);
+    if (!gh || gh.fl !== fl || !stairLooks(game.map, gh.s, p.x, p.y)) continue;
+    const d = Math.hypot(gh.x - p.x, gh.y - p.y);
+    if (d > see || d > bd || (d > 70 && Math.abs(angDiff(Math.atan2(gh.y - p.y, gh.x - p.x), p.aim)) > 1.2)) continue;
+    if (!los(game.map, p.x, p.y, gh.x, gh.y, smokes)) continue;
+    const seen = Object.create(q); seen.x = gh.x; seen.y = gh.y; // the person, where they show
+    best = seen; bd = d;
   }
   return best;
 }

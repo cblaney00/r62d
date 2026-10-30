@@ -113,3 +113,64 @@ export function hatchAtPoint(map, x, y) {
   if (map.hatchBelow[k] >= 0) return { h: map.hatches[map.hatchBelow[k]], up: false };
   return null;
 }
+
+// ---- Stairwells (he asked: fights between the top and the bottom of a staircase should work) ----
+// A staircase is drawn on both floors at the same spot. Anyone on its steps, or on the landing at its open end
+// (STAIR_LAND cells: the bottom landing downstairs, the top landing upstairs), also shows up on the steps of the other
+// floor (clamped to the steps), where people near that staircase can see and shoot them. Both ways, so it's fair.
+const STAIR_LAND = 2, STAIR_LOOK = 6;
+const UV = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
+function stairGeo(map, s) {
+  if (s._g) return s._g;
+  const W = map.W, ax = (s.ga % W) * CELL, ay = Math.floor(s.ga / W) * CELL, bx = (s.gb % W) * CELL, by = Math.floor(s.gb / W) * CELL;
+  const [ux, uy] = UV[s.dir] || UV.n, w = s.w * CELL, h = s.h * CELL;
+  // a rectangle stretched by n cells past one end (sign -1: the bottom end, +1: the top end) and pad cells to the sides
+  const grow = (x, y, n, sign, pad = 0) => {
+    let x0 = x - (ux ? 0 : pad * CELL), y0 = y - (uy ? 0 : pad * CELL), x1 = x + w + (ux ? 0 : pad * CELL), y1 = y + h + (uy ? 0 : pad * CELL);
+    const ex = ux * sign * n * CELL, ey = uy * sign * n * CELL;
+    if (ex < 0) x0 += ex; else x1 += ex; if (ey < 0) y0 += ey; else y1 += ey;
+    return { x0, y0, x1, y1 };
+  };
+  s._g = {
+    a: { fl: s.a, steps: { x0: ax, y0: ay, x1: ax + w, y1: ay + h }, zone: grow(ax, ay, STAIR_LAND, -1), look: grow(ax, ay, STAIR_LOOK, -1, 1) },
+    b: { fl: s.b, steps: { x0: bx, y0: by, x1: bx + w, y1: by + h }, zone: grow(bx, by, STAIR_LAND, 1), look: grow(bx, by, STAIR_LOOK, 1, 1) },
+    dx: bx - ax, dy: by - ay,
+  };
+  return s._g;
+}
+const inR = (r, x, y) => x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1;
+const clampR = (r, x, y, m = 5) => ({ x: Math.max(r.x0 + m, Math.min(r.x1 - m, x)), y: Math.max(r.y0 + m, Math.min(r.y1 - m, y)) });
+// Where someone at (x, y) also shows on the other floor, or null: { x, y, s (staircase), fl (floor it shows on), below }
+// below = true when the real person is downstairs (the copy is on the upper floor).
+export function stairGhost(map, x, y) {
+  const S = map.stairs || [];
+  for (let i = 0; i < S.length; i++) {
+    const g = stairGeo(map, S[i]), [ux, uy] = UV[S[i].dir] || UV.n;
+    if (inR(g.a.zone, x, y)) return { ...onStep(map, clampR(g.b.steps, x + g.dx, y + g.dy), ux, uy), s: i, fl: g.b.fl, below: true };
+    if (inR(g.b.zone, x, y)) return { ...onStep(map, clampR(g.a.steps, x - g.dx, y - g.dy), -ux, -uy), s: i, fl: g.a.fl, below: false };
+  }
+  return null;
+}
+// a few stairs run off the edge of a floor (outside steps up to a balcony): slide the copy along the stairs
+// (towards that floor's landing) until it stands on a real step
+function onStep(map, p, ux, uy) {
+  for (let n = 0; n < 16; n++) {
+    const cx = Math.floor(p.x / CELL), cy = Math.floor(p.y / CELL);
+    if (cx >= 0 && cy >= 0 && cx < map.W && cy < map.H && map.tiles[cy * map.W + cx] === T.STAIR) return p;
+    p = { x: p.x + ux * CELL / 2, y: p.y + uy * CELL / 2 };
+  }
+  return p;
+}
+// Can someone at (x, y) see copies on staircase i? Only from on or near it, at the end you look up/down it from.
+export function stairLooks(map, i, x, y) {
+  const s = map.stairs && map.stairs[i]; if (!s) return false;
+  const g = stairGeo(map, s);
+  return inR(g.a.look, x, y) || inR(g.b.look, x, y);
+}
+// The middle of each landing, n cells out from the stairs: bottom (downstairs) and top (upstairs). For tests and bots.
+export function stairEnds(map, i, n = 1.5) {
+  const s = map.stairs[i], g = stairGeo(map, s), [ux, uy] = UV[s.dir] || UV.n;
+  const ca = { x: (g.a.steps.x0 + g.a.steps.x1) / 2, y: (g.a.steps.y0 + g.a.steps.y1) / 2 }, cb = { x: (g.b.steps.x0 + g.b.steps.x1) / 2, y: (g.b.steps.y0 + g.b.steps.y1) / 2 };
+  const len = (ux ? s.w : s.h) * CELL / 2; // half the stairs' length along the way up
+  return { bottom: { x: ca.x - ux * (len + n * CELL), y: ca.y - uy * (len + n * CELL) }, top: { x: cb.x + ux * (len + n * CELL), y: cb.y + uy * (len + n * CELL) }, up: Math.atan2(uy, ux) };
+}

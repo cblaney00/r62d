@@ -1,7 +1,7 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT } from '/shared/constants.js';
-import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear } from '/shared/map.js';
+import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -349,6 +349,14 @@ function onEvent(e, s, players) {
       const w = WEAPONS[e.w]; const a = Math.atan2(e.y2 - e.y, e.x2 - e.x);
       fx.tracer(e.x, e.y, e.x2, e.y2);
       const an = anim(e.id);
+      if (an.lastShotSnd !== s.time && st.listen && st.map && !e.q && e.id !== st.id) { // gunfire on the floor above or below: an arrow towards it
+        const lv = localPos(st.map, st.listen.x, st.listen.y), ls = localPos(st.map, e.x, e.y), fd = ls.f - lv.f;
+        if (fd && Math.abs(fd) <= 1 && Math.hypot(ls.x - lv.x, ls.y - lv.y) < 700) {
+          const ang = Math.atan2(ls.y - lv.y, ls.x - lv.x);
+          st.shotHints = (st.shotHints || []).filter(h => !(h.fd === fd && Math.abs(angDiff(h.a, ang)) < 0.3));
+          st.shotHints.push({ a: ang, fd, t: now });
+        }
+      }
       if (an.lastShotSnd !== s.time) { if (!e.q) fx.muzzle(e.x, e.y, a); audio.gunshot(w ? e.w : 'AR', e.x, e.y, e.id === st.id, !!e.q); audio.casing(e.x, e.y, surfaceAt(e.x, e.y), w && w.cls === 'Shotgun'); an.lastShotSnd = s.time; }
       an.recoil = 1.6; if (!e.q) an.flashT = now; // a suppressor hides the flash
       if (e.k === 'hard') { fx.impact(e.x2, e.y2, 'hard', a); audio.impact(hardMat(e.x2, e.y2, a), e.x2, e.y2); }
@@ -1140,6 +1148,7 @@ audio.setWorld(
     if (fa !== fb) { // an open hatch near both of you lets the sound through
       const lo = Math.min(fa, fb), up = fa > fb ? L : { x, y }, dn = fa > fb ? { x, y } : L;
       for (const h of st.map.hatches) if (h.fl === lo + 1 && st.map.tiles[h.cells[0]] === T.HOLE && Math.hypot(up.x - h.x, up.y - h.y) < 160 && Math.hypot(dn.x - h.bx, dn.y - h.by) < 220) return 1;
+      for (let i = 0; i < (st.map.stairs || []).length; i++) if (stairLooks(st.map, i, L.x, L.y) && stairLooks(st.map, i, x, y)) return 0; // straight up or down an open staircase
       return Math.min(3, 1 + Math.abs(fa - fb));
     }
     const d = Math.hypot(x - L.x, y - L.y); if (d < 1) return 0;
@@ -1294,6 +1303,15 @@ function draw(s, view, now, dt) {
     a.mvS = (a.mvS || 0) + (Math.min(1.4, moved / Math.max(dt, 0.001) / 95) - (a.mvS || 0)) * Math.min(1, dt * 10);
     a.turnAmp = Math.max(0, (a.turnAmp || 0) - dt * 2.5);
     a.recoil = Math.max(0, a.recoil - dt * 12); a.melee = Math.max(0, a.melee - dt * 4);
+    // up or down a staircase: they also show on the other floor's steps, to people near that staircase who can see the spot
+    const gh = !isMe && stairGhost(st.map, p.x, p.y);
+    if (gh && (ally || (!p.sh && ghostSeen(gh)))) {
+      ctx.globalAlpha = 0.9;
+      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, brace: p.br }, now);
+      ctx.globalAlpha = 1;
+      ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x, gh.y - 15);
+    }
     // Silent Shroud: drones and cameras can't see her, only eyes can
     const vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
     if (!vis) continue;
@@ -1401,15 +1419,18 @@ function draw(s, view, now, dt) {
     drawMarks(view, now);
     // footstep direction hints around you
     if (view && view.kind === 'body') for (const p of drawn) { /* visible: no hint */ }
+    // measured in the shared building frame, so steps on the floor above or below show too, marked ▲ / ▼ (he asked)
+    const lv = view && localPos(m, view.x, view.y);
     if (view && view.kind === 'body') for (const sp of s.players) {
-      if (!sp.a || sp.tm === side || sp.x === undefined || (sp.mv || 0) < 2) continue; // only running makes noise
-      const p = interp(sp.id, 'players'); const d = Math.hypot(p.x - view.x, p.y - view.y);
-      const range = 380;
-      if (d > range || seen(p.x, p.y)) continue;
-      const a = Math.atan2(p.y - view.y, p.x - view.x), al = (1 - d / range) * 0.8;
-      ctx.strokeStyle = `rgba(255,140,60,${al})`; ctx.lineWidth = 2.2;
-      ctx.beginPath(); ctx.arc(view.x, view.y, 30, a - 0.22, a + 0.22); ctx.stroke();
+      if (!sp.a || sp.sg || sp.tm === side || sp.x === undefined || (sp.mv || 0) < 2) continue; // only running makes noise
+      const p = interp(sp.id, 'players'); if (!p) continue;
+      const lp = localPos(m, p.x, p.y), fd = lp.f - lv.f, d = Math.hypot(lp.x - lv.x, lp.y - lv.y);
+      const range = fd ? 300 : 380;
+      if (d > range || Math.abs(fd) > 1 || (!fd && seen(p.x, p.y))) continue;
+      floorHint(view, Math.atan2(lp.y - lv.y, lp.x - lv.x), (1 - d / range) * 0.8, fd);
     }
+    st.shotHints = (st.shotHints || []).filter(h => now - h.t < 1.2);
+    if (view) for (const h of st.shotHints) floorHint(view, h.a, (1 - (now - h.t) / 1.2) * 0.9, h.fd, true);
     // interaction progress ring
     if (me.a && me.bu && me.ct === 'body') {
       ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(st.pred.x, st.pred.y, 18, 0, 7); ctx.stroke();
@@ -1777,6 +1798,23 @@ function teamViewers(s, view, me, inGame) {
     if (down) vs.push({ x: h.x, y: h.y, ang: 0, fov: Math.PI * 2, range: 40, near: 40, kind: 'hatch' });
   }
   return vs;
+}
+// a copy of someone on a staircase (stairGhost): seen by a teammate's eyes, drone or camera near that staircase
+// a direction hint round your character: an arc, and ▲ / ▼ when it comes from the floor above or below
+function floorHint(view, a, al, fd, shot = false) {
+  ctx.strokeStyle = shot ? `rgba(255,80,60,${al})` : `rgba(255,140,60,${al})`; ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.arc(view.x, view.y, 30, a - 0.22, a + 0.22); ctx.stroke();
+  if (fd) {
+    ctx.font = '700 9px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = shot ? `rgba(255,90,70,${al})` : `rgba(255,150,70,${al})`;
+    ctx.fillText((fd > 0 ? '▲' : '▼') + (shot ? (fd > 0 ? ' SHOTS ABOVE' : ' SHOTS BELOW') : ''), view.x + Math.cos(a) * 40, view.y + Math.sin(a) * 40);
+    ctx.textBaseline = 'alphabetic';
+  }
+}
+function ghostSeen(gh) {
+  const sm = smokes(st.last);
+  for (const v of st.viewers || []) if (!v.off && v.kind !== 'hatch' && floorAt(st.map, v.x, v.y) === gh.fl && stairLooks(st.map, gh.s, v.x, v.y) && canSee(st.map, v, gh.x, gh.y, sm)) return true;
+  return false;
 }
 function teamSeesBody(x, y) { // seen by someone's own eyes (not a drone, camera or scope)
   const sm = smokes(st.last);

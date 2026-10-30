@@ -89,9 +89,10 @@ export const now = () => (ac ? ac.currentTime : 0);
 function out(x, y, gain, range = 900, wet = 0.25) {
   if (!ac || (ac.state !== 'running' && !ac.offline)) return null;
   gain *= MIX[C] ?? 1;
-  let pan = 0, walls = 0, d = 0;
+  let pan = 0, walls = 0, d = 0, vert = 0;
   if (x !== undefined) {
     const dd = distTo(x, y); d = dd.d;
+    vert = (L(x, y).f ?? 0) - (L(listener.x, listener.y).f ?? 0); // +: from the floor above, -: from below
     gain *= Math.max(0, 1 - d / range) ** 1.7;
     if (gain < 0.003) return null;
     pan = Math.max(-0.9, Math.min(0.9, dd.dx / 260));
@@ -101,7 +102,12 @@ function out(x, y, gain, range = 900, wet = 0.25) {
   const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
   lp.frequency.value = walls === 0 ? 18000 - Math.min(12000, d * 10) : walls === 1 ? 1400 : 650;
   const p = ac.createStereoPanner(); p.pan.value = pan;
-  g.connect(lp); lp.connect(p); p.connect(C === 'guns' || C === 'explosions' || !rest ? sfx : rest);
+  if (vert) { // he asked that sounds obviously come from above or below: a thud through the ceiling, a dull rumble from beneath
+    const v = ac.createBiquadFilter(); v.type = vert > 0 ? 'peaking' : 'lowshelf'; v.frequency.value = vert > 0 ? 180 : 250; v.gain.value = vert > 0 ? 6 : 5; if (vert > 0) v.Q.value = 0.8;
+    const hc = ac.createBiquadFilter(); hc.type = 'lowpass'; hc.frequency.value = Math.min(lp.frequency.value, vert > 0 ? 2600 : 1600);
+    g.connect(v); v.connect(hc); hc.connect(lp);
+  } else g.connect(lp);
+  lp.connect(p); p.connect(C === 'guns' || C === 'explosions' || !rest ? sfx : rest);
   const send = ac.createGain();
   send.gain.value = wet * (indoorAt(listener.x, listener.y) ? 1 : 0.35) * (1 + Math.min(0.6, d / 800) + walls * 0.4);
   p.connect(send); send.connect(verbIn);

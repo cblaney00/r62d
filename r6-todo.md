@@ -9,8 +9,6 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
       Next: the other five maps the same way, after his feedback on Harbor.
-- [ ] Rework the stairs: going between levels kind of sucks right now. Fights should be possible between the top and bottom of a staircase in an
-      intuitive way, and sounds must obviously come from above or below you.
 - [ ] Pick a role before each round: choosing a role (breacher, intel, support, entry, flank / anchor, roamer, trapper...) limits you to
       that role's operators, so it is clearer to new players what their job is.
 - [ ] Shooting through walls takes damage off the bullet, so it is a little harder to just spray in the general direction of someone and win.
@@ -18,6 +16,8 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Barricades like R6: every window and doorway starts boarded up. Three melee hits break one; bullets work differently — they only chew small holes in it that can be used on purpose (to look or shoot through). Work out how R6 does it and match that.
 
 ## Done
+
+- [x] Rework the stairs: anyone on a staircase or on the landing at either end also shows on the other floor's steps (marked ▲ ABOVE / ▼ BELOW), so people at the top and bottom can see and shoot each other, both ways. Sound straight up or down the stairs is clear; sounds from another floor get a thud-through-the-ceiling or rumble-from-below colour, and footsteps and gunfire from the floor above or below show ▲ / ▼ arrows round you.
 
 - [x] Spawns and lock-in: every map has 4 attacker spawns and each attacker picks theirs on the operator screen (buttons and a small map showing where teammates start). Attackers are not on the map during preparation (only their drones, which leave from their spawn) and appear at their spawn when the action phase starts. Operator select has no clock: a LOCK IN button, a READY count, and the round starts once everyone is locked in.
 

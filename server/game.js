@@ -1,7 +1,7 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
-import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint } from '../shared/map.js';
+import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
@@ -354,7 +354,7 @@ export class Game {
     for (const p of this.players.values()) if (p.ms && p.alive) p.ms.playSeconds += dt;
     if (this.free) this.freeRespawns();
     for (const p of this.players.values()) {
-      if (p.bot) { botThink(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
+      if (p.bot && !p.hold) { botThink(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
       this.tickPlayer(p, dt);
       p.prevInput = p.input;
     }
@@ -623,13 +623,19 @@ export class Game {
   }
 
   hitscan(src, x0, y0, ang, range, dmg, wname, cls) {
-    const dx = Math.cos(ang), dy = Math.sin(ang), team = this.side(src);
+    const dx = Math.cos(ang), dy = Math.sin(ang), team = this.side(src), fl = floorAt(this.map, x0, y0);
     let best = null, bestT = range;
     for (const q of this.players.values()) {
       if (q === src || !q.alive) continue; // friendly fire: teammates get hit too
       const at = src.viewTime !== null && src.viewTime !== undefined ? this.posAt(q, src.viewTime) : q; // favour the shooter
       const t = rayCircle(x0, y0, dx, dy, at.x, at.y, hitR(q.op));
       if (t !== null && t < bestT) { bestT = t; best = { q, at }; }
+      // up or down a staircase: someone on its steps or landing can be hit where they show on this floor's steps
+      const gh = stairGhost(this.map, at.x, at.y);
+      if (gh && gh.fl === fl && stairLooks(this.map, gh.s, x0, y0)) {
+        const tg = rayCircle(x0, y0, dx, dy, gh.x, gh.y, hitR(q.op));
+        if (tg !== null && tg < bestT) { bestT = tg; best = { q, at: gh }; }
+      }
     }
     for (const e of this.ents) {
       if (!e.hp || e.team === team || e.tu) continue; // turret cameras are bulletproof
@@ -1281,6 +1287,12 @@ export class Game {
   // 'op' {dir: 1/-1}: switch to the next/previous operator (attackers, then defenders), right where you stand.
   freeAction(p, m) {
     const F = this.free;
+    // screenshot tests only (server started with R62D_FAST): put someone (you, or a bot by id) at a spot, frozen there
+    if (m.a === 'tp' && process.env.R62D_FAST) {
+      const q = m.id ? this.players.get(m.id) : p;
+      if (q && isFinite(m.x) && isFinite(m.y)) { q.x = m.x; q.y = m.y; if (isFinite(m.aim)) q.aim = m.aim; if (q.bot) q.hold = !!m.hold; }
+      return;
+    }
     if (m.a === 'start') {
       for (const q of [...this.players.values()]) if (q.bot) this.players.delete(q.id);
       F.bots = Math.max(0, Math.min(TEAM_SIZE, m.bots | 0));
