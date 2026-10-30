@@ -17,6 +17,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] More hard (unbreakable) walls: there is too much shooting through walls right now.
 - [ ] Armory: sort the guns by type, in folders (one per gun type).
 - [ ] Aiming in the Armory should work exactly the same as in a match.
+- [ ] Rappelling: attackers need a quicker way up to the top floor.
+- [ ] Windows all start boarded up by default (doorways still start open).
 
 ## Done
 
