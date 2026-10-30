@@ -11,6 +11,7 @@ New ideas from him get added to the bottom of **To do**.
 - [ ] Vaulting like R6: you have to vault over things (low cover, windows, broken soft walls), and it leaves you open for a moment while you climb over and recover.
 - [ ] Fewer soft (breakable) walls: right now there are far too many ways into a site by just blowing open the whole room.
 - [ ] Much smarter bots: use their abilities properly, feel like real people with goals and some game knowledge, reactions no faster than a fairly experienced gamer, and a difficulty setting to tune them.
+- [ ] Sound is too loud: quieter by default (opening the game must never blast people's ears), a wider range on the volume slider, and gunshots less aggressive — loud sounds should mask other noises a little, not drown them out so the game feels uncomfortable.
 
 ## Done
 
