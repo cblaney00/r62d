@@ -19,6 +19,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] Aiming in the Armory should work exactly the same as in a match.
 - [ ] Rappelling: attackers need a quicker way up to the top floor.
 - [ ] Windows all start boarded up by default (doorways still start open).
+- [ ] Editing a loadout jitters: the panel refreshes with a jump whenever something is clicked.
 
 ## Done
 
