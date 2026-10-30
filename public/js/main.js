@@ -1,6 +1,6 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
-import { CELL, PHASE, T, MAT } from '/shared/constants.js';
+import { CELL, PHASE, T, MAT, PX_PER_M } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat, JOBS, jobOf } from '/shared/operators.js';
@@ -30,6 +30,17 @@ const cv = $('game'), ctx0 = cv.getContext('2d'), mapLayer = $('mapLayer');
 let ctx = ctx0;
 const fog = $('fog'), fctx = fog.getContext('2d');
 const over = $('over'), octx = over.getContext('2d');
+// He asked for labels to stay upright with Rotate aiming: any text is turned back by however much the drawing is
+// turned at that moment, round its own spot. (UP() is "up the screen" in the world, for labels that sit above things.)
+for (const c of [ctx0, octx]) for (const fn of ['fillText', 'strokeText']) {
+  const orig = c[fn].bind(c);
+  c[fn] = (t, x, y, w) => {
+    const m = c.getTransform(), a = Math.atan2(m.b, m.a);
+    if (Math.abs(a) < 1e-4) return w === undefined ? orig(t, x, y) : orig(t, x, y, w);
+    c.save(); c.translate(x, y); c.rotate(-a); if (w === undefined) orig(t, 0, 0); else orig(t, 0, 0, w); c.restore();
+  };
+}
+const UP = () => ({ x: -Math.sin(st.rot || 0), y: -Math.cos(st.rot || 0) });
 let DPR = 1, VW = 0, VH = 0;
 
 // Graphics quality (saved per computer): how many pixels get drawn and how many extras are added.
@@ -172,7 +183,8 @@ function cursor() {
     return { x: px + cx * d, y: py + cy * d };
   }
   const cx = Math.cos(padAng + (st.rot || 0)), cy = Math.sin(padAng + (st.rot || 0)), m = 30 * DPR;
-  let d = VH * 0.07 + padReach * VH * 0.36; // shortened if it would leave the screen (near the edge of a map)
+  const scoped = st.me && String(st.me.aa || '').includes('scope');
+  let d = VH * 0.07 + padReach * (VH * 0.36 + (scoped ? 0 : 4 * PX_PER_M * z)); // +4 m without a scope (he asked); shortened if it would leave the screen
   if (cx > 0.01) d = Math.min(d, (VW - m - px) / cx); else if (cx < -0.01) d = Math.min(d, (m - px) / cx);
   if (cy > 0.01) d = Math.min(d, (VH - m - py) / cy); else if (cy < -0.01) d = Math.min(d, (m - py) / cy);
   d = Math.max(d, 24 * DPR);
@@ -1182,7 +1194,7 @@ function drawMarks(view, now) {
     const S0 = w2s(k.x, k.y), sx = S0.x, sy = S0.y;
     const cx = Math.max(pad, Math.min(VW - pad, sx)), cy = Math.max(pad + 60 * DPR, Math.min(VH - pad - 60 * DPR, sy));
     const W0 = screenToWorld(cx, cy), wx = W0.x, wy = W0.y, r = 5 * (2 - pop);
-    ctx.save(); ctx.translate(wx, wy); ctx.globalAlpha = al;
+    ctx.save(); ctx.translate(wx, wy); ctx.rotate(-(st.rot || 0)); ctx.globalAlpha = al; // upright on a turned view
     ctx.fillStyle = `rgba(${col},0.25)`; ctx.strokeStyle = `rgb(${col})`; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(0, 0, 1.2, 0, 7); ctx.fill();
@@ -1392,7 +1404,7 @@ function draw(s, view, now, dt) {
       drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, brace: p.br }, now);
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x, gh.y - 15);
+      ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x + u.x * 15, gh.y + u.y * 15);
     }
     // Silent Shroud: drones and cameras can't see her, only eyes can
     const vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
@@ -1485,8 +1497,9 @@ function draw(s, view, now, dt) {
       if (!sp.a || sp.id === me.id) continue;
       const p = interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
       if (p.tm === side) {
-        ctx.fillStyle = p.dn ? '#ff5050' : '#3aa0ff'; ctx.beginPath(); ctx.arc(p.x, p.y - 17, 2, 0, 7); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(p.n + (p.dn ? ' ▼' : ''), p.x, p.y - 21);
+        const u = UP();
+        ctx.fillStyle = p.dn ? '#ff5050' : '#3aa0ff'; ctx.beginPath(); ctx.arc(p.x + u.x * 17, p.y + u.y * 17, 2, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(p.n + (p.dn ? ' ▼' : ''), p.x + u.x * 21, p.y + u.y * 21);
       } else if (spotted.has(p.id)) {
         ctx.strokeStyle = '#ff3b3b'; ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.moveTo(p.x, p.y - 22); ctx.lineTo(p.x - 4, p.y - 29); ctx.lineTo(p.x + 4, p.y - 29); ctx.closePath(); ctx.stroke();
@@ -1561,7 +1574,8 @@ function marker(x, y, label, col, view) {
   const S0 = w2s(x, y), sx = S0.x, sy = S0.y, pad = 40 * DPR;
   const cx = Math.max(pad, Math.min(VW - pad, sx)), cy = Math.max(pad + 60 * DPR, Math.min(VH - pad - 60 * DPR, sy));
   const W0 = screenToWorld(cx, cy), wx = W0.x, wy = W0.y;
-  ctx.save(); ctx.translate(wx, wy - (cx === sx && cy === sy ? 14 : 0));
+  const lift = cx === sx && cy === sy ? 14 : 0, u = UP();
+  ctx.save(); ctx.translate(wx + u.x * lift, wy + u.y * lift); ctx.rotate(-(st.rot || 0));
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(0, 0, 5.5, 0, 7); ctx.fill();
   ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.stroke();
   ctx.fillStyle = col; ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, 0.5);
