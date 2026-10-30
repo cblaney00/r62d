@@ -13,9 +13,10 @@ New ideas from him get added to the bottom of **To do**.
 
 - [ ] Revamp the loading screen: if you watch it you can see it doesn't feel very crisp or premium.
 
-- [ ] Camera/crosshair bouncing before you click in: when you're tabbed out or haven't clicked into the game yet (he isn't sure which), the cursor bounces around; firing the first shot fixed it. Loading into a match and starting should feel natural, with no camera bouncing everywhere when you're outside.
 
 ## Done
+
+- [x] Camera/crosshair bouncing before you click in: until you click into the game (or after tabbing out) your aim now stays still instead of following the loose pointer (that, with the camera sliding after it, was the bounce). A "CLICK TO TAKE CONTROL" sign shows; that first click only takes control, it doesn't fire. When you spawn or a round starts the camera is there at once instead of swooping, and the look-ahead outdoors settles more calmly.
 
 - [x] Barricades like R6: every doorway and window starts boarded up. Three melee hits break one (it splinters as you hit it). Rifles, SMGs, LMGs and pistols only chew small holes in it, which you can look and shoot through on purpose; a shotgun needs two blasts; explosives clear it. Defenders can board a broken one up again (fresh boards, no holes).
 

@@ -564,7 +564,9 @@ cv.addEventListener('mousemove', e => {
 });
 cv.addEventListener('mousedown', e => {
   audio.initAudio();
-  if (playing() && !menuOpen() && document.pointerLockElement !== cv) cv.requestPointerLock?.();
+  if (playing() && !menuOpen() && document.pointerLockElement !== cv && !st.lockAsked) { // the first click just takes control, it doesn't shoot
+    st.lockAsked = true; cv.requestPointerLock?.(); return;
+  }
   if (e.button === 0) { mouse.l = true; mouse.wl++; }
   if (e.button === 2) { mouse.r = true; mouse.wr++; }
 });
@@ -961,14 +963,9 @@ function frame(nowMs) {
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
   st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
   audio.setListenerRot(st.rot);
-  if (padOn && aimMode === 'free' && document.pointerLockElement !== cv && !gpRecent() && mouseT) { // mouse not captured yet: the crosshair is the pointer
-    const P0 = w2s(st.pred.x, st.pred.y);
-    aimOff = { x: 0, y: 0 }; freeMove(mouse.x - P0.x, mouse.y - P0.y);
-  }
-  if (padOn && aimMode === 'pad' && document.pointerLockElement !== cv && !gpRecent()) { // mouse not captured yet: read the ring from the cursor
-    const P = pad(), dx = mouse.x - P.x, dy = mouse.y - P.y, l = Math.hypot(dx, dy);
-    if (l > 1) { padAng = Math.atan2(dy, dx); padReach = Math.min(1, l / P.r); }
-  }
+  $('clickIn').classList.toggle('hidden', !(playing() && !menuOpen() && document.pointerLockElement !== cv && !gpRecent() && $('pause').classList.contains('hidden')));
+  // Until you click into the game (or after tabbing out) the mouse isn't captured: your aim simply stays where it was.
+  // (It used to follow the loose pointer, and the camera sliding after it made everything bounce — he noticed.)
   if (view && (view.kind === 'body' || view.kind === 'drone')) {
     const c = cursor(), mw = screenToWorld(c.x, c.y);
     st.aim = Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x);
@@ -998,7 +995,7 @@ function frame(nowMs) {
       // ahead far enough that its far end is on screen (st.sightLead, worked out with the zoom below)
       const sl = st.sightLead || 0, al = Math.hypot(ax, ay);
       if (sl > al) { ax = Math.cos(view.ang) * sl; ay = Math.sin(view.ang) * sl; }
-      st.leadV = st.leadV || { x: ax, y: ay }; const kl = 1 - Math.exp(-dt * 7); // the lead swings round smoothly when you turn
+      st.leadV = st.leadV || { x: ax, y: ay }; const kl = 1 - Math.exp(-dt * 4); // the lead swings round smoothly when you turn
       st.leadV.x += (ax - st.leadV.x) * kl; st.leadV.y += (ay - st.leadV.y) * kl;
       cx += st.leadV.x; cy += st.leadV.y;
     }
@@ -1006,6 +1003,7 @@ function frame(nowMs) {
     cx = st.map.W * CELL / 2 + Math.cos(now * 0.05) * 300; cy = st.map.H * CELL / 2 + Math.sin(now * 0.07) * 160;
   }
   const k = 1 - Math.exp(-dt * 14);
+  if (Math.hypot(cx - st.cam.x, cy - st.cam.y) > 420) { st.cam.x = cx; st.cam.y = cy; if (view) st.leadV = null; } // spawned, new round: be there at once
   st.cam.x += (cx - st.cam.x) * k; st.cam.y += (cy - st.cam.y) * k;
   if (view && view.kind !== 'body') { st.cam.x = cx; st.cam.y = cy; }
   // zoom: close in tight rooms, wider outside or when looking down a long sightline
@@ -1024,7 +1022,7 @@ function frame(nowMs) {
       for (let i = 0; i < n; i++) ds.push(castSight(st.map, view.x, view.y, view.ang - fov / 2 + fov * i / (n - 1), 1100, null));
       ds.sort((a, b) => a - b);
       const far = ds[Math.floor(n * 0.8)];
-      st.farS = st.farS === undefined ? far : st.farS + (far - st.farS) * (1 - Math.exp(-dt * (far > st.farS ? 4 : 1.2)));
+      st.farS = st.farS === undefined ? far : st.farS + (far - st.farS) * (1 - Math.exp(-dt * (far > st.farS ? 2 : 0.7))); // calm outdoors, where sightlines change a lot as you turn
       // the screen must hold you and that far point: its reach along your aim is viewH * e (e from the screen's shape)
       const cA = Math.abs(Math.cos(view.ang)), sA = Math.abs(Math.sin(view.ang));
       const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), m1 = 70, m2 = 40;
@@ -2116,6 +2114,7 @@ for (const id of ['volMaster', 'volSfx', 'volMusic']) $(id).addEventListener('ch
 function playing() { const p = st.last && st.last.ph; return !!st.id && (p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END); }
 // Esc releases the mouse: treat that like pausing, as in CS2
 document.addEventListener('pointerlockchange', () => {
+  st.lockAsked = false; // captured: clicks shoot; let go: the next click takes control again
   if (!document.pointerLockElement && playing() && !menuOpen() && !st.quitting) $('pause').classList.remove('hidden');
 });
 // let go of the mouse whenever a menu is open or the match is over
