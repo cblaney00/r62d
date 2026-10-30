@@ -27,7 +27,7 @@ export function closeOps(el) { el.classList.add('hidden'); cancelAnimationFrame(
 const panel = { raf: 0 };
 export function showLoadout(d, { profile, send, op }) {
   state.profile = profile; state.send = send;
-  fillDetail(d, op, panel, true, () => showLoadout(d, { profile: state.profile, send, op }));
+  fillDetail(d, op, panel, true);
 }
 
 function loadoutOf(op) { return cleanLoadout(op, state.profile && state.profile.loadouts && state.profile.loadouts[op]); }
@@ -43,7 +43,7 @@ function render(el) {
     x.save(); x.scale(64 / 34, 64 / 34); drawOperator(x, { x: 17, y: 17, aim: -0.6, op: k, w: loadoutOf(k).primary, ally: true }, 0); x.restore();
     b.onclick = () => { state.sel = k; render(el); };
   }
-  renderDetail(el);
+  renderDetail(el, true);
 }
 
 function bars(w) {
@@ -53,10 +53,14 @@ function bars(w) {
     stat('Accuracy', 100 - W.ads * 1500) + stat('Range', W.range / 13);
 }
 
-function renderDetail(el) { fillDetail(el.querySelector('#opsDetail'), state.sel, state, false, () => renderDetail(el)); }
+function renderDetail(el, force) { fillDetail(el.querySelector('#opsDetail'), state.sel, state, false, force); }
 
-function fillDetail(d, k, anim, compact, again) {
-  const o = OPERATORS[k], bio = BIOS[k], L = LOADOUTS[k], cur = loadoutOf(k);
+// Clicking a gun, attachment or gadget (or the saved profile coming back) only updates what changed in place:
+// rebuilding the whole panel replayed its slide-in and made it jump (he noticed the jitter).
+function fillDetail(d, k, anim, compact, force) {
+  if (!force && d.dataset.op === k && d._refresh) { d._refresh(); return; }
+  const o = OPERATORS[k], bio = BIOS[k], L = LOADOUTS[k];
+  let cur = loadoutOf(k);
   const s = state.profile && state.profile.stats && state.profile.stats.ops[k];
   const pips = n => [1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('');
   const weaponCard = (w, slot) => `<button class="wcard ${cur[slot] === w ? 'on' : ''}" data-slot="${slot}" data-v="${w}">
@@ -66,7 +70,7 @@ function fillDetail(d, k, anim, compact, again) {
   const attRows = slot => {
     const w = cur[slot]; if (!w) return '';
     const a = cleanAtt(w, cur.att[w]), opts = attachFor(w);
-    return `<div class="atts"><div class="atthead">${WEAPONS[w].name} attachments</div>` + ATTACH_SLOTS.map(([s, label]) => `<div class="attrow"><span>${label}</span>` +
+    return `<div class="atts" data-slot="${slot}"><div class="atthead">${WEAPONS[w].name} attachments</div>` + ATTACH_SLOTS.map(([s, label]) => `<div class="attrow"><span>${label}</span>` +
       opts[s].map(v => `<button class="att ${a[s] === v ? 'on' : ''}" data-w="${w}" data-s="${s}" data-v="${v}" title="${ATTACH[s][v].desc}">${ATTACH[s][v].short}</button>`).join('') +
       `<em>${ATTACH[s][a[s]].desc}</em></div>`).join('') + '</div>';
   };
@@ -90,20 +94,38 @@ function fillDetail(d, k, anim, compact, again) {
     <h3>GADGET</h3><div class="cards">${L.gadgets.map(gadgetCard).join('')}</div>
     <p class="hint">Your choices are saved to your profile and used every time you pick ${o.name}.</p>`;
   d.scrollTop = keepScroll;
-  for (const p of d.querySelectorAll('.wpic')) p.appendChild(gunPicture(p.dataset.w, cleanAtt(p.dataset.w, cur.att[p.dataset.w]), 270, 84));
-  for (const b of d.querySelectorAll('.att')) b.onclick = () => {
+  const save = l => {
+    if (state.profile) { state.profile.loadouts = { ...state.profile.loadouts, [k]: l }; }
+    if (state.send) state.send({ t: 'loadout', op: k, l });
+    refresh();
+  };
+  const bindAtts = root => { for (const b of root.querySelectorAll('.att')) b.onclick = () => {
     const l = loadoutOf(k), w = b.dataset.w;
     l.att = { ...l.att, [w]: { ...cleanAtt(w, l.att[w]), [b.dataset.s]: b.dataset.v } };
-    if (state.profile) { state.profile.loadouts = { ...state.profile.loadouts, [k]: l }; }
-    if (state.send) state.send({ t: 'loadout', op: k, l });
-    again();
+    save(l);
+  }; };
+  const pics = {}; // gun picture per card, redrawn only when that gun's attachments change
+  const drawPics = () => { for (const p of d.querySelectorAll('.wpic')) {
+    const w = p.dataset.w, a = cleanAtt(w, cur.att[w]), key = JSON.stringify(a);
+    if (pics[w + p.closest('.wcard').dataset.slot] === key) continue;
+    pics[w + p.closest('.wcard').dataset.slot] = key; p.replaceChildren(gunPicture(w, a, 270, 84));
+  } };
+  const refresh = () => {
+    cur = loadoutOf(k);
+    for (const b of d.querySelectorAll('.wcard')) b.classList.toggle('on', cur[b.dataset.slot] === b.dataset.v);
+    for (const box of d.querySelectorAll('.atts')) {
+      const html = attRows(box.dataset.slot);
+      if (box.dataset.html === html) continue;
+      const t = document.createElement('div'); t.innerHTML = html;
+      const nb = t.firstElementChild; nb.dataset.slot = box.dataset.slot; nb.dataset.html = html; nb.style.animation = 'none';
+      box.replaceWith(nb); bindAtts(nb);
+    }
+    drawPics();
   };
-  for (const b of d.querySelectorAll('.wcard')) b.onclick = () => {
-    const l = { ...loadoutOf(k), [b.dataset.slot]: b.dataset.v };
-    if (state.profile) { state.profile.loadouts = { ...state.profile.loadouts, [k]: l }; }
-    if (state.send) state.send({ t: 'loadout', op: k, l });
-    again();
-  };
+  for (const box of d.querySelectorAll('.atts')) box.dataset.html = attRows(box.dataset.slot);
+  d._refresh = refresh;
+  drawPics(); bindAtts(d);
+  for (const b of d.querySelectorAll('.wcard')) b.onclick = () => save({ ...loadoutOf(k), [b.dataset.slot]: b.dataset.v });
   // slowly animated big portrait
   cancelAnimationFrame(anim.raf);
   const cv = d.querySelector('.opBig'), x = cv.getContext('2d');
