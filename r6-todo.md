@@ -5,21 +5,21 @@ finished it gets ticked and moved to **Done**, then work continues on the next o
 Only ideas he asks for go in **To do** (added to the bottom). Claude never adds its own suggestions here.
 
 ## To do
-- [ ] The chat box is too long and covers the role cards between rounds.
-- [ ] Not all attacker bots seem to use their drone; every attacker bot should drone.
-- [ ] A way to look over each map and know where the bomb sites could be. A "Map knowledge" tab in the main menu, underneath the Armory.
-- [ ] The Tusk Auto-12 shoots to the left every time (tested in the Armory). Check that no other gun has the same problem.
-- [ ] Fights on the stairs are still a bit of a choke point. Look for a way to preview what you'd see at the top (or other end) of the stairs once you get close enough to them.
-- [ ] Bullets should actually be very small, so you have to be perfectly precise with them. Tracers smaller too, or shown for a few less frames.
-- [ ] A new attacker with an RPG-style launcher, not too far off from Ash in R6 (our own operator: own name, look and twist).
-- [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
-- [ ] A reloading circle around your character that shows how far the reload has got.
-- [ ] More hard (unbreakable) walls: there is too much shooting through walls right now.
-- [ ] Armory: sort the guns by type, in folders (one per gun type).
-- [ ] Aiming in the Armory should work exactly the same as in a match.
-- [ ] Rappelling: attackers need a quicker way up to the top floor.
 - [ ] Windows all start boarded up by default (doorways still start open).
+- [ ] More hard (unbreakable) walls: there is too much shooting through walls right now.
+- [ ] The chat box is too long and covers the role cards between rounds.
+- [ ] A reloading circle around your character that shows how far the reload has got.
+- [ ] The Tusk Auto-12 shoots to the left every time (tested in the Armory). Check that no other gun has the same problem.
 - [ ] Editing a loadout jitters: the panel refreshes with a jump whenever something is clicked.
+- [ ] Bullets should actually be very small, so you have to be perfectly precise with them. Tracers smaller too, or shown for a few less frames.
+- [ ] Armory: sort the guns by type, in folders (one per gun type).
+- [ ] Not all attacker bots seem to use their drone; every attacker bot should drone.
+- [ ] Aiming in the Armory should work exactly the same as in a match.
+- [ ] A way to look over each map and know where the bomb sites could be. A "Map knowledge" tab in the main menu, underneath the Armory.
+- [ ] Fights on the stairs are still a bit of a choke point. Look for a way to preview what you'd see at the top (or other end) of the stairs once you get close enough to them.
+- [ ] A new attacker with an RPG-style launcher, not too far off from Ash in R6 (our own operator: own name, look and twist).
+- [ ] Rappelling: attackers need a quicker way up to the top floor.
+- [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
 
 ## Done
 
