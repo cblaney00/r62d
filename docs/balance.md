@@ -50,3 +50,8 @@ where it is meant to be hopeless.
 are closer together (kills per gun carried 0.41–0.80, shotguns and sidearms aside). Wasp SMG led at 0.80:
 damage 19→18. A separate 12-match look at how rounds end: 19 defenders eliminated, 15 attackers eliminated,
 13 defuser disabled, 5 time out; the defuser never ran out its 45 s — bot attackers don't guard a plant.
+
+## 2026-10-30 — side-specific weapons
+With no gun on both sides (and four new ones), attackers won 34% of 294 bot rounds. Defence SMGs led:
+Marten 1.00 kills per carry (small sample), Lark 0.79 → Marten 28→26 damage, Lark 22→21. The Rook (0.33)
+kicked too hard for bots: its spray kick 1.4→1.2.

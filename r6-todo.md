@@ -10,10 +10,11 @@ New ideas from him get added to the bottom of **To do**.
       *In progress:* angled/curved walls work in the engine; Harbor Office is reshaped and waiting for his playtest.
       Harbor approved by him ("looking very good"): next, the other five maps the same way.
 
-- [ ] Revamp the loading screen: if you watch it you can see it doesn't feel very crisp or premium.
 
 
 ## Done
+
+- [x] Revamp the loading screen: when a map loads, a softened picture of it drifts slowly behind its name in big letters ("DEPLOYING TO CLIFFSIDE VILLA"), its floors and description; the bar glides smoothly (even while the map is being built) with a sheen running along it, a percentage, what it's doing and a tip; loading steps that follow each other share one screen instead of flickering.
 
 - [x] Side-specific weapons: no gun is carried by both sides now. Attack: the assault rifles, marksman rifles, bolt-action, Mule and Ox, Tusk shotgun, plus a new Javelin SMG and Halberd breaching shotgun (sidearms P10, Bison, Stub). Defence: the SMGs, Hornet, Drummer, Breaker, the Anvil slug for long shots (no marksman rifles), plus a new Sentry carbine and Sparrow pistol (sidearms Vex, Gnat, Sparrow). The Armory shows ATTACK or DEFENCE on each gun.
 

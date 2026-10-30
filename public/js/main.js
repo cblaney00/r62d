@@ -213,7 +213,7 @@ function connect(mode = '') { // '' = the shared match, 'tut' / 'free' = a priva
         for (const k in m.holes || {}) { st.map.holes[k] = m.holes[k]; st.known.holes[k] = m.holes[k].slice(); st.rend.cellChanged(+k); }
       } else {
         st.mapLoading = true;
-        runLoading('LOADING MAP', [['Building the map', () => loadMap(m.mapVersion, m.tiles, m.hp, m.mapId, m.holes)], ['Getting every floor ready', () => frames(6)]]).then(() => { st.mapLoading = false; });
+        runLoading('LOADING MAP', [['Building the map', () => loadMap(m.mapVersion, m.tiles, m.hp, m.mapId, m.holes)], ['Getting every floor ready', () => frames(6)]], m.mapId).then(() => { st.mapLoading = false; });
       }
       st.token = m.token; st.profile = m.profile; updateCard();
       if (m.profile.settings) applySettings(m.profile.settings); else saveSettings(); // first time: keep what this browser had
@@ -311,22 +311,44 @@ function resetMap(mv) {
 // ---------------- loading screen ----------------
 const frames = n => new Promise(r => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
 let loadingChain = Promise.resolve();
-function runLoading(title, steps) { // one loading screen at a time; each step gets a painted frame first
+// The loading screen (he asked for it to feel crisp and premium): the map being loaded drifts slowly behind its
+// name, floors and description; the bar glides (a CSS transform, so it keeps moving smoothly even while the map is
+// being built) with a sheen running along it, a percentage and a tip. Loading jobs queued back to back share one
+// screen, so it never flickers off and on between them. mapId = the map being loaded (none at start-up).
+let loadQueued = 0, loadSpan = [0, 1];
+function setLoad(f) { // overall progress 0..1
+  const v = Math.max(0, Math.min(1, f));
+  $('loadBar').style.transform = `scaleX(${v})`; $('loadPct').textContent = Math.round(v * 100) + '%';
+}
+const loadPart = f => setLoad(loadSpan[0] + (loadSpan[1] - loadSpan[0]) * f); // progress inside the current step
+function runLoading(title, steps, mapId = null) {
+  loadQueued++;
   loadingChain = loadingChain.then(async () => {
-    const el = $('loading'); el.classList.remove('hidden'); $('loadTitle').textContent = title;
+    const el = $('loading'), M = mapId && MAPS[mapId];
+    const fresh = el.classList.contains('hidden');
+    if (fresh) setLoad(0);
+    el.classList.toggle('withMap', !!M);
+    $('loadTitle').textContent = M ? M.name.toUpperCase() : title;
+    $('loadSub').textContent = M ? `${M.floors}  ·  ${M.desc}` : title === 'LOADING' ? 'TACTICAL BREACH  ·  5 VS 5' : '';
+    $('loadKicker').textContent = M ? 'DEPLOYING TO' : '';
+    if (M) { const bg = $('loadBg'); bg.innerHTML = ''; const c = mapThumb(mapId), cc = document.createElement('canvas'); cc.width = c.width; cc.height = c.height; cc.getContext('2d').drawImage(c, 0, 0); bg.appendChild(cc); }
+    if (fresh || !$('loadTip').textContent) $('loadTip').textContent = 'TIP  ' + TIPS[Math.floor(Math.random() * TIPS.length)];
+    el.classList.remove('hidden');
     for (let i = 0; i < steps.length; i++) {
-      $('loadStep').textContent = steps[i][0]; $('loadBar').style.width = Math.round(i / steps.length * 100) + '%';
+      loadSpan = [i / steps.length, (i + 1) / steps.length];
+      $('loadStep').textContent = steps[i][0]; loadPart(0);
       await frames(2);
       await steps[i][1]();
+      loadPart(1);
     }
-    $('loadBar').style.width = '100%'; $('loadStep').textContent = 'Ready';
-    await frames(4);
-    el.classList.add('hidden');
+    $('loadStep').textContent = 'Ready';
+    await frames(6);
+    if (--loadQueued <= 0) { loadQueued = 0; el.classList.add('hidden'); } // more loading right behind this? keep the screen up
   });
   return loadingChain;
 }
 // the same thing split into many small jobs, a slice per frame, so the bar keeps moving
-const jobsStep = (jobs, perFrame) => async () => { for (let i = 0; i < jobs.length; i += perFrame) { jobs.slice(i, i + perFrame).forEach(j => j()); await frames(1); } };
+const jobsStep = (jobs, perFrame) => async () => { for (let i = 0; i < jobs.length; i += perFrame) { jobs.slice(i, i + perFrame).forEach(j => j()); loadPart(Math.min(1, (i + perFrame) / jobs.length)); await frames(1); } };
 const portraitCache = new Map();
 function portraitCached(c, k) { // operator portraits are drawn once and copied after that
   let p = portraitCache.get(k);
@@ -339,7 +361,7 @@ function onSnap(s) {
   if (s.mp && s.mp !== st.mapId) { // a different map: build it behind a loading screen
     st.mapLoading = true;
     const name = MAPS[s.mp] ? MAPS[s.mp].name.toUpperCase() : 'MAP';
-    runLoading(`LOADING ${name}`, [['Building the map', () => loadMap(s.mv, null, null, s.mp)], ['Getting every floor ready', () => frames(6)]]).then(() => { st.mapLoading = false; });
+    runLoading(`LOADING ${name}`, [['Building the map', () => loadMap(s.mv, null, null, s.mp)], ['Getting every floor ready', () => frames(6)]], s.mp).then(() => { st.mapLoading = false; });
     return;
   }
   if (s.mv !== st.mv) { if (st.rend) resetMap(s.mv); else loadMap(s.mv, null, null, s.mp); } // same map, new round

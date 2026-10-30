@@ -20,9 +20,9 @@ export const WEAPONS = {
              burst: 3, burstGap: 0.2, kickMul: 0.8, trait: 'Three-round burst with every click: deadly accurate in bursts, but it can\'t spray.' },
   wasp:    { name: 'Wasp SMG', cls: 'SMG', dmg: 18, rpm: 1100, mag: 40, reserve: 200, reload: 2.3, spread: 0.08, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 800, len: 11,
              kickMul: 0.8, swayMul: 1.5, fall: { from: 220, to: 500, min: 0.55 }, trait: 'A frantic fire rate shreds up close; wild sideways recoil and weak at range.' },
-  marten:  { name: 'Marten .45', cls: 'SMG', dmg: 28, rpm: 640, mag: 25, reserve: 150, reload: 2.1, spread: 0.065, ads: 0.020, bloom: 0.010, auto: true, pellets: 1, range: 850, len: 13,
+  marten:  { name: 'Marten .45', cls: 'SMG', dmg: 26, rpm: 640, mag: 25, reserve: 150, reload: 2.1, spread: 0.065, ads: 0.020, bloom: 0.010, auto: true, pellets: 1, range: 850, len: 13,
              quiet: true, kickMul: 0.75, swayMul: 0.6, settle: 0.26, fall: { from: 240, to: 520, min: 0.6 }, trait: 'Built-in suppressor with no damage lost: quiet, steady and slow-firing.' },
-  lark:    { name: 'Lark PDW', cls: 'SMG', dmg: 22, rpm: 860, mag: 50, reserve: 200, reload: 2.6, spread: 0.07, ads: 0.018, bloom: 0.010, auto: true, pellets: 1, range: 1000, len: 12,
+  lark:    { name: 'Lark PDW', cls: 'SMG', dmg: 21, rpm: 860, mag: 50, reserve: 200, reload: 2.6, spread: 0.07, ads: 0.018, bloom: 0.010, auto: true, pellets: 1, range: 1000, len: 12,
              kickMul: 0.95, fall: { from: 380, to: 700, min: 0.75 }, trait: 'A 50-round magazine that keeps its damage at rifle range, but each bullet is weak.' },
   tusk:    { name: 'Tusk Auto-12', cls: 'Shotgun', dmg: 11, rpm: 260, mag: 8, reserve: 48, reload: 3.4, spread: 0.17, ads: 0.13, bloom: 0, auto: false, pellets: 8, range: 380, len: 15,
              kickMul: 0.7, settle: 0.3, trait: 'Semi-automatic: fires as fast as you click, but each blast is weaker and wider.' },
@@ -402,7 +402,7 @@ export const SPRAY = {
   hornet:  { pull: 0.3,  zig: 1.4, per: 3, flip: 0,  k: 1,   mx: 1 },    // shakes both ways
   vex50:   { pull: 1,    zig: 0.5, per: 2, flip: 0,  k: 1.6, mx: 1.4 },  // big kick right
   p10:     { pull: -0.4, zig: 0.6, per: 3, flip: 0,  k: 1,   mx: 1 },
-  rook:    { pull: -1,   zig: 0.5, per: 4, flip: 0,  k: 1.4, mx: 1.6 },  // hard and to the left
+  rook:    { pull: -1,   zig: 0.5, per: 4, flip: 0,  k: 1.2, mx: 1.5 },  // hard and to the left
   sabre:   { pull: 0.2,  zig: 1.3, per: 3, flip: 0,  k: 1,   mx: 1 },    // wanders side to side
   trident: { pull: 0.7,  zig: 0.4, per: 3, flip: 0,  k: 1,   mx: 1 },
   wasp:    { pull: -0.3, zig: 1.6, per: 3, flip: 0,  k: 1.1, mx: 1.3 },  // wild shake
