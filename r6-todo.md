@@ -8,6 +8,7 @@ New ideas from him get added to the bottom of **To do**.
 
 - [ ] Maps are too blocky and boring: more interesting shapes (angled walls, curves, alcoves, varied room sizes) instead of plain boxes.
 - [ ] Floors, part 2: hatches in floors/ceilings to break open, hearing/seeing through them.
+- [ ] Vaulting like R6: you have to vault over things (low cover, windows, broken soft walls), and it leaves you open for a moment while you climb over and recover.
 
 ## Done
 
