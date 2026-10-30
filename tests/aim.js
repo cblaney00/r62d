@@ -58,5 +58,22 @@ for (const [id, w] of Object.entries(WEAPONS)) {
   tick(1);
   if (shots.length !== 1) fail('quick click fired', shots.length, 'shots'); else if (!near(shots[0], 1.234)) fail('quick click used aim', shots[0], 'not 1.234');
 }
+// holding the trigger fires at the gun's real rate (not rounded to whole server ticks); a pistol tapped a hair early still fires
+for (const [id, w] of Object.entries(WEAPONS)) {
+  if (!w.auto) continue;
+  const gun = { w: id, ammo: 9999, reserve: 0, att: {}, m: gunMods(id) };
+  p.guns = [gun]; p.slot = 0; p.input = {}; p.prevInput = {}; p.fireCd = 0; tick(30);
+  p.input = { fire: 1 }; const a0 = gun.ammo; tick(90); p.input = {}; tick(1);
+  const want = w.rpm / 20, got = a0 - gun.ammo; // 3 s of fire
+  if (Math.abs(got - want) > 1.5) fail(`${w.name}: fired ${got} shots in 3 s, its rate says ${want}`);
+}
+{
+  const w = WEAPONS.p10, gun = { w: 'p10', ammo: 15, reserve: 60, att: {}, m: gunMods('p10') };
+  p.guns = [gun]; p.slot = 0; p.input = {}; p.prevInput = {}; p.fireCd = 0; tick(30);
+  const a0 = gun.ammo;
+  g.handle(p, { t: 'input', s: 10, k: { fire: 1 }, a: 1, dt: 0.005 }); g.handle(p, { t: 'input', s: 11, k: {}, a: 1, dt: 0.005 }); tick(2);
+  g.handle(p, { t: 'input', s: 12, k: { fire: 1 }, a: 1, dt: 0.005 }); g.handle(p, { t: 'input', s: 13, k: {}, a: 1, dt: 0.005 }); tick(10);
+  if (a0 - gun.ammo !== 2) fail('an early second tap was lost:', a0 - gun.ammo, 'shots');
+}
 console.log(fails ? `${fails} failure(s)` : 'PASS aim');
 process.exit(fails ? 1 : 0);

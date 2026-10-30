@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
@@ -312,7 +312,7 @@ function onSnap(s) {
   }
   if (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION && s.ph !== PHASE.ROUND_END) revealAll();
   const players = new Map(s.players.map(p => [p.id, p]));
-  if (s.mine && players.has(s.you)) Object.assign(players.get(s.you), s.mine); // your own private details
+  if (s.mine && players.has(s.you)) { Object.assign(players.get(s.you), s.mine); st.mineAt = now; } // your own private details
   const ents = new Map(s.ents.map(e => [e.id, e]));
   st.snaps.push({ t: now, st: s.time, players, ents }); if (st.snaps.length > 12) st.snaps.shift();
   const prevMe = st.me;
@@ -947,6 +947,12 @@ function sendInput(dt, me, ctrl, view, s, now) {
     const f = Math.min(1, (nowS - st.vault.t0) / dur), e = f * f * (3 - 2 * f);
     st.pred.x = x0 + (x1 - x0) * e; st.pred.y = y0 + (y1 - y0) * e;
   } else st.vault = null;
+  { // a fresh click: open the crosshair gap now instead of when the server's answer comes back
+    const w = WEAPONS[me.w];
+    if (k.fire && !st.fireK && w && me.a && ctrl === 'body' && ph === PHASE.ACTION && me.am > 0 && !(st.shotPred && now - st.shotPred.t < 60 / w.rpm))
+      st.shotPred = { w: me.w, t: now, sh: gunHeat(me, w, now) + 1 };
+    st.fireK = k.fire;
+  }
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
   const c = cursor(), mw = screenToWorld(c.x, c.y); msg.ax = Math.round(mw.x); msg.ay = Math.round(mw.y);
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
@@ -1408,16 +1414,27 @@ function aimPad() {
   ctx.restore();
 }
 
+// how hot your gun is right now, worked out every frame (not only when a snapshot arrives) so the crosshair gap closes
+// the moment the next shot is exact; a click you just made opens it at once, before the server has even heard of it
+function gunHeat(me, w, now) {
+  const srv = aimHeat(w, me.sh || 0, (me.fs ?? 99) + (now - (st.mineAt || now)));
+  const p = st.shotPred, own = p && p.w === me.w ? aimHeat(w, p.sh, now - p.t) : 0;
+  return Math.max(srv, own);
+}
+
 function crosshair(me, now) {
   const w = WEAPONS[me.w];
   const gm = gunMods(me.w, attFromCode(me.aa));
   // recoil kicks the crosshair round your character: pull the mouse against it
   const px = (st.pred.x - st.cam.x) * st.zoom + VW / 2, py = (st.pred.y - st.cam.y) * st.zoom + VH / 2;
-  const rc = me.rc || 0, c = Math.cos(rc), s2 = Math.sin(rc);
+  // glides to the server's recoil (it arrives 20 times a second) instead of jumping; 25 ms behind at most
+  const dtx = Math.min(0.1, now - (st.rcT || now)); st.rcT = now;
+  st.rcShow = Math.abs((me.rc || 0) - (st.rcShow || 0)) > 0.3 ? me.rc || 0 : (st.rcShow || 0) + ((me.rc || 0) - (st.rcShow || 0)) * (1 - Math.exp(-dtx / 0.025));
+  const rc = st.rcShow, c = Math.cos(rc), s2 = Math.sin(rc);
   const m = cursor(), x = px + (m.x - px) * c - (m.y - py) * s2, y = py + (m.x - px) * s2 + (m.y - py) * c;
   // the gap is the true cone the next shot can land in, measured at the crosshair: shut when the next shot is exact
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
-  const cone = w ? spreadCone(w, gm, { at: me.at || 0, run, crouch: !!me.cr, shots: me.bs || 0 }) : 0;
+  const cone = w ? spreadCone(w, gm, { at: me.at || 0, run, crouch: !!me.cr, shots: gunHeat(me, w, now) }) : 0;
   const spread = xh.dynamic ? Math.tan(cone) * Math.hypot(m.x - px, m.y - py) / DPR : 0;
   drawXhair(ctx, x, y, xh, spread, DPR);
   const hk = 1 - (now - st.hitT) / 0.18;

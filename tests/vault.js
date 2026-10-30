@@ -9,7 +9,7 @@ import { vaultable, findVault } from '../shared/physics.js';
 
 let fails = 0;
 const fail = (...a) => { fails++; console.log('FAIL', ...a); };
-const ready = (g, q) => { q.alive = true; q.downed = false; q.ctrl = 'body'; q.busy = null; q.vault = null; q.stunUntil = 0; q.recoverUntil = 0; q.input = { ...q.input, up: 0, down: 0, left: 0, right: 0, fire: 0, ads: 0 }; };
+const ready = (g, q) => { q.bracing = false; q.alive = true; q.downed = false; q.ctrl = 'body'; q.busy = null; q.vault = null; q.stunUntil = 0; q.recoverUntil = 0; q.input = { ...q.input, up: 0, down: 0, left: 0, right: 0, fire: 0, ads: 0 }; };
 for (const id of MAP_LIST) {
   const g = new Game();
   for (let i = 0; i < 2; i++) g.addBot();

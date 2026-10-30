@@ -93,7 +93,7 @@ function view(cv) {
 function aimAngle(cv) { const v = view(cv); return Math.atan2((S.mouse.y - v.oy) / v.z, (S.mouse.x - v.ox) / v.z); }
 
 function fire(w, cv) {
-  S.ammo--; S.fireCd = 60 / w.rpm; S.fired++;
+  S.ammo--; S.fireCd = Math.max(S.fireCd, -0.02) + 60 / w.rpm; S.fired++;
   const m = modsOf(S.w), cone = spreadCone(w, m, { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot) }), rc0 = S.rc;
   S.lastShot = S.t; // same rules as a match
   S.shots++; S.rc = Math.max(-recoilMax(w), Math.min(recoilMax(w), S.rc + recoilStep(w, m, S.shots)));

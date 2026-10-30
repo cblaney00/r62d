@@ -517,7 +517,9 @@ export class Game {
     // shooting
     const canShoot = p.ctrl === "body" && !p.busy && !p.vault && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && !p.bracing && gun &&
       !(p.switchUntil > this.time) && !(p.staggerUntil > this.time);
-    const click = p.click; p.click = null;
+    // a click made a hair before the gun is ready is kept until it is (up to 0.15 s), so fast tapping never loses a shot
+    const click = p.click && !(this.time - (p.click.t ?? this.time) > 0.15) ? p.click : null; p.click = null;
+    if (click && click.t === undefined) click.t = this.time;
     if (canShoot && (inp.fire || click)) {
       const w = WEAPONS[gun.w];
       const edge = !prev.fire || !!click;
@@ -525,7 +527,7 @@ export class Game {
         if (gun.ammo > 0) this.fire(p, gun, w, click);
         else if (gun.reserve > 0) this.startReload(p);
         else if (edge) this.events.push({ e: 'snd', s: 'empty', x: r1(p.x), y: r1(p.y) });
-      }
+      } else if (click && !w.auto && p.fireCd > 0) p.click = click;
     }
   }
 
@@ -544,7 +546,7 @@ export class Game {
 
   fire(p, gun, w, click = null) {
     this.noise(p.x, p.y, this.side(p), (gun.m && gun.m.quiet) ? 260 : 950);
-    gun.ammo--; p.fireCd = 60 / w.rpm;
+    gun.ammo--; p.fireCd = Math.max(p.fireCd, -1 / 30) + 60 / w.rpm; // keep the leftover: guns fire at their real rate, not rounded up to whole ticks
     if (p.ms) p.ms.shots += w.pellets;
     // hip fire is a loose cone that widens while moving; aimed fire is accurate even on the move (R6 rules)
     const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED), at = p.adsT || 0;
@@ -1659,7 +1661,7 @@ export class Game {
       });
       if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
-        vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, bs: p.guns[p.slot] ? Math.round(aimHeat(WEAPONS[p.guns[p.slot].w], p.shots || 0, this.time - p.lastShot) * 100) / 100 : 0, at: r2(p.adsT || 0),
+        vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0,
       }));
