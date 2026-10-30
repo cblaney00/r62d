@@ -1,7 +1,7 @@
 // The Armory: a private shooting range in the menus. Pick any gun, shoot dummies at different
 // distances and read its numbers. Runs only in your browser (nobody else sees it), using the same
 // damage, drop-off, spread, aim-in time, recoil and headshot rules as the server.
-import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide } from '/shared/operators.js';
+import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -118,8 +118,9 @@ function fire(w, cv) {
     if (tracerPellet(w, i)) S.tracers.push({ x2: ex, y2: ey, life: 0.07 });
     if (best) {
       hitAny = true; S.hits++;
-      const miss = Math.abs(best.x * dy - best.y * dx), head = miss < HEAD_R && w.pellets === 1; // a pellet to the head only hurts more
-      const dmg = head ? best.hp : Math.round(w.dmg * m.dmg * fallAt(w, bt, m.range) * (miss < HEAD_R ? 1.8 : 1));
+      const v = view(cv), onH = onHead((S.mouse.x - v.ox) / v.z, (S.mouse.y - v.oy) / v.z, best.x, best.y); // same rule as a match: crosshair on the head
+      const miss = Math.abs(best.x * dy - best.y * dx), head = miss < HEAD_R && onH && w.pellets === 1; // a pellet to the head only hurts more
+      const dmg = head ? best.hp : Math.round(w.dmg * m.dmg * fallAt(w, bt, m.range) * (miss < HEAD_R && onH ? 1.8 : 1));
       best.hp -= dmg; best.flash = 1;
       S.pops.push({ x: best.x + (Math.random() - 0.5) * 14, y: best.y - 14, txt: head ? 'HEADSHOT' : String(dmg), head, life: 0.9 });
       if (best.hp <= 0) { best.deadT = 1.6; S.kills++; if (S.first === null) S.first = S.fired; audio.impact('flesh'); }

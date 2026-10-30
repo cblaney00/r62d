@@ -8,7 +8,7 @@ import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf } from '../shared
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode, settleTime, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, settleTime, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -118,7 +118,7 @@ export class Game {
       if (p.ctrl === 'cam') { const c = this.feed(p); if (c && this.operates(p, c)) c.ang = c.wn === null || c.wn === undefined ? p.aim : c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(p.aim, c.wn))); } // a wall camera can't look into its wall
       if (typeof m.ax === 'number') { p.aimX = m.ax; p.aimY = m.ay; }
       if (typeof m.vt === 'number' && isFinite(m.vt)) p.viewTime = m.vt; // server time of the world this player is looking at
-      { const f = !!(m.k && m.k.fire); if (f && !p.msgFire && !p.click) p.click = { a: p.aim, vt: p.viewTime }; p.msgFire = f; } // a click keeps the aim it was made with, even if more input arrives before the next tick
+      { const f = !!(m.k && m.k.fire); if (f && !p.msgFire && !p.click) p.click = { a: p.aim, vt: p.viewTime, ax: p.aimX, ay: p.aimY }; p.msgFire = f; } // a click keeps the aim it was made with, even if more input arrives before the next tick
       this.applyMove(p, Math.max(0, Math.min(0.05, Number(m.dt) || 0)));
       p.lastSeq = m.s | 0;
       if (Array.isArray(m.ev)) for (const e of m.ev.slice(0, 10)) this.event(p, e);
@@ -595,7 +595,7 @@ export class Game {
     const aim = click ? click.a : p.aim, vt = p.viewTime;
     if (click && click.vt !== undefined) p.viewTime = click.vt; // judged against what they saw when they clicked
     const base = aim + (p.rc || 0);
-    this.rangeMul = m.range; this.shotW = w;
+    this.rangeMul = m.range; this.shotW = w; this.shotAim = click ? { x: click.ax, y: click.ay } : { x: p.aimX, y: p.aimY };
     const mx = p.x + Math.cos(aim) * (w.len + 6), my = p.y + Math.sin(aim) * (w.len + 6);
     for (let i = 0; i < w.pellets; i++) {
       const a = base + shotOffset(w, cone, i);
@@ -605,7 +605,7 @@ export class Game {
       if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });
-    this.shotW = null;
+    this.shotW = null; this.shotAim = null;
     p.viewTime = vt;
     p.lastShot = this.time;
     p.shots = (p.shots || 0) + 1; // recoil comes after the shot, so it moves the next one, never this one
@@ -695,8 +695,9 @@ export class Game {
       const W = this.shotW && this.shotW.cls === cls ? this.shotW : null, pellet = W ? W.pellets > 1 : cls === 'Shotgun';
       const F = W ? falloffOf(W) : FALLOFF[cls] || FALLOFF.AR, rm = this.rangeMul || 1, fo = { from: F.from * rm, to: F.to * rm, min: F.min };
       const fall = stopT <= fo.from ? 1 : stopT >= fo.to ? fo.min : 1 - (1 - fo.min) * (stopT - fo.from) / (fo.to - fo.from);
-      if (miss < HEAD_R && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
-      else if (miss < HEAD_R && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
+      const sa = this.shotAim, head = miss < HEAD_R && (!sa || onHead(sa.x, sa.y, at.x, at.y));
+      if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
+      else if (head && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
       else this.damage(q, dmg * mult * fall, src, wname, ang);
     } else if (best && best.e) this.hitEnt(best.e, src);
     else if (kind === 'hard' || kind === 'prop') this.events.push({ e: 'hit', k: kind, x: r1(ex), y: r1(ey) });

@@ -6,7 +6,7 @@ import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { store } from '../server/store.js';
 import { WEAPONS, gunMods, spreadCone, settleTime, shotOffset, SPRAY, recoilStep } from '../shared/operators.js';
-import { BASE_SPEED } from '../shared/physics.js';
+import { BASE_SPEED, castSight } from '../shared/physics.js';
 
 let fails = 0;
 const fail = (...a) => { fails++; console.log('FAIL', ...a); };
@@ -98,6 +98,24 @@ for (const [id, w] of Object.entries(WEAPONS)) {
   if (Math.abs(off.reduce((a, b) => a + b, 0)) > 1e-9 || Math.abs(Math.min(...off) + Math.max(...off)) > 1e-9) fail(id, 'pellet fan is lopsided', off.map(o => o.toFixed(2)).join(' '));
   let r = 0; for (let n = 1; n <= 10; n++) r += recoilStep(w, { kick: 1, sway: 1, first: 1 }, n);
   if (SPRAY[id] && SPRAY[id].pull && Math.sign(r) !== Math.sign(SPRAY[id].pull)) fail(id, 'recoil drifts the wrong way', r.toFixed(3));
+}
+// headshots need the crosshair on the head (he asked): a bullet through the head with the crosshair there kills at once;
+// the same bullet with the crosshair a little in front of or behind them is a body shot
+{
+  const q = g.addPlayer('Target', false), A = p.alive; p.viewTime = null; // judged where they are now
+  let lastHp = 0;
+  let a = 0; for (let t = 0; t < 64; t++) if (castSight(g.map, p.x, p.y, t / 64 * Math.PI * 2, 400, null) > 200) { a = t / 64 * Math.PI * 2; break; }
+  const hit = (ax, ay) => {
+    Object.assign(q, { op: 'ember', alive: true, downed: false, ctrl: 'body', staged: false, x: p.x + Math.cos(a) * 120, y: p.y + Math.sin(a) * 120 }); q.hp = 100;
+    g.shotAim = { x: ax, y: ay }; g.hitscan(p, p.x, p.y, a, 600, 30, 'test', 'AR'); g.shotAim = null;
+    lastHp = q.hp; return q.alive && !q.downed ? (q.hp < 100 ? 'body' : 'miss') : 'dead';
+  };
+  { const r = hit(p.x + Math.cos(a) * 120, p.y + Math.sin(a) * 120); if (r !== 'dead') fail('crosshair on the head, bullet through it: no headshot', r, lastHp); }
+  const far = hit(p.x + Math.cos(a) * 160, p.y + Math.sin(a) * 160), near = hit(p.x + Math.cos(a) * 80, p.y + Math.sin(a) * 80);
+  if (far !== 'body') fail('crosshair behind the target still headshot');
+  if (near !== 'body') fail('crosshair in front of the target still headshot');
+  if (hit(q.x - Math.sin(a) * 4, q.y + Math.cos(a) * 4) !== 'dead') fail('crosshair on the edge of the head (4 px) did not headshot');
+  p.alive = A;
 }
 console.log(fails ? `${fails} failure(s)` : 'PASS aim');
 process.exit(fails ? 1 : 0);

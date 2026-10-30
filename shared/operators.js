@@ -355,6 +355,10 @@ export const FALLOFF = {
   Shotgun: { from: 70, to: 260, min: 0.25 },
 };
 export const HEAD_R = 2.3; // a bullet passing this close to the centre of a body is a headshot: instant kill
+// ...and only if your crosshair was on their head when you fired (he asked: no headshots from a crosshair in front of
+// or behind someone that just happens to line up). 4.5 px is the head as drawn.
+export const HEAD_AIM = 4.5;
+export const onHead = (ax, ay, x, y) => ax === undefined || ax === null || Math.hypot(ax - x, ay - y) <= HEAD_AIM;
 
 // ---- the aiming model: one set of rules for the server, the crosshair and the Armory ----
 // The first shot after the gun has settled (no shot for settleTime) goes exactly where the crosshair is: no spread, no
