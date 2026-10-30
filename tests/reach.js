@@ -3,7 +3,7 @@
 // in, per room. Usage: node tests/reach.js [--r 7] [--map villa] [--drone]
 import { CELL, PLAYER_R, DRONE_R, T, blocksMove, blocksDrone } from '../shared/constants.js';
 import { MAP_LIST, buildMap } from '../shared/map.js';
-import { moveCircle } from '../shared/physics.js';
+import { moveCircle, circleBlocked } from '../shared/physics.js';
 
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : d; };
 const drone = process.argv.includes('--drone');
@@ -13,16 +13,7 @@ let bad = 0;
 for (const id of only ? [only] : MAP_LIST) {
   const m = buildMap(id), GW = m.W * CELL / S, GH = m.H * CELL / S;
   const blk = drone ? (t, k) => blocksDrone(t) && !(m.dhole && m.dhole[k]) : t => blocksMove(t);
-  const fits = (px, py) => {
-    for (let cy = Math.floor((py - R) / CELL); cy <= Math.floor((py + R) / CELL); cy++)
-      for (let cx = Math.floor((px - R) / CELL); cx <= Math.floor((px + R) / CELL); cx++) {
-        if (cx < 0 || cy < 0 || cx >= m.W || cy >= m.H) return false;
-        const k = cy * m.W + cx; if (!blk(m.tiles[k], k)) continue;
-        const nx = Math.max(cx * CELL, Math.min(px, cx * CELL + CELL)), ny = Math.max(cy * CELL, Math.min(py, cy * CELL + CELL));
-        if ((px - nx) ** 2 + (py - ny) ** 2 < R * R - 0.01) return false;
-      }
-    return true;
-  };
+  const fits = (px, py) => !circleBlocked(m, px, py, R, blk); // sloped and curved walls by their real shape
   const seen = new Uint8Array(GW * GH), q = [];
   const add = (gx, gy) => { if (gx < 0 || gy < 0 || gx >= GW || gy >= GH) return; const i = gy * GW + gx; if (seen[i]) return; if (!fits(gx * S + S / 2, gy * S + S / 2)) { seen[i] = 2; return; } seen[i] = 1; q.push(i); };
   for (let k = 0; k < m.W * m.H; k++) if (m.tiles[k] === T.GROUND) { const cx = k % m.W, cy = (k / m.W) | 0; add((cx * CELL + 8) / S | 0, (cy * CELL + 8) / S | 0); }

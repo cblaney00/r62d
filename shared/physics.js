@@ -13,6 +13,8 @@ function resolve(map, o, r, blockFn) {
   const y0 = Math.floor((o.y - r) / CELL), y1 = Math.floor((o.y + r) / CELL);
   for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
     if (!blockFn(tileAt(map, cx, cy), cy * map.W + cx)) continue;
+    const sh = shapeAt(map, cx, cy);
+    if (sh) { for (const P of sh) if (pushPoly(o, r, P)) hit = true; continue; }
     const rx = cx * CELL, ry = cy * CELL;
     const nx = Math.max(rx, Math.min(o.x, rx + CELL)), ny = Math.max(ry, Math.min(o.y, ry + CELL));
     let dx = o.x - nx, dy = o.y - ny; const d2 = dx * dx + dy * dy;
@@ -122,11 +124,20 @@ export function walkRay(x0, y0, dx, dy, maxT, cb) {
 export function castSight(map, x0, y0, ang, maxD, smokes) {
   const dx = Math.cos(ang), dy = Math.sin(ang);
   const startCx = Math.floor(x0 / CELL), startCy = Math.floor(y0 / CELL);
+  let exact = -1;
   let d = walkRay(x0, y0, dx, dy, maxD, (cx, cy) => {
-    if (cx === startCx && cy === startCy) return false;
     const t = tileAt(map, cx, cy);
-    return blocksSight(t) && !(t === T.SOFT && throughHole(map, cy * map.W + cx, x0, y0, dx, dy));
+    if (!blocksSight(t)) return false;
+    const sh = shapeAt(map, cx, cy);
+    if (sh) { // an angled or curved bit of wall: only its solid part stops sight
+      const h = rayShape(sh, x0, y0, dx, dy);
+      if (h === null || (t === T.SOFT && throughHole(map, cy * map.W + cx, x0, y0, dx, dy))) return false;
+      exact = h; return true;
+    }
+    if (cx === startCx && cy === startCy) return false;
+    return !(t === T.SOFT && throughHole(map, cy * map.W + cx, x0, y0, dx, dy));
   });
+  if (exact >= 0) d = exact;
   if (smokes) for (const s of smokes) {
     const t = raySmoke(x0, y0, dx, dy, s);
     if (t !== null && t < d) d = t;
@@ -216,4 +227,81 @@ export function rayCircle(x0, y0, dx, dy, cx, cy, r) {
   const t = -b - Math.sqrt(disc);
   if (t >= 0) return t;
   return c < 0 ? 0 : null;
+}
+
+// ---- shaped wall cells (angled and curved walls) ----
+// map.shape[k] lists the solid parts of a wall cell as convex polygons (flat x, y lists in world px, wound so
+// that (ey, -ex) of each edge points outwards). A wall cell without one is solid all over. The pieces are cut
+// from whole wall shapes cell by cell (mapkit.js), so neighbouring pieces meet exactly with no gaps.
+export function shapeAt(map, cx, cy) {
+  if (!map.shape || cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return undefined;
+  return map.shape[cy * map.W + cx];
+}
+// Is a point inside a convex piece (pad > 0 grows it a little)?
+export function polyIn(P, x, y, pad = 0) {
+  const n = P.length;
+  for (let i = 0; i < n; i += 2) {
+    const ax = P[i], ay = P[i + 1], ex = P[(i + 2) % n] - ax, ey = P[(i + 3) % n] - ay;
+    if (((x - ax) * ey - (y - ay) * ex) / Math.hypot(ex, ey) > pad) return false;
+  }
+  return true;
+}
+// Where a ray first enters a convex piece (distance along the unit direction), or null.
+export function rayPoly(P, x0, y0, dx, dy) {
+  let t0 = -Infinity, t1 = Infinity;
+  const n = P.length;
+  for (let i = 0; i < n; i += 2) {
+    const ax = P[i], ay = P[i + 1], ex = P[(i + 2) % n] - ax, ey = P[(i + 3) % n] - ay;
+    const den = ey * dx - ex * dy, num = ey * (ax - x0) - ex * (ay - y0);
+    if (Math.abs(den) < 1e-12) { if (num < 0) return null; continue; }
+    const t = num / den;
+    if (den < 0) { if (t > t0) t0 = t; } else if (t < t1) t1 = t;
+    if (t0 > t1) return null;
+  }
+  return t1 < 0 ? null : Math.max(t0, 0);
+}
+export function rayShape(sh, x0, y0, dx, dy) {
+  let best = null;
+  for (const P of sh) { const t = rayPoly(P, x0, y0, dx, dy); if (t !== null && (best === null || t < best)) best = t; }
+  return best;
+}
+// Is a world point inside solid wall (shaped cells count only their solid parts)?
+export function pointSolid(map, x, y, blockFn) {
+  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), t = tileAt(map, cx, cy);
+  if (!blockFn(t, cy * map.W + cx)) return false;
+  const sh = shapeAt(map, cx, cy);
+  return !sh || sh.some(P => polyIn(P, x, y));
+}
+// Push a circle out of one convex piece. Returns true if they touched.
+function pushPoly(o, r, P) {
+  const n = P.length;
+  let inside = true, best = Infinity, bx = 0, by = 0, pen = Infinity, pnx = 0, pny = 0;
+  for (let i = 0; i < n; i += 2) {
+    const ax = P[i], ay = P[i + 1], ex = P[(i + 2) % n] - ax, ey = P[(i + 3) % n] - ay, l2 = ex * ex + ey * ey, l = Math.sqrt(l2);
+    if (l < 1e-9) continue;
+    const d = ((o.x - ax) * ey - (o.y - ay) * ex) / l;
+    if (d > 0) inside = false;
+    if (-d < pen) { pen = -d; pnx = ey / l; pny = -ex / l; }
+    const u = Math.max(0, Math.min(1, ((o.x - ax) * ex + (o.y - ay) * ey) / l2));
+    const qx = ax + ex * u, qy = ay + ey * u, dd = (o.x - qx) ** 2 + (o.y - qy) ** 2;
+    if (dd < best) { best = dd; bx = qx; by = qy; }
+  }
+  if (inside) { o.x += pnx * (pen + r); o.y += pny * (pen + r); return true; }
+  if (best >= r * r) return false;
+  const d = Math.sqrt(best); if (d < 1e-6) return false;
+  o.x += (o.x - bx) / d * (r - d); o.y += (o.y - by) / d * (r - d);
+  return true;
+}
+// Does a circle overlap blocking cells (shaped cells by their solid parts)? Used by tests and placement.
+export function circleBlocked(map, px, py, r, blockFn) {
+  for (let cy = Math.floor((py - r) / CELL); cy <= Math.floor((py + r) / CELL); cy++)
+    for (let cx = Math.floor((px - r) / CELL); cx <= Math.floor((px + r) / CELL); cx++) {
+      if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return true;
+      const k = cy * map.W + cx; if (!blockFn(map.tiles[k], k)) continue;
+      const sh = map.shape && map.shape[k];
+      if (sh) { for (const P of sh) { const o = { x: px, y: py }; if (pushPoly(o, r - 0.01, P)) return true; } continue; }
+      const nx = Math.max(cx * CELL, Math.min(px, cx * CELL + CELL)), ny = Math.max(cy * CELL, Math.min(py, cy * CELL + CELL));
+      if ((px - nx) ** 2 + (py - ny) ** 2 < r * r - 0.01) return true;
+    }
+  return false;
 }

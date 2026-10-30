@@ -67,6 +67,7 @@ function findPath(map, sx, sy, gx, gy) {
   const heap = [[0, start]]; g[start] = 0;
   const cost = k => {
     const t = map.tiles[k];
+    if (map.shape && map.shape[k] && map.shapeFill[k] < 10 && t !== T.VOID) return 2.5; // the open side of a sloped wall: a body slides along it
     if (t === T.BARRI) return 8;
     if (t === T.SOFT && map.hp[k] > 0) return 30; // a plain wall: attackers will knock a hole in it if there's no other way
     if (t === T.PANEL) return 70; // a steel panel: very slow to hammer through, only when there is no other way in

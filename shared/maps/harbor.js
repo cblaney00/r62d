@@ -42,7 +42,7 @@ export function build() {
   G.door(24, 49, 26, 49, true);    // main entrance
   G.door(52, 49, 58, 49, true);    // garage shutter
   G.window(18, 10, 19, 10); G.window(48, 10, 49, 10); G.window(63, 10, 64, 10);
-  G.window(71, 13, 71, 14); G.window(71, 32, 71, 33); G.window(12, 15, 12, 16); G.window(12, 44, 12, 45);
+  G.window(71, 32, 71, 33); G.window(12, 15, 12, 16);
   G.door(12, 31, 12, 32, true);    // kitchen back door
   G.door(12, 24, 12, 26, true);    // west hall door
   G.door(71, 24, 71, 26, true);    // east hall door
@@ -59,7 +59,7 @@ export function build() {
   G.prop('console', 30, 20, 3, 1, T.LOW);
   G.prop('shelf', 44, 12, 9, 1, T.TALL); G.prop('shelf', 46, 15, 6, 1, T.TALL);
   G.prop('cabinet', 54, 18, 1, 3, T.TALL);
-  G.prop('desk', 59, 13, 4, 2, T.LOW); G.prop('desk', 65, 13, 4, 2, T.LOW); G.prop('desk', 59, 18, 4, 2, T.LOW);
+  G.prop('desk', 59, 13, 4, 2, T.LOW); G.prop('desk', 63, 16, 4, 2, T.LOW); G.prop('desk', 59, 18, 4, 2, T.LOW);
   G.prop('plant', 69, 20, 1, 1, T.TALL);
   G.prop('pillar', 30, 25, 1, 1, T.TALL); G.prop('pillar', 45, 25, 1, 1, T.TALL); G.prop('pillar', 58, 25, 1, 1, T.TALL);
   G.prop('bench', 38, 23, 3, 1, T.LOW);
@@ -80,6 +80,16 @@ export function build() {
   G.prop('bush', 64, 5, 3, 2, T.LOW);
   G.prop('dumpster', 2, 30, 2, 3, T.TALL); G.prop('container', 40, 2, 6, 3, T.TALL, 1);
   G.prop('barrier', 14, 51, 6, 1, T.LOW, 1);
+
+  // shapes: the building's north-east and south-west corners are cut off at an angle, and a few rooms get
+  // rounded or angled corners (plastered structure, so they can't be blown open)
+  G.outside([[65.2, 10], [72, 10], [72, 16.8]]); G.walls([[65.5, 10.5], [71.5, 16.5]], 1, T.SOFT, MAT.BRICK);
+  G.outside([[12, 43.2], [12, 50], [18.8, 50]]); G.walls([[12.5, 43.5], [18.5, 49.5]], 1, T.SOFT, MAT.BRICK);
+  G.round(13, 11, 3, 'se', T.HARD, MAT.DRYWALL);                                  // West Office
+  G.round(13, 40, 3, 'ne', T.HARD, MAT.DRYWALL);                                  // Kitchen
+  G.round(27, 40, 3, 'ne', T.HARD, MAT.DRYWALL); G.round(44, 40, 3, 'nw', T.HARD, MAT.DRYWALL); // Lounge
+  G.chamfer(53, 29, 3, 'se', T.HARD, MAT.DRYWALL); G.chamfer(53, 40, 2, 'ne', T.HARD, MAT.DRYWALL); // Meeting Room
+  G.chamfer(71, 49, 4, 'nw');                                                       // Garage
 
   G.decor((x, X, Y) => {
     x.fillStyle = 'rgba(230,190,60,0.8)';
@@ -120,7 +130,7 @@ export function build() {
   U.door(50, 38, 51, 38); U.door(65, 38, 66, 38);
   U.door(71, 35, 71, 36, true);                        // fire-escape door into Records
   U.window(18, 10, 19, 10); U.window(38, 10, 39, 10); U.window(60, 10, 61, 10);
-  U.window(12, 15, 12, 16); U.window(12, 36, 12, 37); U.window(71, 15, 71, 16); U.window(71, 31, 71, 32);
+  U.window(12, 15, 12, 16); U.window(12, 36, 12, 37); U.window(71, 31, 71, 32);
   U.window(25, 49, 26, 49); U.window(58, 49, 59, 49);
 
   U.prop('desk', 15, 13, 5, 2, T.LOW); U.prop('bookshelf', 13, 20, 5, 1, T.TALL); U.prop('cabinet', 26, 12, 1, 3, T.TALL);
@@ -129,10 +139,15 @@ export function build() {
   U.prop('console', 66, 19, 3, 1, T.LOW);
   U.prop('pillar', 34, 25, 1, 1, T.TALL); U.prop('pillar', 54, 25, 1, 1, T.TALL);
   for (const [dx, dy] of [[15, 31], [21, 31], [27, 31], [15, 37], [21, 37], [27, 37]]) U.prop('desk', dx, dy, 4, 2, T.LOW);
-  U.prop('plant', 14, 47, 1, 1, T.TALL); U.prop('bookshelf', 14, 44, 1, 3, T.TALL);
+  U.prop('plant', 14, 42, 1, 1, T.TALL); U.prop('bookshelf', 41, 30, 1, 3, T.TALL);
   U.prop('counter', 45, 30, 8, 1, T.LOW); U.prop('fridge', 54, 30, 1, 2, T.TALL); U.prop('coffeetable', 47, 34, 3, 2, T.LOW);
   U.prop('shelf', 58, 30, 1, 6, T.TALL); U.prop('shelf', 61, 30, 1, 5, T.TALL);
   U.prop('crates', 46, 41, 2, 2, T.TALL); U.prop('crates', 53, 45, 3, 2, T.TALL); U.prop('shelf', 58, 40, 8, 1, T.TALL); U.prop('crates', 66, 45, 2, 2, T.TALL);
+
+  U.outside([[65.2, 10], [72, 10], [72, 16.8]]); U.walls([[65.5, 10.5], [71.5, 16.5]], 1, T.SOFT, MAT.BRICK);
+  U.outside([[12, 43.2], [12, 50], [18.8, 50]]); U.walls([[12.5, 43.5], [18.5, 49.5]], 1, T.SOFT, MAT.BRICK);
+  U.arc(24, 46.5, 5, 180, 360, 0.7, T.SOFT);                                        // curved glass-walled booth in the open office
+  U.chamfer(29, 11, 2, 'se', T.HARD, MAT.DRYWALL); U.chamfer(49, 11, 2, 'sw', T.HARD, MAT.DRYWALL); // Boardroom
 
   // ================= stairs =================
   stair(0, 1, 36, 42, 3, 6, 'n', FL.MARBLE);          // lobby -> open office

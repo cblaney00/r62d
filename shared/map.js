@@ -53,7 +53,7 @@ export function roomAt(map, wx, wy) {
 const MOUNT_WALL = new Set([T.HARD, T.SOFT, T.REINF]);
 export function wallMount(map, x, y) {
   const W = map.W, ox = Math.floor(x / CELL), oy = Math.floor(y / CELL), room = roomAt(map, x, y), fl = floorAt(map, x, y);
-  const wall = (cx, cy) => { if (cx < 0 || cy < 0 || cx >= W || cy >= map.H) return false; const k = cy * W + cx; return MOUNT_WALL.has(map.tiles[k]) && map.openId[k] < 0 && !map.dhole[k]; };
+  const wall = (cx, cy) => { if (cx < 0 || cy < 0 || cx >= W || cy >= map.H) return false; const k = cy * W + cx; return MOUNT_WALL.has(map.tiles[k]) && map.openId[k] < 0 && !map.dhole[k] && !(map.shape && map.shape[k]); };
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   let best = null;
   for (let cy = oy - 12; cy <= oy + 12; cy++) for (let cx = ox - 12; cx <= ox + 12; cx++) {

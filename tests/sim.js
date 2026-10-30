@@ -13,7 +13,7 @@ if (process.argv.includes('--map')) {
     console.log(`--- ${m.name} ${F.name} ---`);
     for (let y = 0; y < F.h; y++) {
       let row = '';
-      for (let x = F.gx; x < F.gx + F.w; x++) row += ch[m.tiles[y * m.W + x]] ?? '?';
+      for (let x = F.gx; x < F.gx + F.w; x++) row += m.shape && m.shape[y * m.W + x] ? '/' : ch[m.tiles[y * m.W + x]] ?? '?';
       console.log(String(y + F.y0).padStart(2) + ' ' + row);
     }
   }

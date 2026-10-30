@@ -2,7 +2,7 @@
 import { CELL, PHASE, DUR, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R,
   stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
 import { buildMap, roomAt, wallMount, MAPS, MAP_LIST } from '../shared/map.js';
-import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED } from '../shared/physics.js';
+import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
@@ -583,8 +583,9 @@ export class Game {
     let mult = 1, stopT = bestT, kind = best ? 'flesh' : 'none', pens = 0;
     const sx = Math.floor(x0 / CELL), sy = Math.floor(y0 / CELL);
     walkRay(x0, y0, dx, dy, bestT, (cx, cy, t) => {
-      if (cx === sx && cy === sy) return false;
-      const k = cy * this.map.W + cx, tile = tileAt(this.map, cx, cy);
+      const k = cy * this.map.W + cx, tile = tileAt(this.map, cx, cy), sh = (stopsBullet(tile) || penBullet(tile)) && shapeAt(this.map, cx, cy);
+      if (sh) { const h = rayShape(sh, x0, y0, dx, dy); if (h === null || h > bestT) return false; t = h; } // angled/curved wall: only its solid part
+      else if (cx === sx && cy === sy) return false;
       if (stopsBullet(tile)) { stopT = t; kind = tile === T.TALL ? 'prop' : 'hard'; best = null; return true; }
       if (penBullet(tile)) {
         if (tile === T.SOFT && HOLE_ONLY.has(cls)) this.holeCell(k, cx, cy, x0, y0, dx, dy, t);
@@ -1261,7 +1262,7 @@ export class Game {
   tickNade(e, dt) {
     const sp = Math.hypot(e.vx, e.vy);
     const nx = e.x + e.vx * dt, ny = e.y + e.vy * dt;
-    const blocked = (x, y) => { const t = tileAt(this.map, Math.floor(x / CELL), Math.floor(y / CELL)); return blocksDrone(t) || t === T.BARRI; };
+    const blocked = (x, y) => pointSolid(this.map, x, y, t => blocksDrone(t) || t === T.BARRI);
     let bounced = false;
     if (blocked(nx, e.y)) { e.vx = -e.vx * 0.45; bounced = true; } else e.x = nx;
     if (blocked(e.x, ny)) { e.vy = -e.vy * 0.45; bounced = true; } else e.y = ny;
@@ -1413,10 +1414,7 @@ export class Game {
   freeSpotNear(x, y, spread, drone = false) {
     for (let i = 0; i < 40; i++) {
       const px = x + rnd(-spread, spread), py = y + rnd(-spread, spread);
-      const ok = [[0, 0], [8, 0], [-8, 0], [0, 8], [0, -8]].every(([dx, dy]) => {
-        const t = tileAt(this.map, Math.floor((px + dx) / CELL), Math.floor((py + dy) / CELL));
-        return drone ? !blocksDrone(t) : !blocksMove(t);
-      });
+      const ok = [[0, 0], [8, 0], [-8, 0], [0, 8], [0, -8]].every(([dx, dy]) => !pointSolid(this.map, px + dx, py + dy, drone ? blocksDrone : blocksMove));
       if (ok) return { x: px, y: py };
     }
     return { x, y };

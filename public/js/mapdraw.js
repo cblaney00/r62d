@@ -2,6 +2,7 @@
 // and redraws small parts of it when walls get broken or reinforced.
 import { CELL, T, FL, MAT, CELL_HP } from '/shared/constants.js';
 import { S, floorPatterns, hash, shade, canvas } from './textures.js';
+import { polyIn } from '/shared/physics.js';
 
 const SOLID = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL]);
 const WALLISH = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.BARRI]);
@@ -22,6 +23,15 @@ export class MapRenderer {
   }
 
   t(x, y) { const m = this.map; return x < 0 || y < 0 || x >= m.W || y >= m.H ? T.HARD : m.tiles[y * m.W + x]; }
+  // the solid parts of an angled/curved wall cell, if it is one (and still standing)
+  sh(x, y) { const m = this.map; if (!m.shape || x < 0 || y < 0 || x >= m.W || y >= m.H || !SOLID.has(m.tiles[y * m.W + x])) return null; return m.shape[y * m.W + x] || null; }
+  // is the cell at (x, y) solid wall all along its side facing (fx, fy)? (sloped cells only where their wall reaches that side)
+  solidToward(x, y, fx, fy) {
+    const t = this.t(x, y); if (!SOLID.has(t) && t !== T.DSHIELD) return false;
+    if (!this.sh(x, y)) return true;
+    const side = fy < 0 ? 0 : fx > 0 ? 1 : fy > 0 ? 2 : 3;
+    return !!(this.map.shapeSide[y * this.map.W + x] & (1 << side));
+  }
 
   // Floors for a block of cells (the caller has clipped to that block).
   drawFloors(x0, y0, x1, y1) {
@@ -50,6 +60,28 @@ export class MapRenderer {
       if (m.tiles[vk] !== T.VOID && m.floor[vk] !== FL.VOID) continue;
       x.fillStyle = m.tiles[vk] === T.VOID ? '#07090c' : '#101318'; x.fillRect(cx * CELL, cy * CELL, CELL, CELL);
       if (hash(cx, cy, 9) < 0.25) { x.fillStyle = 'rgba(255,255,255,0.025)'; x.fillRect(cx * CELL + hash(cx, cy, 1) * 12, cy * CELL + hash(cx, cy, 2) * 12, 3, 3); }
+    }
+    // sloped wall cells are open on one or both sides: each small patch shows the floor of the nearest plain neighbour
+    if (m.shape) for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+      if (!m.shape[cy * m.W + cx]) continue;
+      const nb = [];
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = cx + dx, ny = cy + dy; if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= m.W || ny >= m.H) continue;
+        const nk = ny * m.W + nx, t = m.tiles[nk];
+        if (m.shape[nk] || SOLID.has(t)) continue;
+        nb.push([nx, ny, t === T.VOID || m.floor[nk] === FL.VOID ? (t === T.VOID ? '#07090c' : '#101318') : this.pat[m.floor[nk]]]);
+      }
+      if (!nb.length) continue;
+      const n = 8, s = CELL / n;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        const px = cx * CELL + (i + 0.5) * s, py = cy * CELL + (j + 0.5) * s;
+        let best = null, bd = Infinity;
+        for (const b of nb) {
+          const qx = Math.max(b[0] * CELL, Math.min(px, b[0] * CELL + CELL)), qy = Math.max(b[1] * CELL, Math.min(py, b[1] * CELL + CELL));
+          const d = (px - qx) ** 2 + (py - qy) ** 2; if (d < bd) { bd = d; best = b; }
+        }
+        x.fillStyle = best[2]; x.fillRect(cx * CELL + i * s, cy * CELL + j * s, s + 0.05, s + 0.05);
+      }
     }
     this.drawStairs(x0, y0, x1, y1);
   }
@@ -114,18 +146,25 @@ export class MapRenderer {
     for (let y = ey0; y <= ey1; y++) for (let x = ex0; x <= ex1; x++) {
       const t = this.t(x, y);
       if (!SOLID.has(t) && t !== T.TALL) continue;
-      const X0 = x * CELL, Y0 = y * CELL;
-      if (!SOLID.has(this.t(x, y + 1)) && this.t(x, y + 1) !== T.TALL) {
+      const X0 = x * CELL, Y0 = y * CELL, sh = this.sh(x, y);
+      if (sh) { // a sloped or curved wall casts its own shape
+        for (const [ox, oy, a] of [[1, 2, 0.26], [2.5, 4.5, 0.12]]) {
+          ctx.fillStyle = `rgba(0,0,0,${a})`;
+          for (const P of sh) { ctx.beginPath(); for (let i = 0; i < P.length; i += 2) ctx.lineTo(P[i] + ox, P[i + 1] + oy); ctx.fill(); }
+        }
+        continue;
+      }
+      if (!this.solidToward(x, y + 1, 0, -1) && this.t(x, y + 1) !== T.TALL) {
         ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.fillRect(X0 + 1, Y0 + CELL, CELL, 2.5);
         ctx.fillStyle = 'rgba(0,0,0,0.13)'; ctx.fillRect(X0 + 2, Y0 + CELL + 2.5, CELL, 3);
       }
-      if (!SOLID.has(this.t(x + 1, y)) && this.t(x + 1, y) !== T.TALL) {
+      if (!this.solidToward(x + 1, y, -1, 0) && this.t(x + 1, y) !== T.TALL) {
         ctx.fillStyle = 'rgba(0,0,0,0.24)'; ctx.fillRect(X0 + CELL, Y0 + 1, 2, CELL);
         ctx.fillStyle = 'rgba(0,0,0,0.10)'; ctx.fillRect(X0 + CELL + 2, Y0 + 2, 2.5, CELL);
       }
       if (t === T.TALL) continue;
-      if (!SOLID.has(this.t(x, y - 1))) { ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(X0, Y0 - 2, CELL, 2); }
-      if (!SOLID.has(this.t(x - 1, y))) { ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(X0 - 2, Y0, 2, CELL); }
+      if (!this.solidToward(x, y - 1, 0, 1)) { ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(X0, Y0 - 2, CELL, 2); }
+      if (!this.solidToward(x - 1, y, 1, 0)) { ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(X0 - 2, Y0, 2, CELL); }
     }
     for (const p of m.props) {
       if (p.x > ex1 || p.y > ey1 || p.x + p.w < ex0 || p.y + p.h < ey0) continue;
@@ -263,15 +302,50 @@ export class MapRenderer {
   }
 
   wall(x, y, k, t) {
+    const sh = this.sh(x, y);
+    if (sh) { // angled or curved: draw the plain wall clipped to its solid part, then light its sloped faces
+      const ctx = this.ctx; ctx.save(); ctx.beginPath();
+      for (const P of sh) { ctx.moveTo(P[0], P[1]); for (let i = 2; i < P.length; i += 2) ctx.lineTo(P[i], P[i + 1]); ctx.closePath(); }
+      ctx.clip(); this.wallFill(x, y, k, t, true); ctx.restore();
+      this.slopeEdges(x, y, sh, t, k);
+      return;
+    }
+    this.wallFill(x, y, k, t);
+  }
+  solidAt(px, py) {
+    const cx = Math.floor(px / CELL), cy = Math.floor(py / CELL), t = this.t(cx, cy);
+    if (!SOLID.has(t)) return false;
+    const sh = this.sh(cx, cy);
+    return !sh || sh.some(P => polyIn(P, px, py));
+  }
+  slopeEdges(x, y, sh, t, k) {
+    const ctx = this.ctx, X = x * CELL, Y = y * CELL, on = v => Math.abs(v) < 0.05 || Math.abs(v - CELL) < 0.05;
+    const top = t === T.HARD ? (this.map.mat[k] === MAT.DRYWALL ? '#c4bdaf' : '#7a7f85') : t === T.REINF ? '#59626c' : this.map.mat[k] === MAT.BRICK ? '#93503b' : '#d8d2c4';
+    ctx.lineCap = 'round';
+    for (const P of sh) for (let i = 0; i < P.length; i += 2) {
+      const ax = P[i], ay = P[i + 1], bx = P[(i + 2) % P.length], by = P[(i + 3) % P.length];
+      if ((on(ax - X) && on(bx - X) && Math.abs(ax - bx) < 0.05) || (on(ay - Y) && on(by - Y) && Math.abs(ay - by) < 0.05)) continue; // lies on the cell's own side
+      const ex = bx - ax, ey = by - ay, l = Math.hypot(ex, ey); if (l < 0.2) continue;
+      const nx = ey / l, ny = -ex / l;
+      if (this.solidAt((ax + bx) / 2 + nx * 0.4, (ay + by) / 2 + ny * 0.4)) continue; // an inside seam between two pieces, not a face
+      const lit = -(nx * 0.55 + ny * 0.83); // light comes from the top-left
+      if (lit > 0) { ctx.strokeStyle = `rgba(255,255,255,${0.12 + lit * 0.2})`; ctx.lineWidth = 0.9; }
+      else { ctx.strokeStyle = shade(top, 0.55); ctx.lineWidth = 1 + -lit * 2.2; }
+      const ix = -nx * ctx.lineWidth / 2, iy = -ny * ctx.lineWidth / 2; // keep the band inside the wall
+      ctx.beginPath(); ctx.moveTo(ax + ix, ay + iy); ctx.lineTo(bx + ix, by + iy); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    }
+  }
+  wallFill(x, y, k, t, sloped = false) {
     const ctx = this.ctx, m = this.map, X = x * CELL, Y = y * CELL, mat = m.mat[k];
     let top;
-    if (t === T.HARD) top = '#7a7f85';
+    if (t === T.HARD) top = mat === MAT.DRYWALL ? '#c4bdaf' : '#7a7f85'; // plastered structure (rounded corners) or bare concrete
     else if (t === T.REINF) top = '#59626c';
     else if (t === T.PANEL) top = '#3e454d';
     else if (t === T.DSHIELD) top = '#2b3036';
     else top = mat === MAT.BRICK ? '#93503b' : '#d8d2c4';
     ctx.fillStyle = top; ctx.fillRect(X, Y, CELL, CELL);
-    const s = (dx, dy) => SOLID.has(this.t(x + dx, y + dy)) || this.t(x + dx, y + dy) === T.DSHIELD;
+    const s = (dx, dy) => this.solidToward(x + dx, y + dy, -dx, -dy);
     if (t === T.SOFT && mat === MAT.BRICK) {
       ctx.fillStyle = 'rgba(210,190,160,0.45)';
       for (let r = 0; r < 4; r++) {
@@ -330,6 +404,7 @@ export class MapRenderer {
         ctx.stroke();
       }
     }
+    if (sloped) return; // sloped cells get their edges from slopeEdges
     // raised-edge shading
     const dark = shade(t === T.SOFT && mat !== MAT.BRICK ? '#d8d2c4' : top.startsWith('#') ? top : '#888888', 0.55);
     if (!s(0, 1)) { ctx.fillStyle = dark; ctx.fillRect(X, Y + CELL - 3, CELL, 3); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(X, Y + CELL - 0.6, CELL, 0.6); }
