@@ -473,7 +473,7 @@ function onEvent(e, s, players) {
       const v = players.get(e.victim), k = e.killer ? players.get(e.killer) : null;
       const prev = st.snaps.length > 1 ? st.snaps[st.snaps.length - 2].players.get(e.victim) : null;
       const pos = prev && prev.x !== undefined ? prev : null;
-      if (pos && v && (v.tm === mySide() || teamSees(pos.x, pos.y))) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide() }); st.rend.pool(pos.x, pos.y); }
+      if (pos && v && (v.tm === mySide() || teamSees(pos.x, pos.y))) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide(), n: v.n, t: performance.now() / 1000 }); st.rend.pool(pos.x, pos.y); }
       addKill(k, v, e.w, e.hs);
       if (e.hs && k && k.id === st.id) audio.ui('headshot');
       break;
@@ -1570,6 +1570,7 @@ function draw(s, view, now, dt) {
     if (s.pl) marker(s.pl.x, s.pl.y, '!', '#ff4040', view);
     if (side === 'atk') for (const e of ents) if (e.ty === 'defuser') marker(e.x, e.y, 'D', '#f2c14e', view);
     drawMarks(view, now);
+    deathMarks(view, now);
     // an enemy your team can see who is off the edge of your screen: a mark at the edge, so nobody shoots you unseen
     for (const p of drawn) if (p.tm !== side) {
       const { x: sx, y: sy } = w2s(p.x, p.y);
@@ -1638,18 +1639,37 @@ function draw(s, view, now, dt) {
   if (inGame && padOn && aimMode === 'pad' && !gpRecent() && !menuOpen()) aimPad();
 }
 
-function marker(x, y, label, col, view) {
+// where a teammate died: a red cross with their name, shown through walls and kept at the screen edge (he asked for
+// these to be obvious now that you no longer see through teammates' eyes); pulses for the first few seconds.
+// Someone who died on another floor shows at the same spot of the building on yours, with ▲ / ▼.
+function deathMarks(view, now) {
+  if (!view || !st.map) return;
+  const fl = floorAt(st.map, view.x, view.y), t = performance.now() / 1000;
+  for (const c of st.corpses) {
+    if (!c.ally) continue;
+    let x = c.x, y = c.y, up = '';
+    const cf = floorAt(st.map, c.x, c.y);
+    if (cf >= 0 && fl >= 0 && cf !== fl) { // the same spot of the building, on your floor
+      const L = localPos(st.map, c.x, c.y), F = st.map.floors[fl];
+      x = L.x - (F.x0 - F.gx) * CELL; y = L.y - F.y0 * CELL; up = cf > fl ? '▲ ' : '▼ ';
+    }
+    const age = t - (c.t || 0), pulse = 1.8 * (age < 4 ? 1 + 0.3 * Math.abs(Math.sin(age * 5)) : 1);
+    marker(x, y, '✖', '#ff4040', view, up + (c.n || 'Teammate'), pulse);
+  }
+}
+function marker(x, y, label, col, view, sub, big = 1) {
   const z = st.zoom;
   // clamp to screen edges so you can always find it
   const S0 = w2s(x, y), sx = S0.x, sy = S0.y, pad = 40 * DPR;
   const cx = Math.max(pad, Math.min(VW - pad, sx)), cy = Math.max(pad + 60 * DPR, Math.min(VH - pad - 60 * DPR, sy));
   const W0 = screenToWorld(cx, cy), wx = W0.x, wy = W0.y;
   const lift = cx === sx && cy === sy ? 14 : 0, u = UP();
-  ctx.save(); ctx.translate(wx + u.x * lift, wy + u.y * lift); ctx.rotate(-(st.rot || 0));
+  ctx.save(); ctx.translate(wx + u.x * lift, wy + u.y * lift); ctx.rotate(-(st.rot || 0)); if (big !== 1) ctx.scale(big, big);
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(0, 0, 5.5, 0, 7); ctx.fill();
   ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.stroke();
   ctx.fillStyle = col; ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, 0.5);
   if (view) { const d = Math.round(Math.hypot(x - view.x, y - view.y) / CELL * 0.8); ctx.font = '600 5px Barlow Condensed, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillText(d + 'm', 0, 9); }
+  if (sub) { ctx.font = '700 5.5px Barlow Condensed, sans-serif'; ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(sub, 0, -9); ctx.fillStyle = col; ctx.fillText(sub, 0, -9); }
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 }
@@ -1843,7 +1863,8 @@ function hud(s) {
     `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label
   let vl = '';
-  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); vl = d && d.j ? 'DRONE JAMMED' : `YOUR DRONE · CLICK OR ${label('spot')} TO PING · WHEEL: TEAM DRONES · ${label('view')} TO EXIT`; }
+  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); const sp = me.dsl > 0 ? `SPRINTING ${me.dsl.toFixed(1)}s` : !me.ds ? 'NO SPRINTS LEFT' : me.dsc > 0 ? `SPRINT IN ${Math.ceil(me.dsc)}s (${me.ds} LEFT)` : `${label('walk')}: SPRINT (${me.ds} LEFT)`;
+    vl = d && d.j ? 'DRONE JAMMED' : `YOUR DRONE · ${sp} · CLICK OR ${label('spot')} TO PING · WHEEL: TEAM DRONES · ${label('view')} TO EXIT`; }
   else if (me.ct === 'cam') {
     const list = feedList(s, me), c = list.find(e => e.id === me.fi);
     if (c) {
@@ -1955,35 +1976,14 @@ function camBar(s, me) {
   }
 }
 
-// ---------------- shared team vision ----------------
-// Everything that can see for your team: you, teammates, their drones, and (defence) working cameras.
+// ---------------- vision ----------------
+// Only what you look through (he asked): your own eyes, or the drone / camera feed you are watching (yours or a
+// teammate's), or the teammate you spectate once dead. Teammates' eyes, drones and cameras no longer light up your map;
+// their pings and spotted marks still show, and where a teammate died is marked clearly (deathMarks).
 function teamViewers(s, view, me, inGame) {
   const vs = [];
   if (view) vs.push(view);
   if (!s || !me || !inGame) return vs;
-  const side = me.tm;
-  for (const sp of s.players) {
-    if (!sp.a || sp.sg || sp.tm !== side || sp.x === undefined) continue;
-    if (sp.id === me.id && view && view.kind === 'body') continue;
-    const p = sp.id === me.id ? { ...sp, x: st.pred.x, y: st.pred.y } : interp(sp.id, 'players');
-    if (!p || p.x === undefined) continue;
-    if (view && view.kind === 'spect' && Math.hypot(view.x - p.x, view.y - p.y) < 1) continue;
-    if (sp.id === me.id && me.ct === 'drone') { vs.push({ x: me.x, y: me.y, ang: me.ag, fov: fovFor(me), range: 1100, near: 26, kind: 'mate' }); continue; }
-    vs.push({ x: p.x, y: p.y, ang: p.ag, fov: fovFor(p), range: 1100, near: 26, kind: 'mate' });
-  }
-  for (const e of s.ents) {
-    if (e.tm !== side) continue;
-    const ie = interp(e.id, 'ents') || e;
-    if (e.ty === 'drone') {
-      if (view && view.kind === 'drone' && me.did === e.id) continue;
-      vs.push({ x: ie.x, y: ie.y, ang: 0, fov: Math.PI * 2, range: 230, near: 0, kind: 'drone' });
-    } else if (e.ty === 'scope' && side === 'atk') { // Wall Scope: a view through the wall
-      vs.push({ x: ie.x, y: ie.y, ang: e.ag || 0, fov: 1.3, range: 420, near: 6, kind: 'cam' });
-    } else if (e.ty === 'cam' && e.hp > 0 && !e.off && side === 'def') {
-      if (view && view.kind === 'cam' && view.cam.id === e.id) continue;
-      vs.push({ x: e.x, y: e.y, ang: e.ag || 0, fov: 1.9, range: 650, near: 14, kind: 'cam' });
-    }
-  }
   // an open hatch someone can see into shows a little of the room on the other side of it
   const m = st.map, sm = smokes(s), n = vs.length;
   for (const h of m.hatches || []) {

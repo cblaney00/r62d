@@ -1,6 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS,
-  MAT, stopsBullet, penBullet, blocksDrone, blocksMove, other } from '../shared/constants.js';
+  MAT, stopsBullet, penBullet, blocksDrone, blocksMove, other, DRONE_SPRINT } from '../shared/constants.js';
 import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
@@ -318,6 +318,7 @@ export class Game {
     p.barri = o.team === TEAM.DEF ? BARRICADES_EACH : 0;
     p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false;
+    p.sprints = DRONE_SPRINT.charges; p.sprintUntil = 0; p.sprintCd = 0;
     p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0; p.staged = false;
     p.downedBy = null; p.nitroId = null; p.ai = {};
     p.boostUntil = 0; p.ghostUntil = 0; p.dazeUntil = 0; p.clampUntil = 0; p.plated = false; p.gasId = null;
@@ -403,7 +404,7 @@ export class Game {
   mods(p) {
     if (p.ctrl === 'drone') {
       const d = this.ent(p.droneId);
-      return { drone: true, frozen: !d || this.jammedAt(d.x, d.y) };
+      return { drone: true, frozen: !d || this.jammedAt(d.x, d.y), sprint: this.time < (p.sprintUntil || 0) };
     }
     const o = OPERATORS[p.op] || { armor: 2 };
     let mul = 1;
@@ -445,6 +446,15 @@ export class Game {
     }
     const team = this.side(p);
     const inp = p.input, prev = p.prevInput;
+    if (p.ctrl === 'drone') { // drone sprint (he asked): Shift, 1.6x for up to 3 s, 3 a round, 6 s between; the motor whine carries
+      const on = this.time < (p.sprintUntil || 0), held = inp && inp.walk, was = prev && prev.walk;
+      if (on && !held) { p.sprintUntil = this.time; p.sprintCd = this.time + DRONE_SPRINT.wait; }
+      else if (!on && held && !was && (p.sprints || 0) > 0 && this.time >= (p.sprintCd || 0)) {
+        p.sprints--; p.sprintUntil = this.time + DRONE_SPRINT.time; p.sprintCd = p.sprintUntil + DRONE_SPRINT.wait;
+        const d = this.ent(p.droneId); if (d) this.events.push({ e: 'snd', s: 'droneSprint', x: r1(d.x), y: r1(d.y), id: p.id });
+      }
+      if (this.time < (p.sprintUntil || 0) && this.time - (p.sprintNoiseT || 0) > 0.4) { const d = this.ent(p.droneId); if (d) { p.sprintNoiseT = this.time; this.noise(d.x, d.y, team, 260); } }
+    } else if (this.time < (p.sprintUntil || 0)) { p.sprintUntil = this.time; p.sprintCd = this.time + DRONE_SPRINT.wait; }
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
     { const g = p.guns[p.slot], rate = (1 / (g ? adsTime(WEAPONS[g.w]) : 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
       const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time) && !p.vault && !(p.recoverUntil > this.time);
@@ -651,7 +661,7 @@ export class Game {
     for (const e of this.ents) {
       if (!e.hp || e.team === team || e.tu) continue; // turret cameras are bulletproof
       const at = e.type === 'drone' && src.viewTime !== null && src.viewTime !== undefined ? this.posAt(e, src.viewTime) : e;
-      const t = rayCircle(x0, y0, dx, dy, at.x, at.y, e.type === 'decoy' ? hitR(e.op) : 6);
+      const t = rayCircle(x0, y0, dx, dy, at.x, at.y, e.type === 'decoy' ? hitR(e.op) : e.type === 'drone' ? 4.5 : 6); // drones are small
       if (t !== null && t < bestT) { bestT = t; best = { e }; }
     }
     let mult = 1, stopT = bestT, kind = best ? 'flesh' : 'none', pens = 0, wallT = 0;
@@ -1750,7 +1760,7 @@ export class Game {
       if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
-        bat: r1(p.battery), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
+        bat: r1(p.battery), ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
         m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0,
       }));

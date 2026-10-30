@@ -5,13 +5,18 @@ finished it gets ticked and moved to **Done**, then work continues on the next o
 Only ideas he asks for go in **To do** (added to the bottom). Claude never adds its own suggestions here.
 
 ## To do
+
 - [ ] A way to look over each map and know where the bomb sites could be. A "Map knowledge" tab in the main menu, underneath the Armory.
 - [ ] A new attacker with an RPG-style launcher, not too far off from Ash in R6 (our own operator: own name, look and twist).
 - [ ] Rappelling: attackers need a quicker way up to the top floor.
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
-
+- [ ] when all enemies die OR are all downed and cannot get back up then the round is over, players are being downed without the round ending so it just wastes time
+- [ ] the aiming is very close to being proper, it's just a little hard to pull the mouse around to make the character turn left and right and i think it would still be wonky if we just upped the default sensitivity, flicks should be possible and not get caught on every door, maybe the reticle distance can reset to a regular distance every time you ADS
 
 ## Done
+
+- [x] Only your own vision: your map lights up only from your own eyes, or the drone or camera you are looking through (yours or a teammate's, through the team feeds), or the teammate you watch once dead. Teammates' pings and spotted marks still show. Where a teammate died shows as a big red ✖ with their name, through walls and at the screen edge, pulsing at first (▲ / ▼ when it was on another floor).
+- [x] Drones are 30% smaller (and a little harder to hit) and can sprint: hold Shift on a drone for 1.6× speed for up to 3 s, 3 sprints a round, 6 s before the next one. A sprinting drone whines louder and further. The drone's top line shows how many are left.
 
 - [x] Stairs preview: when you can see a staircase and are within a few metres of it (or on it), a live window in the top-left corner shows the other end ("▲ TOP OF THE STAIRS" / "▼ BOTTOM OF THE STAIRS"): everything visible all round the landing, with anyone standing there and their gadgets (hidden traps stay hidden), and a dashed ring where you come out. It fades away when you step back. Enemies on another floor no longer get a misleading red ! at the screen edge.
 

@@ -1,5 +1,5 @@
 // Movement, collision, line of sight and ray casting on the tile grid.
-import { CELL, PX_PER_M, T, FL, HOLE_R, PLAYER_R, DRONE_R, blocksMove, blocksDrone, blocksSight } from './constants.js';
+import { CELL, PX_PER_M, T, FL, HOLE_R, PLAYER_R, DRONE_R, DRONE_SPRINT, blocksMove, blocksDrone, blocksSight } from './constants.js';
 
 // What stops a body: everything blocksMove says, plus window openings (you vault through those, see findVault).
 export const bodyBlocks = map => (t, k) => blocksMove(t) || (t === T.OPEN && !!map.win && map.win[k] === 1);
@@ -90,7 +90,7 @@ export function stepMove(map, o, input, dt, mods) {
   const len = Math.hypot(mx, my);
   if (len > 0) { mx /= len; my /= len; }
   let spd;
-  if (mods.drone) spd = DRONE_SPEED;
+  if (mods.drone) spd = DRONE_SPEED * (mods.sprint ? DRONE_SPRINT.mul : 1);
   else {
     spd = BASE_SPEED * (ARMOR_SPEED[mods.armor] || 1) * (mods.mul || 1);
     if (mods.downed) spd = M_S.downed * PX_PER_M;
@@ -101,7 +101,7 @@ export function stepMove(map, o, input, dt, mods) {
   // Weight: velocity eases toward where you want to go instead of jumping there.
   o.vx = o.vx || 0; o.vy = o.vy || 0;
   if (mods.frozen) { o.vx = 0; o.vy = 0; return false; }
-  const accel = mods.drone ? 800 : len > 0 ? 500 : 760; // eased down with the slower speeds: same sense of weight
+  const accel = mods.drone ? (mods.sprint ? 1100 : 800) : len > 0 ? 500 : 760; // eased down with the slower speeds: same sense of weight
   let dvx = mx * spd - o.vx, dvy = my * spd - o.vy;
   const dl = Math.hypot(dvx, dvy), maxd = accel * dt;
   if (dl > maxd) { dvx *= maxd / dl; dvy *= maxd / dl; }

@@ -225,7 +225,7 @@ export function drawDrone(ctx, d, t, ally) {
   const spd = d.spd || 0, wheel = d.wheel || 0, lean = Math.min(1, spd / 115); // 115 = drone top speed (DRONE_SPEED)
   const rel = (d.mvAng ?? d.ag) - (d.ag || 0);
   ctx.save(); ctx.translate(d.x, d.y);
-  ctx.rotate(d.ag || 0);
+  ctx.rotate(d.ag || 0); ctx.scale(0.7, 0.7); // 30% smaller (he asked)
   // about a foot long (10 px, 1 m = 36 px) and half as wide: a low rectangle on four little wheels
   if (ally) { ctx.strokeStyle = 'rgba(70,170,255,0.45)'; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.roundRect(-5.8, -3.5, 11.6, 7, 2); ctx.stroke(); }
   ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(0.5, 0.8, 5.2, 2.9, 0, 0, 7); ctx.fill();

@@ -28,7 +28,7 @@ export function buildMap(id = 'harbor') {
 export function floorAt(map, wx, wy) {
   const cx = Math.floor(wx / CELL), cy = Math.floor(wy / CELL);
   if (cx < 0 || cy < 0 || cx >= map.W || cy >= map.H) return -1;
-  const f = map.flAt[cy * map.W + cx]; return f === 255 ? -1 : f;
+  const f = map.flAt[cy * map.W + cx]; return f === undefined || f === 255 ? -1 : f; // undefined: a position that is not a number
 }
 // The same spot in the shared building frame (for sound between floors, distances, markers).
 export function localPos(map, wx, wy) {

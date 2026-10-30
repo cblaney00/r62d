@@ -472,6 +472,7 @@ export function play(name, x, y) {
     case 'vault': { foley('cloth', x, y); const g = out(x, y, 0.35, 380, 0.12); if (!g) return; const t = ac.currentTime; noise(g, t + 0.05, 0.14, 'lowpass', 600, 0.9, 0.6); noise(g, t + 0.45, 0.12, 'lowpass', 500, 1, 0.5); return; } // a hand on the ledge, then the landing
     case 'clamp': impact('metal', x, y); return foley('hurt', x, y);
     case 'swap': return;
+    case 'droneSprint': { const g = out(x, y, 0.5, 300, 0.12); if (!g) return; const t = ac.currentTime; tone(g, t, 0.35, 600, 1500, 'sawtooth', 0.08); return; } // the motor winding up
     case 'empty': return foley('empty', x, y);
     case 'break': return impact('electronic', x, y);
     case 'barricade': for (let i = 0; i < 3; i++) setTimeout(() => foley('nail', x, y), i * 150); return;
@@ -542,11 +543,11 @@ export function droneLoop(id, x, y, speed, own) {
     L = { n, hum, mix, p, whirr, lp, seen: 0 }; loops.set(id, L);
   }
   const d = own ? 0 : distTo(x, y).d;
-  const move = Math.min(1, speed / 160);
-  const k = Math.max(0, 1 - d / 280) ** 1.6 * move * Math.pow(0.45, d > 20 ? occlude(x, y) : 0);
+  const move = Math.min(1, speed / 160), hot = Math.max(0, Math.min(0.6, speed / 115 - 1.1)); // hot: sprinting, a louder whine that carries further
+  const k = Math.max(0, 1 - d / (280 * (1 + hot))) ** 1.6 * move * (1 + hot * 1.6) * Math.pow(0.45, d > 20 ? occlude(x, y) : 0);
   const t = ac.currentTime;
   L.mix.gain.setTargetAtTime((own ? 0.095 : 0.13) * k * (MIX.loops ?? 1), t, 0.12); // measured: own ≈ -34 dB like your own footsteps
-  L.whirr.frequency.setTargetAtTime(500 + move * 450, t, 0.2);
+  L.whirr.frequency.setTargetAtTime(500 + move * 450 + hot * 1100, t, 0.2);
   L.hum.frequency.setTargetAtTime(95 + move * 40, t, 0.2);
   L.p.pan.setTargetAtTime(own ? 0 : Math.max(-0.9, Math.min(0.9, distTo(x, y).dx / 260)), t, 0.05);
   L.seen = t;
