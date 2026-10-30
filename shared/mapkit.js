@@ -183,7 +183,8 @@ export function makeMap({ id, name, floors }) {
   // Fewer breakable walls (he asked: too many ways into a site by blowing the whole room open). Every straight wall
   // between two spaces (two rooms, or a room and outside) is one "wall". Each site room keeps one breakable wall
   // besides the one to its partner room (an inside one if it has one), so there are only a few ways to blow into a site;
-  // elsewhere about two in five inside walls and one in four outside walls stay breakable. The rest become solid concrete.
+  // elsewhere about one in five inside walls and one in ten outside walls stay breakable (he asked again: too much
+  // shooting through walls). The rest become solid concrete.
   // Same choice every round (it hashes the map id). map.hardened marks the walls this turned solid.
   const hardened = new Uint8Array(N);
   const hardenWalls = (sites) => {
@@ -218,13 +219,26 @@ export function makeMap({ id, name, floors }) {
         for (const key of mine) { decided.add(key); if (keep.includes(key)) soft.add(key); }
       }
     }
-    for (const [key, w] of walls) if (!decided.has(key) && hash(key) < (w.a < 0 ? 0.25 : 0.4)) soft.add(key);
+    for (const [key, w] of walls) if (!decided.has(key) && hash(key) < (w.a < 0 ? 0.1 : 0.2)) soft.add(key); // he asked twice: fewer (too much wallbanging)
     const make = k => { tiles[k] = T.HARD; mat[k] = MAT.CONCRETE; hp[k] = 0; hardened[k] = 1; };
     for (const [key, w] of walls) if (!soft.has(key)) w.cells.forEach(make);
     // corners and joints between walls: solid unless they touch a wall that stayed breakable
     const rest = [];
     for (let k = 0; k < N; k++) if (tiles[k] === T.SOFT && !keyOf.has(k) && !shape[k]) rest.push(k);
     for (const k of rest) if (![1, -1, W, -W].some(d => tiles[k + d] === T.SOFT && keyOf.has(k + d))) make(k);
+    // angled and curved walls (map.shape) aren't straight stretches: each joined run of them is one wall, kept breakable
+    // round a site room, elsewhere like an inside wall (one in five). Its shape stays, only the material changes.
+    const siteRid = new Set((sites || []).flatMap(s => (s.rooms || []).map(roomIdx)).filter(r => r >= 0));
+    const seen = new Uint8Array(N);
+    for (let k0 = 0; k0 < N; k0++) {
+      if (seen[k0] || tiles[k0] !== T.SOFT || !shape[k0]) continue;
+      const run = [k0]; seen[k0] = 1;
+      for (let i = 0; i < run.length; i++) for (const d of [1, -1, W, -W, W + 1, W - 1, -W + 1, -W - 1]) {
+        const k = run[i] + d; if (k >= 0 && k < N && !seen[k] && tiles[k] === T.SOFT && shape[k]) { seen[k] = 1; run.push(k); }
+      }
+      const bySite = run.some(k => [1, -1, W, -W, W + 1, W - 1, -W + 1, -W - 1].some(d => siteRid.has(rid[k + d])));
+      if (!bySite && hash('shape' + k0) >= 0.2) for (const k of run) { tiles[k] = T.HARD; mat[k] = MAT.CONCRETE; hp[k] = 0; hardened[k] = 1; }
+    }
   };
 
   // Drone holes, like the small gaps at the foot of walls in R6: a drone (radius 5) fits, a body doesn't.

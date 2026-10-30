@@ -1,4 +1,4 @@
-// Barricades like R6 (he asked): doorways and windows start open, each defender has 3 barricades that take ~2.5 s
+// Barricades like R6 (he asked): doorways start open, windows start boarded, each defender has 3 barricades that take ~2.5 s
 // to put up; a barricade breaks as one board; three melee hits break one; rifle,
 // SMG, LMG and pistol bullets only chew small holes in it, which you can look (and shoot) through; a shotgun takes
 // two blasts. Run: node tests/barricades.js
@@ -18,9 +18,10 @@ for (const id of MAP_LIST) {
   while (g.phase !== PHASE.PREP) g.tick(1 / 30);
   const m = g.map, W = m.W;
   const defs = [...g.players.values()].filter(q => g.side(q) === TEAM.DEF);
-  const boarded = m.openings.filter(o => o.cells.some(c => m.tiles[c] === T.BARRI)).length;
+  const boarded = m.openings.filter(o => o.kind !== 'window' && o.cells.some(c => m.tiles[c] === T.BARRI)).length;
+  for (const o of m.openings) if (o.kind === 'window' && !o.cells.every(c => m.tiles[c] === T.BARRI)) { fail(id, 'a window did not start boarded'); break; }
   if (boarded > defs.length * BARRICADES_EACH) fail(id, boarded, 'barricades up from', defs.length, 'defenders');
-  if (boarded === m.openings.length) fail(id, 'every doorway boarded up at the start');
+  if (boarded === m.openings.filter(o => o.kind !== 'window').length) fail(id, 'every doorway boarded up at the start');
   for (const q of defs) if (q.barri < 0 || q.barri > BARRICADES_EACH) fail(id, q.name, 'has', q.barri, 'barricades');
   // a person holding E: about 2.5 s each, 3 of them, then none left
   {
@@ -83,7 +84,7 @@ for (const id of MAP_LIST) {
     if (i === 1 && m.tiles[k] !== T.BARRI) fail(id, 'one shotgun blast broke the barricade');
     if (i === 2 && m.tiles[k] === T.BARRI) fail(id, 'two shotgun blasts did not break it');
   }
-  console.log(`${id}: ${boarded} of ${m.openings.length} doorways and windows boarded by the bots at the start`);
+  console.log(`${id}: ${boarded} of ${m.openings.filter(o => o.kind !== 'window').length} doorways boarded by the bots at the start (every window starts boarded)`);
 }
 console.log(fails ? `${fails} failure(s)` : 'PASS barricades');
 process.exit(fails ? 1 : 0);

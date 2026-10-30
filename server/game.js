@@ -237,6 +237,7 @@ export class Game {
       for (let i = 0; i <= 16; i++) { const a = c.n === null ? i / 16 * Math.PI * 2 : c.n - c.sp + c.sp * 2 * i / 16, d = castSight(map, c.x, c.y, a, 600, null); if (d > bestD) { bestD = d; best = a; } }
       this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, team: TEAM.DEF, hp: 1, offUntil: 0, ang: best, wn: c.n, ws: c.sp, wall: c.wall });
     }
+    this.boardWindows();
     // defenders start on site, attackers at one spawn (their bodies wait while they drone)
     const site = map.sites[this.site];
     const defCells = this.freeCellsInRooms(site.rooms);
@@ -936,6 +937,11 @@ export class Game {
       if (Math.hypot(q.x - nx, q.y - ny) < PLAYER_R) return true;
     }
     return false;
+  }
+
+  // He asked: every window starts boarded up (doorways start open). These are free, not out of anyone's 3.
+  boardWindows() {
+    for (const o of this.map.openings) if (o.kind === 'window' && o.cells.every(c => this.map.tiles[c] === T.OPEN)) this.barricade(o.id, T.BARRI, true);
   }
 
   // A melee hit on a barricade: three break it (the whole board across the doorway or window, like R6)

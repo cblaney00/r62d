@@ -1,7 +1,7 @@
 // Angled and curved walls: sight, bullets and bodies must stop at the real slope or curve, with no gaps
 // between the pieces in neighbouring cells. Run: node tests/shapes.js
 import './_tmpdata.js';
-import { CELL } from '../shared/constants.js';
+import { CELL, T, CELL_HP } from '../shared/constants.js';
 import { buildMap } from '../shared/map.js';
 import { castSight, moveCircle } from '../shared/physics.js';
 import { Game } from '../server/game.js';
@@ -34,12 +34,13 @@ for (let s = 0; s <= 360; s++) {
   if (r < 4.5) fail(`2F booth: sight stopped early at radius ${r.toFixed(2)}`);
 }
 // 3. bullets: from the 1F Meeting Room into its angled plastered corner (hard) they stop at the slope;
-//    from the 2F booth out through the curve (soft) they go through and chip the wall
+//    from the 2F booth out through the curve (made soft here: the map may harden it) they go through and chip the wall
 {
   const g = new Game(); g.map = buildMap('harbor'); const gm = g.map;
   const src = { id: 'x', team: 'atk', ms: null };
   const o = W(0, 56, 32), r = g.hitscan(src, o.x, o.y, Math.atan2(-1, -1), 300, 30, 'test', 'AR'), e = back(0, r.x, r.y);
   if (r.k !== 'hard' || e.u + e.v > 85.6 || e.u + e.v < 84.5) fail(`bullet into the Meeting Room's angled corner ended at ${e.u.toFixed(2)},${e.v.toFixed(2)} (${r.k})`);
+  for (let k = 0; k < gm.tiles.length; k++) if (gm.hardened[k] && gm.shape[k]) { gm.tiles[k] = T.SOFT; gm.hp[k] = CELL_HP[T.SOFT]; }
   const b = W(1, 24, 46), r2 = g.hitscan(src, b.x, b.y, -Math.PI / 2, 300, 30, 'test', 'Shotgun');
   if (!Object.keys(g.changed ? Object.fromEntries([...g.changed].map(k => [k, 1])) : {}).length && !(gm.hp.some((h, k) => gm.shape[k] && h < 60 && h > 0))) fail('shotgun pellet did not chip the curved booth wall');
 }
