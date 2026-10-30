@@ -1,7 +1,7 @@
 // The Armory: a private shooting range in the menus. Pick any gun, shoot dummies at different
 // distances and read its numbers. Runs only in your browser (nobody else sees it), using the same
 // damage, drop-off, spread, aim-in time, recoil and headshot rules as the server.
-import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide } from '/shared/operators.js';
+import { WEAPONS, OPERATORS, OP_LIST, ADS_TIME, RECOIL, FALLOFF, HEAD_R, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, settleTime, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -115,7 +115,7 @@ function fire(w, cv) {
       if (t > 0 && t < bt) { bt = t; best = d; }
     }
     const ex = dx * bt, ey = dy * bt;
-    if (i < 3) S.tracers.push({ x2: ex, y2: ey, life: 0.07 });
+    if (tracerPellet(w, i)) S.tracers.push({ x2: ex, y2: ey, life: 0.07 });
     if (best) {
       hitAny = true; S.hits++;
       const miss = Math.abs(best.x * dy - best.y * dx), head = miss < HEAD_R && w.pellets === 1; // a pellet to the head only hurts more

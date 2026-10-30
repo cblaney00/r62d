@@ -390,6 +390,9 @@ export function shotOffset(w, cone, i, rnd = Math.random) {
   if (w.pellets > 1) return cone * ((i / (w.pellets - 1)) * 2 - 1) * (Math.min(i, w.pellets - 1 - i) % 2 ? 0.75 : 1) + (rnd() - 0.5) * cone * 0.1;
   return cone ? (rnd() + rnd() - 1) * cone : 0;
 }
+// which pellets of a blast get a tracer: the two outside ones and the middle one, so the streaks show the whole spread
+// (the first three were all on the left, so every shotgun looked like it shot left; he noticed on the Tusk)
+export const tracerPellet = (w, i) => w.pellets <= 3 || i === 0 || i === w.pellets - 1 || i === w.pellets >> 1;
 // Each gun's own spray (he asked: some pull left, some right, some much harder). Recoil turns your aim; + is to the
 // right (clockwise), - to the left. pull: steady drift per shot (×kick); zig: side-to-side shake (×sway) repeating every
 // per shots; flip: the steady drift changes side every flip shots (0 = never); k: how hard it kicks overall; mx: how

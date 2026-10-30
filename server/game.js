@@ -8,7 +8,7 @@ import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf } from '../shared
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode, settleTime, aimHeat, spreadCone, shotOffset, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout, ADS_TIME, RECOIL, FALLOFF, HEAD_R, hitR, cleanAtt, gunMods, attachFor, attCode, settleTime, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -602,7 +602,7 @@ export class Game {
       const into = this.aimedHatch(p, a); // aimed into a hatch: the bullet goes down (or up) there, not on across the room
       const end = this.hitscan(p, p.x, p.y, a, into ? into.ad : w.range, w.dmg * m.dmg, w.name, w.cls);
       if (into && end.k === 'none') this.shotThroughHatch(p, a, into, w.dmg * m.dmg, w.name, w.cls);
-      if (i < 3) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
+      if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });
     this.shotW = null;
