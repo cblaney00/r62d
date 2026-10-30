@@ -1556,6 +1556,18 @@ function draw(s, view, now, dt) {
       ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(st.pred.x, st.pred.y, 18, 0, 7); ctx.stroke();
       ctx.strokeStyle = '#f2c14e'; ctx.beginPath(); ctx.arc(st.pred.x, st.pred.y, 18, -Math.PI / 2, -Math.PI / 2 + me.bu.p * Math.PI * 2); ctx.stroke();
     }
+    // reload ring round you (he asked): fills clockwise from screen-up; glides between snapshots using the gun's reload time
+    const rw = WEAPONS[me.w];
+    if (me.a && me.rl > 0 && rw && me.ct === 'body') {
+      const start = now - me.rl * rw.reload;
+      if (!st.rlStart || st.rlW !== me.w || Math.abs(st.rlStart - start) > 0.25) { st.rlStart = start; st.rlW = me.w; }
+      st.rlStart += (start - st.rlStart) * 0.1;
+      const f = Math.min(1, Math.max(me.rl, (now - st.rlStart) / rw.reload)), u = UP(), a0 = Math.atan2(u.y, u.x);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 3.2; ctx.beginPath(); ctx.arc(st.pred.x, st.pred.y, 14.5, 0, 7); ctx.stroke();
+      ctx.strokeStyle = 'rgba(235,245,255,0.92)'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(st.pred.x, st.pred.y, 14.5, a0, a0 + f * Math.PI * 2); ctx.stroke();
+      ctx.lineCap = 'butt';
+    } else st.rlStart = 0;
     // aim line for grenades so you can judge throws
     if (me.a && me.ct === 'body' && keys.has('gadget')) {
       const c = cursor(), mw = screenToWorld(c.x, c.y);
