@@ -257,7 +257,7 @@ setInterval(() => send({ t: 'ping', c: performance.now(), rtt: st.rtt == null ? 
 // ---------------- tutorial ----------------
 // A lesson runs in its own private match on the server: leave the lobby, join a tutorial, come back after.
 const coach = createCoach({ el: $('coach'), send, getMap: () => st.map, onExit: () => switchMatch(null) });
-$('coach').addEventListener('click', e => { if (coach.blocking && !e.target.closest('button')) coach.space(st.last); }); // clicking the card itself (mouse not captured)
+$('coach').addEventListener('click', e => { if ((coach.blocking && !e.target.closest('button')) || e.target.closest('[data-skip]')) coach.space(st.last); }); // clicking the card itself (mouse not captured)
 // free = { map, bots } for a free-play match (see the FREE PLAY page below)
 function switchMatch(lesson, free = null) {
   if (!st.token) { setTab('play'); $('name').focus(); return; }
@@ -593,7 +593,7 @@ function pollPad(dt, view) {
   const falling = (gpLastL - rs.l) / Math.max(dt, 1e-3) > 4;
   if (rs.l > 0.05 && !falling && !aimReset) { // (the frame you aim in on a phone keeps the pulled-in crosshair)
     if (view && view.kind === 'cam') { mouse.x = VW / 2 + rs.x / rs.l * VH * 0.25; mouse.y = VH / 2 + rs.y / rs.l * VH * 0.25; }
-    else { padAng = Math.atan2(rs.y, rs.x); padReach = rs.l; }
+    else { padAng = Math.atan2(rs.y, rs.x); if (!gp.rsDir) padReach = rs.l; }
   }
   gpLastL = rs.l;
 }
@@ -1173,7 +1173,9 @@ function frame(nowMs) {
       if (sl > al) { ax = Math.cos(view.ang) * sl; ay = Math.sin(view.ang) * sl; }
       st.leadV = st.leadV || { x: ax, y: ay }; const kl = 1 - Math.exp(-dt * 4); // the lead swings round smoothly when you turn
       st.leadV.x += (ax - st.leadV.x) * kl; st.leadV.y += (ay - st.leadV.y) * kl;
-      cx += st.leadV.x; cy += st.leadV.y;
+      let lvx = st.leadV.x, lvy = st.leadV.y;
+      if (isTouch) { const hw = vh * VW / VH * 0.16, hh = vh * 0.12; lvx = Math.max(-hw, Math.min(hw, lvx)); lvy = Math.max(-hh, Math.min(hh, lvy)); } // phone: you stay near the middle, clear of thumbs and panels
+      cx += lvx; cy += lvy;
     }
   } else { // menus: slow drift over the map
     cx = st.map.W * CELL / 2 + Math.cos(now * 0.05) * 300; cy = st.map.H * CELL / 2 + Math.sin(now * 0.07) * 160;
@@ -1243,8 +1245,14 @@ function frame(nowMs) {
     }
     const hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom, x0 = F.gx * CELL, mw = F.w * CELL, mh = F.h * CELL;
     if (st.rot) { /* a turned view isn't kept inside the floor's edges; the blackout hides what's beyond */ } else
+    if (isTouch) { // phone: the view may go a little past the edge so you are never under a thumb at the map's edge
+      const ex = hw * 0.55, ey = hh * 0.45;
+      const lim = (v, lo, hi) => lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v));
+      st.cam.x = lim(st.cam.x, x0 + hw - ex, x0 + mw - hw + ex); st.cam.y = lim(st.cam.y, hh - ey, mh - hh + ey);
+    } else {
     st.cam.x = mw > hw * 2 ? Math.max(x0 + hw, Math.min(x0 + mw - hw, st.cam.x)) : x0 + mw / 2;
     if (!st.rot) st.cam.y = mh > hh * 2 ? Math.max(hh, Math.min(mh - hh, st.cam.y)) : mh / 2;
+    }
     st.floorRect = [x0, 0, x0 + mw, mh];
   }
   if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
@@ -1990,6 +1998,7 @@ function hud(s) {
   if (s.fp && me.op) {
     const all = [...opsForTeam('atk'), ...opsForTeam('def')], i = all.indexOf(me.op), n = all.length;
     const nm = k => `${OPERATORS[k].name}${OPERATORS[k].team !== side ? (OPERATORS[k].team === 'atk' ? ' (attack)' : ' (defence)') : ''}`;
+    if (isTouch) setHTML('freeHint', `<b>GOD MODE</b> · <button id="freeOpsBtn">ALL OPERATORS</button> · <b>${esc(OPERATORS[me.op].name)}</b>`); else
     setHTML('freeHint', `<b>GOD MODE</b> · <button id="freeOpsBtn"><kbd>${esc(label('opGrid'))}</kbd> ALL OPERATORS</button> · <kbd>${esc(label('opPrev'))}</kbd> ${esc(nm(all[(i - 1 + n) % n]))} · <b>${esc(OPERATORS[me.op].name)}</b> · ${esc(nm(all[(i + 1) % n]))} <kbd>${esc(label('opNext'))}</kbd>`);
     const fb = $('freeOpsBtn'); if (fb && !fb.onclick) fb.onclick = () => toggleFreeOps();
   }
@@ -2033,6 +2042,7 @@ function hud(s) {
   const ab = o.ability, g = GADGETS[me.gd || o.gadget];
   const abCount = ab.battery ? `${Math.round(me.bat / ab.battery * 100)}%` : ab.count ? me.ac : '';
   const viewName = side === 'atk' ? `Drone${s.ph === PHASE.ACTION ? ' ×' + me.dr : ''}` : 'Cameras';
+  st.tBadge = { skill: me.gi ? '!' : String(abCount), gadget: me.ni ? '!' : String(me.gc ?? ''), view: side === 'atk' && s.ph === PHASE.ACTION ? String(me.dr ?? '') : '' };
   setHTML('gadgets',
     `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : ab.name}<em>${me.gi ? '!' : abCount}</em></div>` +
     `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>${label('gadget')}</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +
@@ -2058,9 +2068,10 @@ function hud(s) {
     $('prompt').innerHTML = '';
   } else {
     $('progress').style.display = 'none';
-    $('prompt').innerHTML = me.ct === 'body' && !me.dn ? promptText(s, me) : '';
+    const pt = me.ct === 'body' && !me.dn ? promptText(s, me) : '';
+    $('prompt').innerHTML = isTouch ? pt.replace(/<b>([A-Z ]+)<\/b>\1(?![A-Z])/g, '<b>$1</b>') : pt; // phone: no "VAULT VAULT"
   }
-  if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone' }); }
+  if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone', badge: st.tBadge || {} }); }
 }
 function setHTML(id, h) { const el = $(id); if (el.innerHTML !== h) el.innerHTML = h; }
 
@@ -2499,11 +2510,12 @@ function playing() { const p = st.last && st.last.ph; return !!st.id && (p === P
 // Esc releases the mouse: treat that like pausing, as in CS2
 document.addEventListener('pointerlockchange', () => {
   st.lockAsked = false; // captured: clicks shoot; let go: the next click takes control again
+  if (isTouch) return;
   if (!document.pointerLockElement && playing() && !menuOpen() && !st.quitting) $('pause').classList.remove('hidden');
 });
 // let go of the mouse whenever a menu is open or the match is over
 setInterval(() => { if (document.pointerLockElement && document.pointerLockElement !== $('armCanvas') && (menuOpen() || !playing())) document.exitPointerLock(); }, 150);
-$('pResume').addEventListener('click', () => { if (playing()) cv.requestPointerLock?.(); });
+$('pResume').addEventListener('click', () => { if (playing() && !isTouch) cv.requestPointerLock?.(); }); // a phone has no mouse to capture (asking anyway re-opened this menu)
 const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; };
 for (const id of ['sens', 'adsSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
 try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; } } catch {}

@@ -585,10 +585,14 @@ html.touch, html.touch body { touch-action: pan-x pan-y; -webkit-user-select: no
 html.touchplay, html.touchplay body { touch-action: none; } /* menus scroll with a finger; only the match takes every touch */
 html.touch .mnav { overflow: auto; padding-top: 12px; padding-bottom: 12px; } html.touch .mnav button { padding: 8px 18px; }
 html.touch .mtop { padding: 12px 28px; }
+html.touch #freeMaps { scrollbar-width: thin; scrollbar-color: rgba(242,193,78,0.5) transparent; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; } html.touch #freeMaps button { flex: none; } /* phone: one row of maps you swipe through, so START is on screen */
+html.touch #tab-free .freeH { margin: 10px 0 6px; } html.touch #tab-free .hint { display: none; }
 html.touch #pause .menu, html.touch #quitDlg .menu { zoom: 1.15; }
 #touchUI { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
 #touchUI > * { pointer-events: auto; touch-action: none; }
 #touchUI .tzone { position: absolute; left: 50%; right: 0; top: 0; bottom: 0; }
+#touchUI #tzLeft { left: 0; right: 50%; top: 30%; } /* a thumb landing anywhere here brings the move stick to it */
+#touchUI #tsLeft.held { border-color: rgba(255,255,255,0.6); }
 #touchUI .tstick { position: absolute; width: 124px; height: 124px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: rgba(10,14,18,0.25); }
 #touchUI .tstick i { position: absolute; left: 37px; top: 37px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.4); box-shadow: 0 0 0 2px rgba(0,0,0,0.4); }
 #touchUI #tsLeft { left: max(28px, env(safe-area-inset-left)); bottom: 28px; }
@@ -624,6 +628,14 @@ html.touch #hud #feed, html.touch #hud #killfeed { margin-top: 56px; }
 html.touchplay #corner { display: none; }
 html.touch #chat { bottom: 150px; }
 html.touch #clickIn { display: none !important; }
+/* phone match screen, slimmed (he found it cluttered): no gun picture or gadget list (the counts are on the buttons), ammo
+   right under health, and the drone / camera line at the bottom */
+html.touch #wpic, html.touch #gadgets, html.touch #wname { display: none; }
+html.touch #br { top: 152px; }
+html.touch #bl { width: 260px; }
+html.touch #viewlabel { top: auto; bottom: 44px; font-size: 13px; letter-spacing: 0.12em; max-width: 46vw; text-align: center; }
+#touchUI .tbtn em { position: absolute; top: -9px; right: -8px; min-width: 22px; height: 22px; line-height: 22px; padding: 0 5px; border-radius: 11px; background: #f2c14e; color: #000; font: 800 14px var(--head); font-style: normal; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+#touchUI .tbtn.out { opacity: 0.45; }
 /* free play operator grid (he asked) */
 #freeHint button { all: unset; cursor: pointer; color: #f2c14e; font-weight: 700; pointer-events: auto; }
 #freeHint { pointer-events: auto; }
@@ -648,3 +660,10 @@ html.touch #clickIn { display: none !important; }
 #touchUI .tbtn, #touchUI #tsLeft { zoom: var(--tz, 1); }
 html.touch #prompt { top: auto; bottom: 120px; font-size: 20px; }
 html.fitui #settings, html.fitui .overlay .page { max-height: calc(100vh / var(--uiz, 1) - 16px); overflow: auto; }
+
+/* tutorial on a phone: the "do this" banner sits small at the top, and touches pass through it to the controls (only its
+   SKIP button takes a tap), so a thumb aiming on the right never skips a step by accident */
+html.touch #coach.task { top: 74px; width: min(560px, 54vw); padding: 10px 16px; font-size: 14px; line-height: 1.35; pointer-events: none; }
+html.touch #coach.task .cTitle { font-size: 19px; margin-bottom: 3px; } html.touch #coach.task .cDots { display: none; }
+html.touch #coach.task .cFoot { margin-top: 6px; } html.touch #coach button[data-skip] { pointer-events: auto; padding: 6px 12px; font: 700 13px var(--head); letter-spacing: 0.1em; }
+html.touch #coach.task.sel { top: auto; bottom: 26px; left: auto; right: 12px; transform: none; width: min(520px, 52vw); } /* operator select: over the loadout, clear of the cards */

@@ -59,6 +59,6 @@ export function keyName(code) {
     .replace('Arrow', '').replace('Control', 'Ctrl').replace('Bracket', ' Bracket');
 }
 // on a phone the prompts name the touch button instead of a key (touch.js buttons)
-const TOUCH_NAMES = { interact: 'USE', vault: 'VAULT', melee: 'MELEE', ability: 'SKILL', gadget: 'GADGET', reload: 'RELOAD', spot: 'PING', crouch: 'CROUCH', view: 'DRONE / CAMS', scoreboard: 'SCORES' };
+const TOUCH_NAMES = { interact: 'USE', vault: 'VAULT', melee: 'MELEE', ability: 'SKILL', gadget: 'GADGET', reload: 'RELOAD', spot: 'PING', crouch: 'CROUCH', ads: 'AIM', walk: 'a light push', view: 'DRONE / CAMS', scoreboard: 'SCORES' };
 export const label = id => (isTouch && TOUCH_NAMES[id]) || keyName((binds[id] || [])[0]);
 loadBinds();

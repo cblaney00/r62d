@@ -55,6 +55,7 @@ const N = 16;
 const held = new Array(N).fill(false), trig = { lt: 0, rt: 0 }, tc = { lt: 0, rt: 0 }; // tc: fingers on each trigger button
 let prevHeld = new Array(N).fill(false);
 const ls = { x: 0, y: 0 }, rs = { x: 0, y: 0 };
+let releaseAll = () => {}, fireAim = false; // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
 let ui = null, shown = false, recentre = () => {};
 export const touchAimReset = () => recentre();
 
@@ -65,55 +66,79 @@ export function touchPad() {
   if (!isTouch || !shown) return null;
   const pressed = held.map((v, i) => v && !prevHeld[i]), released = prevHeld.map((v, i) => v && !held[i]);
   prevHeld = held.slice();
-  return { name: 'Touch screen', ls: stickOf(ls), rs: stickOf(rs), lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released };
+  return { name: 'Touch screen', ls: stickOf(ls), rs: stickOf(rs), rsDir: fireAim, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released };
 }
 export const touchActive = () => isTouch && shown;
 
 function build() {
   ui = document.createElement('div'); ui.id = 'touchUI'; ui.className = 'hidden';
-  ui.innerHTML = `<div class="tzone" id="tzRight"></div>
+  ui.innerHTML = `<div class="tzone" id="tzRight"></div><div class="tzone" id="tzLeft"></div>
     <div class="tstick" id="tsLeft"><i></i></div><div class="tstick dyn hidden" id="tsRight"><i></i></div>
-    ${BUTTONS.map(b => `<button class="tbtn ${b.cls}" data-id="${b.id}">${b.label}</button>`).join('')}
+    ${BUTTONS.map(b => `<button class="tbtn ${b.cls}" data-id="${b.id}" data-label="${b.label}">${b.label}</button>`).join('')}
     <div id="tTurn" class="hidden"><b>⟳</b>Turn your phone sideways to play</div>`;
   document.body.appendChild(ui);
-  const base = ui.querySelector('#tsLeft'), dyn = ui.querySelector('#tsRight'), zone = ui.querySelector('#tzRight');
+  const base = ui.querySelector('#tsLeft'), dyn = ui.querySelector('#tsRight');
   const knob = (el, v) => { el.querySelector('i').style.transform = `translate(${v.x * R}px, ${v.y * R}px)`; };
-  // left stick: fixed in the bottom-left corner
-  let lid = null;
-  const lmove = e => { const r = base.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2; let x = (e.clientX - cx) / R, y = (e.clientY - cy) / R; const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } ls.x = x; ls.y = y; knob(base, ls); };
-  base.addEventListener('pointerdown', e => { lid = e.pointerId; try { base.setPointerCapture(lid); } catch {} lmove(e); e.preventDefault(); });
-  base.addEventListener('pointermove', e => { if (e.pointerId === lid) lmove(e); });
-  const lup = e => { if (e.pointerId !== lid) return; lid = null; ls.x = ls.y = 0; knob(base, ls); };
-  base.addEventListener('pointerup', lup); base.addEventListener('pointercancel', lup);
-  // right half: a stick that appears where the thumb lands
-  let rid = null, ox = 0, oy = 0, tx = 0, ty = 0;
+  const tz = () => +getComputedStyle(document.documentElement).getPropertyValue('--tz') || 1;
+  // Every finger is followed on its own (he found two thumbs at once didn't work: when both land together the browser
+  // only reports one of them as a pointer). Touch events list each finger, and we look up what is under it ourselves.
+  const fingers = new Map(); // finger → { move(x, y), end() }
+  let leftF = null, aimF = null, ox = 0, oy = 0, tx = 0, ty = 0;
   // aiming in re-centres the right stick under the thumb, so dragging from there moves the crosshair out from close in
-  recentre = () => { if (rid === null) return; ox = tx; oy = ty; dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; rs.x = rs.y = 0; knob(dyn, rs); };
-  zone.addEventListener('pointerdown', e => {
-    if (rid !== null) return;
-    rid = e.pointerId; try { zone.setPointerCapture(rid); } catch {} ox = tx = e.clientX; oy = ty = e.clientY;
-    dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; dyn.classList.remove('hidden'); rs.x = rs.y = 0; knob(dyn, rs); e.preventDefault();
-  });
-  zone.addEventListener('pointermove', e => {
-    if (e.pointerId !== rid) return;
-    tx = e.clientX; ty = e.clientY;
-    let x = (e.clientX - ox) / R, y = (e.clientY - oy) / R; const l = Math.hypot(x, y);
-    if (l > 1) { ox += (x / l) * (l - 1) * R; oy += (y / l) * (l - 1) * R; x /= l; y /= l; dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; } // the stick follows a thumb that slides past its edge
-    rs.x = x; rs.y = y; knob(dyn, rs);
-  });
-  const rup = e => { if (e.pointerId !== rid) return; rid = null; rs.x = rs.y = 0; dyn.classList.add('hidden'); };
-  zone.addEventListener('pointerup', rup); zone.addEventListener('pointercancel', rup);
-  // buttons: held while a finger is on them
-  for (const el of ui.querySelectorAll('.tbtn')) {
-    const b = BUTTONS.find(x => x.id === el.dataset.id); let pid = null;
+  recentre = () => { if (aimF === null) return; ox = tx; oy = ty; dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; rs.x = rs.y = 0; knob(dyn, rs); };
+  const grab = (id, x, y) => {
+    if (fingers.has(id)) return; // the same finger can be announced twice
+    const under = document.elementFromPoint(x, y), btn = under && under.closest && under.closest('#touchUI .tbtn');
+    if (btn && !btn.classList.contains('hidden')) return pressButton(id, btn, x, y);
+    if (x >= innerWidth / 2) { // right half: the aim stick appears under the thumb
+      if (aimF !== null) return;
+      aimF = id; ox = tx = x; oy = ty = y;
+      dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; dyn.classList.remove('hidden'); rs.x = rs.y = 0; knob(dyn, rs);
+      fingers.set(id, {
+        move(x, y) {
+          tx = x; ty = y; let u = (x - ox) / R, v = (y - oy) / R; const l = Math.hypot(u, v);
+          if (l > 1) { ox += (u / l) * (l - 1) * R; oy += (v / l) * (l - 1) * R; u /= l; v /= l; dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; } // the stick follows a thumb that slides past its edge
+          rs.x = u; rs.y = v; knob(dyn, rs);
+        },
+        end() { aimF = null; rs.x = rs.y = 0; dyn.classList.add('hidden'); },
+      });
+    } else if (y > innerHeight * 0.3) { // lower left: the move stick jumps to wherever the thumb lands
+      if (leftF !== null) return;
+      leftF = id; const z = tz(), r = R * z, cx = x, cy = y;
+      base.style.left = `${cx / z - 62}px`; base.style.top = `${cy / z - 62}px`; base.style.bottom = 'auto'; base.classList.add('held');
+      const move = (x, y) => { let u = (x - cx) / r, v = (y - cy) / r; const l = Math.hypot(u, v); if (l > 1) { u /= l; v /= l; } ls.x = u; ls.y = v; knob(base, ls); };
+      move(x, y);
+      fingers.set(id, { move, end() { leftF = null; ls.x = ls.y = 0; knob(base, ls); base.style.left = base.style.top = base.style.bottom = ''; base.classList.remove('held'); } });
+    }
+  };
+  // buttons: held while the finger that pressed them is down (wherever it slides)
+  const pressButton = (id, el, x0, y0) => {
+    const b = BUTTONS.find(q => q.id === el.dataset.id);
     const set = on => { el.classList.toggle('on', on); if (b.b === 'lt' || b.b === 'rt') { tc[b.b] = Math.max(0, tc[b.b] + (on ? 1 : -1)); trig[b.b] = tc[b.b] ? 1 : 0; } else held[b.b] = on; };
-    el.addEventListener('pointerdown', e => { pid = e.pointerId; try { el.setPointerCapture(pid); } catch {} set(true); e.preventDefault(); });
-    const up = e => { if (e.pointerId !== pid) return; pid = null; set(false); };
-    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
-    el.addEventListener('contextmenu', e => e.preventDefault());
-  }
-  // contextual buttons can vanish under a finger: a lost capture counts as letting go
-  for (const el of ui.querySelectorAll('.tbtn')) el.addEventListener('lostpointercapture', e => el.dispatchEvent(new PointerEvent('pointerup', { pointerId: e.pointerId })));
+    set(true);
+    let fx = x0, fy = y0, dragAim = false; // the right FIRE can be dragged to aim while shooting (like phone shooters)
+    fingers.set(id, {
+      move(x, y) {
+        if (b.id !== 'fireR' || aimF !== null) return; // the aim stick has priority if a thumb is on it too
+        let u = (x - fx) / R, v = (y - fy) / R; const l = Math.hypot(u, v);
+        if (!dragAim && l * R < 10) return; // a small wobble while tapping doesn't turn you
+        dragAim = fireAim = true; if (l > 1) { fx += (u / l) * (l - 1) * R; fy += (v / l) * (l - 1) * R; u /= l; v /= l; }
+        rs.x = u; rs.y = v;
+      },
+      end() { set(false); if (dragAim && aimF === null) rs.x = rs.y = 0; if (dragAim) fireAim = false; },
+    });
+  };
+  const release = id => { const f = fingers.get(id); if (f) { fingers.delete(id); f.end(); } };
+  ui.addEventListener('touchstart', e => { for (const t of e.changedTouches) grab('t' + t.identifier, t.clientX, t.clientY); if (e.cancelable) e.preventDefault(); }, { passive: false });
+  addEventListener('touchmove', e => { for (const t of e.changedTouches) { const f = fingers.get('t' + t.identifier); if (f) f.move(t.clientX, t.clientY); } }, { passive: true });
+  const tend = e => { for (const t of e.changedTouches) release('t' + t.identifier); };
+  addEventListener('touchend', tend, true); addEventListener('touchcancel', tend, true);
+  // a mouse or pen (a laptop set to touch controls) works the same way; touches are handled above
+  ui.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') return; grab('p' + e.pointerId, e.clientX, e.clientY); e.preventDefault(); });
+  addEventListener('pointermove', e => { if (e.pointerType === 'touch') return; const f = fingers.get('p' + e.pointerId); if (f) f.move(e.clientX, e.clientY); });
+  addEventListener('pointerup', e => { if (e.pointerType !== 'touch') release('p' + e.pointerId); }); addEventListener('pointercancel', e => { if (e.pointerType !== 'touch') release('p' + e.pointerId); });
+  ui.addEventListener('contextmenu', e => e.preventDefault());
+  releaseAll = () => { for (const id of [...fingers.keys()]) release(id); };
 }
 
 // main.js says each frame what the context buttons can do ({ use, vault, cams }); one under a finger stays until let go
@@ -128,6 +153,10 @@ export function touchContext(c) {
   }
   const cr = ui.querySelector('[data-id="crouch"]'), cl = c.drone ? 'SPRINT' : 'CROUCH'; // on a drone the crouch button sprints
   if (cr.textContent !== cl) cr.textContent = cl;
+  for (const [id, n] of [['skill', c.badge.skill], ['gadget', c.badge.gadget], ['view', c.badge.view]]) { // how many are left, on the button itself
+    const el = ui.querySelector(`[data-id="${id}"]`), h = el.dataset.label + (n ? `<em>${n}</em>` : '');
+    if (el.innerHTML !== h) { el.innerHTML = h; el.classList.toggle('out', n === '0' || n === '0%'); }
+  }
 }
 
 // main.js calls this every frame: show the controls only while playing (not in menus)
@@ -138,7 +167,7 @@ export function setTouchVisible(on) {
   ui.querySelector('#tTurn').classList.toggle('hidden', !(on && upright));
   if (on === shown) return;
   shown = on; ui.classList.toggle('hidden', !on); document.documentElement.classList.toggle('touchplay', on);
-  if (!on) { ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
+  if (!on) { releaseAll(); ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
 }
 // Menus and match text shrink to fit small screens (the game picture itself always fills the screen), times the
 // player's own size setting. Menus are laid out for ~900 px tall, the match text for ~760 (and both for the width).

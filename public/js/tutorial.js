@@ -7,12 +7,14 @@
 import { PHASE } from '/shared/constants.js';
 import { roomAt } from '/shared/map.js';
 import { OPERATORS, JOBS } from '/shared/operators.js';
-import { keyName, bindsFor } from './keys.js';
+import { keyName, bindsFor, label } from './keys.js';
+import { isTouch } from './touch.js';
 
 const ORDER = [PHASE.SELECT, PHASE.PREP, PHASE.ACTION];
-const K = id => `<kbd>${keyName(bindsFor(id)[0])}</kbd>`;
+const K = id => `<kbd>${isTouch ? label(id) : keyName(bindsFor(id)[0])}</kbd>`; // on a phone: the touch button's name
+const MOVE = () => isTouch ? '<b>the left stick</b>' : `${K('up')}${K('left')}${K('down')}${K('right')}`;
 const roles = team => JOBS[team].map(j => `<li><b>${j.name}</b> — ${j.ops.map(o => OPERATORS[o].name).join(', ')}</li>`).join('');
-const PICK = '<b>Click a role on the left, then one of its operators.</b>';
+const PICK = `<b>${isTouch ? 'Tap' : 'Click'} a role on the left, then one of its operators.</b>`;
 const siteName = c => c.map && c.map.sites[c.s.site] ? c.map.sites[c.s.site].name : 'the objective';
 
 // Each step: part (0 = attacking round, 1 = defending round), phase, what the coach says, and when it is done.
@@ -27,16 +29,20 @@ const STEPS = [
   { part: 0, ph: PHASE.SELECT, t: 'Pick an attacker', b: () => `Each round you choose a <b>role</b>, then an operator from it:
     <ul>${roles('atk')}</ul>${PICK}`, done: c => !!c.me.op, go: true },
   { part: 0, ph: PHASE.PREP, t: 'Find the objective with your drone', b: c => `
-    You are driving a <b>drone</b>. Drive it (${K('up')}${K('left')}${K('down')}${K('right')}, hold ${K('walk')} for a short sprint)
+    You are driving a <b>drone</b>. Drive it (${MOVE()}, hold ${isTouch ? K('crouch').replace('CROUCH', 'SPRINT') : K('walk')} for a short sprint)
     into the building — it fits through the small <b>drone holes</b> at the foot of walls. The objective is
     <b>${siteName(c)}</b>: get it on your screen until the yellow <b>A</b> and <b>B</b> markers appear.`, done: c => !!c.s.rev },
   { part: 0, ph: PHASE.PREP, t: 'Ping it for your team', b: () => `
-    Point at a bomb marker (or an enemy, a door, anything) and press ${K('spot')} or click. Your team sees a marker and a chat line.`,
+    Point at a bomb marker (or an enemy, a door, anything)${isTouch ? ' with your right thumb' : ''} and press ${K('spot')}${isTouch ? '' : ' or click'}. Your team sees a marker and a chat line.`,
     done: c => c.tu.n > c.base.n },
   { part: 0, ph: PHASE.PREP, go: true, t: 'Into action', b: () => `
     Nice. The action phase is starting: you are back in your body at the spawn.`,
     done: c => c.ph === PHASE.ACTION },
-  { part: 0, ph: PHASE.ACTION, cont: true, t: 'Moving and shooting', b: () => `
+  { part: 0, ph: PHASE.ACTION, cont: true, t: 'Moving and shooting', b: () => isTouch ? `
+    The <b>left stick</b> moves: push it all the way to run (loud), a light push walks (silent). ${K('crouch')} is silent too and
+    more accurate. Put your <b>right thumb</b> anywhere on the right half to aim: drag the way you want to look, further to look
+    further. <b>FIRE</b> shoots, and you can slide your thumb on it to aim while shooting; hold ${K('ads')} for tighter shots and a
+    wider view. ${K('interact')} and ${K('vault')} pop up when there is something to use or climb. ${K('melee')}, ${K('ability')} and ${K('gadget')} do what they say.` : `
     ${K('up')}${K('left')}${K('down')}${K('right')} runs (loud). Hold ${K('walk')} to walk and ${K('crouch')} to crouch: both silent and
     more accurate. Move the mouse to aim, <b>left click</b> to shoot, <b>right click</b> to aim in (tighter shots, wider view).
     The first shot goes exactly on the crosshair once you stand still. ${K('interact')} uses things, ${K('melee')} is melee,
@@ -60,7 +66,7 @@ const STEPS = [
     Face an <b>open doorway</b> and <b>hold ${K('interact')}</b> (you have 3 a round). Barricades block walking and sight,
     but break easily — the noise warns you someone is coming.`, done: c => c.tu.barri > c.base.barri },
   { part: 1, ph: PHASE.PREP, t: 'Watch the cameras', b: () => `
-    Press ${K('view')} for the cameras; ${K('left')} / ${K('right')} or the wheel flip through them. <b>Click something to ping it</b>
+    Press ${K('view')} for the cameras; ${isTouch ? '<kbd>◀</kbd> / <kbd>▶</kbd>' : `${K('left')} / ${K('right')} or the wheel`} flip through them. <b>${isTouch ? `Point at something and press ${K('spot')}` : 'Click something'} to ping it</b>
     for your team (an attacker's drone is a good find — shoot drones you see). ${K('view')} again to leave.`,
     done: c => c.tu.feedPings > c.base.feedPings },
   { part: 1, ph: PHASE.PREP, go: true, t: 'Ready', b: () => `Well fortified. The action phase is starting: the attackers are on their way.`, done: c => c.ph === PHASE.ACTION },
@@ -140,7 +146,7 @@ export function createCoach({ el, send, onExit, getMap }) {
       render(`<div class="cHead">TUTORIAL · ${c.part ? 'DEFENDING' : 'ATTACKING'}<span>STEP ${i + 1} / ${n}</span></div>
         <div class="cDots">${steps.map((_, k) => `<i class="${k < i ? 'd' : k === i ? 'on' : ''}"></i>`).join('')}</div>
         <div class="cTitle">${st.t}</div><div class="cBody">${st.b(c)}</div>
-        <div class="cFoot">${st.cont ? '<b><kbd>SPACE</kbd> · <kbd>ENTER</kbd> · CLICK</b> to continue' : (hint ? `<kbd>SPACE</kbd> ${hint} · ` : 'Do it to carry on · ') + '<kbd>ESC</kbd> menu'}</div>`);
+        <div class="cFoot">${st.cont ? (isTouch ? '<b>TAP HERE</b> to continue' : '<b><kbd>SPACE</kbd> · <kbd>ENTER</kbd> · CLICK</b> to continue') : isTouch ? (hint ? `<button data-skip>${hint.toUpperCase()}</button> · ` : 'Do it to carry on · ') + '<kbd>❚❚</kbd> menu' : (hint ? `<kbd>SPACE</kbd> ${hint} · ` : 'Do it to carry on · ') + '<kbd>ESC</kbd> menu'}</div>`);
     },
   };
 }
