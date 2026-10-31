@@ -34,13 +34,13 @@ const STEPS = [
     Point at a bomb marker (or an enemy, a door, anything) and press ${K('spot')} or click. Your team sees a marker and a chat line.`,
     done: c => c.tu.n > c.base.n },
   { part: 0, ph: PHASE.PREP, go: true, t: 'Into action', b: () => `
-    When the action phase starts you are back in your body at the spawn.<br><br><b>Press <kbd>SPACE</kbd> to start.</b>`,
+    Nice. The action phase is starting: you are back in your body at the spawn.`,
     done: c => c.ph === PHASE.ACTION },
   { part: 0, ph: PHASE.ACTION, cont: true, t: 'Moving and shooting', b: () => `
     ${K('up')}${K('left')}${K('down')}${K('right')} runs (loud). Hold ${K('walk')} to walk and ${K('crouch')} to crouch: both silent and
     more accurate. Move the mouse to aim, <b>left click</b> to shoot, <b>right click</b> to aim in (tighter shots, wider view).
     The first shot goes exactly on the crosshair once you stand still. ${K('interact')} uses things, ${K('melee')} is melee,
-    ${K('ability')} your operator's skill and ${K('gadget')} your gadget.<br><br><b>Press <kbd>SPACE</kbd> when you've tried it.</b>` },
+    ${K('ability')} your operator's skill and ${K('gadget')} your gadget.` },
   { part: 0, ph: PHASE.ACTION, t: 'Break in', b: c => `
     Go to <b>${siteName(c)}</b> (follow the yellow markers). Windows start boarded and some walls are soft: shoot,
     melee (${K('melee')}) or blow them open, or <b>vault</b> a low wall or open window with ${K('vault')}. Upstairs?
@@ -63,7 +63,7 @@ const STEPS = [
     Press ${K('view')} for the cameras; ${K('left')} / ${K('right')} or the wheel flip through them. <b>Click something to ping it</b>
     for your team (an attacker's drone is a good find — shoot drones you see). ${K('view')} again to leave.`,
     done: c => c.tu.feedPings > c.base.feedPings },
-  { part: 1, ph: PHASE.PREP, go: true, t: 'Ready', b: () => `<b>Press <kbd>SPACE</kbd> to start the action phase.</b>`, done: c => c.ph === PHASE.ACTION },
+  { part: 1, ph: PHASE.PREP, go: true, t: 'Ready', b: () => `Well fortified. The action phase is starting: the attackers are on their way.`, done: c => c.ph === PHASE.ACTION },
   { part: 1, ph: PHASE.ACTION, t: 'Hold and take them down', b: () => `
     Two attackers are coming for the objective. Pick a spot looking at a way in, crouch (${K('crouch')}) and wait.
     Orange arcs round you are <b>footsteps you hear</b>; ▲ / ▼ means another floor. Ping them (${K('spot')}) and
@@ -73,7 +73,7 @@ const STEPS = [
 const keyOf = st => st.part * 3 + ORDER.indexOf(st.ph);
 
 export function createCoach({ el, send, onExit, getMap }) {
-  let lesson = null, i = 0, base = null, shown = '', lastPh = null;
+  let lesson = null, i = 0, base = null, shown = '', lastPh = null, blocking = false, goSent = -1;
   const steps = STEPS;
   const ctx = (s, me) => {
     const site = getMap() && getMap().sites[s.site];
@@ -81,13 +81,16 @@ export function createCoach({ el, send, onExit, getMap }) {
     return { s, me: me || {}, map: getMap(), ph: s.ph, part: me && me.tm === 'def' ? 1 : 0, tu: s.tu || { pings: [], n: 0, reinf: 0, barri: 0, feedPings: 0 }, base: base || {}, inSite: !!(site && room && site.rooms.includes(room)) };
   };
   const enter = (n, c) => { i = n; base = { ...c.tu, pings: [...c.tu.pings] }; };
+  // how the box shows: a card in the middle to read and dismiss, or a banner at the top for something to do
+  const mode = m => { el.classList.toggle('center', m === 'center'); el.classList.toggle('task', m === 'task'); blocking = m === 'center'; };
   function render(html) { if (html !== shown) { el.innerHTML = html; shown = html; } }
   const place = ph => el.classList.toggle('sel', ph === PHASE.SELECT); // out of the way of the operator cards
 
   return {
     get active() { return !!lesson; },
-    start(l) { lesson = l; i = 0; base = null; shown = ''; lastPh = null; el.classList.remove('hidden'); },
-    stop() { lesson = null; el.classList.add('hidden'); el.innerHTML = ''; shown = ''; },
+    get blocking() { return !!lesson && blocking; }, // a card to read is up: Space, Enter or a click dismisses it
+    start(l) { lesson = l; i = 0; base = null; shown = ''; lastPh = null; goSent = -1; el.classList.remove('hidden'); },
+    stop() { lesson = null; blocking = false; mode(''); el.classList.add('hidden'); el.innerHTML = ''; shown = ''; },
     // Space: continue an info step, start the next phase on a 'go' step, otherwise skip the step
     space(s) {
       if (!lesson || !s) return false;
@@ -105,6 +108,7 @@ export function createCoach({ el, send, onExit, getMap }) {
       if (!base) enter(0, c);
       place(s.ph);
       if (s.ph === PHASE.ROUND_END) {
+        mode('center'); blocking = false; // the end cards wait for a button (or for the next round)
         if (c.part === 0) { lastPh = s.ph; render(`<div class="cHead">TUTORIAL</div><div class="cTitle">ROUND WON</div><div class="cBody">Nice. The sides swap now: next round you <b>defend</b>.</div>`); return; }
         if (lastPh !== PHASE.ROUND_END) document.exitPointerLock && document.exitPointerLock();
         lastPh = s.ph;
@@ -128,12 +132,15 @@ export function createCoach({ el, send, onExit, getMap }) {
         if (st.go && s.ph === PHASE.SELECT) send({ t: 'tut', a: 'go' });
         if (i < steps.length - 1) { enter(i + 1, c); st = steps[i]; }
       }
-      if (keyOf(st) !== now) { render(`<div class="cHead">TUTORIAL</div><div class="cBody">…</div>`); return; }
-      const n = steps.length, hint = st.cont ? 'continue' : st.go && st.ph === PHASE.PREP ? 'start the action phase' : i === n - 1 ? 'finish the tutorial' : s.ph === PHASE.ACTION ? '' : 'skip this step';
+      if (keyOf(st) !== now) { mode('task'); render(`<div class="cHead">TUTORIAL</div><div class="cBody">…</div>`); return; }
+      // a 'go' step in preparation starts the action phase by itself: no stopping to press anything (he asked)
+      if (st.go && s.ph === PHASE.PREP && goSent !== i) { goSent = i; send({ t: 'tut', a: 'go' }); }
+      mode(st.cont ? 'center' : 'task');
+      const n = steps.length, hint = st.cont ? 'continue' : i === n - 1 ? 'finish the tutorial' : st.go || s.ph === PHASE.ACTION ? '' : 'skip this step';
       render(`<div class="cHead">TUTORIAL · ${c.part ? 'DEFENDING' : 'ATTACKING'}<span>STEP ${i + 1} / ${n}</span></div>
         <div class="cDots">${steps.map((_, k) => `<i class="${k < i ? 'd' : k === i ? 'on' : ''}"></i>`).join('')}</div>
         <div class="cTitle">${st.t}</div><div class="cBody">${st.b(c)}</div>
-        <div class="cFoot">${hint ? `<kbd>SPACE</kbd> ${hint} · ` : ''}<kbd>ESC</kbd> menu</div>`);
+        <div class="cFoot">${st.cont ? '<b><kbd>SPACE</kbd> · <kbd>ENTER</kbd> · CLICK</b> to continue' : (hint ? `<kbd>SPACE</kbd> ${hint} · ` : 'Do it to carry on · ') + '<kbd>ESC</kbd> menu'}</div>`);
     },
   };
 }

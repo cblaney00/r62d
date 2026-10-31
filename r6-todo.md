@@ -7,8 +7,14 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
+- [ ] defenders should be able to place unlimited wooded door and window barrcades (planks) but limited metal barracades on soft walls
+- [ ] make sure all the outside windows and doors each map are boarded up and can be vaulted through
+- [ ] add a point system for objects pinged and other objectives completed
 
 ## Done
+
+- [x] Tutorial text is bigger and the focus: things to read come up as a large card in the middle of the screen (Space, Enter or a click dismisses it). Things to do show as a large banner near the top that moves on by itself as soon as you've done them.
+- [x] No more stopping to press anything to move on: the tutorial starts the action phase by itself when you've finished preparing, both when attacking and when defending.
 
 - [x] Checked: the latest version (with the 21 new operators, 51 in all) is on GitHub's main, and both the game server running on this computer and the installed R62D app have all 51.
 

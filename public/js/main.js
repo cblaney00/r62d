@@ -257,6 +257,7 @@ setInterval(() => send({ t: 'ping', c: performance.now(), rtt: st.rtt == null ? 
 // ---------------- tutorial ----------------
 // A lesson runs in its own private match on the server: leave the lobby, join a tutorial, come back after.
 const coach = createCoach({ el: $('coach'), send, getMap: () => st.map, onExit: () => switchMatch(null) });
+$('coach').addEventListener('click', e => { if (coach.blocking && !e.target.closest('button')) coach.space(st.last); }); // clicking the card itself (mouse not captured)
 // free = { map, bots } for a free-play match (see the FREE PLAY page below)
 function switchMatch(lesson, free = null) {
   if (!st.token) { setTab('play'); $('name').focus(); return; }
@@ -521,6 +522,7 @@ addEventListener('keydown', e => {
   if (document.activeElement === $('chatIn')) { chatKey(e); return; }
   if (document.activeElement && document.activeElement.tagName === 'INPUT') { if (e.key === 'Enter') $('joinBtn').click(); return; }
   if (e.code === 'Space' && coach.active && !e.repeat && coach.space(st.last)) { e.preventDefault(); return; }
+  if ((e.code === 'Enter' || e.code === 'NumpadEnter') && coach.blocking && !e.repeat) { coach.space(st.last); e.preventDefault(); return; } // Enter dismisses a tutorial card too
   const a = actionFor(e.code);
   if (a || e.code === 'AltLeft' || e.code === 'AltRight' || e.code === 'Tab') e.preventDefault();
   if (!a || keys.has(a)) return;
@@ -608,6 +610,11 @@ cv.addEventListener('mousemove', e => {
 });
 cv.addEventListener('mousedown', e => {
   audio.initAudio();
+  if (coach.blocking && e.button === 0) { // a tutorial card to read: the click dismisses it (and takes control), it doesn't shoot
+    coach.space(st.last);
+    if (playing() && !menuOpen() && document.pointerLockElement !== cv) { st.lockAsked = true; cv.requestPointerLock?.(); }
+    return;
+  }
   if (playing() && !menuOpen() && document.pointerLockElement !== cv && !st.lockAsked) { // the first click just takes control, it doesn't shoot
     st.lockAsked = true; cv.requestPointerLock?.(); return;
   }

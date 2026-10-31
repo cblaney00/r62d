@@ -550,3 +550,13 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 .mkLayers button.on { opacity: 1; border-color: rgba(255,255,255,0.35); }
 .mkLayers button i { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 #stairPip.right { left: auto; right: 18px; top: 130px; }
+/* tutorial (he asked: bigger text, the focal point): a card in the middle to read and dismiss, a banner at the top to do */
+#coach.center { left: 50%; top: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); width: min(720px, 86vw); padding: 26px 32px; font-size: 20px; line-height: 1.5;
+  border-left: 0; border-top: 4px solid #f2c14e; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.55), 0 12px 50px rgba(0,0,0,0.7); z-index: 60; }
+#coach.center .cTitle { font-size: 38px; margin-bottom: 10px; }
+#coach.center .cHead { font-size: 14px; } #coach.center .cFoot { font-size: 15px; margin-top: 18px; color: #f2c14e; }
+#coach.task { left: 50%; top: 150px; right: auto; bottom: auto; transform: translateX(-50%); width: min(820px, 64vw); padding: 18px 26px; font-size: 19px; line-height: 1.45;
+  border-left: 0; border-top: 4px solid #f2c14e; }
+#coach.task .cTitle { font-size: 32px; } #coach.task .cHead { font-size: 13px; } #coach.task .cFoot { font-size: 13px; }
+#coach.task.sel { top: auto; bottom: 64px; left: 50%; right: auto; transform: translateX(-50%); width: min(760px, 56vw); }
+#coach kbd { font-size: 0.85em; }
