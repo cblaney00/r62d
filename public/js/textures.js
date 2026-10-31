@@ -184,6 +184,28 @@ function grass(P) {
   return c;
 }
 
+// packed desert sand: warm ochre with soft drifts, ripples and grit
+function sand(P) {
+  const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(97);
+  x.scale(TEX, TEX);
+  x.fillStyle = '#c9a66b'; x.fillRect(0, 0, P, P);
+  for (let i = 0; i < 16; i++) {
+    const bx = r() * P, by = r() * P, br = 12 + r() * 34, dark = r() < 0.5;
+    wrap(P, (ox, oy) => {
+      const g = x.createRadialGradient(bx + ox, by + oy, 0, bx + ox, by + oy, br);
+      g.addColorStop(0, dark ? 'rgba(120,85,40,0.16)' : 'rgba(255,235,190,0.14)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = g; x.fillRect(bx + ox - br, by + oy - br, br * 2, br * 2);
+    });
+  }
+  x.lineWidth = 0.5; x.lineCap = 'round';
+  for (let i = 0; i < 26; i++) { // wind ripples
+    const y0 = r() * P, x0 = r() * P, len = 10 + r() * 22;
+    x.strokeStyle = r() < 0.5 ? 'rgba(140,100,50,0.22)' : 'rgba(255,240,205,0.25)';
+    x.beginPath(); x.moveTo(x0, y0); x.quadraticCurveTo(x0 + len / 2, y0 - 1.5, x0 + len, y0); x.stroke();
+  }
+  for (let i = 0; i < 1100; i++) { x.fillStyle = r() < 0.5 ? 'rgba(110,80,40,0.35)' : 'rgba(255,245,215,0.35)'; x.fillRect(r() * P, r() * P, 0.4 + r() * 0.6, 0.4 + r() * 0.6); }
+  return c;
+}
 function asphalt(P) {
   const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(83);
   x.scale(TEX, TEX);
@@ -209,7 +231,7 @@ export function floorPatterns(ctx) {
   if (!cache) cache = {
     [FL.WOOD]: wood(128), [FL.TILE]: tile(64, '#c4cbcf', 16, '#7d8589'), [FL.SERVER]: serverFloor(64),
     [FL.MARBLE]: marble(128), [FL.CARPET]: carpet(64), [FL.CONCRETE]: concrete(128),
-    [FL.GRASS]: grass(128), [FL.ASPHALT]: asphalt(128),
+    [FL.GRASS]: grass(128), [FL.ASPHALT]: asphalt(128), [FL.SAND]: sand(128),
   };
   const out = {};
   for (const [k, c] of Object.entries(cache)) {

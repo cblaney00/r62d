@@ -17,8 +17,8 @@ must be original**: our own operators, names, map, art. We declined to copy Sieg
 operators/maps/art (it would be recreating a specific existing game); keep it that way.
 
 His wishes so far:
-- Six maps, each with 2–3 floors, picked in the lobby (Harbor Office, Cliffside Villa, Rail Depot, The Embassy,
-  Alpine Lodge, Clocktower School). 51 operators (he chose 15 each first, then asked for at least 5 per role: 21 more were added, see "New operators" below), covering R6's role types with our own names and twists.
+- Seven maps picked in the lobby (Harbor Office, Cliffside Villa, Rail Depot, The Embassy,
+  Alpine Lodge, Clocktower School, and Dust Town: he asked for a classic CS-style desert town, `shared/maps/dust.js`, mostly one floor, `FL.SAND` ground with a `sand()` texture). 51 operators (he chose 15 each first, then asked for at least 5 per role: 21 more were added, see "New operators" below), covering R6's role types with our own names and twists.
   Quick Match only (first to 3 rounds, sides swap every round). Defenders choose the site during operator select.
 - Out of sight = dull grey "remembered" map; only what YOU look through is live colour (he asked, no more shared team vision): your eyes, the drone/camera feed you watch (yours or a teammate's), the teammate you spectate (`teamViewers` in main.js, plus open-hatch and stairs-preview viewers derived from it). Teammates' pings/spotted marks still show; a dead teammate gets a big red ✖ + name through walls (`deathMarks`). Enemy changes out of sight stay hidden until seen (`st.known` vs `st.map` in main.js).
 - Drone sprint (he asked): Shift on a drone, `DRONE_SPRINT` in constants.js (1.6x, 3 s, 3 a round, 6 s wait), server `p.sprints`/`sprintUntil`/`sprintCd` in tickPlayer, `mods.sprint` in physics `stepMove`, mine `ds`/`dsl`/`dsc`, louder `droneLoop`. Drones are `DRONE_R` 2.5, drawn ×0.7, hit radius 4.5. `node tests/dronesprint.js`.

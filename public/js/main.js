@@ -739,7 +739,7 @@ function mapThumb(id) {
   if (mapThumbs.has(id)) return mapThumbs.get(id);
   const m = buildMap(id), F = m.floors.find(f => f.name === '1F') || m.floors[0];
   const c = document.createElement('canvas'); c.width = F.w * 3; c.height = F.h * 3; const x = c.getContext('2d');
-  const FC = { [FL.GRASS]: '#33502c', [FL.ASPHALT]: '#2c2e31', [FL.WOOD]: '#7a5534', [FL.TILE]: '#9aa2a6', [FL.CARPET]: '#4a5a78', [FL.CONCRETE]: '#6d6d68', [FL.MARBLE]: '#c7c2b8', [FL.SERVER]: '#3d4650' };
+  const FC = { [FL.GRASS]: '#33502c', [FL.ASPHALT]: '#2c2e31', [FL.WOOD]: '#7a5534', [FL.TILE]: '#9aa2a6', [FL.CARPET]: '#4a5a78', [FL.CONCRETE]: '#6d6d68', [FL.MARBLE]: '#c7c2b8', [FL.SERVER]: '#3d4650', [FL.SAND]: '#c9a66b' };
   for (let y = 0; y < F.h; y++) for (let gx = F.gx; gx < F.gx + F.w; gx++) {
     const k = y * m.W + gx, t = m.tiles[k];
     x.fillStyle = t === T.HARD || t === T.SOFT ? '#d8d2c4' : t === T.TALL ? '#22262a' : t === T.OPEN ? '#e0b54a' : t === T.STAIR ? '#f2c14e' : FC[m.floor[k]] || '#111';
@@ -1322,7 +1322,7 @@ const smokeMemo = new WeakMap();
 const smokes = s => { if (!s) return []; let v = smokeMemo.get(s); if (!v) smokeMemo.set(s, v = s.ents.filter(e => e.ty === 'smoke').map(e => ({ x: e.x, y: e.y, r: e.r }))); return v; };
 
 // ---------------- what things are made of (for sound) ----------------
-const FLOOR_SURF = { [FL.WOOD]: 'wood', [FL.TILE]: 'tile', [FL.SERVER]: 'metal', [FL.MARBLE]: 'marble', [FL.CARPET]: 'carpet', [FL.CONCRETE]: 'concrete', [FL.GRASS]: 'grass', [FL.ASPHALT]: 'asphalt' };
+const FLOOR_SURF = { [FL.WOOD]: 'wood', [FL.TILE]: 'tile', [FL.SERVER]: 'metal', [FL.MARBLE]: 'marble', [FL.CARPET]: 'carpet', [FL.CONCRETE]: 'concrete', [FL.GRASS]: 'grass', [FL.ASPHALT]: 'asphalt', [FL.SAND]: 'grass' };
 function cellAt(x, y) { const m = st.map, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return cx < 0 || cy < 0 || cx >= m.W || cy >= m.H ? -1 : cy * m.W + cx; }
 function surfaceAt(x, y) {
   const k = cellAt(x, y); if (k < 0) return 'concrete';
@@ -1362,7 +1362,7 @@ audio.setWorld(
     });
     return Math.min(3, Math.ceil(n / 1.5));
   },
-  (x, y) => { const k = cellAt(x, y); return k >= 0 && st.map && st.map.floor[k] !== FL.GRASS && st.map.floor[k] !== FL.ASPHALT; },
+  (x, y) => { const k = cellAt(x, y); return k >= 0 && st.map && st.map.floor[k] !== FL.GRASS && st.map.floor[k] !== FL.ASPHALT && st.map.floor[k] !== FL.SAND; },
   (x, y) => (st.map ? localPos(st.map, x, y) : { x, y }),
 );
 

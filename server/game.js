@@ -825,7 +825,7 @@ export class Game {
     if (t === T.BARRI || t === T.PANEL) m.tiles[k] = T.OPEN;
     else if (m.openId[k] >= 0) m.tiles[k] = T.OPEN;
     else if (stub && t === T.SOFT) m.tiles[k] = T.RUBBLE;
-    else m.tiles[k] = (m.floor[k] === FL.GRASS || m.floor[k] === FL.ASPHALT) ? T.GROUND : T.FLOOR;
+    else m.tiles[k] = (m.floor[k] === FL.GRASS || m.floor[k] === FL.ASPHALT || m.floor[k] === FL.SAND) ? T.GROUND : T.FLOOR;
     m.hp[k] = 0; delete m.holes[k]; this.changed.add(k);
     for (const e of this.ents) if (e.type === 'cam' && e.hp > 0 && e.wall && e.wall.includes(k)) { // its wall is gone: the camera falls with it
       e.hp = 0; this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) });
