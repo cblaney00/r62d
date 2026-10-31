@@ -10,6 +10,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Checked: the latest version (with the 21 new operators, 51 in all) is on GitHub's main, and both the game server running on this computer and the installed R62D app have all 51.
+
 - [x] A new attacker with a launcher: **SALVO** (Breacher), Delay Launcher with 4 rounds. A round sticks to whatever it hits (a wall, a barricade or a person) and blows 1.5 s later, opening soft walls and barricades and sending a second blast into the room behind.
 - [x] At least 5 operators in every role: 21 new ones (51 in all). Attack: SALVO and TORQUE (Breacher), RUSH and BLAZE (Entry), ECHO and MARK (Intel), PATCH and TRENCH (Support), WREN, VAPOR and CROW (Flank). Defence: SOLDER (Anchor), LATCH (Trapper), HOUND, RUSE and RALLY (Roamer), LENS and AUDIT (Intel), TONIC, WARD and GIRDER (Support). Each has its own skill, guns, look and a short bio, and bots use the defence gadgets and several of the fight skills.
 
