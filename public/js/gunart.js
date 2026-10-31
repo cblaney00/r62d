@@ -53,7 +53,7 @@ export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   ctx.save();
   ctx.translate(X + (W - 108 * s) / 2 + 4 * s, Y + (H - 44 * s) / 2 + 2 * s); ctx.scale(s, s);
   const [r0, r1] = g.rec, top = g.pistol ? 15 : 14, bot = g.pistol ? 22 : 23, mid = (top + bot) / 2;
-  let muzzle = g.bar + (a.barrel === 'extended' ? 6 : 0);
+  let muzzle = g.bar + (a.barrel === 'extended' ? 6 : a.barrel === 'heavy' ? 3 : a.barrel === 'short' ? -Math.min(6, Math.max(0, g.bar - (g.guard[1] || r1) - 2)) : 0);
   // --- stock ---
   if (g.stock === 'adjust') { part(ctx, [r0, 16, 8, 17, 4, 15, 2, 17, 2, 27, 7, 28, 12, 22, r0, 21], g.furn); box(ctx, 6, 19, r0 - 6, 1.6, '#1d1f22'); }
   if (g.stock === 'fold') { box(ctx, 6, 16.5, r0 - 6, 1.6, '#1d1f22'); box(ctx, 6, 22, r0 - 6, 1.6, '#1d1f22'); box(ctx, 4, 15.5, 3, 9.5, g.furn); }
@@ -62,7 +62,9 @@ export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   if (g.stock === 'bullpup') { part(ctx, [r0, 15, 4, 15, 2, 17, 2, 25, r0, 25], g.furn); box(ctx, 2, 16, 2, 9, '#15171a'); }
   if (g.stock === 'cheek') { part(ctx, [r0, 16, 10, 17, 3, 17, 2, 28, 8, 29, 14, 24, r0, 22], g.furn); box(ctx, 9, 13.5, 12, 3, shadeCol(g.furn, 1.15)); }
   // --- barrel and handguard ---
-  box(ctx, r1 - 2, mid - 1.4, muzzle - r1 + 2, 2.8, '#1e2023', 1.6);
+  if (a.barrel === 'heavy') box(ctx, r1 - 2, mid - 2.1, muzzle - r1 + 2, 4.2, '#1b1d20', 1.8); // thick fluted barrel
+  else box(ctx, r1 - 2, mid - 1.4, muzzle - r1 + 2, 2.8, '#1e2023', 1.6);
+  if (a.barrel === 'heavy') for (let i = (g.guard[1] || r1) + 2; i < muzzle - 2; i += 3) box(ctx, i, mid - 0.4, 1.8, 0.8, '#2c2f33');
   if (g.double) box(ctx, r1 - 2, mid - 4.4, muzzle - r1 + 2, 2.8, '#24262a', 1.6); // second barrel on top
   if (g.can) { box(ctx, r1, mid - 3.2, muzzle - r1 + 12, 6.4, '#1a1c1f', 1.7); for (let i = r1 + 3; i < muzzle + 10; i += 3) box(ctx, i, mid - 3.2, 0.6, 6.4, '#2a2d31'); muzzle += 12; } // built-in suppressor
   if (g.pump) { box(ctx, r1, bot - 1, g.guard[1] - r1 + 8, 3, '#202225'); box(ctx, g.guard[0], bot - 1.8, g.guard[1] - g.guard[0], 5, g.furn, 1.5); for (let i = 0; i < 5; i++) box(ctx, g.guard[0] + 2 + i * 3.5, bot - 1.4, 0.7, 4.2, shadeCol(g.furn, 0.6)); }
@@ -99,11 +101,14 @@ export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   if (a.barrel === 'suppressor') { box(ctx, muzzle - 1, mid - 3, 16, 6, '#1a1c1f', 1.7); box(ctx, muzzle + 1, mid - 3, 1, 6, '#2c2f33'); muzzle += 15; }
   else if (a.barrel === 'compensator') { box(ctx, muzzle - 1, mid - 2.4, 7, 4.8, '#24272b', 1.6); for (let i = 0; i < 3; i++) box(ctx, muzzle + 0.8 + i * 1.8, mid - 2.4, 0.8, 2, '#0c0d0e'); muzzle += 6; }
   else if (a.barrel === 'brake') { box(ctx, muzzle - 1, mid - 2.8, 6, 5.6, '#2d3035', 1.6); box(ctx, muzzle + 1, mid - 2.8, 1.2, 5.6, '#0c0d0e'); box(ctx, muzzle + 3, mid - 2.8, 1.2, 5.6, '#0c0d0e'); muzzle += 5; }
+  else if (a.barrel === 'choke') { part(ctx, [muzzle - 1, mid - 2.2, muzzle + 6, mid - 1.5, muzzle + 6, mid + 1.5, muzzle - 1, mid + 2.2], '#2a2d31'); box(ctx, muzzle + 1.5, mid - 2, 0.8, 4, '#121315'); muzzle += 6; }
   else box(ctx, muzzle - 1, mid - 1.8, 3, 3.6, '#16181a', 1.6);
   if (!g.pistol) box(ctx, (g.guard[1] || r1) - 3, top - 4, 1.6, 4, '#1b1d20'); // front sight post
   // grip
   if (a.grip === 'vertical' && !g.pistol) part(ctx, [g.guard[0] + 8, bot, g.guard[0] + 13, bot, g.guard[0] + 12.5, bot + 11, g.guard[0] + 8.5, bot + 11], '#1f2124');
   if (a.grip === 'angled' && !g.pistol) part(ctx, [g.guard[0] + 4, bot, g.guard[0] + 15, bot, g.guard[0] + 8, bot + 6], '#1f2124');
+  if (a.grip === 'handstop' && !g.pistol) part(ctx, [g.guard[1] - 9, bot, g.guard[1] - 3, bot, g.guard[1] - 4, bot + 4.5, g.guard[1] - 7, bot + 4.5], '#1f2124'); // a little stop at the front of the handguard
+  if (a.grip === 'stubby' && !g.pistol) part(ctx, [g.guard[0] + 7, bot, g.guard[0] + 13, bot, g.guard[0] + 12.5, bot + 6, g.guard[0] + 7.5, bot + 6], '#1f2124');
   if (a.grip === 'laser') {
     const lx = g.pistol ? r0 + 5 : g.guard[0] + 4, ly = g.pistol ? bot + 2.4 : bot - 1;
     box(ctx, lx, ly, 8, 3.2, '#1b1d20'); ctx.fillStyle = '#ff3030'; ctx.fillRect(lx + 8, ly + 1.1, 1, 1);
@@ -114,6 +119,7 @@ export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   if (a.sight === 'iron') { if (!g.handle) box(ctx, g.pistol ? r0 + 1 : r0 + 3, top - (g.pistol ? 2 : 4), 3, g.pistol ? 2 : 4, '#1b1d20'); }
   if (a.sight === 'reddot') { part(ctx, [sx, top - 1.6, sx + 10, top - 1.6, sx + 9, top - 6.5, sx + 2, top - 7], '#22252a'); ctx.fillStyle = 'rgba(120,200,255,0.45)'; ctx.fillRect(sx + 2.5, top - 5.8, 6, 3); ctx.fillStyle = '#ff3030'; ctx.fillRect(sx + 5, top - 4.6, 1, 1); }
   if (a.sight === 'holo') { box(ctx, sx, top - 3, 13, 1.4, '#22252a'); part(ctx, [sx + 1, top - 3, sx + 3, top - 9, sx + 12, top - 9, sx + 12.5, top - 3], '#2a2d32'); ctx.fillStyle = 'rgba(140,220,255,0.4)'; ctx.fillRect(sx + 4, top - 8, 7, 4.2); }
+  if (a.sight === 'prism') { box(ctx, sx, top - 2.2, 15, 2.2, '#1b1d20'); box(ctx, sx + 1, top - 9, 14, 7, '#24272b', 1.4); box(ctx, sx + 3, top - 10, 9, 1.4, '#2c2f33'); ctx.fillStyle = 'rgba(255,170,60,0.55)'; ctx.fillRect(sx + 14.2, top - 8, 0.9, 5); }
   if (a.sight === 'scope') { box(ctx, sx + 4, top - 4, 3, 2.5, '#1b1d20'); box(ctx, sx + 16, top - 4, 3, 2.5, '#1b1d20'); box(ctx, sx - 1, top - 9, 26, 5.5, '#1e2024', 1.7); box(ctx, sx - 3, top - 10, 4, 7.5, '#25282c'); box(ctx, sx + 23, top - 10.5, 5, 8.5, '#25282c'); ctx.fillStyle = 'rgba(110,180,255,0.6)'; ctx.fillRect(sx + 27.5, top - 9.5, 0.8, 6.5); box(ctx, sx + 9, top - 11, 3, 2, '#2c2f33'); }
   ctx.restore();
 }

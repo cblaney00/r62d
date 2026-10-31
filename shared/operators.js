@@ -341,37 +341,53 @@ export const CLASS_TIP = {
   LMG: 'Huge magazine, slow to aim.', DMR: 'Hard-hitting single shots at range.', Shotgun: 'Devastating up close, weak far away.', Pistol: 'Backup gun.',
 };
 // Each attachment nudges the gun a little. Multipliers: dmg, range (full-damage distance), ads (time to aim),
-// hip (hip-fire spread), adsSpread (aimed spread), kick (upward recoil), sway (sideways recoil), first (first shots' kick).
+// hip (hip-fire spread; a shotgun's pellet fan), adsSpread (aimed spread), kick (recoil drift), sway (side-to-side
+// shake), first (first shots' kick). Every one is a trade-off (he asked): something better, something worse.
 export const ATTACH = {
   barrel: {
     none: { name: 'Standard barrel', short: 'Standard', desc: 'No changes.' },
-    suppressor: { name: 'Suppressor', short: 'Suppressor', desc: 'Much quieter shots and no muzzle flash. 10% less damage.', dmg: 0.9, quiet: 1 },
-    compensator: { name: 'Compensator', short: 'Compensator', desc: 'Less sideways recoil when spraying.', sway: 0.55 },
-    brake: { name: 'Muzzle Brake', short: 'Muzzle brake', desc: 'Your first few shots kick much less.', first: 0.55 },
-    extended: { name: 'Extended Barrel', short: 'Extended', desc: 'Full damage from further away. Slightly slower to aim.', range: 1.3, ads: 1.08 },
+    suppressor: { name: 'Suppressor', short: 'Suppressor', desc: '+ Much quieter, no muzzle flash. − 10% less damage, full damage over a shorter distance.', dmg: 0.9, range: 0.85, quiet: 1 },
+    compensator: { name: 'Compensator', short: 'Compensator', desc: '+ Much less side-to-side shake when spraying. − The spray drifts a little more.', sway: 0.55, kick: 1.12 },
+    brake: { name: 'Muzzle Brake', short: 'Muzzle brake', desc: '+ The first few shots kick much less. − More shake in a long spray.', first: 0.55, sway: 1.15 },
+    extended: { name: 'Extended Barrel', short: 'Extended', desc: '+ Full damage from 30% further away. − Slower to aim in.', range: 1.3, ads: 1.1 },
+    heavy: { name: 'Heavy Barrel', short: 'Heavy barrel', desc: '+ Steadier sprays: less drift and shake. − Slow to aim in, looser hip fire.', kick: 0.82, sway: 0.85, ads: 1.15, hip: 1.1 },
+    short: { name: 'Short Barrel', short: 'Short barrel', desc: '+ Quick to aim in, tighter hip fire. − Damage drops off sooner.', ads: 0.85, hip: 0.88, range: 0.8 },
+    choke: { name: 'Choke', short: 'Choke', desc: '+ Pellets stay together, so it reaches further. − Easier to miss up close, slower to aim in.', hip: 0.72, adsSpread: 0.72, ads: 1.1 },
   },
   grip: {
     none: { name: 'No grip', short: 'None', desc: 'No changes.' },
-    vertical: { name: 'Vertical Grip', short: 'Vertical grip', desc: 'Less upward kick when spraying.', kick: 0.78 },
-    angled: { name: 'Angled Grip', short: 'Angled grip', desc: 'Aim down sights 20% faster.', ads: 0.8 },
-    laser: { name: 'Laser', short: 'Laser', desc: 'Tighter hip-fire, but enemies can see your beam.', hip: 0.72, laser: 1 },
+    vertical: { name: 'Vertical Grip', short: 'Vertical grip', desc: '+ Less recoil drift when spraying. − A little slower to aim in.', kick: 0.78, ads: 1.06 },
+    angled: { name: 'Angled Grip', short: 'Angled grip', desc: '+ Aim in 20% faster. − A little more recoil drift.', ads: 0.8, kick: 1.12 },
+    handstop: { name: 'Handstop', short: 'Handstop', desc: '+ Much less side-to-side shake. − Slower to aim in.', sway: 0.72, ads: 1.08 },
+    stubby: { name: 'Stubby Grip', short: 'Stubby grip', desc: '+ Tighter hip fire and a bit quicker to aim. − More shake when spraying.', hip: 0.85, ads: 0.95, sway: 1.12 },
+    laser: { name: 'Laser', short: 'Laser', desc: '+ Much tighter hip fire. − Enemies can see your beam.', hip: 0.72, laser: 1 },
   },
   sight: {
-    iron: { name: 'Iron Sights', short: 'Iron sights', desc: 'Nothing in the way: the quickest to aim in.', ads: 0.92 }, // he asked: iron sights must be a real choice
-    reddot: { name: 'Red Dot', short: 'Red dot', desc: 'Slightly tighter aimed shots.', adsSpread: 0.88 },
-    holo: { name: 'Holo Sight', short: 'Holo', desc: 'A little tighter aimed shots, and a little quicker to aim than a red dot.', adsSpread: 0.94, ads: 0.96 },
-    scope: { name: '2.0× Scope', short: '2× scope', desc: 'Very accurate aimed shots and you see further ahead, but slower to aim.', adsSpread: 0.7, ads: 1.2, zoom: 1 },
+    iron: { name: 'Iron Sights', short: 'Iron sights', desc: '+ Nothing in the way: the quickest to aim in. − Aimed shots a little looser.', ads: 0.92, adsSpread: 1.05 }, // he asked: iron sights must be a real choice
+    reddot: { name: 'Red Dot', short: 'Red dot', desc: 'Tighter aimed shots, normal aim-in speed.', adsSpread: 0.88 },
+    holo: { name: 'Holo Sight', short: 'Holo', desc: '+ A little quicker to aim than a red dot. − Aimed shots a little looser than a red dot.', adsSpread: 0.94, ads: 0.96 },
+    prism: { name: '1.5× Prism', short: '1.5× prism', desc: '+ Accurate aimed shots for mid range. − Slower to aim in.', adsSpread: 0.8, ads: 1.1 },
+    scope: { name: '2.0× Scope', short: '2× scope', desc: '+ Very accurate aimed shots, and you see further ahead. − Slowest to aim in, looser hip fire.', adsSpread: 0.7, ads: 1.2, hip: 1.08, zoom: 1 },
   },
 };
 export const ATTACH_SLOTS = [['barrel', 'Barrel'], ['grip', 'Grip'], ['sight', 'Sight']];
+// What fits which gun (he asked: attachments that make sense for the type of gun)
+const FITS = {
+  AR:      { barrel: ['none', 'suppressor', 'compensator', 'brake', 'extended', 'heavy'], grip: ['none', 'vertical', 'angled', 'handstop', 'laser'], sight: ['iron', 'reddot', 'holo', 'prism', 'scope'] },
+  LMG:     { barrel: ['none', 'suppressor', 'compensator', 'brake', 'extended', 'heavy'], grip: ['none', 'vertical', 'angled', 'handstop'], sight: ['iron', 'reddot', 'holo', 'prism', 'scope'] },
+  DMR:     { barrel: ['none', 'suppressor', 'brake', 'extended', 'heavy'], grip: ['none', 'vertical', 'angled', 'handstop'], sight: ['iron', 'reddot', 'holo', 'prism', 'scope'] },
+  SMG:     { barrel: ['none', 'suppressor', 'compensator', 'brake', 'extended', 'short'], grip: ['none', 'vertical', 'angled', 'stubby', 'laser'], sight: ['iron', 'reddot', 'holo', 'prism'] },
+  MP:      { barrel: ['none', 'suppressor', 'compensator', 'short'], grip: ['none', 'angled', 'stubby', 'laser'], sight: ['iron', 'reddot', 'holo'] },
+  Shotgun: { barrel: ['none', 'suppressor', 'choke', 'short', 'extended'], grip: ['none', 'vertical', 'angled', 'stubby', 'laser'], sight: ['iron', 'reddot', 'holo'] },
+  Pistol:  { barrel: ['none', 'suppressor', 'compensator', 'extended'], grip: ['none', 'angled', 'laser'], sight: ['iron', 'reddot', 'holo'] },
+};
 export function attachFor(w) {
-  const W = WEAPONS[w], cls = W ? W.cls : 'AR', side = SIDEARMS.has(w);
-  const barrel = cls === 'Shotgun' ? ['none', 'suppressor', 'extended'] : ['none', 'suppressor', 'compensator', 'brake', 'extended'];
-  return {
-    barrel: W && W.quiet ? barrel.filter(b => b !== 'suppressor') : barrel, // a built-in suppressor already
-    grip: side ? ['none', 'angled', 'laser'] : ['none', 'vertical', 'angled', 'laser'], // at least 3 in every slot (he asked)
-    sight: side ? ['iron', 'reddot', 'holo'] : ['iron', 'reddot', 'holo', 'scope'],
-  };
+  const W = WEAPONS[w], f = FITS[W ? W.cls : 'AR'] || FITS.AR;
+  const slug = W && W.pellets === 1; // a one-pellet shotgun (the Anvil slug) has no pellets to keep together
+  let barrel = f.barrel.filter(b => !(W && W.quiet && b === 'suppressor') && !(slug && b === 'choke')); // a built-in suppressor already
+  let grip = f.grip;
+  if (W && SIDEARMS.has(w) && W.cls !== 'MP' && W.cls !== 'Pistol') { grip = grip.filter(g => g !== 'vertical' && g !== 'handstop'); } // sidearms: nothing bulky underneath
+  return { barrel, grip, sight: f.sight }; // at least 3 in every slot (he asked)
 }
 export function cleanAtt(w, a) {
   const ok = attachFor(w), out = { barrel: 'none', grip: 'none', sight: 'iron' };
