@@ -47,7 +47,8 @@ export function openArmory(el, opts) {
   cv.onmousedown = e => {
     audio.initAudio();
     if (document.pointerLockElement !== cv && !S.lockAsked) { S.lockAsked = true; cv.requestPointerLock?.(); return; } // the first click just takes control
-    if (e.button === 0) { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; } if (e.button === 2) S.mouse.r = true;
+    if (e.button === 0) { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; }
+    if (e.button === 2) { S.mouse.r = true; const l = Math.hypot(S.aim.x, S.aim.y) || 1; S.aim = { x: S.aim.x / l * 5 * M, y: S.aim.y / l * 5 * M }; } // aiming in: 5 m out, as in a match
   };
   cv.oncontextmenu = e => e.preventDefault();
   S.up = e => { if (e.button === 0) S.mouse.l = false; if (e.button === 2) S.mouse.r = false; };
@@ -136,12 +137,13 @@ const farEnd = () => S.dist * M + 60; // the backstop
 const scoped = () => String(attOf(S.w).sight || '').includes('scope');
 const fitCap = () => S.mouse.r ? (scoped() ? 1000 : 820) : 700;
 const aimMin = () => 46 * O.dpr() / (S.z || 1), aimMax = () => S.reachW || 400;
-function freeMove(dx, dy) { // the match's Crosshair mode: 1:1 with the mouse on screen, fixed to you, never on top of you
+function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): sideways turns as if never past TURN_R
   const z = S.z || 1; dx /= z; dy /= z;
-  const o = S.aim, n = { x: o.x + dx, y: o.y + dy }, l = Math.hypot(n.x, n.y), lo = aimMin(), hi = aimMax();
-  if (l > hi) { const L = Math.max(hi, Math.hypot(o.x, o.y)); n.x *= L / l; n.y *= L / l; }
-  else if (l < lo) { const a = l > 0.01 ? Math.atan2(n.y, n.x) : Math.atan2(-o.y, -o.x); n.x = Math.cos(a) * lo; n.y = Math.sin(a) * lo; }
-  S.aim = n;
+  const o = S.aim, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = aimMin(), hi = aimMax();
+  let l = l0 + dx * ux + dy * uy, a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / Math.min(l0, 160);
+  if (l < 0) { l = -l; a += Math.PI; }
+  if (l > hi) l = Math.max(hi, Math.min(l, l0)); else if (l < lo) l = lo;
+  S.aim = { x: Math.cos(a) * l, y: Math.sin(a) * l };
 }
 function screenToWorld(cv, x, y) { return { x: (x - cv.width / 2) / S.z + S.cam.x, y: (y - cv.height / 2) / S.z + S.cam.y }; }
 function w2s(cv, x, y) { return { x: (x - S.cam.x) * S.z + cv.width / 2, y: (y - S.cam.y) * S.z + cv.height / 2 }; }

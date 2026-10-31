@@ -9,6 +9,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] A new attacker with an RPG-style launcher, not too far off from Ash in R6 (our own operator: own name, look and twist).
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
 - [ ] the aiming is very close to being proper, it's just a little hard to pull the mouse around to make the character turn left and right and i think it would still be wonky if we just upped the default sensitivity, flicks should be possible and not get caught on every door, maybe the reticle distance can reset to a regular distance every time you ADS
+- [ ] fix shield characters, reference my piece of shield characters i have you earlier and make sure the animations match up properly, also make sure no characters walk insanely slow, when they are walking as fast as possible the sheild should move around making is possible to shoot, only slow walking should be truly safe and make sure sheild counterplay is well balanced
+- [ ] fix the tutorial, dont make the bots aggressive and make sure that every step has a clear walkthrough from the beginning to the end, when you click tutorial it should give you the whole rundown of basically how to play. It should go by quickly, no more than 4 minutes
 
 ## Done
 

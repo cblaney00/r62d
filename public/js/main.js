@@ -138,16 +138,20 @@ let aimOff = { x: 150, y: 0 };
 const AIM_MIN = () => 46 * DPR / (st.zoom || 1), AIM_MAX = () => st.reachW || 400;
 // how far a view can grow to fit you and your crosshair: further when aiming in, furthest with a 2x scope
 const FIT_H = me => me && me.ad ? (String(me.aa).includes('scope') ? 1000 : 820) : 700;
+// Turning (he asked: hard to pull the mouse round, flicks must be possible): moving the mouse sideways turns you as if
+// the crosshair were never further than TURN_R from you, so a far-out crosshair turns as quickly as a near one; moving
+// it towards / away from you changes the distance 1:1. Close in it is exactly 1:1 like a pointer.
+const TURN_R = 160, ADS_DIST = 5 * PX_PER_M; // aiming in puts the crosshair 5 m out, the way you face (he chose)
 function freeMove(dx, dy) {
-  const z = st.zoom || 1; dx /= z; dy /= z; // the mouse moves the crosshair 1:1 on screen
-  const o = aimOff, n = { x: o.x + dx, y: o.y + dy }, l = Math.hypot(n.x, n.y), lo = AIM_MIN(), hi = AIM_MAX();
-  if (l > hi) { const L = Math.max(hi, Math.hypot(o.x, o.y)); n.x *= L / l; n.y *= L / l; } // no pushing past the reach (a reach that just shrank keeps your spot)
-  else if (l < lo) { // too close to you: pushed out to the edge of the little circle, on whichever side it's now on
-    const a = l > 0.01 ? Math.atan2(n.y, n.x) : Math.atan2(-o.y, -o.x);
-    n.x = Math.cos(a) * lo; n.y = Math.sin(a) * lo;
-  }
-  aimOff = n;
+  const z = st.zoom || 1; dx /= z; dy /= z;
+  const o = aimOff, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = AIM_MIN(), hi = AIM_MAX();
+  let l = l0 + dx * ux + dy * uy, a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / Math.min(l0, TURN_R);
+  if (l < 0) { l = -l; a += Math.PI; } // pulled through the middle: out the other side
+  if (l > hi) l = Math.max(hi, Math.min(l, l0)); // no pushing past the reach (a reach that just shrank keeps your spot)
+  else if (l < lo) l = lo;
+  aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l };
 }
+function adsReset() { const l = Math.hypot(aimOff.x, aimOff.y) || 1; aimOff = { x: aimOff.x / l * ADS_DIST, y: aimOff.y / l * ADS_DIST }; }
 const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
 let padOn = false, padAng = 0, padReach = 0.6;
 const wrapAng = a => Math.atan2(Math.sin(a), Math.cos(a));
@@ -190,10 +194,10 @@ function cursor() {
   d = Math.max(d, 24 * DPR);
   return { x: px + cx * d, y: py + cy * d };
 }
-// Crosshair mode: the crosshair you see is held on the first thing along your aim you can't see through (x, y, d).
-// The point you really aim at (ax, ay, ad, sent to the server for headshots) goes on through soft walls and
-// barricades, which bullets pass, and stops only at a wall they can't (he asked: a headshot through a soft wall
-// must still be possible). When they differ, a faint marker shows where you aim behind the wall.
+// Crosshair mode: the crosshair stays at the distance you put it (he asked: it used to jump onto every door frame
+// in the way, so flicks got caught). x, y = ax, ay = that point (sent to the server for headshots). see = how far you
+// can see along your aim, shot = how far a bullet gets (through soft walls and barricades); when something is in the
+// way a tick marks it and the crosshair fades if bullets can't reach it.
 function freeAimPoint() {
   let l = Math.min(Math.hypot(aimOff.x, aimOff.y) || 1, AIM_MAX());
   const a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), s = Math.sin(a);
@@ -203,10 +207,10 @@ function freeAimPoint() {
     if (s > 1e-6) l = Math.min(l, (y1 - st.pred.y) / s); else if (s < -1e-6) l = Math.min(l, (m - st.pred.y) / s);
     l = Math.max(1, l);
   }
-  const lo = Math.min(l, AIM_MIN()), see = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null) + 2 : l;
+  const see = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null) + 2 : l;
   const shot = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null, true) + 2 : l;
-  const d = Math.max(lo, Math.min(l, see)), ad = Math.max(d, Math.min(l, shot));
-  return { x: st.pred.x + c * d, y: st.pred.y + s * d, d, ax: st.pred.x + c * ad, ay: st.pred.y + s * ad, ad, through: ad > d + 4 };
+  const x = st.pred.x + c * l, y = st.pred.y + s * l;
+  return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
 }
 addEventListener('resize', resize); resize();
 fx.quality = gq.parts; setShading(gq.shade);
@@ -608,7 +612,7 @@ cv.addEventListener('mousedown', e => {
     st.lockAsked = true; cv.requestPointerLock?.(); return;
   }
   if (e.button === 0) { mouse.l = true; mouse.wl++; }
-  if (e.button === 2) { mouse.r = true; mouse.wr++; }
+  if (e.button === 2) { mouse.r = true; mouse.wr++; if (aimMode === 'free' && padOn && st.me && st.me.ct === 'body') adsReset(); }
 });
 addEventListener('mouseup', e => { if (e.button === 0) mouse.l = false; if (e.button === 2) mouse.r = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
@@ -1737,16 +1741,22 @@ function crosshair(me, now) {
     ctx.strokeStyle = on ? '#ff3b3b' : 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.arc(H.x, H.y, r, 0, 7); ctx.stroke();
     if (on) { ctx.fillStyle = 'rgba(255,59,59,0.22)'; ctx.fill(); }
   }
+  const fq = aimMode === 'free' && padOn && !gpRecent() ? freeAimPoint() : null;
+  if (fq && fq.stopped) ctx.globalAlpha = 0.45; // bullets stop at a wall before it: faded
   drawXhair(ctx, x, y, xh, spread, DPR);
+  ctx.globalAlpha = 1;
   // far out: how far away the crosshair is (it can go anywhere you can see)
-  if (aimMode === 'free' && padOn && !gpRecent()) {
-    const q = freeAimPoint(), dm = q.ad / PX_PER_M;
-    if (q.through) { // held on a soft wall: a dotted line and a faint ring show where you really aim behind it
-      const G = w2s(q.ax, q.ay), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
-      ctx.setLineDash([2 * DPR, 3 * DPR]); ctx.lineWidth = 1.2 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(gx, gy); ctx.stroke(); ctx.setLineDash([]);
-      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 3 * DPR; ctx.beginPath(); ctx.arc(gx, gy, 5 * DPR, 0, 7); ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.3 * DPR; ctx.beginPath(); ctx.arc(gx, gy, 5 * DPR, 0, 7); ctx.stroke();
+  if (fq) {
+    const q = fq, dm = q.ad / PX_PER_M;
+    if (q.blocked) { // something in the way: a tick on it and a dotted line on to the crosshair
+      const G = w2s(q.wx, q.wy), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
+      ctx.setLineDash([2 * DPR, 3 * DPR]); ctx.lineWidth = 1.2 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+      const na = Math.atan2(y - gy, x - gx) + Math.PI / 2, tl = 5 * DPR;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 4 * DPR; ctx.beginPath(); ctx.moveTo(gx - Math.cos(na) * tl, gy - Math.sin(na) * tl); ctx.lineTo(gx + Math.cos(na) * tl, gy + Math.sin(na) * tl); ctx.stroke();
+      ctx.strokeStyle = q.stopped ? '#ff8a5a' : 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2 * DPR; ctx.beginPath(); ctx.moveTo(gx - Math.cos(na) * tl, gy - Math.sin(na) * tl); ctx.lineTo(gx + Math.cos(na) * tl, gy + Math.sin(na) * tl); ctx.stroke();
+      ctx.lineCap = 'butt';
     }
     if (dm >= 8) {
       ctx.font = `700 ${12 * DPR}px Barlow Condensed, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
