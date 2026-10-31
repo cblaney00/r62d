@@ -6,6 +6,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] clean up the game files, run tests about operator abilities and their intended use as well
 
 ## Done
 

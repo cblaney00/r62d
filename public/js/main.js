@@ -18,7 +18,7 @@ import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './cross
 import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor } from '/shared/progress.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout } from '/shared/operators.js';
+import {  } from '/shared/operators.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
 import { walkRay, tileAt, findVault } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
@@ -432,7 +432,6 @@ function reconcile() {
 
 // ---------------- events from the server ----------------
 function mySide() { return st.me ? st.me.tm : null; }
-function nameOf(players, id) { const p = players.get(id); return p ? p.n : '?'; }
 
 function onEvent(e, s, players) {
   const now = performance.now() / 1000;
