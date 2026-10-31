@@ -141,7 +141,7 @@ His wishes so far:
   brace), `tickEnts` (gadgets over time), `detonate`/`explode`; client draws them in `sprites.js drawGadget` and
   `main.js draw` (decoys, lance sparks, gas, shroud hiding via `teamSeesBody`, scope viewers in `teamViewers`).
   Defending bots place their gadgets in `botPrep`; attacking bots use a few abilities in `botThink`.
-- **Tests:** `node tests/abilities.js` has every operator use their ability in a live match.
+- **Tests:** `node tests/abilities.js` has every operator use their ability in a live match; `node tests/oldops.js` (first 30) and `node tests/newops.js` (the 21 added) check each skill does what its description says.
   `node tests/sim.js` plays a bot-only match on every map (must print PASS; `--only <id>` for one).
   `node tests/reach.js` checks a body can reach every floor cell and every drone hole passes a drone but not a body.
   `node tests/stairs.js` walks a body up and down every staircase with real physics + bot path finding.

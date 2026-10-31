@@ -15,6 +15,7 @@ for (const id of MAP_LIST) {
   while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
   const cams = g.ents.filter(e => e.type === 'cam' && !e.owner && !e.tu);
   const atk = [...g.players.values()].find(q => g.side(q) !== cams[0].team && q.alive);
+  for (const q of g.players.values()) if (q !== atk) { q.x = -9000; q.y = -9000; q.bot = false; } // nobody standing in the line of fire
   let shot = 0, swung = 0;
   for (const c of cams) {
     if (c.wn === null || !c.wall.length) { fail(id, 'camera not on a wall at', c.x, c.y); continue; }

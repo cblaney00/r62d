@@ -6,9 +6,10 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] clean up the game files, run tests about operator abilities and their intended use as well
 
 ## Done
+
+- [x] Cleaned up the game files: removed unused leftovers in the code, moved an old copy of the saved profiles out of the game folder (kept as a backup next to your real saves; nothing in it was missing from them), and brought the project notes up to date. New test for the first 30 operators: each skill does what its description says (31 checks, all pass); with the existing test for the 21 newer ones, every operator's skill is now checked. The whole test suite (29 tests) passes; one camera test that could fail by luck (a bot in the line of fire) was fixed.
 
 - [x] Compass to the bomb site: once the objective is found (defenders always know it), a small dial under the score bar points along the walking route to the bomb rooms, not straight through walls. When the route goes up or down a floor it points to the stairs instead ("STAIRS ▲ 2F · 12 m"), and it says ON SITE when you're there.
 
