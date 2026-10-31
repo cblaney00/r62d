@@ -1,5 +1,5 @@
 // All maps. Each map file builds its floors with the kit in mapkit.js.
-import { CELL, T } from './constants.js';
+import { CELL, T, FL } from './constants.js';
 import { castSight } from './physics.js';
 import { build as harbor } from './maps/harbor.js';
 import { build as villa } from './maps/villa.js';
@@ -21,8 +21,82 @@ export const MAP_LIST = Object.keys(MAPS);
 const cache = new Map();
 export function buildMap(id = 'harbor') {
   if (!MAPS[id]) id = 'harbor';
-  return MAPS[id].build();
+  const m = MAPS[id].build();
+  addRopes(m);
+  return m;
 }
+
+// ---- Rappelling (he asked: attackers need a quicker way up) ----
+// Every outside window on a floor above the ground floor gets a rope: stand outside on the ground below it and press E
+// to climb (2 s a floor), hang outside the window (the air cell just outside becomes a "drop" ledge: T.LOW over FL.VOID,
+// which sight and bullets pass but nobody walks or vaults onto), Space climbs in once the window is open, E drops
+// back down. While hanging you slide left / right along the wall, up to ROPE_SPAN cells past either side of the window
+// (he asked: outside-the-window play matters). map.ropes[i] = { f, lvl, cells, hang (by the window's middle), base,
+// inside, out, tx, ty (along the wall), a, b (how far you can slide each way, px), up, down }.
+export const ROPE_CLIMB = 2, ROPE_DROP = 0.8, ROPE_REACH = 20, ROPE_SPAN = 5;
+function addRopes(m) {
+  const W = m.W, ropes = [];
+  let gi = -1; for (let k = 0; k < m.tiles.length && gi < 0; k++) if (m.tiles[k] === T.GROUND) gi = m.flAt[k];
+  m.ropes = ropes; if (gi < 0) return;
+  const G = m.floors[gi], cc = k => ({ x: (k % W + 0.5) * CELL, y: (Math.floor(k / W) + 0.5) * CELL });
+  const walk = (x, y, f) => { const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); if (cx < 0 || cy < 0 || cx >= W || cy >= m.H) return false; const k = cy * W + cx, t = m.tiles[k]; return m.flAt[k] === f && (t === T.GROUND || t === T.FLOOR) && !m.shape[k]; };
+  for (const o of m.openings) {
+    if (o.kind !== 'window') continue;
+    const f = m.flAt[o.cells[0]]; if (f <= gi || f === 255) continue;
+    const mid = o.cells[o.cells.length >> 1];
+    let out = null;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = mid + dy * W + dx; if (m.flAt[n] === f && m.tiles[n] === T.VOID) { out = [dx, dy]; break; } }
+    if (!out) continue;
+    const ledge = o.cells.map(k => k + out[1] * W + out[0]);
+    if (ledge.some(k => m.flAt[k] !== f || m.tiles[k] !== T.VOID)) continue;
+    const a = cc(o.cells[0]), b = cc(o.cells[o.cells.length - 1]), c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const hang = { x: c.x + out[0] * CELL, y: c.y + out[1] * CELL }, inside = { x: c.x - out[0] * CELL * 1.3, y: c.y - out[1] * CELL * 1.3 };
+    if (!walk(inside.x, inside.y, f)) continue;
+    const F = m.floors[f], bx0 = hang.x + (F.x0 - F.gx) * CELL - (G.x0 - G.gx) * CELL, by0 = hang.y + (F.y0 - G.y0) * CELL;
+    let base = null;
+    for (const n of [0, 0.5, 1, 1.5]) { const x = bx0 + out[0] * CELL * n, y = by0 + out[1] * CELL * n; if (walk(x, y, gi)) { base = { x, y }; break; } }
+    if (!base) continue;
+    // the stretch of outside wall either side of the window you can slide along: air outside, wall (or window) inside
+    const tx = Math.abs(out[1]), ty = Math.abs(out[0]), step = ty * W + tx, half = o.cells.length * CELL / 2;
+    const okLedge = k => m.flAt[k] === f && (m.tiles[k] === T.VOID || (m.tiles[k] === T.LOW && m.floor[k] === FL.VOID));
+    const okWall = k => { const t = m.tiles[k]; return (t === T.HARD || t === T.SOFT || t === T.REINF || t === T.BARRI || (t === T.OPEN && m.win[k])) && !m.shape[k]; };
+    const lo = Math.min(...ledge), hi = Math.max(...ledge), ext = [];
+    let nA = 0, nB = 0;
+    for (let n = 1; n <= ROPE_SPAN; n++) { const k = lo - step * n; if (!okLedge(k) || !okWall(k - out[1] * W - out[0])) break; ext.push(k); nA = n; }
+    for (let n = 1; n <= ROPE_SPAN; n++) { const k = hi + step * n; if (!okLedge(k) || !okWall(k - out[1] * W - out[0])) break; ext.push(k); nB = n; }
+    for (const k of [...ledge, ...ext]) { m.tiles[k] = T.LOW; m.floor[k] = FL.VOID; }
+    const sa = -(half - CELL / 2) - nA * CELL, sb = (half - CELL / 2) + nB * CELL;
+    ropes.push({ i: ropes.length, f, lvl: f - gi, cells: o.cells, ledge: [...ledge, ...ext], hang, base, inside, out: Math.atan2(out[1], out[0]), tx, ty, a: sa, b: sb, half, up: -1, down: -1 });
+  }
+  for (const r of ropes) { // the windows above and below on the same rope
+    for (const q of ropes) if (q !== r && Math.hypot(q.base.x - r.base.x, q.base.y - r.base.y) < 12) {
+      if (q.lvl === r.lvl + 1) r.up = q.i;
+      if (q.lvl === r.lvl - 1) r.down = q.i;
+    }
+  }
+  m.groundFloor = gi;
+}
+// The rope you can start climbing from (x, y) on the ground floor, anywhere below its stretch of wall: [rope, s] or null
+// (s: how far along the wall from the window's middle, px).
+export function ropeAt(m, x, y) {
+  let best = null, bd = ROPE_REACH;
+  for (const r of m.ropes || []) {
+    if (r.down >= 0) continue;
+    const s = Math.max(r.a, Math.min(r.b, (x - r.base.x) * r.tx + (y - r.base.y) * r.ty)), d = Math.hypot(r.base.x + r.tx * s - x, r.base.y + r.ty * s - y);
+    if (d < bd) { bd = d; best = [r, s]; }
+  }
+  return best;
+}
+// Where you land on the ground when you let go (or are shot off) at s along the wall: below you if there is ground there
+export function ropeGround(m, r, s) {
+  const x = r.base.x + r.tx * s, y = r.base.y + r.ty * s, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), k = cy * m.W + cx;
+  return cx >= 0 && cy >= 0 && cx < m.W && cy < m.H && (m.tiles[k] === T.GROUND || m.tiles[k] === T.FLOOR) && !m.shape[k] ? { x, y } : r.base;
+}
+// How far along the wall (px from the window's middle) someone at (x, y) hangs, and are they in front of the window?
+export const ropeS = (r, x, y) => (x - r.hang.x) * r.tx + (y - r.hang.y) * r.ty;
+export const ropeAtWindow = (r, x, y) => Math.abs(ropeS(r, x, y)) <= r.half - 4;
+// Is this rope's window open enough to climb in (not boarded, reinforced or blocked)?
+export function ropeWindowOpen(m, r) { return r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE); }
 
 // Which floor a world position is on (index into map.floors), or -1.
 export function floorAt(map, wx, wy) {

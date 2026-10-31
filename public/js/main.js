@@ -1,7 +1,7 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M } from '/shared/constants.js';
-import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds } from '/shared/map.js';
+import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -1424,6 +1424,23 @@ function draw(s, view, now, dt) {
   }
   // corpses
   for (const c of st.corpses) drawOperator(ctx, { ...c, downed: true }, now);
+  // rappel ropes: a coil on the ground under each stretch of wall you can climb (attackers), and the rope on anyone using one
+  if (side === 'atk' && view) for (const r of st.map.ropes || []) {
+    const bx = r.base.x, by = r.base.y; if (Math.abs(bx - view.x) > 700 || Math.abs(by - view.y) > 700) continue;
+    ctx.strokeStyle = 'rgba(205,165,100,0.95)'; ctx.lineWidth = 1.4;
+    for (const rr of [4.6, 3, 1.4]) { ctx.beginPath(); ctx.arc(bx, by, rr, 0, 7); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(170,135,85,0.35)'; ctx.setLineDash([2, 2]); ctx.beginPath();
+    ctx.moveTo(r.base.x + r.tx * r.a, r.base.y + r.ty * r.a); ctx.lineTo(r.base.x + r.tx * r.b, r.base.y + r.ty * r.b); ctx.stroke(); ctx.setLineDash([]);
+  }
+  for (const sp of s.players) if (sp.rp && sp.a) {
+    const p = me && sp.id === me.id ? { x: st.pred.x, y: st.pred.y } : interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
+    let r = null; for (const q of st.map.ropes || []) { const sx = Math.max(q.a, Math.min(q.b, (p.x - q.hang.x) * q.tx + (p.y - q.hang.y) * q.ty)); if (Math.hypot(q.hang.x + q.tx * sx - p.x, q.hang.y + q.ty * sx - p.y) < 3 || Math.hypot(q.base.x + q.tx * sx - p.x, q.base.y + q.ty * sx - p.y) < 6) { r = q; break; } }
+    if (!r) continue;
+    const up = Math.hypot(r.hang.x - p.x, r.hang.y - p.y) < Math.hypot(r.base.x - p.x, r.base.y - p.y) + 200 && floorAt(st.map, p.x, p.y) === r.f;
+    const a = up ? r.out : r.out + Math.PI; // hanging: the rope runs up the wall above you; at the bottom: to the wall
+    ctx.strokeStyle = '#b08a55'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14); ctx.stroke();
+    ctx.fillStyle = '#6b5434'; ctx.beginPath(); ctx.arc(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, 1.3, 0, 7); ctx.fill();
+  }
 
   // gadgets / entities
   const ents = s.ents.map(e => interp(e.id, 'ents') || e);
@@ -1889,6 +1906,16 @@ function setHTML(id, h) { const el = $(id); if (el.innerHTML !== h) el.innerHTML
 
 function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;
+  if (me.ro) { // on a rope
+    if (!me.ro[0]) return me.ro[2] < 0 ? 'LETTING GO…' : `CLIMBING ${Math.round(me.ro[3] * 100)}%`;
+    const r = m.ropes[me.ro[1]], atW = r && ropeAtWindow(r, x, y);
+    const what = !atW ? 'MOVE TO SLIDE ALONG THE WALL' : ropeWindowOpen(m, r) ? `<b>${label('vault')}</b>CLIMB IN` : `<b>${label('melee')}</b>BREAK THE BOARDS (OR SHOOT A WAY IN)`;
+    return `${what}  ·  <b>${label('interact')}</b>LET GO`;
+  }
+  if (side === 'atk' && s.ph === PHASE.ACTION && me.ct === 'body' && !me.dn && floorAt(m, x, y) === m.groundFloor) {
+    const h = ropeAt(m, x, y);
+    if (h) return `<b>${label('interact')}</b>RAPPEL UP TO ${m.floors[h[0].f].name}`;
+  }
   if (side === 'atk' && me.df && s.ph === PHASE.ACTION && !s.pl) {
     const b = m.sites[s.site].bombs.find(b => Math.hypot(b.x - x, b.y - y) < 30);
     if (b) return `<b>${label('interact')}</b>HOLD TO PLANT DEFUSER (BOMB ${b.id})`;

@@ -1,7 +1,7 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS,
   MAT, stopsBullet, penBullet, blocksDrone, blocksMove, other, DRONE_SPRINT } from '../shared/constants.js';
-import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt } from '../shared/map.js';
+import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
@@ -318,7 +318,7 @@ export class Game {
     p.barri = o.team === TEAM.DEF ? BARRICADES_EACH : 0;
     p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false;
-    p.sprints = DRONE_SPRINT.charges; p.sprintUntil = 0; p.sprintCd = 0;
+    p.rope = null; p.sprints = DRONE_SPRINT.charges; p.sprintUntil = 0; p.sprintCd = 0;
     p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0; p.staged = false;
     p.downedBy = null; p.nitroId = null; p.ai = {};
     p.boostUntil = 0; p.ghostUntil = 0; p.dazeUntil = 0; p.clampUntil = 0; p.plated = false; p.gasId = null;
@@ -402,6 +402,10 @@ export class Game {
   }
 
   mods(p) {
+    if (p.rope && p.rope.st === 'hang' && p.alive && !p.downed) { // hanging: slide along the wall (physics stepMove)
+      const r = this.map.ropes[p.rope.r];
+      return { rope: { x: r.hang.x, y: r.hang.y, tx: r.tx, ty: r.ty, a: r.a, b: r.b } };
+    }
     if (p.ctrl === 'drone') {
       const d = this.ent(p.droneId);
       return { drone: true, frozen: !d || this.jammedAt(d.x, d.y), sprint: this.time < (p.sprintUntil || 0) };
@@ -414,7 +418,7 @@ export class Game {
     if (this.time < (p.boostUntil || 0)) mul *= 1.25; // Adrenal Shot
     if (p.shrouded) mul *= 0.8;
     for (const e of this.ents) if (e.type === 'wire' && e.team !== this.side(p) && Math.hypot(e.x - p.x, e.y - p.y) < 24) { mul *= 0.3; break; }
-    const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') ||
+    const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || !!p.rope || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') ||
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
       (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK);
     return { armor: o.armor, mul, downed: p.downed, frozen };
@@ -455,6 +459,7 @@ export class Game {
       }
       if (this.time < (p.sprintUntil || 0) && this.time - (p.sprintNoiseT || 0) > 0.4) { const d = this.ent(p.droneId); if (d) { p.sprintNoiseT = this.time; this.noise(d.x, d.y, team, 260); } }
     } else if (this.time < (p.sprintUntil || 0)) { p.sprintUntil = this.time; p.sprintCd = this.time + DRONE_SPRINT.wait; }
+    this.tickRope(p, dt);
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
     { const g = p.guns[p.slot], rate = (1 / (g ? adsTime(WEAPONS[g.w]) : 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
       const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time) && !p.vault && !(p.recoverUntil > this.time);
@@ -534,7 +539,7 @@ export class Game {
     }
 
     // interaction (hold E)
-    if (inp.interact && p.ctrl === 'body') {
+    if (inp.interact && p.ctrl === 'body' && !p.rope && !p.ropeHeld) {
       if (!p.busy) p.busy = this.startInteract(p);
       if (p.busy) this.continueInteract(p, dt);
     } else p.busy = null;
@@ -559,7 +564,7 @@ export class Game {
     }
 
     // shooting
-    const canShoot = p.ctrl === "body" && !p.busy && !p.vault && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && !p.bracing && gun &&
+    const canShoot = p.ctrl === "body" && !p.busy && !p.vault && !(p.rope && p.rope.st !== 'hang') && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && !p.bracing && gun &&
       !(p.switchUntil > this.time) && !(p.staggerUntil > this.time);
     // a click made a hair before the gun is ready is kept until it is (up to 0.15 s), so fast tapping never loses a shot
     const click = p.click && !(this.time - (p.click.t ?? this.time) > 0.15) ? p.click : null; p.click = null;
@@ -813,7 +818,7 @@ export class Game {
       if (!this.headshot && q.hp > -35 && up > 1 && this.phase === PHASE.ACTION) {
         if (src && src.ms && src !== q) src.ms.downs++;
         q.downed = true; q.hp = DUR.bleedout; q.downedBy = src ? src.id : null; q.busy = null; q.ctrl = 'body';
-        q.scanning = false; q.bracing = false; q.reloadT = 0;
+        q.scanning = false; q.bracing = false; q.reloadT = 0; this.ropeFall(q);
         this.events.push({ e: 'down', id: q.id, by: src ? src.id : null });
         if (q.hasDefuser) this.dropDefuser(q);
       } else this.kill(q, src, wname);
@@ -822,6 +827,7 @@ export class Game {
 
   kill(q, src, wname) {
     if (!q.alive) return;
+    this.ropeFall(q);
     q.alive = false; q.downed = false; q.hp = 0; q.deaths++; q.busy = null; q.scanning = false; q.bracing = false;
     if (q.ctrl !== 'body') q.ctrl = 'body';
     if (src && src !== q && this.side(src) !== this.side(q)) { src.kills++; if (src.ms) { src.ms.kills++; this.opStat(src).kills++; } }
@@ -910,8 +916,55 @@ export class Game {
     }
   }
 
+  // ---------------- rappelling (he asked: attackers need a quicker way up; see addRopes in shared/map.js) ----------------
+  // p.rope = { st: 'move' | 'hang', r: the window you hang at (-1 = none), from, to (-1 = the ground), t, dur, base }
+  tickRope(p, dt) {
+    const inp = p.input || {}, prev = p.prevInput || {}, edge = k => inp[k] && !prev[k], R = this.map.ropes || [];
+    if (!inp.interact) p.ropeHeld = false; // E that started or ended a climb doesn't also start something else
+    if (!p.rope) {
+      if (!edge('interact') || this.phase !== PHASE.ACTION || this.side(p) !== TEAM.ATK || p.ctrl !== 'body' || p.downed || p.busy || p.vault || !p.alive) return;
+      const hit = ropeAt(this.map, p.x, p.y); if (!hit) return;
+      const [r, s] = hit;
+      p.rope = { st: 'move', r: -1, from: -1, to: r.i, s, t: 0, dur: ROPE_CLIMB * r.lvl, base: ropeGround(this.map, r, s) }; p.ropeHeld = true;
+      p.reloadT = 0; p.adsT = 0; p.burst = 0;
+      this.noise(p.x, p.y, this.side(p), 260); this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id });
+      return;
+    }
+    if (p.ctrl !== 'body') p.ctrl = 'body';
+    const o = p.rope, at = i => i === -2 ? o.top : i < 0 ? o.base : { x: R[i].hang.x + R[i].tx * (o.s || 0), y: R[i].hang.y + R[i].ty * (o.s || 0) };
+    if (o.st === 'hang') {
+      const r = R[o.r];
+      if (edge('interact')) { // let go: slide back down to the ground below you
+        p.rope = { st: 'move', r: -1, from: -2, to: -1, t: 0, dur: ROPE_DROP * r.lvl, base: ropeGround(this.map, r, ropeS(r, p.x, p.y)), top: { x: p.x, y: p.y } };
+        p.ropeHeld = true; p.adsT = 0; p.burst = 0; this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id });
+      }
+      return;
+    }
+    o.t += dt;
+    const P = at(o.t < o.dur * 0.5 ? o.from : o.to); p.x = P.x; p.y = P.y; p.vx = p.vy = 0; // halfway up you show at the top
+    if (o.t >= o.dur) {
+      if (o.to < 0) p.rope = null;
+      else { o.st = 'hang'; o.r = o.to; }
+    }
+  }
+  // shot off the rope: down on the ground below it
+  ropeFall(p) {
+    if (!p.rope) return;
+    const r = p.rope.st === 'hang' && this.map.ropes[p.rope.r], g = r ? ropeGround(this.map, r, ropeS(r, p.x, p.y)) : p.rope.base;
+    p.x = g.x; p.y = g.y; p.vx = p.vy = 0; p.rope = null;
+  }
+
   // Vault over the low thing in front of you (toward ang: where you're moving, else where you look).
   startVault(p, ang) {
+    if (p.rope) { // hanging outside a window: climb in once it is open
+      const r = p.rope.st === 'hang' && this.map.ropes[p.rope.r];
+      if (!r || !ropeWindowOpen(this.map, r) || !ropeAtWindow(r, p.x, p.y) || p.downed) return false;
+      p.rope = null;
+      p.vault = { x0: p.x, y0: p.y, x1: r.inside.x, y1: r.inside.y, t: 0, dur: VAULT_TIME * 1.3 };
+      this.noise(p.x, p.y, this.side(p), 320);
+      this.events.push({ e: 'snd', s: 'vault', x: r1(p.x), y: r1(p.y), id: p.id });
+      return true;
+    }
     if (p.vault || p.downed || p.ctrl !== 'body' || p.busy || this.time < p.stunUntil || this.time < (p.clampUntil || 0)) return false;
     if (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK) return false;
     const to = findVault(this.map, p.x, p.y, ang);
@@ -992,8 +1045,8 @@ export class Game {
       case 'reload': if (!p.downed && p.ctrl === 'body') this.startReload(p); break;
       case 'slot': if (!p.downed && p.guns[e.n] && e.n !== p.slot) { p.slot = e.n; p.reloadT = 0; p.fireCd = 0.35; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); } break;
       case 'melee': this.melee(p); break;
-      case 'ability': if (!p.downed && p.ctrl === 'body' && !p.busy) this.useAbility(p); break;
-      case 'gadget': if (!p.downed && p.ctrl === 'body' && !p.busy) this.useGadget(p); break;
+      case 'ability': if (!p.downed && p.ctrl === 'body' && !p.busy && !p.rope) this.useAbility(p); break;
+      case 'gadget': if (!p.downed && p.ctrl === 'body' && !p.busy && !p.rope) this.useGadget(p); break;
       case 'view': this.toggleView(p); break;
       case 'camNext': case 'camPrev': if (p.ctrl === 'cam' || p.ctrl === 'drone') this.cycleCam(p, e.k === 'camNext' ? 1 : -1); break;
       case 'camSet': if (p.ctrl === 'cam' || p.ctrl === 'drone') { const f = this.feeds(team).find(f => f.id === e.id); if (f) this.watch(p, f); } break;
@@ -1062,7 +1115,7 @@ export class Game {
   }
 
   melee(p) {
-    if (p.meleeCd > 0 || p.downed || p.ctrl !== 'body') return;
+    if (p.meleeCd > 0 || p.downed || p.ctrl !== 'body' || (p.rope && p.rope.st !== 'hang')) return;
     p.meleeCd = 0.75; p.fireCd = Math.max(p.fireCd, 0.45); // a swing takes a moment to recover from
     this.events.push({ e: 'melee', id: p.id });
     const team = this.side(p);
@@ -1747,7 +1800,7 @@ export class Game {
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
-        sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
+        rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ct: p.ctrl,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
         gt: r2(p.gait || 0), mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
@@ -1760,7 +1813,7 @@ export class Game {
       if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
-        bat: r1(p.battery), ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
+        bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur)] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
         m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0,
       }));

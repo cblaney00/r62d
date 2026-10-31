@@ -75,7 +75,7 @@ export function moveCircle(map, o, dx, dy, r, drone = false) {
 //   running (the default, like CS2 — no sprint) is a tactical jog with a gun up, 2.6 m/s for a 2-speed
 //   operator (2.3 heavy, 3.0 light); walking (Shift) 1.4 m/s, a normal walk; aiming down sights 1.5 m/s;
 //   crouch-walking 0.9 m/s; crawling while downed 0.5 m/s; a drone 3.2 m/s, a little quicker than a jog.
-export const M_S = { run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, downed: 0.5, drone: 3.2 };
+export const M_S = { run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, downed: 0.5, drone: 3.2, rope: 1.0 };
 export const BASE_SPEED = M_S.run * PX_PER_M;   // ~94 px/s (was 118)
 export const DRONE_SPEED = M_S.drone * PX_PER_M; // ~115 px/s (was 200)
 export const ARMOR_SPEED = { 1: 0.88, 2: 1.0, 3: 1.14 };
@@ -101,6 +101,11 @@ export function stepMove(map, o, input, dt, mods) {
   // Weight: velocity eases toward where you want to go instead of jumping there.
   o.vx = o.vx || 0; o.vy = o.vy || 0;
   if (mods.frozen) { o.vx = 0; o.vy = 0; return false; }
+  if (mods.rope) { // hanging on a rope outside a window: slide along the wall (he asked: outside-the-window play matters)
+    const R = mods.rope; let s = (o.x - R.x) * R.tx + (o.y - R.y) * R.ty;
+    s = Math.max(R.a, Math.min(R.b, s + (mx * R.tx + my * R.ty) * M_S.rope * PX_PER_M * dt));
+    o.x = R.x + R.tx * s; o.y = R.y + R.ty * s; o.vx = 0; o.vy = 0; return false;
+  }
   const accel = mods.drone ? (mods.sprint ? 1100 : 800) : len > 0 ? 500 : 760; // eased down with the slower speeds: same sense of weight
   let dvx = mx * spd - o.vx, dvy = my * spd - o.vy;
   const dl = Math.hypot(dvx, dvy), maxd = accel * dt;
