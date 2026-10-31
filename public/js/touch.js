@@ -39,6 +39,34 @@ export const viewMul = () => Math.max(0.8, Math.min(2, +(store('r62d-view') || (
 export function setUiScale(v) { store('r62d-uiscale', String(v)); fitUi(); }
 export function setViewMul(v) { store('r62d-view', String(v)); }
 
+// Tilt to move (he asked; phones only): tip the phone the way you want to walk. A small tilt past the dead zone walks
+// (silently), a bigger one runs; the stick still works too (a thumb on it wins). "Level" is however you hold the phone
+// when a match starts, or when you press ⟲ TILT. The dead zone (degrees) is adjustable in Settings.
+export const tiltOn = () => store('r62d-tilt') === '1';
+export const tiltDead = () => Math.max(2, Math.min(25, +(store('r62d-tiltdz') || 7)));
+export function setTilt(on) {
+  store('r62d-tilt', on ? '1' : '0');
+  try { if (on && typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) DeviceMotionEvent.requestPermission().catch(() => {}); } catch {} // iPhones ask first
+  tiltLevel = null;
+}
+export function setTiltDead(v) { store('r62d-tiltdz', String(v)); }
+const TILT_FULL = 16; // degrees past the dead zone for a full run
+let grav = null, tiltLevel = null; // smoothed gravity on the screen (x right, y up; 1 = straight down), and "level"
+const tiltV = { x: 0, y: 0 };
+addEventListener('devicemotion', e => {
+  const g = e.accelerationIncludingGravity; if (!g || g.x == null) return;
+  const a = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * Math.PI / 180;
+  const sx = (g.x * Math.cos(a) - g.y * Math.sin(a)) / 9.81, sy = (g.x * Math.sin(a) + g.y * Math.cos(a)) / 9.81; // turned to the screen
+  grav = grav ? { x: grav.x + (sx - grav.x) * 0.3, y: grav.y + (sy - grav.y) * 0.3 } : { x: sx, y: sy };
+  if (!tiltLevel) tiltLevel = { ...grav };
+  // tipping an edge down: that way. sin(angle) past the dead zone, scaled so dead zone + TILT_FULL° is a full push
+  let x = -(grav.x - tiltLevel.x), y = grav.y - tiltLevel.y; const l = Math.hypot(x, y);
+  const d0 = Math.sin(tiltDead() * Math.PI / 180), d1 = Math.sin((tiltDead() + TILT_FULL) * Math.PI / 180);
+  const k = l <= d0 ? 0 : Math.min(1, (l - d0) / (d1 - d0)) / l;
+  tiltV.x = x * k; tiltV.y = y * k;
+});
+export const tiltLevelNow = () => { tiltLevel = grav ? { ...grav } : null; };
+
 // button → the controller button number main.js already understands (PAD_ACTIONS in gamepad.js); 'lt' / 'rt' are the triggers
 // USE, VAULT and the camera arrows only show when they do something (he found the screen too cluttered)
 const BUTTONS = [
@@ -49,7 +77,7 @@ const BUTTONS = [
   { id: 'skill', label: 'SKILL', b: 5, cls: 'r r3 c1' }, { id: 'gadget', label: 'GADGET', b: 4, cls: 'r r3 c2' },
   { id: 'melee', label: 'MELEE', b: 11, cls: 'r r4 c1' }, { id: 'ping', label: 'PING', b: 12, cls: 'r r4 c2' },
   { id: 'view', label: 'DRONE / CAMS', b: 13, cls: 't t1' }, { id: 'prev', label: '◀', b: 14, cls: 't t2 hidden' }, { id: 'next', label: '▶', b: 15, cls: 't t3 hidden' },
-  { id: 'score', label: 'SCORES', b: 8, cls: 't t4' }, { id: 'pause', label: '❚❚', b: 9, cls: 't t5' },
+  { id: 'tiltc', label: '⟲ TILT', b: null, cls: 't t6 hidden' }, { id: 'score', label: 'SCORES', b: 8, cls: 't t4' }, { id: 'pause', label: '❚❚', b: 9, cls: 't t5' },
 ];
 const N = 16;
 const held = new Array(N).fill(false), trig = { lt: 0, rt: 0 }, tc = { lt: 0, rt: 0 }; // tc: fingers on each trigger button
@@ -66,7 +94,8 @@ export function touchPad() {
   if (!isTouch || !shown) return null;
   const pressed = held.map((v, i) => v && !prevHeld[i]), released = prevHeld.map((v, i) => v && !held[i]);
   prevHeld = held.slice();
-  return { name: 'Touch screen', ls: stickOf(ls), rs: stickOf(rs), rsDir: fireAim, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released };
+  const L = (ls.x || ls.y || !tiltOn()) ? ls : tiltV; // a thumb on the stick wins over tilting
+  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsDir: fireAim, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released };
 }
 export const touchActive = () => isTouch && shown;
 
@@ -114,6 +143,7 @@ function build() {
   // buttons: held while the finger that pressed them is down (wherever it slides)
   const pressButton = (id, el, x0, y0) => {
     const b = BUTTONS.find(q => q.id === el.dataset.id);
+    if (b.b === null) { tiltLevelNow(); el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 200); return; } // ⟲ TILT: how you hold it now is level
     const set = on => { el.classList.toggle('on', on); if (b.b === 'lt' || b.b === 'rt') { tc[b.b] = Math.max(0, tc[b.b] + (on ? 1 : -1)); trig[b.b] = tc[b.b] ? 1 : 0; } else held[b.b] = on; };
     set(true);
     let fx = x0, fy = y0, dragAim = false; // the right FIRE can be dragged to aim while shooting (like phone shooters)
@@ -166,6 +196,7 @@ export function setTouchVisible(on) {
   const upright = innerHeight > innerWidth;
   ui.querySelector('#tTurn').classList.toggle('hidden', !(on && upright));
   if (on === shown) return;
+  if (on) { tiltLevel = null; ui.querySelector('[data-id="tiltc"]').classList.toggle('hidden', !tiltOn()); } // a match starts level
   shown = on; ui.classList.toggle('hidden', !on); document.documentElement.classList.toggle('touchplay', on); keepAwake(on);
   if (!on) { releaseAll(); ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
 }

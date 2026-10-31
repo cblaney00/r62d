@@ -135,6 +135,17 @@ async function run() {
     await tap('#pause .menu button'); await sleep(800); await report('resumed from pause');
     // 11. scoreboard (hold)
     const SC = await centre('[data-id="score"]'); await touch(finger('S', [SC, [SC[0], SC[1], 50]], 800));
+    // 11b. tilt to move: switch it on, hold level, press ⟲ TILT, then tip the right edge down / the top edge down
+    const tiltFor = (x, y, ms) => js(`new Promise(r => { const t0 = performance.now(); const go = () => { dispatchEvent(new DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: { x: ${x}, y: ${y}, z: 9 } })); if (performance.now() - t0 < ${ms}) setTimeout(go, 16); else r(true); }; go(); })`);
+    await js("localStorage.setItem('r62d-tilt', '1'); localStorage.setItem('r62d-tiltdz', '7'); true");
+    await tap('[data-id="pause"]'); await sleep(500); await tap('#pResume'); await sleep(500); // re-shows the controls with ⟲ TILT
+    await tiltFor(0, 3, 400); await tap('[data-id="tiltc"]'); await tiltFor(0, 3, 300); await report('tilt on, held level');
+    await shot('t8b-tilt');
+    await tiltFor(2.0, 3, 1500); await report('left edge tipped ~12° (should walk left)');
+    await tiltFor(5.0, 3, 1500); await report('left edge tipped ~30° (should run left, faster)');
+    await tiltFor(-0.6, 3, 1000); await report('tipped ~3.5° (inside dead zone: no move)');
+    await tiltFor(0, 5.5, 1500); await report('top edge tipped back (should go down)');
+    await tiltFor(0, 3, 300); await js("localStorage.setItem('r62d-tilt', '0'); true");
     // 12. hunt the bot: walk around for a while with a thumb on each stick, firing in bursts
     for (let i = 0; i < 4; i++) {
       const a = i * Math.PI / 2;

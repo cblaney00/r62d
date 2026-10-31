@@ -677,3 +677,5 @@ html.touch * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) tr
 .armTouch button.fire { width: 120px; height: 120px; border-radius: 50%; background: rgba(200,50,40,0.6); border-color: rgba(255,120,100,0.8); }
 .armTouch button.on { background: rgba(242,193,78,0.7); color: #000; }
 html.touch #armCanvas { touch-action: none; }
+#touchUI .tbtn.t6 { right: auto; left: max(20px, env(safe-area-inset-left)); top: auto; bottom: 168px; width: 84px; } /* ⟲ TILT, above the move stick */
+#settings .phoneOnly { display: none; } html.touch #settings .phoneOnly { display: flex; }

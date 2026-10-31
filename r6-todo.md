@@ -6,9 +6,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] balance the attachments and add more attachments that make sense based on the type of gun
 
 ## Done
 
+- [x] Tilt to move (phones only): Settings → "Tilt the phone to move" On/Off and a "Tilt dead zone" slider (2–25°, starts at 7°). Tip the phone the way you want to go: a small tilt walks quietly, a bigger one runs, inside the dead zone you stand still. The left stick still works alongside it (a thumb on the stick wins). "Level" is however you hold the phone when the match starts; the ⟲ TILT button above the stick resets it to how you hold it now. Works for drones too.
 - [x] Played it with (pretend) thumbs on a phone-sized screen and fixed what felt bad: two thumbs at once now always work (moving while aiming or shooting), you can slide your thumb on FIRE to aim while shooting, the move stick comes to wherever your left thumb lands, RESUME in the pause menu works (it used to pop the pause menu straight back), the match screen is slimmer (skill/gadget/drone counts sit on their buttons), the camera keeps you near the middle instead of under your thumbs at the map's edge, the tutorial speaks in buttons instead of keys and its banner no longer gets in the way, menu pages fill the screen, the Armory works by touch, the screen stays awake during a match, and phones start on Medium graphics so they run smoothly.
 - [x] Phones on Firefox, second go: the game now really goes full screen (Firefox only allows it when a tap ends, not when a finger lands, so every tap asks until it works). Bigger text in menus and matches, bigger touch buttons, and fewer of them: USE and VAULT only pop up beside FIRE when there's something to use or climb, and the camera arrows only while watching a drone or camera. Prompts say the button name ("USE") instead of a key. Menus scroll with a finger. On a drone the CROUCH button becomes SPRINT (a light push used to sprint by accident). The game can also be added to the phone's home screen to open full screen.
 - [x] Phones: the game tells a phone apart by itself (touch controls); if a device has both a touch screen and a mouse it asks on the title screen ("Phone / tablet" or "Keyboard & mouse"). The choice is remembered and can be changed in Settings → Controls.

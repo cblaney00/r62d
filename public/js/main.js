@@ -21,7 +21,7 @@ import { levelFor } from '/shared/progress.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
 import { walkRay, tileAt, findVault } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
-import { touchPad, touchContext, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul } from './touch.js';
+import { touchPad, touchContext, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
 import { blocksSight, FL } from '/shared/constants.js';
 
 const $ = id => document.getElementById(id);
@@ -2392,6 +2392,11 @@ for (const b of $('inputSeg').querySelectorAll('button')) {
   u.value = Math.round(uiScale() * 100); v.value = Math.round(viewMul() * 100); show();
   u.addEventListener('input', () => { show(); setUiScale(u.value / 100); });
   v.addEventListener('input', () => { show(); setViewMul(v.value / 100); }); }
+{ // phone: tilt to move (on/off + dead zone), kept on this device
+  const seg = $('tiltSeg'), dz = $('tiltDz'), show = () => { for (const b of seg.children) b.classList.toggle('on', (b.dataset.t === '1') === tiltOn()); $('tiltDzVal').textContent = dz.value + '°'; };
+  dz.value = tiltDead(); show();
+  for (const b of seg.children) b.onclick = () => { audio.ui(); setTilt(b.dataset.t === '1'); show(); };
+  dz.addEventListener('input', () => { setTiltDead(+dz.value); show(); }); }
 $('splash').addEventListener('click', () => {
   if (st.started) return;
   audio.initAudio(); audio.ui('open');
