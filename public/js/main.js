@@ -22,6 +22,7 @@ import {  } from '/shared/operators.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
 import { walkRay, tileAt, findVault } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
+import { touchPad, touchActive, setTouchVisible, touchAimReset } from './touch.js';
 import { blocksSight, FL } from '/shared/constants.js';
 
 const $ = id => document.getElementById(id);
@@ -171,7 +172,7 @@ function turnMove(dx, dy) {
 // controller state (merged with the keyboard and mouse in sendInput)
 const gpk = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0 };
 let gpT = -1e9, mouseT = 0, gpLastL = 0, gpName = '';
-const gpRecent = () => gpT > mouseT && performance.now() - gpT < 4000;
+const gpRecent = () => touchActive() || (gpT > mouseT && performance.now() - gpT < 4000);
 // world <-> screen pixels, allowing for a turned view (st.rot, Rotate aiming)
 function w2s(x, y) {
   const z = st.zoom || 1, c = Math.cos(st.rot || 0), s = Math.sin(st.rot || 0), dx = (x - st.cam.x) * z, dy = (y - st.cam.y) * z;
@@ -560,7 +561,7 @@ function vaultDir() {
 }
 // Read the controller once a frame and turn it into the same actions as the keyboard and mouse.
 function pollPad(dt, view) {
-  const gp = readPad();
+  const gp = readPad() || touchPad(); // a real controller first, else the phone's touch controls (touch.js)
   if (!gp) { if (gpName) { for (const k in gpk) gpk[k] = 0; gpName = ''; renderSettings(); } return; }
   if (!gpName) { gpName = gp.name; renderSettings(); }
   const { ls, rs } = gp;
@@ -584,10 +585,12 @@ function pollPad(dt, view) {
   gpk.down = ls.l && ny > 0.38 ? 1 : 0; gpk.up = ls.l && ny < -0.38 ? 1 : 0;
   gpk.walk = ls.l && ls.l < 0.55 ? 1 : 0;
   if (gp.rt > 0.35 && !gpk.fire) mouse.wl++; // a trigger pull also counts as a click (next teammate, ping in a camera)
+  const aimReset = gp.lt > 0.35 && !gpk.ads && touchActive();
+  if (aimReset) { padReach = 0.22; touchAimReset(); } // phone (he asked): aiming in pulls the crosshair in to ~2.5 m, like the mouse's aim-in reset
   gpk.fire = gp.rt > 0.35 ? 1 : 0; gpk.ads = gp.lt > 0.35 ? 1 : 0;
   // right stick: aim. A stick snapping back to the middle when let go is ignored, so the aim stays put.
   const falling = (gpLastL - rs.l) / Math.max(dt, 1e-3) > 4;
-  if (rs.l > 0.05 && !falling) {
+  if (rs.l > 0.05 && !falling && !aimReset) { // (the frame you aim in on a phone keeps the pulled-in crosshair)
     if (view && view.kind === 'cam') { mouse.x = VW / 2 + rs.x / rs.l * VH * 0.25; mouse.y = VH / 2 + rs.y / rs.l * VH * 0.25; }
     else { padAng = Math.atan2(rs.y, rs.x); padReach = rs.l; }
   }
@@ -612,6 +615,7 @@ cv.addEventListener('mousemove', e => {
 });
 cv.addEventListener('mousedown', e => {
   audio.initAudio();
+  if (touchActive()) return; // on a phone, firing and aiming come from the touch controls (touch.js), not taps on the map
   if (coach.blocking && e.button === 0) { // a tutorial card to read: the click dismisses it (and takes control), it doesn't shoot
     coach.space(st.last);
     if (playing() && !menuOpen() && document.pointerLockElement !== cv) { st.lockAsked = true; cv.requestPointerLock?.(); }
@@ -1114,6 +1118,7 @@ function frame(nowMs) {
 
   // --- input & prediction ---
   pollPad(dt, view);
+  setTouchVisible(playing() && !menuOpen() && !!st.me && $('pause').classList.contains('hidden')); // phone controls only while playing
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
   st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
   audio.setListenerRot(st.rot);
@@ -2429,7 +2434,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, showEnd, playXp, siteFound, freeMove, turnMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { PF, st, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.

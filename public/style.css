@@ -580,3 +580,37 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 #compass { position: absolute; top: 92px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
 #compass canvas { width: 64px; height: 64px; }
 #compass b { margin-top: 2px; font: 700 14px var(--head); letter-spacing: 0.1em; color: #f2c14e; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; }
+/* phone / tablet controls (touch.js; he asked: they pop up by themselves on mobile) */
+html.touch, html.touch body { touch-action: none; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
+#touchUI { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
+#touchUI > * { pointer-events: auto; touch-action: none; }
+#touchUI .tzone { position: absolute; left: 50%; right: 0; top: 0; bottom: 0; }
+#touchUI .tstick { position: absolute; width: 124px; height: 124px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: rgba(10,14,18,0.25); }
+#touchUI .tstick i { position: absolute; left: 37px; top: 37px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.4); box-shadow: 0 0 0 2px rgba(0,0,0,0.4); }
+#touchUI #tsLeft { left: max(28px, env(safe-area-inset-left)); bottom: 28px; }
+#touchUI .tstick.dyn { pointer-events: none; border-color: rgba(242,193,78,0.55); }
+#touchUI .tstick.dyn i { background: rgba(242,193,78,0.55); }
+#touchUI .tbtn { position: absolute; min-width: 0; padding: 0; width: 58px; height: 40px; border-radius: 10px; font: 700 11px var(--head); letter-spacing: 0.05em;
+  background: rgba(10,14,18,0.55); border: 1px solid rgba(255,255,255,0.3); color: #fff; z-index: 2; }
+#touchUI .tbtn.on { background: rgba(242,193,78,0.6); color: #000; }
+#touchUI .tbtn.fire { width: 84px; height: 84px; border-radius: 50%; font-size: 15px; background: rgba(200,50,40,0.5); border-color: rgba(255,120,100,0.7); }
+#touchUI .tbtn.fire.left { left: max(170px, calc(env(safe-area-inset-left) + 150px)); bottom: 120px; }
+#touchUI .tbtn.fire.right { right: max(24px, env(safe-area-inset-right)); bottom: 28px; }
+#touchUI .tbtn.r { right: max(24px, env(safe-area-inset-right)); } #touchUI .tbtn.r.c1 { right: calc(max(24px, env(safe-area-inset-right)) + 64px); }
+#touchUI .tbtn.r1 { bottom: 122px; } #touchUI .tbtn.r2 { bottom: 160px; } #touchUI .tbtn.r3 { bottom: 198px; } #touchUI .tbtn.r4 { bottom: 236px; } #touchUI .tbtn.r5 { bottom: 274px; }
+#touchUI .tbtn.r { height: 34px; }
+#touchUI .tbtn.t { top: 8px; height: 34px; }
+#touchUI .tbtn.t1 { right: 236px; width: 104px; } #touchUI .tbtn.t2 { right: 190px; width: 40px; } #touchUI .tbtn.t3 { right: 144px; width: 40px; }
+#touchUI .tbtn.t4 { right: 72px; width: 66px; } #touchUI .tbtn.t5 { right: 24px; width: 42px; }
+#tTurn { position: fixed; inset: 0; z-index: 90; background: rgba(5,7,9,0.96); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font: 700 22px var(--head); letter-spacing: 0.08em; color: #fff; text-align: center; padding: 30px; }
+#tTurn b { font-size: 64px; color: #f2c14e; }
+/* make room for the thumbs: health and ammo move up out of the corners */
+html.touch #lobby, html.touch #splash > *, html.touch #select, html.touch #endscreen, html.touch .overlay > *, html.touch #settings, html.touch #pause,
+html.touch #quitDlg, html.touch #loading > *, html.touch #corner, html.touch #help, html.touch #conn, html.touch #countdown { zoom: var(--uiz, 1); }
+html.touch #hud, html.touch #coach, html.touch #chat, html.touch #siteFound { zoom: var(--hudz, 1); }
+html.touch #bl { bottom: auto; top: 70px; }
+html.touch #br { bottom: auto; top: 172px; right: auto; left: 18px; text-align: left; }
+html.touch #hud #feed, html.touch #hud #killfeed { margin-top: 56px; }
+html.touchplay #corner { display: none; }
+html.touch #chat { bottom: 150px; }
+html.touch #clickIn { display: none !important; }

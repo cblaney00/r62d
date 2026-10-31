@@ -22,6 +22,7 @@ ws.onopen = async () => {
     const ctx = (await call('browsingContext.create', { type: 'tab' })).context;
     await call('browsingContext.setViewport', { context: ctx, viewport: { width: 1600, height: 900 } });
     for (const s of steps) {
+      if (s.viewport) await call('browsingContext.setViewport', { context: ctx, viewport: { width: s.viewport[0], height: s.viewport[1] } });
       if (s.url) await call('browsingContext.navigate', { context: ctx, url: s.url, wait: 'complete' });
       if (s.js) {
         const r = await call('script.evaluate', { expression: s.js, target: { context: ctx }, awaitPromise: true });
