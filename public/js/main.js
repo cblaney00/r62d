@@ -58,7 +58,7 @@ if (!GFX[gfxName] && gfxName !== 'auto') gfxName = 'auto';
 let autoLevel = (() => {
   try { const s = localStorage.getItem('r62d-gfx-auto'); if (GFX[s]) return s; } catch {}
   const weak = (navigator.hardwareConcurrency || 4) <= 4 || (navigator.deviceMemory && navigator.deviceMemory <= 4);
-  return weak ? 'medium' : 'high';
+  return weak || isTouch ? 'medium' : 'high'; // phones start at Medium (map pictures at High take a lot of a phone browser's memory)
 })();
 const gfxLevel = () => (gfxName === 'auto' ? autoLevel : gfxName);
 let gq = GFX[gfxLevel()];

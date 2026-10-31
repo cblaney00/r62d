@@ -51,6 +51,15 @@ async function run() {
     await js(`document.exitFullscreen && document.exitFullscreen().catch(() => {}); Element.prototype.requestFullscreen = () => Promise.reject(); true`); await sleep(800);
     await call('browsingContext.setViewport', { context: ctx, viewport: { width: +W, height: +H } });
     await shot('t1-menu');
+    if (process.env.SCENARIO === 'menus') { // every menu page by thumb
+      for (const t of ['ops', 'armory', 'maps', 'profile', 'settings', 'controls']) {
+        const ok = await tap(`[data-tab="${t}"]`); await sleep(2500); await shot('v-' + t);
+        if (t === 'armory') { const c = [W * 0.4, H * 0.5]; await touch(finger('a', [c, [c[0] + 25, c[1] - 10, 300]], 200)); const fb = await centre('.armTouch .fire'); if (fb) await touch(finger('f', [fb, [fb[0], fb[1], 50]], 900)); await sleep(300); await shot('v-armory-touched'); }
+        console.log(t, ok, 'open overlays:', await js("[...document.querySelectorAll('.overlay:not(.hidden), #settings:not(.hidden)')].map(e => e.id).join(',')"));
+        await js("window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' }))"); await sleep(600);
+      }
+      return;
+    }
     if (process.env.SCENARIO === 'tut') { // the tutorial, by thumb: tap through its cards and pick by tapping
       await tap('[data-tab="free"]'); await sleep(800); await shot('u0-free-tab');
       await tap('[data-tab="tutorial"]'); await sleep(800); await shot('u1-tut-tab');

@@ -9,6 +9,7 @@ import { WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP,
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
+import { isTouch } from './touch.js';
 
 const M = PX_PER_M; // world pixels per metre, the same as a match
 const CLASS_ORDER = ['AR', 'SMG', 'MP', 'LMG', 'DMR', 'Shotgun', 'Pistol'];
@@ -51,6 +52,27 @@ export function openArmory(el, opts) {
     if (e.button === 2) { S.mouse.r = true; const l = Math.hypot(S.aim.x, S.aim.y) || 1; S.aim = { x: S.aim.x / l * 2.5 * M, y: S.aim.y / l * 2.5 * M }; } // aiming in: 2.5 m out, as in a match
   };
   cv.oncontextmenu = e => e.preventDefault();
+  if (isTouch && !el.querySelector('.armTouch')) { // phone: drag on the range to aim; FIRE / AIM (held) and RELOAD buttons
+    const bar = document.createElement('div'); bar.className = 'armTouch';
+    bar.innerHTML = '<button data-a="reload">RELOAD</button><button data-a="ads">AIM</button><button data-a="fire" class="fire">FIRE</button>';
+    cv.parentElement.appendChild(bar);
+    for (const b of bar.querySelectorAll('button')) {
+      const a = b.dataset.a;
+      b.addEventListener('touchstart', e => {
+        e.preventDefault(); audio.initAudio(); b.classList.add('on');
+        if (a === 'fire') { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; }
+        if (a === 'ads') { S.mouse.r = true; const l = Math.hypot(S.aim.x, S.aim.y) || 1; S.aim = { x: S.aim.x / l * 2.5 * M, y: S.aim.y / l * 2.5 * M }; }
+        if (a === 'reload') reload();
+      }, { passive: false });
+      const up = () => { b.classList.remove('on'); if (a === 'fire') S.mouse.l = false; if (a === 'ads') S.mouse.r = false; };
+      b.addEventListener('touchend', up); b.addEventListener('touchcancel', up);
+    }
+    let fid = null, fx = 0, fy = 0;
+    cv.addEventListener('touchstart', e => { e.preventDefault(); audio.initAudio(); if (fid !== null) return; const t = e.changedTouches[0]; fid = t.identifier; fx = t.clientX; fy = t.clientY; }, { passive: false });
+    cv.addEventListener('touchmove', e => { for (const t of e.changedTouches) if (t.identifier === fid) { const k = 1.6 * O.dpr(); freeMove((t.clientX - fx) * k, (t.clientY - fy) * k); fx = t.clientX; fy = t.clientY; } }, { passive: true });
+    const tend = e => { for (const t of e.changedTouches) if (t.identifier === fid) fid = null; };
+    cv.addEventListener('touchend', tend); cv.addEventListener('touchcancel', tend);
+  }
   S.up = e => { if (e.button === 0) S.mouse.l = false; if (e.button === 2) S.mouse.r = false; };
   S.key = e => { if (e.code === 'KeyR') reload(); };
   S.lock = () => { S.lockAsked = false; if (document.pointerLockElement !== cv) { S.unlockT = performance.now(); S.mouse.l = S.mouse.r = false; } };
@@ -150,7 +172,7 @@ function w2s(cv, x, y) { return { x: (x - S.cam.x) * S.z + cv.width / 2, y: (y -
 // the point you aim at, held at the range's walls like a wall holds it in a match
 function aimPoint(cv) {
   let x, y;
-  if (O.mode() === 'cursor') { const p = screenToWorld(cv, S.mouse.x, S.mouse.y); x = p.x; y = p.y; }
+  if (O.mode() === 'cursor' && !isTouch) { const p = screenToWorld(cv, S.mouse.x, S.mouse.y); x = p.x; y = p.y; }
   else { x = S.aim.x; y = S.aim.y; }
   let l = Math.hypot(x, y) || 1; const c = x / l, s = y / l;
   if (s < -1e-6) l = Math.min(l, farEnd() / -s); if (s > 1e-6) l = Math.min(l, 60 / s);
@@ -292,8 +314,8 @@ function draw(cv, dt) {
   c.textAlign = 'right'; c.font = `700 ${30 * dpr}px Barlow Condensed, sans-serif`; c.fillStyle = '#fff';
   c.fillText(S.reloadT > 0 ? 'RELOADING' : `${S.ammo} / ${w.mag}`, cv.width - 16 * dpr, cv.height - 16 * dpr);
   c.textAlign = 'left'; c.font = `600 ${14 * dpr}px Barlow Condensed, sans-serif`; c.fillStyle = 'rgba(255,255,255,0.6)';
-  c.fillText('Left mouse: shoot   ·   Right mouse: aim in   ·   R: reload   ·   Esc: let go of the mouse', 14 * dpr, cv.height - 18 * dpr);
-  if (document.pointerLockElement !== cv) { // not captured yet: the first click only takes control, as in a match
+  c.fillText(isTouch ? 'Drag on the range to aim   ·   hold FIRE to shoot, AIM to aim in' : 'Left mouse: shoot   ·   Right mouse: aim in   ·   R: reload   ·   Esc: let go of the mouse', 14 * dpr, cv.height - 18 * dpr);
+  if (document.pointerLockElement !== cv && !isTouch) { // not captured yet: the first click only takes control, as in a match
     const a = 0.65 + 0.35 * Math.sin(performance.now() / 260);
     c.textAlign = 'center'; c.font = `700 ${26 * dpr}px Barlow Condensed, sans-serif`; c.fillStyle = `rgba(255,255,255,${a})`;
     c.lineWidth = 4 * dpr; c.strokeStyle = 'rgba(0,0,0,0.6)'; c.strokeText('CLICK TO TAKE CONTROL', cv.width / 2, cv.height * 0.42); c.fillText('CLICK TO TAKE CONTROL', cv.width / 2, cv.height * 0.42);

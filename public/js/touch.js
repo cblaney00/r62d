@@ -166,7 +166,7 @@ export function setTouchVisible(on) {
   const upright = innerHeight > innerWidth;
   ui.querySelector('#tTurn').classList.toggle('hidden', !(on && upright));
   if (on === shown) return;
-  shown = on; ui.classList.toggle('hidden', !on); document.documentElement.classList.toggle('touchplay', on);
+  shown = on; ui.classList.toggle('hidden', !on); document.documentElement.classList.toggle('touchplay', on); keepAwake(on);
   if (!on) { releaseAll(); ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
 }
 // Menus and match text shrink to fit small screens (the game picture itself always fills the screen), times the
@@ -184,3 +184,12 @@ function fitUi() {
 if (isTouch) document.documentElement.classList.add('touch');
 fitUi(); addEventListener('resize', fitUi);
 addEventListener('touchend', goFull, true); addEventListener('click', goFull, true);
+
+// keep a phone's screen awake during a match (it would dim and lock mid-round otherwise)
+let wake = null;
+function keepAwake(on) {
+  try {
+    if (on && !wake && navigator.wakeLock) navigator.wakeLock.request('screen').then(w => { wake = w; w.addEventListener('release', () => { wake = null; }); }).catch(() => {});
+    else if (!on && wake) { wake.release().catch(() => {}); wake = null; }
+  } catch {}
+}

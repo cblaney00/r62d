@@ -667,3 +667,13 @@ html.touch #coach.task { top: 74px; width: min(560px, 54vw); padding: 10px 16px;
 html.touch #coach.task .cTitle { font-size: 19px; margin-bottom: 3px; } html.touch #coach.task .cDots { display: none; }
 html.touch #coach.task .cFoot { margin-top: 6px; } html.touch #coach button[data-skip] { pointer-events: auto; padding: 6px 12px; font: 700 13px var(--head); letter-spacing: 0.1em; }
 html.touch #coach.task.sel { top: auto; bottom: 26px; left: auto; right: 12px; transform: none; width: min(520px, 52vw); } /* operator select: over the loadout, clear of the cards */
+/* phone: menu pages (operators, armory, map knowledge, profile) fill the screen, with slim dark scroll bars */
+html.touch .overlay .page { width: calc(100vw / var(--uiz, 1)); height: calc(100vh / var(--uiz, 1)); max-height: none; overflow: hidden; border: none; }
+html.touch * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
+/* Armory on a phone: big buttons over the bottom right of the range */
+.armMid { position: relative; }
+.armTouch { position: absolute; right: 14px; bottom: 60px; display: flex; gap: 12px; align-items: flex-end; }
+.armTouch button { width: 96px; height: 64px; font: 800 18px var(--head); letter-spacing: 0.08em; background: rgba(10,14,18,0.7); border: 1px solid rgba(255,255,255,0.35); border-radius: 12px; touch-action: none; }
+.armTouch button.fire { width: 120px; height: 120px; border-radius: 50%; background: rgba(200,50,40,0.6); border-color: rgba(255,120,100,0.8); }
+.armTouch button.on { background: rgba(242,193,78,0.7); color: #000; }
+html.touch #armCanvas { touch-action: none; }

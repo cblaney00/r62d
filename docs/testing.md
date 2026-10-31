@@ -19,3 +19,14 @@ Plays 10 bots through a full match (25 sim-minutes max). Prints each round's win
   `__r62d.st.ws.send(JSON.stringify({t:'free', a:'tp', x, y, id?, aim?, hold?}))` — moves you (or a bot by `id`;
   `hold: 1` freezes that bot). Set `localStorage['r62d-aim']='cursor'` before joining and dispatch `mousemove` on
   the window to aim. `import('/shared/map.js')` gives helpers such as `stairEnds(map, i)` for spots.
+
+## Playing as a phone (simulated thumbs)
+`tests/thumbs.mjs` drives Firefox with real touch events (WebDriver BiDi `input.performActions`, pointerType touch,
+several fingers at once) at 914×412 and prints position / aim / shots after each move:
+1. Fast server on a spare port with throwaway data: `R62D_FAST=1 PORT=6263 R62D_DATA=<tmp> node server/server.js`.
+2. A Firefox profile (made as insideabush) whose `user.js` has
+   `user_pref("general.useragent.override", "Mozilla/5.0 (Android 14; Mobile; rv:133.0) Gecko/133.0 Firefox/133.0");` and
+   `user_pref("dom.w3c_touch_events.enabled", 1);`, started headless with `--remote-debugging-port 9333`.
+3. `node tests/thumbs.mjs 9333 <outdir> http://localhost:6263/` — free play by thumb; `SCENARIO=tut` taps through the
+   tutorial, `SCENARIO=menus` opens every menu page (and shoots in the Armory).
+Don't `pkill -f` a pattern that also appears in the same shell command line (it kills that shell); put it in a script.
