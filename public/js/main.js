@@ -13,6 +13,7 @@ import * as audio from './audio.js';
 import { openOps, closeOps, updateOpsProfile, showLoadout } from './ops.js';
 import { openProfile } from './profile.js';
 import { openArmory, closeArmory, armoryHoldsEsc } from './armory.js';
+import { openMapInfo, closeMapInfo } from './mapinfo.js';
 import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './crosshair.js';
 import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
@@ -2164,7 +2165,7 @@ function revealSeen() {
 function revealAll() { if (!st.unseen) return; for (const k of st.unseen) applyKnown(k); st.unseen.clear(); }
 
 // ---------------- pause menu & pages ----------------
-const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'armoryPage', 'pause', 'quitDlg'];
+const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage', 'pause', 'quitDlg'];
 function menuOpen() { return OVERLAYS.some(id => !$(id).classList.contains('hidden')); }
 function inMatch() { const p = st.last && st.last.ph; return p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END || p === PHASE.SELECT; }
 function showOps(op) { audio.ui('open'); openOps($('opsPage'), { profile: st.profile, send, op }); }
@@ -2172,8 +2173,8 @@ function showProfile() { audio.ui('open'); if (st.token) openProfile($('profileP
 // Esc closes whatever is open, otherwise opens/closes the pause menu during a match.
 function escape() {
   if (!$('armoryPage').classList.contains('hidden') && armoryHoldsEsc()) return; // Esc first lets go of the captured mouse, as in a match
-  for (const id of ['settings', 'opsPage', 'profilePage', 'armoryPage']) if (!$(id).classList.contains('hidden')) {
-    if (id === 'opsPage') closeOps($(id)); else if (id === 'armoryPage') closeArmory($(id)); else $(id).classList.add('hidden');
+  for (const id of ['settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage']) if (!$(id).classList.contains('hidden')) {
+    if (id === 'opsPage') closeOps($(id)); else if (id === 'armoryPage') closeArmory($(id)); else if (id === 'mapsPage') closeMapInfo($(id)); else $(id).classList.add('hidden');
     return;
   }
   if (!$('quitDlg').classList.contains('hidden')) { $('quitDlg').classList.add('hidden'); audio.ui('back'); return; }
@@ -2202,6 +2203,7 @@ $('pEnd').onclick = () => { if (st.tutorial || st.free) return switchMatch(null)
 $('lobbyOpsBtn').onclick = () => showOps();
 $('lobbyProfBtn').onclick = () => showProfile();
 $('armoryPage').querySelector('.close').onclick = () => closeArmory($('armoryPage'));
+$('mapsPage').querySelector('.close').onclick = () => closeMapInfo($('mapsPage'));
 for (const id of ['opsPage', 'profilePage']) $(id).querySelector('.close').onclick = () => { if (id === 'opsPage') closeOps($(id)); else $(id).classList.add('hidden'); };
 
 // ---------------- title screen, main menu, little touches ----------------
@@ -2221,6 +2223,7 @@ function setTab(tab) {
   if (tab === 'ops') { showOps(); return; }
   if (tab === 'profile') { showProfile(); return; }
   if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR }); return; }
+  if (tab === 'maps') { audio.ui('open'); openMapInfo($('mapsPage')); return; }
   if (tab === 'settings') { toggleSettings(); return; }
   if (tab === 'quit') { $('quitDlg').classList.remove('hidden'); audio.ui('open'); return; }
   for (const b of $('mnav').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);

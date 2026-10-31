@@ -525,3 +525,27 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 #stairPip.on { opacity: 1; }
 #stairPip canvas { width: 100%; height: 100%; display: block; }
 #stairPip b { position: absolute; left: 0; right: 0; top: 0; padding: 4px 8px; font: 700 14px var(--head); letter-spacing: 0.12em; color: #fff; background: linear-gradient(rgba(0,0,0,0.7), transparent); }
+/* Map knowledge page */
+.mkWrap { flex: 1; display: flex; gap: 14px; padding: 14px 18px 18px; min-height: 0; }
+#mkList { width: 190px; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+#mkList button { display: flex; flex-direction: column; align-items: flex-start; padding: 10px 12px; text-align: left; flex-shrink: 0; }
+#mkList button span { color: var(--dim); font-size: 13px; }
+#mkList button.on { border-color: var(--gold); color: var(--gold); }
+.mkMid { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+#mkFloors { align-self: flex-start; }
+#mkCanvas { flex: 1; width: 100%; min-height: 0; border: 1px solid var(--line); background: #0b0e12; }
+#mkSide { width: 300px; overflow: auto; }
+#mkSide h3 { margin: 0 0 4px; font: 800 24px var(--head); letter-spacing: 0.08em; }
+#mkSide h4 { margin: 16px 0 8px; font: 700 15px var(--head); letter-spacing: 0.16em; text-transform: uppercase; }
+#mkSide h4 small { display: block; font: 500 12px var(--body); letter-spacing: 0; text-transform: none; color: var(--dim); margin-top: 2px; }
+#mkSide .dim { color: var(--dim); } #mkSide .small { font-size: 13px; }
+.mkSites { display: flex; flex-direction: column; gap: 5px; }
+.mkSites button { display: flex; align-items: center; gap: 9px; padding: 7px 10px; text-align: left; }
+.mkSites button i { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; border: 1px solid #000; }
+.mkSites button b { flex: 1; font-weight: 600; }
+.mkSites button span { color: var(--dim); font-size: 13px; }
+.mkSites button.on { border-color: var(--gold); background: rgba(242,193,78,0.12); }
+.mkLayers { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+.mkLayers button { display: flex; align-items: center; gap: 7px; padding: 6px 8px; font-size: 13px; text-align: left; opacity: 0.45; }
+.mkLayers button.on { opacity: 1; border-color: rgba(255,255,255,0.35); }
+.mkLayers button i { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
