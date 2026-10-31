@@ -941,6 +941,68 @@ function siteFound(s) {
   clearTimeout(st.foundT); st.foundT = setTimeout(() => { box.classList.add('out'); setTimeout(() => box.classList.add('hidden'), 600); }, 6000);
 }
 
+// Compass to the bomb site (he asked): once the objective is found (defenders always know it), a dial under the score
+// bar points along the walking route to the site rooms — not straight through walls — and when that route goes
+// up or down it points to the stairs (or hatch) instead and says which way. The route is a breadth-first search over
+// what your team knows of the map (st.known), recomputed a few times a second.
+const WALKISH = new Set([T.FLOOR, T.GROUND, T.STAIR, T.OPEN, T.HATCH, T.HATCHR, T.HOLE, T.BARRI, T.RUBBLE]);
+function compassRoute(s, from) {
+  const m = st.map, K = st.known || m, site = m.sites[s.site], W = m.W, N = W * m.H;
+  const start = Math.floor(from.y / CELL) * W + Math.floor(from.x / CELL);
+  if (start < 0 || start >= N) return null;
+  const inSite = k => { const x = k % W, y = (k / W) | 0; return m.rooms.some(r => site.rooms.includes(r.name) && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h); };
+  if (inSite(start)) return { here: true };
+  const prev = st.cmpPrev && st.cmpPrev.length === N ? st.cmpPrev.fill(-2) : (st.cmpPrev = new Int32Array(N).fill(-2));
+  const q = st.cmpQ && st.cmpQ.length === N ? st.cmpQ : (st.cmpQ = new Int32Array(N));
+  let h = 0, t = 0, goal = -1; q[t++] = start; prev[start] = -1;
+  while (h < t) {
+    const k = q[h++];
+    if (inSite(k)) { goal = k; break; }
+    const x = k % W, nb = [x > 0 ? k - 1 : -1, x < W - 1 ? k + 1 : -1, k - W, k + W, m.portal ? m.portal[k] : -1];
+    for (const n of nb) {
+      if (n < 0 || n >= N || prev[n] !== -2) continue;
+      if (!WALKISH.has(K.tiles[n]) && !(m.portal && m.portal[k] === n)) continue;
+      prev[n] = k; q[t++] = n;
+    }
+  }
+  if (goal < 0) return null;
+  const path = []; for (let k = goal; k >= 0; k = prev[k]) path.push(k); path.reverse();
+  // first floor change along the route: point at the stairs (or hatch) and say up or down
+  const flOf = k => m.flAt[k];
+  for (let i = 1; i < path.length; i++) if (flOf(path[i]) !== flOf(path[i - 1])) {
+    const up = flOf(path[i]) > flOf(path[i - 1]), aim = path[Math.max(0, i - 1)];
+    return { cell: path[Math.min(i - 1, 10)], aim, cells: i, stairs: up ? '▲' : '▼', to: m.floors[flOf(path[i])].name };
+  }
+  return { cell: path[Math.min(path.length - 1, 10)], cells: path.length };
+}
+function drawCompass(s, me, now) {
+  const box = $('compass');
+  const show = s && me && me.a && s.ph === PHASE.ACTION && (me.tm === 'def' || s.rev) && !st.tutorialHideCompass && st.map && st.map.sites[s.site];
+  box.classList.toggle('hidden', !show);
+  if (!show) return;
+  const from = { x: st.pred.x, y: st.pred.y };
+  if (!st.cmp || now - st.cmp.t > 0.35 || Math.hypot(from.x - st.cmp.x, from.y - st.cmp.y) > CELL * 2) st.cmp = { t: now, x: from.x, y: from.y, r: compassRoute(s, from) };
+  const r = st.cmp.r, c = box.querySelector('canvas'), g = c.getContext('2d'), label = box.querySelector('b');
+  g.clearRect(0, 0, 96, 96);
+  g.fillStyle = 'rgba(8,11,15,0.78)'; g.beginPath(); g.arc(48, 48, 44, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(242,193,78,0.55)'; g.lineWidth = 2; g.stroke();
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(48 + Math.cos(a) * 36, 48 + Math.sin(a) * 36); g.lineTo(48 + Math.cos(a) * 41, 48 + Math.sin(a) * 41); g.stroke(); }
+  let text = '';
+  if (!r) text = 'NO ROUTE KNOWN';
+  else if (r.here) { text = 'ON SITE'; g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(48, 48, 9, 0, 7); g.fill(); }
+  else {
+    const k = r.aim ?? r.cell, tx = (k % st.map.W + 0.5) * CELL, ty = (Math.floor(k / st.map.W) + 0.5) * CELL;
+    const a = Math.atan2(ty - from.y, tx - from.x) + (st.rot || 0);
+    g.save(); g.translate(48, 48); g.rotate(a);
+    g.fillStyle = '#f2c14e'; g.strokeStyle = '#000'; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(34, 0); g.lineTo(-10, -15); g.lineTo(-3, 0); g.lineTo(-10, 15); g.closePath(); g.stroke(); g.fill();
+    g.restore();
+    const m = Math.round(r.cells * CELL / PX_PER_M);
+    text = r.stairs ? `STAIRS ${r.stairs} ${r.to} · ${m} m` : `BOMB SITE · ${m} m`;
+  }
+  if (label.textContent !== text) label.textContent = text;
+}
+
 function banner(text, sub, color) {
   const b = $('banner'); b.querySelector('.t').textContent = text; b.querySelector('.s').textContent = sub || '';
   b.querySelector('.t').style.color = color || ''; b.classList.add('show'); st.bannerT = performance.now() / 1000 + 3;
@@ -1171,6 +1233,7 @@ function frame(nowMs) {
   revealSeen(); t1 = pfa('viewers', t1);
   bodySounds(me, dt);
   draw(s, view, now, dt); ctx = ctx0;
+  drawCompass(st.last, st.me, now);
   drawStairPip(s, me, now); pfa('total', T0);
   watchPerf(rawGap, performance.now() - T0);
 }

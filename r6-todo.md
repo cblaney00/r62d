@@ -9,6 +9,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Compass to the bomb site: once the objective is found (defenders always know it), a small dial under the score bar points along the walking route to the bomb rooms, not straight through walls. When the route goes up or down a floor it points to the stairs instead ("STAIRS ▲ 2F · 12 m"), and it says ON SITE when you're there.
+
 - [x] Dust Town couldn't be picked in the lobby: the row of map cards only had room for six, so the seventh was hidden off the edge. The cards now shrink to fit every map in one row.
 
 - [x] Dust Town, a desert town map in the classic layout: attackers come from the south edge (4 spawns); bomb sites at opposite ends of the north (A: Spice Bazaar / Granary in the west, B: Water Works / Pump House in the east) with the Hotel (a third site) between them near the middle. Long Road runs up the open west edge to A (a gate halfway), Mid Street goes up the middle to the Town Square (Short Gate to A, B Alley to B), and a tight winding concrete tunnel comes up the east side into the B yard. The market and garage between the lanes link them. Mostly one floor; only the Hotel has an upstairs with windows over the square. New sand ground.

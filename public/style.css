@@ -576,3 +576,7 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 #siteFound .sfF { font: 800 26px var(--head); letter-spacing: 0.3em; color: #f2c14e; margin-top: 8px; }
 #siteFound canvas { display: block; width: 560px; height: 340px; border: 1px solid rgba(255,255,255,0.12); }
 @keyframes sfIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+/* compass to the bomb site (he asked): under the score bar */
+#compass { position: absolute; top: 92px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+#compass canvas { width: 64px; height: 64px; }
+#compass b { margin-top: 2px; font: 700 14px var(--head); letter-spacing: 0.1em; color: #f2c14e; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; }
