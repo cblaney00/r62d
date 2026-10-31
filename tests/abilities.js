@@ -4,7 +4,7 @@ import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { OPERATORS, OP_LIST } from '../shared/operators.js';
 import { PHASE, T, CELL } from '../shared/constants.js';
-const WALLY = new Set(['cutter', 'lance', 'scope', 'hammer', 'grid', 'cluster', 'panel']);
+const WALLY = new Set(['cutter', 'lance', 'scope', 'hammer', 'grid', 'cluster', 'panel', 'spreader', 'periscope']);
 // stand the body in front of a plain wall (or a doorway, for panels), facing it
 function faceWall(g, p, door) {
   const m = g.map;
@@ -46,7 +46,7 @@ for (const op of OP_LIST) {
       g.broadcast();
     }
   } catch (e) { err = e.stack.split('\n').slice(0, 3).join(' | '); }
-  const used = ab.count ? ab.count - p.abilityCount : Math.round((ab.battery - p.battery) * 10) / 10;
+  const used = ab.count ? ab.count - p.abilityCount : ab.battery ? Math.round((ab.battery - p.battery) * 10) / 10 : 'passive';
   const ok = !err;
   if (!ok) fails++;
   let changed = 0; for (let k = 0; k < startTiles.length; k++) if (startTiles[k] !== g.map.tiles[k]) changed++;

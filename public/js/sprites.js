@@ -121,7 +121,7 @@ export function drawOperator(ctx, p, t) {
   for (let i = -1; i <= 1; i++) { box(ctx, 2.2, i * 3.9 - 1.5, 2.6, 3, 0.6, u.vestL); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(2.2, i * 3.9 - 0.4, 2.6, 0.35); }
   box(ctx, -3.6, -8.6, 3.6, 2.2, 0.6, o.color, false); box(ctx, -3.6, 6.4, 3.6, 2.2, 0.6, o.color, false); // shoulder patches
   if (o.team === 'def') { box(ctx, -1.8, -6.2, 1.8, 2.4, 0.4, '#141518'); cap(ctx, -1, -6, -1.5, -10, 0.5, '#111'); } // radio
-  if (id === 'slug') { cap(ctx, -4.5, -6.5, 3.5, 6.5, 1.6, '#3a2a1a'); ctx.fillStyle = '#b02a2a'; for (let i = 0; i < 6; i++) ctx.fillRect(-4 + i * 1.3, -5.2 + i * 2.05, 0.9, 1.1); }
+  if (id === 'slug' || id === 'sticky') { cap(ctx, -4.5, -6.5, 3.5, 6.5, 1.6, '#3a2a1a'); ctx.fillStyle = '#b02a2a'; for (let i = 0; i < 6; i++) ctx.fillRect(-4 + i * 1.3, -5.2 + i * 2.05, 0.9, 1.1); }
   if (id === 'emp') { for (const yy of [-3, 1.5]) { ell(ctx, -2.5, yy, 1.4, 1.4, '#7d4fb0'); ctx.fillStyle = `rgba(200,150,255,${0.5 + 0.5 * Math.sin(t * 4 + yy)})`; ctx.beginPath(); ctx.arc(-2.5, yy, 0.5, 0, 7); ctx.fill(); } }
   if (id === 'mine') { for (const yy of [-7.4, 7.4]) { box(ctx, -4, yy - 1, 2.6, 2, 0.5, '#33402a'); ctx.fillStyle = '#8fd14f'; ctx.fillRect(-3, yy - 0.3, 0.6, 0.6); } }
   if (id === 'stim') { ctx.fillStyle = '#fff'; ctx.fillRect(-3, 6.6, 2.4, 1.6); ctx.fillStyle = '#c22'; ctx.fillRect(-2.2, 6.7, 0.8, 1.4); ctx.fillRect(-2.8, 7.1, 2, 0.6); }
@@ -401,6 +401,51 @@ export function drawGadget(ctx, e, t, ally) {
       break;
     case 'slug':
       ctx.fillStyle = '#ffcf6a'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, 7); ctx.fill();
+      break;
+    // ---- the operators added to fill every role ----
+    case 'sticky': // SALVO's round: a red-banded slug with a blinking light once it has stuck
+      ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, 7); ctx.fill();
+      ctx.fillStyle = '#c0392b'; ctx.fillRect(-2.4, -0.5, 4.8, 1);
+      if (blink) { ctx.fillStyle = '#ff4a3a'; ctx.beginPath(); ctx.arc(0, 0, 1, 0, 7); ctx.fill(); }
+      break;
+    case 'spreader': // TORQUE's spreader: two yellow jaws on a black body
+      ctx.fillStyle = '#1e1f22'; ctx.fillRect(-3.5, -3.5, 7, 7);
+      ctx.fillStyle = '#e0b53a'; ctx.fillRect(-4.5, -4.5, 3, 9); ctx.fillRect(1.5, -4.5, 3, 9);
+      if (blink) { ctx.fillStyle = '#ff6a3a'; ctx.fillRect(-0.7, -0.7, 1.4, 1.4); }
+      break;
+    case 'spike': // ECHO's seismic spike: a steel stake with ripples
+      ctx.strokeStyle = ally ? 'rgba(94,196,182,0.5)' : 'rgba(255,140,80,0.5)'; ctx.lineWidth = 0.5;
+      for (const r of [5, 8]) { ctx.beginPath(); ctx.arc(0, 0, r + (t * 4 % 3), 0, 7); ctx.stroke(); }
+      ctx.fillStyle = '#9aa0a6'; ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, 7); ctx.fill(); ctx.fillStyle = '#3a3e44'; ctx.beginPath(); ctx.arc(0, 0, 1, 0, 7); ctx.fill();
+      break;
+    case 'pick': // WREN's lockpick tools on the board
+      ctx.strokeStyle = '#c8ccd2'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(-3, -1); ctx.lineTo(3, 1); ctx.moveTo(-3, 1); ctx.lineTo(2, -1.5); ctx.stroke();
+      break;
+    case 'alarm': // LATCH's alarm wire: a thin taut line with two posts (defenders see it; attackers only up close)
+      ctx.rotate(e.ag || 0);
+      ctx.strokeStyle = 'rgba(220,230,120,0.75)'; ctx.lineWidth = 0.35; ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(0, 10); ctx.stroke();
+      ctx.fillStyle = '#4a4d3a'; ctx.fillRect(-1, -11, 2, 2); ctx.fillRect(-1, 9, 2, 2);
+      break;
+    case 'echobox': // RUSE's echo box: a small speaker, pulsing
+      ctx.fillStyle = '#2b2f36'; ctx.fillRect(-3, -3, 6, 6);
+      ctx.fillStyle = '#8a6ad6'; ctx.beginPath(); ctx.arc(0, 0, 1.8 + (blink ? 0.4 : 0), 0, 7); ctx.fill();
+      break;
+    case 'radar': // AUDIT's radar: a dish that sweeps
+      ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.arc(0, 0, 3, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#5ad0c0'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(t * 3) * 4, Math.sin(t * 3) * 4); ctx.stroke();
+      break;
+    case 'station': // TONIC's heal station: a white case with a green cross
+      ctx.fillStyle = 'rgba(106,208,138,0.15)'; ctx.beginPath(); ctx.arc(0, 0, 24, 0, 7); ctx.fill();
+      ctx.fillStyle = '#e8ece8'; ctx.fillRect(-4, -3, 8, 6); ctx.fillStyle = '#3aa85a'; ctx.fillRect(-0.8, -2.2, 1.6, 4.4); ctx.fillRect(-2.2, -0.8, 4.4, 1.6);
+      break;
+    case 'healzone': // PATCH's field kit, burst open: a soft green circle
+      ctx.fillStyle = 'rgba(106,208,138,0.18)'; ctx.beginPath(); ctx.arc(0, 0, 40, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(106,208,138,0.5)'; ctx.lineWidth = 0.6; ctx.stroke();
+      ctx.fillStyle = '#e8ece8'; ctx.fillRect(-2.5, -2, 5, 4); ctx.fillStyle = '#3aa85a'; ctx.fillRect(-0.5, -1.5, 1, 3); ctx.fillRect(-1.5, -0.5, 3, 1);
+      break;
+    case 'catcher': // WARD's grenade catcher: a squat post with a blue emitter
+      ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.arc(0, 0, 3.2, 0, 7); ctx.fill();
+      ctx.fillStyle = blink ? '#9fc4ff' : '#4a78c8'; ctx.beginPath(); ctx.arc(0, 0, 1.6, 0, 7); ctx.fill();
       break;
     case 'defuser':
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(-4, -2, 9, 6);

@@ -6,11 +6,12 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] A new attacker with an RPG-style launcher, not too far off from Ash in R6 (our own operator: own name, look and twist).
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
-- [ ] generate more operators so there are at least 5 options per role on each side
 
 ## Done
+
+- [x] A new attacker with a launcher: **SALVO** (Breacher), Delay Launcher with 4 rounds. A round sticks to whatever it hits (a wall, a barricade or a person) and blows 1.5 s later, opening soft walls and barricades and sending a second blast into the room behind.
+- [x] At least 5 operators in every role: 21 new ones (51 in all). Attack: SALVO and TORQUE (Breacher), RUSH and BLAZE (Entry), ECHO and MARK (Intel), PATCH and TRENCH (Support), WREN, VAPOR and CROW (Flank). Defence: SOLDER (Anchor), LATCH (Trapper), HOUND, RUSE and RALLY (Roamer), LENS and AUDIT (Intel), TONIC, WARD and GIRDER (Support). Each has its own skill, guns, look and a short bio, and bots use the defence gadgets and several of the fight skills.
 
 - [x] Aiming: with the crosshair far out, moving the mouse sideways now turns you as fast as when it is close, so flicks work. The crosshair stays at the distance you put it instead of jumping onto every door frame in the way: a tick marks the wall in the way, and the crosshair fades if bullets can't reach it. Aiming in puts the crosshair 5 m out the way you face. The Armory works the same.
 - [x] Tutorial: one quick run of about 4 minutes from the TUTORIAL tab. You attack one round (pick, drone and ping, moving and shooting, breaking in, vaulting and rappelling, planting, with the plant finishing at once), then the sides swap and you defend one (reinforce, barricade, cameras, hold and take the two attackers down). Each step says exactly what to do and moves on when you've done it. The bots never shoot or hurt you.

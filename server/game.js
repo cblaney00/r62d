@@ -1,6 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS,
-  MAT, stopsBullet, penBullet, blocksDrone, blocksMove, other, DRONE_SPRINT } from '../shared/constants.js';
+  MAT, stopsBullet, penBullet, blocksDrone, blocksMove, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
 import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
@@ -206,6 +206,7 @@ export class Game {
   nextRound() {
     this.round++;
     this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
+    this.baseTiles = this.map.tiles.slice(); // how the walls were built (SOLDER welds broken soft walls back)
     this.ents = []; this.planted = null; this.winner = null; this.reason = ''; this.noises = [];
     this.site = this.tut ? 0 : Math.floor(Math.random() * this.map.sites.length);
     this.siteRevealed = false;
@@ -259,6 +260,7 @@ export class Game {
       }
     }
     if (atkers.length) atkers[Math.floor(Math.random() * atkers.length)].hasDefuser = true;
+    for (const p of this.players.values()) if (p.op && OPERATORS[p.op].ability.id === 'crew' && this.side(p) === TEAM.DEF) this.reinforce += 2; // GIRDER's crew brings two more
     for (const p of this.players.values()) if (p.bot) botPrep(this, p);
     this.phase = PHASE.PREP; this.timer = DUR.prep;
     this.events.push({ e: 'banner', text: 'PREPARATION PHASE', sub: '' });
@@ -537,6 +539,23 @@ export class Game {
       }
       if (!p.lancing) p.lanceT = 0;
     }
+    if (op.ability.id === 'weld') { // SOLDER: hold facing a broken soft wall to weld it back, a block at a time
+      p.welding = false;
+      if (inp.ability && p.battery > 0 && p.ctrl === 'body' && !p.downed && this.baseTiles) {
+        let k = -1;
+        for (let d = 6; d <= 30 && k < 0; d += 3) {
+          const c = Math.floor((p.y + Math.sin(p.aim) * d) / CELL) * this.map.W + Math.floor((p.x + Math.cos(p.aim) * d) / CELL), t = this.map.tiles[c];
+          if (this.baseTiles[c] === T.SOFT && t !== T.SOFT && t !== T.REINF && !this.cellOccupied(c)) k = c;
+          else if (t === T.HARD || t === T.SOFT || t === T.REINF || t === T.TALL) break;
+        }
+        if (k >= 0) {
+          p.welding = true; p.battery = Math.max(0, p.battery - dt); p.weldT = (p.weldT || 0) + dt;
+          if (this.time - (p.noiseT || 0) > 0.4) { p.noiseT = this.time; this.noise(p.x, p.y, team, 260); }
+          if (p.weldT >= 1) { p.weldT = 0; const m = this.map; m.tiles[k] = T.SOFT; m.hp[k] = CELL_HP[T.SOFT]; delete m.holes[k]; this.changed.add(k); this.events.push({ e: 'hit', k: 'spark', x: r1((k % m.W + 0.5) * CELL), y: r1((Math.floor(k / m.W) + 0.5) * CELL) }); }
+        }
+      }
+      if (!p.welding) p.weldT = 0;
+    }
     if (op.ability.id === 'shroud') { // Silent Shroud: hold to go dark
       if (inp.ability && p.battery > 0 && p.ctrl === 'body' && !p.downed) { p.shrouded = true; p.battery = Math.max(0, p.battery - dt); }
       else { p.shrouded = false; p.battery = Math.min(op.ability.battery, p.battery + dt * 0.25); }
@@ -716,6 +735,7 @@ export class Game {
       const F = W ? falloffOf(W) : FALLOFF[cls] || FALLOFF.AR, rm = this.rangeMul || 1, fo = { from: F.from * rm, to: F.to * rm, min: F.min };
       const fall = stopT <= fo.from ? 1 : stopT >= fo.to ? fo.min : 1 - (1 - fo.min) * (stopT - fo.from) / (fo.to - fo.from);
       const sa = this.shotAim, head = miss < HEAD_R && (!sa || onHead(sa.x, sa.y, at.x, at.y));
+      if (src && src.tracerUntil > this.time && this.side(q) !== this.side(src)) this.spot(this.side(src), q.id, 4); // MARK's tracer rounds
       if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
       else if (head && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
       else this.damage(q, dmg * mult * fall, src, wname, ang);
@@ -884,10 +904,10 @@ export class Game {
         return { k: 'revive', t: 0, dur: DUR.revive, target: q.id };
     if (team === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION)) {
       const f = this.facingCell(p, 28); // the same reach as the on-screen prompt
-      if (f && f.t === T.SOFT && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce, cell: f.k };
+      if (f && f.t === T.SOFT && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (OPERATORS[p.op].ability.id === 'crew' ? 0.5 : 1), cell: f.k };
       if (f && f.t === T.OPEN && this.map.openId[f.k] >= 0 && p.barri > 0 && this.canBarricade(this.map.openId[f.k])) return { k: 'barricade', t: 0, dur: DUR.barricade, cell: f.k };
       const h = hatchNear(this.map, p.x, p.y, p.aim, 14);
-      if (h && this.map.tiles[h.cells[0]] === T.HATCH && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce, hatch: h.id };
+      if (h && this.map.tiles[h.cells[0]] === T.HATCH && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (OPERATORS[p.op].ability.id === 'crew' ? 0.5 : 1), hatch: h.id };
     }
     return null;
   }
@@ -1105,7 +1125,7 @@ export class Game {
   // Everything a team can look through, flipped through with left/right or the mouse wheel:
   // defence every working camera (map, turret, sticky); attack every drone and wall scope.
   feeds(team) {
-    return this.ents.filter(e => e.team === team && (team === TEAM.DEF ? e.type === 'cam' && e.hp > 0 : e.type === 'drone' || e.type === 'scope'));
+    return this.ents.filter(e => e.team === team && (team === TEAM.DEF ? (e.type === 'cam' && e.hp > 0) || e.type === 'scope' : e.type === 'drone' || e.type === 'scope'));
   }
   feed(p) { const f = this.ent(p.feedId); return f && this.feeds(this.side(p)).includes(f) ? f : null; }
   // only the one who placed a gadget camera can turn it or fire its laser; map cameras are anyone's
@@ -1142,6 +1162,8 @@ export class Game {
         if (OPERATORS[q.op].ability.id === 'brace' && !q.downed && q.ctrl === 'body' && Math.abs(angDiff(Math.atan2(p.y - q.y, p.x - q.x), q.aim)) < 0.8 && !(this.time < (q.shieldDownUntil || 0))) {
           q.shieldDownUntil = this.time + 1.0; p.meleeCd = 1.3; p.fireCd = Math.max(p.fireCd, 0.9); this.events.push({ e: 'hit', k: 'shield', x: r1(q.x), y: r1(q.y) }); this.events.push({ e: 'snd', s: 'panel', x: r1(q.x), y: r1(q.y) }); return;
         }
+        const behind = Math.abs(angDiff(Math.atan2(p.y - q.y, p.x - q.x), q.aim)) > 2.0; // CROW: from behind, a silent kill
+        if (OPERATORS[p.op].ability.id === 'takedown' && behind && this.side(q) !== this.side(p)) { this.damage(q, 999, p, 'Silent Takedown', p.aim); return; }
         this.damage(q, q.downed ? 999 : 55, p, 'Melee', p.aim); return;
       }
     }
@@ -1296,6 +1318,79 @@ export class Game {
       used();
       this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(tgt.x), y2: r1(tgt.y) });
     }
+    // ---- the operators added to fill every role (he asked) ----
+    else if (id === 'sticky') { // SALVO: a round that sticks, then blows through
+      this.ents.push({ id: this.eid(), type: 'sticky', x: p.x + ca * 12, y: p.y + sa * 12, vx: ca * 560, vy: sa * 560, team, owner: p.id, travel: 0, t: 1.5 });
+      used(); this.events.push({ e: 'snd', s: 'launcher', x: r1(p.x), y: r1(p.y) });
+    } else if (id === 'spreader') { // TORQUE: prises a two-block gap open after 4 s
+      const w = this.wallInFront(p, [T.SOFT, T.REINF]); if (!w) return;
+      const across = Math.abs(ca) > Math.abs(sa) ? [0, 1] : [1, 0];
+      this.ents.push({ id: this.eid(), type: 'spreader', x: w.x, y: w.y, cell: w.k, ax: across[0], ay: across[1], team, owner: p.id, t: 4, hp: 1 });
+      used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
+    } else if (id === 'dash') { if (this.dash(p)) used(); }
+    else if (id === 'flare' || id === 'medkit' || id === 'echobox') { this.throwNade(p, id); used(); }
+    else if (id === 'spike') place('spike', 10, { life: 15, t: 0, pingT: 0 });
+    else if (id === 'tracer') { p.tracerUntil = this.time + 8; used(); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); }
+    else if (id === 'cover') { if (this.placeShield(p)) used(); }
+    else if (id === 'pick') { // WREN: a barricade comes apart quietly
+      const f = this.facingCell(p, 28); if (!f || f.t !== T.BARRI) return;
+      this.ents.push({ id: this.eid(), type: 'pick', x: (f.cx + 0.5) * CELL, y: (f.cy + 0.5) * CELL, cell: f.k, team, owner: p.id, t: 1.5, hp: 1 });
+      used();
+    } else if (id === 'cloak') { // VAPOR: a smoke that follows you
+      this.ents.push({ id: this.eid(), type: 'smoke', x: p.x, y: p.y, r: 30, life: 6, team, follow: p.id });
+      used(); this.events.push({ e: 'snd', s: 'smoke', x: r1(p.x), y: r1(p.y) });
+    } else if (id === 'alarm') place('alarm', 12, { arm: 1 });
+    else if (id === 'tag') { // HOUND: the first attacker along the dart is revealed for 10 s
+      let bt = castSight(this.map, p.x, p.y, p.aim, 420, null), hitQ = null;
+      for (const q of this.players.values()) {
+        if (!q.alive || q === p || this.side(q) === team) continue;
+        const t = rayCircle(p.x, p.y, ca, sa, q.x, q.y, hitR(q.op));
+        if (t !== null && t < bt) { bt = t; hitQ = q; }
+      }
+      if (hitQ) this.spot(team, hitQ.id, 10);
+      used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x + ca * bt), y2: r1(p.y + sa * bt), tag: 1 });
+    } else if (id === 'rally') { p.hp = Math.min(p.maxHp, p.hp + 40); p.boostUntil = this.time + 4; used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x), y2: r1(p.y) }); }
+    else if (id === 'periscope') { // LENS: a defender's scope through a soft wall, seen in the camera feeds
+      const w = this.wallInFront(p, [T.SOFT]); if (!w) return;
+      const t = through(w);
+      this.ents.push({ id: this.eid(), type: 'scope', x: t.x, y: t.y, ang: Math.atan2(t.dy, t.dx), cell: w.k, team, owner: p.id, hp: 1 });
+      used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
+    } else if (id === 'radar') place('radar', 8, { life: 15, t: 0 });
+    else if (id === 'station') place('station', 14, { pool: 100 });
+    else if (id === 'catcher') place('catcher', 10, { c: 2 });
+  }
+
+  // RUSH: a 3 m burst forward along your aim; barricades in the way splinter, people in the way stagger
+  dash(p) {
+    if (p.vault || p.downed || p.ctrl !== 'body' || p.busy || p.rope) return false;
+    const ca = Math.cos(p.aim), sa = Math.sin(p.aim), m = this.map;
+    let x = p.x, y = p.y; const hit = new Set();
+    for (let d = 4; d <= 3 * PX_PER_M; d += 4) {
+      const nx = p.x + ca * d, ny = p.y + sa * d;
+      for (const off of [0, -0.5, 0.5]) { // the leading edge of your body: a barricade there splinters before you hit it
+        const fx = nx + Math.cos(p.aim + off) * (PLAYER_R + 2), fy = ny + Math.sin(p.aim + off) * (PLAYER_R + 2), k = Math.floor(fy / CELL) * m.W + Math.floor(fx / CELL);
+        if (m.tiles[k] === T.BARRI) { this.destroyCell(k); this.events.push({ e: 'hit', k: 'wood', x: r1(fx), y: r1(fy) }); this.noise(fx, fy, this.side(p), 500); }
+      }
+      if (circleBlocked(m, nx, ny, PLAYER_R, blocksMove)) break;
+      for (const q of this.players.values()) if (q !== p && q.alive && Math.hypot(q.x - nx, q.y - ny) < PLAYER_R * 2) hit.add(q);
+      x = nx; y = ny;
+    }
+    for (const q of hit) { q.staggerUntil = this.time + 0.7; q.slowUntil = Math.max(q.slowUntil, this.time + 1); this.damage(q, 10, p, 'Breaching Dash', p.aim); }
+    if (Math.hypot(x - p.x, y - p.y) < 8) return false;
+    p.vault = { x0: p.x, y0: p.y, x1: x, y1: y, t: 0, dur: 0.28 };
+    this.events.push({ e: 'snd', s: 'vault', x: r1(p.x), y: r1(p.y), id: p.id });
+    return true;
+  }
+  // a bulletproof barrier two cells wide across your aim (Deployable Shield gadget, TRENCH's Drop Cover)
+  placeShield(p) {
+    const fx = p.x + Math.cos(p.aim) * 20, fy = p.y + Math.sin(p.aim) * 20;
+    const across = Math.abs(Math.cos(p.aim)) > Math.abs(Math.sin(p.aim)) ? [0, 1] : [1, 0];
+    const cx = Math.floor(fx / CELL), cy = Math.floor(fy / CELL);
+    const ks = [[cx, cy], [cx + across[0], cy + across[1]]].map(([x, y]) => y * this.map.W + x);
+    if (ks.some(k => { const t = this.map.tiles[k]; return (t !== T.FLOOR && t !== T.GROUND) || this.cellOccupied(k); })) return false;
+    for (const k of ks) { this.map.tiles[k] = T.DSHIELD; this.map.hp[k] = CELL_HP[T.DSHIELD]; this.changed.add(k); }
+    this.events.push({ e: 'snd', s: 'panel', x: r1(fx), y: r1(fy) });
+    return true;
   }
 
   useGadget(p) {
@@ -1321,14 +1416,7 @@ export class Game {
       this.ents.push({ id: this.eid(), type: 'wire', x: p.x + Math.cos(p.aim) * 22, y: p.y + Math.sin(p.aim) * 22, ang: p.aim, team, owner: p.id });
       p.gadgetCount--; this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y) });
     } else if (g === 'dshield') {
-      // two cells side by side, across your aim, just in front of you
-      const fx = p.x + Math.cos(p.aim) * 20, fy = p.y + Math.sin(p.aim) * 20;
-      const across = Math.abs(Math.cos(p.aim)) > Math.abs(Math.sin(p.aim)) ? [0, 1] : [1, 0];
-      const cx = Math.floor(fx / CELL), cy = Math.floor(fy / CELL);
-      const ks = [[cx, cy], [cx + across[0], cy + across[1]]].map(([x, y]) => y * this.map.W + x);
-      if (ks.some(k => { const t = this.map.tiles[k]; return (t !== T.FLOOR && t !== T.GROUND) || this.cellOccupied(k); })) return;
-      for (const k of ks) { this.map.tiles[k] = T.DSHIELD; this.map.hp[k] = CELL_HP[T.DSHIELD]; this.changed.add(k); }
-      p.gadgetCount--; this.events.push({ e: 'snd', s: 'panel', x: r1(fx), y: r1(fy) });
+      if (this.placeShield(p)) p.gadgetCount--; // two cells side by side, across your aim, just in front of you
     }
   }
 
@@ -1336,7 +1424,7 @@ export class Game {
     const tx = p.aimX ?? p.x + Math.cos(p.aim) * 200, ty = p.aimY ?? p.y + Math.sin(p.aim) * 200;
     const dist = Math.max(40, Math.min(300, Math.hypot(tx - p.x, ty - p.y)));
     const v = dist * 2.5;
-    const fuse = { frag: 2.5, smoke: 1.0, stun: 1.3, impact: 3, nitro: 999, emp: 1.5, sonar: 1.1, gas: 999, cam: 0.9 }[kind];
+    const fuse = { frag: 2.5, smoke: 1.0, stun: 1.3, impact: 3, nitro: 999, emp: 1.5, sonar: 1.1, gas: 999, cam: 0.9, flare: 1.0, medkit: 0.8, echobox: 0.7 }[kind];
     const n = { id: this.eid(), type: 'nade', kind, x: p.x + Math.cos(p.aim) * 10, y: p.y + Math.sin(p.aim) * 10,
       vx: Math.cos(p.aim) * v, vy: Math.sin(p.aim) * v, fuse, team: this.side(p), owner: p.id };
     this.ents.push(n);
@@ -1487,8 +1575,91 @@ export class Game {
           break;
         }
         case 'nade': this.tickNade(e, dt); break;
-        case 'smoke': e.life -= dt; if (e.life <= 0) this.removeEnt(e); break;
-        case 'cutter': case 'breach': case 'cluster':
+        case 'smoke': {
+          e.life -= dt; if (e.life <= 0) { this.removeEnt(e); break; }
+          const o = e.follow && this.players.get(e.follow); if (o && o.alive) { e.x = o.x; e.y = o.y; } // VAPOR's cloak goes with her
+          break;
+        }
+        case 'sticky': {
+          if (e.stuck) { // counting down where it stuck (on a person, it goes with them)
+            const q = e.on && this.players.get(e.on); if (q && q.alive) { e.x = q.x; e.y = q.y; }
+            e.t -= dt; if (e.t <= 0) this.detonate(e);
+            break;
+          }
+          const step = Math.hypot(e.vx, e.vy) * dt, dx = e.vx / (step / dt), dy = e.vy / (step / dt);
+          let hitT = null, hitQ = null;
+          for (const q of this.players.values()) {
+            if (!q.alive || q.id === e.owner) continue;
+            const t = rayCircle(e.x, e.y, dx, dy, q.x, q.y, hitR(q.op));
+            if (t !== null && t <= step && (hitT === null || t < hitT)) { hitT = t; hitQ = q; }
+          }
+          let wc = null;
+          const wallT = walkRay(e.x, e.y, dx, dy, step, (cx, cy) => { const t = tileAt(this.map, cx, cy); if (blocksDrone(t) || t === T.BARRI) { wc = { cx, cy, t }; return true; } return false; });
+          const stick = () => { e.stuck = true; e.vx = e.vy = 0; this.events.push({ e: 'snd', s: 'place', x: r1(e.x), y: r1(e.y) }); };
+          if (hitQ && hitT < wallT) { e.x = hitQ.x; e.y = hitQ.y; e.on = hitQ.id; stick(); break; }
+          if (wc && wallT < step) {
+            e.x += dx * Math.max(0, wallT - 2); e.y += dy * Math.max(0, wallT - 2);
+            if (wc.t === T.SOFT || wc.t === T.BARRI) { e.cell = wc.cy * this.map.W + wc.cx; e.bx = e.x + dx * (CELL + 22); e.by = e.y + dy * (CELL + 22); } // the room behind gets the second blast
+            stick(); break;
+          }
+          e.x += e.vx * dt; e.y += e.vy * dt; e.travel += step;
+          if (e.travel > 520) stick();
+          break;
+        }
+        case 'spike': case 'radar': {
+          e.life -= dt; e.t -= dt; if (e.life <= 0) { this.removeEnt(e); break; }
+          if (e.t > 0) break;
+          if (e.type === 'spike') { // ECHO: defenders running near it show up
+            e.t = 0.5; let any = false;
+            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && q.moving === 2 && Math.hypot(q.x - e.x, q.y - e.y) < 10 * PX_PER_M) { this.spot(e.team, q.id, 1.5); any = true; }
+            e.pingT -= 0.5; if (any && e.pingT <= 0) { e.pingT = 1.5; this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); }
+          } else { // AUDIT: every attacker drone nearby is marked for the defenders, again and again
+            e.t = 1.5; const o = this.players.get(e.owner);
+            for (const d of this.ents) if (d.type === 'drone' && d.team !== e.team && Math.hypot(d.x - e.x, d.y - e.y) < 15 * PX_PER_M)
+              this.events.push({ e: 'mark', team: e.team, x: r1(d.x), y: r1(d.y), w: 'DRONE', by: o ? o.name : 'Radar', from: e.owner, id: d.id });
+          }
+          break;
+        }
+        case 'pick': // WREN: the barricade comes apart without a sound
+          e.t -= dt;
+          if (e.t <= 0) {
+            const m = this.map, o = m.openId[e.cell] >= 0 ? m.openings[m.openId[e.cell]] : null;
+            if (o) for (const c of o.cells) if (m.tiles[c] === T.BARRI) { m.tiles[c] = T.OPEN; m.hp[c] = 0; delete m.holes[c]; this.changed.add(c); }
+            this.removeEnt(e);
+          }
+          break;
+        case 'alarm': {
+          if (e.arm > 0) { e.arm -= dt; break; }
+          for (const q of this.players.values()) {
+            if (!q.alive || this.side(q) === e.team || this.ghost(q) || Math.hypot(q.x - e.x, q.y - e.y) > 15) continue;
+            this.spot(e.team, q.id, 6); this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); this.removeEnt(e); break;
+          }
+          break;
+        }
+        case 'echobox': // RUSE: footsteps and the odd burst of gunfire that aren't there
+          e.life -= dt; e.t -= dt;
+          if (e.life <= 0) { this.removeEnt(e); break; }
+          if (e.t <= 0) { e.t = 0.35 + Math.random() * 0.2; const shot = Math.random() < 0.18; this.noise(e.x, e.y, e.team, shot ? 950 : 320); this.events.push({ e: 'snd', s: shot ? 'fakeShot' : 'fakeStep', x: r1(e.x + (Math.random() - 0.5) * 20), y: r1(e.y + (Math.random() - 0.5) * 20) }); }
+          break;
+        case 'healzone': case 'station': { // PATCH's kit (5 s) and TONIC's station (100 health in all)
+          if (e.type === 'healzone') { e.life -= dt; if (e.life <= 0) { this.removeEnt(e); break; } }
+          const r = e.type === 'healzone' ? e.r : 24, rate = e.type === 'healzone' ? 10 : 6;
+          for (const q of this.players.values()) {
+            if (!q.alive || q.downed || this.side(q) !== e.team || q.hp >= q.maxHp || Math.hypot(q.x - e.x, q.y - e.y) > r) continue;
+            const h = Math.min(rate * dt, q.maxHp - q.hp, e.type === 'station' ? e.pool : 99); q.hp += h;
+            if (e.type === 'station') { e.pool -= h; if (e.pool <= 0) { this.removeEnt(e); break; } }
+          }
+          break;
+        }
+        case 'catcher': // WARD: zaps attacker grenades and launcher rounds that come near
+          for (const o of [...this.ents]) {
+            if (o.team === e.team || Math.hypot(o.x - e.x, o.y - e.y) > 60) continue;
+            if (!((o.type === 'nade' && o.kind !== 'smoke') || o.type === 'slug' || (o.type === 'sticky' && !o.stuck))) continue;
+            this.removeEnt(o); this.events.push({ e: 'arc', x: r1(e.x), y: r1(e.y), x2: r1(o.x), y2: r1(o.y) }); this.events.push({ e: 'snd', s: 'break', x: r1(o.x), y: r1(o.y) });
+            if (--e.c <= 0) { this.removeEnt(e); break; }
+          }
+          break;
+        case 'cutter': case 'breach': case 'cluster': case 'spreader':
           { const g = this.gridNear(e.x, e.y, other(e.team)); // a static grid fries breaching gadgets on its wall
             if (g) { this.events.push({ e: 'arc', x: r1(g.x), y: r1(g.y), x2: r1(e.x), y2: r1(e.y) }); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e); break; } }
           if (!this.jammedAt(e.x, e.y)) e.t -= dt;
@@ -1656,6 +1827,32 @@ export class Game {
         break;
       }
       case 'smoke': this.ents.push({ id: this.eid(), type: 'smoke', x: e.x, y: e.y, r: 62, life: 12, team: e.team }); this.events.push({ e: 'snd', s: 'smoke', x: r1(e.x), y: r1(e.y) }); break;
+      case 'flare': { // BLAZE: blinds the defenders who are looking at it
+        this.events.push({ e: 'boom', x: r1(e.x), y: r1(e.y), r: 30, kind: 'stun' });
+        for (const q of this.players.values()) {
+          if (!q.alive || this.side(q) === e.team) continue;
+          const d = Math.hypot(q.x - e.x, q.y - e.y);
+          if (d < 230 && Math.abs(angDiff(Math.atan2(e.y - q.y, e.x - q.x), q.aim)) < 1.1 && los(this.map, e.x, e.y, q.x, q.y)) {
+            const dur = 2.2 * (1 - d / 330);
+            q.stunUntil = Math.max(q.stunUntil, this.time + dur);
+            this.events.push({ e: 'stun', id: q.id, dur: r2(dur) });
+          }
+        }
+        break;
+      }
+      case 'medkit': this.ents.push({ id: this.eid(), type: 'healzone', x: e.x, y: e.y, r: 40, life: 5, team: e.team, owner: e.owner }); this.events.push({ e: 'snd', s: 'place', x: r1(e.x), y: r1(e.y) }); break;
+      case 'echobox': this.ents.push({ id: this.eid(), type: 'echobox', x: e.x, y: e.y, life: 8, t: 0, team: e.team, owner: e.owner, hp: 1 }); break;
+      case 'sticky': { // through the wall it stuck to: a blast this side, and one in the room behind
+        this.explode(e, { r: 38, dmg: 70, cellR: 21, cells: [T.SOFT, T.BARRI, T.HATCH, T.RUBBLE], kind: 'slug', selfMul: 0.3 });
+        if (e.bx !== undefined) this.explode({ x: e.bx, y: e.by, team: e.team, owner: e.owner }, { r: 36, dmg: 55, cellR: 0, cells: [], kind: 'impact' });
+        break;
+      }
+      case 'spreader': { // two blocks of the wall forced apart, reinforced or not
+        const m = this.map, x = e.cell % m.W, y = Math.floor(e.cell / m.W);
+        for (const d of [0, 1]) { const k = (y + e.ay * d) * m.W + x + e.ax * d; if (m.tiles[k] === T.SOFT || m.tiles[k] === T.REINF) this.destroyCell(k); }
+        this.events.push({ e: 'hit', k: 'wall', x: r1(e.x), y: r1(e.y) }); this.events.push({ e: 'snd', s: 'reinforce', x: r1(e.x), y: r1(e.y) }); this.noise(e.x, e.y, e.team, 700);
+        break;
+      }
       case 'stun': {
         this.events.push({ e: 'boom', x: r1(e.x), y: r1(e.y), r: 40, kind: 'stun' });
         for (const q of this.players.values()) {

@@ -88,6 +88,10 @@ export function botPrep(game, p) {
   // traps by the site's doors and windows, eyes and ears around it
   const placeAt = (type, x, y, extra = {}) => { game.ents.push({ id: game.eid(), type, x, y, ang: Math.random() * 6.28, team: TEAM.DEF, owner: p.id, hp: 1, ...extra }); };
   const atOpening = i => { const o = siteOpenings[i % siteOpenings.length], k = o.cells[0]; return game.freeSpotNear((k % W + 0.5) * CELL, (Math.floor(k / W) + 0.5) * CELL, 18); };
+  if (id === 'alarm' && siteOpenings.length) for (let i = 0; p.abilityCount > 0 && i < 3; i++) { const s = atOpening(i); placeAt('alarm', s.x, s.y, { arm: 0 }); p.abilityCount--; }
+  if (id === 'station') { const s = near(30); placeAt('station', s.x, s.y, { pool: 100 }); p.abilityCount--; }
+  if (id === 'catcher') for (let i = 0; i < 2; i++) { const s = near(50); placeAt('catcher', s.x, s.y, { c: 2 }); p.abilityCount--; }
+  if (id === 'radar') { const s = near(120); placeAt('radar', s.x, s.y, { life: 15, t: 0 }); p.abilityCount--; }
   if (['prox', 'concuss', 'clamp'].includes(id) && siteOpenings.length) for (let i = 0; p.abilityCount > 0 && i < 3; i++) { const s = atOpening(i); placeAt(id, s.x, s.y, { arm: 0 }); p.abilityCount--; }
   if (id === 'sensor') while (p.abilityCount > 0) { const s = near(150); placeAt('sensor', s.x, s.y, { t: 0, pingT: 0 }); p.abilityCount--; }
   if (id === 'plates') { const s = near(30); placeAt('plates', s.x, s.y, { c: 5 }); p.abilityCount--; }
@@ -374,6 +378,8 @@ export function botThink(game, p, dt) {
   // --- fight ---
   const enemy = p.downed ? null : visibleEnemy(game, p, S.see);
   if (enemy && abId === 'adrenal' && p.abilityCount > 0 && !(game.time < (p.boostUntil || 0))) useAbility();
+  if (enemy && ['tracer', 'cloak'].includes(abId) && p.abilityCount > 0 && Math.random() < dt * 0.6) useAbility(); // tracers / smoke cloak when a fight starts
+  if (enemy && abId === 'rally' && p.abilityCount > 0 && p.hp < p.maxHp * 0.5 && !p.downed) useAbility();
   if (enemy) {
     const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
     if (ai.seen !== enemy.id) { // a surprise takes longer to react to than something they were listening for

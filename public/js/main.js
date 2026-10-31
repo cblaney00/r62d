@@ -1452,7 +1452,7 @@ function draw(s, view, now, dt) {
   for (const e of ents) {
     const ally = e.tm === side;
     if (e.ty === 'drone' || e.ty === 'cam' || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud') continue;
-    if ((e.ty === 'clamp' || e.ty === 'prox' || e.ty === 'concuss') && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < 110)) continue; // hidden traps
+    if ((e.ty === 'clamp' || e.ty === 'prox' || e.ty === 'concuss' || e.ty === 'alarm') && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < (e.ty === 'alarm' ? 40 : 110))) continue; // hidden traps
     if (!ally && !seen(e.x, e.y)) continue;
     if (e.ty === 'mine' && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < 140)) continue;
     drawGadget(ctx, e, now, ally);

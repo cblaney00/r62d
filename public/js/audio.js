@@ -472,6 +472,8 @@ export function play(name, x, y) {
     case 'vault': { foley('cloth', x, y); const g = out(x, y, 0.35, 380, 0.12); if (!g) return; const t = ac.currentTime; noise(g, t + 0.05, 0.14, 'lowpass', 600, 0.9, 0.6); noise(g, t + 0.45, 0.12, 'lowpass', 500, 1, 0.5); return; } // a hand on the ledge, then the landing
     case 'clamp': impact('metal', x, y); return foley('hurt', x, y);
     case 'swap': return;
+    case 'fakeStep': return step(x, y, 'concrete', 2, false); // RUSE's echo box
+    case 'fakeShot': return gunshot('v9', x, y, false);
     case 'droneSprint': { const g = out(x, y, 0.5, 300, 0.12); if (!g) return; const t = ac.currentTime; tone(g, t, 0.35, 600, 1500, 'sawtooth', 0.08); return; } // the motor winding up
     case 'empty': return foley('empty', x, y);
     case 'break': return impact('electronic', x, y);
