@@ -49,10 +49,10 @@ input { font: 600 20px var(--head); padding: 10px 14px; background: rgba(0,0,0,0
 .logo small { font: 600 18px var(--head); letter-spacing: 0.5em; color: var(--dim); }
 #join { display: flex; gap: 10px; }
 .squads { display: flex; gap: 24px; }
-#mapPick { display: flex; gap: 10px; margin: 4px 0 14px; overflow-x: auto; padding-bottom: 4px; }
-#mapPick button { flex: 0 0 auto; width: 150px; padding: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; }
-#mapPick canvas { width: 100%; height: 84px; display: block; background: #0a0c0f; image-rendering: auto; }
-#mapPick b { font: 700 14px var(--head); letter-spacing: 0.08em; }
+#mapPick { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; margin: 4px 0 14px; } /* every map fits (Dust Town, the 7th, was off the edge) */
+#mapPick button { min-width: 0; padding: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; }
+#mapPick canvas { width: 100%; height: 70px; object-fit: contain; display: block; background: #0a0c0f; image-rendering: auto; }
+#mapPick b { font: 700 13px var(--head); letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #mapPick span { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
 #mapPick button.on { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
 .squad { width: 320px; background: var(--panel); border: 1px solid var(--line); padding: 14px 16px; }

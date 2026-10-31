@@ -9,6 +9,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Dust Town couldn't be picked in the lobby: the row of map cards only had room for six, so the seventh was hidden off the edge. The cards now shrink to fit every map in one row.
+
 - [x] Dust Town, a desert town map in the classic layout: attackers come from the south edge (4 spawns); bomb sites at opposite ends of the north (A: Spice Bazaar / Granary in the west, B: Water Works / Pump House in the east) with the Hotel (a third site) between them near the middle. Long Road runs up the open west edge to A (a gate halfway), Mid Street goes up the middle to the Town Square (Short Gate to A, B Alley to B), and a tight winding concrete tunnel comes up the east side into the B yard. The market and garage between the lanes link them. Mostly one floor; only the Hotel has an upstairs with windows over the square. New sand ground.
 
 - [x] Points, R6-style: a "+20 ENEMY SPOTTED" style popup under your crosshair and a SCORE column on the scoreboard (Tab); the MVP is the top score. Kill 100 (headshot 120), down 50, revive 75, plant or disable the defuser 150, objective found 50, enemy spotted 20, pinging a gadget/camera/drone/the objective 10 (once per thing a round), gadget/camera destroyed 25, drone 20, wall or hatch reinforced 15, barricade 5, round won 50, teamkill −50.
