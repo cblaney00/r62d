@@ -8,13 +8,27 @@
 // Played sideways only: held upright a "turn your phone sideways" sign covers the match.
 const R = 62; // stick radius in CSS px
 
-export const isTouch = (() => {
+// Phone or computer? (he asked: sense it, and if that can't be told, ask when the game loads.) A clear phone (a phone
+// browser, or only a finger to point with) gets touch controls; a device with both a touch screen and a mouse or
+// trackpad asks once. The choice is remembered on that device and can be changed in Settings.
+const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { return null; } };
+const sniff = () => {
   try {
-    if (/[?&]touch=1/.test(location.search)) return true;
-    if (/[?&]touch=0/.test(location.search)) return false;
-    return matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches || (navigator.maxTouchPoints > 0 && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
-  } catch { return false; }
-})();
+    const phone = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches);
+    return phone ? 'touch' : navigator.maxTouchPoints > 0 ? 'ask' : 'desk';
+  } catch { return 'desk'; }
+};
+const forced = /[?&]touch=1/.test(location.search) ? 'touch' : /[?&]touch=0/.test(location.search) ? 'desk' : null;
+const chosen = forced || store('r62d-input'), sniffed = sniff();
+export const isTouch = (chosen || (sniffed === 'touch' ? 'touch' : 'desk')) === 'touch';
+export const needsInputChoice = !chosen && sniffed === 'ask'; // touch screen AND a mouse: ask on the title screen
+export function setInputChoice(c) { store('r62d-input', c); location.reload(); }
+// Settings that phones especially need (he asked: adjustable): how big the menus and match text are (1 = fit the
+// screen), and how much of the map you see (bigger = further zoomed out). Kept on this device.
+export const uiScale = () => Math.max(0.5, Math.min(1.6, +(store('r62d-uiscale') || 1)));
+export const viewMul = () => Math.max(0.8, Math.min(2, +(store('r62d-view') || (isTouch ? 1.35 : 1))));
+export function setUiScale(v) { store('r62d-uiscale', String(v)); fitUi(); }
+export function setViewMul(v) { store('r62d-view', String(v)); }
 
 // button → the controller button number main.js already understands (PAD_ACTIONS in gamepad.js); 'lt' / 'rt' are the triggers
 const BUTTONS = [
@@ -104,13 +118,15 @@ export function setTouchVisible(on) {
   shown = on; ui.classList.toggle('hidden', !on); document.documentElement.classList.toggle('touchplay', on);
   if (!on) { ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
 }
-if (isTouch) {
-  document.documentElement.classList.add('touch');
-  // small screens: menus and the match's text shrink to fit (the canvas itself already fills the screen)
-  const fit = () => {
-    const h = Math.min(innerHeight, innerWidth > innerHeight ? innerHeight : innerWidth * 0.6);
-    document.documentElement.style.setProperty('--uiz', Math.max(0.45, Math.min(1, h / 820)).toFixed(3));
-    document.documentElement.style.setProperty('--hudz', Math.max(0.6, Math.min(1, h / 700)).toFixed(3));
-  };
-  fit(); addEventListener('resize', fit);
+// Menus and match text shrink to fit small screens (the game picture itself always fills the screen), times the
+// player's own size setting. Menus are laid out for ~900 px tall, the match text for ~760 (and both for the width).
+function fitUi() {
+  const h = Math.min(innerHeight, innerWidth > innerHeight ? innerHeight : innerWidth * 0.6), w = innerWidth, s = uiScale();
+  const fit = Math.min(1, h / 900, w / 1500), hud = Math.min(1, h / 760, w / 1300);
+  document.documentElement.style.setProperty('--uiz', Math.max(0.3, fit * s).toFixed(3));
+  document.documentElement.style.setProperty('--hudz', Math.max(0.4, Math.min(1.4, hud * s)).toFixed(3));
+  document.documentElement.style.setProperty('--tz', Math.max(0.7, Math.min(1.15, h / 430)).toFixed(3)); // touch buttons: smaller on short screens
+  document.documentElement.classList.toggle('fitui', isTouch || fit < 1 || s !== 1);
 }
+if (isTouch) document.documentElement.classList.add('touch');
+fitUi(); addEventListener('resize', fitUi);

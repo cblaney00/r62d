@@ -21,7 +21,7 @@ import { levelFor } from '/shared/progress.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
 import { walkRay, tileAt, findVault } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
-import { touchPad, touchActive, setTouchVisible, touchAimReset } from './touch.js';
+import { touchPad, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul } from './touch.js';
 import { blocksSight, FL } from '/shared/constants.js';
 
 const $ = id => document.getElementById(id);
@@ -1227,6 +1227,7 @@ function frame(nowMs) {
     st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need;
     st.viewH = Math.max(st.viewH, st.fitH);
   } else st.fitH = 0;
+  st.viewH *= viewMul(); // Settings: how much of the map you see (phones start further out)
   st.zoom = VH / st.viewH;
   if (freeAim) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
@@ -2365,6 +2366,19 @@ for (const id of ['opsPage', 'profilePage']) $(id).querySelector('.close').oncli
 
 // ---------------- title screen, main menu, little touches ----------------
 st.started = false;
+// phone or computer? asked on the title screen only when it can't be told (touch.js); changeable in Settings
+if (needsInputChoice) {
+  $('inputChoice').classList.remove('hidden');
+  for (const b of $('inputChoice').querySelectorAll('button')) b.addEventListener('click', e => { e.stopPropagation(); setInputChoice(b.dataset.c); });
+}
+for (const b of $('inputSeg').querySelectorAll('button')) {
+  b.classList.toggle('on', (b.dataset.c === 'touch') === isTouch);
+  b.onclick = () => { if ((b.dataset.c === 'touch') !== isTouch) setInputChoice(b.dataset.c); };
+}
+{ const u = $('uiScale'), v = $('viewMul'), show = () => { $('uiScaleVal').textContent = u.value + '%'; $('viewMulVal').textContent = v.value + '%'; };
+  u.value = Math.round(uiScale() * 100); v.value = Math.round(viewMul() * 100); show();
+  u.addEventListener('input', () => { show(); setUiScale(u.value / 100); });
+  v.addEventListener('input', () => { show(); setViewMul(v.value / 100); }); }
 $('splash').addEventListener('click', () => {
   if (st.started) return;
   audio.initAudio(); audio.ui('open');

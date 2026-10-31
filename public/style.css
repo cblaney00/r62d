@@ -605,9 +605,9 @@ html.touch, html.touch body { touch-action: none; -webkit-user-select: none; use
 #tTurn { position: fixed; inset: 0; z-index: 90; background: rgba(5,7,9,0.96); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font: 700 22px var(--head); letter-spacing: 0.08em; color: #fff; text-align: center; padding: 30px; }
 #tTurn b { font-size: 64px; color: #f2c14e; }
 /* make room for the thumbs: health and ammo move up out of the corners */
-html.touch #lobby, html.touch #splash > *, html.touch #select, html.touch #endscreen, html.touch .overlay > *, html.touch #settings, html.touch #pause,
-html.touch #quitDlg, html.touch #loading > *, html.touch #corner, html.touch #help, html.touch #conn, html.touch #countdown { zoom: var(--uiz, 1); }
-html.touch #hud, html.touch #coach, html.touch #chat, html.touch #siteFound { zoom: var(--hudz, 1); }
+html.fitui #lobby, html.fitui #splash > *, html.fitui #select, html.fitui #endscreen, html.fitui .overlay > *, html.fitui #settings, html.fitui #pause,
+html.fitui #quitDlg, html.fitui #loading > *, html.fitui #corner, html.fitui #help, html.fitui #conn, html.fitui #countdown, html.fitui #freeOps { zoom: var(--uiz, 1); }
+html.fitui #hud, html.fitui #coach, html.fitui #chat, html.fitui #siteFound, html.fitui #compass { zoom: var(--hudz, 1); }
 html.touch #bl { bottom: auto; top: 70px; }
 html.touch #br { bottom: auto; top: 172px; right: auto; left: 18px; text-align: left; }
 html.touch #hud #feed, html.touch #hud #killfeed { margin-top: 56px; }
@@ -629,4 +629,11 @@ html.touch #clickIn { display: none !important; }
 #freeOps .foOps button.on { border-color: #f2c14e; box-shadow: inset 0 0 0 1px #f2c14e; }
 #freeOps .foOps canvas { width: 56px; height: 56px; }
 #freeOps .foOps b { font: 700 13px var(--head); letter-spacing: 0.06em; } #freeOps .foOps span { font-size: 10px; color: var(--dim); text-align: center; }
-html.touch #freeOps { zoom: var(--uiz, 1); }
+/* the phone-or-computer choice on the title screen */
+#inputChoice { position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 5; }
+#inputChoice p { margin: 0; font: 700 16px var(--head); letter-spacing: 0.12em; color: #fff; }
+#inputChoice div { display: flex; gap: 12px; }
+#inputChoice button { font: 800 20px var(--head); letter-spacing: 0.08em; padding: 14px 22px; }
+/* short phone screens: touch buttons shrink with the screen, and long panels scroll instead of running off */
+#touchUI .tbtn, #touchUI #tsLeft { zoom: var(--tz, 1); }
+html.fitui #settings, html.fitui .overlay .page { max-height: calc(100vh / var(--uiz, 1) - 16px); overflow: auto; }

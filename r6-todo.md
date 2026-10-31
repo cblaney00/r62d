@@ -9,6 +9,9 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Phones: the game tells a phone apart by itself (touch controls); if a device has both a touch screen and a mouse it asks on the title screen ("Phone / tablet" or "Keyboard & mouse"). The choice is remembered and can be changed in Settings → Controls.
+- [x] Phones fit the screen: menus, lobby, operator select and the match text shrink to fit (checked at the Pixel 6 and Z Flip 7 screen sizes), long panels like Settings scroll, the touch buttons shrink on short screens, and phones start further zoomed out. Two new Settings sliders, for phones and computers: "Menu & screen text size" and "How much of the map you see".
+
 - [x] Free play is god mode: you can't be hurt, and ammo, reloads, skills, gadgets, drones and drone sprints never run out (bots still take damage). Press O (or click ALL OPERATORS at the bottom) for a grid of every operator, attack and defence, by role; click one to switch on the spot. N / B still step through them.
 - [x] Dust Town's market tables were invisible: they used the toilet-cubicle piece by mistake. They're now proper market stalls (wooden tables with a striped awning and goods laid out).
 
