@@ -141,7 +141,7 @@ const FIT_H = me => me && me.ad ? (String(me.aa).includes('scope') ? 1000 : 820)
 // Turning (he asked: hard to pull the mouse round, flicks must be possible): moving the mouse sideways turns you as if
 // the crosshair were never further than TURN_R from you, so a far-out crosshair turns as quickly as a near one; moving
 // it towards / away from you changes the distance 1:1. Close in it is exactly 1:1 like a pointer.
-const TURN_R = 160, ADS_DIST = 5 * PX_PER_M; // aiming in puts the crosshair 5 m out, the way you face (he chose)
+const TURN_R = 160, ADS_DIST = 2.5 * PX_PER_M; // aiming in puts the crosshair 2.5 m out, the way you face (he chose 5 m, then asked for half)
 function freeMove(dx, dy) {
   const z = st.zoom || 1; dx /= z; dy /= z;
   const o = aimOff, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = AIM_MIN(), hi = AIM_MAX();

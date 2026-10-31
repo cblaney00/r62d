@@ -357,9 +357,9 @@ export const ATTACH = {
     laser: { name: 'Laser', short: 'Laser', desc: 'Tighter hip-fire, but enemies can see your beam.', hip: 0.72, laser: 1 },
   },
   sight: {
-    iron: { name: 'Iron Sights', short: 'Iron sights', desc: 'No changes.' },
+    iron: { name: 'Iron Sights', short: 'Iron sights', desc: 'Nothing in the way: the quickest to aim in.', ads: 0.92 }, // he asked: iron sights must be a real choice
     reddot: { name: 'Red Dot', short: 'Red dot', desc: 'Slightly tighter aimed shots.', adsSpread: 0.88 },
-    holo: { name: 'Holo Sight', short: 'Holo', desc: 'A little faster to aim.', ads: 0.9 },
+    holo: { name: 'Holo Sight', short: 'Holo', desc: 'A little tighter aimed shots, and a little quicker to aim than a red dot.', adsSpread: 0.94, ads: 0.96 },
     scope: { name: '2.0× Scope', short: '2× scope', desc: 'Very accurate aimed shots and you see further ahead, but slower to aim.', adsSpread: 0.7, ads: 1.2, zoom: 1 },
   },
 };
@@ -369,8 +369,8 @@ export function attachFor(w) {
   const barrel = cls === 'Shotgun' ? ['none', 'suppressor', 'extended'] : ['none', 'suppressor', 'compensator', 'brake', 'extended'];
   return {
     barrel: W && W.quiet ? barrel.filter(b => b !== 'suppressor') : barrel, // a built-in suppressor already
-    grip: side ? ['none', 'laser'] : ['none', 'vertical', 'angled', 'laser'],
-    sight: side ? ['iron', 'reddot'] : ['iron', 'reddot', 'holo', 'scope'],
+    grip: side ? ['none', 'angled', 'laser'] : ['none', 'vertical', 'angled', 'laser'], // at least 3 in every slot (he asked)
+    sight: side ? ['iron', 'reddot', 'holo'] : ['iron', 'reddot', 'holo', 'scope'],
   };
 }
 export function cleanAtt(w, a) {

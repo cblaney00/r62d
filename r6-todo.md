@@ -10,8 +10,17 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] defenders should be able to place unlimited wooded door and window barrcades (planks) but limited metal barracades on soft walls
 - [ ] make sure all the outside windows and doors each map are boarded up and can be vaulted through
 - [ ] add a point system for objects pinged and other objectives completed
+- [ ] make sure hush's silence actually works, he seems to be making a lot of noise, also his ability needs to be a toggle
+- [ ] make the bots capable of turning faster, and they should always be trying to look somewhat close to a place an enemy should be coming from unless they are easy or normal (sometimes for normal)
+- [ ] you shouldn't be able to spam ping, there is actually an extending timer for each time that you ping that never extends longer than 20 seconds
+- [ ] when the bomb site is found make it more obvious on the screen because that is a massive deal, show on the map where it is and what floor, like a picture for people to understand easy
 
 ## Done
+
+- [x] Operators page in sections like a match: ATTACK / DEFENCE at the top, then each role (with what it does) and its operators.
+- [x] Aiming in puts the crosshair 2.5 m out instead of 5 m (in matches and the Armory).
+- [x] No friendly fire during preparation: shots pass through teammates and nobody (you included) gets hurt by their own side while setting up. It's back on in the action phase.
+- [x] At least 3 choices in every attachment slot: pistols and other sidearms now also get the Holo sight and the Angled grip. Iron sights are a real choice now: the quickest to aim in (red dot: tighter aimed shots; holo: a bit of both).
 
 - [x] Tutorial text is bigger and the focus: things to read come up as a large card in the middle of the screen (Space, Enter or a click dismisses it). Things to do show as a large banner near the top that moves on by itself as soon as you've done them.
 - [x] No more stopping to press anything to move on: the tutorial starts the action phase by itself when you've finished preparing, both when attacking and when defending.

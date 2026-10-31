@@ -48,7 +48,7 @@ export function openArmory(el, opts) {
     audio.initAudio();
     if (document.pointerLockElement !== cv && !S.lockAsked) { S.lockAsked = true; cv.requestPointerLock?.(); return; } // the first click just takes control
     if (e.button === 0) { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; }
-    if (e.button === 2) { S.mouse.r = true; const l = Math.hypot(S.aim.x, S.aim.y) || 1; S.aim = { x: S.aim.x / l * 5 * M, y: S.aim.y / l * 5 * M }; } // aiming in: 5 m out, as in a match
+    if (e.button === 2) { S.mouse.r = true; const l = Math.hypot(S.aim.x, S.aim.y) || 1; S.aim = { x: S.aim.x / l * 2.5 * M, y: S.aim.y / l * 2.5 * M }; } // aiming in: 2.5 m out, as in a match
   };
   cv.oncontextmenu = e => e.preventDefault();
   S.up = e => { if (e.button === 0) S.mouse.l = false; if (e.button === 2) S.mouse.r = false; };

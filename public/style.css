@@ -560,3 +560,10 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 #coach.task .cTitle { font-size: 32px; } #coach.task .cHead { font-size: 13px; } #coach.task .cFoot { font-size: 13px; }
 #coach.task.sel { top: auto; bottom: 64px; left: 50%; right: auto; transform: translateX(-50%); width: min(760px, 56vw); }
 #coach kbd { font-size: 0.85em; }
+/* Operators page: attack / defence, then each role and its operators (he asked: like in a match) */
+#opsList { width: 300px; }
+#opsList .opsSides { display: flex; position: sticky; top: -10px; z-index: 2; background: rgba(9,12,16,0.97); padding: 4px 0 8px; }
+#opsList .opsSides button { flex: 1; }
+#opsList .opsRole { margin-bottom: 8px; }
+#opsList .opsRole h4 { margin: 14px 4px 6px; color: #f2c14e; letter-spacing: 0.22em; }
+#opsList .opsRole h4 small { display: block; font: 500 12px var(--body); letter-spacing: 0; color: var(--dim); margin-top: 3px; text-transform: none; }

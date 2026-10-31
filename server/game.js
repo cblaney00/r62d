@@ -677,6 +677,7 @@ export class Game {
     let best = null, bestT = range;
     for (const q of this.players.values()) {
       if (q === src || !q.alive) continue; // friendly fire: teammates get hit too
+      if (this.phase === PHASE.PREP && this.side(q) === this.side(src)) continue; // ...except in preparation: shots pass teammates (he asked: shotgunning walls to set up)
       const at = src.viewTime !== null && src.viewTime !== undefined ? this.posAt(q, src.viewTime) : q; // favour the shooter
       const t = rayCircle(x0, y0, dx, dy, at.x, at.y, hitR(q.op));
       if (t !== null && t < bestT) { bestT = t; best = { q, at }; }
@@ -831,6 +832,7 @@ export class Game {
 
   damage(q, amount, src, wname, ang) {
     if (!q.alive || amount <= 0) return;
+    if (this.phase === PHASE.PREP && src && this.side(src) === this.side(q)) return; // no friendly fire (or hurting yourself) while setting up (he asked)
     if (this.tut && src && src.bot && !q.bot) return; // tutorial bots never hurt you (he asked)
     amount = Math.round(amount);
     if (src && src.ms && src !== q && this.side(src) !== this.side(q)) src.ms.damage += Math.min(amount, Math.max(0, q.hp));

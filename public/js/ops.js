@@ -1,5 +1,5 @@
 // The Operators page: who each operator is, their gear choices (saved per player), and your stats with them.
-import { OPERATORS, WEAPONS, GADGETS, LOADOUTS, GADGET_COUNT, BIOS, OP_LIST, cleanLoadout, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, LOADOUTS, GADGET_COUNT, BIOS, OP_LIST, JOBS, jobOf, cleanLoadout, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import { shade } from './textures.js';
@@ -17,6 +17,7 @@ let state = { sel: 'ember', profile: null, send: null, raf: 0 };
 
 export function openOps(el, { profile, send, op }) {
   state.profile = profile; state.send = send; if (op) state.sel = op;
+  state.side = OPERATORS[state.sel].team;
   el.classList.remove('hidden');
   render(el);
 }
@@ -33,10 +34,16 @@ export function showLoadout(d, { profile, send, op }) {
 function loadoutOf(op) { return cleanLoadout(op, state.profile && state.profile.loadouts && state.profile.loadouts[op]); }
 
 function render(el) {
-  const list = el.querySelector('#opsList');
-  list.innerHTML = ['atk', 'def'].map(team => `<h4>${team === 'atk' ? 'ATTACK' : 'DEFENCE'}</h4>` +
-    OP_LIST.filter(k => OPERATORS[k].team === team).map(k => `<button class="opbtn ${k === state.sel ? 'on' : ''}" data-op="${k}" style="--c:${OPERATORS[k].color}">
-      <canvas width="64" height="64"></canvas><span>${OPERATORS[k].name}<small>${OPERATORS[k].role}</small></span></button>`).join('')).join('');
+  // laid out the way you meet them in a match (he asked): attack or defence, then each role with its operators
+  const list = el.querySelector('#opsList'), side = state.side || OPERATORS[state.sel].team;
+  list.innerHTML = `<div class="opsSides seg">${['atk', 'def'].map(t => `<button data-side="${t}" class="${t === side ? 'on' : ''}">${t === 'atk' ? 'ATTACK' : 'DEFENCE'}</button>`).join('')}</div>` +
+    JOBS[side].map(j => `<div class="opsRole"><h4>${esc(j.name)}<small>${esc(j.desc)}</small></h4>` +
+      j.ops.map(k => `<button class="opbtn ${k === state.sel ? 'on' : ''}" data-op="${k}" style="--c:${OPERATORS[k].color}">
+      <canvas width="64" height="64"></canvas><span>${OPERATORS[k].name}<small>${OPERATORS[k].role}</small></span></button>`).join('') + '</div>').join('');
+  for (const b of list.querySelectorAll('.opsSides button')) b.onclick = () => {
+    state.side = b.dataset.side; if (OPERATORS[state.sel].team !== state.side) state.sel = JOBS[state.side][0].ops[0];
+    render(el); list.scrollTop = 0;
+  };
   for (const b of list.querySelectorAll('.opbtn')) {
     const c = b.querySelector('canvas'), k = b.dataset.op, x = c.getContext('2d');
     x.fillStyle = shade(OPERATORS[k].color, 0.35); x.fillRect(0, 0, 64, 64);
