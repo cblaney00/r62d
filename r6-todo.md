@@ -8,6 +8,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 - [ ] A new attacker with an RPG-style launcher, not too far off from Ash in R6 (our own operator: own name, look and twist).
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
+- [ ] generate more operators so there are at least 5 options per role on each side
 
 ## Done
 
