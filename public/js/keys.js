@@ -20,6 +20,7 @@ export const ACTIONS = [
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['opNext', 'Free play: next operator', 'KeyN', ''],
   ['opPrev', 'Free play: previous operator', 'KeyB', ''],
+  ['opGrid', 'Free play: choose any operator', 'KeyO', ''],
   ['settings', 'Settings', 'KeyO', 'F1'],
   ['pause', 'Pause menu', 'Escape', 'KeyP'],
 ];

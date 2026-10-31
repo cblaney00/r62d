@@ -18,7 +18,6 @@ import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './cross
 import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor } from '/shared/progress.js';
-import {  } from '/shared/operators.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
 import { walkRay, tileAt, findVault } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
@@ -551,6 +550,7 @@ function pressAction(a, e) {
     case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
     case 'vault': ev.push({ k: 'vault', a: Math.round(vaultDir() * 1000) / 1000 }); break;
     case 'opNext': case 'opPrev': if (st.last && st.last.fp) send({ t: 'free', a: 'op', dir: a === 'opNext' ? 1 : -1 }); break;
+    case 'opGrid': if (st.last && st.last.fp) toggleFreeOps(); break;
     case 'camPrev': case 'camNext': if (st.me && (st.me.ct === 'cam' || st.me.ct === 'drone')) ev.push({ k: a }); break;
   }
 }
@@ -1004,6 +1004,22 @@ function drawCompass(s, me, now) {
     text = r.stairs ? `STAIRS ${r.stairs} ${r.to} · ${m} m` : `BOMB SITE · ${m} m`;
   }
   if (label.textContent !== text) label.textContent = text;
+}
+
+// Free play's operator grid (he asked): every operator, attack and defence, by role; click one to switch to it on the spot
+function toggleFreeOps(force) {
+  const el = $('freeOps'), open = force ?? el.classList.contains('hidden');
+  if (!open) { el.classList.add('hidden'); return; }
+  if (document.pointerLockElement) document.exitPointerLock();
+  const cur = st.me && st.me.op, body = el.querySelector('.foBody');
+  body.innerHTML = ['atk', 'def'].map(t => `<div class="foSide"><h3>${t === 'atk' ? 'ATTACK' : 'DEFENCE'}</h3>` + JOBS[t].map(j => `<div class="foRole"><h4>${esc(j.name)}</h4><div class="foOps">` +
+    j.ops.map(k => `<button data-op="${k}" class="${k === cur ? 'on' : ''}"><canvas width="72" height="72"></canvas><b>${esc(OPERATORS[k].name)}</b><span>${esc(OPERATORS[k].ability.name)}</span></button>`).join('') + '</div></div>').join('') + '</div>').join('');
+  for (const b of body.querySelectorAll('button[data-op]')) {
+    portrait(b.querySelector('canvas'), b.dataset.op);
+    b.onclick = () => { audio.ui(); send({ t: 'free', a: 'pick', op: b.dataset.op }); el.classList.add('hidden'); };
+  }
+  el.querySelector('.close').onclick = () => { audio.ui('back'); el.classList.add('hidden'); };
+  el.classList.remove('hidden'); audio.ui('open');
 }
 
 function banner(text, sub, color) {
@@ -1972,7 +1988,8 @@ function hud(s) {
   if (s.fp && me.op) {
     const all = [...opsForTeam('atk'), ...opsForTeam('def')], i = all.indexOf(me.op), n = all.length;
     const nm = k => `${OPERATORS[k].name}${OPERATORS[k].team !== side ? (OPERATORS[k].team === 'atk' ? ' (attack)' : ' (defence)') : ''}`;
-    setHTML('freeHint', `Switch operator: <kbd>${esc(label('opPrev'))}</kbd> ${esc(nm(all[(i - 1 + n) % n]))} · <b>${esc(OPERATORS[me.op].name)}</b> · ${esc(nm(all[(i + 1) % n]))} <kbd>${esc(label('opNext'))}</kbd>`);
+    setHTML('freeHint', `<b>GOD MODE</b> · <button id="freeOpsBtn"><kbd>${esc(label('opGrid'))}</kbd> ALL OPERATORS</button> · <kbd>${esc(label('opPrev'))}</kbd> ${esc(nm(all[(i - 1 + n) % n]))} · <b>${esc(OPERATORS[me.op].name)}</b> · ${esc(nm(all[(i + 1) % n]))} <kbd>${esc(label('opNext'))}</kbd>`);
+    const fb = $('freeOpsBtn'); if (fb && !fb.onclick) fb.onclick = () => toggleFreeOps();
   }
   // objective
   let obj, sub = '';
@@ -2305,7 +2322,7 @@ function revealSeen() {
 function revealAll() { if (!st.unseen) return; for (const k of st.unseen) applyKnown(k); st.unseen.clear(); }
 
 // ---------------- pause menu & pages ----------------
-const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage', 'pause', 'quitDlg'];
+const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage', 'freeOps', 'pause', 'quitDlg'];
 function menuOpen() { return OVERLAYS.some(id => !$(id).classList.contains('hidden')); }
 function inMatch() { const p = st.last && st.last.ph; return p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END || p === PHASE.SELECT; }
 function showOps(op) { audio.ui('open'); openOps($('opsPage'), { profile: st.profile, send, op }); }
@@ -2313,7 +2330,7 @@ function showProfile() { audio.ui('open'); if (st.token) openProfile($('profileP
 // Esc closes whatever is open, otherwise opens/closes the pause menu during a match.
 function escape() {
   if (!$('armoryPage').classList.contains('hidden') && armoryHoldsEsc()) return; // Esc first lets go of the captured mouse, as in a match
-  for (const id of ['settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage']) if (!$(id).classList.contains('hidden')) {
+  for (const id of ['settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage', 'freeOps']) if (!$(id).classList.contains('hidden')) {
     if (id === 'opsPage') closeOps($(id)); else if (id === 'armoryPage') closeArmory($(id)); else if (id === 'mapsPage') closeMapInfo($(id)); else $(id).classList.add('hidden');
     return;
   }

@@ -108,7 +108,7 @@ export function build() {
   G.prop('tree', 30, 70, 2, 2, T.TALL); G.prop('tree', 72, 72, 2, 2, T.TALL); G.prop('car', 14, 70, 6, 3, T.TALL, 1);
   G.prop('van', 80, 67, 8, 3, T.TALL, 1); G.prop('crates', 40, 66, 2, 2, T.TALL); G.prop('dumpster', 100, 66, 2, 3, T.TALL);
   // A site
-  G.prop('stall', 9, 7, 4, 1, T.LOW); G.prop('stall', 9, 12, 4, 1, T.LOW); G.prop('crates', 17, 6, 2, 2, T.TALL); G.prop('counter', 14, 15, 5, 1, T.LOW);
+  G.prop('marketstall', 9, 7, 4, 1, T.LOW); G.prop('marketstall', 9, 12, 4, 1, T.LOW); G.prop('crates', 17, 6, 2, 2, T.TALL); G.prop('counter', 14, 15, 5, 1, T.LOW);
   G.prop('crates', 24, 6, 3, 2, T.TALL); G.prop('crates', 31, 13, 2, 2, T.TALL); G.prop('shelf', 34, 6, 1, 3, T.TALL);
   // hotel
   G.prop('reception', 45, 15, 5, 1, T.LOW); G.prop('plant', 50, 5, 1, 1, T.TALL); G.prop('couch', 47, 6, 3, 1, T.LOW);
@@ -117,8 +117,8 @@ export function build() {
   G.prop('rack', 69, 6, 1, 6, T.TALL); G.prop('workbench', 74, 14, 5, 1, T.LOW); G.prop('crates', 78, 6, 2, 2, T.TALL);
   G.prop('rack', 86, 6, 6, 1, T.TALL); G.prop('console', 93, 14, 3, 1, T.LOW); G.prop('crates', 96, 6, 2, 2, T.TALL);
   // market and garage
-  G.prop('stall', 19, 37, 4, 1, T.LOW); G.prop('stall', 26, 37, 4, 1, T.LOW); G.prop('stall', 33, 37, 4, 1, T.LOW);
-  G.prop('stall', 19, 43, 4, 1, T.LOW); G.prop('stall', 33, 43, 4, 1, T.LOW); G.prop('crates', 17, 56, 2, 2, T.TALL);
+  G.prop('marketstall', 19, 37, 4, 1, T.LOW); G.prop('marketstall', 26, 37, 4, 1, T.LOW); G.prop('marketstall', 33, 37, 4, 1, T.LOW);
+  G.prop('marketstall', 19, 43, 4, 1, T.LOW); G.prop('marketstall', 33, 43, 4, 1, T.LOW); G.prop('crates', 17, 56, 2, 2, T.TALL);
   G.prop('shelf', 32, 50, 1, 5, T.TALL); G.prop('counter', 37, 59, 5, 1, T.LOW);
   G.prop('car', 64, 36, 3, 6, T.TALL); G.prop('car', 74, 36, 3, 6, T.TALL); G.prop('workbench', 62, 58, 6, 1, T.LOW); G.prop('crates', 79, 51, 2, 2, T.TALL);
 

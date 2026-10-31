@@ -9,6 +9,9 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Free play is god mode: you can't be hurt, and ammo, reloads, skills, gadgets, drones and drone sprints never run out (bots still take damage). Press O (or click ALL OPERATORS at the bottom) for a grid of every operator, attack and defence, by role; click one to switch on the spot. N / B still step through them.
+- [x] Dust Town's market tables were invisible: they used the toilet-cubicle piece by mistake. They're now proper market stalls (wooden tables with a striped awning and goods laid out).
+
 - [x] Phone and tablet support: opening the game on a phone shows touch controls by itself during a match. A stick for your left thumb to move (a light push walks quietly); the whole right half of the screen is a stick that appears wherever your thumb lands, to aim (drag further to look further). FIRE buttons on both sides, and buttons for aim in, crouch, use (hold), reload, swap, skill, gadget, melee, vault, ping, drone/cameras (with previous/next), scores and pause. Pressing AIM pulls the crosshair in close, like aiming in with the mouse, and re-centres the right stick under your thumb. Menus and the match's text shrink to fit a phone screen; it plays sideways only (held upright it asks you to turn the phone). The first touch in a match goes full screen.
 
 - [x] Cleaned up the game files: removed unused leftovers in the code, moved an old copy of the saved profiles out of the game folder (kept as a backup next to your real saves; nothing in it was missing from them), and brought the project notes up to date. New test for the first 30 operators: each skill does what its description says (31 checks, all pass); with the existing test for the 21 newer ones, every operator's skill is now checked. The whole test suite (29 tests) passes; one camera test that could fail by luck (a bot in the line of fire) was fixed.

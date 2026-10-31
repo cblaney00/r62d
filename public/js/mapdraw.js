@@ -725,6 +725,16 @@ export function drawProp(ctx, p, m) {
       ctx.fillStyle = 'rgba(80,140,200,0.35)'; ctx.fillRect(X + 1, Y + 6.2, W - 2, 0.6);
       break;
     }
+    case 'marketstall': { // a market trader's table (Dust Town): a wooden top under a striped awning, goods laid out
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; rr(ctx, X + 2, Y + 3, W, H, 2); ctx.fill();
+      ctx.fillStyle = '#8a5a32'; rr(ctx, X, Y, W, H, 2); ctx.fill();
+      ctx.fillStyle = '#6e4626'; ctx.fillRect(X, Y + H - 3, W, 3);
+      const cols = ['#c0392b', '#e8d8b0'], bands = Math.max(3, Math.round(W / 8));
+      for (let i = 0; i < bands; i++) { ctx.fillStyle = cols[i % 2]; ctx.fillRect(X + i * W / bands, Y - 4, W / bands + 0.5, 5); } // the awning's edge
+      const goods = ['#e2a33a', '#7aa84a', '#d0573a', '#c9b48a', '#9a6ad0'];
+      for (let i = 0; i < Math.round(W / 7); i++) { ctx.fillStyle = goods[(i * 3 + (X | 0)) % goods.length]; ctx.beginPath(); ctx.arc(X + 4 + i * 7, Y + H / 2 + (i % 2 ? 1.5 : -1.5), 2.3, 0, 7); ctx.fill(); }
+      break;
+    }
     case 'stall': {
       ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(X + 7, Y + 2, 3, H);
       ctx.fillStyle = '#9fb3b8'; ctx.fillRect(X + 6, Y, 3, H);

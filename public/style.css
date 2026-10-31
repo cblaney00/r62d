@@ -614,3 +614,19 @@ html.touch #hud #feed, html.touch #hud #killfeed { margin-top: 56px; }
 html.touchplay #corner { display: none; }
 html.touch #chat { bottom: 150px; }
 html.touch #clickIn { display: none !important; }
+/* free play operator grid (he asked) */
+#freeHint button { all: unset; cursor: pointer; color: #f2c14e; font-weight: 700; pointer-events: auto; }
+#freeHint { pointer-events: auto; }
+#freeOps { position: fixed; inset: 4vh 4vw; z-index: 70; background: rgba(9,12,16,0.97); border: 1px solid var(--line); display: flex; flex-direction: column; }
+#freeOps .foHead { display: flex; align-items: center; gap: 18px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+#freeOps .foHead h2 { margin: 0; font: 800 26px var(--head); letter-spacing: 0.2em; }
+#freeOps .foHead span { flex: 1; color: var(--dim); }
+#freeOps .foBody { flex: 1; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 12px 18px; }
+#freeOps h3 { margin: 0 0 6px; font: 800 18px var(--head); letter-spacing: 0.25em; color: #f2c14e; }
+#freeOps h4 { margin: 8px 0 4px; font: 700 13px var(--head); letter-spacing: 0.2em; color: var(--dim); }
+#freeOps .foOps { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+#freeOps .foOps button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; }
+#freeOps .foOps button.on { border-color: #f2c14e; box-shadow: inset 0 0 0 1px #f2c14e; }
+#freeOps .foOps canvas { width: 56px; height: 56px; }
+#freeOps .foOps b { font: 700 13px var(--head); letter-spacing: 0.06em; } #freeOps .foOps span { font-size: 10px; color: var(--dim); text-align: center; }
+html.touch #freeOps { zoom: var(--uiz, 1); }

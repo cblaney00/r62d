@@ -465,6 +465,7 @@ export class Game {
       if (this.time < (p.sprintUntil || 0) && this.time - (p.sprintNoiseT || 0) > 0.4) { const d = this.ent(p.droneId); if (d) { p.sprintNoiseT = this.time; this.noise(d.x, d.y, team, 260); } }
     } else if (this.time < (p.sprintUntil || 0)) { p.sprintUntil = this.time; p.sprintCd = this.time + DRONE_SPRINT.wait; }
     this.tickRope(p, dt);
+    if (this.free && !p.bot && p.sock && p.alive) this.godMode(p); // (only a real connected player, not the test harness)
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
     { const g = p.guns[p.slot], rate = (1 / (g ? adsTime(WEAPONS[g.w]) : 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
       const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time) && !p.vault && !(p.recoverUntil > this.time);
@@ -833,6 +834,7 @@ export class Game {
 
   damage(q, amount, src, wname, ang) {
     if (!q.alive || amount <= 0) return;
+    if (this.free && !q.bot && q.sock) return; // free play: god mode, nothing hurts you
     if (this.phase === PHASE.PREP && src && this.side(src) === this.side(q)) return; // no friendly fire (or hurting yourself) while setting up (he asked)
     if (this.tut && src && src.bot && !q.bot) return; // tutorial bots never hurt you (he asked)
     amount = Math.round(amount);
@@ -1526,10 +1528,23 @@ export class Game {
       this.beginPrep(); this.beginAction();
       p.hasDefuser = true;
       this.events = [{ e: 'banner', text: 'FREE PLAY', sub: MAPS[this.mapId].name }];
+    } else if (m.a === 'pick' && this.phase === PHASE.ACTION && OPERATORS[m.op]) { // the operator grid
+      this.freeSwitch(p, m.op);
     } else if (m.a === 'op' && this.phase === PHASE.ACTION) {
       const i = Math.max(0, FREE_OPS.indexOf(p.op)), n = FREE_OPS.length;
       this.freeSwitch(p, FREE_OPS[(i + (m.dir < 0 ? -1 : 1) + n) % n]);
     }
+  }
+  // Free play is god mode for the player (he asked): you can't be hurt, and ammo, reloads, skills, gadgets, drones
+  // and drone sprints never run out.
+  godMode(p) {
+    const o = OPERATORS[p.op]; if (!o) return;
+    p.hp = Math.max(p.hp, p.maxHp); p.downed = false;
+    for (const g of p.guns || []) { g.ammo = WEAPONS[g.w].mag; g.reserve = WEAPONS[g.w].reserve; }
+    if (o.ability.count) p.abilityCount = o.ability.count;
+    if (o.ability.battery && !p.shrouded && !p.scanning && !p.lancing && !p.welding) p.battery = o.ability.battery;
+    p.gadgetCount = Math.max(p.gadgetCount || 0, GADGET_COUNT[p.gadget] || 1);
+    p.drones = Math.max(p.drones || 0, 2); p.sprints = DRONE_SPRINT.charges; p.sprintCd = 0; p.pingReady = 0;
   }
   freeSwitch(p, op) {
     const squad = OPERATORS[op].team === TEAM.ATK ? 0 : 1;
