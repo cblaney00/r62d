@@ -8,10 +8,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 - [ ] A new attacker with an RPG-style launcher, not too far off from Ash in R6 (our own operator: own name, look and twist).
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
-- [ ] when all enemies die OR are all downed and cannot get back up then the round is over, players are being downed without the round ending so it just wastes time
 - [ ] the aiming is very close to being proper, it's just a little hard to pull the mouse around to make the character turn left and right and i think it would still be wonky if we just upped the default sensitivity, flicks should be possible and not get caught on every door, maybe the reticle distance can reset to a regular distance every time you ADS
 
 ## Done
+
+- [x] Round ends when every enemy is dead or downed with nobody left to revive them: checked, it already works (a full bot match ended every round correctly). He agreed to leave it for now; if it happens again, note where (Free Play, tutorial or a match) and whether a teammate was still standing.
 
 - [x] Map knowledge tab (under the Armory): pick a map and a floor to see its plan with every bomb site pair (click one to pick it out and jump to its floor), attacker spawns, defender cameras and where they look, floor hatches, stairs (which floor they lead to), breakable walls in orange, rappel spots and room names. Each can be switched on or off; pointing at a room names it.
 
