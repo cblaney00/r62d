@@ -487,6 +487,7 @@ function onEvent(e, s, players) {
     case 'down': { const v = players.get(e.id); if (v) addFeed(`${v.n} is down`); break; }
     case 'msg': if (!e.team || e.team === mySide()) addFeed(e.text); break;
     case 'banner': if (!e.team || e.team === mySide()) banner(e.text, e.sub); audio.ui('round'); break;
+    case 'found': if (e.team === mySide()) siteFound(s); break;
     case 'roundEnd': {
       const won = st.me && e.squad === st.me.sq;
       banner(won ? 'ROUND WON' : 'ROUND LOST', e.reason, won ? 'var(--ally)' : 'var(--enemy)');
@@ -495,6 +496,7 @@ function onEvent(e, s, players) {
     case 'matchEnd': st.endT = now; st.mvp = e.mvp; showEnd(e.squad); break;
     case 'stun': if (st.me && e.id === st.me.id) { st.flashUntil = now + e.dur; audio.tinnitus(e.dur); } break;
     case 'hurt': if (st.me && e.id === st.me.id) { st.hurtT = now; st.hurtFrom = e.from; } break;
+    case 'pts': if (e.to === st.id) { (st.ptsPops || (st.ptsPops = [])).push({ n: e.n, w: e.w, t: now }); if (st.ptsPops.length > 5) st.ptsPops.shift(); } break;
     case 'pingwait': if (e.to === st.id && performance.now() - (st.pingWaitT || 0) > 600) { st.pingWaitT = performance.now(); addFeed(`Ping ready in ${Math.ceil(e.t)} s`); audio.ui('back'); } break;
     case 'hitmark': if (e.to === st.id) { st.hitT = now; st.hitKill = e.kill; audio.ui(e.kill ? 'kill' : 'hit'); } break;
     case 'arc': fx.tracer(e.x, e.y, e.x2, e.y2, '130,200,255'); fx.tracer(e.x, e.y, e.x2 + 2, e.y2 - 2, '200,230,255'); fx.impact(e.x2, e.y2, 'spark'); audio.impact('electronic', e.x2, e.y2); break;
@@ -900,6 +902,45 @@ function drawSpawnMap(mates, me) {
   };
 }
 
+// The attackers found the objective (he asked: make it obvious, it's a massive deal): a big alert with the two bomb
+// rooms, their floor, and a picture of that floor with the rooms lit up and where you are, for about 6 seconds.
+function siteFound(s) {
+  const m = st.map, site = m && m.sites[s.site]; if (!site) return;
+  const box = $('siteFound'), c = box.querySelector('canvas'), g = c.getContext('2d');
+  const fl = Math.max(0, floorAt(m, site.bombs[0].x, site.bombs[0].y)), F = m.floors[fl];
+  const flNames = [...new Set(site.bombs.map(b => m.floors[Math.max(0, floorAt(m, b.x, b.y))].name))];
+  box.querySelector('.sfS').textContent = site.bombs.map(b => `${b.id}: ${b.room}`).join('   ·   ');
+  box.querySelector('.sfF').textContent = `FLOOR ${flNames.join(' & ')}`;
+  // the floor plan: walls light, floors dark, the bomb rooms gold
+  let x0 = m.W, y0 = m.H, x1 = 0, y1 = 0;
+  for (let k = 0; k < m.tiles.length; k++) if (m.flAt[k] === fl && m.tiles[k] !== T.VOID && m.tiles[k] !== T.GROUND) { const x = k % m.W, y = (k / m.W) | 0; if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+  x0 -= 2; y0 -= 2; x1 += 2; y1 += 2;
+  const sc = Math.min(c.width / (x1 - x0 + 1), c.height / (y1 - y0 + 1)), ox = (c.width - (x1 - x0 + 1) * sc) / 2, oy = (c.height - (y1 - y0 + 1) * sc) / 2;
+  g.fillStyle = '#0b0e12'; g.fillRect(0, 0, c.width, c.height);
+  const inSite = (x, y) => m.rooms.some(r => site.rooms.includes(r.name) && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (x < 0 || y < 0 || x >= m.W || y >= m.H) continue;
+    const k = y * m.W + x, t = m.tiles[k]; if (m.flAt[k] !== fl) continue;
+    g.fillStyle = t === T.HARD || t === T.SOFT || t === T.REINF || t === T.PANEL ? '#9aa3ad' : t === T.GROUND ? '#1d2a22' : t === T.VOID || (t === T.LOW && m.floor[k] === FL.VOID) ? '#0b0e12'
+      : t === T.STAIR ? '#5a616b' : t === T.OPEN || t === T.BARRI ? '#8a6a44' : inSite(x, y) ? '#7a6224' : '#2c333b';
+    g.fillRect(ox + (x - x0) * sc, oy + (y - y0) * sc, Math.ceil(sc), Math.ceil(sc));
+  }
+  const P = (wx, wy) => ({ x: ox + (wx / CELL - x0) * sc, y: oy + (wy / CELL - y0) * sc });
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (const b of site.bombs) {
+    if (floorAt(m, b.x, b.y) !== fl) continue;
+    const q = P(b.x, b.y);
+    g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(q.x, q.y, 14, 0, 7); g.fill(); g.lineWidth = 3; g.strokeStyle = '#000'; g.stroke();
+    g.fillStyle = '#000'; g.font = '800 18px Barlow Condensed, sans-serif'; g.fillText(b.id, q.x, q.y + 1);
+  }
+  const me = st.me;
+  if (me && me.a && floorAt(m, st.pred.x, st.pred.y) === fl) { const q = P(st.pred.x, st.pred.y); g.fillStyle = '#3aa0ff'; g.beginPath(); g.arc(q.x, q.y, 6, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); g.font = '700 13px Barlow Condensed, sans-serif'; g.fillStyle = '#fff'; g.fillText('YOU', q.x, q.y - 14); }
+  g.textBaseline = 'alphabetic';
+  box.classList.remove('hidden', 'out'); void box.offsetWidth; box.classList.add('show');
+  audio.ui('level');
+  clearTimeout(st.foundT); st.foundT = setTimeout(() => { box.classList.add('out'); setTimeout(() => box.classList.add('hidden'), 600); }, 6000);
+}
+
 function banner(text, sub, color) {
   const b = $('banner'); b.querySelector('.t').textContent = text; b.querySelector('.s').textContent = sub || '';
   b.querySelector('.t').style.color = color || ''; b.classList.add('show'); st.bannerT = performance.now() / 1000 + 3;
@@ -954,9 +995,9 @@ async function playXp(m) {
 }
 function scoreTable(s) {
   const me = st.me;
-  const rows = [...s.players].sort((a, b) => (a.sq - b.sq) || (b.k - a.k)).map(p =>
-    `<tr class="${me && p.sq === me.sq ? 'ally' : 'enemy'} ${p.id === s.you ? 'me' : ''} ${p.a ? '' : 'dead'}"><td>${esc(p.n)}</td><td>${p.op ? OPERATORS[p.op].name : '—'}</td><td>${p.k}</td><td>${p.d}</td><td>${p.b ? 'BOT' : p.ms != null ? p.ms + ' ms' : '…'}</td></tr>`).join('');
-  return `<table><tr><th>PLAYER</th><th>OPERATOR</th><th>KILLS</th><th>DEATHS</th><th>PING</th></tr>${rows}</table>`;
+  const rows = [...s.players].sort((a, b) => (a.sq - b.sq) || ((b.sc || 0) - (a.sc || 0)) || (b.k - a.k)).map(p =>
+    `<tr class="${me && p.sq === me.sq ? 'ally' : 'enemy'} ${p.id === s.you ? 'me' : ''} ${p.a ? '' : 'dead'}"><td>${esc(p.n)}</td><td>${p.op ? OPERATORS[p.op].name : '—'}</td><td>${p.sc || 0}</td><td>${p.k}</td><td>${p.d}</td><td>${p.b ? 'BOT' : p.ms != null ? p.ms + ' ms' : '…'}</td></tr>`).join('');
+  return `<table><tr><th>PLAYER</th><th>OPERATOR</th><th>SCORE</th><th>KILLS</th><th>DEATHS</th><th>PING</th></tr>${rows}</table>`;
 }
 
 // ---------------- interpolation ----------------
@@ -1753,6 +1794,19 @@ function crosshair(me, now) {
   if (fq && fq.stopped) ctx.globalAlpha = 0.45; // bullets stop at a wall before it: faded
   drawXhair(ctx, x, y, xh, spread, DPR);
   ctx.globalAlpha = 1;
+  // points popups under the crosshair (he asked, R6-style): newest at the top, each fades after a couple of seconds
+  if (st.ptsPops && st.ptsPops.length) {
+    st.ptsPops = st.ptsPops.filter(q => now - q.t < 2.4);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    st.ptsPops.slice().reverse().forEach((q, i) => {
+      const age = now - q.t, a = Math.min(1, age * 6) * Math.min(1, (2.4 - age) / 0.5), yy = y + (34 + i * 17) * DPR - Math.max(0, 0.15 - age) * 60 * DPR;
+      ctx.globalAlpha = a; ctx.font = `700 ${(i ? 13 : 15) * DPR}px Barlow Condensed, sans-serif`;
+      const t = `${q.n > 0 ? '+' : ''}${q.n}  ${q.w}`;
+      ctx.lineWidth = 3 * DPR; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(t, x, yy);
+      ctx.fillStyle = q.n > 0 ? '#f2c14e' : '#ff5a5a'; ctx.fillText(t, x, yy);
+    });
+    ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic';
+  }
   // far out: how far away the crosshair is (it can go anywhere you can see)
   if (fq) {
     const q = fq, dm = q.ad / PX_PER_M;
@@ -2313,7 +2367,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, showEnd, playXp, freeMove, turnMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { PF, st, showEnd, playXp, siteFound, freeMove, turnMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.

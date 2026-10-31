@@ -7,10 +7,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
-- [ ] add a point system for objects pinged and other objectives completed
-- [ ] when the bomb site is found make it more obvious on the screen because that is a massive deal, show on the map where it is and what floor, like a picture for people to understand easy
 
 ## Done
+
+- [x] Points, R6-style: a "+20 ENEMY SPOTTED" style popup under your crosshair and a SCORE column on the scoreboard (Tab); the MVP is the top score. Kill 100 (headshot 120), down 50, revive 75, plant or disable the defuser 150, objective found 50, enemy spotted 20, pinging a gadget/camera/drone/the objective 10 (once per thing a round), gadget/camera destroyed 25, drone 20, wall or hatch reinforced 15, barricade 5, round won 50, teamkill −50.
+- [x] Objective found is a big moment now: "OBJECTIVE FOUND" in large letters with the two bomb rooms, the floor they're on, and a picture of that floor with both rooms lit up, the A and B spots and where you are. It shows for about 6 seconds, then fades.
 
 - [x] HUSH's Silent Shroud is now a toggle (Q on, Q off; it lasts up to 10 s and recharges while off) and is truly silent: no footstep noise for bots, sound sensors or ECHO's spike, and no movement sounds (aiming in, crouching, drawing a gun) for anyone else.
 - [x] Bots turn much faster (Easy 4.5, Normal 7, Hard 10, Expert 12.5 radians a second). Hard and Expert bots always look towards where an enemy could come from (the nearest doorway, window, stairs or open hatch ahead of them); Normal bots do it some of the time; Easy bots just look where they walk.

@@ -296,7 +296,7 @@ export class Game {
       if (!p.op || !p.ms) continue;
       const o = this.opStat(p);
       p.ms.rounds++; o.rounds++;
-      if (p.squad === squad) { p.ms.roundsWon++; o.roundsWon++; }
+      if (p.squad === squad) { p.ms.roundsWon++; o.roundsWon++; this.pts(p, 50, 'ROUND WON'); }
     }
     this.winner = squad; this.reason = reason;
     this.phase = PHASE.ROUND_END; this.timer = DUR.roundEnd;
@@ -320,7 +320,7 @@ export class Game {
     p.barri = o.team === TEAM.DEF ? BARRICADES_EACH : 0;
     p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false;
-    p.rope = null; p.sprints = DRONE_SPRINT.charges; p.sprintUntil = 0; p.sprintCd = 0;
+    p.rope = null; p.pinged = null; p.sprints = DRONE_SPRINT.charges; p.sprintUntil = 0; p.sprintCd = 0;
     p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0; p.staged = false;
     p.downedBy = null; p.nitroId = null; p.ai = {};
     p.boostUntil = 0; p.ghostUntil = 0; p.dazeUntil = 0; p.clampUntil = 0; p.plated = false; p.gasId = null;
@@ -354,7 +354,7 @@ export class Game {
         if (Math.max(...this.score) >= WIN_ROUNDS) {
           this.phase = PHASE.MATCH_END; this.timer = DUR.matchEnd;
           const win = this.score[0] > this.score[1] ? 0 : 1;
-          const mvp = [...this.players.values()].map(p => ({ p, sc: matchScore(p.ms || {}) })).sort((a, b) => b.sc - a.sc)[0];
+          const mvp = [...this.players.values()].map(p => ({ p, sc: (p.ms && p.ms.score) || matchScore(p.ms || {}) })).sort((a, b) => b.sc - a.sc)[0]; // the MVP is the top score
           this.events.push({ e: 'matchEnd', squad: win, mvp: mvp ? { id: mvp.p.id, name: mvp.p.name, op: mvp.p.op, ...(mvp.p.ms || {}), ops: undefined } : null });
           const xp = this.saveMatch(win) || {};
           for (const p of this.players.values()) if (p.sock && xp[p.pid]) {
@@ -847,6 +847,7 @@ export class Game {
       const up = [...this.players.values()].filter(o => o.alive && !o.downed && this.side(o) === this.side(q)).length;
       if (!this.headshot && q.hp > -35 && up > 1 && this.phase === PHASE.ACTION) {
         if (src && src.ms && src !== q) src.ms.downs++;
+        if (src && src !== q && this.side(src) !== this.side(q)) this.pts(src, 50, 'ENEMY DOWNED');
         q.downed = true; q.hp = DUR.bleedout; q.downedBy = src ? src.id : null; q.busy = null; q.ctrl = 'body';
         q.scanning = false; q.bracing = false; q.reloadT = 0; this.ropeFall(q);
         this.events.push({ e: 'down', id: q.id, by: src ? src.id : null });
@@ -860,8 +861,8 @@ export class Game {
     this.ropeFall(q);
     q.alive = false; q.downed = false; q.hp = 0; q.deaths++; q.busy = null; q.scanning = false; q.bracing = false;
     if (q.ctrl !== 'body') q.ctrl = 'body';
-    if (src && src !== q && this.side(src) !== this.side(q)) { src.kills++; if (src.ms) { src.ms.kills++; this.opStat(src).kills++; } }
-    else if (src && src !== q) src.kills--; // a teamkill costs you
+    if (src && src !== q && this.side(src) !== this.side(q)) { src.kills++; if (src.ms) { src.ms.kills++; this.opStat(src).kills++; } this.pts(src, this.headshot ? 120 : 100, this.headshot ? 'HEADSHOT KILL' : 'KILL'); }
+    else if (src && src !== q) { src.kills--; this.pts(src, -50, 'TEAMKILL'); } // a teamkill costs you
     if (q.ms) { q.ms.deaths++; this.opStat(q).deaths++; }
     if (src && src.sock) this.events.push({ e: 'hitmark', to: src.id, kill: true });
     this.events.push({ e: 'kill', killer: src ? src.id : null, victim: q.id, w: wname || '', hs: this.headshot ? 1 : 0 });
@@ -876,6 +877,7 @@ export class Game {
   }
 
   hitEnt(e, src) {
+    if (src && e.team && e.team !== this.side(src) && (e.hp || e.type === 'drone')) this.pts(src, e.type === 'drone' ? 20 : 25, e.type === 'drone' ? 'DRONE DESTROYED' : e.type === 'cam' ? 'CAMERA DESTROYED' : 'GADGET DESTROYED');
     if (e.type === 'cam') { e.hp = 0; this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) }); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); return; }
     this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) });
     this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) });
@@ -928,21 +930,21 @@ export class Game {
     if (b.k === 'plant') {
       const bomb = this.map.sites[this.site].bombs.find(x => x.id === b.bomb);
       this.planted = { x: bomb.x, y: bomb.y, bomb: bomb.id, t: this.tut ? 3 : DUR.bomb }; // the tutorial doesn't make you wait
-      p.hasDefuser = false; if (p.ms) p.ms.plants++;
+      p.hasDefuser = false; if (p.ms) p.ms.plants++; this.pts(p, 150, 'DEFUSER PLANTED');
       this.events.push({ e: 'banner', text: 'DEFUSER PLANTED', sub: `Bomb ${bomb.id} — ${bomb.room}` });
       this.events.push({ e: 'snd', s: 'planted', x: r1(bomb.x), y: r1(bomb.y) });
     } else if (b.k === 'defuse') {
-      this.events.push({ e: 'banner', text: 'DEFUSER DISABLED', sub: '' }); if (p.ms) p.ms.defuses++;
+      this.events.push({ e: 'banner', text: 'DEFUSER DISABLED', sub: '' }); if (p.ms) p.ms.defuses++; this.pts(p, 150, 'DEFUSER DISABLED');
       this.endRound(TEAM.DEF, 'Defuser disabled');
     } else if (b.k === 'revive') {
       const q = this.players.get(b.target);
-      q.downed = false; q.hp = 25; if (p.ms) p.ms.revives++; this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) });
+      q.downed = false; q.hp = 25; if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) });
     } else if (b.k === 'reinforce' && b.hatch !== undefined) {
-      if (this.map.tiles[this.map.hatches[b.hatch].cells[0]] === T.HATCH && this.reinforce > 0) { this.reinforceHatch(b.hatch); this.reinforce--; }
+      if (this.map.tiles[this.map.hatches[b.hatch].cells[0]] === T.HATCH && this.reinforce > 0) { this.reinforceHatch(b.hatch); this.reinforce--; this.pts(p, 15, 'HATCH REINFORCED'); }
     } else if (b.k === 'reinforce') {
-      if (this.map.tiles[b.cell] === T.SOFT && this.reinforce > 0) { this.reinforceWall(b.cell); this.reinforce--; if (this.tut && !p.bot) this.tut.info.reinf++; }
+      if (this.map.tiles[b.cell] === T.SOFT && this.reinforce > 0) { this.reinforceWall(b.cell); this.reinforce--; this.pts(p, 15, 'WALL REINFORCED'); if (this.tut && !p.bot) this.tut.info.reinf++; }
     } else if (b.k === 'barricade') {
-      if (p.barri > 0 && this.barricade(this.map.openId[b.cell], T.BARRI)) { p.barri--; if (this.tut && !p.bot) this.tut.info.barri++; }
+      if (p.barri > 0 && this.barricade(this.map.openId[b.cell], T.BARRI)) { p.barri--; this.pts(p, 5, 'BARRICADE'); if (this.tut && !p.bot) this.tut.info.barri++; }
     }
   }
 
@@ -1091,6 +1093,7 @@ export class Game {
         if (q && q.alive && this.side(q) !== team && this.markOk(p)) {
           this.spot(team, q.id, DUR.spot);
           this.mark(p, q.x, q.y, 'ENEMY' + (q.op ? ' ' + OPERATORS[q.op].name : ''), q.id);
+          if (!(p.pinged || (p.pinged = new Set())).has('p' + q.id)) { p.pinged.add('p' + q.id); this.pts(p, 20, 'ENEMY SPOTTED'); } // once per enemy a round
         }
         break;
       }
@@ -1100,6 +1103,10 @@ export class Game {
         if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > this.map.W * CELL || y > this.map.H * CELL || !this.markOk(p)) break;
         const w = String(e.w || '').toUpperCase().replace(/[^A-Z0-9 .'-]/g, '').trim().slice(0, 28) || 'HERE';
         this.mark(p, x, y, w, typeof e.id === 'string' || typeof e.id === 'number' ? e.id : null);
+        { // points for pinging something worth knowing (a gadget, camera, drone, the objective...), once per thing a round
+          const key = e.id != null ? 'e' + e.id : w + '@' + (roomAt(this.map, x, y) || Math.round(x / 80) + ',' + Math.round(y / 80)), worth = !/^(GO|LOOK) HERE/.test(w);
+          if (worth && !(p.pinged || (p.pinged = new Set())).has(key)) { p.pinged.add(key); this.pts(p, 10, w.split(' ').slice(0, 2).join(' ') + ' PINGED'); }
+        }
         break;
       }
     }
@@ -1320,7 +1327,7 @@ export class Game {
         if (t !== null && t < tb) { tb = t; tgt = q; }
       }
       tgt = tgt || p;
-      if (tgt.downed) { tgt.downed = false; tgt.hp = 40; if (p.ms) p.ms.revives++; }
+      if (tgt.downed) { tgt.downed = false; tgt.hp = 40; if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); }
       else tgt.hp = Math.min(tgt.maxHp + 30, tgt.hp + 40);
       used();
       this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(tgt.x), y2: r1(tgt.y) });
@@ -1941,7 +1948,8 @@ export class Game {
     for (const v of viewers) for (const b of bombs) {
       if (Math.hypot(b.x - v.x, b.y - v.y) < 380 && los(this.map, v.x, v.y, b.x, b.y)) {
         this.siteRevealed = true;
-        this.events.push({ e: 'banner', text: 'OBJECTIVE LOCATED', sub: this.map.sites[this.site].name, team: TEAM.ATK });
+        this.pts(v.type === 'drone' ? this.players.get(v.owner) : v, 50, 'OBJECTIVE FOUND');
+        this.events.push({ e: 'found', team: TEAM.ATK }); // the attackers' big "objective found" alert with a floor picture (main.js siteFound)
         return;
       }
     }
@@ -1982,7 +1990,13 @@ export class Game {
   }
 
   // ---------------- saved stats ----------------
-  blankMatchStats() { return { rounds: 0, roundsWon: 0, kills: 0, deaths: 0, downs: 0, revives: 0, plants: 0, defuses: 0, shots: 0, hits: 0, damage: 0, playSeconds: 0, ops: {} }; }
+  // Points (he asked, R6-style): a popup for you and a SCORE on the scoreboard; the MVP is the top score.
+  pts(p, n, why) {
+    if (!p || !n || this.tut || this.free) return;
+    p.score = (p.score || 0) + n; if (p.ms) p.ms.score = (p.ms.score || 0) + n;
+    if (p.sock) this.events.push({ e: 'pts', to: p.id, n, w: why });
+  }
+  blankMatchStats() { return { score: 0, rounds: 0, roundsWon: 0, kills: 0, deaths: 0, downs: 0, revives: 0, plants: 0, defuses: 0, shots: 0, hits: 0, damage: 0, playSeconds: 0, ops: {} }; }
   opStat(p) { if (!p.ms) p.ms = this.blankMatchStats(); return p.ms.ops[p.op] || (p.ms.ops[p.op] = { rounds: 0, roundsWon: 0, kills: 0, deaths: 0 }); }
   botLoadout(op) {
     const L = LOADOUTS[op], pick = a => a.length ? a[Math.floor(Math.random() * a.length)] : null;
@@ -2015,7 +2029,7 @@ export class Game {
       const g = p.guns[p.slot];
       const o = {
         id: p.id, n: p.name, b: p.bot ? 1 : 0, sq: p.squad, tm: this.round ? this.side(p) : (p.squad === 0 ? 'atk' : 'def'),
-        op: p.op, a: p.alive ? 1 : 0, k: p.kills, d: p.deaths, ms: p.rtt,
+        op: p.op, a: p.alive ? 1 : 0, k: p.kills, d: p.deaths, sc: p.score || 0, ms: p.rtt,
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
