@@ -581,7 +581,11 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 #compass canvas { width: 64px; height: 64px; }
 #compass b { margin-top: 2px; font: 700 14px var(--head); letter-spacing: 0.1em; color: #f2c14e; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; }
 /* phone / tablet controls (touch.js; he asked: they pop up by themselves on mobile) */
-html.touch, html.touch body { touch-action: none; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
+html.touch, html.touch body { touch-action: pan-x pan-y; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
+html.touchplay, html.touchplay body { touch-action: none; } /* menus scroll with a finger; only the match takes every touch */
+html.touch .mnav { overflow: auto; padding-top: 12px; padding-bottom: 12px; } html.touch .mnav button { padding: 8px 18px; }
+html.touch .mtop { padding: 12px 28px; }
+html.touch #pause .menu, html.touch #quitDlg .menu { zoom: 1.15; }
 #touchUI { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
 #touchUI > * { pointer-events: auto; touch-action: none; }
 #touchUI .tzone { position: absolute; left: 50%; right: 0; top: 0; bottom: 0; }
@@ -590,18 +594,24 @@ html.touch, html.touch body { touch-action: none; -webkit-user-select: none; use
 #touchUI #tsLeft { left: max(28px, env(safe-area-inset-left)); bottom: 28px; }
 #touchUI .tstick.dyn { pointer-events: none; border-color: rgba(242,193,78,0.55); }
 #touchUI .tstick.dyn i { background: rgba(242,193,78,0.55); }
-#touchUI .tbtn { position: absolute; min-width: 0; padding: 0; width: 58px; height: 40px; border-radius: 10px; font: 700 11px var(--head); letter-spacing: 0.05em;
+/* bigger, fewer buttons (he found them too small and cluttered): 2 x 4 grid above the right FIRE, USE / VAULT pop up beside it */
+#touchUI .tbtn { position: absolute; min-width: 0; padding: 0; width: 72px; height: 46px; border-radius: 12px; font: 700 14px var(--head); letter-spacing: 0.05em;
   background: rgba(10,14,18,0.55); border: 1px solid rgba(255,255,255,0.3); color: #fff; z-index: 2; }
+#touchUI .tbtn.hidden { display: none; }
 #touchUI .tbtn.on { background: rgba(242,193,78,0.6); color: #000; }
-#touchUI .tbtn.fire { width: 84px; height: 84px; border-radius: 50%; font-size: 15px; background: rgba(200,50,40,0.5); border-color: rgba(255,120,100,0.7); }
-#touchUI .tbtn.fire.left { left: max(170px, calc(env(safe-area-inset-left) + 150px)); bottom: 120px; }
-#touchUI .tbtn.fire.right { right: max(24px, env(safe-area-inset-right)); bottom: 28px; }
-#touchUI .tbtn.r { right: max(24px, env(safe-area-inset-right)); } #touchUI .tbtn.r.c1 { right: calc(max(24px, env(safe-area-inset-right)) + 64px); }
-#touchUI .tbtn.r1 { bottom: 122px; } #touchUI .tbtn.r2 { bottom: 160px; } #touchUI .tbtn.r3 { bottom: 198px; } #touchUI .tbtn.r4 { bottom: 236px; } #touchUI .tbtn.r5 { bottom: 274px; }
-#touchUI .tbtn.r { height: 34px; }
-#touchUI .tbtn.t { top: 8px; height: 34px; }
-#touchUI .tbtn.t1 { right: 236px; width: 104px; } #touchUI .tbtn.t2 { right: 190px; width: 40px; } #touchUI .tbtn.t3 { right: 144px; width: 40px; }
-#touchUI .tbtn.t4 { right: 72px; width: 66px; } #touchUI .tbtn.t5 { right: 24px; width: 42px; }
+#touchUI .tbtn.fire { width: 92px; height: 92px; border-radius: 50%; font-size: 17px; background: rgba(200,50,40,0.5); border-color: rgba(255,120,100,0.7); }
+#touchUI .tbtn.fire.left { left: max(166px, calc(env(safe-area-inset-left) + 146px)); bottom: 24px; }
+#touchUI .tbtn.fire.right { right: max(20px, env(safe-area-inset-right)); bottom: 20px; }
+#touchUI .tbtn.ctx { width: 84px; height: 84px; border-radius: 50%; font-size: 16px; background: rgba(242,193,78,0.35); border: 2px solid rgba(242,193,78,0.85); }
+#touchUI .tbtn.c-use { right: calc(max(20px, env(safe-area-inset-right)) + 104px); bottom: 20px; }
+#touchUI .tbtn.c-vault { right: calc(max(20px, env(safe-area-inset-right)) + 198px); bottom: 20px; }
+#touchUI .tbtn.r { right: max(20px, env(safe-area-inset-right)); } #touchUI .tbtn.r.c1 { right: calc(max(20px, env(safe-area-inset-right)) + 80px); }
+#touchUI .tbtn.r1 { bottom: 126px; } #touchUI .tbtn.r2 { bottom: 180px; } #touchUI .tbtn.r3 { bottom: 234px; } #touchUI .tbtn.r4 { bottom: 288px; }
+#touchUI .tbtn.t { top: 8px; height: 44px; }
+#touchUI .tbtn.t1 { right: 160px; width: 120px; }
+#touchUI .tbtn.t2, #touchUI .tbtn.t3 { top: auto; bottom: 20px; width: 84px; height: 84px; border-radius: 50%; font-size: 26px; } /* camera arrows sit where USE / VAULT do (never both at once) */
+#touchUI .tbtn.t2 { right: calc(max(20px, env(safe-area-inset-right)) + 198px); } #touchUI .tbtn.t3 { right: calc(max(20px, env(safe-area-inset-right)) + 104px); }
+#touchUI .tbtn.t4 { right: 72px; width: 80px; } #touchUI .tbtn.t5 { right: 20px; width: 44px; }
 #tTurn { position: fixed; inset: 0; z-index: 90; background: rgba(5,7,9,0.96); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font: 700 22px var(--head); letter-spacing: 0.08em; color: #fff; text-align: center; padding: 30px; }
 #tTurn b { font-size: 64px; color: #f2c14e; }
 /* make room for the thumbs: health and ammo move up out of the corners */
@@ -636,4 +646,5 @@ html.touch #clickIn { display: none !important; }
 #inputChoice button { font: 800 20px var(--head); letter-spacing: 0.08em; padding: 14px 22px; }
 /* short phone screens: touch buttons shrink with the screen, and long panels scroll instead of running off */
 #touchUI .tbtn, #touchUI #tsLeft { zoom: var(--tz, 1); }
+html.touch #prompt { top: auto; bottom: 120px; font-size: 20px; }
 html.fitui #settings, html.fitui .overlay .page { max-height: calc(100vh / var(--uiz, 1) - 16px); overflow: auto; }

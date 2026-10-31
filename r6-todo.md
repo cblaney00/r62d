@@ -9,6 +9,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Phones on Firefox, second go: the game now really goes full screen (Firefox only allows it when a tap ends, not when a finger lands, so every tap asks until it works). Bigger text in menus and matches, bigger touch buttons, and fewer of them: USE and VAULT only pop up beside FIRE when there's something to use or climb, and the camera arrows only while watching a drone or camera. Prompts say the button name ("USE") instead of a key. Menus scroll with a finger. On a drone the CROUCH button becomes SPRINT (a light push used to sprint by accident). The game can also be added to the phone's home screen to open full screen.
 - [x] Phones: the game tells a phone apart by itself (touch controls); if a device has both a touch screen and a mouse it asks on the title screen ("Phone / tablet" or "Keyboard & mouse"). The choice is remembered and can be changed in Settings → Controls.
 - [x] Phones fit the screen: menus, lobby, operator select and the match text shrink to fit (checked at the Pixel 6 and Z Flip 7 screen sizes), long panels like Settings scroll, the touch buttons shrink on short screens, and phones start further zoomed out. Two new Settings sliders, for phones and computers: "Menu & screen text size" and "How much of the map you see".
 

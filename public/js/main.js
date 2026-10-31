@@ -21,7 +21,7 @@ import { levelFor } from '/shared/progress.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
 import { walkRay, tileAt, findVault } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
-import { touchPad, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul } from './touch.js';
+import { touchPad, touchContext, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul } from './touch.js';
 import { blocksSight, FL } from '/shared/constants.js';
 
 const $ = id => document.getElementById(id);
@@ -573,7 +573,7 @@ function pollPad(dt, view) {
   for (let i = 0; i < gp.pressed.length; i++) {
     const a = PAD_ACTIONS[i]; if (!a) continue;
     if (gp.pressed[i]) {
-      if (a === 'crouch') gpk.crouch = gpk.crouch ? 0 : 1;
+      if (a === 'crouch') { if (!(st.me && st.me.ct === 'drone')) gpk.crouch = gpk.crouch ? 0 : 1; } // on a drone B is sprint
       else if (a === 'pause') escape();
       else pressAction(a);
     }
@@ -583,7 +583,8 @@ function pollPad(dt, view) {
   const nx = ls.l ? ls.x / ls.l : 0, ny = ls.l ? ls.y / ls.l : 0;
   gpk.right = ls.l && nx > 0.38 ? 1 : 0; gpk.left = ls.l && nx < -0.38 ? 1 : 0;
   gpk.down = ls.l && ny > 0.38 ? 1 : 0; gpk.up = ls.l && ny < -0.38 ? 1 : 0;
-  gpk.walk = ls.l && ls.l < 0.55 ? 1 : 0;
+  // on a drone, walk = sprint: held on B (a light push used to start one by accident)
+  gpk.walk = st.me && st.me.ct === 'drone' ? (gp.held[1] ? 1 : 0) : ls.l && ls.l < 0.55 ? 1 : 0;
   if (gp.rt > 0.35 && !gpk.fire) mouse.wl++; // a trigger pull also counts as a click (next teammate, ping in a camera)
   const aimReset = gp.lt > 0.35 && !gpk.ads && touchActive();
   if (aimReset) { padReach = 0.22; touchAimReset(); } // phone (he asked): aiming in pulls the crosshair in to ~2.5 m, like the mouse's aim-in reset
@@ -2038,8 +2039,8 @@ function hud(s) {
     `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label
   let vl = '';
-  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); const sp = me.dsl > 0 ? `SPRINTING ${me.dsl.toFixed(1)}s` : !me.ds ? 'NO SPRINTS LEFT' : me.dsc > 0 ? `SPRINT IN ${Math.ceil(me.dsc)}s (${me.ds} LEFT)` : `${label('walk')}: SPRINT (${me.ds} LEFT)`;
-    vl = d && d.j ? 'DRONE JAMMED' : `YOUR DRONE · ${sp} · CLICK OR ${label('spot')} TO PING · WHEEL: TEAM DRONES · ${label('view')} TO EXIT`; }
+  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); const sp = me.dsl > 0 ? `SPRINTING ${me.dsl.toFixed(1)}s` : !me.ds ? 'NO SPRINTS LEFT' : me.dsc > 0 ? `SPRINT IN ${Math.ceil(me.dsc)}s (${me.ds} LEFT)` : `${gpRecent() ? (isTouch ? 'SPRINT' : 'B') : label('walk')}: SPRINT (${me.ds} LEFT)`.replace('SPRINT: SPRINT', 'HOLD SPRINT');
+    vl = d && d.j ? 'DRONE JAMMED' : isTouch ? `YOUR DRONE · ${sp} · PING TO MARK · ◀ ▶ TEAM DRONES` : `YOUR DRONE · ${sp} · CLICK OR ${label('spot')} TO PING · WHEEL: TEAM DRONES · ${label('view')} TO EXIT`; }
   else if (me.ct === 'cam') {
     const list = feedList(s, me), c = list.find(e => e.id === me.fi);
     if (c) {
@@ -2059,6 +2060,7 @@ function hud(s) {
     $('progress').style.display = 'none';
     $('prompt').innerHTML = me.ct === 'body' && !me.dn ? promptText(s, me) : '';
   }
+  if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone' }); }
 }
 function setHTML(id, h) { const el = $(id); if (el.innerHTML !== h) el.innerHTML = h; }
 

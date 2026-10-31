@@ -8,6 +8,15 @@
 // Played sideways only: held upright a "turn your phone sideways" sign covers the match.
 const R = 62; // stick radius in CSS px
 
+// Full screen on a phone (he found Firefox's bars stayed): browsers only allow it from a tap that has ENDED (touchend /
+// click; a finger landing doesn't count), so every tap anywhere asks again until it's granted, then holds it sideways.
+function goFull() {
+  if (!isTouch || document.fullscreenElement) return;
+  const el = document.documentElement, req = el.requestFullscreen || el.mozRequestFullScreen || el.webkitRequestFullscreen;
+  if (!req) return;
+  try { Promise.resolve(req.call(el, { navigationUI: 'hide' })).then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch {} }).catch(() => {}); } catch {}
+}
+
 // Phone or computer? (he asked: sense it, and if that can't be told, ask when the game loads.) A clear phone (a phone
 // browser, or only a finger to point with) gets touch controls; a device with both a touch screen and a mouse or
 // trackpad asks once. The choice is remembered on that device and can be changed in Settings.
@@ -31,14 +40,15 @@ export function setUiScale(v) { store('r62d-uiscale', String(v)); fitUi(); }
 export function setViewMul(v) { store('r62d-view', String(v)); }
 
 // button → the controller button number main.js already understands (PAD_ACTIONS in gamepad.js); 'lt' / 'rt' are the triggers
+// USE, VAULT and the camera arrows only show when they do something (he found the screen too cluttered)
 const BUTTONS = [
   { id: 'fireL', label: 'FIRE', b: 'rt', cls: 'fire left' }, { id: 'fireR', label: 'FIRE', b: 'rt', cls: 'fire right' },
+  { id: 'use', label: 'USE', b: 0, cls: 'ctx c-use hidden' }, { id: 'vault', label: 'VAULT', b: 10, cls: 'ctx c-vault hidden' },
   { id: 'ads', label: 'AIM', b: 'lt', cls: 'r r1 c1' }, { id: 'crouch', label: 'CROUCH', b: 1, cls: 'r r1 c2' },
   { id: 'reload', label: 'RELOAD', b: 2, cls: 'r r2 c1' }, { id: 'swap', label: 'SWAP', b: 3, cls: 'r r2 c2' },
-  { id: 'use', label: 'USE', b: 0, cls: 'r r3 c1' }, { id: 'vault', label: 'VAULT', b: 10, cls: 'r r3 c2' },
-  { id: 'skill', label: 'SKILL', b: 5, cls: 'r r4 c1' }, { id: 'gadget', label: 'GADGET', b: 4, cls: 'r r4 c2' },
-  { id: 'melee', label: 'MELEE', b: 11, cls: 'r r5 c1' }, { id: 'ping', label: 'PING', b: 12, cls: 'r r5 c2' },
-  { id: 'view', label: 'DRONE / CAMS', b: 13, cls: 't t1' }, { id: 'prev', label: '◀', b: 14, cls: 't t2' }, { id: 'next', label: '▶', b: 15, cls: 't t3' },
+  { id: 'skill', label: 'SKILL', b: 5, cls: 'r r3 c1' }, { id: 'gadget', label: 'GADGET', b: 4, cls: 'r r3 c2' },
+  { id: 'melee', label: 'MELEE', b: 11, cls: 'r r4 c1' }, { id: 'ping', label: 'PING', b: 12, cls: 'r r4 c2' },
+  { id: 'view', label: 'DRONE / CAMS', b: 13, cls: 't t1' }, { id: 'prev', label: '◀', b: 14, cls: 't t2 hidden' }, { id: 'next', label: '▶', b: 15, cls: 't t3 hidden' },
   { id: 'score', label: 'SCORES', b: 8, cls: 't t4' }, { id: 'pause', label: '❚❚', b: 9, cls: 't t5' },
 ];
 const N = 16;
@@ -102,10 +112,22 @@ function build() {
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
     el.addEventListener('contextmenu', e => e.preventDefault());
   }
-  // a first touch in a match goes full screen and holds the phone sideways where the browser allows it
-  ui.addEventListener('pointerdown', () => {
-    try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {}); } catch {}
-  }, { capture: true });
+  // contextual buttons can vanish under a finger: a lost capture counts as letting go
+  for (const el of ui.querySelectorAll('.tbtn')) el.addEventListener('lostpointercapture', e => el.dispatchEvent(new PointerEvent('pointerup', { pointerId: e.pointerId })));
+}
+
+// main.js says each frame what the context buttons can do ({ use, vault, cams }); one under a finger stays until let go
+const ctxSeen = { use: 0, vault: 0, prev: 0, next: 0 };
+export function touchContext(c) {
+  if (!ui || !shown) return;
+  const now = performance.now();
+  for (const id in ctxSeen) {
+    if (id === 'prev' || id === 'next' ? c.cams : c[id]) ctxSeen[id] = now;
+    const el = ui.querySelector(`[data-id="${id}"]`), want = now - ctxSeen[id] < 400 || el.classList.contains('on');
+    if (el.classList.contains('hidden') === want) el.classList.toggle('hidden', !want);
+  }
+  const cr = ui.querySelector('[data-id="crouch"]'), cl = c.drone ? 'SPRINT' : 'CROUCH'; // on a drone the crouch button sprints
+  if (cr.textContent !== cl) cr.textContent = cl;
 }
 
 // main.js calls this every frame: show the controls only while playing (not in menus)
@@ -122,7 +144,9 @@ export function setTouchVisible(on) {
 // player's own size setting. Menus are laid out for ~900 px tall, the match text for ~760 (and both for the width).
 function fitUi() {
   const h = Math.min(innerHeight, innerWidth > innerHeight ? innerHeight : innerWidth * 0.6), w = innerWidth, s = uiScale();
-  const fit = Math.min(1, h / 900, w / 1500), hud = Math.min(1, h / 760, w / 1300);
+  // phones lay menus out for ~640 tall (they scroll) and match text for ~520, so text stays readable (he found it too small)
+  const fit = isTouch ? Math.min(1, h / 640, w / 1150) : Math.min(1, h / 900, w / 1500);
+  const hud = isTouch ? Math.min(1, h / 520, w / 1000) : Math.min(1, h / 760, w / 1300);
   document.documentElement.style.setProperty('--uiz', Math.max(0.3, fit * s).toFixed(3));
   document.documentElement.style.setProperty('--hudz', Math.max(0.4, Math.min(1.4, hud * s)).toFixed(3));
   document.documentElement.style.setProperty('--tz', Math.max(0.7, Math.min(1.15, h / 430)).toFixed(3)); // touch buttons: smaller on short screens
@@ -130,3 +154,4 @@ function fitUi() {
 }
 if (isTouch) document.documentElement.classList.add('touch');
 fitUi(); addEventListener('resize', fitUi);
+addEventListener('touchend', goFull, true); addEventListener('click', goFull, true);

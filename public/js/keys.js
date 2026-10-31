@@ -1,3 +1,4 @@
+import { isTouch } from './touch.js';
 // Key bindings: each action has a main and an alternate key, saved in the browser.
 export const ACTIONS = [
   ['up', 'Move forward', 'KeyW', 'ArrowUp'],
@@ -57,5 +58,7 @@ export function keyName(code) {
   return code.replace(/^Key/, '').replace(/^Digit/, '').replace('Left', ' L').replace('Right', ' R')
     .replace('Arrow', '').replace('Control', 'Ctrl').replace('Bracket', ' Bracket');
 }
-export const label = id => keyName((binds[id] || [])[0]);
+// on a phone the prompts name the touch button instead of a key (touch.js buttons)
+const TOUCH_NAMES = { interact: 'USE', vault: 'VAULT', melee: 'MELEE', ability: 'SKILL', gadget: 'GADGET', reload: 'RELOAD', spot: 'PING', crouch: 'CROUCH', view: 'DRONE / CAMS', scoreboard: 'SCORES' };
+export const label = id => (isTouch && TOUCH_NAMES[id]) || keyName((binds[id] || [])[0]);
 loadBinds();
