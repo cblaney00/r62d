@@ -7,15 +7,16 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] A desert town map (our own layout) that follows the classic Counter-Strike pattern so friends pick it up quickly: attacker spawn on one side, defenders near the middle, two bomb sites at opposite ends, a long open route to one site, a tight tunnel route to the other, a middle lane linking them. When building it, tell him about basic gameplay issues (besides the lack of openings into each site).
-- [ ] defenders should be able to place unlimited wooded door and window barrcades (planks) but limited metal barracades on soft walls
-- [ ] make sure all the outside windows and doors each map are boarded up and can be vaulted through
 - [ ] add a point system for objects pinged and other objectives completed
-- [ ] make sure hush's silence actually works, he seems to be making a lot of noise, also his ability needs to be a toggle
-- [ ] make the bots capable of turning faster, and they should always be trying to look somewhat close to a place an enemy should be coming from unless they are easy or normal (sometimes for normal)
-- [ ] you shouldn't be able to spam ping, there is actually an extending timer for each time that you ping that never extends longer than 20 seconds
 - [ ] when the bomb site is found make it more obvious on the screen because that is a massive deal, show on the map where it is and what floor, like a picture for people to understand easy
 
 ## Done
+
+- [x] HUSH's Silent Shroud is now a toggle (Q on, Q off; it lasts up to 10 s and recharges while off) and is truly silent: no footstep noise for bots, sound sensors or ECHO's spike, and no movement sounds (aiming in, crouching, drawing a gun) for anyone else.
+- [x] Bots turn much faster (Easy 4.5, Normal 7, Hard 10, Expert 12.5 radians a second). Hard and Expert bots always look towards where an enemy could come from (the nearest doorway, window, stairs or open hatch ahead of them); Normal bots do it some of the time; Easy bots just look where they walk.
+- [x] Wooden barricades on doors and windows are unlimited; reinforcing soft walls (the metal) stays limited.
+- [x] No ping spam: each ping makes the next one wait longer (1, 2, 4, 8, 16 s, never more than 20 s), and the wait shrinks back as you go without pinging. Trying too soon tells you how long is left.
+- [x] Every window and every door to the outside starts boarded on every map. Every window can be vaulted through once its boards are gone (upstairs windows from the rope). Two upstairs windows that had a bookcase right against them (Harbor Office, Alpine Lodge) were moved to a clear stretch of the same wall.
 
 - [x] Operators page in sections like a match: ATTACK / DEFENCE at the top, then each role (with what it does) and its operators.
 - [x] Aiming in puts the crosshair 2.5 m out instead of 5 m (in matches and the Armory).

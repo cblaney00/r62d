@@ -186,7 +186,7 @@ export const OPERATORS = {
              ability: {id: "grid",name: "Static Grid",count: 3,desc: "Clamp it on a wall. It fries cutters, charges and scopes placed on that wall and shocks anyone torching it."},
              gadget: 'wire', gadgetCount: 2, color: '#4f86ff', helmet: '#2a3654', look: 'helmet' },
   hush    : { team: 'def', name: 'HUSH', role: 'Stealth Roamer', armor: 3, primary: 'v9', secondary: 'p10',
-             ability: {id: "shroud",name: "Silent Shroud",count: 0,battery: 10,desc: "Hold to go dark: silent footsteps and invisible to drones and cameras. Recharges while off."},
+             ability: {id: "shroud",name: "Silent Shroud",count: 0,battery: 10,desc: "Press to go dark, press again to come back: totally silent and invisible to drones and cameras while it lasts (10 s). Recharges while off."},
              gadget: 'impact', gadgetCount: 2, color: '#5a5f6e', helmet: '#25272d', look: 'hood' },
   shade   : { team: 'def', name: 'SHADE', role: 'Intel', armor: 2, primary: 'breaker', secondary: 'p10',
              ability: {id: "sensor",name: "Sound Sensor",count: 3,desc: "Place a microphone. Any attacker who runs near it is revealed to your whole team."},

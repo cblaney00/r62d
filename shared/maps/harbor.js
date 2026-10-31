@@ -129,7 +129,7 @@ export function build() {
   U.door(56, 33, 56, 34); U.door(43, 33, 43, 34); U.door(43, 44, 43, 45);
   U.door(50, 38, 51, 38); U.door(65, 38, 66, 38);
   U.door(71, 35, 71, 36, true);                        // fire-escape door into Records
-  U.window(18, 10, 19, 10); U.window(38, 10, 39, 10); U.window(60, 10, 61, 10);
+  U.window(18, 10, 19, 10); U.window(34, 10, 35, 10); /* moved off the bookcases so it can be used */ U.window(60, 10, 61, 10);
   U.window(12, 15, 12, 16); U.window(12, 36, 12, 37); U.window(71, 31, 71, 32);
   U.window(25, 49, 26, 49); U.window(58, 49, 59, 49);
 

@@ -443,7 +443,7 @@ export class Game {
     stepMove(this.map, p, p.input, dt, m);
     const moved = Math.hypot(p.x - before.x, p.y - before.y) / dt;
     p.moving = moved < 5 ? 0 : (p.input.crouch || p.input.walk) ? 1 : 2;
-    if (p.moving === 2 && !this.ghost(p) && this.time - (p.noiseT || 0) > 0.3) { p.noiseT = this.time; this.noise(p.x, p.y, this.side(p), 320); } // running footsteps
+    if (p.moving === 2 && !this.ghost(p) && !p.shrouded && this.time - (p.noiseT || 0) > 0.3) { p.noiseT = this.time; this.noise(p.x, p.y, this.side(p), 320); } // running footsteps (none from HUSH's shroud)
   }
 
   tickPlayer(p, dt) {
@@ -556,9 +556,11 @@ export class Game {
       }
       if (!p.welding) p.weldT = 0;
     }
-    if (op.ability.id === 'shroud') { // Silent Shroud: hold to go dark
-      if (inp.ability && p.battery > 0 && p.ctrl === 'body' && !p.downed) { p.shrouded = true; p.battery = Math.max(0, p.battery - dt); }
-      else { p.shrouded = false; p.battery = Math.min(op.ability.battery, p.battery + dt * 0.25); }
+    if (op.ability.id === 'shroud') { // Silent Shroud: press to go dark, press again to come back (he asked: a toggle)
+      if (inp.ability && !(prev && prev.ability) && p.ctrl === 'body' && !p.downed) p.shrouded = !p.shrouded && p.battery > 0.5;
+      if (p.shrouded && (p.battery <= 0 || p.downed || p.ctrl !== 'body')) p.shrouded = false;
+      if (p.shrouded) p.battery = Math.max(0, p.battery - dt);
+      else p.battery = Math.min(op.ability.battery, p.battery + dt * 0.25);
     }
 
     // interaction (hold E)
@@ -1035,8 +1037,11 @@ export class Game {
   }
 
   // He asked: every window starts boarded up (doorways start open). These are free, not out of anyone's 3.
+  // Every window, and every door to the outside, starts boarded (he asked); free, not out of anyone's barricades.
   boardWindows() {
-    for (const o of this.map.openings) if (o.kind === 'window' && o.cells.every(c => this.map.tiles[c] === T.OPEN)) this.barricade(o.id, T.BARRI, true);
+    const m = this.map, W = m.W;
+    const outside = o => o.ext || o.cells.some(c => [1, -1, W, -W].some(d => { const k = c + d, t = m.tiles[k]; return !o.cells.includes(k) && m.flAt[k] === m.flAt[c] && (t === T.GROUND || t === T.VOID || (t === T.LOW && m.floor[k] === FL.VOID)); }));
+    for (const o of m.openings) if ((o.kind === 'window' || outside(o)) && o.cells.every(c => m.tiles[c] === T.OPEN)) this.barricade(o.id, T.BARRI, true);
   }
 
   // A melee hit on a barricade: three break it (the whole board across the doorway or window, like R6)
@@ -1448,12 +1453,17 @@ export class Game {
     return false;
   }
 
-  // pings: a few per player every 3 seconds, only while alive in a round
+  // pings (he asked: no spamming): each ping makes you wait longer for the next — 1, 2, 4, 8, 16 s, never more
+  // than 20 — and the wait shrinks back one step for every 8 s you go without pinging. Only while alive in a round.
   markOk(p) {
     if (!p.alive || (this.phase !== PHASE.PREP && this.phase !== PHASE.ACTION)) return false;
-    const now = this.time; p.markTimes = (p.markTimes || []).filter(t => now - t < 3);
-    if (p.markTimes.length >= 4) return false;
-    p.markTimes.push(now); return true;
+    const now = this.time;
+    if (now < (p.pingReady || 0)) { this.events.push({ e: 'pingwait', to: p.id, t: r1(p.pingReady - now) }); return false; }
+    const quiet = now - (p.pingLast ?? -99);
+    p.pingLevel = Math.max(0, (p.pingLevel || 0) - Math.floor(Math.max(0, quiet - (p.pingWait || 0)) / 8));
+    p.pingWait = Math.min(20, [0, 1, 2, 4, 8, 16][p.pingLevel] ?? 20);
+    p.pingLevel++; p.pingLast = now; p.pingReady = now + p.pingWait;
+    return true;
   }
   // A labelled marker for the pinger's team, plus a line in their team chat saying what and where.
   mark(p, x, y, w, id) {
@@ -1613,7 +1623,7 @@ export class Game {
           if (e.t > 0) break;
           if (e.type === 'spike') { // ECHO: defenders running near it show up
             e.t = 0.5; let any = false;
-            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && q.moving === 2 && Math.hypot(q.x - e.x, q.y - e.y) < 10 * PX_PER_M) { this.spot(e.team, q.id, 1.5); any = true; }
+            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving === 2 && Math.hypot(q.x - e.x, q.y - e.y) < 10 * PX_PER_M) { this.spot(e.team, q.id, 1.5); any = true; }
             e.pingT -= 0.5; if (any && e.pingT <= 0) { e.pingT = 1.5; this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); }
           } else { // AUDIT: every attacker drone nearby is marked for the defenders, again and again
             e.t = 1.5; const o = this.players.get(e.owner);
@@ -1731,7 +1741,7 @@ export class Game {
           e.t -= dt; e.pingT -= dt; if (e.t > 0) break; e.t = 0.5;
           let any = false;
           for (const q of this.players.values())
-            if (q.alive && this.side(q) !== e.team && !this.ghost(q) && q.moving === 2 && Math.hypot(q.x - e.x, q.y - e.y) < 190) { this.spot(e.team, q.id, 1.5); any = true; }
+            if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving === 2 && Math.hypot(q.x - e.x, q.y - e.y) < 190) { this.spot(e.team, q.id, 1.5); any = true; }
           if (any && e.pingT <= 0) { e.pingT = 1.5; this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); }
           break;
         }
@@ -2020,7 +2030,7 @@ export class Game {
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
       if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); }
       if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
-        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
+        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur)] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),

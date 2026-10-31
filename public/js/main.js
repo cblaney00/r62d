@@ -495,6 +495,7 @@ function onEvent(e, s, players) {
     case 'matchEnd': st.endT = now; st.mvp = e.mvp; showEnd(e.squad); break;
     case 'stun': if (st.me && e.id === st.me.id) { st.flashUntil = now + e.dur; audio.tinnitus(e.dur); } break;
     case 'hurt': if (st.me && e.id === st.me.id) { st.hurtT = now; st.hurtFrom = e.from; } break;
+    case 'pingwait': if (e.to === st.id && performance.now() - (st.pingWaitT || 0) > 600) { st.pingWaitT = performance.now(); addFeed(`Ping ready in ${Math.ceil(e.t)} s`); audio.ui('back'); } break;
     case 'hitmark': if (e.to === st.id) { st.hitT = now; st.hitKill = e.kill; audio.ui(e.kill ? 'kill' : 'hit'); } break;
     case 'arc': fx.tracer(e.x, e.y, e.x2, e.y2, '130,200,255'); fx.tracer(e.x, e.y, e.x2 + 2, e.y2 - 2, '200,230,255'); fx.impact(e.x2, e.y2, 'spark'); audio.impact('electronic', e.x2, e.y2); break;
     case 'laser': fx.tracer(e.x, e.y, e.x2, e.y2, '255,50,50'); fx.impact(e.x2, e.y2, 'spark'); audio.foley('tick', e.x, e.y); break;
@@ -1342,7 +1343,7 @@ function playerFoley(p, a, moved, own, dt) {
     if (Math.floor(a.turn / Math.PI) > before && (own || !p.si)) audio.shuffle(p.x, p.y, surfaceAt(p.x, p.y), own);
   }
   a.walk = gt + Math.PI / 2 + a.turn;
-  if (a.pAd !== undefined) {
+  if (a.pAd !== undefined && (own || !p.si)) { // a silent player (HUSH's shroud, Ghost Step) makes none of these for others
     if (p.ad !== a.pAd && !p.dn) audio.foley(p.ad ? 'adsIn' : 'adsOut', p.x, p.y, own);
     if (p.cr !== a.pCr && !p.dn) audio.foley(p.cr ? 'crouch' : 'stand', p.x, p.y, own);
     if (p.w !== a.pW && p.w) audio.foley('draw', p.x, p.y, own);
@@ -1857,7 +1858,7 @@ function hud(s) {
   const where = me.a && me.x !== undefined ? roomAt(st.map, st.pred.x, st.pred.y) : '';
   if (side === 'def') {
     obj = s.pl ? 'DISABLE THE DEFUSER!' : s.ph === PHASE.PREP ? `FORTIFY: ${site.name}` : `DEFEND: ${site.name}`;
-    sub = s.ph === PHASE.PREP ? `Reinforcements left: ${s.rf} · your barricades: ${me.bx ?? 0} · hold E on walls to reinforce, E on doors/windows to barricade, melee soft walls for rotation holes` : `Reinforcements left: ${s.rf} · your barricades: ${me.bx ?? 0}`;
+    sub = s.ph === PHASE.PREP ? `Reinforcements left: ${s.rf} · hold E on walls to reinforce, E on doors/windows to barricade (as many as you like), melee soft walls for rotation holes` : `Reinforcements left: ${s.rf}`;
   } else {
     obj = s.pl ? 'PROTECT THE DEFUSER' : s.ph === PHASE.PREP ? 'LOCATE THE OBJECTIVE WITH YOUR DRONE' : s.rev ? `PLANT THE DEFUSER: ${site.name}` : 'FIND THE OBJECTIVE';
     if (me.df) sub = 'You are carrying the defuser';
@@ -1944,7 +1945,7 @@ function promptText(s, me) {
   const f = facingCell(m, x, y, st.aim, 28);
   if (side === 'def' && f) {
     if (f.t === T.SOFT && s.rf > 0) return `<b>${label('interact')}</b>HOLD TO REINFORCE WALL (${s.rf} LEFT)`;
-    if (f.t === T.OPEN && m.openId[f.k] >= 0) return (me.bx > 0 ? `<b>${label('interact')}</b>HOLD TO BARRICADE (${me.bx} LEFT)` : 'NO BARRICADES LEFT') + `${me.op === 'mason' && me.ac > 0 ? '  ·  <b>' + label('ability') + '</b>ARMOR PANEL' : ''}`;
+    if (f.t === T.OPEN && m.openId[f.k] >= 0) return `<b>${label('interact')}</b>HOLD TO BARRICADE` + `${me.op === 'mason' && me.ac > 0 ? '  ·  <b>' + label('ability') + '</b>ARMOR PANEL' : ''}`;
     if (f.t === T.BARRI && me.op === 'mason' && me.ac > 0) return '<b>' + label('ability') + '</b>ARMOR PANEL';
   }
   if (f && f.t === T.BARRI) return '<b>' + label('melee') + '</b>MELEE TO BREAK BARRICADE';

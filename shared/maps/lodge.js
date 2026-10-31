@@ -66,7 +66,7 @@ export function build() {
   U.door(34, 31, 35, 31); U.door(25, 36, 25, 37); U.door(53, 31, 54, 31); U.door(46, 36, 46, 37); U.door(17, 20, 18, 20); U.door(53, 20, 54, 20);
   U.door(34, 42, 35, 42, true);
   U.window(14, 9, 15, 9); U.window(34, 9, 37, 9); U.window(56, 9, 57, 9); U.window(10, 14, 10, 15); U.window(10, 30, 10, 31);
-  U.window(61, 14, 61, 15); U.window(61, 27, 61, 28); U.window(17, 42, 18, 42); U.window(40, 42, 41, 42); U.window(53, 42, 54, 42);
+  U.window(61, 14, 61, 15); U.window(61, 27, 61, 28); U.window(17, 42, 18, 42); U.window(40, 42, 41, 42); U.window(56, 42, 57, 42); /* moved off the tall shelves so it can be used */
   U.prop('bench', 38, 11, 6, 1, T.LOW); U.prop('plant', 44, 16, 1, 1, T.TALL);
   U.prop('bed', 13, 12, 5, 6, T.LOW); U.prop('cabinet', 22, 11, 2, 1, T.TALL);
   U.prop('bed', 54, 12, 5, 6, T.LOW); U.prop('cabinet', 48, 11, 2, 1, T.TALL);

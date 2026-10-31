@@ -6,7 +6,7 @@
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, T, TEAM, PHASE, blocksMove, blocksDrone } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight } from '../shared/physics.js';
-import { floorAt, localPos, stairGhost, stairLooks } from '../shared/map.js';
+import { floorAt, localPos, stairGhost, stairLooks, stairEnds } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
 
 // Per skill level. react: seconds before the first shot at someone who surprised them (plus up to reactX more);
@@ -14,10 +14,10 @@ import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf } from '../shared/operators
 // err: how far off the first aim is; settle: how fast it closes in. tol: how close the aim must be before they fire.
 // see: how far they notice people (px). body: how widely their aim point wanders over the body (px).
 const SKILL = [
-  { react: 0.75, reactX: 0.5, expect: 0.45, turn: 3.2, err: 1.4, settle: 1.0, tol: 0.26, see: 520, body: 13, drone: 0.7 },  // Easy
-  { react: 0.5, reactX: 0.35, expect: 0.3, turn: 4.5, err: 1.0, settle: 1.4, tol: 0.2, see: 650, body: 11, drone: 0.5 },     // Normal
-  { react: 0.36, reactX: 0.24, expect: 0.22, turn: 6, err: 0.75, settle: 1.9, tol: 0.15, see: 720, body: 8, drone: 0.4 },    // Hard
-  { react: 0.28, reactX: 0.14, expect: 0.18, turn: 7.5, err: 0.55, settle: 2.5, tol: 0.12, see: 780, body: 6, drone: 0.3 },  // Expert
+  { react: 0.75, reactX: 0.5, expect: 0.45, turn: 4.5, err: 1.4, settle: 1.0, tol: 0.26, see: 520, body: 13, drone: 0.7 },  // Easy
+  { react: 0.5, reactX: 0.35, expect: 0.3, turn: 7, err: 1.0, settle: 1.4, tol: 0.2, see: 650, body: 11, drone: 0.5 },     // Normal
+  { react: 0.36, reactX: 0.24, expect: 0.22, turn: 10, err: 0.75, settle: 1.9, tol: 0.15, see: 720, body: 8, drone: 0.4 },    // Hard
+  { react: 0.28, reactX: 0.14, expect: 0.18, turn: 12.5, err: 0.55, settle: 2.5, tol: 0.12, see: 780, body: 6, drone: 0.3 },  // Expert // turn: he asked for faster turning
 ];
 const skill = (game, p) => SKILL[game.tut ? 0 : Math.max(0, Math.min(3, p.level ?? game.botLevel ?? 1))]; // p.level: a test can give one bot its own
 
@@ -369,7 +369,7 @@ export function botThink(game, p, dt) {
   const heardRecently = ai.heard && game.time - ai.heard.t < 4;
 
   // --- held abilities: let go unless something below holds them again ---
-  if (abId === 'shroud') inp.ability = heardRecently && p.battery > 1.5 && !p.downed ? 1 : 0; // go dark while enemies are close by
+  if (abId === 'shroud') { const want = heardRecently && p.battery > 1.5 && !p.downed; inp.ability = want !== !!p.shrouded && !(p.prevInput && p.prevInput.ability) ? 1 : 0; } // go dark while enemies are close by (a toggle: press to switch)
   if (abId === 'scan' && action && !p.downed) { // a few seconds of scanning when something is heard, or every so often
     ai.scanT = (ai.scanT ?? 8 + Math.random() * 10) - dt;
     if ((heardRecently || ai.scanT < 0) && p.battery > 1) { inp.ability = 1; if (ai.scanT < -3) ai.scanT = 15 + Math.random() * 15; }
@@ -497,7 +497,7 @@ export function botThink(game, p, dt) {
 
   // heard something and can't see it: stop, turn to face it and listen for a moment (pushy bots don't stop as long)
   if (heardRecently && game.time - ai.heard.t < 1.6 - me.aggr * 0.6 && !p.hasDefuser && !(team === TEAM.DEF && game.planted)) {
-    turnTo(p, Math.atan2(ai.heard.y - p.y, ai.heard.x - p.x), 3, dt);
+    turnTo(p, Math.atan2(ai.heard.y - p.y, ai.heard.x - p.x), skill(game, p).turn * 0.6, dt);
     inp.crouch = atk ? 0 : 1;
     const hd = Math.hypot(ai.heard.x - p.x, ai.heard.y - p.y);
     // a smoke barrage between us and a noise close by
@@ -622,7 +622,7 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
     else if (hold) { // hold an angle on the nearest way in
       if (!ai.watch) ai.watch = watchPoint(game, p) || { x: p.x + Math.cos(p.aim) * 50, y: p.y + Math.sin(p.aim) * 50 };
       const a = Math.atan2(ai.watch.y - p.y, ai.watch.x - p.x);
-      turnTo(p, a + Math.sin(game.time * 0.5 + p.x) * 0.25, 2, dt);
+      turnTo(p, a + Math.sin(game.time * 0.5 + p.x) * 0.25, skill(game, p).turn * 0.4, dt);
       inp.crouch = team === TEAM.DEF || persona(p).patience > 0.5 ? 1 : 0;
     }
     return;
@@ -630,7 +630,12 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   const next = ai.path[0];
   const nx = (next % map.W + 0.5) * CELL, ny = (Math.floor(next / map.W) + 0.5) * CELL;
   const dirA = Math.atan2(ny - p.y, nx - p.x);
-  turnTo(p, dirA, 6, dt);
+  let lookA = dirA; // where they walk, or (better bots) where an enemy would come from
+  if (preAims(game, p)) {
+    if ((ai.threatT = (ai.threatT || 0) - dt) <= 0) { ai.threatT = 0.7; ai.threat = threatPoint(game, p, dirA); }
+    if (ai.threat) lookA = Math.atan2(ai.threat.y - p.y, ai.threat.x - p.x);
+  }
+  turnTo(p, lookA, skill(game, p).turn * 0.8, dt);
   if (vaultable(map, next) && Math.hypot(nx - p.x, ny - p.y) < 24) { // climb over it, or note it can't be done and go round
     if (!game.startVault(p, dirA)) { (ai.noVault || (ai.noVault = new Set())).add(next); ai.path = null; }
     return;
@@ -682,6 +687,30 @@ function botDrone(game, p, dt) {
 }
 
 // the doorway or window nearest to this bot that it can see (to hold an angle on): the site's own when defending it
+// He asked: bots should look roughly where an enemy would come from — Hard and Expert always, Normal some of the time,
+// Easy never (they look where they walk). A threat point: the nearest doorway, window, staircase end or open hatch
+// they can see, roughly ahead of them (dir), 2–11 m away.
+function preAims(game, p) {
+  const lvl = game.tut ? 0 : Math.max(0, Math.min(3, p.level ?? game.botLevel ?? 1));
+  if (lvl >= 2) return true;
+  if (lvl === 0) return false;
+  const ai = p.ai; if ((ai.preRollT = (ai.preRollT || 0) - 1) <= 0) { ai.preRollT = 180; ai.preRoll = Math.random() < 0.4; } // Normal: now and then (re-decided every few seconds)
+  return ai.preRoll;
+}
+function threatPoint(game, p, dir) {
+  const m = game.map, W = m.W, pts = [];
+  for (const o of m.openings) { const k = o.cells[o.cells.length >> 1]; pts.push({ x: (k % W + 0.5) * CELL, y: (Math.floor(k / W) + 0.5) * CELL }); }
+  for (let i = 0; i < (m.stairs || []).length; i++) { const e = stairEnds(m, i, 0); pts.push(e.top, e.bottom); }
+  for (const h of m.hatches || []) if (m.tiles[h.cells[0]] === T.HOLE) pts.push({ x: h.x, y: h.y }, { x: h.bx, y: h.by });
+  let best = null, bs = Infinity;
+  for (const q of pts) {
+    const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < 70 || d > 400) continue;
+    const off = Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), dir)); if (off > 1.5) continue;
+    const sc = d + off * 160; if (sc >= bs || !los(m, p.x, p.y, q.x, q.y)) continue;
+    bs = sc; best = q;
+  }
+  return best;
+}
 function watchPoint(game, p) {
   const m = game.map, site = m.sites[game.site], W = m.W;
   const inSite = siteTest(m, site), atSite = inRoomOf(m, site.rooms, Math.floor(p.x / CELL), Math.floor(p.y / CELL));
