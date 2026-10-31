@@ -399,10 +399,11 @@ export function botThink(game, p, dt) {
     if (p.bracing && d < 32) { p.aim = Math.atan2(enemy.y - p.y, enemy.x - p.x); game.event(p, { k: 'melee' }); return; } // shield bash
     if (p.bracing && Math.random() < dt * 0.8) inp.ability = 1; // now and then put the shield away to shoot
     if (!p.bracing && abId === 'brace' && d < 45 && Math.random() < dt) inp.ability = 1;
-    const shieldUp = enemy.bracing && !enemy.downed && Math.abs(angDiff(Math.atan2(p.y - enemy.y, p.x - enemy.x), enemy.aim)) < 0.8;
+    const esp = enemy.bracing ? game.shieldOf(enemy) : null; // a shield swung aside (firing, knocked, a jogging gap) is a chance to shoot
+    const shieldUp = enemy.bracing && !enemy.downed && !esp.off && Math.abs(angDiff(Math.atan2(p.y - enemy.y, p.x - enemy.x), enemy.aim + esp.rot)) < esp.arc - 0.1;
     if (shieldUp && d < 26) { p.aim = Math.atan2(enemy.y - p.y, enemy.x - p.x); game.event(p, { k: 'melee' }); return; } // knock the shield aside
     if (shieldUp && !(game.time < (enemy.shieldDownUntil || 0))) { ai.strafe = ai.strafe || (Math.random() < 0.5 ? -1 : 1); const sa = Math.atan2(enemy.y - p.y, enemy.x - p.x) + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); return; }
-    else if (ai.react > 0 && Math.abs(angDiff(want, p.aim)) < S.tol) shootInput(inp, ai, gun);
+    else if (!game.tut && ai.react > 0 && Math.abs(angDiff(want, p.aim)) < S.tol) shootInput(inp, ai, gun); // tutorial bots never shoot
     // the arc gun zaps a defender in reach as well as gadgets
     if (abId === 'arc' && p.abilityCount > 0 && ai.react > 0 && d < 300 && Math.abs(angDiff(want, p.aim)) < 0.1 && Math.random() < dt * 0.5) useAbility();
     ai.strafeT = (ai.strafeT || 0) - dt;

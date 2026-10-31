@@ -358,6 +358,18 @@ export const HEAD_R = 2.3; // a bullet passing this close to the centre of a bod
 // ...and only if your crosshair was on their head when you fired (he asked: no headshots from a crosshair in front of
 // or behind someone that just happens to line up). 4.5 px is the head as drawn.
 export const HEAD_AIM = 4.5;
+// The ballistic shield's pose, shared by the server (what stops bullets) and the drawing (what you see), so they always
+// match (he asked). rot: how far the shield is turned from where its holder aims; arc: how far it reaches either side.
+// Standing, walking (Shift) or crouching: square in front, the full arc: truly safe from the front. Jogging: it swings
+// with every step and covers less, so its edges open up. Just fired: swung out of the way to shoot, the front is open.
+// Knocked aside by a melee hit (or a missed bash): no cover at all (off).
+export const SHIELD_ARC = 0.95;
+export function shieldPose(gait, jogging, firing, knocked) {
+  if (knocked) return { rot: 1.7, arc: 0.5, off: true };
+  if (firing) return { rot: -1.3, arc: 0.55 };
+  if (jogging) return { rot: Math.sin(gait || 0) * 0.85, arc: 0.72 }; // about a third of each stride the front is open
+  return { rot: 0, arc: SHIELD_ARC };
+}
 export const onHead = (ax, ay, x, y) => ax === undefined || ax === null || Math.hypot(ax - x, ay - y) <= HEAD_AIM;
 
 // ---- the aiming model: one set of rules for the server, the crosshair and the Armory ----

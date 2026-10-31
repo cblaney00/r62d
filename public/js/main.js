@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
@@ -1479,7 +1479,7 @@ function draw(s, view, now, dt) {
     const gh = !isMe && stairGhost(st.map, p.x, p.y);
     if (gh && (ally || (!p.sh && ghostSeen(gh)))) {
       ctx.globalAlpha = 0.9;
-      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, brace: p.br }, now);
+      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, p.so === 1, p.so === 2) : null }, now);
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x + u.x * 15, gh.y + u.y * 15);
@@ -1490,7 +1490,7 @@ function draw(s, view, now, dt) {
     if (!vis) continue;
     drawOperator(ctx, {
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, downed: p.dn,
-      recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, scan: p.sc, melee: a.melee,
+      recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, p.so === 1, p.so === 2) : null, scan: p.sc, melee: a.melee,
     }, now);
     drawn.push(p);
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x, y: p.y });
@@ -2079,6 +2079,7 @@ function stairPeek(view, me, inGame) {
 function drawStairPip(s, me, now) {
   const box = $('stairPip'), pv = st.pip;
   box.classList.toggle('on', !!pv);
+  box.classList.toggle('right', coach.active); // the tutorial coach sits top-left
   if (!pv) return;
   const cvp = box.querySelector('canvas'), px = Math.round(260 * DPR);
   if (cvp.width !== px) { cvp.width = px; cvp.height = px; }
@@ -2116,7 +2117,7 @@ function drawStairPip(s, me, now) {
     const ally = p.tm === side;
     if (!ally && (p.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue;
     const a = anim(p.id);
-    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br }, now);
+    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, p.so === 1, p.so === 2) : null }, now);
   }
   c.restore();
   // where you come out of the stairs: a dashed white ring

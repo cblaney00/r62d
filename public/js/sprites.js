@@ -166,14 +166,16 @@ export function drawOperator(ctx, p, t) {
   if (shieldBack) { // slung on the back while the pistol is out
     ctx.strokeStyle = '#22252a'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.arc(2, 0, 11, Math.PI - 0.8, Math.PI + 0.8); ctx.stroke();
   }
-  if (shield) {
-    const arc = 0.95;
+  if (shield) { // pose from shieldPose (shared/operators.js): exactly where the server's shield stops bullets
+    const sp = p.shieldPose || { rot: 0, arc: 0.95 }, arc = sp.arc;
+    ctx.save(); ctx.rotate(sp.rot); if (sp.off) ctx.globalAlpha *= 0.75;
     ctx.lineCap = 'butt';
     ctx.strokeStyle = OUT; ctx.lineWidth = 5.4; ctx.beginPath(); ctx.arc(-2, 0, 14, -arc, arc); ctx.stroke();
     ctx.strokeStyle = '#22252a'; ctx.lineWidth = 4.4; ctx.beginPath(); ctx.arc(-2, 0, 14, -arc, arc); ctx.stroke();
     ctx.strokeStyle = '#5a626b'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(-2, 0, 15.8, -arc, arc); ctx.stroke();
     ctx.save(); ctx.rotate(-0.12); ctx.fillStyle = '#8fd0f2'; ctx.fillRect(11.3, -2, 1.6, 4); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(11.4, -1.8, 0.5, 1.5); ctx.restore();
     ctx.save(); ctx.rotate(0.5); ctx.fillStyle = '#d84a4a'; ctx.fillRect(11.2, -1, 2.2, 2); ctx.restore();
+    ctx.restore();
   }
 
   // ---- head & headgear ----

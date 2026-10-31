@@ -55,3 +55,6 @@ damage 19→18. A separate 12-match look at how rounds end: 19 defenders elimina
 With no gun on both sides (and four new ones), attackers won 34% of 294 bot rounds. Defence SMGs led:
 Marten 1.00 kills per carry (small sample), Lark 0.79 → Marten 28→26 damage, Lark 22→21. The Rook (0.33)
 kicked too hard for bots: its spray kick 1.4→1.2.
+
+## Shield pass (he asked)
+- Bulwark can shoot with the shield up, but each shot swings it aside for 0.5 s; jogging swings it with each step (~20% of front shots get through); standing/walking/crouching covers the whole front. Shield-up speed ×0.82 (was ×0.45). 6-match run: Bulwark 48% (56 rounds).

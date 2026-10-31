@@ -4,7 +4,7 @@ import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOL
 import { buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
-import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
@@ -197,7 +197,7 @@ export class Game {
   // ---------------- match flow ----------------
   startMatch() {
     if (this.players.size === 0) return;
-    this.score = [0, 0]; this.round = this.tut && this.tut.lesson === 'def' ? 1 : 0; // the tutorial's defence lesson starts with you defending
+    this.score = [0, 0]; this.round = 0; // round 1: squad 0 attacks (the tutorial: you attack, then defend)
     for (const p of this.players.values()) { p.kills = 0; p.deaths = 0; p.ms = this.blankMatchStats(); }
     this.departed = []; this.roundLog = []; this.matchStart = Date.now();
     this.nextRound();
@@ -343,7 +343,11 @@ export class Game {
       return;
     }
     if (this.phase === PHASE.ROUND_END) {
-      if (this.tut) { this.timer = Math.max(0, this.timer); return; } // a lesson is one round: the coach offers what's next
+      if (this.tut) { // the tutorial: after the attacking round the sides swap for one defending round, then it stops
+        if (this.round >= 2) { this.timer = Math.max(0, this.timer); return; }
+        if (this.timer <= 0) { this.tut.hold = true; this.nextRound(); }
+        return;
+      }
       if (this.timer <= 0) {
         if (Math.max(...this.score) >= WIN_ROUNDS) {
           this.phase = PHASE.MATCH_END; this.timer = DUR.matchEnd;
@@ -413,7 +417,7 @@ export class Game {
     const o = OPERATORS[p.op] || { armor: 2 };
     let mul = 1;
     if (this.time < p.slowUntil) mul *= 0.45;
-    if (p.bracing) mul *= 0.45;
+    if (p.bracing) mul *= 0.82; // shield up: a little slower, never a crawl (he asked)
     if (p.scanning) mul *= 0.6;
     if (this.time < (p.boostUntil || 0)) mul *= 1.25; // Adrenal Shot
     if (p.shrouded) mul *= 0.8;
@@ -564,7 +568,7 @@ export class Game {
     }
 
     // shooting
-    const canShoot = p.ctrl === "body" && !p.busy && !p.vault && !(p.rope && p.rope.st !== 'hang') && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && !p.bracing && gun &&
+    const canShoot = p.ctrl === "body" && !p.busy && !p.vault && !(p.rope && p.rope.st !== 'hang') && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && gun &&
       !(p.switchUntil > this.time) && !(p.staggerUntil > this.time);
     // a click made a hair before the gun is ready is kept until it is (up to 0.15 s), so fast tapping never loses a shot
     const click = p.click && !(this.time - (p.click.t ?? this.time) > 0.15) ? p.click : null; p.click = null;
@@ -599,6 +603,7 @@ export class Game {
   }
 
   fire(p, gun, w, click = null) {
+    if (p.bracing) p.shieldOpenUntil = this.time + 0.5; // shooting from behind the shield swings it out of the way (he asked)
     this.noise(p.x, p.y, this.side(p), (gun.m && gun.m.quiet) ? 260 : 950);
     gun.ammo--; p.fireCd = Math.max(p.fireCd, -1 / 30) + 60 / w.rpm; // keep the leftover: guns fire at their real rate, not rounded up to whole ticks
     if (p.ms) p.ms.shots += w.pellets;
@@ -698,8 +703,8 @@ export class Game {
     if (best && best.q) {
       const q = best.q;
       if (OPERATORS[q.op].ability.id === 'brace' && !q.downed && q.ctrl === 'body' && !(this.time < (q.shieldDownUntil || 0))) {
-        const off = Math.abs(angDiff(Math.atan2(y0 - q.y, x0 - q.x), q.aim)), switching = q.switchUntil > this.time;
-        if (!switching && (q.bracing ? off < 0.95 : off > Math.PI - 0.8)) {
+        const pose = this.shieldOf(q), off = Math.abs(angDiff(Math.atan2(y0 - q.y, x0 - q.x), q.aim + pose.rot)), switching = q.switchUntil > this.time;
+        if (!switching && (q.bracing ? off < pose.arc : Math.abs(angDiff(Math.atan2(y0 - q.y, x0 - q.x), q.aim)) > Math.PI - 0.8)) {
           this.events.push({ e: 'hit', k: 'shield', x: r1(ex), y: r1(ey) });
           return { x: ex, y: ey, k: 'shield' };
         }
@@ -806,6 +811,7 @@ export class Game {
 
   damage(q, amount, src, wname, ang) {
     if (!q.alive || amount <= 0) return;
+    if (this.tut && src && src.bot && !q.bot) return; // tutorial bots never hurt you (he asked)
     amount = Math.round(amount);
     if (src && src.ms && src !== q && this.side(src) !== this.side(q)) src.ms.damage += Math.min(amount, Math.max(0, q.hp));
     if (src && src.sock) this.events.push({ e: 'hitmark', to: src.id, kill: false });
@@ -897,7 +903,7 @@ export class Game {
     p.busy = null; p.input.interact = 0;
     if (b.k === 'plant') {
       const bomb = this.map.sites[this.site].bombs.find(x => x.id === b.bomb);
-      this.planted = { x: bomb.x, y: bomb.y, bomb: bomb.id, t: DUR.bomb };
+      this.planted = { x: bomb.x, y: bomb.y, bomb: bomb.id, t: this.tut ? 3 : DUR.bomb }; // the tutorial doesn't make you wait
       p.hasDefuser = false; if (p.ms) p.ms.plants++;
       this.events.push({ e: 'banner', text: 'DEFUSER PLANTED', sub: `Bomb ${bomb.id} — ${bomb.room}` });
       this.events.push({ e: 'snd', s: 'planted', x: r1(bomb.x), y: r1(bomb.y) });
@@ -915,6 +921,9 @@ export class Game {
       if (p.barri > 0 && this.barricade(this.map.openId[b.cell], T.BARRI)) { p.barri--; if (this.tut && !p.bot) this.tut.info.barri++; }
     }
   }
+
+  // the shield's pose right now (shieldPose in shared/operators.js); the drawing uses the same rule from the snapshot
+  shieldOf(q) { return shieldPose(q.gait, q.moving === 2, this.time < (q.shieldOpenUntil || 0), this.time < (q.shieldDownUntil || 0)); }
 
   // ---------------- rappelling (he asked: attackers need a quicker way up; see addRopes in shared/map.js) ----------------
   // p.rope = { st: 'move' | 'hang', r: the window you hang at (-1 = none), from, to (-1 = the ground), t, dur, base }
@@ -1372,14 +1381,15 @@ export class Game {
   tutAction(p, m) {
     const tu = this.tut;
     if (m.a === 'start' || m.a === 'retry') {
-      const lesson = m.a === 'retry' ? tu.lesson : m.lesson;
-      if (lesson !== 'atk' && lesson !== 'def') return;
+      const lesson = 'all'; // one run: attack a round, then defend one
       for (const q of [...this.players.values()]) if (q.bot) this.players.delete(q.id);
       p.squad = 0;
       tu.lesson = lesson; tu.hold = true; tu.info = this.blankTutInfo();
       if (this.mapId !== 'harbor') { this.mapId = 'harbor'; this.map = buildMap(this.mapId); }
       this.addBot(1); this.addBot(1);
       this.startMatch();
+    } else if (m.a === 'finish') { // Space on the last step: done
+      if (this.phase === PHASE.ACTION) this.endRound(TEAM.DEF, 'Tutorial finished');
     } else if (m.a === 'go') {
       if (this.phase === PHASE.SELECT) this.timer = 0;
       else if (this.phase === PHASE.PREP && tu.hold) { tu.hold = false; this.timer = Math.min(this.timer, 3.5); }
@@ -1803,7 +1813,7 @@ export class Game {
         rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ct: p.ctrl,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
-        gt: r2(p.gait || 0), mv: p.moving, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
+        gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && (this.time < (p.shieldOpenUntil || 0) || this.time < (p.shieldDownUntil || 0)) ? (this.time < (p.shieldDownUntil || 0) ? 2 : 1) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
         aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,

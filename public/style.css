@@ -549,3 +549,4 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 .mkLayers button { display: flex; align-items: center; gap: 7px; padding: 6px 8px; font-size: 13px; text-align: left; opacity: 0.45; }
 .mkLayers button.on { opacity: 1; border-color: rgba(255,255,255,0.35); }
 .mkLayers button i { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+#stairPip.right { left: auto; right: 18px; top: 130px; }
