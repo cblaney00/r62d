@@ -643,7 +643,7 @@ export class Game {
     }
 
     // shooting
-    const canShoot = p.ctrl === "body" && !p.busy && !p.vault && !(p.rope && p.rope.st !== 'hang') && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && gun &&
+    const canShoot = p.ctrl === "body" && !p.staged && !p.busy && !p.vault && !(p.rope && p.rope.st !== 'hang') && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && gun &&
       !(p.switchUntil > this.time) && !(p.staggerUntil > this.time);
     // a click made a hair before the gun is ready is kept until it is (up to 0.15 s), so fast tapping never loses a shot
     const click = p.click && !(this.time - (p.click.t ?? this.time) > 0.15) ? p.click : null; p.click = null;
@@ -1144,6 +1144,7 @@ export class Game {
     if (!active) return;
     const team = this.side(p);
     if (p.vault && e.k !== 'spot' && e.k !== 'view') return; // busy climbing
+    if (p.staged && ['vault', 'melee', 'ability', 'gadget', 'reload'].includes(e.k)) return; // not on the map yet (he noticed shots before spawning)
     switch (e.k) {
       case 'vault': this.startVault(p, typeof e.a === 'number' && isFinite(e.a) ? e.a : p.aim); break;
       case 'reload': if (!p.downed && p.ctrl === 'body') this.startReload(p); break;
@@ -1656,6 +1657,18 @@ export class Game {
       this.beginPrep(); this.beginAction();
       p.hasDefuser = true;
       this.events = [{ e: 'banner', text: 'FREE PLAY', sub: MAPS[this.mapId].name }];
+    } else if ((m.a === 'bot' || m.a === 'dummy') && this.phase === PHASE.ACTION && this.players.size < MAX_PLAYERS) {
+      // he asked: add bots and dummies while playing. A bot plays normally (enemy or on your team); a dummy is an enemy
+      // that stands still 3 m in front of you, facing you, and comes back to the same spot 3 s after it goes down.
+      const dummy = m.a === 'dummy', squad = dummy || m.side !== 'team' ? 1 - p.squad : p.squad;
+      const used = new Set([...this.players.values()].map(q => q.name));
+      let name; if (dummy) { let i = 1; while (used.has('DUMMY ' + i)) i++; name = 'DUMMY ' + i; } else name = '[BOT] ' + (BOT_NAMES.find(n => !used.has('[BOT] ' + n)) || 'Bot');
+      const b = this.blankPlayer(name, true, squad); this.players.set(b.id, b);
+      if (dummy) { const at = this.freeSpotNear(p.x + Math.cos(p.aim) * 3 * PX_PER_M, p.y + Math.sin(p.aim) * 3 * PX_PER_M, 30); b.hold = true; b.dummyAt = at; }
+      this.freeSpawn(b, true);
+      if (dummy) this.dummyPlace(b, p);
+    } else if (m.a === 'clearBots') {
+      for (const q of [...this.players.values()]) if (q.bot) { if (q.hasDefuser) this.dropDefuser(q); this.players.delete(q.id); }
     } else if (m.a === 'pick' && this.phase === PHASE.ACTION && OPERATORS[m.op]) { // the operator grid
       this.freeSwitch(p, m.op);
     } else if (m.a === 'op' && this.phase === PHASE.ACTION) {
@@ -1713,12 +1726,17 @@ export class Game {
     }
     if (atk) { p.drones = 2; if (!p.bot && !this.planted && !this.ents.some(e => e.type === 'defuser')) p.hasDefuser = true; }
   }
-  freeRespawns() { // the dead come back at their side's start after 3 s
+  freeRespawns() { // the dead come back at their side's start after 3 s (dummies at their own spot)
     for (const p of this.players.values()) {
       if (p.alive || !p.op) continue;
       if (!p.respawnAt) p.respawnAt = this.time + 3;
-      else if (this.time >= p.respawnAt) this.freeSpawn(p, true);
+      else if (this.time >= p.respawnAt) { this.freeSpawn(p, true); if (p.dummyAt) this.dummyPlace(p); }
     }
+  }
+  dummyPlace(b, face) {
+    b.x = b.dummyAt.x; b.y = b.dummyAt.y; b.vx = b.vy = 0;
+    const f = face || [...this.players.values()].find(q => !q.bot);
+    if (f) b.aim = Math.atan2(f.y - b.y, f.x - b.x);
   }
 
   spot(team, id, dur) {

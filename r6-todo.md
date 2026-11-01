@@ -6,9 +6,32 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] bots should know how and when to look at cameras, when it is safe to, when the risk of viewing your cameras is worth taking when enemies are nearby/approaching
+- [ ] onyx's ability should give an solid audio warning, maybe a second before it activates and it should activate 3 times with the final blast being slightly larger than the first two
+- [ ] volt's laser's strength is really its stealth so make sure it's a quiet noise that cant be heard too closely, unless you are half a room away (average distance, dont take me literally) you shouldnt be able to hear it unless you really focus, and at a certain point it would just be silent
+- [ ] make the operator's utility more detailed so one can tell what it is by looking at it and not having to ping it to see what it is necesarily
+- [ ] talon is going to need to get a buff, emp grenades are sort of on the strength of regular utility so its not very viable
+- [ ] enhance the animation to have each character's abilities more character, also make it necessary to take time to set up certain abilities, especially ones that are being placed in a location. There will be a difference between placed and thrown utility, being able to throw utlity is pretty strong, so the utility that is thrown either needs to be less valuable or there needs to be some other way to reverse-make up for it
+- [ ] torque's saws should go straight through wooden planks and make hole the size of the saw but doesnt do damage to the door aside from that
+- [ ] rivet's thermal lance should make a much smaller hole in soft and hard walls, it should be enough for a bullet at minimum and can be widened with more time carving out the wall
+- [ ] when bulwark is shift walking with his shield it should not swing at all, only when full walking, it should also not swing when its being moved out of the way when moving to ADS
+- [ ] crow should be able to lunge from quite a distance and their ability should have to be targeted at the person they want to lunge at, the person that is being targted will get a notification that crow unshealths/makes a noise with their weapon 1.5 seconds before they can be lunged at
+- [ ] when bulwark holds his ADS button he should have a smooth animation between holding the shield and moving it out of the way to aim, there should be a downtime during most of this animation if not all of it
+- [ ] ADS walking speed and slow walking speed should be different speeds depending on the gun. but there should be no benefit to holding shift and ADS if ADS is just going to make you walk just as slow and make you use your pinky finger on the shift button at the same time, the speed of the movement does effect how loud it is
+- [ ] wraith's scanner should be toggle
+- [ ] glint cannot sonar pulse up stairs
+- [ ] im not sure how lens periscope works, make sure it's more intuitive and it will say when periscoping is not possible when you try in a forbidden place
+- [ ] trench's cover needs to be thinner, vaultable, and able to be placed at an angle close to one another if the player wants
+- [ ] there should be a minimap that shows where your allies in the map in text form
+- [ ] consider removing features or UI things for the mobile version of the game, the two versions of the game should be updated alongside eachother and work as the same game but there should be a difference in how the game loads in when it knows what type of device is trying to play the game
+- [ ] make sure the menu for toggling god mode things or editing the game functions pops up on a keybind in freeplay when pressed
+- [ ] ferro's hammer should have a decent sized downtime, also he shouldnt be ableto break soft walls with his hammer, only door and window barracades instantly. also make sure that other characters have a balanced amount of ability to break soft walls, it really shouldnt be every character that can do that without a breach charge or grenade
 
 ## Done
 
+- [x] Free play: the operators screen (O, or the button at the bottom) has + ENEMY BOT, + TEAM BOT, + DUMMY and REMOVE ALL (up to 9). A dummy stands still 3 m in front of you, facing you, and comes back to the same spot 3 s after it goes down.
+- [x] Fixed: an attacker whose drone broke in preparation got their body back while still waiting off the map and could fire; now nothing (shooting, melee, gadgets, skills, vaulting) works until you're on the map.
+- [x] Boards crack with each melee hit: small cracks after the first, long branching cracks with a snapped middle plank and a dent after the second, broken on the third.
 - [x] Esports TV: A switches the auto director on and off; off, it stays on whoever you're watching.
 - [x] Esports TV: in preparation the director cuts round the defenders as they place gadgets, reinforce and board up; shooting, plants and close fights still come first.
 - [x] From Gold up, attacker bots pull their drone back to safety when a defender gets close or preparation is ending (Diamond keeps about 70% alive, Silver about 10%); the risk-takers among the pros still push. From Gold up one defender waits by the stairs nearest the site to shoot drones.

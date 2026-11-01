@@ -1058,6 +1058,12 @@ function toggleFreeOps(force) {
     b.onclick = () => { audio.ui(); send({ t: 'free', a: 'pick', op: b.dataset.op }); el.classList.add('hidden'); };
   }
   el.querySelector('.close').onclick = () => { audio.ui('back'); el.classList.add('hidden'); };
+  for (const b of el.querySelectorAll('[data-fb]')) b.onclick = () => { // he asked: bots and dummies while in free play
+    const k = b.dataset.fb; audio.ui();
+    send({ t: 'free', a: k === 'clear' ? 'clearBots' : k === 'dummy' ? 'dummy' : 'bot', side: k === 'team' ? 'team' : 'enemy' });
+    if (k === 'dummy') el.classList.add('hidden'); // back to the game to see it
+  };
+  { const n = (st.last ? st.last.players : []).filter(p => p.b).length; el.querySelector('.foCount').textContent = `${n} bot${n === 1 ? '' : 's'} in the match · up to 9`; }
   el.classList.remove('hidden'); audio.ui('open');
 }
 
@@ -2070,8 +2076,8 @@ function hud(s) {
   if (s.fp && me.op) {
     const all = [...opsForTeam('atk'), ...opsForTeam('def')], i = all.indexOf(me.op), n = all.length;
     const nm = k => `${OPERATORS[k].name}${OPERATORS[k].team !== side ? (OPERATORS[k].team === 'atk' ? ' (attack)' : ' (defence)') : ''}`;
-    if (isTouch) setHTML('freeHint', `<b>GOD MODE</b> · <button id="freeOpsBtn">ALL OPERATORS</button> · <b>${esc(OPERATORS[me.op].name)}</b>`); else
-    setHTML('freeHint', `<b>GOD MODE</b> · <button id="freeOpsBtn"><kbd>${esc(label('opGrid'))}</kbd> ALL OPERATORS</button> · <kbd>${esc(label('opPrev'))}</kbd> ${esc(nm(all[(i - 1 + n) % n]))} · <b>${esc(OPERATORS[me.op].name)}</b> · ${esc(nm(all[(i + 1) % n]))} <kbd>${esc(label('opNext'))}</kbd>`);
+    if (isTouch) setHTML('freeHint', `<b>GOD MODE</b> · <button id="freeOpsBtn">OPERATORS · BOTS</button> · <b>${esc(OPERATORS[me.op].name)}</b>`); else
+    setHTML('freeHint', `<b>GOD MODE</b> · <button id="freeOpsBtn"><kbd>${esc(label('opGrid'))}</kbd> OPERATORS · BOTS · DUMMIES</button> · <kbd>${esc(label('opPrev'))}</kbd> ${esc(nm(all[(i - 1 + n) % n]))} · <b>${esc(OPERATORS[me.op].name)}</b> · ${esc(nm(all[(i + 1) % n]))} <kbd>${esc(label('opNext'))}</kbd>`);
     const fb = $('freeOpsBtn'); if (fb && !fb.onclick) fb.onclick = () => toggleFreeOps();
   }
   // objective

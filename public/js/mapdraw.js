@@ -296,8 +296,17 @@ export class MapRenderer {
     else { if (SOLID.has(this.t(x, y - 1))) ctx.fillRect(X + 3, Y, 10, 1.6); if (SOLID.has(this.t(x, y + 1))) ctx.fillRect(X + 3, Y + CELL - 1.6, 10, 1.6); }
     if (t === T.BARRI) {
       const hpF = m.hp[k] / CELL_HP[T.BARRI];
+      // he asked: each melee hit cracks the boards more, the third breaks them. 0 = whole, 1 = cracked, 2 = splitting
+      const stage = hpF > 0.95 ? 0 : hpF > 0.5 ? 1 : 2;
       for (let i = 0; i < 3; i++) {
-        if (hpF < 0.5 && i === 1) continue;
+        if (stage === 2 && i === 1) { // the middle plank snapped in two, the halves sagging apart
+          ctx.save(); ctx.translate(X + CELL / 2, Y + CELL / 2); ctx.rotate(horiz ? 0 : Math.PI / 2);
+          for (const sd of [-1, 1]) { ctx.save(); ctx.translate(sd * 5.5, 0); ctx.rotate(sd * 0.16);
+            ctx.fillStyle = shade('#9a6a3a', 0.8); ctx.fillRect(-4, -1.6, 8, 3.2);
+            ctx.fillStyle = '#e0bc86'; for (let j = 0; j < 3; j++) ctx.fillRect(sd < 0 ? 3.6 : -4.4, -1.6 + j * 1.1 + hash(x, y, j) * 0.3, 0.8 + hash(j, x, y) * 0.8, 0.7); // raw splintered ends
+            ctx.restore(); }
+          ctx.restore(); continue;
+        }
         ctx.save();
         ctx.translate(X + CELL / 2, Y + CELL / 2);
         ctx.rotate((horiz ? 0 : Math.PI / 2) + (i - 1) * 0.35 + (hash(x, y, i) - 0.5) * 0.15);
@@ -307,10 +316,20 @@ export class MapRenderer {
         ctx.fillStyle = '#c9c9c9'; ctx.fillRect(-7, -0.6 + (i - 1) * 3.3, 0.9, 0.9); ctx.fillRect(6, -0.6 + (i - 1) * 3.3, 0.9, 0.9);
         ctx.restore();
       }
-      if (hpF < 0.8) { // splintered by a melee hit
-        ctx.strokeStyle = 'rgba(40,22,10,0.8)'; ctx.lineWidth = 0.6; ctx.beginPath();
-        for (let i = 0; i < (hpF < 0.4 ? 4 : 2); i++) { const sx = X + 3 + hash(x, y, i + 70) * 10, sy = Y + 3 + hash(y, x, i + 80) * 10; ctx.moveTo(sx, sy); ctx.lineTo(sx + (hash(i, y, x) - 0.5) * 9, sy + (hash(x, i, y) - 0.5) * 9); }
-        ctx.stroke();
+      if (stage) { // cracks running out from where the hits landed: short after one hit, long and branching after two
+        const cx = X + CELL / 2 + (hash(x, y, 91) - 0.5) * 4, cy = Y + CELL / 2 + (hash(y, x, 92) - 0.5) * 4;
+        const n = stage === 1 ? 3 : 6, len = stage === 1 ? 5 : 10;
+        const crack = (sx, sy, a, L, seed, depth) => {
+          const pts = [[sx, sy]]; let px = sx, py = sy;
+          for (let j = 1; j <= 4; j++) { const aa = a + (hash(seed, j, x + y) - 0.5) * 0.9; px += Math.cos(aa) * L / 4; py += Math.sin(aa) * L / 4; pts.push([px, py]); }
+          for (const [col, w, o] of [['rgba(232,196,140,0.55)', 0.9, 0.5], ['rgba(28,15,6,0.9)', 0.55, 0]]) { // a pale splinter edge under a dark split
+            ctx.strokeStyle = col; ctx.lineWidth = w * (depth ? 0.8 : 1); ctx.beginPath(); ctx.moveTo(pts[0][0] + o, pts[0][1] + o); for (const [qx, qy] of pts.slice(1)) ctx.lineTo(qx + o, qy + o); ctx.stroke(); }
+          if (stage === 2 && !depth) crack(pts[2][0], pts[2][1], a + (hash(seed, 7, y) > 0.5 ? 0.7 : -0.7), L * 0.5, seed + 13, 1); // branches
+        };
+        { const r = horiz ? 0 : Math.PI / 2; ctx.save(); ctx.translate(X + CELL / 2, Y + CELL / 2); ctx.rotate(r); ctx.beginPath(); ctx.rect(-CELL / 2, -5.6, CELL, 11.2); ctx.clip(); ctx.rotate(-r); ctx.translate(-X - CELL / 2, -Y - CELL / 2); } // only on the boards
+        for (let i = 0; i < n; i++) crack(cx, cy, i / n * Math.PI * 2 + hash(x, i, y) * 0.8, len * (0.7 + hash(i, x, y) * 0.6), i * 31 + x, 0);
+        if (stage === 2) { ctx.fillStyle = '#140b05'; ctx.beginPath(); ctx.ellipse(cx, cy, 1.9, 1.3, hash(x, y, 5) * 3, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,230,180,0.35)'; ctx.beginPath(); ctx.arc(cx, cy, 0.6, 0, 7); ctx.fill(); } // a punched-in dent
+        ctx.restore();
       }
       const holes = m.holes && m.holes[k]; // bullet holes: pins of light you can look and shoot through
       if (holes) for (let i = 0; i < holes.length; i += 2) {
