@@ -71,9 +71,9 @@ const game = new Game();
 // /ws?tut=1 gets its own private tutorial match (/ws?free=1 a free-play one), gone when that player leaves it
 const tutorials = new Set();
 attachWebSocket(server, '/ws', (sock, req) => {
-  const tut = /[?&]tut=1/.test(req.url), free = /[?&]free=1/.test(req.url);
-  if (!tut && !free) return game.connect(sock);
-  const g = new Game({ tut, free }); tutorials.add(g);
+  const tut = /[?&]tut=1/.test(req.url), free = /[?&]free=1/.test(req.url), tv = /[?&]tv=1/.test(req.url);
+  if (!tut && !free && !tv) return game.connect(sock);
+  const g = new Game({ tut, free, tv }); tutorials.add(g); // tv: ESPORTS TV, the pro teams playing while you watch
   g.onEmpty = () => tutorials.delete(g);
   g.connect(sock);
 });

@@ -39,6 +39,7 @@
       <button data-tab="play" class="on">PLAY</button>
       <button data-tab="tutorial">TUTORIAL</button>
       <button data-tab="free">FREE PLAY</button>
+      <button data-tab="tv">ESPORTS TV</button>
       <button data-tab="ops">OPERATORS</button>
       <button data-tab="armory">ARMORY</button>
       <button data-tab="maps">MAP KNOWLEDGE</button>
@@ -68,6 +69,15 @@
           <div class="row center botLv"><span class="hint">BOT SKILL</span><div class="seg" id="botLevel"><button data-lv="0">Easy</button><button data-lv="1">Normal</button><button data-lv="2">Hard</button><button data-lv="3">Expert</button><button data-lv="4" title="The pro teams: Northwind and Ironclad Collective">Pro</button></div></div>
           <div class="row center"><button id="switchBtn">Switch team</button><button id="fillBtn">Fill empty slots with bots</button>
             <button id="lobbyOpsBtn" class="hidden">Operators</button><button id="lobbyProfBtn" class="hidden">Profile</button></div>
+        </div>
+      </section>
+      <section class="tab" id="tab-tv">
+        <div class="tutPage">
+          <h2>ESPORTS TV</h2>
+          <p class="hint">Sit back and watch the pro teams, <b>Northwind</b> and <b>Ironclad Collective</b>, play a full match. The camera cuts to the action by itself; press 1-5 or 6-0 (or click a player) to follow someone, A to go back to the director, M for the map. When a match ends the next one starts on another map.</p>
+          <h4 class="freeH">MAP</h4>
+          <div id="tvMaps" class="mapRow"></div>
+          <div class="row"><button id="tvGo" class="primary big">START WATCHING</button></div>
         </div>
       </section>
       <section class="tab" id="tab-free">
@@ -196,6 +206,7 @@
   <div id="armoryPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>ARMORY</h2><span class="hint">Your private shooting range — try any gun</span><button class="close">Close</button></div>
     <div class="armWrap"><div id="armList"></div><div class="armMid"><div class="armBar"><span>Distance</span><span id="armDist" class="seg"><button data-d="5">5 m</button><button data-d="10">10 m</button><button data-d="15">15 m</button><button data-d="20">20 m</button><button data-d="25">25 m</button></span><button id="armReset">Reset targets</button></div><canvas id="armCanvas"></canvas></div><div id="armStats"></div></div></div></div>
   <div id="profilePage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>PROFILE</h2><button class="close">Close</button></div><div id="profBody"></div></div></div>
+  <div id="tvHud"><div id="tvL" class="tvSide"></div><div id="tvR" class="tvSide"></div><div id="tvHelp"></div></div>
   <div id="corner"><button id="fsBtn" title="Fullscreen">⛶ Fullscreen</button><button id="setBtn">⚙ Settings</button><button id="muteBtn">🔊</button><button id="leaveBtn" class="hidden">End match</button></div>
   <div id="conn" class="hidden">Connecting…</div>
 </div>

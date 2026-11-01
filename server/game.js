@@ -1,6 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, MAT, stopsBullet, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
-import { localPos, buildMap, roomAt, wallMount, MAPS, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
+import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, SELF_UP, SELF_UP_TIME } from '../shared/operators.js';
@@ -32,6 +32,8 @@ export class Game {
     this.tut = opts.tut ? { lesson: null, hold: true, info: this.blankTutInfo() } : null;
     // opts.free: a private free-play match for one player: no clock, no rounds, switch operator any time (see freeAction)
     this.free = opts.free ? { bots: 0 } : null;
+    // opts.tv: ESPORTS TV (he asked): the two pro teams play each other, match after match, while the people connected only watch
+    this.tv = opts.tv ? { socks: new Set(), follow: null, maps: [] } : null;
     this.onEmpty = null;
     this.players = new Map();
     this.nextId = 1;
@@ -55,6 +57,7 @@ export class Game {
 
   // ---------------- connections ----------------
   connect(sock) {
+    if (this.tv) return this.tvConnect(sock);
     let p = null;
     sock.on('message', raw => {
       let m; try { m = JSON.parse(raw); } catch { return; }
@@ -79,6 +82,35 @@ export class Game {
       this.players.delete(p.id);
       if (this.humanCount() === 0) { this.resetToLobby(); if (this.onEmpty) this.onEmpty(); }
     });
+  }
+
+  // ESPORTS TV: a viewer is not a player. They get the map, then ask for a match (a map or random); the snapshots go to
+  // them too, with the details of the player they are following ('mine'), and both teams' chat (the leaders' calls).
+  tvConnect(sock) {
+    let joined = false;
+    sock.on('message', raw => {
+      let m; try { m = JSON.parse(raw); } catch { return; }
+      if (m.t === 'join' && !joined) {
+        joined = true; this.tv.socks.add(sock);
+        const login = store.login(cleanName(m.name));
+        sock.send(JSON.stringify({ t: 'welcome', id: null, tv: 1, mapVersion: this.mapVersion, mapId: this.mapId, token: login.token, profile: publicProfile(login.profile),
+          tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp), holes: this.map.holes }));
+      } else if (m.t === 'tv' && joined) {
+        if (m.a === 'start' && this.phase === PHASE.LOBBY) this.tvStart(m.map);
+        else if (m.a === 'follow') this.tv.follow = this.players.has(m.id) ? m.id : null;
+      }
+    });
+    sock.on('close', () => { this.tv.socks.delete(sock); if (!this.tv.socks.size && this.onEmpty) this.onEmpty(); });
+  }
+  tvStart(want) {
+    const list = MAP_LIST.filter(k => k !== this.mapId);
+    const id = MAPS[want] ? want : list[Math.floor(Math.random() * list.length)];
+    this.tv.want = want;
+    if (id !== this.mapId) { this.mapId = id; this.map = buildMap(id); }
+    for (const q of [...this.players.values()]) this.players.delete(q.id);
+    this.botLevel = 4;
+    for (let i = 0; i < 10; i++) this.addBot(i % 2);
+    this.startMatch();
   }
 
   humanCount() { let n = 0; for (const p of this.players.values()) if (!p.bot) n++; return n; }
@@ -367,7 +399,7 @@ export class Game {
       }
       return;
     }
-    if (this.phase === PHASE.MATCH_END) { if (this.timer <= 0) this.resetToLobby(); return; }
+    if (this.phase === PHASE.MATCH_END) { if (this.timer <= 0) { this.resetToLobby(); if (this.tv && this.tv.socks.size) this.tvStart(null); } return; } // TV: the next match, on another map
 
     // PREP / ACTION
     for (const p of this.players.values()) if (p.ms && p.alive) p.ms.playSeconds += dt;
@@ -2143,6 +2175,7 @@ export class Game {
     const team = !!m.team;
     const msg = JSON.stringify({ t: 'chat', from: p.id, name: p.name, text, team, squad: p.squad, dead: !p.alive && this.phase === PHASE.ACTION });
     for (const q of this.players.values()) if (q.sock && q.sock.open && (!team || q.squad === p.squad)) q.sock.send(msg);
+    if (this.tv) for (const sk of this.tv.socks) if (sk.open) sk.send(msg); // TV viewers hear both teams' calls
   }
 
   // ---------------- saved stats ----------------
@@ -2165,7 +2198,7 @@ export class Game {
     return { name: p.name, bot: !!p.bot, pid: p.pid || null, token: p.token || null, squad: p.squad, left, ...ms, damage: Math.round(ms.damage), playSeconds: Math.round(ms.playSeconds) };
   }
   saveMatch(winner) {
-    if (this.tut || this.free) return null; // tutorials and free play never count
+    if (this.tut || this.free || this.tv) return null; // tutorials, free play and esports TV never count
     const players = [...[...this.players.values()].map(p => this.statLine(p)), ...(this.departed || [])];
     if (!players.some(p => p.token)) return null; // nobody real played
     return store.recordMatch({
@@ -2199,7 +2232,7 @@ export class Game {
       });
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
       if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); }
-      if (p.alive && p.sock) mine.set(p.id, JSON.stringify({
+      if (p.alive && (p.sock || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur)] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
@@ -2235,5 +2268,6 @@ export class Game {
     });
     this.events = [];
     for (const p of this.players.values()) if (p.sock && p.sock.open) p.sock.send('{"t":"snap","you":"' + p.id + '",' + (mine.has(p.id) ? '"mine":' + mine.get(p.id) + ',' : '') + common.slice(1));
+    if (this.tv) { const f = this.tv.follow, msg = '{"t":"snap","tv":1,"you":' + JSON.stringify(f) + ',' + (f && mine.has(f) ? '"mine":' + mine.get(f) + ',' : '') + common.slice(1); for (const sk of this.tv.socks) if (sk.open) sk.send(msg); }
   }
 }

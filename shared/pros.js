@@ -164,6 +164,7 @@ export function siteIntel(m, si) {
 export function playbook(m, si, side, team) {
   const I = siteIntel(m, si), plans = [], ways = I.main ? [I.main, I.side, I.wall].filter(Boolean) : [];
   if (!I.main) return plans;
+  const two = (a, b) => (doorName(a) === doorName(b) ? ['the main way in', 'the other way in'] : [doorName(a), doorName(b)]); // two ways in that would read the same
   const doorName = w => w ? (w.kind === 'wall' ? 'the breakable wall' : w.kind === 'window' ? 'the window' : w.kind === 'stairs' ? 'the stairs' : 'the door') + roomTag(m, w.out) : '';
   const bombNear = w => I.bombs.slice().sort((a, b) => Math.hypot(a.x - w.inside.x, a.y - w.inside.y) - Math.hypot(b.x - w.inside.x, b.y - w.inside.y))[0];
   if (side === 'atk') {
@@ -184,7 +185,7 @@ export function playbook(m, si, side, team) {
         support: { task: 'Right behind the entry for the trade, plants straight away.', stack: I.main.stack, target: I.main.inside, plant: b },
         flank: { task: 'Comes in a few seconds later from the other side to catch anyone looking at the door.', stack: (I.side || I.main).stack, target: (I.side || I.main).inside, delay: 6 },
       } });
-    if (I.side) plans.push({ id: 'split', name: 'Split', tempo: 'medium', go: 35, idea: `Two pairs: one at ${doorName(I.main)}, one at ${doorName(I.side)}. Both go at the same moment so the defenders face two ways.`,
+    if (I.side) plans.push({ id: 'split', name: 'Split', tempo: 'medium', go: 35, idea: `Two pairs: one at ${two(I.main, I.side)[0]}, one at ${two(I.main, I.side)[1]}. Both go at the same moment so the defenders face two ways.`,
       jobs: {
         intel: { task: 'Drones both sides, then joins the pair on the far side.', drone: I.siteCentre, keepDrone: 25, stack: I.side.stack, target: I.side.inside },
         breach: { task: `Opens ${doorName(I.wall || I.main)} for the main pair.`, breach: I.wall ? I.wall.k : null, stack: (I.wall || I.main).stack, target: (I.wall || I.main).inside },
@@ -200,7 +201,7 @@ export function playbook(m, si, side, team) {
         support: { task: 'Covers the breacher at the hatch, then drops in to plant.', stack: hc, target: hc, plant: b, drop: true },
         flank: { task: 'Pushes with the entry from the door.', stack: I.main.stack, target: I.main.inside, delay: 3 },
       } }); }
-    if (I.side) plans.push({ id: 'fake', name: 'Fake', tempo: 'medium', go: 45, idea: `Two players make a lot of noise at ${doorName(I.side)} (shooting barricades, utility) to pull the roamers, then the team hits ${doorName(I.main)}.`,
+    if (I.side) plans.push({ id: 'fake', name: 'Fake', tempo: 'medium', go: 45, idea: `Two players make a lot of noise at ${two(I.main, I.side)[1]} (shooting barricades, utility) to pull the roamers, then the team hits ${two(I.main, I.side)[0]}.`,
       jobs: {
         intel: { task: 'Watches the fake on a drone and calls when the defenders rotate.', drone: I.siteCentre, keepDrone: 40, stack: I.main.stack, target: I.main.inside },
         breach: { task: `Fakes at ${doorName(I.side)}: breaks barricades and throws utility, then runs round to join the hit.`, fake: I.side.stack, stack: I.main.stack, target: I.main.inside },

@@ -927,6 +927,24 @@ function postPlant(game, p, inp, dt, watch) {
   if (!near(p, ai.pp, 12)) { moveTo(game, p, inp, ai.pp, dt); inp.walk = near(p, ai.pp, 150) ? 1 : 0; return true; }
   watch(pl, true); return true;
 }
+// Spread out (he asked: one grenade, gas cloud or charge can take out a whole stack): around the plan's spot each player
+// takes their own, at least gap px from teammates' spots, still in sight of the plan's spot (same side of the walls).
+// A fast rush packs tighter (speed matters more), a slow setup spreads wider.
+function spreadSpot(game, p, base, gap) {
+  const ai = p.ai, key = Math.round(base.x) + ',' + Math.round(base.y);
+  if (ai.spreadKey === key && ai.spread) return ai.spread;
+  const m = game.map, taken = [...game.players.values()].filter(q => q !== p && q.squad === p.squad && q.alive && q.ai && q.ai.spread).map(q => q.ai.spread);
+  let best = null, bs = Infinity;
+  for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) {
+    const x = base.x + dx * CELL, y = base.y + dy * CELL, k = Math.floor(y / CELL) * m.W + Math.floor(x / CELL);
+    if (k < 0 || k >= m.tiles.length || blocksMove(m.tiles[k]) || m.tiles[k] === T.BARRI || floorAt(m, x, y) !== floorAt(m, base.x, base.y)) continue;
+    if ((dx || dy) && !los(m, base.x, base.y, x, y)) continue;
+    const crowd = taken.reduce((n, t) => n + (Math.hypot(t.x - x, t.y - y) < gap ? 1 : 0), 0);
+    const sc = crowd * 100 + Math.hypot(dx, dy) + Math.random() * 0.5;
+    if (sc < bs) { bs = sc; best = { x, y }; }
+  }
+  ai.spreadKey = key; ai.spread = best || base; return ai.spread;
+}
 // One pro's part of the plan this tick. true: handled (movement set); false: the ordinary bot behaviour carries on.
 function proAct(game, p, inp, dt, team) {
   const side = team === TEAM.ATK ? 'atk' : 'def', st = proPlan(game, p.squad, side), plan = st.plan; if (!plan) return false;
@@ -968,7 +986,7 @@ function proAct(game, p, inp, dt, team) {
     }
     const holdUntil = (j.until || 0) + (TIMING[name] || 0);
     if (el < go || (j.hold && el < holdUntil)) { // set up: quiet at the end, then hold an angle on the way in
-      const spot = j.hold && el < holdUntil ? j.hold : eff(st, j, 'stack');
+      const spot = spreadSpot(game, p, j.hold && el < holdUntil ? j.hold : eff(st, j, 'stack'), st.plan.tempo === 'fast' ? 40 : 64);
       if (!near(p, spot, 14)) { moveTo(game, p, inp, spot, dt); if (near(p, spot, 260)) inp.walk = 1; return true; }
       watch(eff(st, j, 'target'), true); return true;
     }
@@ -991,7 +1009,7 @@ function proAct(game, p, inp, dt, team) {
   }
   const rot = st.rotate && game.time > st.rotate.t + (ROTATE_DELAY[name] ?? 0) && ['support', 'intel', 'roamer'].includes(p.pro.pl.jobs.def) ? st.rotate : null;
   const roaming = action && j.roam && el < (j.until || 0) + (TIMING[name] || 0) && !rot;
-  const spot = roaming ? (ai.roamAt || (ai.roamAt = game.freeSpotNear(j.roam.x, j.roam.y, 50))) : rot ? rot.at : (ai.holdAt || (ai.holdAt = game.freeSpotNear(j.hold.x, j.hold.y, 26)));
+  const spot = roaming ? (ai.roamAt || (ai.roamAt = game.freeSpotNear(j.roam.x, j.roam.y, 50))) : spreadSpot(game, p, rot ? rot.at : j.hold, 56); // defenders don't bunch either
   if (!near(p, spot, 14)) { moveTo(game, p, inp, spot, dt, true); if (roaming && near(p, spot, 200)) inp.walk = 1; return true; }
   watch(rot ? rot.w.pos : j.watch, !roaming); return true;
 }

@@ -714,3 +714,36 @@ html.touch #lanDlg .lanBody { gap: 14px; } html.touch #lanQr { width: 170px; hei
 .pbJob { border-left: 4px solid var(--jc); padding: 6px 10px; margin: 8px 0; background: rgba(255,255,255,0.03); }
 .pbJob b { display: block; font: 700 15px var(--head); letter-spacing: 0.08em; color: var(--jc); } .pbJob span { font-size: 14px; }
 #pbDetail .dim { color: var(--dim); } #pbDetail .small { font-size: 12px; }
+/* ESPORTS TV */
+#tvMaps { display: flex; gap: 10px; flex-wrap: wrap; }
+#tvMaps button { width: 150px; padding: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; }
+#tvMaps canvas, #tvMaps .tvRandom { width: 100%; height: 84px; display: block; background: #0a0c0f; }
+#tvMaps .tvRandom { display: grid; place-items: center; font: 800 46px var(--head); color: #f2c14e; }
+#tvMaps b { font: 700 14px var(--head); letter-spacing: 0.08em; } #tvMaps span { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
+#tvMaps button.on { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+#tvHud { display: none; }
+html.tv #tvHud { display: block; position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+html.tv #hud #bl, html.tv #hud #br, html.tv #coach { display: none; }
+.tvSide { position: absolute; top: 120px; width: 190px; display: flex; flex-direction: column; gap: 5px; pointer-events: auto; }
+#tvL { left: 14px; } #tvR { right: 14px; }
+.tvTeam { font: 800 16px var(--head); letter-spacing: 0.06em; color: var(--tc); text-shadow: 0 2px 6px #000; margin-bottom: 2px; } .tvTeam small { color: #fff; font-size: 13px; }
+.tvCard { position: relative; display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 6px 10px 8px; background: rgba(8,10,14,0.78); border: 1px solid rgba(255,255,255,0.12); overflow: hidden; }
+.tvCard b { font: 700 15px var(--head); letter-spacing: 0.05em; } .tvCard b em { font-style: normal; color: #f2c14e; }
+.tvCard span { font-size: 12px; color: var(--dim); }
+.tvCard i { position: absolute; left: 0; bottom: 0; height: 3px; background: #6fdc7a; }
+.tvCard.dead { opacity: 0.4; } .tvCard.down i { background: #ff5050; }
+.tvCard.on { border-color: #f2c14e; box-shadow: inset 0 0 0 1px #f2c14e; }
+#tvHelp { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); font: 600 13px var(--head); letter-spacing: 0.12em; color: #cfd6dd; background: rgba(0,0,0,0.55); padding: 4px 12px; white-space: nowrap; }
+html.tv #chat { left: 220px; }
+/* ESPORTS TV is sacred (he asked: nothing clunky in the way of the competition): no player HUD clutter, small corner overlays */
+html.tv #objective, html.tv #compass, html.tv #prompt, html.tv #siteFound, html.tv #corner, html.tv #feed, html.tv #stairPip, html.tv #viewlabel, html.tv #freeHint, html.tv #clickIn { display: none !important; }
+html.tv #chat { left: 14px; bottom: 40px; width: 380px; font-size: 13px; }
+html.tv #chatLog div:not(:nth-last-child(-n+3)) { display: none; }
+html.tv #chatLog div { background: rgba(0,0,0,0.42); padding: 2px 7px; }
+html.tv #chatLog .tag { display: none; }
+html.tv #killfeed { right: 200px; }
+html.tv #banner .t { font-size: 44px; } html.tv #banner { top: 12%; }
+html.tv .tvSide { width: 168px; gap: 4px; }
+html.tv .tvCard { background: rgba(8,10,14,0.58); padding: 4px 9px 6px; }
+html.tv #tvHelp { opacity: 0.55; font-size: 12px; }
+.tvTeam { white-space: nowrap; font-size: 15px; } .tvTeam small { display: block; font: 700 12px var(--head); letter-spacing: 0.14em; }

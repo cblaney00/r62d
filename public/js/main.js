@@ -15,6 +15,7 @@ import { openProfile } from './profile.js';
 import { openArmory, closeArmory, armoryHoldsEsc } from './armory.js';
 import { openMapInfo, closeMapInfo } from './mapinfo.js';
 import { openPlaybook, closePlaybook } from './playbook.js';
+import { PRO_TEAMS } from '/shared/pros.js';
 import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './crosshair.js';
 import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
@@ -228,6 +229,7 @@ function connect(mode = '') { // '' = the shared match, 'tut' / 'free' = a priva
     if (m.t === 'welcome') {
       if (st.tutorial) send({ t: 'tut', a: 'start', lesson: st.tutorial });
       if (st.free) send({ t: 'free', a: 'start', map: st.free.map, bots: st.free.bots, level: st.free.level });
+      if (st.tv) send({ t: 'tv', a: 'start', map: st.tv.map });
       st.id = m.id;
       if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
         resetMap(m.mapVersion);
@@ -261,17 +263,32 @@ setInterval(() => send({ t: 'ping', c: performance.now(), rtt: st.rtt == null ? 
 const coach = createCoach({ el: $('coach'), send, getMap: () => st.map, onExit: () => switchMatch(null) });
 $('coach').addEventListener('click', e => { if ((coach.blocking && !e.target.closest('button')) || e.target.closest('[data-skip]')) coach.space(st.last); }); // clicking the card itself (mouse not captured)
 // free = { map, bots } for a free-play match (see the FREE PLAY page below)
-function switchMatch(lesson, free = null) {
+function switchMatch(lesson, free = null, tv = null) {
   if (!st.token) { setTab('play'); $('name').focus(); return; }
-  st.tutorial = lesson; st.free = free; st.rejoin = true; st.marks = [];
+  st.tutorial = lesson; st.free = free; st.tv = tv ? { map: tv.map, auto: true, follow: null, overview: false, cutT: 0, shot: {} } : null; st.rejoin = true; st.marks = [];
+  document.documentElement.classList.toggle('tv', !!tv);
   if (lesson) coach.start(lesson); else coach.stop();
-  const leave = lesson ? 'Leave tutorial' : free ? 'Leave free play' : '';
+  const leave = lesson ? 'Leave tutorial' : free ? 'Leave free play' : tv ? 'Leave Esports TV' : '';
   $('pEnd').textContent = leave || 'End match for everyone'; $('leaveBtn').textContent = leave || 'End match';
-  const old = st.ws; connect(lesson ? 'tut' : free ? 'free' : ''); try { old.close(); } catch {}
+  const old = st.ws; connect(lesson ? 'tut' : free ? 'free' : tv ? 'tv' : ''); try { old.close(); } catch {}
   $('pause').classList.add('hidden');
 }
 for (const b of document.querySelectorAll('[data-lesson]')) b.onclick = () => switchMatch(b.dataset.lesson);
 
+// ---------------- ESPORTS TV page: pick a map (or random), then watch ----------------
+const tvPick = { map: 'random' };
+function renderTv() {
+  const el = $('tvMaps');
+  if (!el.children.length) for (const id of ['random', ...MAP_LIST]) {
+    const b = document.createElement('button'); b.dataset.id = id;
+    if (id === 'random') b.innerHTML = '<div class="tvRandom">?</div><b>RANDOM</b><span>a new map every match</span>';
+    else { b.appendChild(mapThumb(id).cloneNode()); b.querySelector('canvas').getContext('2d').drawImage(mapThumb(id), 0, 0); b.insertAdjacentHTML('beforeend', `<b>${esc(MAPS[id].name)}</b><span>${esc(MAPS[id].floors)}</span>`); }
+    b.onclick = () => { audio.ui(); tvPick.map = id; renderTv(); };
+    el.appendChild(b);
+  }
+  for (const b of el.children) b.classList.toggle('on', b.dataset.id === tvPick.map);
+}
+$('tvGo').onclick = () => switchMatch(null, null, { map: tvPick.map === 'random' ? null : tvPick.map });
 // ---------------- free play page ----------------
 // Pick a map and how many enemy bots, then play alone with no clock, switching operator with N / B.
 const freePick = { map: 'harbor', bots: 0, level: 1 };
@@ -410,7 +427,8 @@ function onSnap(s) {
   const ents = new Map(s.ents.map(e => [e.id, e]));
   st.snaps.push({ t: now, st: s.time, players, ents }); if (st.snaps.length > 12) st.snaps.shift();
   const prevMe = st.me;
-  st.last = s; st.me = players.get(s.you) || null;
+  if (st.tv) { tvDirector(s, players, now); st.id = st.tv.follow; } // ESPORTS TV: ride along with whoever the director (or you) picked
+  st.last = s; st.me = players.get(st.tv ? st.tv.follow : s.you) || null;
   for (const e of s.ev) onEvent(e, s, players);
   reconcile(prevMe);
 }
@@ -486,6 +504,7 @@ function onEvent(e, s, players) {
     case 'banner': if (!e.team || e.team === mySide()) banner(e.text, e.sub); audio.ui('round'); break;
     case 'found': if (e.team === mySide()) siteFound(s); break;
     case 'roundEnd': {
+      if (st.tv) { const T = PRO_TEAMS[e.squad]; banner(T ? `${T.name.toUpperCase()} WIN THE ROUND` : 'ROUND OVER', e.reason, T ? T.colour : '#fff'); break; }
       const won = st.me && e.squad === st.me.sq;
       banner(won ? 'ROUND WON' : 'ROUND LOST', e.reason, won ? 'var(--ally)' : 'var(--enemy)');
       break;
@@ -525,6 +544,7 @@ addEventListener('keydown', e => {
   if (document.activeElement && document.activeElement.tagName === 'INPUT') { if (e.key === 'Enter') $('joinBtn').click(); return; }
   if (e.code === 'Space' && coach.active && !e.repeat && coach.space(st.last)) { e.preventDefault(); return; }
   if ((e.code === 'Enter' || e.code === 'NumpadEnter') && coach.blocking && !e.repeat) { coach.space(st.last); e.preventDefault(); return; } // Enter dismisses a tutorial card too
+  if (st.tv && !menuOpen() && tvKey(e)) { e.preventDefault(); return; }
   const a = actionFor(e.code);
   if (a || e.code === 'AltLeft' || e.code === 'AltRight' || e.code === 'Tab') e.preventDefault();
   if (!a || keys.has(a)) return;
@@ -616,6 +636,7 @@ cv.addEventListener('mousemove', e => {
 });
 cv.addEventListener('mousedown', e => {
   audio.initAudio();
+  if (st.tv) return; // watching: the mouse does nothing to the match
   if (touchActive()) return; // on a phone, firing and aiming come from the touch controls (touch.js), not taps on the map
   if (coach.blocking && e.button === 0) { // a tutorial card to read: the click dismisses it (and takes control), it doesn't shoot
     coach.space(st.last);
@@ -1119,6 +1140,11 @@ function frame(nowMs) {
   if (coach.active) coach.update(s, me);
 
   // --- view source ---
+  if (st.tv && me && me.a) { // ride along: their position and aim, smoothed like everyone else's
+    const pv = me.ct === 'drone' ? interp(me.did, 'ents') : interp(me.id, 'players');
+    if (pv && Number.isFinite(pv.x) && Number.isFinite(pv.y)) { st.pred.x = pv.x; st.pred.y = pv.y; st.pred.vx = pv.vx || 0; st.pred.vy = pv.vy || 0; st.pred.gait = Number.isFinite(pv.gt) ? pv.gt : 0; } // no position for a moment (waiting off the map, just died): keep the last one
+    const pa = interp(me.id, 'players'); if (pa && Number.isFinite(pa.ag)) st.aim = pa.ag;
+  }
   let view = null, ctrl = me && me.a ? me.ct : null;
   if (inGame && me && me.a) {
     if (ctrl === 'drone') view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: 230, near: 0, kind: 'drone' };
@@ -1133,16 +1159,17 @@ function frame(nowMs) {
     }
   }
 
+  if (st.tv && st.tv.overview) view = null; // the whole-map overview
   // --- input & prediction ---
   pollPad(dt, view);
-  setTouchVisible(playing() && !menuOpen() && !!st.me && $('pause').classList.contains('hidden')); // phone controls only while playing
+  setTouchVisible(playing() && !st.tv && !menuOpen() && !!st.me && $('pause').classList.contains('hidden')); // phone controls only while playing
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
   st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
   audio.setListenerRot(st.rot);
-  $('clickIn').classList.toggle('hidden', !(playing() && !menuOpen() && document.pointerLockElement !== cv && !gpRecent() && $('pause').classList.contains('hidden')));
+  $('clickIn').classList.toggle('hidden', !(playing() && !st.tv && !menuOpen() && document.pointerLockElement !== cv && !gpRecent() && $('pause').classList.contains('hidden')));
   // Until you click into the game (or after tabbing out) the mouse isn't captured: your aim simply stays where it was.
   // (It used to follow the loose pointer, and the camera sliding after it made everything bounce — he noticed.)
-  if (view && (view.kind === 'body' || view.kind === 'drone')) {
+  if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone')) {
     const c = cursor(), mw = screenToWorld(c.x, c.y);
     st.aim = Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x);
     if (now < (st.dazeUntil || 0)) st.aim += Math.sin(now * 6.3) * 0.05 + Math.sin(now * 2.1) * 0.04; // dazed: the aim sways
@@ -1156,14 +1183,14 @@ function frame(nowMs) {
     view.ang = st.aim;
   }
   if (!view || view.kind !== 'cam') st.lastCam = null;
-  sendInput(dt, me, ctrl, view, s, now);
+  if (!st.tv) sendInput(dt, me, ctrl, view, s, now);
 
   // --- camera ---
   let cx, cy;
   if (view) {
     cx = view.x; cy = view.y;
     if (view.kind === 'body') {
-      const c = cursor(), mw = screenToWorld(c.x, c.y);
+      const c = cursor(), mw = st.tv ? { x: st.pred.x + Math.cos(st.aim) * 160, y: st.pred.y + Math.sin(st.aim) * 160 } : screenToWorld(c.x, c.y); // TV: lead the way they look
       const vh = st.viewH || 400;
       const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? (String(me.aa).includes('scope') ? 0.46 : 0.32) : 0.2); // a scope looks further ahead
       let ax = l > mx ? lx / l * mx : lx, ay = l > mx ? ly / l * mx : ly;
@@ -1177,6 +1204,10 @@ function frame(nowMs) {
       if (isTouch) { const hw = vh * VW / VH * 0.16, hh = vh * 0.12; lvx = Math.max(-hw, Math.min(hw, lvx)); lvy = Math.max(-hh, Math.min(hh, lvy)); } // phone: you stay near the middle, clear of thumbs and panels
       cx += lvx; cy += lvy;
     }
+  } else if (st.tv && inGame) { // TV overview: the whole floor of the objective
+    const site = st.map.sites[s.site], fi = Math.max(0, floorAt(st.map, site.bombs[0].x, site.bombs[0].y)), F = st.map.floors[fi];
+    st.tvOv = { f: fi, h: Math.max(F.h * CELL, F.w * CELL * VH / VW) * 1.04 };
+    cx = (F.gx + F.w / 2) * CELL; cy = F.h * CELL / 2;
   } else { // menus: slow drift over the map
     cx = st.map.W * CELL / 2 + Math.cos(now * 0.05) * 300; cy = st.map.H * CELL / 2 + Math.sin(now * 0.07) * 160;
   }
@@ -1185,7 +1216,7 @@ function frame(nowMs) {
   st.cam.x += (cx - st.cam.x) * k; st.cam.y += (cy - st.cam.y) * k;
   if (view && view.kind !== 'body') { st.cam.x = cx; st.cam.y = cy; }
   // zoom: close in tight rooms, wider outside or when looking down a long sightline
-  let want = 600; // world px shown top to bottom; he asked twice for a closer view
+  let want = !view && st.tv && st.tvOv ? st.tvOv.h : 600; // world px shown top to bottom; he asked twice for a closer view
   if (view && (view.kind === 'drone' || view.dr)) want = 240;
   else if (view) {
     let sum = 0;
@@ -1221,7 +1252,7 @@ function frame(nowMs) {
   st.viewH = st.envH * st.adsZ;
   // Crosshair mode: the crosshair can go anywhere you can see; if you and it don't fit on screen, the view grows
   // (up to FIT_H) and st.reachW is how far it can go in the way you face at the largest view
-  const freeAim = view && view.kind === 'body' && padOn && aimMode === 'free' && !gpRecent();
+  const freeAim = !st.tv && view && view.kind === 'body' && padOn && aimMode === 'free' && !gpRecent();
   if (freeAim) {
     const q = freeAimPoint(), cA = Math.abs(Math.cos(st.aim)), sA = Math.abs(Math.sin(st.aim));
     const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), mg = 86 * DPR / (st.zoom || 1);
@@ -1239,7 +1270,7 @@ function frame(nowMs) {
   }
   if (view && view.kind === 'cam' && !view.dr) { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
   { // never look past the edge of the floor you are on (other floors sit beside it in the map grid)
-    const fi = view ? Math.max(0, floorAt(st.map, view.x, view.y)) : 0, F = st.map.floors[fi];
+    const fi = view ? Math.max(0, floorAt(st.map, view.x, view.y)) : st.tv && st.tvOv ? st.tvOv.f : 0, F = st.map.floors[fi];
     if (st.camFloor !== fi) { // changed floor: jump straight there
       st.camFloor = fi; if (view) { st.cam.x = cx; st.cam.y = cy; }
     }
@@ -1733,7 +1764,7 @@ function draw(s, view, now, dt) {
     if (s.pl) marker(s.pl.x, s.pl.y, '!', '#ff4040', view);
     if (side === 'atk') for (const e of ents) if (e.ty === 'defuser') marker(e.x, e.y, 'D', '#f2c14e', view);
     drawMarks(view, now);
-    deathMarks(view, now);
+    if (!st.tv) deathMarks(view, now); // TV: the cards and kill feed already say who is down; no big marks over the action
     // an enemy your team can see who is off the edge of your screen: a mark at the edge, so nobody shoots you unseen
     for (const p of drawn) if (p.tm !== side) {
       const { x: sx, y: sy } = w2s(p.x, p.y);
@@ -1858,6 +1889,7 @@ function gunHeat(me, w, now) {
 }
 
 function crosshair(me, now) {
+  if (st.tv) return; // watching: no crosshair of your own on the broadcast
   const w = WEAPONS[me.w];
   const gm = gunMods(me.w, attFromCode(me.aa));
   // recoil kicks the crosshair round your character: pull the mouse against it
@@ -1981,9 +2013,10 @@ function hud(s) {
     const cls = [ally ? 'ally' : 'enemy', p.a ? '' : 'dead', p.dn ? 'down' : '', known ? '' : 'unknown'].join(' ');
     return `<div class="${cls}" title="${esc(p.n)}">${known && p.op ? OPERATORS[p.op].name.slice(0, 3) : '?'}</div>`;
   }).join('');
-  const mine = s.players.filter(p => p.sq === me.sq), theirs = s.players.filter(p => p.sq !== me.sq);
-  setHTML('tiL', icons(mine, true)); setHTML('tiR', icons(theirs, false));
-  $('scL').textContent = s.sc[me.sq]; $('scR').textContent = s.sc[1 - me.sq];
+  const hs = st.tv ? 0 : me.sq, mine = s.players.filter(p => p.sq === hs), theirs = s.players.filter(p => p.sq !== hs);
+  setHTML('tiL', icons(mine, true)); setHTML('tiR', icons(theirs, !!st.tv));
+  $('scL').textContent = s.sc[hs]; $('scR').textContent = s.sc[1 - hs];
+  if (st.tv) tvHud(s);
   const t = s.pl ? s.pl.t : s.tm;
   $('time').textContent = s.fp && !s.pl ? '∞' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
   $('time').classList.toggle('planted', !!s.pl);
@@ -2371,7 +2404,7 @@ $('pOps').onclick = () => showOps(st.me && st.me.op);
 $('pProf').onclick = () => showProfile();
 $('pSet').onclick = () => toggleSettings();
 $('pFs').onclick = () => { toggleFullscreen(); $('pause').classList.add('hidden'); };
-$('pEnd').onclick = () => { if (st.tutorial || st.free) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) { send({ t: 'lobby', a: 'end' }); $('pause').classList.add('hidden'); } };
+$('pEnd').onclick = () => { if (st.tutorial || st.free || st.tv) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) { send({ t: 'lobby', a: 'end' }); $('pause').classList.add('hidden'); } };
 $('lobbyOpsBtn').onclick = () => showOps();
 $('lobbyProfBtn').onclick = () => showProfile();
 $('armoryPage').querySelector('.close').onclick = () => closeArmory($('armoryPage'));
@@ -2439,6 +2472,7 @@ function setTab(tab) {
   for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t.id === 'tab-' + tab);
   if (tab === 'controls') renderControls();
   if (tab === 'free') renderFree();
+  if (tab === 'tv') renderTv();
   updateNav();
 }
 function updateNav() {
@@ -2592,7 +2626,46 @@ function chatKey(e) {
     closeChat();
   }
 }
+// ---------------- ESPORTS TV (he asked: a mode to just watch the pro teams play) ----------------
+// The director cuts to where it matters: a plant or defuse, someone shooting or about to meet an enemy, the defuser
+// carrier, the last one alive; it stays on someone at least ~3 s unless they die. 1-5 / 6-0 (or a player card) follow
+// someone yourself, A goes back to the director, M shows the whole floor of the objective.
+function tvDirector(s, players, now) {
+  const T = st.tv; for (const e of s.ev) if (e.e === 'shot') T.shot[e.id] = now;
+  const cur = players.get(T.follow), curOk = cur && cur.a && !cur.dn;
+  if (!T.auto && curOk) return;
+  if (curOk && now - T.cutT < 3) return;
+  let best = null, bs = -1;
+  const alive = s.players.filter(p => p.a && !p.dn && p.x !== undefined);
+  for (const p of alive) {
+    let sc = 0;
+    if (p.bu) sc += 100; if (now - (T.shot[p.id] || -9) < 1.5) sc += 40; if (p.df) sc += 10;
+    if (alive.filter(q => q.sq === p.sq).length === 1) sc += 25;
+    for (const q of alive) if (q.sq !== p.sq) sc += Math.max(0, 30 - Math.hypot(q.x - p.x, q.y - p.y) / 15) * 0.5;
+    if (p.id === T.follow) sc += 8; sc += Math.random();
+    if (sc > bs) { bs = sc; best = p; }
+  }
+  if (best && best.id !== T.follow) { T.follow = best.id; T.cutT = now; send({ t: 'tv', a: 'follow', id: best.id }); }
+}
+function tvFollow(id) { const T = st.tv; T.auto = !id; T.overview = false; if (id) { T.follow = id; T.cutT = performance.now() / 1000; send({ t: 'tv', a: 'follow', id }); } }
+function tvKey(e) {
+  const s = st.last; if (!s) return false;
+  const d = '1234567890'.indexOf(e.key);
+  if (d >= 0) { const sq = d < 5 ? 0 : 1, list = s.players.filter(p => p.sq === sq), p = list[d % 5]; if (p) { audio.ui(); tvFollow(p.id); } return true; }
+  if (e.code === 'KeyA') { audio.ui(); tvFollow(null); return true; }
+  if (e.code === 'KeyM') { audio.ui(); st.tv.overview = !st.tv.overview; return true; }
+  return false;
+}
+function tvHud(s) {
+  const card = p => { const o = OPERATORS[p.op], hp = p.a ? Math.max(0, p.hp || 0) / (p.mhp || 100) : 0, on = p.id === st.tv.follow;
+    return `<button class="tvCard ${p.a ? '' : 'dead'} ${p.dn ? 'down' : ''} ${on ? 'on' : ''}" data-id="${p.id}"><b>${esc(p.n.replace(/^\[\w+\] /, ''))}${p.df ? ' <em>◆</em>' : ''}</b><span>${o ? esc(o.name) : '—'}</span><i style="width:${Math.round(hp * 100)}%"></i></button>`; };
+  for (const sq of [0, 1]) { const T = PRO_TEAMS[sq], el = $(sq ? 'tvR' : 'tvL');
+    const h = `<div class="tvTeam" style="--tc:${T.colour}">[${T.tag}] ${esc(T.name)}<small>${s.sc[sq]} · ${s.round || s.rd ? (s.players.find(p => p.sq === sq)?.tm === 'atk' ? 'ATTACK' : 'DEFENCE') : ''}</small></div>` + s.players.filter(p => p.sq === sq).map(card).join('');
+    if (el.innerHTML !== h) { el.innerHTML = h; for (const b of el.querySelectorAll('.tvCard')) b.onclick = () => { audio.ui(); tvFollow(b.dataset.id); }; } }
+  setHTML('tvHelp', `${st.tv.overview ? 'MAP OVERVIEW' : st.tv.auto ? 'AUTO DIRECTOR' : 'FOLLOWING'} · 1-5 / 6-0 follow a player · A auto · M map · Esc menu`);
+}
 function addChat(m) {
+  if (st.tv && m.text && m.text.length > 96) m = { ...m, text: m.text.slice(0, 92).replace(/\s+\S*$/, '') + '…' }; // TV: one short line per call
   const me = st.me, mine = me && m.squad === me.sq;
   const d = document.createElement('div');
   d.innerHTML = m.ping ? `<span class="tag ping">PING</span><b class="${mine ? 'a' : 'e'}">${esc(m.name)}:</b> <span class="pingTxt">${esc(m.text)}</span>`
