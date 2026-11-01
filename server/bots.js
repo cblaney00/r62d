@@ -89,6 +89,8 @@ export function botPrep(game, p) {
   const placeAt = (type, x, y, extra = {}) => { game.ents.push({ id: game.eid(), type, x, y, ang: Math.random() * 6.28, team: TEAM.DEF, owner: p.id, hp: 1, ...extra }); };
   const atOpening = i => { const o = siteOpenings[i % siteOpenings.length], k = o.cells[0]; return game.freeSpotNear((k % W + 0.5) * CELL, (Math.floor(k / W) + 0.5) * CELL, 18); };
   if (id === 'alarm' && siteOpenings.length) for (let i = 0; p.abilityCount > 0 && i < 3; i++) { const s = atOpening(i); placeAt('alarm', s.x, s.y, { arm: 0 }); p.abilityCount--; }
+  if (id === 'pace') for (let i = 0; i < 2; i++) { const s = near(80 + i * 60); placeAt('pace', s.x, s.y, { life: 999, hit: {} }); p.abilityCount--; } // RALLY: beacons on the routes round the site
+  if (id === 'beam') for (const o of siteOpenings.slice(-2)) { if (p.abilityCount > 0 && game.barricade(o.id, T.BEAM, true)) p.abilityCount--; } // GIRDER: brace two ways into the site
   if (id === 'station') { const s = near(30); placeAt('station', s.x, s.y, { pool: 100 }); p.abilityCount--; }
   if (id === 'catcher') for (let i = 0; i < 2; i++) { const s = near(50); placeAt('catcher', s.x, s.y, { c: 2 }); p.abilityCount--; }
   if (id === 'radar') { const s = near(120); placeAt('radar', s.x, s.y, { life: 15, t: 0 }); p.abilityCount--; }
@@ -385,7 +387,6 @@ export function botThink(game, p, dt) {
     const mine = game.ents.filter(e => e.type === 'sticky' && e.owner === p.id && e.stuck && !e.go);
     if (mine.length && mine.every(e => Math.hypot(e.x - p.x, e.y - p.y) > 60) && Math.random() < dt * 2) useAbility();
   }
-  if (enemy && abId === 'rally' && p.abilityCount > 0 && p.hp < p.maxHp * 0.5 && !p.downed) useAbility();
   if (enemy) {
     const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
     if (ai.seen !== enemy.id) { // a surprise takes longer to react to than something they were listening for

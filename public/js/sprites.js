@@ -472,7 +472,17 @@ export function drawGadget(ctx, e, t, ally) {
       for (const [cx, cy] of [[-2.2, -1.8], [2.2, -1.8], [-2.2, 1.8], [2.2, 1.8]]) { ctx.fillStyle = '#55595f'; ctx.beginPath(); ctx.arc(cx, cy, 1.4, 0, 7); ctx.fill(); }
       ctx.fillStyle = blink ? '#ff3030' : '#601010'; ctx.fillRect(-0.6, -0.6, 1.2, 1.2);
       break;
+    case 'pace': { // RALLY's pace beacon: a little post with a pulsing ring
+      const k = (t * 1.2) % 1; ctx.strokeStyle = `rgba(120,255,160,${0.6 * (1 - k)})`; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(0, 0, 4 + k * 20, 0, 7); ctx.stroke();
+      ctx.fillStyle = '#2a3a30'; ctx.beginPath(); ctx.arc(0, 0, 3, 0, 7); ctx.fill(); ctx.fillStyle = '#78ffa0'; ctx.beginPath(); ctx.arc(0, 0, 1.4, 0, 7); ctx.fill();
+      break;
+    }
     case 'scope': // Wall Scope: a lens poking out of the wall (TETHER's: a shimmering energy shield for its first 3 s)
+      if (e.fl) { // LENS's periscope through the floor/ceiling: a round lens with an arrow (up or down)
+        ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.arc(0, 0, 3.2, 0, 7); ctx.fill(); ctx.fillStyle = '#55c1e8'; ctx.beginPath(); ctx.arc(0, 0, 1.8, 0, 7); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); const d = e.fl === 'up' ? -1 : 1; ctx.moveTo(-1, 0.6 * d); ctx.lineTo(1, 0.6 * d); ctx.lineTo(0, -1 * d); ctx.fill();
+        break;
+      }
       if (e.sh) { const k = Math.min(1, e.sh), w = 0.5 + 0.5 * Math.sin(t * 12); ctx.strokeStyle = `rgba(120,230,255,${(0.35 + 0.35 * w) * k})`; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(0, 0, 5.5 + w * 0.6, 0, 7); ctx.stroke(); ctx.fillStyle = `rgba(120,230,255,${0.12 * k})`; ctx.fill(); }
       ctx.rotate(e.ag || 0);
       ctx.fillStyle = '#2b2f36'; ctx.fillRect(-4, -1.5, 5, 3);

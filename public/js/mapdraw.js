@@ -173,7 +173,7 @@ export class MapRenderer {
     for (let y = ey0; y <= ey1; y++) for (let x = ex0; x <= ex1; x++) {
       if (x < 0 || y < 0 || x >= m.W || y >= m.H) continue;
       const k = y * m.W + x, t = m.tiles[k];
-      if (m.openId[k] >= 0 || t === T.OPEN || t === T.BARRI || t === T.PANEL) this.opening(x, y, k);
+      if (m.openId[k] >= 0 || t === T.OPEN || t === T.BARRI || t === T.PANEL || t === T.BEAM) this.opening(x, y, k);
       if (SOLID.has(t) || t === T.DSHIELD) this.wall(x, y, k, t);
       if (t === T.RUBBLE) this.stub(x, y, k);
       if (m.hatchAt && (m.hatchAt[k] >= 0 || m.hatchBelow[k] >= 0) && x >= x0 && x <= x1 && y >= y0 && y <= y1) this.hatchCell(x, y, k);
@@ -318,6 +318,14 @@ export class MapRenderer {
         ctx.fillStyle = '#120c06'; ctx.beginPath(); ctx.arc(holes[i], holes[i + 1], 1.2, 0, 7); ctx.fill();
         ctx.fillStyle = 'rgba(255,236,190,0.6)'; ctx.beginPath(); ctx.arc(holes[i], holes[i + 1], 0.45, 0, 7); ctx.fill();
       }
+    }
+    if (t === T.BEAM) { // GIRDER's steel brace: an open lattice of steel beams, see-through
+      ctx.save(); ctx.translate(X + CELL / 2, Y + CELL / 2); if (!horiz) ctx.rotate(Math.PI / 2);
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(-8, -5); ctx.lineTo(8, 5); ctx.moveTo(-8, 5); ctx.lineTo(8, -5); ctx.stroke();
+      ctx.strokeStyle = '#7a828c'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(-8, -5); ctx.lineTo(8, 5); ctx.moveTo(-8, 5); ctx.lineTo(8, -5); ctx.stroke();
+      ctx.fillStyle = '#5a626b'; ctx.fillRect(-8, -5.6, 16, 1.6); ctx.fillRect(-8, 4, 16, 1.6);
+      ctx.fillStyle = '#d9b02a'; ctx.fillRect(-1, -1, 2, 2);
+      ctx.restore();
     }
     if (t === T.PANEL) {
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; if (horiz) ctx.fillRect(X, Y + 5.5, CELL, 7); else ctx.fillRect(X + 5.5, Y, 7, CELL);

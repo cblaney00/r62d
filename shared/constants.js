@@ -29,7 +29,7 @@ export const BARRICADES_EACH = 999; // wooden barricades on doors and windows: u
 export const DUR = {
   select: 15, prep: 40, action: 180, roundEnd: 7, matchEnd: 12,
   plant: 7, defuse: 7, bomb: 45, reinforce: 3, barricade: 2.5, revive: 4, // a barricade takes about as long as in R6 (he asked)
-  bleedout: 20, spot: 5,
+  bleedout: 20, spot: 5, trapArm: 1.5, // every placed trap arms after the same time (he asked: one rule)
 };
 
 // Tile kinds
@@ -42,6 +42,7 @@ export const T = {
   // while shut; defenders reinforce them, explosives / shotguns / melee open them. HOLE = opened: you drop
   // through it (map.portal), and you can look and shoot through it to the other floor.
   HATCH: 13, HATCHR: 14, HOLE: 15,
+  BEAM: 17,   // GIRDER's steel brace in a doorway: blocks walking, not sight or bullets; explosives, hammers and cutters break it
   RUBBLE: 16, // the waist-high stub of a soft wall knocked through by melee or shotguns: you vault over it (or knife it clear)
 };
 
@@ -53,9 +54,9 @@ export const FL = {
 // Wall materials (for drawing)
 export const MAT = { DRYWALL: 0, BRICK: 1, CONCRETE: 2 };
 
-export const CELL_HP = { [T.HATCH]: 60, [T.SOFT]: 60, [T.BARRI]: 60, [T.PANEL]: 400, [T.DSHIELD]: 300 };
+export const CELL_HP = { [T.BEAM]: 200, [T.HATCH]: 60, [T.SOFT]: 60, [T.BARRI]: 60, [T.PANEL]: 400, [T.DSHIELD]: 300 };
 
-const MOVE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.LOW, T.TALL, T.PANEL, T.DSHIELD, T.VOID, T.RUBBLE]);
+const MOVE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.LOW, T.TALL, T.PANEL, T.DSHIELD, T.VOID, T.RUBBLE, T.BEAM]);
 const DRONE_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.TALL, T.PANEL, T.DSHIELD, T.LOW, T.VOID, T.HOLE]); // drones fit through barricade gaps but not under furniture
 const SIGHT_BLOCK = new Set([T.HARD, T.SOFT, T.REINF, T.BARRI, T.TALL, T.PANEL, T.VOID]);
 const BULLET_STOP = new Set([T.HARD, T.REINF, T.TALL, T.PANEL, T.DSHIELD, T.VOID]);

@@ -3,9 +3,10 @@
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { buildMap } from '../shared/map.js';
-import { T, CELL, TEAM, PX_PER_M } from '../shared/constants.js';
+import { T, CELL, TEAM, PX_PER_M, blocksMove, blocksSight, stopsBullet } from '../shared/constants.js';
 import { JOBS, WEAPONS } from '../shared/operators.js';
 import { castSight, los } from '../shared/physics.js';
+import { floorAt } from '../shared/map.js';
 let fails = 0; const fail = (...a) => { fails++; console.log('FAIL', ...a); }, ok = (c, ...a) => { if (!c) fail(...a); };
 for (const t of ['atk', 'def']) for (const j of JOBS[t]) ok(j.ops.length >= 5, t, j.name, 'has only', j.ops.length);
 const g = new Game({ free: true }), a = g.addPlayer('Att', false), d = g.addPlayer('Def', false);
@@ -46,15 +47,16 @@ if (o) {
 // SOLDER: welds a broken soft wall back
 fresh(); g.destroyCell(wk); setup(d, 'solder', wx - 18, wy, 0); for (let i = 0; i < 40; i++) { d.input = { ability: 1 }; g.tickPlayer(d, 1 / 30); g.time += 1 / 30; }
 ok(m.tiles[wk] === T.SOFT, 'welder did not repair the wall');
-// LATCH: an alarm wire reveals whoever crosses it; HOUND: a spotter dart reveals
-const X = 360, Y = 40; fresh(); setup(d, 'latch', X, Y, 0); use(d); run(1.2); setup(a, 'ember', X + 12, Y, 0); run(0.1);
-ok(g.spots.def.has(a.id), 'alarm wire did not reveal the attacker');
+// LATCH: the siren wire deafens whoever crosses it (no reveal: one job each); HOUND: a spotter dart reveals
+const X = 360, Y = 40; fresh(); g.spots.def.clear(); setup(d, 'latch', X, Y, 0); use(d); run(1.6); setup(a, 'ember', X + 12, Y, 0); run(0.1);
+ok(a.deafUntil > g.time + 7, 'siren wire did not deafen the attacker'); ok(!g.spots.def.has(a.id), 'siren wire should not reveal any more');
 g.spots.def.clear(); setup(d, 'hound', X, Y, 0); setup(a, 'ember', X + 120, Y, 0); use(d); ok(g.spots.def.has(a.id), 'spotter dart did not reveal');
 // MARK: tracer rounds reveal who you hit
 g.spots.atk.clear(); setup(a, 'mark', X, Y, 0); setup(d, 'lynx', X + 100, Y + 4, Math.PI); d.hp = 999; use(a); g.hitscan(a, a.x, a.y, 0, 2000, 10, 'Test', 'AR'); ok(g.spots.atk.has(d.id), 'tracer hit did not reveal');
 // TONIC / PATCH heal; RALLY heals itself
 fresh(); setup(d, 'tonic', X, Y, 0); d.hp = 50; d.maxHp = 100; use(d); const st = g.ents.find(e => e.type === 'station'); d.x = st.x; d.y = st.y; run(3); ok(d.hp > 60, 'heal station did not heal', d.hp);
-fresh(); setup(d, 'rally', X, Y, 0); d.hp = 30; d.maxHp = 100; use(d); ok(d.hp === 70 && d.boostUntil > g.time, 'second wind');
+fresh(); setup(d, 'rally', X, Y, 0); d.boostUntil = 0; use(d); const pb = g.ents.find(e => e.type === 'pace'); ok(pb, 'RALLY placed no pace beacon');
+if (pb) { d.x = pb.x; d.y = pb.y; run(0.1); ok(d.boostUntil > g.time + 4, 'running past the pace beacon gave no speed'); d.boostUntil = 0; run(0.1); ok(!(d.boostUntil > g.time), 'the beacon should only boost the same person once every 10 s'); }
 // WARD: zaps a thrown attacker grenade
 fresh(); setup(d, 'ward', X, Y, 0); use(d); const ct = g.ents.find(e => e.type === 'catcher'); setup(a, 'ember', ct.x - 150, ct.y, 0);
 g.ents.push({ id: g.eid(), type: 'nade', kind: 'frag', x: ct.x - 40, y: ct.y, vx: 0, vy: 0, fuse: 5, team: TEAM.ATK, owner: a.id }); run(0.1);
@@ -71,7 +73,13 @@ ok(d.stunUntil > g.time, 'flare did not blind a defender facing it'); ok(!(d2.st
 // GIRDER: two extra reinforcements, reinforcing twice as fast
 const g2 = new Game(); for (let i = 0; i < 10; i++) g2.addBot(); g2.startMatch(); const df = [...g2.players.values()].filter(p => g2.side(p) === TEAM.DEF);
 df.forEach((p, i) => { p.op = i ? 'lynx' : 'girder'; p.locked = true; }); [...g2.players.values()].filter(p => g2.side(p) === TEAM.ATK).forEach(p => { p.op = 'ember'; p.locked = true; });
-const r0 = g2.reinforce; for (const p of g2.players.values()) p.bot = false; g2.beginPrep(); ok(g2.reinforce >= r0 + 2, 'girder: no extra reinforcements', r0, g2.reinforce);
+// GIRDER: the steel brace blocks walking through a doorway, not seeing or shooting
+{ let o = null; for (const op of m.openings) { const k = op.cells[0]; if (m.tiles[k] === T.OPEN && op.cells.every(c => m.tiles[c] === T.OPEN) && m.tiles[k - 1] === T.FLOOR && m.tiles[k - 2] === T.FLOOR && m.tiles[k + 1] === T.FLOOR && m.tiles[k + 2] === T.FLOOR) { o = op; break; } }
+  ok(o, 'no doorway to test the brace on');
+  if (o) { const k = o.cells[0], ox = (k % W + 0.5) * CELL, oy = (Math.floor(k / W) + 0.5) * CELL; fresh(); setup(d, 'girder', ox - 22, oy, 0); use(d);
+    ok(o.cells.every(c => m.tiles[c] === T.BEAM), 'GIRDER did not brace the doorway'); ok(blocksMove(T.BEAM) && !blocksSight(T.BEAM) && !stopsBullet(T.BEAM), 'the brace should block walking only');
+    ok(los(m, ox - 22, oy, ox + 22, oy, null), 'cannot see through the brace');
+    for (const c of o.cells) { m.tiles[c] = T.OPEN; m.changed?.add?.(c); } } }
 // VAPOR: a cone of smoke in front that fills the room's shape (no puff on the other side of a wall)
 fresh(); setup(a, 'vapor', X, Y, 0); use(a); const vc = g.ents.find(e => e.type === 'smoke' && e.kind === 'cone');
 ok(vc && vc.puffs.length / 2 >= 15, 'VAPOR cone too small', vc && vc.puffs.length / 2);
@@ -95,5 +103,16 @@ use(a); run(1.5); ok(!g.ents.some(e => e.id === 'mA'), 'EMP did not reach throug
 // throwing (he asked: consistent): a smoke lands where you aim and only pops once it has landed
 fresh(); setup(a, 'ember', X, Y, 0); a.aimX = X + 150; a.aimY = Y; const sm = g.throwNade(a, 'smoke'); run(0.3); ok(g.ents.includes(sm), 'smoke popped in the air'); run(1.5);
 const sp = g.ents.find(e => e.type === 'smoke'); ok(sp && Math.abs(sp.x - (X + 150)) < 25, 'smoke did not land where aimed', sp && sp.x);
+// LYNX: the paint trap marks the attacker for 12 s, no damage
+fresh(); g.spots.def.clear(); a.x = a.y = -9000; setup(d, 'lynx', X, Y, 0); use(d); run(1.6); const mn = g.ents.find(e => e.type === 'mine'); setup(a, 'ember', mn.x + 5, mn.y, 0); const hp0 = a.hp; run(0.1);
+ok(g.spots.def.has(a.id) && a.hp === hp0 && !g.ents.includes(mn), 'paint trap should mark without hurting', a.hp, hp0);
+// KITE: a bullet into the turret's lens from the front knocks it out; from behind nothing happens
+fresh(); setup(d, 'kite', X, Y, 0); use(d); const tu = g.ents.find(e => e.type === 'cam' && e.tu); tu.ang = 0; tu.offUntil = 0;
+setup(a, 'ember', tu.x - 80, tu.y, 0); g.hitscan(a, a.x, a.y, 0, 300, 30, 'Test', 'AR'); ok(!(tu.offUntil > g.time), 'a shot at the back of the turret should do nothing');
+setup(a, 'ember', tu.x + 80, tu.y, Math.PI); g.hitscan(a, a.x, a.y, Math.PI, 300, 30, 'Test', 'AR'); ok(tu.offUntil > g.time + 7 && g.ents.includes(tu), 'a shot into the lens did not knock the turret out for 8 s');
+// LENS: the periscope comes out on the floor above (or below) at the same spot, and joins the defence feeds
+{ let spot = null; for (let k = 0; k < m.tiles.length && !spot; k += 7) { const x = (k % W + 0.5) * CELL, y = (Math.floor(k / W) + 0.5) * CELL; if (m.tiles[k] !== T.FLOOR) continue; spot = g.periscopeSpot({ x, y }) ? { x, y } : null; }
+  ok(spot, 'nowhere on Harbor to push a periscope up or down');
+  if (spot) { fresh(); setup(d, 'lens', spot.x, spot.y, 0); use(d); const ps = g.ents.find(e => e.type === 'scope' && e.fl); ok(ps && floorAt(m, ps.x, ps.y) !== floorAt(m, spot.x, spot.y) && g.feeds(TEAM.DEF).includes(ps), 'LENS periscope not on another floor / not in the feeds'); } }
 console.log(fails ? `${fails} failure(s)` : 'PASS newops');
 process.exit(fails ? 1 : 0);

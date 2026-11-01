@@ -1,9 +1,9 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, MAT, stopsBullet, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
-import { buildMap, roomAt, wallMount, MAPS, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
+import { localPos, buildMap, roomAt, wallMount, MAPS, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
-import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, SELF_UP, SELF_UP_TIME } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
@@ -261,7 +261,6 @@ export class Game {
       }
     }
     if (atkers.length) atkers[Math.floor(Math.random() * atkers.length)].hasDefuser = true;
-    for (const p of this.players.values()) if (p.op && OPERATORS[p.op].ability.id === 'crew' && this.side(p) === TEAM.DEF) this.reinforce += 2; // GIRDER's crew brings two more
     for (const p of this.players.values()) if (p.bot) botPrep(this, p);
     this.phase = PHASE.PREP; this.timer = DUR.prep;
     this.events.push({ e: 'banner', text: 'PREPARATION PHASE', sub: '' });
@@ -483,6 +482,9 @@ export class Game {
     }
     if (p.downed) {
       p.hp -= dt; p.busy = null;
+      if (SELF_UP.has(p.op) && (p.selfUp = (p.selfUp || 0) + dt) >= SELF_UP_TIME) { // SOLACE / TONIC / RALLY: slowly back on their feet
+        p.downed = false; p.hp = 20; p.selfUp = 0; this.events.push({ e: 'snd', s: 'revive', x: r1(p.x), y: r1(p.y) }); return;
+      }
       if (p.hp <= 0) this.kill(p, this.players.get(p.downedBy), 'Bled out');
       return;
     }
@@ -512,11 +514,16 @@ export class Game {
       p.bracing = p.shieldMode === 'shield' && !(p.switchUntil > this.time);
     }
     if (op.ability.id === 'scan') {
-      if (inp.ability && p.battery > 0 && p.ctrl === 'body') {
-        p.scanning = true; p.battery = Math.max(0, p.battery - dt);
+      if (!inp.ability) p.scanLock = false; // let go: the next scan can start
+      if (inp.ability && p.battery > 0 && p.ctrl === 'body' && !p.scanLock) {
+        p.scanning = true; p.battery = Math.max(0, p.battery - dt); p.scanRun = (p.scanRun || 0) + dt;
+        if (p.scanRun >= 4) p.scanLock = true; // he asked: 4 s at most per scan
         for (const q of this.players.values())
-          if (q.alive && this.side(q) === TEAM.ATK && !this.ghost(q) && Math.hypot(q.x - p.x, q.y - p.y) < 300) this.spot(TEAM.DEF, q.id, 0.4);
-      } else { p.scanning = false; p.battery = Math.min(op.ability.battery, p.battery + dt * 0.35); }
+          if (q.alive && this.side(q) === TEAM.ATK && !this.ghost(q) && Math.hypot(q.x - p.x, q.y - p.y) < 300) {
+            this.spot(TEAM.DEF, q.id, 0.4);
+            if (!(q.scanWarnT > this.time)) { q.scanWarnT = this.time + 2; this.events.push({ e: 'scanned', id: q.id }); } // ...and they hear it
+          }
+      } else { p.scanning = false; p.scanRun = 0; p.battery = Math.min(op.ability.battery, p.battery + dt * 0.35); }
     }
 
     if (op.ability.id === 'lance') { // Thermal Lance: burn the wall cell you face, one at a time
@@ -560,10 +567,12 @@ export class Game {
       if (!p.welding) p.weldT = 0;
     }
     if (op.ability.id === 'shroud') { // Silent Shroud: press to go dark, press again to come back (he asked: a toggle)
-      if (inp.ability && !(prev && prev.ability) && p.ctrl === 'body' && !p.downed) p.shrouded = !p.shrouded && p.battery > 0.5;
+      const was = p.shrouded;
+      if (inp.ability && !(prev && prev.ability) && p.ctrl === 'body' && !p.downed) p.shrouded = !p.shrouded && p.battery > 0.5 && !(p.shroudCd > this.time);
       if (p.shrouded && (p.battery <= 0 || p.downed || p.ctrl !== 'body')) p.shrouded = false;
+      if (was && !p.shrouded) p.shroudCd = this.time + 15; // he asked: 15 s before it is ready again
       if (p.shrouded) p.battery = Math.max(0, p.battery - dt);
-      else p.battery = Math.min(op.ability.battery, p.battery + dt * 0.25);
+      else p.battery = Math.min(op.ability.battery, p.battery + dt * op.ability.battery / 15);
     }
 
     // interaction (hold E)
@@ -694,7 +703,8 @@ export class Game {
       }
     }
     for (const e of this.ents) {
-      if (!e.hp || e.team === team || e.tu) continue; // turret cameras are bulletproof (a shielded scope is hit, but shrugs it off in hitEnt)
+      if (!e.hp || e.team === team) continue;
+      if (e.tu && Math.abs(angDiff(Math.atan2(y0 - e.y, x0 - e.x), e.ang || 0)) > 0.9) continue; // a turret is bulletproof except its lens, from the front (KITE)
       const at = e.type === 'drone' && src.viewTime !== null && src.viewTime !== undefined ? this.posAt(e, src.viewTime) : e;
       const t = rayCircle(x0, y0, dx, dy, at.x, at.y, e.type === 'decoy' ? hitR(e.op) : e.type === 'drone' ? 4.5 : 6); // drones are small
       if (t !== null && t < bestT) { bestT = t; best = { e }; }
@@ -746,7 +756,8 @@ export class Game {
       if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
       else if (head && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
       else this.damage(q, dmg * mult * fall, src, wname, ang);
-    } else if (best && best.e) this.hitEnt(best.e, src);
+    } else if (best && best.e && best.e.tu) { best.e.offUntil = Math.max(best.e.offUntil || 0, this.time + 8); this.events.push({ e: 'hit', k: 'spark', x: r1(ex), y: r1(ey) }); }
+    else if (best && best.e) this.hitEnt(best.e, src);
     else if (kind === 'hard' || kind === 'prop') this.events.push({ e: 'hit', k: kind, x: r1(ex), y: r1(ey) });
     return { x: ex, y: ey, k: kind };
   }
@@ -853,7 +864,7 @@ export class Game {
       if (!this.headshot && q.hp > -35 && up > 1 && this.phase === PHASE.ACTION) {
         if (src && src.ms && src !== q) src.ms.downs++;
         if (src && src !== q && this.side(src) !== this.side(q)) this.pts(src, 50, 'ENEMY DOWNED');
-        q.downed = true; q.hp = DUR.bleedout; q.downedBy = src ? src.id : null; q.busy = null; q.ctrl = 'body';
+        q.downed = true; q.selfUp = 0; q.hp = DUR.bleedout; q.downedBy = src ? src.id : null; q.busy = null; q.ctrl = 'body';
         q.scanning = false; q.bracing = false; q.reloadT = 0; this.ropeFall(q);
         this.events.push({ e: 'down', id: q.id, by: src ? src.id : null });
         if (q.hasDefuser) this.dropDefuser(q);
@@ -916,10 +927,10 @@ export class Game {
         return { k: 'revive', t: 0, dur: DUR.revive, target: q.id };
     if (team === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION)) {
       const f = this.facingCell(p, 28); // the same reach as the on-screen prompt
-      if (f && f.t === T.SOFT && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (OPERATORS[p.op].ability.id === 'crew' ? 0.5 : 1), cell: f.k };
+      if (f && f.t === T.SOFT && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (p.op === 'girder' ? 0.5 : 1), cell: f.k };
       if (f && f.t === T.OPEN && this.map.openId[f.k] >= 0 && p.barri > 0 && this.canBarricade(this.map.openId[f.k])) return { k: 'barricade', t: 0, dur: DUR.barricade, cell: f.k };
       const h = hatchNear(this.map, p.x, p.y, p.aim, 14);
-      if (h && this.map.tiles[h.cells[0]] === T.HATCH && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (OPERATORS[p.op].ability.id === 'crew' ? 0.5 : 1), hatch: h.id };
+      if (h && this.map.tiles[h.cells[0]] === T.HATCH && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (p.op === 'girder' ? 0.5 : 1), hatch: h.id };
     }
     return null;
   }
@@ -1255,7 +1266,7 @@ export class Game {
       this.ents.push({ id: this.eid(), type: 'jammer', x: p.x + Math.cos(p.aim) * 8, y: p.y + Math.sin(p.aim) * 8, team, owner: p.id, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y) });
     } else if (id === 'mine') {
-      this.ents.push({ id: this.eid(), type: 'mine', x: p.x + Math.cos(p.aim) * 10, y: p.y + Math.sin(p.aim) * 10, ang: p.aim, team, owner: p.id, arm: 1.5, hp: 1 });
+      this.ents.push({ id: this.eid(), type: 'mine', x: p.x + Math.cos(p.aim) * 10, y: p.y + Math.sin(p.aim) * 10, ang: p.aim, team, owner: p.id, arm: DUR.trapArm, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y) });
     } else if (id === 'barrage') { // HAZE: a thin wall of smoke across your aim (he asked: much thinner than VAPOR's cloud)
       const want = Math.hypot((p.aimX ?? p.x + ca * 150) - p.x, (p.aimY ?? p.y + sa * 150) - p.y);
@@ -1306,11 +1317,11 @@ export class Game {
       const f = this.facingCell(p, 30), hs = this.hatchSpot(p, [T.HATCH]);
       if (hs && !(f && (f.t === T.SOFT || f.t === T.BARRI) && Math.hypot((f.cx + 0.5) * CELL - p.x, (f.cy + 0.5) * CELL - p.y) < Math.hypot(hs.x - p.x, hs.y - p.y))) {
         this.breakHatch(hs.hatch);
-      } else if (f && (f.t === T.SOFT || f.t === T.BARRI || f.t === T.RUBBLE)) {
+      } else if (f && (f.t === T.SOFT || f.t === T.BARRI || f.t === T.RUBBLE || f.t === T.BEAM)) {
         const across = Math.abs(ca) > Math.abs(sa) ? [0, 1] : [1, 0];
         for (const d of [0, 1, -1]) {
           const k = (f.cy + across[1] * d) * this.map.W + f.cx + across[0] * d, t = this.map.tiles[k];
-          if (t === T.SOFT || t === T.BARRI || t === T.RUBBLE) this.destroyCell(k);
+          if (t === T.SOFT || t === T.BARRI || t === T.RUBBLE || t === T.BEAM) this.destroyCell(k);
         }
         this.events.push({ e: 'hit', k: f.t === T.BARRI ? 'wood' : 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) });
         this.events.push({ e: 'snd', s: 'break', x: r1(p.x), y: r1(p.y) });
@@ -1321,9 +1332,9 @@ export class Game {
         this.damage(q, 75, p, 'Breaching Hammer', p.aim);
       }
       p.meleeCd = 0.9; used(); this.events.push({ e: 'melee', id: p.id });
-    } else if (id === 'prox') place('prox', 10, { arm: 1.5 });
-    else if (id === 'concuss') place('concuss', 10, { arm: 1.5 });
-    else if (id === 'clamp') place('clamp', 14, { arm: 1.5 });
+    } else if (id === 'prox') place('prox', 10, { arm: DUR.trapArm });
+    else if (id === 'concuss') place('concuss', 10, { arm: DUR.trapArm });
+    else if (id === 'clamp') place('clamp', 14, { arm: DUR.trapArm });
     else if (id === 'sensor') place('sensor', 8, { t: 0, pingT: 0 });
     else if (id === 'plates') place('plates', 14, { c: 5 });
     else if (id === 'turret') place('cam', 14, { tu: 1, offUntil: 0 });
@@ -1378,7 +1389,13 @@ export class Game {
       }
       this.ents.push({ id: this.eid(), type: 'smoke', x: p.x, y: p.y, ang: p.aim, r: 14, life: 8, team, kind: 'cone', puffs });
       used(); this.events.push({ e: 'snd', s: 'smoke', x: r1(p.x), y: r1(p.y) });
-    } else if (id === 'alarm') place('alarm', 12, { arm: 1 });
+    } else if (id === 'alarm') place('alarm', 12, { arm: DUR.trapArm });
+    else if (id === 'pace') place('pace', 10, { life: 999, hit: {} }); // RALLY: stays for the round (one bullet breaks it)
+    else if (id === 'beam') { // GIRDER: a steel brace across an open doorway
+      const f = this.facingCell(p, 28);
+      if (!f || f.t !== T.OPEN || this.map.openId[f.k] < 0) return;
+      if (this.barricade(this.map.openId[f.k], T.BEAM, true)) { used(); this.events.push({ e: 'snd', s: 'panel', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) }); }
+    }
     else if (id === 'tag') { // HOUND: the first attacker along the dart is revealed for 10 s
       let bt = castSight(this.map, p.x, p.y, p.aim, 420, null), hitQ = null;
       for (const q of this.players.values()) {
@@ -1389,14 +1406,25 @@ export class Game {
       if (hitQ) this.spot(team, hitQ.id, 10);
       used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x + ca * bt), y2: r1(p.y + sa * bt), tag: 1 });
     } else if (id === 'rally') { p.hp = Math.min(p.maxHp, p.hp + 40); p.boostUntil = this.time + 4; used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x), y2: r1(p.y) }); }
-    else if (id === 'periscope') { // LENS: a defender's scope through a soft wall, seen in the camera feeds
-      const w = this.wallInFront(p, [T.SOFT]); if (!w) return;
-      const t = through(w);
-      this.ents.push({ id: this.eid(), type: 'scope', x: t.x, y: t.y, ang: Math.atan2(t.dy, t.dx), cell: w.k, team, owner: p.id, hp: 1 });
-      used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
+    else if (id === 'periscope') { // LENS (he asked: no copy of TETHER's scope): up through the ceiling or down through the floor
+      const spot = this.periscopeSpot(p); if (!spot) return;
+      this.ents.push({ id: this.eid(), type: 'scope', x: spot.x, y: spot.y, ang: p.aim, fl: spot.dir, team, owner: p.id, hp: 1 });
+      p.periDir = spot.dir === 'up' ? 'down' : 'up'; used(); this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y) });
     } else if (id === 'radar') place('radar', 8, { life: 15, t: 0 });
     else if (id === 'station') place('station', 14, { pool: 100 });
     else if (id === 'catcher') place('catcher', 10, { c: 2 });
+  }
+
+  // where LENS's periscope comes out: the same spot one floor up (first) or down, if there is floor there
+  periscopeSpot(p) {
+    const m = this.map, lp = localPos(m, p.x, p.y);
+    for (const dir of p.periDir === 'down' ? ['down', 'up'] : ['up', 'down']) {
+      const F = m.floors[lp.f + (dir === 'up' ? 1 : -1)]; if (!F) continue;
+      const x = lp.x - (F.x0 - F.gx) * CELL, y = lp.y - F.y0 * CELL, k = Math.floor(y / CELL) * m.W + Math.floor(x / CELL);
+      if (floorAt(m, x, y) !== m.floors.indexOf(F) || blocksMove(m.tiles[k])) continue;
+      return { x, y, dir };
+    }
+    return null;
   }
 
   // CROW's Lunge (he asked for a rework): a silent 2 m lunge along the aim that downs whoever it reaches, from any side
@@ -1718,7 +1746,15 @@ export class Game {
           if (e.arm > 0) { e.arm -= dt; break; }
           for (const q of this.players.values()) {
             if (!q.alive || this.side(q) === e.team || this.ghost(q) || Math.hypot(q.x - e.x, q.y - e.y) > 15) continue;
-            this.spot(e.team, q.id, 6); this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); this.removeEnt(e); break;
+            q.deafUntil = this.time + 8; this.removeEnt(e); // LATCH's siren: 8 s without hearing footsteps
+            this.events.push({ e: 'snd', s: 'siren', x: r1(e.x), y: r1(e.y) }); this.noise(e.x, e.y, e.team, 900); break;
+          }
+          break;
+        }
+        case 'pace': { // RALLY's pace beacon: teammates running past get 5 s of speed (each once every 10 s)
+          e.life -= dt; if (e.life <= 0) { this.removeEnt(e); break; }
+          for (const q of this.players.values()) if (q.alive && !q.downed && this.side(q) === e.team && Math.hypot(q.x - e.x, q.y - e.y) < 26 && !(e.hit[q.id] > this.time)) {
+            e.hit[q.id] = this.time + 10; q.boostUntil = Math.max(q.boostUntil || 0, this.time + 5); this.events.push({ e: 'stim', x: r1(e.x), y: r1(e.y), x2: r1(q.x), y2: r1(q.y) });
           }
           break;
         }
@@ -1844,7 +1880,13 @@ export class Game {
             const d = Math.hypot(q.x - e.x, q.y - e.y);
             if (this.ghost(q)) continue;
             const inCone = e.type === 'mine' ? d < 22 : d < 44 && Math.abs(angDiff(Math.atan2(q.y - e.y, q.x - e.x), e.ang)) < 0.7;
-            if (inCone && los(this.map, e.x, e.y, q.x, q.y)) { this.detonate(e); break; }
+            if (inCone && los(this.map, e.x, e.y, q.x, q.y)) {
+              if (e.type === 'mine') { // LYNX's paint trap (he asked: one job each): no bang, the attacker glows for the defenders for 12 s
+                this.spot(e.team, q.id, 12); q.paintUntil = this.time + 12; this.removeEnt(e);
+                this.events.push({ e: 'paint', id: q.id, x: r1(q.x), y: r1(q.y) }); this.events.push({ e: 'snd', s: 'clamp', x: r1(e.x), y: r1(e.y) });
+              } else this.detonate(e);
+              break;
+            }
           }
           break;
         }
@@ -1920,7 +1962,7 @@ export class Game {
   detonate(e) {
     this.removeEnt(e);
     const kind = e.type === 'nade' ? e.kind : e.type;
-    const SOFTISH = [T.SOFT, T.BARRI, T.HATCH, T.RUBBLE];
+    const SOFTISH = [T.SOFT, T.BARRI, T.HATCH, T.RUBBLE, T.BEAM];
     switch (kind) {
       case 'frag': this.explode(e, { r: 75, dmg: 130, cellR: 14, cells: SOFTISH, kind: 'frag' }); break;
       case 'impact': this.explode(e, { r: 34, dmg: 40, cellR: 22, cells: SOFTISH, kind: 'impact' }); break;
@@ -1935,7 +1977,7 @@ export class Game {
         }
         break;
       }
-      case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD, T.HATCH, T.HATCHR, T.RUBBLE], kind: 'cutter', at: e.cell }); break;
+      case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD, T.HATCH, T.HATCHR, T.RUBBLE, T.BEAM], kind: 'cutter', at: e.cell }); break;
       case 'sonar': {
         let any = false;
         for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 230) { this.spot(e.team, q.id, 2.5); any = true; }
@@ -2159,7 +2201,7 @@ export class Game {
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur)] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
-        m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined,
+        m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined, df: p.deafUntil > this.time ? 1 : undefined, su: p.downed && SELF_UP.has(p.op) ? r2(p.selfUp / SELF_UP_TIME) : undefined, scd: p.shroudCd > this.time ? r1(p.shroudCd - this.time) : undefined,
       }));
       return o;
     });
@@ -2174,6 +2216,7 @@ export class Game {
       if (e.type === 'gascloud') { o.r = e.r; o.l = r1(e.life); }
       if (e.type === 'cluster') o.t = r1(e.t);
       if (e.type === 'smoke') { o.r = e.r; o.l = r1(e.life); if (e.puffs) { o.pf = e.puffs; o.sk = e.kind; } }
+      if (e.type === 'scope' && e.fl) o.fl = e.fl;
       if (e.type === 'scope' && e.shieldUntil > this.time) o.sh = r1(e.shieldUntil - this.time);
       if (e.type === 'sticky' && e.stuck) o.st = 1;
       if (e.type === 'cutter' || e.type === 'breach') { o.t = r1(e.t); o.j = this.jammedAt(e.x, e.y) ? 1 : 0; }

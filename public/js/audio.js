@@ -468,6 +468,7 @@ export function play(name, x, y) {
   switch (name) {
     case 'reload': return; // handled by the reload phases in foley
     case 'beep': return foley('beep', x, y);
+    case 'siren': { const g = out(x, y, 0.5, 900, 0.2); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 6; i++) tone(g, t + i * 0.32, 0.3, i % 2 ? 1250 : 820, i % 2 ? 820 : 1250, 'square', 0.12, 0.01); return; } // LATCH's siren wire
     case 'ghost': return foley('cloth', x, y);
     case 'vault': { foley('cloth', x, y); const g = out(x, y, 0.35, 380, 0.12); if (!g) return; const t = ac.currentTime; noise(g, t + 0.05, 0.14, 'lowpass', 600, 0.9, 0.6); noise(g, t + 0.45, 0.12, 'lowpass', 500, 1, 0.5); return; } // a hand on the ledge, then the landing
     case 'clamp': impact('metal', x, y); return foley('hurt', x, y);

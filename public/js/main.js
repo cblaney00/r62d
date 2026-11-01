@@ -507,6 +507,8 @@ function onEvent(e, s, players) {
       st.marks.push({ ...e, t: now }); fx.ping(e.x, e.y, e.w.startsWith('ENEMY') ? '255,70,70' : '255,210,74');
       if (e.from !== st.id) audio.foley('spot');
     } break;
+    case 'scanned': if (e.id === st.id) { addFeed('A scanner just picked you up — they can see you through walls'); audio.foley('beep', st.pred.x, st.pred.y); } break; // WRAITH
+    case 'paint': if (e.id === st.id) addFeed('You walked into a paint trap — the defenders can see you for 12 s'); fx.ping(e.x, e.y, '120,255,90'); break; // LYNX
     case 'ping': if (e.team === mySide()) { fx.ping(e.x, e.y, e.any ? '255,90,60' : '79,179,169'); audio.foley('beep', e.x, e.y); } break;
     case 'stim': fx.tracer(e.x, e.y, e.x2, e.y2, '120,255,160'); fx.ping(e.x2, e.y2, '120,255,160'); audio.foley('revive', e.x, e.y); break;
     case 'melee': anim(e.id).melee = 1; { const p = players.get(e.id); if (p && p.x !== undefined) audio.foley('melee', p.x, p.y, e.id === st.id); } break;
@@ -1467,7 +1469,7 @@ function playerFoley(p, a, moved, own, dt) {
   const pace = p.dn ? 1 : p.wk ? 0 : p.cr ? 1 : p.mv >= 3 ? 3 : 2;
   // legs follow the real step cycle; a foot plants each time the gait passes a multiple of PI
   const gt = p.gt || 0, plant = Math.floor(gt / Math.PI);
-  if (a.plant !== undefined && plant > a.plant && moved > 0.05 && (own || !p.si)) audio.step(p.x, p.y, surfaceAt(p.x, p.y), pace, own);
+  if (a.plant !== undefined && plant > a.plant && moved > 0.05 && (own || !p.si) && (own || !(st.me && st.me.df))) audio.step(p.x, p.y, surfaceAt(p.x, p.y), pace, own);
   if (a.plant === undefined || plant < a.plant - 1 || plant > a.plant) a.plant = plant;
   // turning on the spot: feet shuffle round, each shuffle a little step
   const dAng = Math.abs(angDiff(p.ag, a.lag ?? p.ag)); a.lag = p.ag;
@@ -1595,9 +1597,8 @@ function draw(s, view, now, dt) {
   for (const e of ents) {
     const ally = e.tm === side;
     if (e.ty === 'drone' || e.ty === 'cam' || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud') continue;
-    if ((e.ty === 'clamp' || e.ty === 'prox' || e.ty === 'concuss' || e.ty === 'alarm') && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < (e.ty === 'alarm' ? 40 : 110))) continue; // hidden traps
+    if (TRAPS.has(e.ty) && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < TRAP_SEEN)) continue; // hidden traps: one rule for all (he asked), seen only within 2 m
     if (!ally && !seen(e.x, e.y)) continue;
-    if (e.ty === 'mine' && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < 140)) continue;
     drawGadget(ctx, e, now, ally);
   }
   for (const e of ents) if (e.ty === 'cam' && (e.tm === side || seen(e.x, e.y))) drawCam(ctx, e, now, e.tm === side);
@@ -2046,7 +2047,7 @@ function hud(s) {
   const salvoWait = ab.id === 'sticky' ? s.ents.filter(e => e.ty === 'sticky' && e.ow === me.id && e.st).length : 0; // SALVO: rounds waiting for her
   st.tBadge = { skill: me.gi || salvoWait || me.lu ? '!' : String(abCount), gadget: me.ni ? '!' : String(me.gc ?? ''), view: side === 'atk' && s.ph === PHASE.ACTION ? String(me.dr ?? '') : '' };
   setHTML('gadgets',
-    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
+    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : me.scd ? `${ab.name} ready in ${Math.ceil(me.scd)}s` : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
     `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>${label('gadget')}</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +
     `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label
@@ -2071,6 +2072,7 @@ function hud(s) {
   } else {
     $('progress').style.display = 'none';
     const pt = me.ct === 'body' && !me.dn ? promptText(s, me) : '';
+    if (me.dn && me.su !== undefined) { setHTML('prompt', `GETTING BACK UP… ${Math.round(me.su * 100)}%`); } else // the health operators get up by themselves
     $('prompt').innerHTML = isTouch ? pt.replace(/<b>([A-Z ]+)<\/b>\1(?![A-Z])/g, '<b>$1</b>') : pt; // phone: no "VAULT VAULT"
   }
   if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone', badge: st.tBadge || {} }); }
@@ -2101,6 +2103,7 @@ function promptText(s, me) {
     if (f.t === T.SOFT && s.rf > 0) return `<b>${label('interact')}</b>HOLD TO REINFORCE WALL (${s.rf} LEFT)`;
     if (f.t === T.OPEN && m.openId[f.k] >= 0) return `<b>${label('interact')}</b>HOLD TO BARRICADE` + `${me.op === 'mason' && me.ac > 0 ? '  ·  <b>' + label('ability') + '</b>ARMOR PANEL' : ''}`;
     if (f.t === T.BARRI && me.op === 'mason' && me.ac > 0) return '<b>' + label('ability') + '</b>ARMOR PANEL';
+    if (f.t === T.OPEN && m.openId[f.k] >= 0 && me.op === 'girder' && me.ac > 0 && s.ph === PHASE.ACTION) return `<b>${label('interact')}</b>HOLD TO BARRICADE  ·  <b>${label('ability')}</b>STEEL BRACE`;
   }
   if (f && f.t === T.BARRI) return '<b>' + label('melee') + '</b>MELEE TO BREAK BARRICADE';
   if (!me.vt && findVault(m, x, y, vaultDir())) return '<b>' + label('vault') + '</b>VAULT';
@@ -2149,11 +2152,13 @@ function bodySounds(me, dt) {
 function feedList(s, me) {
   return s.ents.filter(e => e.tm === me.tm && (me.tm === 'def' ? e.ty === 'cam' && e.hp > 0 : e.ty === 'drone' || e.ty === 'scope'));
 }
-function feedKind(c) { return c.ty === 'drone' ? 'DRONE' : c.ty === 'scope' ? 'WALL SCOPE' : c.tu ? 'TURRET' : c.ow ? 'STICKY CAM' : 'CAMERA'; }
+const TRAPS = new Set(['clamp', 'prox', 'concuss', 'alarm', 'mine']), TRAP_SEEN = 2 * PX_PER_M;
+function feedKind(c) { return c.ty === 'drone' ? 'DRONE' : c.ty === 'scope' && c.fl ? (c.fl === 'up' ? 'PERISCOPE ▲' : 'PERISCOPE ▼') : c.ty === 'scope' ? 'WALL SCOPE' : c.tu ? 'TURRET' : c.ow ? 'STICKY CAM' : 'CAMERA'; }
 function ownerName(s, id) { const p = s.players.find(p => p.id === id); return p ? p.n.replace(/^\[BOT\] /, '') : 'TEAMMATE'; }
 function feedView(c, me) {
   const ro = c.ow && c.ow !== me.id ? 1 : 0;
   if (c.ty === 'drone') { const ic = interp(c.id, 'ents') || c; return { x: ic.x, y: ic.y, ang: ic.ag || c.ag || 0, fov: Math.PI * 2, range: 230, near: 0, kind: 'cam', cam: c, dr: 1, ro: 1 }; }
+  if (c.ty === 'scope' && c.fl) return { x: c.x, y: c.y, ang: c.ag || 0, fov: 6.28, range: 230, near: 6, kind: 'cam', cam: c, ro: 1 }; // LENS: looking all round the room above / below
   if (c.ty === 'scope') return { x: c.x, y: c.y, ang: c.ag || 0, fov: 1.3, range: 420, near: 6, kind: 'cam', cam: c, ro: 1 };
   return { x: c.x, y: c.y, ang: ro ? c.ag || 0 : st.aim, fov: 1.9, range: 650, near: 14, kind: 'cam', off: c.off, cam: c, ro };
 }

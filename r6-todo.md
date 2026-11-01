@@ -9,6 +9,15 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Trappers one job each: Bramble keeps the bomb; Lynx's mine becomes a paint trap (no bang, the attacker glows for defenders through walls for 12 s); Latch's wire becomes a siren that deafens the attacker (no footsteps heard) for 8 s; Shade's microphone stays
+- [x] Placed traps follow one rule for arming and hiding (like throwing)
+- [x] Wraith: a scan lasts 4 s at most, and attackers it sees hear a ping
+- [x] Hush: 6 s, then 15 s before it's ready again
+- [x] Kite: one bullet into the turret's lens disables it for 8 s
+- [x] The three health operators (Solace, Tonic, Rally) slowly get up by themselves when downed
+- [x] Rally: new ability, a pace beacon (teammates who run past it get a 5 s speed boost)
+- [x] Girder: active steel brace that blocks a doorway to walking but not to shooting or seeing (keeps fast reinforcing)
+- [x] Lens: the periscope goes through the floor or ceiling to watch the room above or below
 - [x] OPEN TO LAN (in the lobby next to START MATCH, and in the pause menu): shows your game's home-network address big, with a QR code a phone can scan with its camera, plus any other addresses (cable, Wi-Fi, homelab VPN). The game stays open to your home network as before (you chose that). The lobby now gives the home address first instead of the VPN one, and the title screen says which computer and version you are connected to ("Connected to blaney-pc · version …"), so a phone can tell your own PC's game from Lando's mini-server. Updating Lando's copy is the separate step in the config session, once phone play is good.
 - [x] VAPOR's Smoke Burst: a cone of thick smoke blasts out in front of him, spreads almost at once and fills the shape of the room (it follows doorways, never goes through walls), for 8 seconds.
 - [x] CROW reworked: Lunge (2 a round). For 5 seconds his melee becomes a silent 2-metre lunge that downs anyone it reaches, from any side (a shield from the front just gets knocked aside).

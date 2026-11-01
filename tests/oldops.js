@@ -44,14 +44,21 @@ if (door) { const c = door.cells[0], cx = (c % W + 0.5) * CELL, cy = (Math.floor
   fresh(); setup(d, 'mason', cx - 20, cy, 0); use(d); ok(door.cells.every(k => m.tiles[k] === T.PANEL), 'MASON panel did not seal the doorway');
   for (const k of door.cells) m.tiles[k] = T.OPEN; } else ok(false, 'no door to test MASON');
 fresh(); m.tiles[wk] = T.REINF; setup(d, 'veil', wx + 30, wy, 0); use(d); setup(a, 'ember', wx - 22, wy, 0); use(a); ticks(6); ok(m.tiles[wk] === T.REINF, 'VEIL jammer did not stop a cutter'); m.tiles[wk] = T.SOFT;
-fresh(); setup(d, 'lynx', X, Y, 0); use(d); ticks(1.6); setup(a, 'ember', X + 10, Y, 0); ticks(0.2); ok(a.slowUntil > g.time && sees('def', a), 'LYNX mine did not slow and reveal');
+fresh(); setup(d, 'lynx', X, Y, 0); use(d); ticks(1.6); setup(a, 'ember', X + 10, Y, 0); ticks(0.2); ok(!(a.slowUntil > g.time) && sees('def', a), 'LYNX paint trap should reveal without slowing');
 fresh(); setup(d, 'solace', X, Y, 0); setup(d2, 'lynx', X + 100, Y, 0); d2.hp = 40; use(d); ok(d2.hp > 40, 'SOLACE stim did not heal a teammate'); d2.downed = true; use(d); ok(!d2.downed, 'SOLACE stim did not revive');
-fresh(); setup(d, 'wraith', X, Y, 0); d.hold = { ability: 1 }; ticks(0.5, d); ok(d.scanning, 'WRAITH did not scan while holding');
+fresh(); setup(d, 'wraith', X, Y, 0); setup(a, 'ember', X + 100, Y, 0); g.events = []; d.hold = { ability: 1 }; ticks(0.5, d); ok(d.scanning, 'WRAITH did not scan while holding');
+ok(g.events.some(e => e.e === 'scanned' && e.id === a.id), 'the scanned attacker was not warned'); ticks(4, d); ok(!d.scanning, 'WRAITH scanned for more than 4 s in one go');
+d.hold = null; ticks(0.2, d); d.hold = { ability: 1 }; ticks(0.3, d); ok(d.scanning, 'WRAITH could not scan again after letting go'); d.hold = null;
 fresh(); setup(d, 'bramble', X, Y, 0); use(d); ticks(1.6); setup(a, 'ember', X + 30, Y, 0); a.hp = a.maxHp = 500; ticks(1.2); ok(a.hp < 500, 'BRAMBLE proximity charge did not go off');
 fresh(); setup(d, 'kite', X, Y, 0); use(d); ok(g.ents.some(e => e.type === 'cam' && e.tu), 'KITE did not place a turret camera');
 fresh(); setup(d, 'gravel', X, Y, 0); use(d); ticks(1.6); setup(a, 'ember', X + 20, Y, 0); ticks(0.2); ok(a.dazeUntil > g.time, 'GRAVEL daze mine did not daze');
 fresh(); setup(d, 'shunt', wx + 18, wy, Math.PI); use(d); setup(a, 'ember', wx - 22, wy, 0); use(a); ticks(0.3); ok(!g.ents.some(e => e.type === 'cutter'), 'SHUNT grid did not fry a cutter on its wall');
 fresh(); setup(d, 'hush', X, Y, 0); d.hold = { ability: 1 }; ticks(0.1, d); d.hold = null; ticks(0.1, d); ok(d.shrouded, 'HUSH shroud did not switch on'); d.hold = { right: 1 }; const n0 = (g.noises || []).length; ticks(1, d); ok((g.noises || []).length === n0, 'HUSH made noise while shrouded');
+d.hold = null; ticks(6, d); ok(!d.shrouded && d.shroudCd > g.time + 8, 'HUSH should last 6 s and then wait 15 s', d.shrouded, d.shroudCd - g.time);
+d.hold = { ability: 1 }; ticks(0.1, d); d.hold = null; ticks(0.1, d); ok(!d.shrouded, 'HUSH went dark again before 15 s');
+// SOLACE (one of the three health operators) gets back up by himself after 12 s; a plain operator does not
+fresh(); setup(d, 'solace', X, Y, 0); d.downed = true; d.hp = 20; d.selfUp = 0; ticks(12.2, d); ok(d.alive && !d.downed, 'SOLACE did not get up by himself');
+fresh(); setup(d, 'mason', X, Y, 0); d.downed = true; d.hp = 30; d.selfUp = 0; ticks(12.2, d); ok(d.downed, 'MASON should stay down');
 fresh(); setup(d, 'shade', X, Y, 0); use(d); setup(a, 'ember', X + 120, Y, 0); a.moving = 2; ticks(0.6); ok(sees('def', a), 'SHADE sensor did not hear a running attacker');
 fresh(); setup(d, 'rampart', X, Y, 0); use(d); const pb = g.ents.find(e => e.type === 'plates'); setup(d2, 'lynx', pb.x, pb.y, 0); d2.plated = false; ticks(0.1); ok(d2.maxHp === 115, 'RAMPART plates did not add health', d2.maxHp);
 fresh(); setup(d, 'miasma', X, Y, 0); setup(a, 'ember', X + 60, Y, 0); a.hp = a.maxHp = 500; g.detonate({ type: 'nade', kind: 'gas', x: X + 60, y: Y, team: TEAM.DEF, owner: d.id }); ticks(1.5); ok(a.hp < 500, 'MIASMA gas did not hurt');
