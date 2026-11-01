@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { OP_LIST, cleanLoadout } from '../shared/operators.js';
-import { matchXp, levelFor } from '../shared/progress.js';
+import { matchXp, levelFor, START_MMR, rankOf, mmrChange } from '../shared/progress.js';
 
 const DIR = process.env.R62D_DATA || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const PROFILES = path.join(DIR, 'profiles.json');
@@ -124,6 +124,10 @@ class Store {
       const before = prof.xp || 0, gain = matchXp(pl, won && !pl.left);
       prof.xp = before + gain.total; pl.xp = gain.total;
       xp[prof.id] = { lines: gain.lines, gain: gain.total, before, after: prof.xp };
+      if (m.mode === 'Ranked' && m.strength) { // the ladder: against the other team's strength (bots count at their rank)
+        const mb = prof.mmr ?? START_MMR, d = mmrChange(mb, m.strength[1 - pl.squad], won && !pl.left);
+        prof.mmr = Math.max(0, mb + d); xp[prof.id].mmr = { before: mb, after: prof.mmr, rank: rankOf(prof.mmr), was: rankOf(mb) };
+      }
     }
     for (const pl of m.players) delete pl.token; // tokens stay secret
     this.dirty.add('p'); this.dirty.add('m');
@@ -135,4 +139,4 @@ class Store {
 }
 
 export const store = new Store();
-export const publicProfile = p => p && ({ id: p.id, name: p.name, created: p.created, lastSeen: p.lastSeen, loadouts: p.loadouts, stats: p.stats, settings: p.settings || null, xp: p.xp || 0, level: levelFor(p.xp || 0) });
+export const publicProfile = p => p && ({ id: p.id, name: p.name, created: p.created, lastSeen: p.lastSeen, loadouts: p.loadouts, stats: p.stats, settings: p.settings || null, xp: p.xp || 0, level: levelFor(p.xp || 0), mmr: p.mmr ?? START_MMR, rank: rankOf(p.mmr ?? START_MMR) });

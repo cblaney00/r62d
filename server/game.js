@@ -1,12 +1,12 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
-import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, MAT, stopsBullet, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
+import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, SELF_UP, SELF_UP_TIME } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep, assignPros, proSay } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
-import { matchScore } from '../shared/progress.js';
+import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 
@@ -49,7 +49,7 @@ export class Game {
     this.site = 0; this.siteRevealed = false; this.planted = null;
     this.spots = { atk: new Map(), def: new Map() };
     this.reinforce = 10;
-    this.botLevel = 1; // bot skill: 0 Easy, 1 Normal, 2 Hard, 3 Expert (BOT_LEVELS)
+    this.botLevel = DEFAULT_LEVEL; // bot skill = a rank (BOT_LEVELS), PRO_LEVEL = the pro teams
     this.winner = null; this.reason = '';
     this.revealCheck = 0;
     this.departed = []; this.roundLog = []; this.matchStart = 0;
@@ -67,7 +67,7 @@ export class Game {
         if (!this.tut && !this.free && [...this.players.values()].some(q => !q.bot && q.pid === login.profile.id)) { sock.send(JSON.stringify({ t: 'taken', name: login.profile.name })); return; }
         p = this.addPlayer(login.profile.name, false);
         p.sock = sock;
-        p.token = login.token; p.pid = login.profile.id;
+        p.token = login.token; p.pid = login.profile.id; p.mmr = login.profile.mmr ?? START_MMR;
         p.ms = this.blankMatchStats();
         sock.send(JSON.stringify({ t: 'welcome', id: p.id, mapVersion: this.mapVersion, mapId: this.mapId, token: p.token, profile: publicProfile(login.profile),
           tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp), holes: this.map.holes }));
@@ -108,7 +108,7 @@ export class Game {
     this.tv.want = want;
     if (id !== this.mapId) { this.mapId = id; this.map = buildMap(id); }
     for (const q of [...this.players.values()]) this.players.delete(q.id);
-    this.botLevel = 4;
+    this.botLevel = PRO_LEVEL;
     for (let i = 0; i < 10; i++) this.addBot(i % 2);
     this.startMatch();
   }
@@ -165,7 +165,8 @@ export class Game {
       else if (m.a === 'removeBot') this.removeBot(m.squad);
       else if (m.a === 'fillBots') { for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); }
       else if (m.a === 'switch') this.switchSquad(p);
-      else if (m.a === 'botLevel' && BOT_LEVELS[m.lv] && m.lv !== this.botLevel) { this.botLevel = m.lv; assignPros(this); this.msg(m.lv === 4 ? `${p.name} brought in the pro teams: Northwind and Ironclad Collective` : `${p.name} set the bot skill to ${BOT_LEVELS[m.lv]}`); }
+      else if (m.a === 'ranked' && this.phase === PHASE.LOBBY) { this.ranked = !!m.on; if (this.ranked) this.rankedLevel(); this.msg(this.ranked ? `${p.name} switched on RANKED: bots play at the lobby's rank (${BOT_LEVELS[this.botLevel]})` : `${p.name} switched ranked off`); }
+      else if (m.a === 'botLevel' && !this.ranked && BOT_LEVELS[m.lv] && m.lv !== this.botLevel) { this.botLevel = m.lv; assignPros(this); this.msg(m.lv === PRO_LEVEL ? `${p.name} brought in the pro teams: Northwind and Ironclad Collective` : `${p.name} set the bot skill to ${BOT_LEVELS[m.lv]}`); }
       else if (m.a === 'map' && this.phase === PHASE.LOBBY && MAPS[m.id] && m.id !== this.mapId) {
         this.mapId = m.id; this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
         this.msg(`${p.name} chose the map ${MAPS[m.id].name}`);
@@ -229,8 +230,15 @@ export class Game {
   }
 
   // ---------------- match flow ----------------
+  // ranked: the bots' rank is the lobby people's average MMR
+  rankedLevel() {
+    const ms = [...this.players.values()].filter(q => !q.bot && q.token).map(q => (store.byToken(q.token) || {}).mmr ?? START_MMR);
+    const lv = rankOf(ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : START_MMR);
+    if (lv !== this.botLevel) { this.botLevel = lv; assignPros(this); }
+  }
   startMatch() {
     if (this.players.size === 0) return;
+    if (this.ranked) { this.rankedLevel(); for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); } // empty slots on both teams: bots at that rank
     assignPros(this); this.proState = {}; this.proLast = {}; this.proLog = [];
     this.score = [0, 0]; this.round = 0; // round 1: squad 0 attacks (the tutorial: you attack, then defend)
     for (const p of this.players.values()) { p.kills = 0; p.deaths = 0; p.ms = this.blankMatchStats(); }
@@ -392,7 +400,7 @@ export class Game {
           this.events.push({ e: 'matchEnd', squad: win, mvp: mvp ? { id: mvp.p.id, name: mvp.p.name, op: mvp.p.op, ...(mvp.p.ms || {}), ops: undefined } : null });
           const xp = this.saveMatch(win) || {};
           for (const p of this.players.values()) if (p.sock && xp[p.pid]) {
-            const prof = store.byToken(p.token);
+            const prof = store.byToken(p.token); if (prof && prof.mmr != null) p.mmr = prof.mmr;
             p.sock.send(JSON.stringify({ t: 'xp', ...xp[p.pid], stats: p.ms, profile: publicProfile(prof) }));
           }
         } else this.nextRound();
@@ -2207,10 +2215,11 @@ export class Game {
     if (this.tut || this.free || this.tv) return null; // tutorials, free play and esports TV never count
     const players = [...[...this.players.values()].map(p => this.statLine(p)), ...(this.departed || [])];
     if (!players.some(p => p.token)) return null; // nobody real played
-    return store.recordMatch({
+    const strength = [0, 1].map(s => { const v = players.filter(q => q.squad === s).map(q => q.token ? ((store.byToken(q.token) || {}).mmr ?? START_MMR) : mmrOfRank(this.botLevel)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : mmrOfRank(this.botLevel); });
+    return store.recordMatch({ strength: this.ranked ? strength : null,
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: Date.now(),
       duration: Math.round((Date.now() - (this.matchStart || Date.now())) / 1000),
-      map: this.map.name, mode: 'Quick Match', score: [...this.score], winner, rounds: this.roundLog || [], players,
+      map: this.map.name, mode: this.ranked ? 'Ranked' : 'Quick Match', score: [...this.score], winner, rounds: this.roundLog || [], players,
     });
   }
 
@@ -2224,7 +2233,7 @@ export class Game {
       const g = p.guns[p.slot];
       const o = {
         id: p.id, n: p.name, b: p.bot ? 1 : 0, sq: p.squad, tm: this.round ? this.side(p) : (p.squad === 0 ? 'atk' : 'def'),
-        op: p.op, a: p.alive ? 1 : 0, k: p.kills, d: p.deaths, sc: p.score || 0, ms: p.rtt,
+        op: p.op, a: p.alive ? 1 : 0, rn: p.bot || !p.token ? undefined : rankOf(p.mmr), k: p.kills, d: p.deaths, sc: p.score || 0, ms: p.rtt,
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
@@ -2269,7 +2278,7 @@ export class Game {
     const common = JSON.stringify({
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId,
       site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
-      rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel,
+      rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];

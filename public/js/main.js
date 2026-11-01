@@ -19,7 +19,8 @@ import { PRO_TEAMS } from '/shared/pros.js';
 import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './crosshair.js';
 import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
-import { levelFor } from '/shared/progress.js';
+import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
+const rankTag = i => i == null ? '' : `<span class="rankTag" style="color:${RANK_COL[i]};border-color:${RANK_COL[i]}">${RANKS[i].toUpperCase()}</span>`;
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
 import { walkRay, tileAt, findVault } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
@@ -304,7 +305,7 @@ setInterval(() => { if (!$('tab-tv').classList.contains('on') && $('playbookPage
 $('tvGo').onclick = () => switchMatch(null, null, { map: tvPick.map === 'random' ? null : tvPick.map });
 // ---------------- free play page ----------------
 // Pick a map and how many enemy bots, then play alone with no clock, switching operator with N / B.
-const freePick = { map: 'harbor', bots: 0, level: 1 };
+const freePick = { map: 'harbor', bots: 0, level: 2 };
 try { Object.assign(freePick, JSON.parse(localStorage.getItem('r62d-free') || '{}')); } catch {}
 if (!MAPS[freePick.map]) freePick.map = 'harbor';
 function renderFree() {
@@ -754,6 +755,7 @@ document.querySelectorAll('[data-bot]').forEach(b => b.onclick = () => { send({ 
 document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { send({ t: 'lobby', a: 'removeBot', squad: +b.dataset.unbot }); });
 $('switchBtn').onclick = () => { send({ t: 'lobby', a: 'switch' }); };
 $('fillBtn').onclick = () => { send({ t: 'lobby', a: 'fillBots' }); };
+$('rankedBtn').onclick = () => { audio.ui(); send({ t: 'lobby', a: 'ranked', on: !st.rk }); };
 for (const b of $('botLevel').children) b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'botLevel', lv: +b.dataset.lv }); };
 $('startBtn').onclick = () => { send({ t: 'lobby', a: 'start' }); };
 $('leaveBtn').onclick = () => { if (st.tutorial || st.free) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
@@ -801,7 +803,9 @@ function renderMapPick(s) {
 }
 function renderLobby(s) {
   renderControls(); renderMapPick(s);
-  for (const b of $('botLevel').children) b.classList.toggle('on', +b.dataset.lv === (s.bl ?? 1));
+  for (const b of $('botLevel').children) b.classList.toggle('on', +b.dataset.lv === (s.bl ?? 2));
+  $('botLevel').classList.toggle('locked', !!s.rk); // ranked: the lobby's rank decides
+  { const t = s.rk ? 'RANKED: ON' : 'RANKED: OFF'; if ($('rankedBtn').textContent !== t) { $('rankedBtn').textContent = t; $('rankedBtn').classList.toggle('primary', !!s.rk); } st.rk = !!s.rk; }
   // the address friends type to join (the first network card is the wired one)
   if (st.addr === undefined || (st.addrT && performance.now() - st.addrT > 15000)) { st.addr = st.addr || null; st.addrT = performance.now(); fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
   const u = st.addr && st.addr.urls[0], jt = !u ? '' : `Friends at home join at ${u.url} · OPEN TO LAN shows a code to scan with a phone`;
@@ -809,7 +813,7 @@ function renderLobby(s) {
   for (const sq of [0, 1]) {
     const ul = document.querySelector(`#sq${sq} ul`);
     const list = s.players.filter(p => p.sq === sq);
-    const html = list.map(p => `<li class="${p.id === s.you ? 'me' : ''}"><span>${esc(p.n)}</span>${p.b ? '<span class="bot">BOT</span>' : ''}</li>`).join('') +
+    const html = list.map(p => `<li class="${p.id === s.you ? 'me' : ''}"><span>${esc(p.n)}</span>${p.b ? '<span class="bot">BOT</span>' : rankTag(p.rn)}</li>`).join('') +
       Array(Math.max(0, 5 - list.length)).fill('<li style="opacity:.3"><span>— empty —</span></li>').join('');
     if (ul.innerHTML !== html) ul.innerHTML = html;
   }
@@ -1094,6 +1098,7 @@ async function playXp(m) {
   const els = [...$('eTiles').querySelectorAll('b')];
   await sleep(900);
   for (let k = 0; k <= 20; k++) { tiles.forEach(([, v, suf], i) => els[i].textContent = Math.round(v * k / 20) + (suf || '')); if (k % 4 === 0) audio.ui('xp'); await sleep(30); }
+  if (m.mmr) { const d = m.mmr.after - m.mmr.before, el = document.createElement('div'); el.innerHTML = `<span>Ranked ${rankTag(m.mmr.rank)}${m.mmr.rank !== m.mmr.was ? (m.mmr.rank > m.mmr.was ? ' RANK UP' : ' rank down') : ''}</span><b>${d >= 0 ? '+' : ''}${d} MMR (${m.mmr.after})</b>`; $('xpLines').appendChild(el); }
   let xp = m.before;
   for (const [label, amt] of m.lines) {
     await sleep(350);
@@ -1902,6 +1907,29 @@ function gunHeat(me, w, now) {
   return Math.max(srv, own);
 }
 
+// each sight has its own faint look while aiming in (he asked: interesting but never in the way); nothing covers the middle
+function sightLook(sight, x, y, k) {
+  const W = ctx.canvas.width, H = ctx.canvas.height, d = DPR;
+  ctx.save();
+  if (sight === 'reddot') { // a soft red bloom round the crosshair, like the glass of the dot catching light
+    const g = ctx.createRadialGradient(x, y, 4 * d, x, y, 34 * d); g.addColorStop(0, `rgba(255,60,60,${0.10 * k})`); g.addColorStop(1, 'rgba(255,60,60,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 34 * d, 0, 7); ctx.fill();
+  } else if (sight === 'holo') { // the holographic ring, broken at the four points
+    ctx.strokeStyle = `rgba(120,230,255,${0.38 * k})`; ctx.lineWidth = 1.3 * d;
+    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(x, y, 26 * d, i * Math.PI / 2 + 0.25, (i + 1) * Math.PI / 2 - 0.25); ctx.stroke(); }
+  } else if (sight === 'prism') { // an amber chevron under the crosshair and a faint etched ring
+    ctx.strokeStyle = `rgba(255,170,60,${0.6 * k})`; ctx.lineWidth = 1.6 * d;
+    ctx.beginPath(); ctx.moveTo(x - 7 * d, y + 20 * d); ctx.lineTo(x, y + 13 * d); ctx.lineTo(x + 7 * d, y + 20 * d); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,170,60,${0.16 * k})`; ctx.lineWidth = d; ctx.beginPath(); ctx.arc(x, y, 44 * d, 0, 7); ctx.stroke();
+  } else if (sight === 'scope') { // a lens: the screen edges darken a little, range ticks beside the crosshair
+    const r = Math.hypot(W, H) / 2, g = ctx.createRadialGradient(W / 2, H / 2, r * 0.55, W / 2, H / 2, r);
+    g.addColorStop(0, 'rgba(0,8,14,0)'); g.addColorStop(1, `rgba(0,8,14,${0.42 * k})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = `rgba(0,0,0,${0.5 * k})`; ctx.lineWidth = d;
+    for (const sgn of [-1, 1]) for (let i = 1; i <= 3; i++) { const o = (26 + i * 9) * d; ctx.beginPath(); ctx.moveTo(x + sgn * o, y - 3 * d); ctx.lineTo(x + sgn * o, y + 3 * d); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x - 3 * d, y + o); ctx.lineTo(x + 3 * d, y + o); ctx.stroke(); }
+  }
+  ctx.restore();
+}
 function crosshair(me, now) {
   if (st.tv) return; // watching: no crosshair of your own on the broadcast
   const w = WEAPONS[me.w];
@@ -1918,6 +1946,7 @@ function crosshair(me, now) {
   const cone = w ? spreadCone(w, gm, { at: me.at || 0, run, crouch: !!me.cr, shots: gunHeat(me, w, now) }) : 0;
   const spread = xh.dynamic ? Math.tan(cone) * Math.hypot(m.x - px, m.y - py) / DPR : 0;
   // aiming in: each enemy you can see shows the zone your crosshair must be on for a headshot; it lights red when it is
+  if (me.at > 0.05 && me.ct === 'body') sightLook(attFromCode(me.aa).sight, x, y, Math.min(1, me.at));
   if (me.ad && st.heads) for (const h of st.heads) {
     const H = w2s(h.x, h.y), r = Math.max(2.5 * DPR, HEAD_AIM * (st.zoom || 1)), on = Math.hypot(x - H.x, y - H.y) <= r;
     ctx.lineWidth = (on ? 2 : 1.2) * DPR;
@@ -2500,7 +2529,7 @@ function updateCard() {
   const L = levelFor(p.xp || 0);
   $('pcard').classList.remove('hidden');
   $('pcName').textContent = p.name; $('pcLevel').textContent = L.level;
-  $('pcXp').style.width = (L.into / L.need * 100) + '%'; $('pcXpText').textContent = `LEVEL ${L.level} · ${L.into} / ${L.need} XP`;
+  $('pcXp').style.width = (L.into / L.need * 100) + '%'; $('pcXpText').innerHTML = `LEVEL ${L.level} · ${L.into} / ${L.need} XP ${rankTag(p.rank)} <span style="opacity:.6">${p.mmr ?? ''} MMR</span>`;
 }
 const TIPS = [
   'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',

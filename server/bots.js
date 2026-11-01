@@ -4,7 +4,7 @@
 // call out what they see, and react no faster than a fairly experienced player. The bot skill setting
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
-import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone } from '../shared/constants.js';
+import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
@@ -15,13 +15,17 @@ import { planWeight, opWeight } from './training.js';
 // expect: the same when they were already listening for that enemy. turn: how fast they swing their aim (radians/s).
 // err: how far off the first aim is; settle: how fast it closes in. tol: how close the aim must be before they fire.
 // see: how far they notice people (px). body: how widely their aim point wanders over the body (px).
-const SKILL = [
-  { react: 0.75, reactX: 0.5, expect: 0.45, turn: 4.5, err: 1.4, settle: 1.0, tol: 0.26, see: 520, body: 13, drone: 0.7 },  // Easy
-  { react: 0.5, reactX: 0.35, expect: 0.3, turn: 7, err: 1.0, settle: 1.4, tol: 0.2, see: 650, body: 11, drone: 0.5 },     // Normal
-  { react: 0.36, reactX: 0.24, expect: 0.22, turn: 10, err: 0.75, settle: 1.9, tol: 0.15, see: 720, body: 8, drone: 0.4 },    // Hard
-  { react: 0.28, reactX: 0.14, expect: 0.18, turn: 12.5, err: 0.55, settle: 2.5, tol: 0.12, see: 780, body: 6, drone: 0.3 },  // Expert // turn: he asked for faster turning
+const SKILL = [ // the ranks (he asked): Copper, Bronze, Silver, Gold, Platinum, Diamond, Champion
+  { react: 0.95, reactX: 0.6, expect: 0.6, turn: 3.5, err: 1.7, settle: 0.8, tol: 0.3, see: 460, body: 15, drone: 0.8 },  // Copper
+  { react: 0.75, reactX: 0.5, expect: 0.45, turn: 4.5, err: 1.4, settle: 1.0, tol: 0.26, see: 520, body: 13, drone: 0.7 },  // Bronze (was Easy)
+  { react: 0.5, reactX: 0.35, expect: 0.3, turn: 7, err: 1.0, settle: 1.4, tol: 0.2, see: 650, body: 11, drone: 0.5 },     // Silver (was Normal)
+  { react: 0.42, reactX: 0.3, expect: 0.26, turn: 8.5, err: 0.88, settle: 1.6, tol: 0.17, see: 690, body: 9.5, drone: 0.45 }, // Gold
+  { react: 0.36, reactX: 0.24, expect: 0.22, turn: 10, err: 0.75, settle: 1.9, tol: 0.15, see: 720, body: 8, drone: 0.4 },    // Platinum (was Hard)
+  { react: 0.28, reactX: 0.14, expect: 0.18, turn: 12.5, err: 0.55, settle: 2.5, tol: 0.12, see: 780, body: 6, drone: 0.3 },  // Diamond (was Expert)
+  { react: 0.23, reactX: 0.1, expect: 0.16, turn: 14, err: 0.42, settle: 3, tol: 0.1, see: 820, body: 5, drone: 0.25 },  // Champion // turn: he asked for faster turning
 ];
-const skill = (game, p) => p.pro ? proSkill(p) : SKILL[game.tut ? 0 : Math.max(0, Math.min(3, p.level ?? game.botLevel ?? 1))]; // p.level: a test can give one bot its own
+const lvlOf = (game, p) => game.tut ? 0 : Math.max(0, Math.min(TOP_BOT, p.level ?? game.botLevel ?? DEFAULT_LEVEL));
+const skill = (game, p) => p.pro ? proSkill(p) : SKILL[lvlOf(game, p)]; // p.level: a test can give one bot its own
 
 // A bot's personality stays with it all match: aggr = how pushy, patience = how long it waits and watches.
 function persona(p) {
@@ -737,10 +741,10 @@ function botDrone(game, p, dt) {
 // they can see, roughly ahead of them (dir), 2–11 m away.
 function preAims(game, p) {
   if (p.pro) return true; // pros always check where an enemy could come from
-  const lvl = game.tut ? 0 : Math.max(0, Math.min(3, p.level ?? game.botLevel ?? 1));
-  if (lvl >= 2) return true;
-  if (lvl === 0) return false;
-  const ai = p.ai; if ((ai.preRollT = (ai.preRollT || 0) - 1) <= 0) { ai.preRollT = 180; ai.preRoll = Math.random() < 0.4; } // Normal: now and then (re-decided every few seconds)
+  const lvl = lvlOf(game, p);
+  if (lvl >= 4) return true; // Platinum and up: always
+  if (lvl <= 1) return false; // Copper, Bronze: never
+  const ai = p.ai; if ((ai.preRollT = (ai.preRollT || 0) - 1) <= 0) { ai.preRollT = 180; ai.preRoll = Math.random() < (lvl === 2 ? 0.4 : 0.7); } // Normal: now and then (re-decided every few seconds)
   return ai.preRoll;
 }
 function threatPoint(game, p, dir) {
@@ -793,8 +797,8 @@ export const __findPath = (...a) => findPath(...a); // for tests
 // lurking too long, never rotating ...).
 // ======================================================================================================================
 // how often someone strafe-peeks in a fight (he asked: a hard skill, not something everyone does all the time)
-const PEEK = { Kaze: 0.35, Torvi: 0.3, Wisp: 0.15, Juno: 0.12 }, PEEK_LVL = [0.03, 0.06, 0.12, 0.18];
-function peekSkill(game, p) { return p.pro ? (PEEK[p.pro.pl.name] ?? 0.06) : PEEK_LVL[Math.max(0, Math.min(3, p.level ?? game.botLevel ?? 1))]; }
+const PEEK = { Kaze: 0.35, Torvi: 0.3, Wisp: 0.15, Juno: 0.12 }, PEEK_LVL = [0.02, 0.03, 0.06, 0.09, 0.12, 0.18, 0.22];
+function peekSkill(game, p) { return p.pro ? (PEEK[p.pro.pl.name] ?? 0.06) : PEEK_LVL[lvlOf(game, p)]; }
 const PERSONA = { Halden: [0.45, 0.8], Kaze: [0.95, 0.2], Brick: [0.6, 0.6], Moth: [0.2, 0.85], Juno: [0.5, 0.9], Sable: [0.35, 0.9], Torvi: [0.9, 0.3], Pax: [0.5, 0.6], Grit: [0.3, 0.95], Wisp: [0.7, 0.35] };
 const TIMING = { Wisp: -6, Moth: 5, Juno: 8 }; // seconds early (-) or late (+) to their part of the plan: their flaws
 const ROTATE_DELAY = { Halden: 4, Grit: Infinity }; // slow to rotate; never rotates
@@ -814,7 +818,7 @@ export function proSay(game, p, text, key, prio = false) {
   game.chat(p, { text: text.slice(0, 140), team: true });
 }
 export function assignPros(game) {
-  const on = game.botLevel === 4 && !game.tut;
+  const on = game.botLevel === PRO_LEVEL && !game.tut;
   for (const squad of [0, 1]) {
     const bots = [...game.players.values()].filter(q => q.bot && q.squad === squad).sort((a, b) => +a.id.slice(1) - +b.id.slice(1));
     const team = PRO_TEAMS[squad];

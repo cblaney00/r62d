@@ -59,14 +59,14 @@
         </div>
         <div id="room" class="hidden">
           <div class="roomHead"><div><h2>LOBBY</h2><div class="hint" id="lobbyHint">First to 3 rounds · Sides swap every round</div><div class="hint addr" id="joinAddr"></div></div>
-            <div class="roomBtns"><button id="lanBtn" class="big">OPEN TO LAN</button><button id="startBtn" class="primary big">START MATCH</button></div></div>
+            <div class="roomBtns"><button id="rankedBtn" class="big" title="Bots play at your lobby's average rank; winning raises your rank, losing lowers it">RANKED: OFF</button><button id="lanBtn" class="big">OPEN TO LAN</button><button id="startBtn" class="primary big">START MATCH</button></div></div>
           <div id="mapPick"></div>
           <div class="squads">
             <div class="squad" id="sq0"><h3>TEAM ALPHA</h3><ul></ul><div class="row"><button data-bot="0">+ Bot</button><button data-unbot="0">− Bot</button></div></div>
             <div class="vs">VS</div>
             <div class="squad" id="sq1"><h3>TEAM BRAVO</h3><ul></ul><div class="row"><button data-bot="1">+ Bot</button><button data-unbot="1">− Bot</button></div></div>
           </div>
-          <div class="row center botLv"><span class="hint">BOT SKILL</span><div class="seg" id="botLevel"><button data-lv="0">Easy</button><button data-lv="1">Normal</button><button data-lv="2">Hard</button><button data-lv="3">Expert</button><button data-lv="4" title="The pro teams: Northwind and Ironclad Collective">Pro</button></div></div>
+          <div class="row center botLv"><span class="hint">BOT RANK</span><div class="seg" id="botLevel"><button data-lv="0">Copper</button><button data-lv="1">Bronze</button><button data-lv="2">Silver</button><button data-lv="3">Gold</button><button data-lv="4">Platinum</button><button data-lv="5">Diamond</button><button data-lv="6">Champion</button><button data-lv="7" title="The pro teams: Northwind and Ironclad Collective">Pro</button></div></div>
           <div class="row center"><button id="switchBtn">Switch team</button><button id="fillBtn">Fill empty slots with bots</button>
             <button id="lobbyOpsBtn" class="hidden">Operators</button><button id="lobbyProfBtn" class="hidden">Profile</button></div>
         </div>
@@ -89,7 +89,7 @@
           <h4 class="freeH">ENEMY BOTS</h4>
           <div class="seg" id="freeBots"><button data-n="0">None</button><button data-n="1">1</button><button data-n="3">3</button><button data-n="5">5</button></div>
           <h4 class="freeH">BOT SKILL</h4>
-          <div class="seg" id="freeLevel"><button data-lv="0">Easy</button><button data-lv="1">Normal</button><button data-lv="2">Hard</button><button data-lv="3">Expert</button><button data-lv="4" title="The pro teams: Northwind and Ironclad Collective">Pro</button></div>
+          <div class="seg" id="freeLevel"><button data-lv="0">Copper</button><button data-lv="1">Bronze</button><button data-lv="2">Silver</button><button data-lv="3">Gold</button><button data-lv="4">Platinum</button><button data-lv="5">Diamond</button><button data-lv="6">Champion</button><button data-lv="7" title="The pro teams: Northwind and Ironclad Collective">Pro</button></div>
           <div class="row"><button id="freeGo" class="primary big">START FREE PLAY</button></div>
         </div>
       </section>

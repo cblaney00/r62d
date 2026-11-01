@@ -6,20 +6,20 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] make effects for each scope to make them interesting but not impede gameplay
-- [ ] the revolver doesnt look like a revolver, make sure there arent any more inconsistencies like this in the weapons catagory
 - [ ] make it so the auto director can be toggled on an off in case the viewer wants to watch a particular player with focus (lets say they have an interesting playstyle or play operators or roles that the viewers wants to study)
 - [ ] on the esports tv the camera focus should switch to interesting utility usage on the setup of defenders are the ones being spectated at the time, but the auto director should prioritize the most exciting stuff happening at all times
 - [ ] higher rank players should know to preserve their drone, most drones should remain alive by the end of prep phase not considering the players that are less risk averse and have a plan when they overextend. They should know that defenders just camp stairs and wait for drones at this point.
-- [ ] create a ranked mode where you are put against bots with the ranks mentioned considering mmr of current players in the lobby
 - [ ] send this list of notes with priority towards getting the most game changing things done first, i think this might run past my token limit but try to be somewhat efficient with it without sacrificing quailty or ill just end up using more tokens to fix problems
 - [ ] defenders should wander a little bit and sounds like glass breaking, gunshots, explosive utility, other very loud noises should be hearable throughout the building usually (unless the building is super large or the sound is one floor apart from the listener
 - [ ] defenders of all ranks above silver should ernestly set up site with gadjets and barracades unless they decide they want to save their gadgets for later in the round (which is a totally viable move even with site anchor characters)
-- [ ] rework the difficulties so that there are enough for bronze, copper, gold, platinum, diamond, champion, pro
 - [ ] make it so you can zoom in and inspect each room smoothly (like a magnifying glass) the map knowledge maps
 
 ## Done
 
+- [x] The revolver is drawn as a real revolver (frame, fluted cylinder, ribbed barrel, hammer, curved wooden grip), and in matches each gun shows its own shape: cylinder, double barrels, pump grip only on pump guns, built-in suppressor, drum, ammo belt, bolt handle, bullpup magazine. The new semi-auto attachments have pictures.
+- [x] Each sight has its own faint look while aiming in: red dot = soft red glow, holo = broken cyan ring, prism = amber chevron, 2x scope = slightly darkened screen edges and range ticks. Nothing covers the middle.
+- [x] Bot difficulty is now the ranks: Copper, Bronze, Silver, Gold, Platinum, Diamond, Champion, and Pro (the pro teams). Silver is the default.
+- [x] RANKED button in the lobby: everyone starts Silver (1400 MMR), empty slots on both teams fill with bots at the lobby's average rank, a win raises and a loss lowers your MMR (more for beating stronger teams). Rank badges in the lobby and on your profile card; the end screen shows the MMR change and rank ups.
 - [x] The crosshair moves away from you 1.3x faster (coming back stays the same), and aiming in starts it at a distance that suits the sight: iron 2.5 m, holo 3, red dot 3.5, 1.5x prism 5, 2x scope 6.5 (match and Armory).
 - [x] Semi-autos (pistols, revolver, marksman rifles, slug) lose the spray-only attachments and get their own: Match Barrel (tighter aimed shots, longer reach, slower to aim), Trigger Kit (exact again 25% sooner after a shot, looser hip fire) and Recoil Pad (each shot kicks 30% less, a little slower to aim).
 - [x] Wasp toned down: 30 rounds, violent sideways shake, slower to aim, damage falls off fast. Halberd and V9 removed (their operators got other guns). Guns pulled apart: Hornet = easy-control machine pistol, Sentry = slow hard-hitting carbine, Longbow = heavy two-tap DMR (Heron stays the quick three-tap), Trident bursts are slower, Ox = heavy slow belt-fed, Mule = steady LMG, Drummer = fast wandering hose, K4 = the all-rounder.

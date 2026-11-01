@@ -1,6 +1,7 @@
 // Top-down drawings of operators, drones, gadgets and the objective.
 import { OPERATORS, WEAPONS, bodyW } from '/shared/operators.js';
 import { shade } from './textures.js';
+import { G } from './gunart.js';
 import { HEADGEAR, PACK, VEST } from './headgear.js';
 const HAIR = ['#1b1512', '#3a2618', '#5a3a22', '#8a6a3a', '#c9a060', '#2a2a2a', '#6a2a1a', '#d8d2c4'];
 const hairOf = op => HAIR[(op.charCodeAt(0) * 7 + op.charCodeAt(op.length - 1) * 3 + op.length) % HAIR.length];
@@ -133,9 +134,17 @@ function drawGun(ctx, wkey, recoil) {
   // barrel + muzzle
   ctx.fillStyle = '#121316'; ctx.fillRect(x0 + L * 0.6, 0.55, L * 0.4, 1.6);
   ctx.fillStyle = '#0a0a0c'; ctx.fillRect(x0 + L - 1.6, 0.25, 1.9, 2.2);
-  if (w.cls === 'AR' || w.cls === 'SMG' || w.cls === 'MP') { box(ctx, x0 + L * 0.32, 2.7, 2.3, w.cls === 'MP' ? 2.8 : 3.6, 0.5, '#24272b'); }
-  if (w.cls === 'LMG') { box(ctx, x0 + L * 0.26, 2.5, 5, 4.4, 0.8, '#3d4030'); cap(ctx, x0 + L * 0.7, 2.2, x0 + L * 0.45, 3.6, 0.6, '#222'); }
-  if (w.cls === 'Shotgun') { box(ctx, x0 + L * 0.5, -0.1, 5, 3.1, 0.8, '#6a4628'); ctx.fillStyle = 'rgba(0,0,0,0.4)'; for (let i = 0; i < 4; i++) ctx.fillRect(x0 + L * 0.5 + 0.6 + i * 1.1, 0.1, 0.4, 2.7); }
+  const g = G[wkey] || {};
+  if (g.double) { ctx.fillStyle = '#121316'; ctx.fillRect(x0 + L * 0.5, -0.2, L * 0.5, 1.4); ctx.fillRect(x0 + L * 0.5, 1.5, L * 0.5, 1.4); } // side-by-side barrels
+  if (g.revolver) { box(ctx, x0 + L * 0.22, -0.9, 3.4, 4.6, 1.4, '#55595e'); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x0 + L * 0.22 + 0.6, 0.7, 2.2, 0.5); } // cylinder
+  if (g.can) box(ctx, x0 + L - 1.5, -0.1, 4.6, 3, 0.9, '#16181b'); // built-in suppressor
+  if (g.bolt) { ctx.fillStyle = '#2c2f33'; ctx.fillRect(x0 + L * 0.3, 2.8, 0.7, 1.6); ctx.beginPath(); ctx.arc(x0 + L * 0.3 + 0.35, 4.6, 0.9, 0, 7); ctx.fill(); } // bolt handle
+  if (g.mag === 'drum') { ctx.fillStyle = '#3c4147'; ctx.beginPath(); ctx.arc(x0 + L * 0.34, 4.4, 2.5, 0, 7); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 0.5; ctx.stroke(); }
+  else if (g.mag === 'bullpup') box(ctx, x0 + L * 0.06, 2.7, 2.3, 3.6, 0.5, '#24272b');
+  else if (w.cls === 'AR' || w.cls === 'SMG' || w.cls === 'MP') { box(ctx, x0 + L * 0.32, 2.7, 2.3, w.cls === 'MP' ? 2.8 : 3.6, 0.5, '#24272b'); }
+  if (w.cls === 'LMG' && g.mag !== 'drum') { box(ctx, x0 + L * 0.26, 2.5, 5, 4.4, 0.8, '#3d4030'); cap(ctx, x0 + L * 0.7, 2.2, x0 + L * 0.45, 3.6, 0.6, '#222'); }
+  if (g.mag === 'belt') { ctx.fillStyle = '#b08a3e'; for (let i = 0; i < 4; i++) ctx.fillRect(x0 + L * 0.26 - 1 - i * 1.1, 4.6 + i * 0.5, 0.7, 1.6); } // brass belt
+  if (w.cls === 'Shotgun' && g.pump) { box(ctx, x0 + L * 0.5, -0.1, 5, 3.1, 0.8, '#6a4628'); ctx.fillStyle = 'rgba(0,0,0,0.4)'; for (let i = 0; i < 4; i++) ctx.fillRect(x0 + L * 0.5 + 0.6 + i * 1.1, 0.1, 0.4, 2.7); }
   if (w.cls === 'DMR') {
     box(ctx, x0 + L * 0.16, -1.9, L * 0.42, 2, 0.8, '#0f1012');
     ctx.fillStyle = '#7fc3ff'; ctx.beginPath(); ctx.arc(x0 + L * 0.58, -0.9, 0.7, 0, 7); ctx.fill();

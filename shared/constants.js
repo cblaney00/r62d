@@ -15,7 +15,8 @@ export const DRONE_R = 2.5;         // a small drone (he asked for smaller: was 
 export const DRONE_SPRINT = { mul: 1.6, time: 3, wait: 6, charges: 3 };
 export const MAX_PLAYERS = 10;
 export const TEAM_SIZE = 5;
-export const BOT_LEVELS = ['Easy', 'Normal', 'Hard', 'Expert', 'Pro']; // Pro: the two named pro teams (shared/pros.js) // bot skill, chosen in the lobby / free play (game.botLevel)
+export const BOT_LEVELS = ['Copper', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion', 'Pro']; // he asked: difficulty = the ranks, R6 order
+export const PRO_LEVEL = 7, TOP_BOT = 6, DEFAULT_LEVEL = 2; // Pro = the two named pro teams; Silver is where everyone starts // Pro: the two named pro teams (shared/pros.js) // bot skill, chosen in the lobby / free play (game.botLevel)
 export const WIN_ROUNDS = 3;       // Quick Match: first to 3
 
 export const PHASE = {

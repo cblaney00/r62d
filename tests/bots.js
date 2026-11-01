@@ -59,7 +59,7 @@ if (Object.keys(total.ability).length < 22) fails.push('only ' + Object.keys(tot
 
 // skill: Expert (squad 0) against Easy (squad 1), on two maps
 let ex = 0, ez = 0;
-for (const id of maps.slice(0, 2)) for (let i = 0; i < 2; i++) { const { g } = play(id, [3, 0], 10); for (const p of g.players.values()) { const k = p.ms ? p.ms.kills : 0; if (p.squad === 0) ex += k; else ez += k; } }
+for (const id of maps.slice(0, 2)) for (let i = 0; i < 2; i++) { const { g } = play(id, [5, 1], 10); for (const p of g.players.values()) { const k = p.ms ? p.ms.kills : 0; if (p.squad === 0) ex += k; else ez += k; } }
 console.log(`skill check: Expert team ${ex} kills, Easy team ${ez} kills`);
 if (!(ex > ez * 1.3)) fails.push('Expert bots did not clearly beat Easy bots');
 console.log(fails.length ? 'FAIL\n  ' + fails.join('\n  ') : 'PASS');

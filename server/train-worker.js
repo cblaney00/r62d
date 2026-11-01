@@ -10,7 +10,7 @@ const until = Date.now() + (workerData.minutes || 15) * 60 * 1000, dt = 1 / 30;
 let mi = Math.floor(Math.random() * MAP_LIST.length);
 while (Date.now() < until) {
   const id = MAP_LIST[mi++ % MAP_LIST.length];
-  const g = new Game(); g.mapId = id; g.map = buildMap(id); g.botLevel = 4; g.proExplore = true;
+  const g = new Game(); g.mapId = id; g.map = buildMap(id); g.botLevel = 7; g.proExplore = true;
   for (let i = 0; i < 10; i++) g.addBot();
   g.startMatch();
   let t = 0, last = null;

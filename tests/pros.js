@@ -14,10 +14,10 @@ let fails = 0; const bad = (...a) => { fails++; console.log('FAIL', ...a); };
 const dt = 1 / 30;
 
 function play(id, { vsExpert = false, maxMin = 25 } = {}) {
-  const g = new Game(); g.mapId = id; g.map = buildMap(id); g.botLevel = 4;
+  const g = new Game(); g.mapId = id; g.map = buildMap(id); g.botLevel = 7;
   for (let i = 0; i < 10; i++) g.addBot();
   g.startMatch();
-  if (vsExpert) for (const p of g.players.values()) if (p.squad === 1) { p.pro = null; p.level = 3; p.name = p.baseName; p.persona = null; }
+  if (vsExpert) for (const p of g.players.values()) if (p.squad === 1) { p.pro = null; p.level = 5; p.name = p.baseName; p.persona = null; }
   const reacts = [], seenAt = new Map(), rounds = []; let t = 0, last = null;
   while (t < 60 * maxMin) {
     g.tick(dt); t += dt;

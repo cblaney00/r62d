@@ -3,7 +3,7 @@
 import { WEAPONS } from '/shared/operators.js';
 
 // Each gun in a 100 x 40 drawing space: body colour, then the parts' sizes and styles.
-const G = {
+export const G = {
   k4:      { body: '#2c3036', furn: '#3b3f45', stock: 'adjust', rec: [26, 52], bar: 92, guard: [52, 76], mag: 'curved', grip: 34, rail: true },
   breaker: { body: '#2b2d31', furn: '#6b4a2e', stock: 'wood', rec: [24, 44], bar: 96, guard: [52, 70], mag: 'tube', grip: 30, rail: true, pump: true },
   mule:    { body: '#363a33', furn: '#2a2d28', stock: 'heavy', rec: [22, 56], bar: 98, guard: [56, 80], mag: 'box', grip: 34, rail: true, bipod: true, handle: true },
@@ -45,13 +45,35 @@ function part(c, pts, col, lit = 1.35) {
 }
 const box = (c, x, y, w, h, col, lit) => part(c, [x, y, x + w, y, x + w, y + h, x, y + h], col, lit);
 
+// a real revolver (he asked: the old one was a pistol slide with a cylinder stuck on): frame, fluted cylinder,
+// ribbed barrel with an ejector lug and front blade, hammer, trigger guard and a curved wooden grip
+function revolver(ctx, g, muzzle) {
+  const metal = g.body, dark = shadeCol(g.body, 0.55);
+  part(ctx, [30, 25, 37, 21.5, 44, 22, 42, 27, 40.5, 33, 39, 37.5, 31.5, 38, 29.5, 34, 31, 29], g.furn, 1.5); // grip, curving back
+  for (let y = 26; y < 36; y += 2) for (let x = 32.5 + (y - 26) * -0.12; x < 39.5 - (y - 26) * 0.08; x += 2) box(ctx, x, y, 0.7, 0.7, shadeCol(g.furn, 0.6)); // checkering
+  box(ctx, 34.5, 29, 2.4, 2.4, '#8a8f95'); // grip screw
+  ctx.strokeStyle = '#15171a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(46.5, 22.3, 4.2, 0, Math.PI); ctx.stroke(); // trigger guard
+  part(ctx, [45.5, 22, 47.2, 22, 46.6, 25.5, 45.6, 25.8], '#1b1d20'); // trigger
+  part(ctx, [33.5, 14.5, 58, 14.5, 58, 21.5, 44, 22.5, 37, 21.5, 33.5, 19], metal, 1.5); // frame
+  part(ctx, [33.6, 15.5, 31.5, 11.5, 33, 10.5, 36.5, 14.5], dark); // hammer spur
+  box(ctx, 37, 13.4, 3.2, 1.2, '#1b1d20'); // rear notch
+  box(ctx, 41.5, 13, 14.5, 10.6, shadeCol(metal, 0.92), 1.7); // cylinder
+  for (let i = 0; i < 3; i++) box(ctx, 43 + i * 4.1, 14.8, 2.6, 7, shadeCol(metal, 0.62)); // flutes
+  box(ctx, 41.5, 13, 1, 10.6, shadeCol(metal, 1.25)); box(ctx, 55, 13, 1, 10.6, shadeCol(metal, 0.5));
+  box(ctx, 56, 14.6, muzzle - 56, 4.6, metal, 1.6); // barrel
+  box(ctx, 56, 13.4, muzzle - 56, 1.4, shadeCol(metal, 0.8)); for (let x = 58; x < muzzle - 3; x += 3) box(ctx, x, 13.5, 1.6, 0.6, shadeCol(metal, 1.3)); // vent rib
+  box(ctx, 56, 19.2, muzzle - 60, 2.8, shadeCol(metal, 0.85)); // ejector lug under the barrel
+  part(ctx, [muzzle - 5, 13.4, muzzle - 3.5, 10.6, muzzle - 1.5, 10.6, muzzle - 1.5, 13.4], '#c43a2a'); // front blade
+  box(ctx, muzzle - 0.5, 15.2, 1, 3.4, '#0c0d0e');
+}
 export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   const g = G[key] || G.k4, a = { barrel: 'none', grip: 'none', sight: 'iron', ...att };
   const s = Math.min(W / 108, H / 44);
   ctx.save();
   ctx.translate(X + (W - 108 * s) / 2 + 4 * s, Y + (H - 44 * s) / 2 + 2 * s); ctx.scale(s, s);
   const [r0, r1] = g.rec, top = g.pistol ? 15 : 14, bot = g.pistol ? 22 : 23, mid = (top + bot) / 2;
-  let muzzle = g.bar + (a.barrel === 'extended' ? 6 : a.barrel === 'heavy' ? 3 : a.barrel === 'short' ? -Math.min(6, Math.max(0, g.bar - (g.guard[1] || r1) - 2)) : 0);
+  let muzzle = g.bar + (a.barrel === 'extended' ? 6 : a.barrel === 'heavy' ? 3 : a.barrel === 'match' ? 5 : a.barrel === 'short' ? -Math.min(6, Math.max(0, g.bar - (g.guard[1] || r1) - 2)) : 0);
+  if (g.revolver) revolver(ctx, g, muzzle); else {
   // --- stock ---
   if (g.stock === 'adjust') { part(ctx, [r0, 16, 8, 17, 4, 15, 2, 17, 2, 27, 7, 28, 12, 22, r0, 21], g.furn); box(ctx, 6, 19, r0 - 6, 1.6, '#1d1f22'); }
   if (g.stock === 'fold') { box(ctx, 6, 16.5, r0 - 6, 1.6, '#1d1f22'); box(ctx, 6, 22, r0 - 6, 1.6, '#1d1f22'); box(ctx, 4, 15.5, 3, 9.5, g.furn); }
@@ -70,7 +92,6 @@ export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   // --- receiver / slide ---
   if (g.pistol) { part(ctx, [r0, top, r1, top, r1, bot - (g.big ? 0 : 1), r0, bot], g.body, 1.6); for (let i = r0 + 3; i < r0 + 10; i += 1.6) box(ctx, i, top + 1, 0.6, 4, shadeCol(g.body, 0.6)); box(ctx, r0 + 2, bot, r1 - r0 - 8, 2.4, g.furn); }
   else { part(ctx, [r0, top, r1, top, r1, bot, r0 + 4, bot + 1, r0, bot], g.body); box(ctx, r0 + 6, mid - 1.5, 7, 2, shadeCol(g.body, 0.6)); box(ctx, r0 + 16, top + 2, 2.5, 1.2, '#8a8f95'); }
-  if (g.revolver) { box(ctx, r0 + 5, top - 0.8, 13, bot - top + 2.6, shadeCol(g.body, 0.9), 1.5); for (let i = 0; i < 3; i++) box(ctx, r0 + 7 + i * 3.6, top + 0.8, 1.6, bot - top - 0.6, shadeCol(g.body, 0.6)); }
   if (g.bolt) { ctx.strokeStyle = '#1b1d20'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(r0 + 14, mid); ctx.lineTo(r0 + 17, bot + 4); ctx.stroke(); ctx.fillStyle = '#2c2f33'; ctx.beginPath(); ctx.arc(r0 + 17, bot + 4.5, 1.8, 0, Math.PI * 2); ctx.fill(); }
   if (g.handle) { part(ctx, [r0 + 8, top, r0 + 10, top - 6, r0 + 24, top - 6, r0 + 26, top], g.body); box(ctx, r0 + 11, top - 4.2, 13, 3, '#0e0f11'); }
   // --- pistol grip and trigger ---
@@ -94,27 +115,33 @@ export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   if (g.bipod) { ctx.strokeStyle = '#1d1f22'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(g.guard[1] - 3, bot); ctx.lineTo(g.guard[1] - 8, bot + 11); ctx.moveTo(g.guard[1] - 3, bot); ctx.lineTo(g.guard[1] + 2, bot + 11); ctx.stroke(); }
   // --- top rail ---
   if (g.rail) { box(ctx, r0 + 2, top - 1.6, (g.guard[1] || r1) - r0 - 2, 1.6, '#1b1d20'); for (let i = r0 + 3; i < (g.guard[1] || r1) - 1; i += 2) box(ctx, i, top - 1.6, 0.6, 1.6, '#3a3d42'); }
+  }
   // ================= attachments =================
   // barrel
   if (a.barrel === 'suppressor') { box(ctx, muzzle - 1, mid - 3, 16, 6, '#1a1c1f', 1.7); box(ctx, muzzle + 1, mid - 3, 1, 6, '#2c2f33'); muzzle += 15; }
   else if (a.barrel === 'compensator') { box(ctx, muzzle - 1, mid - 2.4, 7, 4.8, '#24272b', 1.6); for (let i = 0; i < 3; i++) box(ctx, muzzle + 0.8 + i * 1.8, mid - 2.4, 0.8, 2, '#0c0d0e'); muzzle += 6; }
   else if (a.barrel === 'brake') { box(ctx, muzzle - 1, mid - 2.8, 6, 5.6, '#2d3035', 1.6); box(ctx, muzzle + 1, mid - 2.8, 1.2, 5.6, '#0c0d0e'); box(ctx, muzzle + 3, mid - 2.8, 1.2, 5.6, '#0c0d0e'); muzzle += 5; }
   else if (a.barrel === 'choke') { part(ctx, [muzzle - 1, mid - 2.2, muzzle + 6, mid - 1.5, muzzle + 6, mid + 1.5, muzzle - 1, mid + 2.2], '#2a2d31'); box(ctx, muzzle + 1.5, mid - 2, 0.8, 4, '#121315'); muzzle += 6; }
-  else box(ctx, muzzle - 1, mid - 1.8, 3, 3.6, '#16181a', 1.6);
+  else if (a.barrel === 'match') { box(ctx, muzzle - 6, mid - 1.6, 1.4, 3.2, '#b8913a', 1.5); box(ctx, muzzle - 1, mid - 1.5, 2.5, 3, '#16181a', 1.6); muzzle += 1; } // gold-ringed target barrel
+  else if (!g.revolver) box(ctx, muzzle - 1, mid - 1.8, 3, 3.6, '#16181a', 1.6);
   if (!g.pistol) box(ctx, (g.guard[1] || r1) - 3, top - 4, 1.6, 4, '#1b1d20'); // front sight post
+  const gx2 = g.grip, tgx = g.revolver ? 45.6 : gx2 + 8.2, tgy = g.revolver ? 22.3 : bot + 0.6;
+  if (a.grip === 'trigger') { box(ctx, tgx, tgy, 1.5, 3.2, '#d4a83c', 1.6); } // gold match trigger
+  if (a.grip === 'pad') { if (g.pistol) part(ctx, g.revolver ? [31, 29, 41.5, 27, 40, 33, 39, 37.5, 31.5, 38, 29.5, 34] : [gx2, bot + 3, gx2 + 5.6, bot + 3, gx2 + 4.6, bot + 12.5, gx2 - 1.4, bot + 12.5], '#232323', 1.1);
+    else if (g.stock !== 'none') { box(ctx, 0.4, 15.5, 2.4, 13, '#202020', 1.1); for (let y = 17; y < 28; y += 2.2) box(ctx, 0.4, y, 2.4, 0.5, '#0e0e0e'); } } // rubber butt pad / grip sleeve
   // grip
   if (a.grip === 'vertical' && !g.pistol) part(ctx, [g.guard[0] + 8, bot, g.guard[0] + 13, bot, g.guard[0] + 12.5, bot + 11, g.guard[0] + 8.5, bot + 11], '#1f2124');
   if (a.grip === 'angled' && !g.pistol) part(ctx, [g.guard[0] + 4, bot, g.guard[0] + 15, bot, g.guard[0] + 8, bot + 6], '#1f2124');
   if (a.grip === 'handstop' && !g.pistol) part(ctx, [g.guard[1] - 9, bot, g.guard[1] - 3, bot, g.guard[1] - 4, bot + 4.5, g.guard[1] - 7, bot + 4.5], '#1f2124'); // a little stop at the front of the handguard
   if (a.grip === 'stubby' && !g.pistol) part(ctx, [g.guard[0] + 7, bot, g.guard[0] + 13, bot, g.guard[0] + 12.5, bot + 6, g.guard[0] + 7.5, bot + 6], '#1f2124');
   if (a.grip === 'laser') {
-    const lx = g.pistol ? r0 + 5 : g.guard[0] + 4, ly = g.pistol ? bot + 2.4 : bot - 1;
+    const lx = g.revolver ? 57 : g.pistol ? r0 + 5 : g.guard[0] + 4, ly = g.revolver ? 22 : g.pistol ? bot + 2.4 : bot - 1;
     box(ctx, lx, ly, 8, 3.2, '#1b1d20'); ctx.fillStyle = '#ff3030'; ctx.fillRect(lx + 8, ly + 1.1, 1, 1);
     ctx.strokeStyle = 'rgba(255,40,40,0.55)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(lx + 9, ly + 1.6); ctx.lineTo(108, ly + 1.6); ctx.stroke();
   }
   // sight
   const sx = g.pistol ? r0 + 12 : r0 + 8;
-  if (a.sight === 'iron') { if (!g.handle) box(ctx, g.pistol ? r0 + 1 : r0 + 3, top - (g.pistol ? 2 : 4), 3, g.pistol ? 2 : 4, '#1b1d20'); }
+  if (a.sight === 'iron') { if (!g.handle && !g.revolver) box(ctx, g.pistol ? r0 + 1 : r0 + 3, top - (g.pistol ? 2 : 4), 3, g.pistol ? 2 : 4, '#1b1d20'); }
   if (a.sight === 'reddot') { part(ctx, [sx, top - 1.6, sx + 10, top - 1.6, sx + 9, top - 6.5, sx + 2, top - 7], '#22252a'); ctx.fillStyle = 'rgba(120,200,255,0.45)'; ctx.fillRect(sx + 2.5, top - 5.8, 6, 3); ctx.fillStyle = '#ff3030'; ctx.fillRect(sx + 5, top - 4.6, 1, 1); }
   if (a.sight === 'holo') { box(ctx, sx, top - 3, 13, 1.4, '#22252a'); part(ctx, [sx + 1, top - 3, sx + 3, top - 9, sx + 12, top - 9, sx + 12.5, top - 3], '#2a2d32'); ctx.fillStyle = 'rgba(140,220,255,0.4)'; ctx.fillRect(sx + 4, top - 8, 7, 4.2); }
   if (a.sight === 'prism') { box(ctx, sx, top - 2.2, 15, 2.2, '#1b1d20'); box(ctx, sx + 1, top - 9, 14, 7, '#24272b', 1.4); box(ctx, sx + 3, top - 10, 9, 1.4, '#2c2f33'); ctx.fillStyle = 'rgba(255,170,60,0.55)'; ctx.fillRect(sx + 14.2, top - 8, 0.9, 5); }
