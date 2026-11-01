@@ -1895,8 +1895,9 @@ function aimPad() {
 // how hot your gun is right now, worked out every frame (not only when a snapshot arrives) so the crosshair gap closes
 // the moment the next shot is exact; a click you just made opens it at once, before the server has even heard of it
 function gunHeat(me, w, now) {
-  const srv = aimHeat(w, me.sh || 0, (me.fs ?? 99) + (now - (st.mineAt || now)));
-  const p = st.shotPred, own = p && p.w === me.w ? aimHeat(w, p.sh, now - p.t) : 0;
+  const gm = gunMods(me.w, attFromCode(me.aa));
+  const srv = aimHeat(w, me.sh || 0, (me.fs ?? 99) + (now - (st.mineAt || now)), gm);
+  const p = st.shotPred, own = p && p.w === me.w ? aimHeat(w, p.sh, now - p.t, gm) : 0;
   return Math.max(srv, own);
 }
 

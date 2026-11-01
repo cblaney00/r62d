@@ -1,12 +1,15 @@
 // Weapons and the 30 operators (15 attack, 15 defence).
 
 export const WEAPONS = {
-  k4:      { name: 'K4 Carbine',   cls: 'AR',      dmg: 31, rpm: 720, mag: 30, reserve: 150, reload: 2.4, spread: 0.06, ads: 0.014, bloom: 0.012, auto: true,  pellets: 1, range: 1100, len: 15 },
-  v9:      { name: 'V9 SMG',       cls: 'SMG',     dmg: 24, rpm: 880, mag: 32, reserve: 192, reload: 2.0, spread: 0.07, ads: 0.022, bloom: 0.010, auto: true,  pellets: 1, range: 900,  len: 11 },
+  k4:      { name: 'K4 Carbine',   cls: 'AR',      dmg: 31, rpm: 720, mag: 30, reserve: 150, reload: 2.4, spread: 0.06, ads: 0.014, bloom: 0.012, auto: true,  pellets: 1, range: 1100, len: 15,
+             trait: 'The all-rounder: nothing it does badly, nothing it does best.' },
   breaker: { name: 'Breaker-12',   cls: 'Shotgun', mode: 'pump-action', dmg: 15, rpm: 78,  mag: 7,  reserve: 42,  reload: 3.1, spread: 0.16, ads: 0.11,  bloom: 0,     auto: false, pellets: 8, range: 420,  len: 14 },
-  mule:    { name: 'Mule LMG',     cls: 'LMG',     dmg: 29, rpm: 640, mag: 80, reserve: 160, reload: 4.4, spread: 0.09, ads: 0.024, bloom: 0.008, auto: true,  pellets: 1, range: 1100, len: 17 },
-  longbow: { name: 'Longbow DMR',  cls: 'DMR',     dmg: 58, rpm: 360, mag: 12, reserve: 60,  reload: 2.7, spread: 0.06, ads: 0.004, bloom: 0.02,  auto: false, pellets: 1, range: 1300, len: 18 },
-  hornet:  { name: 'Hornet MP',    cls: 'MP',      dmg: 20, rpm: 920, mag: 25, reserve: 150, reload: 1.9, spread: 0.08, ads: 0.03,  bloom: 0.010, auto: true,  pellets: 1, range: 800,  len: 8 },
+  mule:    { name: 'Mule LMG',     cls: 'LMG',     dmg: 29, rpm: 640, mag: 80, reserve: 160, reload: 4.4, spread: 0.09, ads: 0.024, bloom: 0.008, auto: true,  pellets: 1, range: 1100, len: 17,
+             adsMul: 1.1, kickMul: 0.85, swayMul: 0.8, trait: 'The steady LMG: 80 rounds that stay where you put them, a little slow to aim.' },
+  longbow: { name: 'Longbow DMR',  cls: 'DMR',     dmg: 66, rpm: 260, mag: 10, reserve: 50,  reload: 2.7, spread: 0.06, ads: 0.004, bloom: 0.02,  auto: false, pellets: 1, range: 1300, len: 18,
+             kickMul: 1.4, settle: 0.6, trait: 'A heavy marksman rifle: two body shots drop anyone, but it jumps hard and needs a moment between shots.' },
+  hornet:  { name: 'Hornet MP',    cls: 'MP',      dmg: 24, rpm: 760, mag: 30, reserve: 150, reload: 1.6, spread: 0.08, ads: 0.03,  bloom: 0.010, auto: true,  pellets: 1, range: 800,  len: 8,
+             kickMul: 0.7, swayMul: 0.7, fall: { from: 200, to: 480, min: 0.55 }, trait: 'A machine pistol tamed for control: easy to keep on target and quick to reload, but it loses its punch past one room.' },
   vex50:   { name: 'Vex .50',      cls: 'Pistol',  dmg: 50, rpm: 210, mag: 7,  reserve: 35,  reload: 2.0, spread: 0.06, ads: 0.012, bloom: 0.04,  auto: false, pellets: 1, range: 900,  len: 8 },
   p10:     { name: 'P10 Sidearm',  cls: 'Pistol',  dmg: 34, rpm: 420, mag: 15, reserve: 60,  reload: 1.6, spread: 0.05, ads: 0.016, bloom: 0.02,  auto: false, pellets: 1, range: 900,  len: 7 },
   // More guns (he asked: "every gun should have its own properties, none of them too similar"). Besides the numbers
@@ -16,10 +19,10 @@ export const WEAPONS = {
              pen: 0.62, adsMul: 1.15, kickMul: 1.8, swayMul: 0.7, fall: { from: 520, to: 900, min: 0.8 }, trait: 'Hits hard and keeps its damage far away, but kicks hard and holds only 20 rounds.' },
   sabre:   { name: 'Sabre Bullpup', cls: 'AR', dmg: 28, rpm: 820, mag: 30, reserve: 180, reload: 2.9, spread: 0.055, ads: 0.016, bloom: 0.011, auto: true, pellets: 1, range: 1000, len: 12,
              adsMul: 0.8, kickMul: 0.85, swayMul: 1.3, trait: 'Short, quick to aim and fast-firing; slow to reload, and its spray wanders sideways.' },
-  trident: { name: 'Trident Burst', cls: 'AR', dmg: 38, rpm: 900, mag: 30, reserve: 150, reload: 2.3, spread: 0.05, ads: 0.010, bloom: 0.010, auto: false, pellets: 1, range: 1150, len: 15,
-             burst: 3, burstGap: 0.2, kickMul: 0.8, trait: 'Three-round burst with every click: deadly accurate in bursts, but it can\'t spray.' },
-  wasp:    { name: 'Wasp SMG', cls: 'SMG', dmg: 18, rpm: 1100, mag: 40, reserve: 200, reload: 2.3, spread: 0.08, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 800, len: 11,
-             kickMul: 0.8, swayMul: 1.5, fall: { from: 220, to: 500, min: 0.55 }, trait: 'A frantic fire rate shreds up close; wild sideways recoil and weak at range.' },
+  trident: { name: 'Trident Burst', cls: 'AR', dmg: 34, rpm: 900, mag: 30, reserve: 150, reload: 2.3, spread: 0.05, ads: 0.010, bloom: 0.010, auto: false, pellets: 1, range: 1150, len: 15,
+             burst: 3, burstGap: 0.28, kickMul: 0.8, trait: 'Three-round burst with every click: deadly accurate in bursts, but it can\'t spray.' },
+  wasp:    { name: 'Wasp SMG', cls: 'SMG', dmg: 18, rpm: 1100, mag: 30, reserve: 180, reload: 2.3, spread: 0.08, ads: 0.026, bloom: 0.011, auto: true, pellets: 1, range: 800, len: 11,
+             kickMul: 1.1, swayMul: 2.1, adsMul: 1.15, fall: { from: 160, to: 420, min: 0.5 }, trait: 'The fastest-firing gun there is and deadly within a few metres, but 30 rounds go in under two seconds, it kicks hard sideways and its damage falls away fast.' },
   marten:  { name: 'Marten .45', cls: 'SMG', dmg: 26, rpm: 640, mag: 25, reserve: 150, reload: 2.1, spread: 0.065, ads: 0.020, bloom: 0.010, auto: true, pellets: 1, range: 850, len: 13,
              quiet: true, kickMul: 0.75, swayMul: 0.6, settle: 0.26, fall: { from: 240, to: 520, min: 0.6 }, trait: 'Built-in suppressor with no damage lost: quiet, steady and slow-firing.' },
   lark:    { name: 'Lark PDW', cls: 'SMG', dmg: 21, rpm: 860, mag: 50, reserve: 200, reload: 2.6, spread: 0.07, ads: 0.018, bloom: 0.010, auto: true, pellets: 1, range: 1000, len: 12,
@@ -30,10 +33,10 @@ export const WEAPONS = {
              pen: 0.6, kickMul: 1.3, fall: { from: 200, to: 600, min: 0.5 }, trait: 'One heavy slug: accurate, huge damage and smashes walls, but very slow to fire.' },
   stub:    { name: 'Stub Sawn-off', cls: 'Shotgun', mode: 'double-barrel', dmg: 13, rpm: 300, mag: 2, reserve: 20, reload: 2.4, spread: 0.22, ads: 0.18, bloom: 0, auto: false, pellets: 9, range: 260, len: 9,
              fall: { from: 50, to: 200, min: 0.2 }, trait: 'A sidearm with two barrels: blow holes in walls and hatches, or end a fight at arm\'s length.' },
-  ox:      { name: 'Ox Belt-Fed', cls: 'LMG', dmg: 31, rpm: 540, mag: 100, reserve: 100, reload: 6.0, spread: 0.10, ads: 0.022, bloom: 0.009, auto: true, pellets: 1, range: 1200, len: 18,
-             adsMul: 1.35, kickMul: 1.1, swayMul: 0.6, trait: '100 heavy rounds that stay on target, but very slow to aim and an age to reload.' },
-  drummer: { name: 'Drummer LMG', cls: 'LMG', dmg: 24, rpm: 780, mag: 60, reserve: 180, reload: 3.6, spread: 0.085, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 1050, len: 16,
-             adsMul: 0.8, swayMul: 1.2, trait: 'A light, fast LMG: quick to aim and reload for its kind, but its bullets hit softer.' },
+  ox:      { name: 'Ox Belt-Fed', cls: 'LMG', dmg: 36, rpm: 480, mag: 100, reserve: 100, reload: 6.0, spread: 0.10, ads: 0.022, bloom: 0.009, auto: true, pellets: 1, range: 1200, len: 18,
+             adsMul: 1.35, kickMul: 1.3, swayMul: 0.5, trait: '100 rounds that hit like a battle rifle and climb straight up, but it fires slowly, is very slow to aim and takes an age to reload.' },
+  drummer: { name: 'Drummer LMG', cls: 'LMG', dmg: 22, rpm: 860, mag: 60, reserve: 180, reload: 3.6, spread: 0.085, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 1050, len: 16,
+             adsMul: 0.8, kickMul: 0.8, swayMul: 1.5, trait: 'A light, fast-firing LMG that hoses a doorway: quick to aim and reload for its kind, but its soft bullets wander side to side.' },
   pike:    { name: 'Pike Bolt-Action', cls: 'DMR', mode: 'bolt-action', dmg: 112, rpm: 50, mag: 5, reserve: 30, reload: 3.2, spread: 0.09, ads: 0.002, bloom: 0.05, auto: false, pellets: 1, range: 1600, len: 20,
              pen: 0.8, adsMul: 1.3, kickMul: 1.5, settle: 0.9, trait: 'One body shot drops any light or medium operator. A slow bolt between shots, slow to aim, hopeless from the hip.' },
   heron:   { name: 'Heron Marksman', cls: 'DMR', dmg: 44, rpm: 480, mag: 20, reserve: 100, reload: 2.4, spread: 0.055, ads: 0.007, bloom: 0.014, auto: false, pellets: 1, range: 1200, len: 16,
@@ -45,10 +48,8 @@ export const WEAPONS = {
   // he asked for side-specific weapons (no gun on both sides), so attack and defence each got the guns they were missing
   javelin: { name: 'Javelin SMG', cls: 'SMG', dmg: 25, rpm: 800, mag: 30, reserve: 180, reload: 2.2, spread: 0.065, ads: 0.019, bloom: 0.010, auto: true, pellets: 1, range: 950, len: 12,
              adsMul: 0.85, fall: { from: 320, to: 620, min: 0.65 }, trait: 'The attackers\' SMG: quick to aim, steady, good on the move.' },
-  halberd: { name: 'Halberd Breaching Shotgun', cls: 'Shotgun', mode: 'pump-action', dmg: 16, rpm: 72, mag: 8, reserve: 48, reload: 3.3, spread: 0.14, ads: 0.10, bloom: 0, auto: false, pellets: 8, range: 440, len: 15,
-             kickMul: 1.1, trait: 'A heavy pump built for breaching: a tight blast that tears soft walls and hatches open.' },
-  sentry:  { name: 'Sentry Carbine', cls: 'AR', dmg: 30, rpm: 690, mag: 30, reserve: 150, reload: 2.3, spread: 0.058, ads: 0.016, bloom: 0.012, auto: true, pellets: 1, range: 900, len: 13,
-             adsMul: 0.9, fall: { from: 300, to: 600, min: 0.7 }, trait: 'A short defender\'s carbine for holding a room: quick to the shoulder, but its damage drops off sooner.' },
+  sentry:  { name: 'Sentry Carbine', cls: 'AR', dmg: 33, rpm: 600, mag: 25, reserve: 125, reload: 2.3, spread: 0.058, ads: 0.016, bloom: 0.012, auto: true, pellets: 1, range: 900, len: 13,
+             adsMul: 0.85, kickMul: 0.6, fall: { from: 260, to: 520, min: 0.65 }, trait: 'A slow, hard-hitting defender\'s carbine: very easy to control and quick to the shoulder, but only 25 rounds and it weakens down long halls.' },
   sparrow: { name: 'Sparrow Compact', cls: 'Pistol', dmg: 28, rpm: 520, mag: 17, reserve: 68, reload: 1.4, spread: 0.05, ads: 0.017, bloom: 0.018, auto: false, pellets: 1, range: 850, len: 6,
              trait: 'A light, quick pistol: fast to fire and reload, but hits softer.' },
 };
@@ -84,10 +85,10 @@ export const OPERATORS = {
   kestrel: { team: 'atk', name: 'KESTREL', role: 'Recon',         armor: 3, primary: 'longbow', secondary: 'p10',
              ability: { id: 'dart', name: 'Seeker Dart', count: 3, desc: 'Fire a dart into a wall. For 10 seconds it pings every enemy near it, through walls, for your whole team.' },
              gadget: 'frag', gadgetCount: 2, color: '#4fb3a9', helmet: '#5a5f4a', look: 'cap' },
-  hammer:  { team: 'atk', name: 'HAMMER',  role: 'Soft Breacher', armor: 2, primary: 'breaker', secondary: 'p10',
+  hammer:  { team: 'atk', name: 'HAMMER',  role: 'Soft Breacher', armor: 2, primary: 'tusk', secondary: 'p10',
              ability: { id: 'slug', name: 'Breaching Rounds', count: 5, desc: 'Launch an explosive round that blows open soft walls, barricades and anyone standing behind them.' },
              gadget: 'claymore', gadgetCount: 1, color: '#c9b037', helmet: '#4a4032', look: 'helmet' },
-  talon:   { team: 'atk', name: 'TALON',   role: 'Disruptor',     armor: 3, primary: 'v9',      secondary: 'p10',
+  talon:   { team: 'atk', name: 'TALON',   role: 'Disruptor',     armor: 3, primary: 'sabre',      secondary: 'p10',
              ability: { id: 'emp', name: 'EMP Grenade', count: 2, desc: 'Throw an EMP that sticks where it hits. In a circle about a door wide — right through the wall it is on — it destroys jammers, traps and enemy gadgets and blinds cameras for 12 seconds.' },
              gadget: 'breach', gadgetCount: 2, color: '#a46ad6', helmet: '#4a5164', look: 'goggles' },
   bulwark: { team: 'atk', name: 'BULWARK', role: 'Shield',        armor: 1, primary: 'p10',     secondary: null,
@@ -99,16 +100,16 @@ export const OPERATORS = {
   haze    : { team: 'atk', name: 'HAZE', role: 'Smoke Support', armor: 2, primary: 'k4', secondary: 'p10',
              ability: {id: "barrage",name: "Smoke Barrage",count: 2,desc: "Fire a canister that lays a thin wall of smoke across your aim, about 6 metres wide, cutting a sightline for 12 seconds."},
              gadget: 'breach', gadgetCount: 2, color: '#9aa3ad', helmet: '#3f4448', look: 'mask' },
-  glint   : { team: 'atk', name: 'GLINT', role: 'Intel', armor: 3, primary: 'v9', secondary: 'p10',
+  glint   : { team: 'atk', name: 'GLINT', role: 'Intel', armor: 3, primary: 'javelin', secondary: 'p10',
              ability: {id: "sonar",name: "Sonar Pulse",count: 3,desc: "Throw a pulse emitter. When it lands it reveals every defender nearby, through walls, to your whole team for a few seconds."},
              gadget: 'frag', gadgetCount: 2, color: '#5fd3e8', helmet: '#2f4a52', look: 'visor' },
-  brisk   : { team: 'atk', name: 'BRISK', role: 'Entry Fragger', armor: 3, primary: 'hornet', secondary: 'vex50',
+  brisk   : { team: 'atk', name: 'BRISK', role: 'Entry Fragger', armor: 3, primary: 'javelin', secondary: 'p10',
              ability: {id: "adrenal",name: "Adrenal Shot",count: 2,desc: "Inject yourself: for 6 seconds you move a quarter faster and aim down sights twice as quickly."},
              gadget: 'stun', gadgetCount: 2, color: '#e84a7a', helmet: '#4a2a36', look: 'cap' },
   onyx    : { team: 'atk', name: 'ONYX', role: 'Area Denial', armor: 1, primary: 'mule', secondary: 'p10',
              ability: {id: "cluster",name: "Cluster Charge",count: 3,desc: "Stick it on a soft wall. After 3 seconds it fires four bomblets into the room on the other side."},
              gadget: 'smoke', gadgetCount: 2, color: '#3a3d44', helmet: '#1f2125', look: 'helmet' },
-  prism   : { team: 'atk', name: 'PRISM', role: 'Deception', armor: 3, primary: 'v9', secondary: 'p10',
+  prism   : { team: 'atk', name: 'PRISM', role: 'Deception', armor: 3, primary: 'javelin', secondary: 'p10',
              ability: {id: "decoy",name: "Holo Decoy",count: 3,desc: "Send a hologram of yourself running ahead. Defenders see and hear a real attacker until they shoot it."},
              gadget: 'smoke', gadgetCount: 2, color: '#c58cff', helmet: '#43365a', look: 'hood' },
   volt    : { team: 'atk', name: 'VOLT', role: 'Gadget Denial', armor: 2, primary: 'k4', secondary: 'p10',
@@ -117,10 +118,10 @@ export const OPERATORS = {
   tether  : { team: 'atk', name: 'TETHER', role: 'Recon', armor: 2, primary: 'longbow', secondary: 'p10',
              ability: {id: "scope",name: "Wall Scope",count: 2,desc: "Push a fibre-optic scope through a soft wall. Your team sees the room behind it. An energy shield protects it for its first 3 seconds; after that one bullet breaks it."},
              gadget: 'claymore', gadgetCount: 2, color: '#6fbf73', helmet: '#34452f', look: 'cap' },
-  strider : { team: 'atk', name: 'STRIDER', role: 'Silent Flank', armor: 3, primary: 'v9', secondary: 'vex50',
+  strider : { team: 'atk', name: 'STRIDER', role: 'Silent Flank', armor: 3, primary: 'javelin', secondary: 'p10',
              ability: {id: "ghost",name: "Ghost Step",count: 2,desc: "For 6 seconds your footsteps are silent and you set off no traps, sensors, scanners or darts — but you move 15% slower while you concentrate."},
              gadget: 'frag', gadgetCount: 2, color: '#8ab4d8', helmet: '#2b3a48', look: 'hood' },
-  ferro   : { team: 'atk', name: 'FERRO', role: 'Soft Breacher', armor: 1, primary: 'breaker', secondary: 'p10',
+  ferro   : { team: 'atk', name: 'FERRO', role: 'Soft Breacher', armor: 1, primary: 'tusk', secondary: 'p10',
              ability: {id: "hammer",name: "Breaching Hammer",count: 0,desc: "A sledgehammer that never runs out: smashes soft walls and barricades open in one swing — and flattens anyone in reach."},
              gadget: 'stun', gadgetCount: 2, color: '#b0703c', helmet: '#4a3828', look: 'helmet' },
   // ---- added to fill every role to 5 (he asked) ----
@@ -158,56 +159,56 @@ export const OPERATORS = {
              ability: { id: 'lunge', name: 'Lunge', count: 2, desc: 'For 5 seconds your melee becomes a silent 2-metre lunge that downs anyone it hits, from any side.' },
              gadget: 'stun', gadgetCount: 2, color: '#3a3d46', helmet: '#2a2c32', look: 'hood' },
   // ---------- Defence ----------
-  mason:   { team: 'def', name: 'MASON',   role: 'Fortifier',     armor: 1, primary: 'mule',    secondary: 'p10',
+  mason:   { team: 'def', name: 'MASON',   role: 'Fortifier',     armor: 1, primary: 'drummer',    secondary: 'vex50',
              ability: { id: 'panel', name: 'Armor Panel', count: 3, desc: 'Seal a door or window with a bulletproof steel panel. Only explosives and cutters get through.' },
              gadget: 'dshield', gadgetCount: 1, color: '#7b8fa6', helmet: '#5a6475', look: 'helmet' },
-  veil:    { team: 'def', name: 'VEIL',    role: 'Anti-Gadget',   armor: 2, primary: 'v9',      secondary: 'p10',
+  veil:    { team: 'def', name: 'VEIL',    role: 'Anti-Gadget',   armor: 2, primary: 'marten',      secondary: 'vex50',
              ability: { id: 'jammer', name: 'Signal Jammer', count: 3, desc: 'Drop a jammer. Drones, cutters, breach charges and seeker darts stop working near it.' },
              gadget: 'nitro', gadgetCount: 1, color: '#55c1e8', helmet: '#36505e', look: 'hood' },
-  lynx:    { team: 'def', name: 'LYNX',    role: 'Trapper',       armor: 3, primary: 'v9',      secondary: 'p10',
+  lynx:    { team: 'def', name: 'LYNX',    role: 'Trapper',       armor: 3, primary: 'lark',      secondary: 'vex50',
              ability: { id: 'mine', name: 'Paint Trap', count: 3, desc: 'Hide a paint trap. An attacker who walks into it is sprayed with glowing paint and shows up for your whole team, through walls, for 12 seconds. No bang, no damage.' },
              gadget: 'wire', gadgetCount: 2, color: '#8fd14f', helmet: '#33402a', look: 'cap' },
-  solace:  { team: 'def', name: 'SOLACE',  role: 'Medic',         armor: 2, primary: 'breaker', secondary: 'p10',
+  solace:  { team: 'def', name: 'SOLACE',  role: 'Medic',         armor: 2, primary: 'breaker', secondary: 'vex50',
              ability: { id: 'stim', name: 'Stim Pistol', count: 3, desc: 'Shoot a teammate to heal them (or revive them if they are down). With nobody in your sights, it heals you. Passive: if downed, gets back up by himself after 12 seconds.' },
              gadget: 'wire', gadgetCount: 2, color: '#f2f2f2', helmet: '#7a2b2b', look: 'helmet' },
-  wraith:  { team: 'def', name: 'WRAITH',  role: 'Intel Roamer',  armor: 3, primary: 'longbow', secondary: 'p10',
+  wraith:  { team: 'def', name: 'WRAITH',  role: 'Intel Roamer',  armor: 3, primary: 'lark', secondary: 'vex50',
              ability: { id: 'scan', name: 'Pulse Scanner', count: 0, battery: 8, desc: 'Hold to scan, for up to 4 seconds at a time. While scanning you see every attacker within range through walls, but you cannot shoot — and the attackers you see hear a warning ping.' },
              gadget: 'impact', gadgetCount: 2, color: '#6c7cf0', helmet: '#3c4260', look: 'mask' },
-  bramble : { team: 'def', name: 'BRAMBLE', role: 'Trapper', armor: 2, primary: 'v9', secondary: 'p10',
+  bramble : { team: 'def', name: 'BRAMBLE', role: 'Trapper', armor: 2, primary: 'wasp', secondary: 'sparrow',
              ability: {id: "prox",name: "Proximity Charge",count: 2,desc: "Hide a charge by a door or window. When an attacker comes close it beeps once, then explodes."},
              gadget: 'wire', gadgetCount: 2, color: '#7a9a3a', helmet: '#3a4a22', look: 'cap' },
-  kite    : { team: 'def', name: 'KITE', role: 'Intel', armor: 2, primary: 'hornet', secondary: 'p10',
+  kite    : { team: 'def', name: 'KITE', role: 'Intel', armor: 2, primary: 'hornet', secondary: 'vex50',
              ability: {id: "turret",name: "Turret Camera",count: 2,desc: "Place a bulletproof camera that fires a stinging laser (it overheats after 12 shots). Only explosives and gadget-killers destroy it, but a bullet into its lens from the front knocks it out for 8 seconds."},
              gadget: 'dshield', gadgetCount: 2, color: '#e05252', helmet: '#4a2a2a', look: 'visor' },
-  gravel  : { team: 'def', name: 'GRAVEL', role: 'Area Denial', armor: 3, primary: 'v9', secondary: 'vex50',
+  gravel  : { team: 'def', name: 'GRAVEL', role: 'Area Denial', armor: 3, primary: 'lark', secondary: 'vex50',
              ability: {id: "concuss",name: "Daze Mines",count: 3,desc: "Sticky mines that daze any attacker who comes near: shaky aim and slow legs for 4 seconds."},
              gadget: 'impact', gadgetCount: 2, color: '#c4a05a', helmet: '#4a3c22', look: 'goggles' },
-  shunt   : { team: 'def', name: 'SHUNT', role: 'Anti-Breach', armor: 1, primary: 'mule', secondary: 'p10',
+  shunt   : { team: 'def', name: 'SHUNT', role: 'Anti-Breach', armor: 1, primary: 'sentry', secondary: 'vex50',
              ability: {id: "grid",name: "Static Grid",count: 3,desc: "Clamp it on a wall. It fries cutters, charges and scopes placed on that wall and shocks anyone torching it."},
              gadget: 'wire', gadgetCount: 2, color: '#4f86ff', helmet: '#2a3654', look: 'helmet' },
-  hush    : { team: 'def', name: 'HUSH', role: 'Stealth Roamer', armor: 3, primary: 'v9', secondary: 'p10',
+  hush    : { team: 'def', name: 'HUSH', role: 'Stealth Roamer', armor: 3, primary: 'marten', secondary: 'sparrow',
              ability: {id: "shroud",name: "Silent Shroud",count: 0,battery: 6,desc: "Press to go dark, press again to come back: totally silent and invisible to drones and cameras while it lasts (6 s). Then it needs 15 seconds before it is ready again."},
              gadget: 'impact', gadgetCount: 2, color: '#5a5f6e', helmet: '#25272d', look: 'hood' },
-  shade   : { team: 'def', name: 'SHADE', role: 'Intel', armor: 2, primary: 'breaker', secondary: 'p10',
+  shade   : { team: 'def', name: 'SHADE', role: 'Intel', armor: 2, primary: 'wasp', secondary: 'vex50',
              ability: {id: "sensor",name: "Sound Sensor",count: 3,desc: "Place a microphone. Any attacker who runs near it is revealed to your whole team."},
              gadget: 'nitro', gadgetCount: 2, color: '#9b6be0', helmet: '#3a2f52', look: 'mask' },
-  rampart : { team: 'def', name: 'RAMPART', role: 'Support', armor: 1, primary: 'breaker', secondary: 'p10',
+  rampart : { team: 'def', name: 'RAMPART', role: 'Support', armor: 1, primary: 'breaker', secondary: 'vex50',
              ability: {id: "plates",name: "Armor Bag",count: 1,desc: "Drop a bag of armor plates. Every teammate who walks over it gets 15 extra health for the round."},
              gadget: 'dshield', gadgetCount: 2, color: '#8f9aa6', helmet: '#3c4249', look: 'helmet' },
-  miasma  : { team: 'def', name: 'MIASMA', role: 'Area Denial', armor: 2, primary: 'v9', secondary: 'p10',
+  miasma  : { team: 'def', name: 'MIASMA', role: 'Area Denial', armor: 2, primary: 'marten', secondary: 'vex50',
              ability: {id: "gas",name: "Toxin Canister",count: 3,desc: "Throw a canister, then press again to release a toxic cloud that hurts attackers inside for 8 seconds."},
              gadget: 'wire', gadgetCount: 2, color: '#9bc43a', helmet: '#3d4a1e', look: 'mask' },
   snare   : { team: 'def', name: 'SNARE', role: 'Trapper', armor: 2, primary: 'breaker', secondary: 'vex50',
              ability: {id: "clamp",name: "Clamp Trap",count: 3,desc: "A spring trap hidden on the floor. An attacker who steps in is held in place for 2 seconds and hurt."},
              gadget: 'impact', gadgetCount: 2, color: '#a35f3a', helmet: '#3e2a1e', look: 'cap' },
-  argus   : { team: 'def', name: 'ARGUS', role: 'Intel', armor: 3, primary: 'hornet', secondary: 'p10',
+  argus   : { team: 'def', name: 'ARGUS', role: 'Intel', armor: 3, primary: 'hornet', secondary: 'sparrow',
              ability: {id: "stickycam",name: "Sticky Cams",count: 3,desc: "Throw cameras that stick where they land and join your team’s camera network."},
              gadget: 'nitro', gadgetCount: 2, color: '#3ac4b0', helmet: '#1f4740', look: 'visor' },
   // ---- added to fill every role to 5 (he asked) ----
   solder: { team: 'def', name: 'SOLDER', role: 'Wall Welder', armor: 1, primary: 'drummer', secondary: 'vex50',
              ability: { id: 'weld', name: 'Wall Welder', count: 0, battery: 12, desc: 'Hold facing a broken soft wall to weld it shut again, one block at a time.' },
              gadget: 'dshield', gadgetCount: 1, color: '#d08a3a', helmet: '#4a4036', look: 'mask' },
-  latch: { team: 'def', name: 'LATCH', role: 'Alarm Trapper', armor: 2, primary: 'v9', secondary: 'vex50',
+  latch: { team: 'def', name: 'LATCH', role: 'Alarm Trapper', armor: 2, primary: 'lark', secondary: 'vex50',
              ability: { id: 'alarm', name: 'Siren Wire', count: 3, desc: 'Hide a siren wire on the floor (best across a doorway). An attacker who crosses it sets off a deafening siren: for 8 seconds they cannot hear anyone\'s footsteps.' },
              gadget: 'wire', gadgetCount: 2, color: '#b0b84a', helmet: '#44473a', look: 'cap' },
   hound: { team: 'def', name: 'HOUND', role: 'Tracker', armor: 3, primary: 'marten', secondary: 'sparrow',
@@ -228,7 +229,7 @@ export const OPERATORS = {
   tonic: { team: 'def', name: 'TONIC', role: 'Heal Station', armor: 2, primary: 'breaker', secondary: 'vex50',
              ability: { id: 'station', name: 'Heal Station', count: 1, desc: 'Place a heal station. Teammates standing next to it heal 6 health a second, up to 100 in total. Passive: if downed, gets back up by himself after 12 seconds.' },
              gadget: 'wire', gadgetCount: 2, color: '#6ad08a', helmet: '#3e4a42', look: 'helmet' },
-  ward: { team: 'def', name: 'WARD', role: 'Grenade Catcher', armor: 2, primary: 'v9', secondary: 'vex50',
+  ward: { team: 'def', name: 'WARD', role: 'Grenade Catcher', armor: 2, primary: 'marten', secondary: 'vex50',
              ability: { id: 'catcher', name: 'Grenade Catcher', count: 2, desc: 'Place a grenade catcher. It zaps the first two attacker grenades, launcher rounds or flares that come near it.' },
              gadget: 'dshield', gadgetCount: 1, color: '#7aa0e8', helmet: '#3a4252', look: 'visor' },
   girder: { team: 'def', name: 'GIRDER', role: 'Steel Crew', armor: 1, primary: 'drummer', secondary: 'vex50',
@@ -246,10 +247,10 @@ export const GADGET_COUNT = { smoke: 2, frag: 2, claymore: 1, breach: 2, stun: 2
 export const LOADOUTS = {
   ember:   { primaries: ['k4', 'tusk', 'rook'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'breach'] },
   kestrel: { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'claymore'] },
-  hammer:  { primaries: ['halberd', 'javelin', 'tusk'], secondaries: ['p10', 'stub'], gadgets: ['claymore', 'frag'] },
+  hammer:  { primaries: ['tusk', 'javelin', 'k4'], secondaries: ['p10', 'stub'], gadgets: ['claymore', 'frag'] },
   talon:   { primaries: ['sabre', 'k4', 'trident'], secondaries: ['p10', 'stub'], gadgets: ['breach', 'stun'] },
   bulwark: { primaries: ['p10', 'bison'], secondaries: [], gadgets: ['stun', 'smoke'] }, // one hand on the shield: pistols only
-  rivet:   { primaries: ['k4', 'sabre', 'halberd'], secondaries: ['p10', 'bison'], gadgets: ['stun', 'smoke'] },
+  rivet:   { primaries: ['k4', 'sabre', 'tusk'], secondaries: ['p10', 'bison'], gadgets: ['stun', 'smoke'] },
   haze:    { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['breach', 'frag'] },
   glint:   { primaries: ['javelin', 'longbow', 'heron'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'claymore'] },
   brisk:   { primaries: ['javelin', 'tusk', 'sabre'], secondaries: ['p10', 'bison'], gadgets: ['stun', 'smoke'] },
@@ -257,43 +258,43 @@ export const LOADOUTS = {
   prism:   { primaries: ['javelin', 'k4', 'heron'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'stun'] },
   volt:    { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['breach', 'claymore'] },
   tether:  { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'bison'], gadgets: ['claymore', 'smoke'] },
-  strider: { primaries: ['javelin', 'sabre', 'halberd'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'stun'] },
-  ferro:   { primaries: ['halberd', 'mule', 'tusk'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'claymore'] },
+  strider: { primaries: ['javelin', 'sabre', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'stun'] },
+  ferro:   { primaries: ['tusk', 'mule', 'k4'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'claymore'] },
   mason:   { primaries: ['drummer', 'breaker', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
-  veil:    { primaries: ['v9', 'wasp', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['nitro', 'impact'] },
-  lynx:    { primaries: ['v9', 'hornet', 'wasp'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
+  veil:    { primaries: ['marten', 'wasp', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['nitro', 'impact'] },
+  lynx:    { primaries: ['lark', 'hornet', 'wasp'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
   solace:  { primaries: ['breaker', 'lark', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
-  wraith:  { primaries: ['lark', 'v9', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
-  bramble: { primaries: ['v9', 'breaker', 'anvil'], secondaries: ['sparrow', 'vex50'], gadgets: ['wire', 'impact'] },
+  wraith:  { primaries: ['lark', 'marten', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
+  bramble: { primaries: ['wasp', 'breaker', 'anvil'], secondaries: ['sparrow', 'vex50'], gadgets: ['wire', 'impact'] },
   kite:    { primaries: ['hornet', 'lark', 'sentry'], secondaries: ['vex50', 'gnat'], gadgets: ['dshield', 'nitro'] },
-  gravel:  { primaries: ['v9', 'hornet', 'marten'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'wire'] },
+  gravel:  { primaries: ['lark', 'hornet', 'marten'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'wire'] },
   shunt:   { primaries: ['sentry', 'breaker', 'drummer'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'dshield'] },
-  hush:    { primaries: ['marten', 'v9', 'anvil'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'nitro'] },
+  hush:    { primaries: ['marten', 'wasp', 'anvil'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'nitro'] },
   shade:   { primaries: ['wasp', 'breaker', 'lark'], secondaries: ['vex50', 'sparrow'], gadgets: ['nitro', 'wire'] },
   rampart: { primaries: ['breaker', 'drummer', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
-  miasma:  { primaries: ['v9', 'breaker', 'sentry'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
-  snare:   { primaries: ['breaker', 'v9', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['impact', 'nitro'] },
-  argus:   { primaries: ['hornet', 'lark', 'v9'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
+  miasma:  { primaries: ['marten', 'breaker', 'sentry'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
+  snare:   { primaries: ['breaker', 'lark', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['impact', 'nitro'] },
+  argus:   { primaries: ['hornet', 'lark', 'marten'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
   salvo: { primaries: ['rook', 'k4', 'javelin'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'claymore'] },
-  torque: { primaries: ['ox', 'halberd', 'k4'], secondaries: ['p10', 'bison'], gadgets: ['smoke', 'stun'] },
+  torque: { primaries: ['ox', 'tusk', 'k4'], secondaries: ['p10', 'bison'], gadgets: ['smoke', 'stun'] },
   rush: { primaries: ['tusk', 'javelin', 'sabre'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'frag'] },
   blaze: { primaries: ['trident', 'k4', 'javelin'], secondaries: ['p10', 'bison'], gadgets: ['smoke', 'breach'] },
   echo: { primaries: ['sabre', 'longbow', 'heron'], secondaries: ['p10', 'bison'], gadgets: ['claymore', 'smoke'] },
   mark: { primaries: ['heron', 'javelin', 'longbow'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'smoke'] },
   patch: { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['smoke', 'breach'] },
-  trench: { primaries: ['mule', 'rook', 'halberd'], secondaries: ['p10', 'stub'], gadgets: ['breach', 'frag'] },
+  trench: { primaries: ['mule', 'rook', 'tusk'], secondaries: ['p10', 'stub'], gadgets: ['breach', 'frag'] },
   wren: { primaries: ['javelin', 'sabre', 'trident'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'stun'] },
   vapor: { primaries: ['javelin', 'heron', 'tusk'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'stun'] },
   crow: { primaries: ['sabre', 'javelin', 'tusk'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'smoke'] },
   solder: { primaries: ['drummer', 'sentry', 'breaker'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
-  latch: { primaries: ['v9', 'wasp', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
-  hound: { primaries: ['marten', 'v9', 'anvil'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'nitro'] },
-  ruse: { primaries: ['wasp', 'lark', 'v9'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
-  rally: { primaries: ['hornet', 'v9', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
+  latch: { primaries: ['lark', 'wasp', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
+  hound: { primaries: ['marten', 'lark', 'anvil'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'nitro'] },
+  ruse: { primaries: ['wasp', 'lark', 'hornet'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
+  rally: { primaries: ['hornet', 'marten', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
   lens: { primaries: ['lark', 'hornet', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'nitro'] },
-  audit: { primaries: ['wasp', 'v9', 'lark'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'wire'] },
+  audit: { primaries: ['wasp', 'marten', 'lark'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'wire'] },
   tonic: { primaries: ['breaker', 'lark', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
-  ward: { primaries: ['v9', 'sentry', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['dshield', 'impact'] },
+  ward: { primaries: ['marten', 'sentry', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['dshield', 'impact'] },
   girder: { primaries: ['drummer', 'breaker', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
 };
 export function defaultLoadout(op) {
@@ -354,6 +355,7 @@ export const ATTACH = {
     extended: { name: 'Extended Barrel', short: 'Extended', desc: '+ Full damage from 30% further away. − Slower to aim in.', range: 1.3, ads: 1.1 },
     heavy: { name: 'Heavy Barrel', short: 'Heavy barrel', desc: '+ Steadier sprays: less drift and shake. − Slow to aim in, looser hip fire.', kick: 0.82, sway: 0.85, ads: 1.15, hip: 1.1 },
     short: { name: 'Short Barrel', short: 'Short barrel', desc: '+ Quick to aim in, tighter hip fire. − Damage drops off sooner.', ads: 0.85, hip: 0.88, range: 0.8 },
+    match: { name: 'Match Barrel', short: 'Match barrel', desc: '+ Tighter aimed shots and full damage from further away. − Slower to aim in.', adsSpread: 0.85, range: 1.15, ads: 1.1 },
     choke: { name: 'Choke', short: 'Choke', desc: '+ Pellets stay together, so it reaches further. − Easier to miss up close, slower to aim in.', hip: 0.72, adsSpread: 0.72, ads: 1.1 },
   },
   grip: {
@@ -362,6 +364,8 @@ export const ATTACH = {
     angled: { name: 'Angled Grip', short: 'Angled grip', desc: '+ Aim in 20% faster. − A little more recoil drift.', ads: 0.8, kick: 1.12 },
     handstop: { name: 'Handstop', short: 'Handstop', desc: '+ Much less side-to-side shake. − Slower to aim in.', sway: 0.72, ads: 1.08 },
     stubby: { name: 'Stubby Grip', short: 'Stubby grip', desc: '+ Tighter hip fire and a bit quicker to aim. − More shake when spraying.', hip: 0.85, ads: 0.95, sway: 1.12 },
+    trigger: { name: 'Trigger Kit', short: 'Trigger kit', desc: '+ Exact again sooner after each shot (25% quicker reset). − Looser hip fire.', settle: 0.75, hip: 1.1 },
+    pad: { name: 'Recoil Pad', short: 'Recoil pad', desc: '+ Each shot kicks your aim 30% less. − A little slower to aim in.', first: 0.7, ads: 1.08 },
     laser: { name: 'Laser', short: 'Laser', desc: '+ Much tighter hip fire. − Enemies can see your beam.', hip: 0.72, laser: 1 },
   },
   sight: {
@@ -388,6 +392,10 @@ export function attachFor(w) {
   const slug = W && W.pellets === 1; // a one-pellet shotgun (the Anvil slug) has no pellets to keep together
   let barrel = f.barrel.filter(b => !(W && W.quiet && b === 'suppressor') && !(slug && b === 'choke')); // a built-in suppressor already
   let grip = f.grip;
+  if (W && !W.auto && !W.burst && W.pellets === 1) { // semi-autos (he asked): spray tools do nothing for them, so they get their own
+    barrel = barrel.filter(b => b !== 'compensator' && b !== 'heavy').concat('match');
+    grip = grip.filter(g => g !== 'vertical' && g !== 'handstop').concat('trigger', 'pad');
+  }
   if (W && SIDEARMS.has(w) && W.cls !== 'MP' && W.cls !== 'Pistol') { grip = grip.filter(g => g !== 'vertical' && g !== 'handstop'); } // sidearms: nothing bulky underneath
   return { barrel, grip, sight: f.sight }; // at least 3 in every slot (he asked)
 }
@@ -398,7 +406,7 @@ export function cleanAtt(w, a) {
 }
 // All the attachments' effects on a gun, combined.
 export function gunMods(w, a) {
-  const m = { dmg: 1, range: 1, ads: 1, hip: 1, adsSpread: 1, kick: 1, sway: 1, first: 1, quiet: 0, laser: 0, zoom: 0 };
+  const m = { dmg: 1, range: 1, ads: 1, hip: 1, adsSpread: 1, kick: 1, sway: 1, first: 1, settle: 1, quiet: 0, laser: 0, zoom: 0 };
   const c = cleanAtt(w, a);
   if (WEAPONS[w] && WEAPONS[w].quiet) m.quiet = 1; // built in, no damage lost
   for (const [slot] of ATTACH_SLOTS) {
@@ -520,7 +528,7 @@ export const falloffOf = w => w.fall || FALLOFF[w.cls] || FALLOFF.AR;
 export const PEN = { AR: 0.5, LMG: 0.62, DMR: 0.68, SMG: 0.4, MP: 0.35, Pistol: 0.4, Shotgun: 0.3 };
 export const penOf = w => w.pen || PEN[w.cls] || 0.5;
 // how "hot" the gun still is: the shots of this burst, cooling to 0 over the settle time (fractions make a smaller cone)
-export const aimHeat = (w, shots, idle) => shots * Math.max(0, 1 - Math.max(0, idle - 60 / w.rpm * 1.05) / settleTime(w));
+export const aimHeat = (w, shots, idle, m) => shots * Math.max(0, 1 - Math.max(0, idle - 60 / w.rpm * 1.05) / (settleTime(w) * (m && m.settle || 1)));
 // half-width of the cone (radians) for the next shot; shots = shots already fired in this burst
 export function spreadCone(w, m, { at = 0, run = 0, crouch = false, shots = 0 } = {}) {
   if (shots <= 0 && w.pellets === 1) return 0;
@@ -545,31 +553,29 @@ export const tracerPellet = (w, i) => w.pellets <= 3 || i === 0 || i === w.pelle
 // far it can drag your aim before topping out (×class).
 export const SPRAY = {
   k4:      { pull: 0.8,  zig: 0.4, per: 5, flip: 10, k: 1,   mx: 1 },    // right, then back left
-  v9:      { pull: -0.6, zig: 0.8, per: 4, flip: 0,  k: 1,   mx: 1 },    // drifts left, a little shaky
   breaker: { pull: 0.6,  zig: 0.3, per: 2, flip: 0,  k: 1,   mx: 1 },
-  mule:    { pull: 1,    zig: 0.3, per: 8, flip: 0,  k: 1.1, mx: 1.3 },  // a long steady climb to the right
-  longbow: { pull: -0.7, zig: 0.6, per: 2, flip: 0,  k: 1,   mx: 1 },
-  hornet:  { pull: 0.3,  zig: 1.4, per: 3, flip: 0,  k: 1,   mx: 1 },    // shakes both ways
+  mule:    { pull: 0.5,  zig: 0.2, per: 8, flip: 0,  k: 0.9, mx: 1.1 },  // a long steady climb, slightly right
+  longbow: { pull: -0.4, zig: 0.4, per: 2, flip: 0,  k: 1.4, mx: 1.2 },  // big jump each shot
+  hornet:  { pull: 0.3,  zig: 0.8, per: 4, flip: 0,  k: 0.8, mx: 0.9 },  // gentle, easy to hold
   vex50:   { pull: 1,    zig: 0.5, per: 2, flip: 0,  k: 1.6, mx: 1.4 },  // big kick right
   p10:     { pull: -0.4, zig: 0.6, per: 3, flip: 0,  k: 1,   mx: 1 },
   rook:    { pull: -1,   zig: 0.5, per: 4, flip: 0,  k: 1.2, mx: 1.5 },  // hard and to the left
   sabre:   { pull: 0.2,  zig: 1.3, per: 3, flip: 0,  k: 1,   mx: 1 },    // wanders side to side
   trident: { pull: 0.7,  zig: 0.4, per: 3, flip: 0,  k: 1,   mx: 1 },
-  wasp:    { pull: -0.3, zig: 1.6, per: 3, flip: 0,  k: 1.1, mx: 1.3 },  // wild shake
+  wasp:    { pull: -0.4, zig: 2.4, per: 2, flip: 0,  k: 1.2, mx: 1.6 },  // violent side to side shake
   marten:  { pull: 0.5,  zig: 0.3, per: 6, flip: 0,  k: 1,   mx: 0.8 },  // gentle
   lark:    { pull: -0.7, zig: 0.5, per: 5, flip: 15, k: 1,   mx: 1 },    // left, then right late in the mag
   tusk:    { pull: 0.4,  zig: 0.9, per: 2, flip: 0,  k: 1,   mx: 1.2 },  // bucks left-right each blast
   anvil:   { pull: -1,   zig: 0.2, per: 2, flip: 0,  k: 1.3, mx: 1.4 },
   stub:    { pull: 1,    zig: 0,   per: 2, flip: 0,  k: 1.5, mx: 1.5 },
-  ox:      { pull: 1,    zig: 0.2, per: 6, flip: 0,  k: 1.3, mx: 1.7 },  // heavy, steady right: hold it left
-  drummer: { pull: -0.8, zig: 0.9, per: 5, flip: 12, k: 1,   mx: 1.2 },  // left, then right
+  ox:      { pull: 0.15, zig: 0.15, per: 6, flip: 0, k: 1.4, mx: 1.8 },  // heavy, straight up: pull down
+  drummer: { pull: -0.6, zig: 1.3, per: 4, flip: 12, k: 0.9, mx: 1.3 },  // wanders left then right
   pike:    { pull: 1,    zig: 0,   per: 2, flip: 0,  k: 1.3, mx: 1.5 },
   heron:   { pull: -0.6, zig: 0.5, per: 3, flip: 0,  k: 1,   mx: 1 },
   gnat:    { pull: 0.6,  zig: 1.8, per: 2, flip: 0,  k: 1.5, mx: 1.8 },  // very hard to control
   bison:   { pull: -1,   zig: 0.3, per: 2, flip: 0,  k: 2,   mx: 1.6 },  // a big kick left every shot
   javelin: { pull: 0.5,  zig: 0.6, per: 4, flip: 0,  k: 0.9, mx: 1 },
-  halberd: { pull: -0.6, zig: 0.3, per: 2, flip: 0,  k: 1.2, mx: 1.3 },
-  sentry:  { pull: -0.7, zig: 0.5, per: 5, flip: 12, k: 1,   mx: 1 },    // left, then right
+  sentry:  { pull: 0.2,  zig: 0.3, per: 6, flip: 0,  k: 0.8, mx: 0.8 },  // almost straight up, very calm
   sparrow: { pull: 0.5,  zig: 0.7, per: 3, flip: 0,  k: 0.9, mx: 1 },
 };
 for (const [k, w] of Object.entries(WEAPONS)) w.id = k;

@@ -5,7 +5,6 @@ import { WEAPONS } from '/shared/operators.js';
 // Each gun in a 100 x 40 drawing space: body colour, then the parts' sizes and styles.
 const G = {
   k4:      { body: '#2c3036', furn: '#3b3f45', stock: 'adjust', rec: [26, 52], bar: 92, guard: [52, 76], mag: 'curved', grip: 34, rail: true },
-  v9:      { body: '#30343a', furn: '#25282c', stock: 'fold', rec: [24, 56], bar: 80, guard: [56, 70], mag: 'straight', grip: 36, rail: true },
   breaker: { body: '#2b2d31', furn: '#6b4a2e', stock: 'wood', rec: [24, 44], bar: 96, guard: [52, 70], mag: 'tube', grip: 30, rail: true, pump: true },
   mule:    { body: '#363a33', furn: '#2a2d28', stock: 'heavy', rec: [22, 56], bar: 98, guard: [56, 80], mag: 'box', grip: 34, rail: true, bipod: true, handle: true },
   longbow: { body: '#3a3c34', furn: '#4c4a3a', stock: 'cheek', rec: [26, 50], bar: 99, guard: [50, 78], mag: 'short', grip: 34, rail: true },
@@ -27,7 +26,6 @@ const G = {
   heron:   { body: '#41443c', furn: '#55533f', stock: 'cheek', rec: [26, 52], bar: 96, guard: [52, 78], mag: 'straight', grip: 34, rail: true },
   gnat:    { body: '#2a2d31', furn: '#1f2124', stock: 'none', rec: [38, 72], bar: 76, guard: [72, 72], mag: 'gripLong', grip: 44, pistol: true },
   javelin: { body: '#2f3338', furn: '#3a3f45', stock: 'adjust', rec: [24, 54], bar: 82, guard: [54, 70], mag: 'curved', grip: 36, rail: true },
-  halberd: { body: '#2a2c30', furn: '#3c3f2e', stock: 'heavy', rec: [24, 46], bar: 98, guard: [52, 74], mag: 'tube', grip: 30, rail: true, pump: true },
   sentry:  { body: '#34383d', furn: '#5b5546', stock: 'fold', rec: [24, 52], bar: 84, guard: [52, 72], mag: 'curved', grip: 34, rail: true },
   sparrow: { body: '#3a3d42', furn: '#26282b', stock: 'none', rec: [44, 70], bar: 72, guard: [70, 70], mag: 'grip', grip: 47, pistol: true },
   bison:   { body: '#6a6e73', furn: '#5a3d26', stock: 'none', rec: [36, 62], bar: 84, guard: [62, 62], mag: 'none', grip: 42, pistol: true, revolver: true },

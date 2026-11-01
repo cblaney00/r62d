@@ -136,7 +136,7 @@ function tick(el, dt) {
   S.t += dt; S.fireCd -= dt; S.bloom = Math.max(0, S.bloom - dt * 0.15);
   S.adsT = Math.max(0, Math.min(1, S.adsT + (S.mouse.r ? 1 : -2) * dt / (adsTime(w) * modsOf(S.w).ads)));
   if (S.t - S.lastShot > 0.1) S.rc *= Math.exp(-dt * 12);
-  if (S.shots && !aimHeat(w, S.shots, S.t - S.lastShot)) { S.rc = 0; S.shots = 0; } // settled: the next shot is exact
+  if (S.shots && !aimHeat(w, S.shots, S.t - S.lastShot, modsOf(S.w))) { S.rc = 0; S.shots = 0; } // settled: the next shot is exact
   if (S.reloadT > 0) { S.reloadT -= dt; if (S.reloadT <= 0) { S.ammo = w.mag; audio.foley(w.cls === 'Shotgun' ? 'shell' : 'magIn', undefined, undefined, true); } }
   if (S.burst && (S.reloadT > 0 || S.ammo <= 0)) S.burst = 0;
   if (S.burst) { if (S.fireCd <= 0) { fire(w, cv); if (!--S.burst) S.fireCd = Math.max(S.fireCd, w.burstGap || 0.3); } } // the rest of a burst fires by itself
@@ -213,7 +213,7 @@ function camera(cv, dt) {
 
 function fire(w, cv) {
   S.ammo--; S.fireCd = Math.max(S.fireCd, -0.02) + 60 / w.rpm; S.fired++;
-  const m = modsOf(S.w), cone = spreadCone(w, m, { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot) }), rc0 = S.rc;
+  const m = modsOf(S.w), cone = spreadCone(w, m, { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot, modsOf(S.w)) }), rc0 = S.rc;
   S.lastShot = S.t; // same rules as a match
   S.shots++; S.rc = Math.max(-recoilMax(w), Math.min(recoilMax(w), S.rc + recoilStep(w, m, S.shots)));
   audio.gunshot(S.w, undefined, undefined, true, !!m.quiet);
@@ -302,7 +302,7 @@ function draw(cv, dt) {
     c.strokeStyle = on ? '#ff3b3b' : 'rgba(255,255,255,0.55)'; c.beginPath(); c.arc(H.x, H.y, hr, 0, 7); c.stroke();
     if (on) { c.fillStyle = 'rgba(255,59,59,0.22)'; c.fill(); }
   }
-  const cone = spreadCone(w, modsOf(S.w), { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot) }), xh = O.xh();
+  const cone = spreadCone(w, modsOf(S.w), { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot, modsOf(S.w)) }), xh = O.xh();
   if (xh) drawXhair(c, x, y, xh, xh.dynamic ? Math.tan(cone) * Math.hypot(Q.x - O0.x, Q.y - O0.y) / dpr : 0, dpr);
   const dm = q.d / M;
   if (dm >= 8) {

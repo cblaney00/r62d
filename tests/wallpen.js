@@ -34,7 +34,7 @@ const shoot = (wid, off = 2.5, n = 200) => { // n shots through the wall at a bo
 const hs = shoot('k4', 0, 100);
 if (hs.kills) fail('a headshot through a wall killed instantly', hs.kills, 'times');
 // damage left after one wall follows the gun
-for (const id of ['k4', 'v9', 'pike']) {
+for (const id of ['k4', 'javelin', 'pike']) {
   const r = shoot(id, 3);
   const want = WEAPONS[id].dmg * penOf(WEAPONS[id]);
   if (r.hits && Math.abs(r.avg - want) > 1) fail(id, 'did', r.avg.toFixed(1), 'through a wall, expected', want.toFixed(1));

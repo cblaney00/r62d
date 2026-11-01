@@ -3,7 +3,7 @@
 // combination pushes a gun to silly numbers.
 import { WEAPONS, ATTACH, ATTACH_SLOTS, attachFor, gunMods } from '../shared/operators.js';
 let fail = 0; const bad = m => { fail++; console.log('FAIL', m); };
-const GOOD_LOW = ['ads', 'hip', 'adsSpread', 'kick', 'sway', 'first'], GOOD_HIGH = ['dmg', 'range'];
+const GOOD_LOW = ['settle', 'ads', 'hip', 'adsSpread', 'kick', 'sway', 'first'], GOOD_HIGH = ['dmg', 'range'];
 for (const [slot] of ATTACH_SLOTS) for (let [id, a] of Object.entries(ATTACH[slot])) {
   if (id === 'none' || id === 'reddot') continue;
   // a gun always has a sight, so sights are measured against the red dot

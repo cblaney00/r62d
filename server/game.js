@@ -508,7 +508,7 @@ export class Game {
       p.adsT = Math.max(0, Math.min(1, (p.adsT || 0) + (canAds ? dt * rate : -dt * rate * 1.6)));
       const idle = this.time - p.lastShot; // the crosshair drifts back after a burst; once the gun has settled the next shot is exact
       if (idle > 0.1) p.rc = (p.rc || 0) * Math.exp(-dt * 12);
-      if (g && p.shots && !aimHeat(WEAPONS[g.w], p.shots, idle)) { p.rc = 0; p.shots = 0; } }
+      if (g && p.shots && !aimHeat(WEAPONS[g.w], p.shots, idle, g.m)) { p.rc = 0; p.shots = 0; } }
 
     if (p.ctrl === 'cam' && !this.feed(p)) { // the feed you were watching broke: go to the next one
       const list = this.feeds(team);
@@ -678,7 +678,7 @@ export class Game {
     const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED), at = p.adsT || 0;
     const m = gun.m || gunMods(gun.w);
     // the aiming model (shared/operators.js): exact first shot, a fixed cone after that, a fixed recoil pattern
-    const cone = spreadCone(w, m, { at, run, crouch: !!p.input.crouch, shots: aimHeat(w, p.shots || 0, this.time - p.lastShot) }) * (this.time < (p.dazeUntil || 0) && p.shots ? 1.7 : 1); // dazed: shaky follow-ups
+    const cone = spreadCone(w, m, { at, run, crouch: !!p.input.crouch, shots: aimHeat(w, p.shots || 0, this.time - p.lastShot, m) }) * (this.time < (p.dazeUntil || 0) && p.shots ? 1.7 : 1); // dazed: shaky follow-ups
     const aim = click ? click.a : p.aim, vt = p.viewTime;
     if (click && click.vt !== undefined) p.viewTime = click.vt; // judged against what they saw when they clicked
     const base = aim + (p.rc || 0);

@@ -383,7 +383,6 @@ const GUN_OWN = {
   heron:   { boom: 60, v: 1.05 },
   gnat:    { body: 1600, bodyTau: 0.02, boom: 105, v: 0.62 },
   javelin: { body: 1150, boom: 82, v: 0.82 },
-  halberd: { boom: 46, boomTau: 0.14, v: 1.3 },
   sentry:  { body: 1000, boom: 72, v: 0.9 },
   sparrow: { body: 1250, boom: 90, v: 0.72 },
   bison:   { crack: 0.7, blastTau: 0.014, boom: 62, boomTau: 0.09, drive: 2.8, mech: 0, v: 1.05 },
@@ -475,7 +474,7 @@ export function play(name, x, y) {
     case 'clamp': impact('metal', x, y); return foley('hurt', x, y);
     case 'swap': return;
     case 'fakeStep': return step(x, y, 'concrete', 2, false); // RUSE's echo box
-    case 'fakeShot': return gunshot('v9', x, y, false);
+    case 'fakeShot': return gunshot('lark', x, y, false);
     case 'droneSprint': { const g = out(x, y, 0.5, 300, 0.12); if (!g) return; const t = ac.currentTime; tone(g, t, 0.35, 600, 1500, 'sawtooth', 0.08); return; } // the motor winding up
     case 'empty': return foley('empty', x, y);
     case 'break': return impact('electronic', x, y);
