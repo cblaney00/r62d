@@ -6,7 +6,7 @@
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight } from '../shared/physics.js';
-import { floorAt, localPos, stairGhost, stairLooks, stairEnds } from '../shared/map.js';
+import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook } from '../shared/pros.js';
 import { planWeight, opWeight } from './training.js';
@@ -384,6 +384,9 @@ export function botThink(game, p, dt) {
     ai.spotT[id] = game.time; ai.heard = { x: q.x, y: q.y, t: game.time }; break;
   }
   const heardRecently = ai.heard && game.time - ai.heard.t < 4;
+  if (p.pro && heardRecently && ai.heard.t !== ai.heardSaid && game.phase === PHASE.ACTION && Math.random() < 0.25) { ai.heardSaid = ai.heard.t;
+    const up = floorAt(map, ai.heard.x, ai.heard.y) !== floorAt(map, p.x, p.y); proSay(game, p, up ? 'Hearing them on another floor' : `Footsteps, ${place(game, ai.heard.x, ai.heard.y)}`, 'hear' + place(game, ai.heard.x, ai.heard.y)); }
+  if (p.pro && p.alive && !p.downed && p.hp < p.maxHp * 0.3 && !ai.lowSaid) { ai.lowSaid = true; proSay(game, p, "I'm one shot", null, true); }
 
   // --- held abilities: let go unless something below holds them again ---
   if (abId === 'shroud') { const want = heardRecently && p.battery > 1.5 && !p.downed; inp.ability = want !== !!p.shrouded && !(p.prevInput && p.prevInput.ability) ? 1 : 0; } // go dark while enemies are close by (a toggle: press to switch)
@@ -420,6 +423,8 @@ export function botThink(game, p, dt) {
     // call it out to the team once they've taken it in (a ping with the operator's name and the room)
     if (!ai.called && ai.react > -0.1) {
       ai.called = true; game.spot(team, enemy.id, 3);
+      if (p.pro) { const near = [...game.players.values()].filter(q => q.alive && game.side(q) !== team && Math.hypot(q.x - enemy.x, q.y - enemy.y) < 120).length;
+        proSay(game, p, `${opName(enemy)}, ${place(game, enemy.x, enemy.y)}${near > 1 ? `, ${near} of them` : ''}${enemy.hp < enemy.maxHp * 0.4 ? ', he is hurt' : ''}`, 'see' + enemy.id); }
       if ([...game.players.values()].some(q => !q.bot && q.squad === p.squad) && game.markOk(p)) game.mark(p, enemy.x, enemy.y, 'ENEMY ' + OPERATORS[enemy.op].name, enemy.id);
     }
     if (gun && gun.ammo === 0) { game.startReload(p); if (d < 120 && p.guns[1] && p.slot === 0 && gun.reserve >= 0) game.event(p, { k: 'slot', n: 1 }); }
@@ -504,7 +509,7 @@ export function botThink(game, p, dt) {
     if (game.planted) { goal = game.planted; if (Math.hypot(goal.x - p.x, goal.y - p.y) < 24) act = 'defuse'; }
     else goal = ai.hold || (ai.hold = nearBomb(game, site, 70));
   }
-  if (act) { inp.interact = 1; inp.crouch = 1; return; }
+  if (act) { if (p.pro && !ai.actSaid) { ai.actSaid = true; proSay(game, p, act === 'plant' ? `Planting ${(ai.bomb || {}).id || ''}, cover me` : 'Defusing, cover me!', act, true); } inp.interact = 1; inp.crouch = 1; return; }
   if (!goal) return;
   const toGoal = Math.hypot(goal.x - p.x, goal.y - p.y);
 
@@ -693,6 +698,7 @@ function botDrone(game, p, dt) {
   for (const q of game.players.values()) {
     if (!q.alive || game.side(q) === team || q.shrouded || Math.hypot(q.x - d.x, q.y - d.y) > 320 || !los(map, d.x, d.y, q.x, q.y, smokes)) continue;
     game.spot(team, q.id, 3);
+    if (p.pro && !(ai.dSaid || (ai.dSaid = new Set())).has(q.id)) { ai.dSaid.add(q.id); proSay(game, p, `Drone: ${opName(q)} in ${place(game, q.x, q.y)}`, 'see' + q.id); }
     if (!(ai.dCalled || (ai.dCalled = new Set())).has(q.id) && [...game.players.values()].some(o => !o.bot && o.squad === p.squad) && game.markOk(p)) {
       ai.dCalled.add(q.id); game.mark(p, q.x, q.y, 'ENEMY ' + OPERATORS[q.op].name, q.id);
     }
@@ -779,6 +785,21 @@ function peekSkill(game, p) { return p.pro ? (PEEK[p.pro.pl.name] ?? 0.06) : PEE
 const PERSONA = { Halden: [0.45, 0.8], Kaze: [0.95, 0.2], Brick: [0.6, 0.6], Moth: [0.2, 0.85], Juno: [0.5, 0.9], Sable: [0.35, 0.9], Torvi: [0.9, 0.3], Pax: [0.5, 0.6], Grit: [0.3, 0.95], Wisp: [0.7, 0.35] };
 const TIMING = { Wisp: -6, Moth: 5, Juno: 8 }; // seconds early (-) or late (+) to their part of the plan: their flaws
 const ROTATE_DELAY = { Halden: 4, Grit: Infinity }; // slow to rotate; never rotates
+// The pros talk (he asked: you can see what they say, an insight into their thoughts; not everything is said, but a
+// change of plan always is, and specific information has to be spoken because pings are limited). A line goes to their
+// team (team chat, and Esports TV viewers). Each player leaves a few seconds between lines, the same news isn't
+// repeated by a teammate, and they only say what they actually saw, heard or know.
+const place = (game, x, y) => { const r = roomAt(game.map, x, y); return r ? r.replace(/^\dF /, '') : 'outside'; };
+const opName = q => (OPERATORS[q.op] ? OPERATORS[q.op].name[0] + OPERATORS[q.op].name.slice(1).toLowerCase() : 'someone');
+export function proSay(game, p, text, key, prio = false) {
+  if (!p || !p.pro) return;
+  const t = game.time, team = (game.proSaid || (game.proSaid = {}))[p.squad] || (game.proSaid[p.squad] = { keys: {}, last: 0 });
+  if (key && t - (team.keys[key] ?? -99) < 8) return; // a teammate just said it
+  if (!prio && (t - (p.saidT ?? -99) < 3 || t - team.last < 1.2)) return; // not constant chatter
+  if (key) team.keys[key] = t; p.saidT = t; team.last = t;
+  (game.proLog || (game.proLog = [])).push({ round: game.round, squad: p.squad, team: p.pro.tag, text, who: p.pro.pl.name });
+  game.chat(p, { text: text.slice(0, 140), team: true });
+}
 export function assignPros(game) {
   const on = game.botLevel === 4 && !game.tut;
   for (const squad of [0, 1]) {
@@ -844,7 +865,7 @@ function proCall(game, squad, text) { // the leader (or whoever is left) says it
   const who = mates.find(q => q.pro.pl.igl && q.alive) || mates.find(q => q.alive) || mates[0];
   const st = proState(game, squad); st.calls.push({ t: game.time, text });
   (game.proLog || (game.proLog = [])).push({ round: game.round, squad, team: PRO_TEAMS[squad].tag, text });
-  if (who) game.chat(who, { text: text.slice(0, 140), team: true });
+  if (who) { who.saidT = game.time; game.chat(who, { text: text.slice(0, 140), team: true }); }
 }
 export function proPickOp(game, p) {
   const side = proSide(game, p), pl = p.pro.pl, st = proPlan(game, p.squad, side), job = pl.jobs[side], j = st.plan && st.plan.jobs[job];
@@ -994,8 +1015,8 @@ function proAct(game, p, inp, dt, team) {
     }
     if (!ai.utilDone) { // utility in first
       ai.utilDone = true; const tg = eff(st, j, 'target'), abId = OPERATORS[p.op].ability.id;
-      if (j.util === 'stun' && p.gadget === 'stun' && p.gadgetCount > 0) { aimAt(p, tg.x, tg.y); game.event(p, { k: 'gadget' }); }
-      if (j.util === 'smoke') { aimAt(p, tg.x, tg.y); if (abId === 'barrage' && p.abilityCount > 0) game.event(p, { k: 'ability' }); else if (p.gadget === 'smoke' && p.gadgetCount > 0) game.event(p, { k: 'gadget' }); }
+      if (j.util === 'stun' && p.gadget === 'stun' && p.gadgetCount > 0) { aimAt(p, tg.x, tg.y); game.event(p, { k: 'gadget' }); proSay(game, p, 'Stun out!', 'util'); }
+      if (j.util === 'smoke') { aimAt(p, tg.x, tg.y); proSay(game, p, 'Smoking the door', 'util'); if (abId === 'barrage' && p.abilityCount > 0) game.event(p, { k: 'ability' }); else if (p.gadget === 'smoke' && p.gadgetCount > 0) game.event(p, { k: 'gadget' }); }
     }
     const tg = eff(st, j, 'target');
     if (!near(p, tg, 18) && !(ai.tgT = (ai.tgT || 0) + dt, ai.tgT > 25)) { moveTo(game, p, inp, tg, dt); return true; }

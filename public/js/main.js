@@ -1863,7 +1863,7 @@ function deathMarks(view, now) {
 function marker(x, y, label, col, view, sub, big = 1) {
   const z = st.zoom;
   // clamp to screen edges so you can always find it
-  const S0 = w2s(x, y), sx = S0.x, sy = S0.y, pad = 40 * DPR;
+  const S0 = w2s(x, y), sx = S0.x, sy = S0.y, pad = (st.tv ? 210 : 40) * DPR; // TV: stay clear of the team cards and comms
   const cx = Math.max(pad, Math.min(VW - pad, sx)), cy = Math.max(pad + 60 * DPR, Math.min(VH - pad - 60 * DPR, sy));
   const W0 = screenToWorld(cx, cy), wx = W0.x, wy = W0.y;
   const lift = cx === sx && cy === sy ? 14 : 0, u = UP();
@@ -2677,7 +2677,12 @@ function tvHud(s) {
   setHTML('tvHelp', `${st.tv.overview ? 'MAP OVERVIEW' : st.tv.auto ? 'AUTO DIRECTOR' : 'FOLLOWING'} · 1-5 / 6-0 follow a player · A auto · M map · Esc menu`);
 }
 function addChat(m) {
-  if (st.tv && m.text && m.text.length > 96) m = { ...m, text: m.text.slice(0, 92).replace(/\s+\S*$/, '') + '…' }; // TV: one short line per call
+  if (st.tv && m.squad !== undefined) { // ESPORTS TV: the team's comms, live, under that team's player cards
+    const el = $(m.squad ? 'tvCommsR' : 'tvCommsL'); if (!el) return;
+    const d = document.createElement('div'); d.innerHTML = `<b>${esc(m.name.replace(/^\[\w+\] /, ''))}</b> ${esc(m.text)}`; el.appendChild(d);
+    while (el.children.length > 5) el.firstChild.remove();
+    setTimeout(() => d.classList.add('old'), 12000); return;
+  }
   const me = st.me, mine = me && m.squad === me.sq;
   const d = document.createElement('div');
   d.innerHTML = m.ping ? `<span class="tag ping">PING</span><b class="${mine ? 'a' : 'e'}">${esc(m.name)}:</b> <span class="pingTxt">${esc(m.text)}</span>`

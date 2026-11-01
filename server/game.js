@@ -4,7 +4,7 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatch
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, SELF_UP, SELF_UP_TIME } from '../shared/operators.js';
-import { botThink, botPickOp, botPrep, assignPros } from './bots.js';
+import { botThink, botPickOp, botPrep, assignPros, proSay } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
@@ -910,6 +910,12 @@ export class Game {
     if (!q.alive) return;
     this.ropeFall(q);
     if (q.pro && src && src !== q) (this.proTrade || (this.proTrade = {}))[q.squad] = { x: q.x, y: q.y, from: { x: src.x, y: src.y }, t: this.time }; // the pros trade a teammate's death
+    if (src && src !== q && this.side(src) !== this.side(q)) { // what the pros say about it: the one who died says who and where, the one who got the kill says so
+      const nm = o => OPERATORS[o.op] ? OPERATORS[o.op].name[0] + OPERATORS[o.op].name.slice(1).toLowerCase() : 'someone', rm = (x, y) => (roomAt(this.map, x, y) || 'outside').replace(/^\dF /, '');
+      const left = [...this.players.values()].filter(o => o.alive && o !== q && this.side(o) === this.side(q)).length;
+      if (q.pro) proSay(this, q, `Dead. ${nm(src)} got me from ${rm(src.x, src.y)}`, null, true);
+      if (src.pro) proSay(this, src, `Got ${nm(q)}${left === 1 ? ', one left' : left === 0 ? '' : ''}`, 'kill' + q.id, true);
+    }
     q.alive = false; q.downed = false; q.hp = 0; q.deaths++; q.busy = null; q.scanning = false; q.bracing = false;
     if (q.ctrl !== 'body') q.ctrl = 'body';
     if (src && src !== q && this.side(src) !== this.side(q)) { src.kills++; if (src.ms) { src.ms.kills++; this.opStat(src).kills++; } this.pts(src, this.headshot ? 120 : 100, this.headshot ? 'HEADSHOT KILL' : 'KILL'); }
