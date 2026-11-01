@@ -1,6 +1,88 @@
 // Top-down drawings of operators, drones, gadgets and the objective.
 import { OPERATORS, WEAPONS, bodyW } from '/shared/operators.js';
 import { shade } from './textures.js';
+import { HEADGEAR, PACK, VEST } from './headgear.js';
+const HAIR = ['#1b1512', '#3a2618', '#5a3a22', '#8a6a3a', '#c9a060', '#2a2a2a', '#6a2a1a', '#d8d2c4'];
+const hairOf = op => HAIR[(op.charCodeAt(0) * 7 + op.charCodeAt(op.length - 1) * 3 + op.length) % HAIR.length];
+
+// what's on someone's back (PACK in headgear.js): one small drawing per kind
+function drawPack(ctx, kind, o, u) {
+  const k = String(kind || '').replace(/\d+$/, ''), v = +(String(kind).match(/\d+$/) || [1])[0], col = o.color;
+  switch (k) {
+    case 'none': return;
+    case 'tank': box(ctx, -12.5, -4 + v, 5, 7, 2.4, v === 4 ? '#4a5a6a' : '#7a4a2a'); cap(ctx, -9, 1 + v, -4, 6, 0.6, '#222'); break; // gas bottle and hose
+    case 'dragbag': box(ctx, -13, -7.5, 4, 15, 1.6, '#4a4a3a'); ctx.fillStyle = '#2a2a22'; ctx.fillRect(-12.6, -1, 3.2, 2); break;
+    case 'tube': cap(ctx, -10, -7 + v * 2, -10, 7 - v, 3.4, v === 2 ? '#5a2a20' : '#3a3424'); ctx.fillStyle = col; ctx.fillRect(-11.6, -1, 3.2, 1.2); break;
+    case 'laptop': box(ctx, -12, -5, 4.5, 10, 0.8, '#202228'); ctx.fillStyle = col; ctx.fillRect(-11.4, -3.5, 3.2, 0.7); break;
+    case 'canisters': for (const y of v === 2 ? [-4, 0, 4] : [-3.4, 3.4]) ell(ctx, -10, y, 2, 2, v === 2 ? '#8aa040' : '#8a9096'); break;
+    case 'radio': box(ctx, -11.5, -4, 4.5, 8, 1, '#2a2e2a'); cap(ctx, -10, v === 2 ? 3 : -3, -16, v === 2 ? 7 : -8, 0.6, '#999'); break;
+    case 'sling': cap(ctx, -6, -7.5, -9, 7.5, 1.4, u.strap); box(ctx, -10.5, 2 * v - 3, 3.5, 4, 1, u.dark); break;
+    case 'crate': box(ctx, -13, -5.5, 6, 11, 0.6, '#3a3d44'); ctx.fillStyle = '#e8b030'; ctx.fillRect(-12.6, -0.5, 5.2, 1); break;
+    case 'projector': box(ctx, -11.5, -4, 4.5, 8, 2, '#3a3050'); ell(ctx, -9.2, 0, 1.3, 1.3, col); break;
+    case 'coil': ctx.strokeStyle = '#b08030'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(-10, 0, 3.6, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(-10, 0, 2, 0, 7); ctx.stroke(); break;
+    case 'reel': ell(ctx, -10, 0, 3.6, 3.6, '#2a3a2a'); ell(ctx, -10, 0, 1.4, 1.4, col); break;
+    case 'hammer': cap(ctx, -13, 6, -5, -6, 1.2, '#6a4a2a'); box(ctx, -15, 4.5, 4, 4, 0.6, '#555a60'); break;
+    case 'discs': for (const y of [-3.5, 0, 3.5]) { ell(ctx, -10, y, 2.4, 1.6, '#9aa0a8'); } break;
+    case 'flares': for (let i = 0; i < 4; i++) { cap(ctx, -12 + i * 1.6, -4, -12 + i * 1.6, 4, 1, i % 2 ? '#d84a2a' : '#ff9f2e'); } break;
+    case 'spikes': for (const y of [-3, 0, 3]) cap(ctx, -14, y, -7, y, 0.9, '#8a8f96'); break;
+    case 'ammo': box(ctx, -11.5, -5, 4.5, 10, 0.6, '#4a5030'); ctx.fillStyle = '#c8a040'; for (let i = 0; i < 4; i++) ctx.fillRect(-11, -4 + i * 2.3, 3.6, 0.6); break;
+    case 'medbag': box(ctx, -12, -4.5, 5, 9, 1.4, v === 2 ? '#e8e8e8' : '#c83a3a'); ctx.fillStyle = v === 2 ? '#c22' : '#fff'; ctx.fillRect(-10, -2, 1, 4); ctx.fillRect(-11.5, -0.5, 4, 1); break;
+    case 'plates': for (const y of [-4, 0.5]) box(ctx, -12, y, 4.5, 3.6, 0.4, '#6a6a5a'); break;
+    case 'roll': box(ctx, -11.5, -6, 4, 12, 2, '#5a4a6a'); ctx.fillStyle = '#ccc'; for (const y of [-3, 0, 3]) ctx.fillRect(-11, y, 3, 0.4); break;
+    case 'cloak': ctx.fillStyle = v === 2 ? shade(o.helmet, 1.2) : '#121317'; ctx.beginPath(); ctx.moveTo(-3, -8.5); ctx.quadraticCurveTo(-15, 0, -3, 8.5); ctx.closePath(); ctx.fill(); break;
+    case 'panel': box(ctx, -12.5, -6, 4.5, 12, 1, '#59626b'); ctx.fillStyle = '#d9b02a'; for (let i = 0; i < 3; i++) ctx.fillRect(-12.3, -5 + i * 4, 4, 1); break;
+    case 'jammer': box(ctx, -11.5, -4, 4.5, 8, 1.2, '#2b2f36'); ctx.fillStyle = '#55c1e8'; ctx.fillRect(-10.5, -2.5, 1.2, 1.2); cap(ctx, -9, -3, -14, -9, 0.6, '#999'); break;
+    case 'pouches': for (const y of v === 2 ? [-5, -1, 3] : [-4, 1.5]) box(ctx, -9.8, y, 3, 3, 0.6, v === 2 ? '#4a5a3a' : '#33402a'); break;
+    case 'antennas': box(ctx, -11, -3, 3.6, 6, 1, '#222'); for (const y of [-2, 2]) cap(ctx, -9, y, -15, y * 3, 0.5, '#aaa'); break;
+    case 'baton': cap(ctx, -9, -6, -9, 6, 1.1, '#111'); box(ctx, -10.5, 3, 3, 3, 0.6, '#1a1a1a'); break;
+    case 'toolbox': box(ctx, -12.5, -4.5, 5.5, 9, 0.6, '#b03a2a'); cap(ctx, -12, 0, -7.5, 0, 0.6, '#222'); break;
+    case 'mics': for (const y of [-3.5, 3.5]) { cap(ctx, -7, y, -12, y, 0.8, '#222'); ell(ctx, -12.5, y, 1.2, 1.2, '#555'); } break;
+    case 'armorbag': box(ctx, -13, -6.5, 6.5, 13, 2, '#3a4a3a'); ctx.fillStyle = '#e0e0e0'; ctx.fillRect(-11, -1.5, 2.5, 3); break;
+    case 'wire': ell(ctx, -10, 0, 3, 3, v === 2 ? '#4a3a5a' : '#3a3a2a'); ctx.strokeStyle = v === 2 ? '#ff5050' : '#c8c8c8'; ctx.lineWidth = 0.5; for (const r of [1, 2, 2.6]) { ctx.beginPath(); ctx.arc(-10, 0, r, 0, 7); ctx.stroke(); } break;
+    case 'camcase': box(ctx, -12, -4.5, 5, 9, 1, '#2a2a30'); for (const y of [-2, 1.5]) ell(ctx, -9.5, y, 0.9, 0.9, '#7ad'); break;
+    case 'darts': box(ctx, -11, -5, 3.6, 10, 1, '#4a3a2a'); ctx.fillStyle = col; for (let i = 0; i < 5; i++) ctx.fillRect(-11.6, -4 + i * 2, 1.2, 0.6); break;
+    case 'speaker': box(ctx, -12, -4, 5, 8, 1.6, '#2a2228'); ell(ctx, -9.5, 0, 1.8, 1.8, '#111'); break;
+    case 'bottle': box(ctx, -10.5, -1.5, 4, 3, 1.4, '#4aa0d8'); cap(ctx, -6, -6, -6, 6, 1, u.strap); break;
+    case 'tripod': for (const a of [-0.4, 0, 0.4]) cap(ctx, -6, 0, -6 - Math.cos(a) * 9, Math.sin(a) * 9, 0.7, '#3a3a3a'); break;
+    case 'medcase': box(ctx, -12, -5, 5, 10, 0.8, '#e8f0f0'); ctx.fillStyle = '#2a9a5a'; ctx.fillRect(-10, -2, 1, 4); ctx.fillRect(-11.5, -0.5, 4, 1); break;
+    case 'radar': box(ctx, -11, -3, 3.6, 6, 1, '#2a3036'); ctx.strokeStyle = col; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(-13, 0, 3, -1, 1); ctx.stroke(); break;
+    case 'girders': for (const y of [-4, 3]) box(ctx, -14, y - 1, 9, 2.2, 0.2, '#8a5a3a'); break;
+    default: box(ctx, -11.5, -5.5, 5, 11, 1.6, u.dark);
+  }
+}
+// the cut of what they wear over the torso (VEST in headgear.js); returns false when there is no plate carrier on top
+function drawTorso(ctx, op, o, u, sh) {
+  const kind = String(VEST[op] || 'carrier'), k = kind.replace(/\d+$/, ''), v = +(kind.match(/\d+$/) || [1])[0];
+  const tint = { parka: '#9aa0a0', wetsuit: '#22282e', jacket: o.team === 'atk' ? '#6a6a52' : '#4e5a6e', leather: '#2a2420', jersey: o.color, field: '#8a7a58', shirt: '#5a5a5a', hoodie: '#3a3a40',
+    coat: '#3a3a44', cloak: '#141518', tweed: '#7a6a4a', poncho: '#8a5a3a', suit: '#2a2a32', scrubs: '#5a9ab8', hazmat: '#c8d34a', ghillie: '#4f6a32', singlet: o.color, light: u.cloth, overalls: '#3a4a6a', apron: '#6a4a2a' }[k];
+  ell(ctx, -1, 0, 6.8 * sh, 9.4 * sh, tint ? shade(tint, 0.85 + v * 0.07) : u.cloth);
+  const patches = () => { box(ctx, -3.6, -8.6, 3.6, 2.2, 0.6, o.color, false); box(ctx, -3.6, 6.4, 3.6, 2.2, 0.6, o.color, false); };
+  const carrier = (col = u.vest, w = 10.2, hgt = 13.2) => {
+    box(ctx, -6, -hgt / 2, w, hgt, 3, col);
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.35; for (let i = -5; i <= 5; i += 1.6) { ctx.beginPath(); ctx.moveTo(-3.5, i); ctx.lineTo(1.8, i); ctx.stroke(); }
+    cap(ctx, -5, -6, -0.5, -7.5, 1.1, u.strap); cap(ctx, -5, 6, -0.5, 7.5, 1.1, u.strap);
+  };
+  const pouches = (n, col = u.vestL) => { for (let i = 0; i < n; i++) { const y = (i - (n - 1) / 2) * 3.4; box(ctx, 2.2, y - 1.4, 2.6, 2.8, 0.6, col); } };
+  switch (k) {
+    case 'carrier': carrier(); pouches(v + 1); break;
+    case 'heavy': carrier(shade(u.vest, 0.9), 11, 15); ell(ctx, -1.5, -8.2, 3, 2, u.vestL); ell(ctx, -1.5, 8.2, 3, 2, u.vestL); pouches(v === 3 ? 2 : 3); break; // shoulder pads
+    case 'bomb': box(ctx, -7, -8.5, 13, 17, 4, '#3a3d44'); ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.5; for (let i = -6; i <= 6; i += 3) { ctx.beginPath(); ctx.moveTo(-6, i); ctx.lineTo(5, i); ctx.stroke(); } break;
+    case 'rig': box(ctx, 0, -5, 3.6, 10, 1, u.vest); pouches(v + 2, u.vestL); cap(ctx, -5, -6.5, 1, -5, 1, u.strap); cap(ctx, -5, 6.5, 1, 5, 1, u.strap); break;
+    case 'harness': cap(ctx, -5, -7, 3, 6, 1.1, '#2a2a2a'); cap(ctx, -5, 7, 3, -6, 1.1, '#2a2a2a'); box(ctx, 0.5, -1.5, 2.4, 3, 0.6, '#d8c040'); break;
+    case 'medic': carrier(); box(ctx, -0.5, -2, 4, 4, 0.6, '#f0f0f0', false); ctx.fillStyle = v === 2 ? '#2a9a5a' : '#c22'; ctx.fillRect(1, -1.5, 1, 3); ctx.fillRect(0, -0.5, 3, 1); break;
+    case 'police': carrier('#1e2430'); ctx.fillStyle = '#d8d8d8'; ctx.fillRect(-3, -1, 5, 2); break;
+    case 'hivis': ctx.fillStyle = '#d8e030'; ctx.fillRect(-6, -7, 9, 14); ctx.fillStyle = '#e8e8e8'; ctx.fillRect(-6, v === 2 ? -1 : -3, 9, 1.2); ctx.fillRect(-6, v === 2 ? 2 : 2, 9, 1.2); break;
+    case 'overalls': case 'apron': cap(ctx, -5, -5.5, 2, -3, 1.1, '#222'); cap(ctx, -5, 5.5, 2, 3, 1.1, '#222'); box(ctx, -1, -4, 5, 8, 1.2, shade(tint, 1.15)); break;
+    case 'cloak': ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(-1, 0, 7, 1.8, 4.5); ctx.fill(); break;
+    case 'jersey': case 'singlet': ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(-4, -0.8, 7, 1.6); break;
+    case 'ghillie': ctx.fillStyle = '#3a5222'; for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc(-4 + (i % 3) * 3, -6 + Math.floor(i / 3) * 5, 1.6, 0, 7); ctx.fill(); } break;
+    default: // jackets, coats, hoodies and the like: a collar and a zip, maybe a light rig
+      cap(ctx, -2.5, -5.6, -2.5, 5.6, 1.4, shade(tint || u.cloth, 0.7)); cap(ctx, 1.5, -6, 1.5, 6, 0.4, 'rgba(0,0,0,0.4)');
+      if (v === 2 || k === 'field') pouches(2);
+  }
+  patches();
+}
+
 
 const UNIFORM = {
   atk: { cloth: '#8a8360', clothD: '#625d43', vest: '#5d5b42', vestL: '#787556', dark: '#38372a', strap: '#47452f' },
@@ -84,7 +166,7 @@ export function drawOperator(ctx, p, t) {
     ell(ctx, -15.5, -3, 2.4, 1.8, '#1a1a1a'); ell(ctx, -15.5, 4, 2.4, 1.8, '#1a1a1a');
     ell(ctx, -1, 0, 7.5, 8, u.cloth); box(ctx, -5.5, -5.5, 9.5, 11, 2.5, u.vest);
     limb(ctx, [1, -6.5, 5, -10, 10, -9.5], 3, u.cloth); limb(ctx, [1, 6.5, 6, 9, 11, 7 + Math.sin(t * 3) * 0.6], 3, u.cloth);
-    ell(ctx, 7.5, 0, 4.8, 4.8, o.helmet);
+    ctx.save(); ctx.translate(7.5, 0); ell(ctx, 0.8, 0, 4.3, 4.3, skin); const hgD = HEADGEAR[p.op]; if (hgD) hgD(ctx, { ell, box, cap, shade, OUT, o, t, hair: hairOf(p.op) }); else ell(ctx, 0, 0, 4.8, 4.8, o.helmet); ctx.restore();
     ctx.restore(); return;
   }
 
@@ -108,18 +190,11 @@ export function drawOperator(ctx, p, t) {
   if (id === 'cutter') { box(ctx, -12.5, -4.5, 5.5, 9, 2.6, '#c8601f'); ctx.fillStyle = '#222'; ctx.fillRect(-12, -1, 4.5, 2); cap(ctx, -9, 3.5, -3, 8, 0.8, '#222'); }
   else if (id === 'panel') { box(ctx, -12.5, -6, 4.5, 12, 1, '#59626b'); ctx.fillStyle = '#d9b02a'; for (let i = 0; i < 3; i++) ctx.fillRect(-12.3, -5 + i * 4, 4, 1); }
   else if (id === 'jammer') { box(ctx, -11.5, -4, 4.5, 8, 1.2, '#2b2f36'); ctx.fillStyle = '#55c1e8'; ctx.fillRect(-10.5, -2.5, 1.2, 1.2); cap(ctx, -9, -3, -14, -9, 0.6, '#999'); }
-  else if (o.team === 'atk') { box(ctx, -11.5, -5.5, 5, 11, 1.6, u.dark); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(-11, -3, 4, 0.6); ctx.fillRect(-11, 2, 4, 0.6); }
-  else { box(ctx, -9.8, 2.6, 3.6, 4.4, 0.8, '#222'); cap(ctx, -8.4, 3, -11.5, 8.5, 0.7, '#111'); }
+  else drawPack(ctx, PACK[p.op], o, u); // every operator carries something of their own
 
   // ---- torso & plate carrier ----
   const sh = cr ? 0.93 : 1;
-  ell(ctx, -1, 0, 6.8 * sh, 9.4 * sh, u.cloth);
-  box(ctx, -6, -6.6, 10.2, 13.2, 3, u.vest);
-  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.35;              // MOLLE webbing
-  for (let i = -5; i <= 5; i += 1.6) { ctx.beginPath(); ctx.moveTo(-3.5, i); ctx.lineTo(1.8, i); ctx.stroke(); }
-  cap(ctx, -5, -6, -0.5, -7.5, 1.1, u.strap); cap(ctx, -5, 6, -0.5, 7.5, 1.1, u.strap);   // shoulder straps
-  for (let i = -1; i <= 1; i++) { box(ctx, 2.2, i * 3.9 - 1.5, 2.6, 3, 0.6, u.vestL); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(2.2, i * 3.9 - 0.4, 2.6, 0.35); }
-  box(ctx, -3.6, -8.6, 3.6, 2.2, 0.6, o.color, false); box(ctx, -3.6, 6.4, 3.6, 2.2, 0.6, o.color, false); // shoulder patches
+  drawTorso(ctx, p.op, o, u, sh);
   if (o.team === 'def') { box(ctx, -1.8, -6.2, 1.8, 2.4, 0.4, '#141518'); cap(ctx, -1, -6, -1.5, -10, 0.5, '#111'); } // radio
   if (id === 'slug' || id === 'sticky') { cap(ctx, -4.5, -6.5, 3.5, 6.5, 1.6, '#3a2a1a'); ctx.fillStyle = '#b02a2a'; for (let i = 0; i < 6; i++) ctx.fillRect(-4 + i * 1.3, -5.2 + i * 2.05, 0.9, 1.1); }
   if (id === 'emp') { for (const yy of [-3, 1.5]) { ell(ctx, -2.5, yy, 1.4, 1.4, '#7d4fb0'); ctx.fillStyle = `rgba(200,150,255,${0.5 + 0.5 * Math.sin(t * 4 + yy)})`; ctx.beginPath(); ctx.arc(-2.5, yy, 0.5, 0, 7); ctx.fill(); } }
@@ -138,9 +213,11 @@ export function drawOperator(ctx, p, t) {
   if (p.reload) ctx.rotate(0.38 + Math.sin(t * 9) * 0.05);
   ctx.translate(p.ads ? 2 : 0, p.ads ? 0 : 1.4);
   const glove = (x, y) => { ell(ctx, x, y, 1.7, 1.6, '#1f1f20'); };
-  if (shield) {
+  if (shield) { // the shield hand holds the grip on the inside of the shield, wherever it has swung to (he asked)
+    const sp = p.shieldPose || { rot: 0 }, ga = sp.rot - 0.45, hx = -2 + 10.6 * Math.cos(ga), hy = 10.6 * Math.sin(ga);
+    const sx = -0.5, sy = -7 * bw, ex = (sx + hx) / 2 + Math.cos(ga - 1.2) * 2.2, ey = (sy + hy) / 2 + Math.sin(ga - 1.2) * 2.2;
     limb(ctx, [-0.5, 7 * bw, 3, 6.5, 8.5 - rec, 2.6], 3.1, u.cloth); drawGun(ctx, p.w, rec); glove(8.5 - rec, 2.6);
-    limb(ctx, [-0.5, -7 * bw, 4, -8 * bw, 9, -7.5 * bw], 3.1, u.cloth); glove(9, -7.5 * bw);
+    limb(ctx, [sx, sy, ex, ey, hx, hy], 3.1, u.cloth); glove(hx, hy);
   } else if (pistol) {
     limb(ctx, [-0.5, 7 * bw, 3, 5.5, 7 - rec, 1.4], 3.1, u.cloth); limb(ctx, [-0.5, -7 * bw, 3, -5.5, 7 - rec, 1.2], 3.1, u.cloth);
     drawGun(ctx, p.w, rec); glove(7 - rec, 1.4); glove(7.3 - rec, 0.4);
@@ -181,7 +258,9 @@ export function drawOperator(ctx, p, t) {
   // ---- head & headgear ----
   ell(ctx, 0.8, 0, 4.3, 4.3, skin);
   const earCups = () => { ell(ctx, 0, -4.7, 1.8, 1.3, '#151618'); ell(ctx, 0, 4.7, 1.8, 1.3, '#151618'); };
-  switch (o.look) {
+  const hg = HEADGEAR[p.op];
+  if (hg) hg(ctx, { ell, box, cap, shade, OUT, o, t, hair: hairOf(p.op) });
+  else switch (o.look) {
     case 'cap':
       earCups(); ell(ctx, 0, 0, 4.6, 4.6, o.helmet);
       ctx.beginPath(); ctx.ellipse(4.4, 0, 2.8, 3.9, 0, -Math.PI / 2, Math.PI / 2); ctx.fillStyle = shade(o.helmet, 0.7); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 0.5; ctx.stroke();
@@ -393,7 +472,8 @@ export function drawGadget(ctx, e, t, ally) {
       for (const [cx, cy] of [[-2.2, -1.8], [2.2, -1.8], [-2.2, 1.8], [2.2, 1.8]]) { ctx.fillStyle = '#55595f'; ctx.beginPath(); ctx.arc(cx, cy, 1.4, 0, 7); ctx.fill(); }
       ctx.fillStyle = blink ? '#ff3030' : '#601010'; ctx.fillRect(-0.6, -0.6, 1.2, 1.2);
       break;
-    case 'scope': // Wall Scope: a lens poking out of the wall
+    case 'scope': // Wall Scope: a lens poking out of the wall (TETHER's: a shimmering energy shield for its first 3 s)
+      if (e.sh) { const k = Math.min(1, e.sh), w = 0.5 + 0.5 * Math.sin(t * 12); ctx.strokeStyle = `rgba(120,230,255,${(0.35 + 0.35 * w) * k})`; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(0, 0, 5.5 + w * 0.6, 0, 7); ctx.stroke(); ctx.fillStyle = `rgba(120,230,255,${0.12 * k})`; ctx.fill(); }
       ctx.rotate(e.ag || 0);
       ctx.fillStyle = '#2b2f36'; ctx.fillRect(-4, -1.5, 5, 3);
       ctx.fillStyle = '#6fbf73'; ctx.beginPath(); ctx.arc(1.5, 0, 1.5, 0, 7); ctx.fill();
@@ -403,16 +483,19 @@ export function drawGadget(ctx, e, t, ally) {
       ctx.fillStyle = '#ffcf6a'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, 7); ctx.fill();
       break;
     // ---- the operators added to fill every role ----
-    case 'sticky': // SALVO's round: a red-banded slug with a blinking light once it has stuck
+    case 'sticky': // SALVO's round: a red-banded slug; stuck and waiting for her, a slow red glow (it goes off when she says)
       ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, 7); ctx.fill();
       ctx.fillStyle = '#c0392b'; ctx.fillRect(-2.4, -0.5, 4.8, 1);
-      if (blink) { ctx.fillStyle = '#ff4a3a'; ctx.beginPath(); ctx.arc(0, 0, 1, 0, 7); ctx.fill(); }
+      if (e.st) { const k = 0.5 + 0.5 * Math.sin(t * 3); ctx.fillStyle = `rgba(255,74,58,${0.25 + 0.5 * k})`; ctx.beginPath(); ctx.arc(0, 0, 1.2 + k * 0.6, 0, 7); ctx.fill(); }
       break;
-    case 'spreader': // TORQUE's spreader: two yellow jaws on a black body
-      ctx.fillStyle = '#1e1f22'; ctx.fillRect(-3.5, -3.5, 7, 7);
-      ctx.fillStyle = '#e0b53a'; ctx.fillRect(-4.5, -4.5, 3, 9); ctx.fillRect(1.5, -4.5, 3, 9);
-      if (blink) { ctx.fillStyle = '#ff6a3a'; ctx.fillRect(-0.7, -0.7, 1.4, 1.4); }
+    case 'saw': { // TORQUE's saw disc: a spinning toothed blade with a blur ring
+      ctx.rotate(t * 40);
+      ctx.fillStyle = 'rgba(200,205,210,0.25)'; ctx.beginPath(); ctx.arc(0, 0, 5.2, 0, 7); ctx.fill();
+      ctx.fillStyle = '#9aa0a8'; ctx.beginPath();
+      for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283, r = i % 2 ? 3.4 : 4.4; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      ctx.closePath(); ctx.fill(); ctx.fillStyle = '#e0b53a'; ctx.beginPath(); ctx.arc(0, 0, 1.3, 0, 7); ctx.fill();
       break;
+    }
     case 'spike': // ECHO's seismic spike: a steel stake with ripples
       ctx.strokeStyle = ally ? 'rgba(94,196,182,0.5)' : 'rgba(255,140,80,0.5)'; ctx.lineWidth = 0.5;
       for (const r of [5, 8]) { ctx.beginPath(); ctx.arc(0, 0, r + (t * 4 % 3), 0, 7); ctx.stroke(); }

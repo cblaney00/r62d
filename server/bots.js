@@ -4,7 +4,7 @@
 // call out what they see, and react no faster than a fairly experienced player. The bot skill setting
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
-import { CELL, T, TEAM, PHASE, blocksMove, blocksDrone } from '../shared/constants.js';
+import { CELL, T, TEAM, PHASE, PX_PER_M, blocksMove, blocksDrone } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks, stairEnds } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
@@ -277,7 +277,7 @@ const BREACH_TOOLS = {
 };
 function breachTool(p) {
   const ab = OPERATORS[p.op].ability.id;
-  if (BREACH_TOOLS[ab] && (p.abilityCount > 0 || ab === 'lance' && p.battery > 2)) return ab;
+  if (BREACH_TOOLS[ab] && (p.abilityCount > 0 || !OPERATORS[p.op].ability.count || ab === 'lance' && p.battery > 2)) return ab;
   if (p.gadget === 'breach' && p.gadgetCount > 0) return 'breach';
   return null;
 }
@@ -378,7 +378,13 @@ export function botThink(game, p, dt) {
   // --- fight ---
   const enemy = p.downed ? null : visibleEnemy(game, p, S.see);
   if (enemy && abId === 'adrenal' && p.abilityCount > 0 && !(game.time < (p.boostUntil || 0))) useAbility();
-  if (enemy && ['tracer', 'cloak'].includes(abId) && p.abilityCount > 0 && Math.random() < dt * 0.6) useAbility(); // tracers / smoke cloak when a fight starts
+  if (enemy && ['tracer', 'burst', 'saw'].includes(abId) && p.abilityCount > 0 && Math.random() < dt * 0.6) useAbility(); // (the saw disc goes at the enemy too)
+  if (enemy && abId === 'lunge' && p.abilityCount > 0 && !(p.lungeUntil > game.time) && Math.hypot(enemy.x - p.x, enemy.y - p.y) < 80) useAbility(); // CROW: close enough to lunge
+  if (abId === 'lunge' && p.lungeUntil > game.time && enemy && Math.hypot(enemy.x - p.x, enemy.y - p.y) < 2 * PX_PER_M + 8) { aimAt(p, enemy.x, enemy.y); game.event(p, { k: 'melee' }); }
+  if (abId === 'sticky') { // SALVO: once her rounds are stuck and she is clear of them, blow them
+    const mine = game.ents.filter(e => e.type === 'sticky' && e.owner === p.id && e.stuck && !e.go);
+    if (mine.length && mine.every(e => Math.hypot(e.x - p.x, e.y - p.y) > 60) && Math.random() < dt * 2) useAbility();
+  }
   if (enemy && abId === 'rally' && p.abilityCount > 0 && p.hp < p.maxHp * 0.5 && !p.downed) useAbility();
   if (enemy) {
     const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
@@ -578,7 +584,7 @@ function doBreach(game, p, inp, b, dt) {
   if (Math.hypot(b.sx - p.x, b.sy - p.y) > 6) { b.t = (b.t || 0) + dt; if (b.t > 25) return 'done'; return moveTo(game, p, inp, { x: b.sx, y: b.sy }, dt); }
   p.aim = Math.atan2(b.wy - p.y, b.wx - p.x);
   if (tool.use === 'hold') { inp.ability = 1; b.held = (b.held || 0) + dt; return b.held > 4.5 || p.battery <= 0 ? 'done' : 'wait'; }
-  if (tool.use === 'swing') { if (p.meleeCd <= 0 && p.abilityCount > 0) game.event(p, { k: 'ability' }); return p.abilityCount > 0 ? 'wait' : 'done'; }
+  if (tool.use === 'swing') { if (p.meleeCd <= 0) game.event(p, { k: 'ability' }); return 'wait'; } // FERRO's hammer never runs out; done once the wall is open
   const before = tool.use === 'gadget' ? p.gadgetCount : p.abilityCount;
   game.event(p, { k: tool.use });
   const after = tool.use === 'gadget' ? p.gadgetCount : p.abilityCount;

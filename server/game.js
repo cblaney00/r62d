@@ -1,5 +1,5 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
-import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, MAT, stopsBullet, penBullet, blocksDrone, blocksMove, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
+import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, MAT, stopsBullet, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
 import { buildMap, roomAt, wallMount, MAPS, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
@@ -23,6 +23,8 @@ const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free pla
 // R62D_FAST=1 shortens the menus, for quick testing.
 if (typeof process !== 'undefined' && process.env.R62D_FAST) { DUR.select = 3; DUR.prep = 6; }
 
+const THROW_K = 5; // drag on thrown things: they come to rest where you aimed
+const EMP_R = 22; // TALON's EMP: a circle about a door wide (he asked), centred inside the wall it stuck to
 export class Game {
   // opts.tut: a private tutorial match for one player (see tutAction), with its timers held
   // while the coach explains each step, and nothing saved to their profile.
@@ -422,6 +424,7 @@ export class Game {
     if (p.scanning) mul *= 0.6;
     if (this.time < (p.boostUntil || 0)) mul *= 1.25; // Adrenal Shot
     if (p.shrouded) mul *= 0.8;
+    if (this.ghost(p)) mul *= 0.85; // STRIDER's Ghost Step: careful, slower steps (he asked: it was too strong)
     for (const e of this.ents) if (e.type === 'wire' && e.team !== this.side(p) && Math.hypot(e.x - p.x, e.y - p.y) < 24) { mul *= 0.3; break; }
     const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || !!p.rope || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') ||
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
@@ -691,18 +694,19 @@ export class Game {
       }
     }
     for (const e of this.ents) {
-      if (!e.hp || e.team === team || e.tu) continue; // turret cameras are bulletproof
+      if (!e.hp || e.team === team || e.tu) continue; // turret cameras are bulletproof (a shielded scope is hit, but shrugs it off in hitEnt)
       const at = e.type === 'drone' && src.viewTime !== null && src.viewTime !== undefined ? this.posAt(e, src.viewTime) : e;
       const t = rayCircle(x0, y0, dx, dy, at.x, at.y, e.type === 'decoy' ? hitR(e.op) : e.type === 'drone' ? 4.5 : 6); // drones are small
       if (t !== null && t < bestT) { bestT = t; best = { e }; }
     }
-    let mult = 1, stopT = bestT, kind = best ? 'flesh' : 'none', pens = 0, wallT = 0;
+    let mult = 1, stopT = bestT, kind = best ? 'flesh' : 'none', pens = 0, wallT = 0, tracerWall = src && src.tracerUntil > this.time && this.shotW ? 2 : 0; // MARK: two cells of solid wall
     const pen = penOf(this.shotW && this.shotW.cls === cls ? this.shotW : { cls });
     const sx = Math.floor(x0 / CELL), sy = Math.floor(y0 / CELL);
     walkRay(x0, y0, dx, dy, bestT, (cx, cy, t) => {
       const k = cy * this.map.W + cx, tile = tileAt(this.map, cx, cy), sh = (stopsBullet(tile) || penBullet(tile)) && shapeAt(this.map, cx, cy);
       if (sh) { const h = rayShape(sh, x0, y0, dx, dy); if (h === null || h > bestT) return false; t = h; } // angled/curved wall: only its solid part
       else if (cx === sx && cy === sy) return false;
+      if (stopsBullet(tile) && tracerWall > 0 && tile !== T.VOID) { tracerWall--; mult *= 0.75; pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) }); return false; }
       if (stopsBullet(tile)) { stopT = t; kind = tile === T.TALL ? 'prop' : 'hard'; best = null; return true; }
       if (penBullet(tile)) {
         if ((tile === T.SOFT || tile === T.BARRI) && HOLE_ONLY.has(cls)) this.holeCell(k, cx, cy, x0, y0, dx, dy, t);
@@ -878,6 +882,7 @@ export class Game {
   }
 
   hitEnt(e, src) {
+    if (e.shieldUntil > this.time) { this.events.push({ e: 'hit', k: 'shield', x: r1(e.x), y: r1(e.y) }); return; } // TETHER's scope: shielded for its first 3 s
     if (src && e.team && e.team !== this.side(src) && (e.hp || e.type === 'drone')) this.pts(src, e.type === 'drone' ? 20 : 25, e.type === 'drone' ? 'DRONE DESTROYED' : e.type === 'cam' ? 'CAMERA DESTROYED' : 'GADGET DESTROYED');
     if (e.type === 'cam') { e.hp = 0; this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) }); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); return; }
     this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) });
@@ -1163,6 +1168,7 @@ export class Game {
     p.meleeCd = 0.75; p.fireCd = Math.max(p.fireCd, 0.45); // a swing takes a moment to recover from
     this.events.push({ e: 'melee', id: p.id });
     const team = this.side(p);
+    if (p.lungeUntil > this.time && !p.bracing && !p.rope) { this.lunge(p); return; }
     if (p.bracing) { // shield bash: staggers whoever it hits; a miss leaves the shield down for a while
       const q = [...this.players.values()].find(q => q.alive && q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 34 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.0);
       if (q) { this.damage(q, 30, p, 'Shield Bash', p.aim); q.staggerUntil = this.time + 0.7; q.slowUntil = Math.max(q.slowUntil, this.time + 1); p.meleeCd = 0.8; }
@@ -1177,8 +1183,6 @@ export class Game {
         if (OPERATORS[q.op].ability.id === 'brace' && !q.downed && q.ctrl === 'body' && Math.abs(angDiff(Math.atan2(p.y - q.y, p.x - q.x), q.aim)) < 0.8 && !(this.time < (q.shieldDownUntil || 0))) {
           q.shieldDownUntil = this.time + 1.0; p.meleeCd = 1.3; p.fireCd = Math.max(p.fireCd, 0.9); this.events.push({ e: 'hit', k: 'shield', x: r1(q.x), y: r1(q.y) }); this.events.push({ e: 'snd', s: 'panel', x: r1(q.x), y: r1(q.y) }); return;
         }
-        const behind = Math.abs(angDiff(Math.atan2(p.y - q.y, p.x - q.x), q.aim)) > 2.0; // CROW: from behind, a silent kill
-        if (OPERATORS[p.op].ability.id === 'takedown' && behind && this.side(q) !== this.side(p)) { this.damage(q, 999, p, 'Silent Takedown', p.aim); return; }
         this.damage(q, q.downed ? 999 : 55, p, 'Melee', p.aim); return;
       }
     }
@@ -1213,6 +1217,10 @@ export class Game {
   useAbility(p) {
     const op = OPERATORS[p.op], team = this.side(p), id = op.ability.id;
     if (id === 'gas' && p.gasId) { const n = this.ent(p.gasId); p.gasId = null; if (n) this.detonate(n); return; } // second press releases the gas
+    if (id === 'sticky') { // SALVO (he asked: remote detonation): with rounds stuck and waiting, the button blows them all
+      const waiting = this.ents.filter(e => e.type === 'sticky' && e.owner === p.id && e.stuck);
+      if (waiting.length) { waiting.forEach((e, i) => { e.t = 0.05 + i * 0.08; e.go = true; }); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); return; }
+    }
     if (op.ability.count && p.abilityCount <= 0) return;
     const ca = Math.cos(p.aim), sa = Math.sin(p.aim);
     const place = (type, dist, extra = {}) => { // set something down just in front of you, if there's floor there
@@ -1249,17 +1257,21 @@ export class Game {
     } else if (id === 'mine') {
       this.ents.push({ id: this.eid(), type: 'mine', x: p.x + Math.cos(p.aim) * 10, y: p.y + Math.sin(p.aim) * 10, ang: p.aim, team, owner: p.id, arm: 1.5, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y) });
-    } else if (id === 'barrage') { // three smokes in a line
-      const far = castSight(this.map, p.x, p.y, p.aim, 220, null);
-      for (const d of [55, 105, 155]) {
-        const dd = Math.min(d, far - 14); if (dd < 20) continue;
-        this.ents.push({ id: this.eid(), type: 'smoke', x: p.x + ca * dd, y: p.y + sa * dd, r: 50, life: 12, team });
+    } else if (id === 'barrage') { // HAZE: a thin wall of smoke across your aim (he asked: much thinner than VAPOR's cloud)
+      const want = Math.hypot((p.aimX ?? p.x + ca * 150) - p.x, (p.aimY ?? p.y + sa * 150) - p.y);
+      const d = Math.max(40, Math.min(300, want, castSight(this.map, p.x, p.y, p.aim, 300, null) - 12));
+      const cx = p.x + ca * d, cy = p.y + sa * d, puffs = [r1(cx), r1(cy)];
+      for (const side of [1, -1]) for (let o = 10; o <= 108; o += 10) { // out to each side until a wall stops it
+        const x = cx - sa * o * side, y = cy + ca * o * side;
+        if (pointSolid(this.map, x, y, blocksSight)) break;
+        puffs.push(r1(x), r1(y));
       }
-      used(); this.events.push({ e: 'snd', s: 'smoke', x: r1(p.x), y: r1(p.y) });
+      this.ents.push({ id: this.eid(), type: 'smoke', x: cx, y: cy, r: 12, life: 12, team, kind: 'wall', puffs });
+      used(); this.events.push({ e: 'snd', s: 'smoke', x: r1(cx), y: r1(cy) });
     } else if (id === 'sonar' || id === 'stickycam') { this.throwNade(p, id === 'sonar' ? 'sonar' : 'cam'); used(); }
     else if (id === 'gas') { p.gasId = this.throwNade(p, 'gas').id; used(); }
     else if (id === 'adrenal') { p.boostUntil = this.time + 6; used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x), y2: r1(p.y) }); }
-    else if (id === 'ghost') { p.ghostUntil = this.time + 10; used(); this.events.push({ e: 'snd', s: 'ghost', x: r1(p.x), y: r1(p.y) }); }
+    else if (id === 'ghost') { p.ghostUntil = this.time + 6; used(); this.events.push({ e: 'snd', s: 'ghost', x: r1(p.x), y: r1(p.y) }); }
     else if (id === 'cluster') {
       const w = this.wallInFront(p, [T.SOFT, T.BARRI]); if (!w) return;
       const t = through(w);
@@ -1268,7 +1280,7 @@ export class Game {
     } else if (id === 'scope') {
       const w = this.wallInFront(p, [T.SOFT]); if (!w) return;
       const t = through(w);
-      this.ents.push({ id: this.eid(), type: 'scope', x: t.x, y: t.y, ang: Math.atan2(t.dy, t.dx), cell: w.k, team, owner: p.id, hp: 1 });
+      this.ents.push({ id: this.eid(), type: 'scope', x: t.x, y: t.y, ang: Math.atan2(t.dy, t.dx), cell: w.k, team, owner: p.id, hp: 1, shieldUntil: this.time + 3 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
     } else if (id === 'decoy') {
       const g = p.guns[0];
@@ -1335,14 +1347,13 @@ export class Game {
     }
     // ---- the operators added to fill every role (he asked) ----
     else if (id === 'sticky') { // SALVO: a round that sticks, then blows through
-      this.ents.push({ id: this.eid(), type: 'sticky', x: p.x + ca * 12, y: p.y + sa * 12, vx: ca * 560, vy: sa * 560, team, owner: p.id, travel: 0, t: 1.5 });
+      this.ents.push({ id: this.eid(), type: 'sticky', x: p.x + ca * 12, y: p.y + sa * 12, vx: ca * 560, vy: sa * 560, team, owner: p.id, travel: 0, t: 0 });
       used(); this.events.push({ e: 'snd', s: 'launcher', x: r1(p.x), y: r1(p.y) });
-    } else if (id === 'spreader') { // TORQUE: prises a two-block gap open after 4 s
-      const w = this.wallInFront(p, [T.SOFT, T.REINF]); if (!w) return;
-      const across = Math.abs(ca) > Math.abs(sa) ? [0, 1] : [1, 0];
-      this.ents.push({ id: this.eid(), type: 'spreader', x: w.x, y: w.y, cell: w.k, ax: across[0], ay: across[1], team, owner: p.id, t: 4, hp: 1 });
-      used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
+    } else if (id === 'saw') { // TORQUE (he asked for a usable breacher): a spinning disc that slits soft walls and barricades
+      this.ents.push({ id: this.eid(), type: 'saw', x: p.x + ca * 12, y: p.y + sa * 12, vx: ca * 700, vy: sa * 700, ang: p.aim, team, owner: p.id, travel: 0, cut: [] });
+      used(); this.events.push({ e: 'snd', s: 'launcher', x: r1(p.x), y: r1(p.y) });
     } else if (id === 'dash') { if (this.dash(p)) used(); }
+    else if (id === 'lunge') { if (!(p.lungeUntil > this.time)) { p.lungeUntil = this.time + 5; used(); this.events.push({ e: 'snd', s: 'ghost', x: r1(p.x), y: r1(p.y), id: p.id }); } }
     else if (id === 'flare' || id === 'medkit' || id === 'echobox') { this.throwNade(p, id); used(); }
     else if (id === 'spike') place('spike', 10, { life: 15, t: 0, pingT: 0 });
     else if (id === 'tracer') { p.tracerUntil = this.time + 8; used(); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); }
@@ -1351,8 +1362,21 @@ export class Game {
       const f = this.facingCell(p, 28); if (!f || f.t !== T.BARRI) return;
       this.ents.push({ id: this.eid(), type: 'pick', x: (f.cx + 0.5) * CELL, y: (f.cy + 0.5) * CELL, cell: f.k, team, owner: p.id, t: 1.5, hp: 1 });
       used();
-    } else if (id === 'cloak') { // VAPOR: a smoke that follows you
-      this.ents.push({ id: this.eid(), type: 'smoke', x: p.x, y: p.y, r: 30, life: 6, team, follow: p.id });
+    } else if (id === 'burst') { // VAPOR (he asked): a cone in front that spreads almost at once and fills the shape of the room
+      const m = this.map, W = m.W, c0x = Math.floor(p.x / CELL), c0y = Math.floor(p.y / CELL), seen = new Set([c0y * W + c0x]), q = [[c0x, c0y]], puffs = [];
+      while (q.length && puffs.length < 180) {
+        const [x, y] = q.shift(), wx = (x + 0.5) * CELL, wy = (y + 0.5) * CELL, dd = Math.hypot(wx - p.x, wy - p.y);
+        puffs.push(r1(wx), r1(wy));
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx, ny = y + dy, k = ny * W + nx; if (seen.has(k) || nx < 0 || ny < 0 || nx >= W || ny >= m.H) continue;
+          seen.add(k);
+          const t = m.tiles[k], cx2 = (nx + 0.5) * CELL, cy2 = (ny + 0.5) * CELL, d2 = Math.hypot(cx2 - p.x, cy2 - p.y);
+          if (blocksSight(t) || t === T.VOID) continue; // walls shape it
+          if (d2 > 34 && (d2 > 180 || Math.abs(angDiff(Math.atan2(cy2 - p.y, cx2 - p.x), p.aim)) > 0.7)) continue; // the cone (and a little round you)
+          q.push([nx, ny]);
+        }
+      }
+      this.ents.push({ id: this.eid(), type: 'smoke', x: p.x, y: p.y, ang: p.aim, r: 14, life: 8, team, kind: 'cone', puffs });
       used(); this.events.push({ e: 'snd', s: 'smoke', x: r1(p.x), y: r1(p.y) });
     } else if (id === 'alarm') place('alarm', 12, { arm: 1 });
     else if (id === 'tag') { // HOUND: the first attacker along the dart is revealed for 10 s
@@ -1373,6 +1397,25 @@ export class Game {
     } else if (id === 'radar') place('radar', 8, { life: 15, t: 0 });
     else if (id === 'station') place('station', 14, { pool: 100 });
     else if (id === 'catcher') place('catcher', 10, { c: 2 });
+  }
+
+  // CROW's Lunge (he asked for a rework): a silent 2 m lunge along the aim that downs whoever it reaches, from any side
+  lunge(p) {
+    const ca = Math.cos(p.aim), sa = Math.sin(p.aim), m = this.map;
+    let x = p.x, y = p.y, hit = null;
+    for (let d = 3; d <= 2 * PX_PER_M; d += 3) {
+      const nx = p.x + ca * d, ny = p.y + sa * d;
+      hit = [...this.players.values()].find(q => q !== p && q.alive && Math.hypot(q.x - nx, q.y - ny) < hitR(q.op) + PLAYER_R);
+      if (hit || circleBlocked(m, nx, ny, PLAYER_R, blocksMove)) break;
+      x = nx; y = ny;
+    }
+    p.lungeUntil = 0; p.meleeCd = 1.0;
+    if (Math.hypot(x - p.x, y - p.y) > 4) p.vault = { x0: p.x, y0: p.y, x1: x, y1: y, t: 0, dur: 0.16 };
+    if (!hit) return;
+    if (OPERATORS[hit.op].ability.id === 'brace' && !hit.downed && hit.ctrl === 'body' && Math.abs(angDiff(Math.atan2(p.y - hit.y, p.x - hit.x), hit.aim)) < 0.8) { // into the front of a shield: knocked aside, nobody downed
+      hit.shieldDownUntil = this.time + 1.0; this.events.push({ e: 'hit', k: 'shield', x: r1(hit.x), y: r1(hit.y) }); return;
+    }
+    this.damage(hit, hit.downed ? 999 : hit.hp + 5, p, 'Lunge', p.aim); // enough to down (the last one standing goes down for good, as always)
   }
 
   // RUSH: a 3 m burst forward along your aim; barricades in the way splinter, people in the way stagger
@@ -1437,11 +1480,15 @@ export class Game {
 
   throwNade(p, kind) {
     const tx = p.aimX ?? p.x + Math.cos(p.aim) * 200, ty = p.aimY ?? p.y + Math.sin(p.aim) * 200;
+    // Every throw works the same way (he asked): it flies to where you aim and comes to rest there (THROW_K is the
+    // drag, so the speed it leaves your hand with is just the distance × THROW_K). A frag's fuse runs from the throw
+    // (cook it); an impact grenade goes off on contact; a nitro cell / gas canister waits for its owner; everything
+    // else does its thing a moment after it lands. An EMP sticks to the first wall it hits (TALON's rule).
     const dist = Math.max(40, Math.min(300, Math.hypot(tx - p.x, ty - p.y)));
-    const v = dist * 2.5;
-    const fuse = { frag: 2.5, smoke: 1.0, stun: 1.3, impact: 3, nitro: 999, emp: 1.5, sonar: 1.1, gas: 999, cam: 0.9, flare: 1.0, medkit: 0.8, echobox: 0.7 }[kind];
+    const v = dist * THROW_K;
+    const fuse = { frag: 2.5, smoke: 0.2, stun: 0.5, impact: 3, nitro: 999, emp: 0.3, sonar: 0.2, gas: 999, cam: 0, flare: 0.4, medkit: 0.1, echobox: 0.1 }[kind];
     const n = { id: this.eid(), type: 'nade', kind, x: p.x + Math.cos(p.aim) * 10, y: p.y + Math.sin(p.aim) * 10,
-      vx: Math.cos(p.aim) * v, vy: Math.sin(p.aim) * v, fuse, team: this.side(p), owner: p.id };
+      vx: Math.cos(p.aim) * v, vy: Math.sin(p.aim) * v, fuse, fromLand: kind !== 'frag', flight: 0, team: this.side(p), owner: p.id };
     this.ents.push(n);
     this.events.push({ e: 'snd', s: 'throw', x: r1(p.x), y: r1(p.y) });
     return n;
@@ -1454,7 +1501,11 @@ export class Game {
 
   ghost(q) { return this.time < (q.ghostUntil || 0); } // Ghost Step: traps and sensors don't notice
   gridNear(x, y, team) { return this.ents.find(g => g.type === 'grid' && g.team === team && Math.hypot(g.x - x, g.y - y) < 30) || null; }
-  smokeList() { return this.ents.filter(e => e.type === 'smoke'); }
+  smokeList() { // every puff of every cloud, as circles (a smoke wall or cone is a list of small puffs)
+    const out = [];
+    for (const e of this.ents) if (e.type === 'smoke') { if (e.puffs) for (let i = 0; i < e.puffs.length; i += 2) out.push({ x: e.puffs[i], y: e.puffs[i + 1], r: e.r }); else out.push(e); }
+    return out;
+  }
 
   jammedAt(x, y) {
     for (const e of this.ents) if (e.type === 'jammer' && Math.hypot(e.x - x, e.y - y) < JAM_R) return true;
@@ -1616,7 +1667,9 @@ export class Game {
         case 'sticky': {
           if (e.stuck) { // counting down where it stuck (on a person, it goes with them)
             const q = e.on && this.players.get(e.on); if (q && q.alive) { e.x = q.x; e.y = q.y; }
-            e.t -= dt; if (e.t <= 0) this.detonate(e);
+            const o = this.players.get(e.owner);
+            if (!o || !o.alive) { e.go = true; e.t = Math.max(e.t, 0.5); } // its owner is gone: it goes off on its own
+            if (e.go) { e.t -= dt; if (e.t <= 0) this.detonate(e); }
             break;
           }
           const step = Math.hypot(e.vx, e.vy) * dt, dx = e.vx / (step / dt), dy = e.vy / (step / dt);
@@ -1692,7 +1745,8 @@ export class Game {
             if (--e.c <= 0) { this.removeEnt(e); break; }
           }
           break;
-        case 'cutter': case 'breach': case 'cluster': case 'spreader':
+        case 'saw': this.tickSaw(e, dt); break;
+        case 'cutter': case 'breach': case 'cluster':
           { const g = this.gridNear(e.x, e.y, other(e.team)); // a static grid fries breaching gadgets on its wall
             if (g) { this.events.push({ e: 'arc', x: r1(g.x), y: r1(g.y), x2: r1(e.x), y2: r1(e.y) }); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e); break; } }
           if (!this.jammedAt(e.x, e.y)) e.t -= dt;
@@ -1805,14 +1859,62 @@ export class Game {
     const nx = e.x + e.vx * dt, ny = e.y + e.vy * dt;
     const blocked = (x, y) => pointSolid(this.map, x, y, t => blocksDrone(t) || t === T.BARRI);
     let bounced = false;
+    if (e.kind === 'emp' && !e.landed && (blocked(nx, e.y) || blocked(e.x, ny))) { // an EMP sticks to the wall it hits; its zone reaches through it
+      e.wx = blocked(nx, e.y) ? Math.sign(e.vx) : 0; e.wy = !e.wx && blocked(e.x, ny) ? Math.sign(e.vy) : 0;
+      e.vx = e.vy = 0; e.landed = true; this.events.push({ e: 'snd', s: 'place', x: r1(e.x), y: r1(e.y) });
+    }
     if (blocked(nx, e.y)) { e.vx = -e.vx * 0.45; bounced = true; } else e.x = nx;
     if (blocked(e.x, ny)) { e.vy = -e.vy * 0.45; bounced = true; } else e.y = ny;
-    const f = Math.exp(-2.5 * dt); e.vx *= f; e.vy *= f;
+    const f = Math.exp(-THROW_K * dt); e.vx *= f; e.vy *= f;
+    e.flight += dt; if (!e.landed && (Math.hypot(e.vx, e.vy) < 20 || e.flight > 1.4)) e.landed = true;
     if (bounced && sp > 60) this.events.push({ e: 'snd', s: 'bounce', x: r1(e.x), y: r1(e.y) });
     if (e.kind === 'impact' && bounced) return this.detonate(e);
     if (e.kind === 'nitro' || e.kind === 'gas') return; // waits for its owner
+    if (e.fromLand && !e.landed) return; // still in the air: the short fuse starts when it lands
     e.fuse -= dt;
     if (e.fuse <= 0) this.detonate(e);
+  }
+
+  // TORQUE's saw disc: flies straight, slicing a thin see-through slit through every soft wall and barricade it crosses
+  // (a row of hole points across the disc's width, so you can see and shoot along the cut), wrecking gadgets on the way;
+  // it stops in anything solid or in the first person it hits
+  tickSaw(e, dt) {
+    const m = this.map, step = Math.hypot(e.vx, e.vy) * dt, dx = e.vx / (step / dt), dy = e.vy / (step / dt);
+    let hitT = null, hitQ = null;
+    for (const q of this.players.values()) {
+      if (!q.alive || q.id === e.owner) continue;
+      const t = rayCircle(e.x, e.y, dx, dy, q.x, q.y, hitR(q.op) + 2);
+      if (t !== null && t <= step && (hitT === null || t < hitT)) { hitT = t; hitQ = q; }
+    }
+    for (const o of [...this.ents]) if (o.team !== e.team && o.hp && o !== e) { const t = rayCircle(e.x, e.y, dx, dy, o.x, o.y, 6); if (t !== null && t <= step && (hitT === null || t < hitT)) this.hitEnt(o, this.players.get(e.owner)); }
+    let stopT = null;
+    walkRay(e.x, e.y, dx, dy, step, (cx, cy, t) => {
+      const k = cy * m.W + cx, tile = m.tiles[k];
+      if (tile === T.SOFT || tile === T.BARRI) {
+        if (!e.cut.includes(k)) { e.cut.push(k); this.sawSlit(k, cx, cy, e.x, e.y, dx, dy); this.events.push({ e: 'hit', k: tile === T.BARRI ? 'wood' : 'wall', x: r1(e.x + dx * t), y: r1(e.y + dy * t) }); this.noise(e.x, e.y, e.team, 600); }
+        return false;
+      }
+      if (blocksDrone(tile) || tile === T.VOID) { stopT = t; return true; }
+      return false;
+    });
+    if (hitQ && (stopT === null || hitT < stopT)) {
+      const src = this.players.get(e.owner);
+      this.damage(hitQ, 45, src || null, 'Saw Disc', Math.atan2(dy, dx)); this.removeEnt(e);
+      this.events.push({ e: 'hit', k: 'flesh', x: r1(hitQ.x), y: r1(hitQ.y) }); return;
+    }
+    if (stopT !== null) { this.events.push({ e: 'hit', k: 'spark', x: r1(e.x + dx * stopT), y: r1(e.y + dy * stopT) }); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e); return; }
+    e.x += e.vx * dt; e.y += e.vy * dt; e.travel += step; e.ang += dt * 40;
+    if (e.travel > 600) this.removeEnt(e);
+  }
+  sawSlit(k, cx, cy, x0, y0, dx, dy) { // hole points along the disc's path through the cell, three across its width
+    const h = this.map.holes[k] || (this.map.holes[k] = []);
+    const tin = [dx > 0 ? (cx * CELL - x0) / dx : dx < 0 ? ((cx + 1) * CELL - x0) / dx : -Infinity, dy > 0 ? (cy * CELL - y0) / dy : dy < 0 ? ((cy + 1) * CELL - y0) / dy : -Infinity];
+    const tout = [dx > 0 ? ((cx + 1) * CELL - x0) / dx : dx < 0 ? (cx * CELL - x0) / dx : Infinity, dy > 0 ? ((cy + 1) * CELL - y0) / dy : dy < 0 ? (cy * CELL - y0) / dy : Infinity];
+    const a = Math.max(0, ...tin), b = Math.min(...tout);
+    for (let t = a + 1; t < b; t += 2) for (const o of [-2.6, 0, 2.6]) {
+      const hx = r1(x0 + dx * t - dy * o), hy = r1(y0 + dy * t + dx * o);
+      if (h.length < 120) { h.push(hx, hy); this.newHoles.push(k, hx, hy); }
+    }
   }
 
   detonate(e) {
@@ -1880,12 +1982,6 @@ export class Game {
         if (e.bx !== undefined) this.explode({ x: e.bx, y: e.by, team: e.team, owner: e.owner }, { r: 36, dmg: 55, cellR: 0, cells: [], kind: 'impact' });
         break;
       }
-      case 'spreader': { // two blocks of the wall forced apart, reinforced or not
-        const m = this.map, x = e.cell % m.W, y = Math.floor(e.cell / m.W);
-        for (const d of [0, 1]) { const k = (y + e.ay * d) * m.W + x + e.ax * d; if (m.tiles[k] === T.SOFT || m.tiles[k] === T.REINF) this.destroyCell(k); }
-        this.events.push({ e: 'hit', k: 'wall', x: r1(e.x), y: r1(e.y) }); this.events.push({ e: 'snd', s: 'reinforce', x: r1(e.x), y: r1(e.y) }); this.noise(e.x, e.y, e.team, 700);
-        break;
-      }
       case 'stun': {
         this.events.push({ e: 'boom', x: r1(e.x), y: r1(e.y), r: 40, kind: 'stun' });
         for (const q of this.players.values()) {
@@ -1899,10 +1995,11 @@ export class Game {
         }
         break;
       }
-      case 'emp': {
-        this.events.push({ e: 'boom', x: r1(e.x), y: r1(e.y), r: 110, kind: 'emp' });
+      case 'emp': { // through walls: nothing but distance from the centre counts
+        const cx = e.x + (e.wx || 0) * 10, cy = e.y + (e.wy || 0) * 10;
+        this.events.push({ e: 'boom', x: r1(cx), y: r1(cy), r: EMP_R, kind: 'emp' });
         for (const o of [...this.ents]) {
-          if (o.team === e.team || Math.hypot(o.x - e.x, o.y - e.y) > 110) continue;
+          if (o.team === e.team || Math.hypot(o.x - cx, o.y - cy) > EMP_R + (o.type === 'cam' ? 6 : 0)) continue;
           if (o.type === 'cam') o.offUntil = this.time + 12;
           else if (['jammer', 'mine', 'nade', 'claymore', 'prox', 'concuss', 'clamp', 'sensor', 'grid', 'gascloud'].includes(o.type)) this.removeEnt(o);
         }
@@ -2062,7 +2159,7 @@ export class Game {
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur)] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
-        m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0,
+        m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined,
       }));
       return o;
     });
@@ -2076,7 +2173,9 @@ export class Game {
       if (e.type === 'plates') o.c = e.c;
       if (e.type === 'gascloud') { o.r = e.r; o.l = r1(e.life); }
       if (e.type === 'cluster') o.t = r1(e.t);
-      if (e.type === 'smoke') { o.r = e.r; o.l = r1(e.life); }
+      if (e.type === 'smoke') { o.r = e.r; o.l = r1(e.life); if (e.puffs) { o.pf = e.puffs; o.sk = e.kind; } }
+      if (e.type === 'scope' && e.shieldUntil > this.time) o.sh = r1(e.shieldUntil - this.time);
+      if (e.type === 'sticky' && e.stuck) o.st = 1;
       if (e.type === 'cutter' || e.type === 'breach') { o.t = r1(e.t); o.j = this.jammedAt(e.x, e.y) ? 1 : 0; }
       if (e.type === 'drone') { o.j = this.jammedAt(e.x, e.y) ? 1 : 0; o.vx = r1(e.vx || 0); o.vy = r1(e.vy || 0); }
       return o;

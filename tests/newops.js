@@ -4,7 +4,8 @@ import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { buildMap } from '../shared/map.js';
 import { T, CELL, TEAM, PX_PER_M } from '../shared/constants.js';
-import { JOBS } from '../shared/operators.js';
+import { JOBS, WEAPONS } from '../shared/operators.js';
+import { castSight, los } from '../shared/physics.js';
 let fails = 0; const fail = (...a) => { fails++; console.log('FAIL', ...a); }, ok = (c, ...a) => { if (!c) fail(...a); };
 for (const t of ['atk', 'def']) for (const j of JOBS[t]) ok(j.ops.length >= 5, t, j.name, 'has only', j.ops.length);
 const g = new Game({ free: true }), a = g.addPlayer('Att', false), d = g.addPlayer('Def', false);
@@ -22,12 +23,17 @@ const fresh = () => { for (const k of [wk - W, wk, wk + W]) { m.tiles[k] = T.SOF
 // SALVO: sticks to the wall, blows it open after 1.5 s and hurts someone behind it
 fresh(); setup(a, 'salvo', wx - 40, wy, 0); setup(d, 'lynx', wx + 30, wy, Math.PI); d.hp = d.maxHp = 500;
 use(a); run(0.3); ok(g.ents.some(e => e.type === 'sticky' && e.stuck), 'salvo round did not stick');
-ok(m.tiles[wk] === T.SOFT, 'salvo round blew before its delay'); run(1.5);
+run(3); ok(m.tiles[wk] === T.SOFT, 'salvo round blew without being told'); // remote detonation (he asked): it waits
+const cnt = a.abilityCount; use(a); ok(a.abilityCount === cnt, 'detonating should not use a round'); run(0.5);
 ok(m.tiles[wk] !== T.SOFT, 'salvo did not open the wall'); ok(d.hp < 500, 'salvo did not hurt the room behind');
 // TORQUE: two reinforced blocks prised open after 4 s
-fresh(); for (const k of [wk - W, wk, wk + W]) m.tiles[k] = T.REINF; setup(a, 'torque', wx - 20, wy, 0); use(a); run(3.5);
-ok(m.tiles[wk] === T.REINF, 'spreader opened too early'); run(1);
-ok([wk - W, wk, wk + W].filter(k => m.tiles[k] !== T.REINF).length === 2, 'spreader did not open a two-block gap');
+// TORQUE: the saw disc slits the soft wall (see-through, still standing) and cuts the defender behind it; a reinforced wall stops it
+fresh(); delete m.holes[wk]; setup(a, 'torque', wx - 40, wy, 0); setup(d, 'lynx', wx + 50, wy, Math.PI); d.hp = d.maxHp = 200; use(a); run(0.5);
+ok(m.tiles[wk] === T.SOFT, 'the saw disc should slit the wall, not knock it down'); ok((m.holes[wk] || []).length >= 20, 'no slit in the wall', (m.holes[wk] || []).length);
+ok(d.hp === 155, 'the disc did not cut the defender behind the wall', d.hp); ok(!g.ents.some(e => e.type === 'saw'), 'the disc should stop in the person it hits');
+ok(castSight(m, wx - 40, wy, 0, 200, null) > 80, 'cannot see through the slit');
+fresh(); delete m.holes[wk]; for (const k of [wk - W, wk, wk + W]) m.tiles[k] = T.REINF; setup(a, 'torque', wx - 40, wy, 0); setup(d, 'lynx', wx + 50, wy, Math.PI); d.hp = d.maxHp = 200; use(a); run(0.5);
+ok(!(m.holes[wk] || []).length && d.hp === 200 && !g.ents.some(e => e.type === 'saw'), 'a reinforced wall should stop the disc');
 // RUSH: 3 m forward through a barricade; WREN: a barricade picked apart silently
 const o = m.openings.find(o => o.kind === 'door' && o.cells.length === 2 && o.cells.every(c => m.tiles[c + 1] === T.FLOOR && m.tiles[c - 1] === T.FLOOR && m.tiles[c + 3] === T.FLOOR && m.tiles[c - 3] === T.FLOOR));
 if (o) {
@@ -53,8 +59,10 @@ fresh(); setup(d, 'rally', X, Y, 0); d.hp = 30; d.maxHp = 100; use(d); ok(d.hp =
 fresh(); setup(d, 'ward', X, Y, 0); use(d); const ct = g.ents.find(e => e.type === 'catcher'); setup(a, 'ember', ct.x - 150, ct.y, 0);
 g.ents.push({ id: g.eid(), type: 'nade', kind: 'frag', x: ct.x - 40, y: ct.y, vx: 0, vy: 0, fuse: 5, team: TEAM.ATK, owner: a.id }); run(0.1);
 ok(!g.ents.some(e => e.type === 'nade'), 'grenade catcher did not zap the grenade');
-// CROW: melee from behind kills; from the front it is a normal hit
-fresh(); setup(a, 'crow', X, Y, 0); setup(d, 'lynx', X + 18, Y, 0); d.hp = d.maxHp = 100; g.melee(a); ok(!d.alive || d.downed, 'takedown from behind did not kill');
+// CROW: Lunge — for 5 s the next melee is a 2 m lunge that downs, from any side; plain melee stays a normal hit
+fresh(); setup(a, 'crow', X, Y, 0); setup(d, 'lynx', X + 60, Y, Math.PI); d.hp = d.maxHp = 100; g.melee(a); ok(d.hp === 100, 'a plain melee should not reach 60 px');
+a.meleeCd = 0; use(a); ok(a.lungeUntil > g.time, 'lunge not ready'); g.melee(a); run(0.3); ok(!d.alive || d.downed, 'the lunge did not down the defender (facing him)'); ok(a.x > X + 30, 'Crow did not lunge forward', a.x);
+setup(a, 'crow', X, Y, 0); a.meleeCd = 0; setup(d, 'lynx', X + 50, Y, 0); d.hp = d.maxHp = 100; use(a); g.melee(a); run(0.3); ok(!d.alive || d.downed, 'the lunge did not down the defender (from behind)');
 setup(a, 'crow', X, Y, 0); setup(d, 'lynx', X + 18, Y, Math.PI); d.hp = d.maxHp = 100; a.meleeCd = 0; g.melee(a); ok(d.alive && d.hp === 45, 'a front melee should be a normal hit', d.hp);
 // BLAZE: blinds a defender facing the flare, not one looking away
 fresh(); setup(a, 'blaze', X, Y, 0); setup(d, 'lynx', X + 150, Y, Math.PI); const d2 = g.addPlayer('Def2', false); d2.squad = d.squad; setup(d2, 'lynx', X + 150, Y + 20, 0);
@@ -64,5 +72,28 @@ ok(d.stunUntil > g.time, 'flare did not blind a defender facing it'); ok(!(d2.st
 const g2 = new Game(); for (let i = 0; i < 10; i++) g2.addBot(); g2.startMatch(); const df = [...g2.players.values()].filter(p => g2.side(p) === TEAM.DEF);
 df.forEach((p, i) => { p.op = i ? 'lynx' : 'girder'; p.locked = true; }); [...g2.players.values()].filter(p => g2.side(p) === TEAM.ATK).forEach(p => { p.op = 'ember'; p.locked = true; });
 const r0 = g2.reinforce; for (const p of g2.players.values()) p.bot = false; g2.beginPrep(); ok(g2.reinforce >= r0 + 2, 'girder: no extra reinforcements', r0, g2.reinforce);
+// VAPOR: a cone of smoke in front that fills the room's shape (no puff on the other side of a wall)
+fresh(); setup(a, 'vapor', X, Y, 0); use(a); const vc = g.ents.find(e => e.type === 'smoke' && e.kind === 'cone');
+ok(vc && vc.puffs.length / 2 >= 15, 'VAPOR cone too small', vc && vc.puffs.length / 2);
+if (vc) { let behind = 0, wall = 0; for (let i = 0; i < vc.puffs.length; i += 2) { const x = vc.puffs[i], y = vc.puffs[i + 1]; if (Math.hypot(x - X, y - Y) > 40 && x < X) behind++; if (!los(m, X, Y, x, y, null) && Math.hypot(x - X, y - Y) < 60) wall++; }
+  ok(behind === 0, 'VAPOR smoke went behind him', behind); }
+// MARK: tracer rounds go through a reinforced wall; ordinary rounds do not
+fresh(); for (const k of [wk - W, wk, wk + W]) m.tiles[k] = T.REINF; setup(a, 'mark', wx - 40, wy, 0); a.tracerUntil = 0; setup(d, 'lynx', wx + 40, wy, Math.PI); d.hp = 999;
+const fireOnce = () => { const gun = a.guns[a.slot]; a.shots = 0; a.lastShot = -9; g.fire(a, gun, WEAPONS[gun.w]); };
+fireOnce(); ok(d.hp === 999, 'a normal round went through a reinforced wall'); use(a); fireOnce(); ok(d.hp < 999 && g.spots.atk.has(d.id), 'a tracer round did not go through the reinforced wall and reveal', d.hp);
+// TETHER: a new scope shrugs off hits for 3 s, then one bullet breaks it
+fresh(); setup(a, 'tether', wx - 18, wy, 0); use(a); const sc2 = g.ents.find(e => e.type === 'scope'); g.hitEnt(sc2, d); ok(g.ents.includes(sc2), 'shielded scope broke');
+g.time += 3.1; g.hitEnt(sc2, d); ok(!g.ents.includes(sc2), 'scope did not break after its shield wore off');
+// STRIDER: 6 s, slower while it lasts
+fresh(); setup(a, 'strider', X, Y, 0); use(a); ok(a.ghostUntil - g.time <= 6.01 && g.mods(a).mul < 0.9, 'Ghost Step should last 6 s and slow him', a.ghostUntil - g.time, g.mods(a).mul);
+// FERRO: the hammer never runs out
+fresh(); setup(a, 'ferro', X, Y, 0); for (let i = 0; i < 30; i++) { a.meleeCd = 0; use(a); } setup(d, 'lynx', X + 20, Y, Math.PI); d.hp = d.maxHp = 500; a.meleeCd = 0; use(a); ok(d.hp < 500, 'FERRO hammer ran out');
+// TALON: an EMP thrown at a wall sticks to it and wipes a gadget just behind the wall, not one 2 m away
+fresh(); setup(a, 'talon', wx - 60, wy, 0); a.aimX = wx; a.aimY = wy;
+g.ents.push({ id: 'mA', type: 'mine', x: wx + 14, y: wy, ang: 0, team: TEAM.DEF, owner: d.id, arm: 9, hp: 1 }, { id: 'mB', type: 'mine', x: wx + 80, y: wy, ang: 0, team: TEAM.DEF, owner: d.id, arm: 9, hp: 1 });
+use(a); run(1.5); ok(!g.ents.some(e => e.id === 'mA'), 'EMP did not reach through the wall'); ok(g.ents.some(e => e.id === 'mB'), 'EMP reached too far');
+// throwing (he asked: consistent): a smoke lands where you aim and only pops once it has landed
+fresh(); setup(a, 'ember', X, Y, 0); a.aimX = X + 150; a.aimY = Y; const sm = g.throwNade(a, 'smoke'); run(0.3); ok(g.ents.includes(sm), 'smoke popped in the air'); run(1.5);
+const sp = g.ents.find(e => e.type === 'smoke'); ok(sp && Math.abs(sp.x - (X + 150)) < 25, 'smoke did not land where aimed', sp && sp.x);
 console.log(fails ? `${fails} failure(s)` : 'PASS newops');
 process.exit(fails ? 1 : 0);

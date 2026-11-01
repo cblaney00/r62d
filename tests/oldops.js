@@ -28,7 +28,8 @@ fresh(); setup(a, 'hammer', wx - 60, wy, 0); use(a); ticks(0.5); ok(m.tiles[wk] 
 fresh(); setup(a, 'talon', X, Y, 0); g.ents.push({ id: g.eid(), type: 'jammer', x: X + 60, y: Y, team: TEAM.DEF, owner: d.id, hp: 1 });
 g.detonate({ type: 'nade', kind: 'emp', x: X + 50, y: Y, team: TEAM.ATK, owner: a.id }); ok(!g.ents.some(e => e.type === 'jammer'), 'TALON EMP did not destroy a jammer');
 fresh(); setup(a, 'rivet', wx - 18, wy, 0); a.hold = { ability: 1 }; ticks(1.6, a); ok(m.tiles[wk] !== T.SOFT, 'RIVET lance did not burn the wall');
-fresh(); setup(a, 'haze', X, Y, 0); use(a); ok(g.ents.filter(e => e.type === 'smoke').length >= 2, 'HAZE barrage: no wall of smoke');
+fresh(); setup(a, 'haze', X, Y, 0); use(a); { const hz = g.ents.find(e => e.type === 'smoke' && e.kind === 'wall'); ok(hz && hz.puffs.length / 2 >= 8, 'HAZE barrage: no wall of smoke'); // a THIN wall across the aim (he asked)
+  if (hz) { const xs = hz.puffs.filter((_, i) => i % 2 === 0); ok(Math.max(...xs) - Math.min(...xs) < 2 && hz.r <= 12, 'HAZE wall is not thin'); } }
 fresh(); setup(a, 'glint', X, Y, 0); setup(d, 'lynx', X + 150, Y, 0); g.detonate({ type: 'nade', kind: 'sonar', x: X + 40, y: Y, team: TEAM.ATK, owner: a.id }); ok(sees('atk', d), 'GLINT sonar did not reveal a defender nearby');
 fresh(); setup(a, 'brisk', X, Y, 0); const m0 = g.mods(a).mul; use(a); ok(g.mods(a).mul > m0, 'BRISK adrenal did not make her faster');
 fresh(); setup(a, 'onyx', wx - 20, wy, 0); setup(d, 'lynx', wx + 40, wy, Math.PI); d.hp = d.maxHp = 500; use(a); ticks(3.3); ok(d.hp < 500, 'ONYX cluster did not hurt the room behind the wall');

@@ -1412,7 +1412,7 @@ function drawMarks(view, now) {
 
 // smoke clouds of a snapshot, worked out once per snapshot (it was being rebuilt many times a frame)
 const smokeMemo = new WeakMap();
-const smokes = s => { if (!s) return []; let v = smokeMemo.get(s); if (!v) smokeMemo.set(s, v = s.ents.filter(e => e.ty === 'smoke').map(e => ({ x: e.x, y: e.y, r: e.r }))); return v; };
+const smokes = s => { if (!s) return []; let v = smokeMemo.get(s); if (!v) smokeMemo.set(s, v = s.ents.filter(e => e.ty === 'smoke').flatMap(e => e.pf ? Array.from({ length: e.pf.length / 2 }, (_, i) => ({ x: e.pf[i * 2], y: e.pf[i * 2 + 1], r: e.r })) : [{ x: e.x, y: e.y, r: e.r }])); return v; };
 
 // ---------------- what things are made of (for sound) ----------------
 const FLOOR_SURF = { [FL.WOOD]: 'wood', [FL.TILE]: 'tile', [FL.SERVER]: 'metal', [FL.MARBLE]: 'marble', [FL.CARPET]: 'carpet', [FL.CONCRETE]: 'concrete', [FL.GRASS]: 'grass', [FL.ASPHALT]: 'asphalt', [FL.SAND]: 'grass' };
@@ -2042,9 +2042,10 @@ function hud(s) {
   const ab = o.ability, g = GADGETS[me.gd || o.gadget];
   const abCount = ab.battery ? `${Math.round(me.bat / ab.battery * 100)}%` : ab.count ? me.ac : '';
   const viewName = side === 'atk' ? `Drone${s.ph === PHASE.ACTION ? ' ×' + me.dr : ''}` : 'Cameras';
-  st.tBadge = { skill: me.gi ? '!' : String(abCount), gadget: me.ni ? '!' : String(me.gc ?? ''), view: side === 'atk' && s.ph === PHASE.ACTION ? String(me.dr ?? '') : '' };
+  const salvoWait = ab.id === 'sticky' ? s.ents.filter(e => e.ty === 'sticky' && e.ow === me.id && e.st).length : 0; // SALVO: rounds waiting for her
+  st.tBadge = { skill: me.gi || salvoWait || me.lu ? '!' : String(abCount), gadget: me.ni ? '!' : String(me.gc ?? ''), view: side === 'atk' && s.ph === PHASE.ACTION ? String(me.dr ?? '') : '' };
   setHTML('gadgets',
-    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : ab.name}<em>${me.gi ? '!' : abCount}</em></div>` +
+    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
     `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>${label('gadget')}</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +
     `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label

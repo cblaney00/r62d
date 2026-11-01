@@ -120,14 +120,70 @@ export class FX {
   }
 }
 
-// Billowing smoke grenade cloud
-export function drawSmoke(ctx, s, t, puffs = 22, col = '205,205,200') {
-  const fade = Math.min(1, s.l / 2) * Math.min(1, (12 - s.l) * 2 + 0.2);
-  for (let i = 0; i < puffs; i++) {
-    const a = i * 2.4 + t * 0.15 * (i % 2 ? 1 : -1), d = (i % 5) / 5 * s.r * 0.75;
-    const x = s.x + Math.cos(a) * d, y = s.y + Math.sin(a) * d, r = s.r * (0.38 + (i % 3) * 0.08);
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `rgba(${col},${0.5 * fade})`); g.addColorStop(1, `rgba(${col},0)`);
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+// Smoke (he asked: a proper smoke effect, the outline smoky and moving): a dense body of soft blobs that churn slowly,
+// and round the edge wisps that curl, swell and drift outward and fade, so the border never sits still as a hard circle.
+// A cloud is either one big circle (grenades: x, y, r) or a list of small puffs (pf: HAZE's thin wall, VAPOR's cone),
+// which is drawn the same way puff by puff, with the edge wisps only on puffs at the edge of the shape.
+const blobCache = new Map();
+function blob(col) { // one soft round puff, drawn once and stamped (fast)
+  let c = blobCache.get(col); if (c) return c;
+  c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, `rgba(${col},1)`); gr.addColorStop(0.45, `rgba(${col},0.75)`); gr.addColorStop(1, `rgba(${col},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); blobCache.set(col, c); return c;
+}
+const stamp = (ctx, img, x, y, r, a) => { if (a <= 0.005 || r <= 0.3) return; ctx.globalAlpha = a; ctx.drawImage(img, x - r, y - r, r * 2, r * 2); };
+const hash = n => { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); };
+const edgeMemo = new Map(); // cloud id -> which puffs are on the edge, and which way is out
+function edgesOf(s) {
+  const key = s.id + ':' + s.pf.length; let m = edgeMemo.get(s.id);
+  if (m && m.key === key) return m.v;
+  const pf = s.pf, n = pf.length / 2, sp = s.r * 1.5, v = [];
+  for (let i = 0; i < n; i++) {
+    let cx = 0, cy = 0, k = 0;
+    for (let j = 0; j < n; j++) if (j !== i && Math.abs(pf[j * 2] - pf[i * 2]) < sp && Math.abs(pf[j * 2 + 1] - pf[i * 2 + 1]) < sp) { cx += pf[j * 2]; cy += pf[j * 2 + 1]; k++; }
+    if (k < 4) { const ox = k ? pf[i * 2] - cx / k : 1, oy = k ? pf[i * 2 + 1] - cy / k : 0, l = Math.hypot(ox, oy) || 1; v.push([i, ox / l, oy / l]); }
   }
+  if (edgeMemo.size > 60) edgeMemo.clear();
+  edgeMemo.set(s.id, { key, v }); return v;
+}
+export function drawSmoke(ctx, s, t, puffs = 22, col = '205,205,200') {
+  const img = blob(col), q = Math.max(0.35, Math.min(1.4, puffs / 16)); // graphics quality: how many blobs and wisps
+  const life = s.l ?? 12, fadeOut = Math.min(1, life / 1.6), A = ctx.globalAlpha;
+  if (s.pf && s.pf.length) {
+    const pf = s.pf, n = pf.length / 2, total = s.sk === 'cone' ? 8 : 12, age = total - life, r = s.r;
+    const grow = (x, y) => { // VAPOR's cone rolls out from him almost at once; HAZE's wall unrolls from its middle
+      const d = s.sk === 'cone' ? Math.hypot(x - s.x, y - s.y) / 900 : Math.hypot(x - pf[0], y - pf[1]) / 1600;
+      return Math.max(0, Math.min(1, (age - d) / 0.14));
+    };
+    for (let i = 0; i < n; i++) { // the body: two churning blobs per puff
+      const x = pf[i * 2], y = pf[i * 2 + 1], g = grow(x, y); if (!g) continue;
+      for (let b = 0; b < 2; b++) {
+        const ph = hash(i * 3 + b) * 6.28, a = t * (0.35 + hash(i + b * 7) * 0.3) + ph;
+        stamp(ctx, img, x + Math.cos(a) * r * 0.3, y + Math.sin(a * 1.3) * r * 0.3, r * (1.5 + 0.2 * Math.sin(t * 0.9 + ph)) * g, 0.26 * fadeOut * A);
+      }
+    }
+    for (const [i, ox, oy] of edgesOf(s)) { // the edge: wisps that curl outward and fade, over and over
+      const x = pf[i * 2], y = pf[i * 2 + 1], g = grow(x, y); if (!g) continue;
+      const w = Math.max(2, Math.round(3 * q));
+      for (let b = 0; b < w; b++) {
+        const ph = hash(i * 11 + b * 5), cyc = (t * (0.28 + ph * 0.2) + ph) % 1, sway = Math.sin(t * 1.7 + ph * 9) * 0.6;
+        const d = r * (0.6 + cyc * 0.75), wx = x + (ox - oy * sway) * d, wy = y + (oy + ox * sway) * d;
+        stamp(ctx, img, wx, wy, r * (0.5 + cyc * 0.5) * g, 0.24 * (1 - cyc) * Math.min(1, cyc * 6) * fadeOut * A);
+      }
+    }
+  } else {
+    const fadeIn = Math.min(1, (12 - life) * 2 + 0.2), f = fadeOut * fadeIn * A, R = s.r, nb = Math.round(puffs);
+    for (let i = 0; i < nb; i++) { // the body
+      const a = i * 2.4 + t * 0.15 * (i % 2 ? 1 : -1), d = (i % 5) / 5 * R * 0.7;
+      stamp(ctx, img, s.x + Math.cos(a) * d, s.y + Math.sin(a) * d, R * (0.42 + (i % 3) * 0.09 + 0.04 * Math.sin(t + i)), 0.36 * f);
+    }
+    const nw = Math.round(26 * q); // the edge: wisps round the rim curling outward
+    for (let i = 0; i < nw; i++) {
+      const ph = hash(i * 13 + (s.x | 0)), cyc = (t * (0.22 + ph * 0.18) + ph) % 1;
+      const a = i / nw * 6.283 + Math.sin(t * 0.4 + ph * 6) * 0.35 + cyc * 0.5 * (i % 2 ? 1 : -1), d = R * (0.58 + cyc * 0.34);
+      stamp(ctx, img, s.x + Math.cos(a) * d, s.y + Math.sin(a) * d, R * (0.22 + cyc * 0.2 + 0.04 * Math.sin(t * 2 + i)), 0.3 * (1 - cyc) * Math.min(1, cyc * 5) * f);
+    }
+  }
+  ctx.globalAlpha = A;
 }

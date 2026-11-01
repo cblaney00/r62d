@@ -4,7 +4,7 @@ import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { OPERATORS, OP_LIST } from '../shared/operators.js';
 import { PHASE, T, CELL } from '../shared/constants.js';
-const WALLY = new Set(['cutter', 'lance', 'scope', 'hammer', 'grid', 'cluster', 'panel', 'spreader', 'periscope']);
+const WALLY = new Set(['cutter', 'lance', 'scope', 'hammer', 'grid', 'cluster', 'panel', 'periscope']);
 // stand the body in front of a plain wall (or a doorway, for panels), facing it
 function faceWall(g, p, door) {
   const m = g.map;
