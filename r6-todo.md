@@ -16,11 +16,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] defenders should wander a little bit and sounds like glass breaking, gunshots, explosive utility, other very loud noises should be hearable throughout the building usually (unless the building is super large or the sound is one floor apart from the listener
 - [ ] defenders of all ranks above silver should ernestly set up site with gadjets and barracades unless they decide they want to save their gadgets for later in the round (which is a totally viable move even with site anchor characters)
 - [ ] rework the difficulties so that there are enough for bronze, copper, gold, platinum, diamond, champion, pro
-- [ ] make it so reticle movement away from the character is a bit faster so if you want to rescope in then you can aim further faster, the aiming system is getting very good though. different scopes should also start out at different ADS ranges now, dont adjust it too crazy but a red dot should definitely feel different than a 2x
 - [ ] make it so you can zoom in and inspect each room smoothly (like a magnifying glass) the map knowledge maps
 
 ## Done
 
+- [x] The crosshair moves away from you 1.3x faster (coming back stays the same), and aiming in starts it at a distance that suits the sight: iron 2.5 m, holo 3, red dot 3.5, 1.5x prism 5, 2x scope 6.5 (match and Armory).
 - [x] Semi-autos (pistols, revolver, marksman rifles, slug) lose the spray-only attachments and get their own: Match Barrel (tighter aimed shots, longer reach, slower to aim), Trigger Kit (exact again 25% sooner after a shot, looser hip fire) and Recoil Pad (each shot kicks 30% less, a little slower to aim).
 - [x] Wasp toned down: 30 rounds, violent sideways shake, slower to aim, damage falls off fast. Halberd and V9 removed (their operators got other guns). Guns pulled apart: Hornet = easy-control machine pistol, Sentry = slow hard-hitting carbine, Longbow = heavy two-tap DMR (Heron stays the quick three-tap), Trident bursts are slower, Ox = heavy slow belt-fed, Mule = steady LMG, Drummer = fast wandering hose, K4 = the all-rounder.
 - [x] No more endless revives: a bot gives up on a revive it can't get started within ~7 s (out of reach or blocked) and tries again later, and a pro doesn't walk into a revive with an enemy just seen or heard right there unless the teammate is about to bleed out.

@@ -5,7 +5,7 @@
 // it is your own crosshair, distances are real metres, the view widens when you aim in and follows the crosshair out.
 import { PX_PER_M } from '/shared/constants.js';
 import { drawXhair } from './crosshair.js';
-import { WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide } from '/shared/operators.js';
+import { WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -49,7 +49,7 @@ export function openArmory(el, opts) {
     audio.initAudio();
     if (document.pointerLockElement !== cv && !S.lockAsked) { S.lockAsked = true; cv.requestPointerLock?.(); return; } // the first click just takes control
     if (e.button === 0) { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; }
-    if (e.button === 2) { S.mouse.r = true; const l = Math.hypot(S.aim.x, S.aim.y) || 1; S.aim = { x: S.aim.x / l * 2.5 * M, y: S.aim.y / l * 2.5 * M }; } // aiming in: 2.5 m out, as in a match
+    if (e.button === 2) { S.mouse.r = true; adsAim(); } // aiming in: 2.5 m out, as in a match
   };
   cv.oncontextmenu = e => e.preventDefault();
   if (isTouch && !el.querySelector('.armTouch')) { // phone: drag on the range to aim; FIRE / AIM (held) and RELOAD buttons
@@ -61,7 +61,7 @@ export function openArmory(el, opts) {
       b.addEventListener('touchstart', e => {
         e.preventDefault(); audio.initAudio(); b.classList.add('on');
         if (a === 'fire') { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; }
-        if (a === 'ads') { S.mouse.r = true; const l = Math.hypot(S.aim.x, S.aim.y) || 1; S.aim = { x: S.aim.x / l * 2.5 * M, y: S.aim.y / l * 2.5 * M }; }
+        if (a === 'ads') { S.mouse.r = true; adsAim(); }
         if (a === 'reload') reload();
       }, { passive: false });
       const up = () => { b.classList.remove('on'); if (a === 'fire') S.mouse.l = false; if (a === 'ads') S.mouse.r = false; };
@@ -159,10 +159,12 @@ const farEnd = () => S.dist * M + 60; // the backstop
 const scoped = () => String(attOf(S.w).sight || '').includes('scope');
 const fitCap = () => S.mouse.r ? (scoped() ? 1000 : 820) : 700;
 const aimMin = () => 46 * O.dpr() / (S.z || 1), aimMax = () => S.reachW || 400;
+function adsAim() { const l = Math.hypot(S.aim.x, S.aim.y) || 1, d = adsStart(attOf(S.w).sight) * M; S.aim = { x: S.aim.x / l * d, y: S.aim.y / l * d }; } // per sight, as in a match
 function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): sideways turns as if never past TURN_R
   const z = S.z || 1; dx /= z; dy /= z;
   const o = S.aim, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = aimMin(), hi = aimMax();
-  let l = l0 + dx * ux + dy * uy, a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / Math.min(l0, 160);
+  const r = dx * ux + dy * uy;
+  let l = l0 + (r > 0 ? r * 1.3 : r), a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / Math.min(l0, 160);
   if (l < 0) { l = -l; a += Math.PI; }
   if (l > hi) l = Math.max(hi, Math.min(l, l0)); else if (l < lo) l = lo;
   S.aim = { x: Math.cos(a) * l, y: Math.sin(a) * l };

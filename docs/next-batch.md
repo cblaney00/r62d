@@ -13,8 +13,7 @@ Still to do, in this order (all are in r6-todo.md "To do"):
    front blade, hammer, curved wood grip instead of the pistol slide) + per-gun top-down features in sprites.js
    `drawGun` (export `G` from gunart.js: revolver cylinder, `double`, pump only if `pump`, `can`, drum, belt, bolt,
    bullpup mag). Also draw the new attachments (match barrel, trigger kit, recoil pad) in gunart.js.
-2. Reticle moves outward ~1.3x faster in `freeMove` (and the Armory copy); aim-in start distance per sight:
-   iron 2.5 m, red dot 3.5, holo 3, prism 5, 2x scope 6.5 (`adsReset`, touch `padReach`).
+2. (done) Reticle speed + per-sight aim-in distance.
 3. Subtle per-sight aim-in look (red dot glow, holo ring, prism amber chevron, scope lens vignette) - never in the way.
 4. Difficulty tiers = the ranks (SKILL table in bots.js, BOT_LEVELS, lobby/free play buttons; tutorial stays easiest).
 5. Ranked mode (above). 6. Above Silver defenders really set up site (gadgets, barricades) unless saving gadgets.

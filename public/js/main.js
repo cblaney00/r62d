@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
@@ -148,13 +148,14 @@ const TURN_R = 160, ADS_DIST = 2.5 * PX_PER_M; // aiming in puts the crosshair 2
 function freeMove(dx, dy) {
   const z = st.zoom || 1; dx /= z; dy /= z;
   const o = aimOff, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = AIM_MIN(), hi = AIM_MAX();
-  let l = l0 + dx * ux + dy * uy, a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / Math.min(l0, TURN_R);
+  const r = dx * ux + dy * uy; // moving away from you goes 1.3x faster (he asked), coming back stays 1:1
+  let l = l0 + (r > 0 ? r * 1.3 : r), a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / Math.min(l0, TURN_R);
   if (l < 0) { l = -l; a += Math.PI; } // pulled through the middle: out the other side
   if (l > hi) l = Math.max(hi, Math.min(l, l0)); // no pushing past the reach (a reach that just shrank keeps your spot)
   else if (l < lo) l = lo;
   aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l };
 }
-function adsReset() { const l = Math.hypot(aimOff.x, aimOff.y) || 1; aimOff = { x: aimOff.x / l * ADS_DIST, y: aimOff.y / l * ADS_DIST }; }
+function adsReset() { const l = Math.hypot(aimOff.x, aimOff.y) || 1, d = st.me && st.me.aa ? adsStart(attFromCode(st.me.aa).sight) * PX_PER_M : ADS_DIST; aimOff = { x: aimOff.x / l * d, y: aimOff.y / l * d }; }
 const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
 let padOn = false, padAng = 0, padReach = 0.6;
 const wrapAng = a => Math.atan2(Math.sin(a), Math.cos(a));

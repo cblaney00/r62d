@@ -416,6 +416,9 @@ export function gunMods(w, a) {
   return m;
 }
 // three short letters for the snapshot: barrel / grip / sight
+// how far out (metres) aiming in puts the crosshair, per sight (he asked: a red dot should feel different from a 2x)
+export const ADS_START = { iron: 2.5, reddot: 3.5, holo: 3, prism: 5, scope: 6.5 };
+export const adsStart = sight => ADS_START[sight] || 2.5;
 export const attCode = a => [a.barrel, a.grip, a.sight].join(',');
 export const attFromCode = s => { const [barrel, grip, sight] = String(s || '').split(','); return { barrel, grip, sight }; };
 
