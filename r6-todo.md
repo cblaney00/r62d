@@ -9,6 +9,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Sound no longer tells you exactly where to shoot blindly: the orange arcs pointing at running enemies and the red arcs pointing at gunfire on another floor are gone. What stays: footsteps or gunfire on the floor just above or below show as a faint "▲ FOOTSTEPS ABOVE" / "▼ GUNFIRE BELOW" with no direction, and the game's own sound through walls or floors is blurrier about which side it comes from (still muffled and quieter as before). Pings, spotted marks, hit markers and seen-enemy edge marks are unchanged.
 - [x] Trappers one job each: Bramble keeps the bomb; Lynx's mine becomes a paint trap (no bang, the attacker glows for defenders through walls for 12 s); Latch's wire becomes a siren that deafens the attacker (no footsteps heard) for 8 s; Shade's microphone stays
 - [x] Placed traps follow one rule for arming and hiding (like throwing)
 - [x] Wraith: a scan lasts 4 s at most, and attackers it sees hear a ping

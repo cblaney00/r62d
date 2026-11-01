@@ -443,11 +443,7 @@ function onEvent(e, s, players) {
       const an = anim(e.id);
       if (an.lastShotSnd !== s.time && st.listen && st.map && !e.q && e.id !== st.id) { // gunfire on the floor above or below: an arrow towards it
         const lv = localPos(st.map, st.listen.x, st.listen.y), ls = localPos(st.map, e.x, e.y), fd = ls.f - lv.f;
-        if (fd && Math.abs(fd) <= 1 && Math.hypot(ls.x - lv.x, ls.y - lv.y) < 700) {
-          const ang = Math.atan2(ls.y - lv.y, ls.x - lv.x);
-          st.shotHints = (st.shotHints || []).filter(h => !(h.fd === fd && Math.abs(angDiff(h.a, ang)) < 0.3));
-          st.shotHints.push({ a: ang, fd, t: now });
-        }
+        if (fd && Math.abs(fd) <= 1 && Math.hypot(ls.x - lv.x, ls.y - lv.y) < 700) st.vertHint = { ...(st.vertHint || {}), [fd > 0 ? 'shotUp' : 'shotDown']: now }; // which floor, never which way (he asked)
       }
       if (an.lastShotSnd !== s.time) { if (!e.q) fx.muzzle(e.x, e.y, a); audio.gunshot(w ? e.w : 'AR', e.x, e.y, e.id === st.id, !!e.q); audio.casing(e.x, e.y, surfaceAt(e.x, e.y), w && w.cls === 'Shotgun'); an.lastShotSnd = s.time; }
       an.recoil = 1.6; if (!e.q) an.flashT = now; // a suppressor hides the flash
@@ -1742,20 +1738,17 @@ function draw(s, view, now, dt) {
       const { x: sx, y: sy } = w2s(p.x, p.y);
       if ((sx < 0 || sy < 0 || sx > VW || sy > VH) && (!view || floorAt(st.map, p.x, p.y) === floorAt(st.map, view.x, view.y))) marker(p.x, p.y, '!', '#ff5040', view); // another floor (seen in the stairs window): no edge mark
     }
-    // footstep direction hints around you
-    if (view && view.kind === 'body') for (const p of drawn) { /* visible: no hint */ }
-    // measured in the shared building frame, so steps on the floor above or below show too, marked ▲ / ▼ (he asked)
-    const lv = view && localPos(m, view.x, view.y);
+    // Sounds you can't see (he asked: hearing someone must not tell you exactly where to shoot blindly): no arrows
+    // towards footsteps or gunfire any more. Only which floor: footsteps running on the floor just above or below
+    // and gunfire there show as a faint "▲ FOOTSTEPS ABOVE" / "▼ GUNFIRE BELOW" by you, with no direction.
+    const lv = view && localPos(m, view.x, view.y), vh = st.vertHint || (st.vertHint = {});
     if (view && view.kind === 'body') for (const sp of s.players) {
       if (!sp.a || sp.sg || sp.tm === side || sp.x === undefined || (sp.mv || 0) < 2) continue; // only running makes noise
       const p = interp(sp.id, 'players'); if (!p) continue;
-      const lp = localPos(m, p.x, p.y), fd = lp.f - lv.f, d = Math.hypot(lp.x - lv.x, lp.y - lv.y);
-      const range = fd ? 300 : 380;
-      if (d > range || Math.abs(fd) > 1 || (!fd && seen(p.x, p.y))) continue;
-      floorHint(view, Math.atan2(lp.y - lv.y, lp.x - lv.x), (1 - d / range) * 0.8, fd);
+      const lp = localPos(m, p.x, p.y), fd = lp.f - lv.f;
+      if (fd && Math.abs(fd) === 1 && Math.hypot(lp.x - lv.x, lp.y - lv.y) < 300) vh[fd > 0 ? 'stepUp' : 'stepDown'] = now;
     }
-    st.shotHints = (st.shotHints || []).filter(h => now - h.t < 1.2);
-    if (view) for (const h of st.shotHints) floorHint(view, h.a, (1 - (now - h.t) / 1.2) * 0.9, h.fd, true);
+    if (view && view.kind === 'body') floorHints(view, now, vh);
     // interaction progress ring
     if (me.a && me.bu && me.ct === 'body') {
       ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(st.pred.x, st.pred.y, 18, 0, 7); ctx.stroke();
@@ -2202,15 +2195,15 @@ function teamViewers(s, view, me, inGame) {
 }
 // a copy of someone on a staircase (stairGhost): seen by a teammate's eyes, drone or camera near that staircase
 // a direction hint round your character: an arc, and ▲ / ▼ when it comes from the floor above or below
-function floorHint(view, a, al, fd, shot = false) {
-  ctx.strokeStyle = shot ? `rgba(255,80,60,${al})` : `rgba(255,140,60,${al})`; ctx.lineWidth = 2.2;
-  ctx.beginPath(); ctx.arc(view.x, view.y, 30, a - 0.22, a + 0.22); ctx.stroke();
-  if (fd) {
-    ctx.font = '700 9px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = shot ? `rgba(255,90,70,${al})` : `rgba(255,150,70,${al})`;
-    ctx.fillText((fd > 0 ? '▲' : '▼') + (shot ? (fd > 0 ? ' SHOTS ABOVE' : ' SHOTS BELOW') : ''), view.x + Math.cos(a) * 40, view.y + Math.sin(a) * 40);
-    ctx.textBaseline = 'alphabetic';
+function floorHints(view, now, vh) { // which floor a sound came from, never which way: above your head or below your feet
+  const u = UP(), fade = t => Math.max(0, 1 - (now - (t || -9)) / 1.4) * 0.85;
+  ctx.font = '700 9px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const [up, k] of [[1, 'Up'], [-1, 'Down']]) {
+    const shot = fade(vh['shot' + k]), step = fade(vh['step' + k]), al = Math.max(shot, step); if (al <= 0.01) continue;
+    ctx.fillStyle = shot >= step ? `rgba(255,90,70,${al})` : `rgba(255,150,70,${al})`;
+    ctx.fillText(`${up > 0 ? '▲' : '▼'} ${shot >= step ? 'GUNFIRE' : 'FOOTSTEPS'} ${up > 0 ? 'ABOVE' : 'BELOW'}`, view.x + u.x * 34 * up, view.y + u.y * 34 * up);
   }
+  ctx.textBaseline = 'alphabetic';
 }
 // ---------------- stairs preview (he asked: stairs were a choke point) ----------------
 // Close to a staircase (on its steps, or within a few metres of its open end) a live corner window shows the other

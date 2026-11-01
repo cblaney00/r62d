@@ -72,7 +72,7 @@ const STEPS = [
   { part: 1, ph: PHASE.PREP, go: true, t: 'Ready', b: () => `Well fortified. The action phase is starting: the attackers are on their way.`, done: c => c.ph === PHASE.ACTION },
   { part: 1, ph: PHASE.ACTION, t: 'Hold and take them down', b: () => `
     Two attackers are coming for the objective. Pick a spot looking at a way in, crouch (${K('crouch')}) and wait.
-    Orange arcs round you are <b>footsteps you hear</b>; ▲ / ▼ means another floor. Ping them (${K('spot')}) and
+    <b>Listen</b>: footsteps and shots come from their side of you, muffled through walls; "▲ ABOVE" / "▼ BELOW" means another floor. Ping them (${K('spot')}) and
     <b>take both down</b>.`,
     done: () => false },
 ];

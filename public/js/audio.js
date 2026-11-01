@@ -99,6 +99,7 @@ function out(x, y, gain, range = 900, wet = 0.25) {
     if (gain < 0.003) return null;
     pan = Math.max(-0.9, Math.min(0.9, (dd.dx * Math.cos(lrot) - dd.dy * Math.sin(lrot)) / 260));
     walls = d > 20 ? occlude(x, y) : 0;
+    pan *= (walls === 0 ? 1 : walls === 1 ? 0.6 : 0.35) * (vert ? 0.6 : 1); // through walls or floors the side it comes from is vaguer (he asked: no blind pinpointing)
   }
   const g = ac.createGain(); g.gain.value = gain * Math.pow(0.55, walls);
   const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
