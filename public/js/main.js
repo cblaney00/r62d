@@ -2675,9 +2675,12 @@ function chatKey(e) {
 // someone yourself, A goes back to the director, M shows the whole floor of the objective.
 function tvDirector(s, players, now) {
   const T = st.tv; for (const e of s.ev) if (e.e === 'shot') T.shot[e.id] = now;
+  // he asked: in preparation, show the defenders setting up (gadgets placed, walls reinforced, doors boarded)
+  const prep = s.ph === PHASE.PREP; T.util = T.util || {}; if (!prep) T.prepSeen = null; else T.prepSeen = T.prepSeen || new Set();
+  for (const e of s.ev) if (e.e === 'snd' && ['place', 'reinforce', 'panel', 'clamp', 'beep'].includes(e.s)) { let b = null, bd = 90; for (const p of s.players) if (p.a && p.x !== undefined) { const d = Math.hypot(p.x - e.x, p.y - e.y); if (d < bd) { bd = d; b = p; } } if (b) T.util[b.id] = now; }
   const cur = players.get(T.follow), curOk = cur && cur.a && !cur.dn;
   if (!T.auto && curOk) return;
-  if (curOk && now - T.cutT < 3) return;
+  if (curOk && now - T.cutT < (prep ? 5 : 3)) return;
   let best = null, bs = -1;
   const alive = s.players.filter(p => p.a && !p.dn && p.x !== undefined);
   for (const p of alive) {
@@ -2685,17 +2688,18 @@ function tvDirector(s, players, now) {
     if (p.bu) sc += 100; if (now - (T.shot[p.id] || -9) < 1.5) sc += 40; if (p.df) sc += 10;
     if (alive.filter(q => q.sq === p.sq).length === 1) sc += 25;
     for (const q of alive) if (q.sq !== p.sq) sc += Math.max(0, 30 - Math.hypot(q.x - p.x, q.y - p.y) / 15) * 0.5;
+    if (prep && p.tm === 'def') { if (now - (T.util[p.id] || -9) < 4) sc += 30; if (!T.prepSeen.has(p.id)) sc += 12; if (s.ents.some(e => e.tm === 'def' && Math.hypot(e.x - p.x, e.y - p.y) < 80)) sc += 6; } // the action above still wins
     if (p.id === T.follow) sc += 8; sc += Math.random();
     if (sc > bs) { bs = sc; best = p; }
   }
-  if (best && best.id !== T.follow) { T.follow = best.id; T.cutT = now; send({ t: 'tv', a: 'follow', id: best.id }); }
+  if (best && best.id !== T.follow) { T.follow = best.id; T.cutT = now; if (T.prepSeen) T.prepSeen.add(best.id); send({ t: 'tv', a: 'follow', id: best.id }); }
 }
 function tvFollow(id) { const T = st.tv; T.auto = !id; T.overview = false; if (id) { T.follow = id; T.cutT = performance.now() / 1000; send({ t: 'tv', a: 'follow', id }); } }
 function tvKey(e) {
   const s = st.last; if (!s) return false;
   const d = '1234567890'.indexOf(e.key);
   if (d >= 0) { const sq = d < 5 ? 0 : 1, list = s.players.filter(p => p.sq === sq), p = list[d % 5]; if (p) { audio.ui(); tvFollow(p.id); } return true; }
-  if (e.code === 'KeyA') { audio.ui(); tvFollow(null); return true; }
+  if (e.code === 'KeyA') { audio.ui(); st.tv.auto = !st.tv.auto; st.tv.overview = false; return true; } // he asked: switch the director off to stay on whoever you're watching
   if (e.code === 'KeyM') { audio.ui(); st.tv.overview = !st.tv.overview; return true; }
   return false;
 }
@@ -2705,7 +2709,7 @@ function tvHud(s) {
   for (const sq of [0, 1]) { const T = PRO_TEAMS[sq], el = $(sq ? 'tvR' : 'tvL');
     const h = `<div class="tvTeam" style="--tc:${T.colour}">[${T.tag}] ${esc(T.name)}<small>${s.sc[sq]} · ${s.round || s.rd ? (s.players.find(p => p.sq === sq)?.tm === 'atk' ? 'ATTACK' : 'DEFENCE') : ''}</small></div>` + s.players.filter(p => p.sq === sq).map(card).join('');
     if (el.innerHTML !== h) { el.innerHTML = h; for (const b of el.querySelectorAll('.tvCard')) b.onclick = () => { audio.ui(); tvFollow(b.dataset.id); }; } }
-  setHTML('tvHelp', `${st.tv.overview ? 'MAP OVERVIEW' : st.tv.auto ? 'AUTO DIRECTOR' : 'FOLLOWING'} · 1-5 / 6-0 follow a player · A auto · M map · Esc menu`);
+  setHTML('tvHelp', `${st.tv.overview ? 'MAP OVERVIEW' : st.tv.auto ? 'AUTO DIRECTOR' : 'FOLLOWING'} · 1-5 / 6-0 follow a player · A director ${st.tv.auto ? 'off' : 'on'} · M map · Esc menu`);
 }
 function addChat(m) {
   if (st.tv && m.squad !== undefined) { // ESPORTS TV: the team's comms, live, under that team's player cards

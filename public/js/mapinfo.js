@@ -23,6 +23,13 @@ export function openMapInfo(el) {
   addEventListener('resize', S.resize);
   cv.onmousemove = e => hover(el, e);
   cv.onmouseleave = () => { S.hover = null; draw(el); };
+  // he asked: zoom in smoothly like a magnifying glass to look at a room. Wheel zooms toward the pointer, drag moves, double-click resets.
+  cv.onwheel = e => { e.preventDefault(); zoomAt(el, e, e.deltaY < 0 ? 1.4 : 1 / 1.4); };
+  cv.ondblclick = e => zoomAt(el, e, 0);
+  cv.onpointerdown = e => { S.drag = { x: e.clientX, y: e.clientY }; cv.setPointerCapture?.(e.pointerId); };
+  cv.onpointerup = cv.onpointercancel = () => { S.drag = null; };
+  cv.onpointermove = e => { if (!S.drag || !S.map || (S.zt || 1) <= 1) return; const r = cv.getBoundingClientRect(), d = cv.width / r.width, { z } = view(cv);
+    S.tcx -= (e.clientX - S.drag.x) * d / z; S.tcy -= (e.clientY - S.drag.y) * d / z; S.cx = S.tcx; S.cy = S.tcy; S.drag = { x: e.clientX, y: e.clientY }; clampView(cv); draw(el); };
   pickMap(el, S.id);
 }
 export function closeMapInfo(el) {
@@ -80,8 +87,27 @@ function fit(cv) {
 }
 
 function view(cv) {
-  const F = S.map.floors[S.fl], W = F.w * CELL, H = F.h * CELL, z = Math.min(cv.width / W, cv.height / H) * 0.97;
-  return { F, z, ox: (cv.width - W * z) / 2 - F.gx * CELL * z, oy: (cv.height - H * z) / 2 };
+  const F = S.map.floors[S.fl], W = F.w * CELL, H = F.h * CELL, z0 = Math.min(cv.width / W, cv.height / H) * 0.97;
+  const key = S.id + '|' + S.fl; if (S.zKey !== key) { S.zKey = key; S.zm = S.zt = 1; S.cx = S.tcx = F.gx * CELL + W / 2; S.cy = S.tcy = H / 2; } // a new floor or map starts whole
+  const z = z0 * S.zm;
+  return { F, z, z0, ox: cv.width / 2 - S.cx * z, oy: cv.height / 2 - S.cy * z };
+}
+// keep the zoomed view on the floor (at full size it is centred)
+function clampView(cv) {
+  const { F, z0 } = view(cv), W = F.w * CELL, H = F.h * CELL, fcx = F.gx * CELL + W / 2, fcy = H / 2;
+  for (const [k, c, size, span] of [['tcx', fcx, W, cv.width], ['tcy', fcy, H, cv.height]]) { const half = Math.max(0, (size - span / (z0 * S.zt)) / 2); S[k] = Math.max(c - half, Math.min(c + half, S[k])); }
+}
+function zoomAt(el, e, f) {
+  if (!S.map) return;
+  const cv = el.querySelector('#mkCanvas'), r = cv.getBoundingClientRect(), d = cv.width / r.width, v = view(cv);
+  const mx = (e.clientX - r.left) * d, my = (e.clientY - r.top) * d, wx = (mx - v.ox) / v.z, wy = (my - v.oy) / v.z;
+  S.zt = f ? Math.max(1, Math.min(7, (S.zt || 1) * f)) : 1;
+  S.tcx = wx - (mx - cv.width / 2) / (v.z0 * S.zt); S.tcy = wy - (my - cv.height / 2) / (v.z0 * S.zt); // the spot under the pointer stays put
+  clampView(cv);
+  if (!S.anim) { let last = performance.now(); const step = t => { const k = 1 - Math.exp(-(t - last) / 70); last = t; // a smooth glide, not a jump
+    const lz = Math.log(S.zm) + (Math.log(S.zt) - Math.log(S.zm)) * k; S.zm = Math.exp(lz); S.cx += (S.tcx - S.cx) * k; S.cy += (S.tcy - S.cy) * k; draw(el);
+    if (Math.abs(S.zm - S.zt) > 0.002 || Math.abs(S.cx - S.tcx) > 0.3 || Math.abs(S.cy - S.tcy) > 0.3) S.anim = requestAnimationFrame(step); else { S.zm = S.zt; S.cx = S.tcx; S.cy = S.tcy; S.anim = 0; draw(el); } };
+    S.anim = requestAnimationFrame(step); }
 }
 const onFloor = (x, y) => S.map.flAt[Math.floor(y / CELL) * S.map.W + Math.floor(x / CELL)] === S.fl;
 
@@ -155,6 +181,8 @@ function draw(el) {
   // hovering a room: its name, big, at the top
   c.setTransform(1, 0, 0, 1, 0, 0);
   if (S.hover) { c.font = `700 ${18 * d}px Barlow Condensed, sans-serif`; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillStyle = '#fff'; c.fillText(S.hover, 12 * d, 10 * d); }
+  c.font = `600 ${12 * d}px Barlow Condensed, sans-serif`; c.textAlign = 'right'; c.textBaseline = 'bottom'; c.fillStyle = 'rgba(255,255,255,0.5)';
+  c.fillText(S.zm > 1.01 ? `×${S.zm.toFixed(1)} · DRAG TO MOVE · DOUBLE-CLICK FOR THE WHOLE FLOOR` : 'SCROLL TO ZOOM IN', cv.width - 10 * d, cv.height - 8 * d); c.textAlign = 'left';
   c.textBaseline = 'alphabetic';
 }
 

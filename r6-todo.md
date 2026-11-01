@@ -6,16 +6,16 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] make it so the auto director can be toggled on an off in case the viewer wants to watch a particular player with focus (lets say they have an interesting playstyle or play operators or roles that the viewers wants to study)
-- [ ] on the esports tv the camera focus should switch to interesting utility usage on the setup of defenders are the ones being spectated at the time, but the auto director should prioritize the most exciting stuff happening at all times
-- [ ] higher rank players should know to preserve their drone, most drones should remain alive by the end of prep phase not considering the players that are less risk averse and have a plan when they overextend. They should know that defenders just camp stairs and wait for drones at this point.
-- [ ] send this list of notes with priority towards getting the most game changing things done first, i think this might run past my token limit but try to be somewhat efficient with it without sacrificing quailty or ill just end up using more tokens to fix problems
-- [ ] defenders should wander a little bit and sounds like glass breaking, gunshots, explosive utility, other very loud noises should be hearable throughout the building usually (unless the building is super large or the sound is one floor apart from the listener
-- [ ] defenders of all ranks above silver should ernestly set up site with gadjets and barracades unless they decide they want to save their gadgets for later in the round (which is a totally viable move even with site anchor characters)
-- [ ] make it so you can zoom in and inspect each room smoothly (like a magnifying glass) the map knowledge maps
 
 ## Done
 
+- [x] Esports TV: A switches the auto director on and off; off, it stays on whoever you're watching.
+- [x] Esports TV: in preparation the director cuts round the defenders as they place gadgets, reinforce and board up; shooting, plants and close fights still come first.
+- [x] From Gold up, attacker bots pull their drone back to safety when a defender gets close or preparation is ending (Diamond keeps about 70% alive, Silver about 10%); the risk-takers among the pros still push. From Gold up one defender waits by the stairs nearest the site to shoot drones.
+- [x] Batch done with the most game-changing items first.
+- [x] Defenders move to a new spot round the site every 10-28 s while nothing is heard. Gunshots, blasts and breaking glass carry through the whole building (faint and muffled, also a floor up or down), for you and for the bots, unless the building is huge.
+- [x] From Gold up, defender bots board every way into the site, put out all their wire/claymores at different doors and a deployable shield facing a way in; Silver and below are sloppier.
+- [x] Map Knowledge: scroll to zoom smoothly toward the pointer (up to 7x), drag to move, double-click for the whole floor.
 - [x] The revolver is drawn as a real revolver (frame, fluted cylinder, ribbed barrel, hammer, curved wooden grip), and in matches each gun shows its own shape: cylinder, double barrels, pump grip only on pump guns, built-in suppressor, drum, ammo belt, bolt handle, bullpup magazine. The new semi-auto attachments have pictures.
 - [x] Each sight has its own faint look while aiming in: red dot = soft red glow, holo = broken cyan ring, prism = amber chevron, 2x scope = slightly darkened screen edges and range ticks. Nothing covers the middle.
 - [x] Bot difficulty is now the ranks: Copper, Bronze, Silver, Gold, Platinum, Diamond, Champion, and Pro (the pro teams). Silver is the default.

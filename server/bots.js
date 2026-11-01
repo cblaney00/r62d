@@ -70,7 +70,10 @@ export function botPrep(game, p) {
   const inSite = siteTest(m, site);
   const siteOpenings = m.openings.filter(o => o.cells.some(k => inSite(k % W, Math.floor(k / W))));
   const op = OPERATORS[p.op];
-  for (const o of siteOpenings) if (p.barri > 0 && m.tiles[o.cells[0]] === T.OPEN && Math.random() < 0.6 && game.barricade(o.id, T.BARRI)) p.barri--; // 3 each, like a person
+  // he asked: above Silver, defenders set the site up in earnest (every way in boarded, all their gadgets out); lower ranks are sloppy
+  const lvl = p.pro ? TOP_BOT : lvlOf(game, p), earnest = lvl >= 3;
+  const boardP = earnest ? 1 : lvl === 2 ? 0.6 : 0.35;
+  for (const o of siteOpenings) if (p.barri > 0 && m.tiles[o.cells[0]] === T.OPEN && Math.random() < boardP && game.barricade(o.id, T.BARRI)) p.barri--; // 3 each, like a person
   // reinforce: hatches over the site first, then the site's breakable walls (outside-facing ones before the one
   // between the two site rooms), two each, like a team sharing out its reinforcements
   for (let n = 0; n < 2 && game.reinforce > 0; n++) {
@@ -115,12 +118,24 @@ export function botPrep(game, p) {
     const k = o.cells[0], s = game.freeSpotNear((k % W + 0.5) * CELL, (Math.floor(k / W) + 0.5) * CELL, 14);
     placeAt('mine', s.x, s.y, { ang: 0, arm: 0 }); p.abilityCount--;
   }
-  // their gadget too: a claymore or barbed wire just inside a way into the site
-  if ((p.gadget === 'claymore' || p.gadget === 'wire') && siteOpenings.length) {
+  // a deployable shield in the site, facing the nearest way in (earnest only)
+  if (earnest && p.gadget === 'dshield' && p.gadgetCount > 0 && siteOpenings.length) {
+    const s = near(50), o = siteOpenings[Math.floor(Math.random() * siteOpenings.length)], k = o.cells[0];
+    if (game.placeShield({ x: s.x, y: s.y, aim: Math.atan2((Math.floor(k / W) + 0.5) * CELL - s.y, (k % W + 0.5) * CELL - s.x) })) p.gadgetCount--;
+  }
+  // their gadget too: a claymore or barbed wire just inside a way into the site (earnest: all of them, each at its own way in;
+  // the lowest ranks often forget)
+  for (let g = 0; g < (earnest ? 3 : 1); g++) if ((p.gadget === 'claymore' || p.gadget === 'wire') && p.gadgetCount > 0 && siteOpenings.length && (earnest || Math.random() < (lvl >= 2 ? 0.8 : 0.5))) {
     const i = Math.floor(Math.random() * siteOpenings.length), s = atOpening(i), k = siteOpenings[i].cells[0];
     const ang = Math.atan2((Math.floor(k / W) + 0.5) * CELL - s.y, (k % W + 0.5) * CELL - s.x);
     if (p.gadget === 'claymore') placeAt('claymore', s.x, s.y, { ang, arm: 0 }); else { delete s.hp; game.ents.push({ id: game.eid(), type: 'wire', x: s.x, y: s.y, ang, team: TEAM.DEF, owner: p.id }); }
     p.gadgetCount--;
+  }
+  // stair watch (he asked): from Gold up, one roamer waits by the stairs nearest the site to shoot drones coming up or down
+  if (earnest && (m.stairs || []).length && ![...game.players.values()].some(q => q !== p && q.bot && q.squad === p.squad && q.ai && q.ai.stairWatch)) {
+    const fl = floorAt(m, bomb.x, bomb.y); let best = null, bd = Infinity;
+    for (let i = 0; i < m.stairs.length; i++) { const e = stairEnds(m, i, 0); for (const q of [e.top, e.bottom]) { if (floorAt(m, q.x, q.y) !== fl) continue; const d = Math.hypot(q.x - bomb.x, q.y - bomb.y); if (d < bd) { bd = d; best = q; } } }
+    if (best && bd < 30 * CELL) (p.ai || (p.ai = {})).stairWatch = game.freeSpotNear(best.x, best.y, 40);
   }
 }
 
@@ -376,8 +391,10 @@ export function botThink(game, p, dt) {
   // --- hearing: the most recent enemy noise this bot could hear ---
   for (const n of game.noises || []) {
     if (n.team === team || game.time - n.t > 1.5 || (ai.heard && ai.heard.t >= n.t)) continue;
-    const r = n.r * (floorAt(map, n.x, n.y) === floorAt(map, p.x, p.y) ? 1 : 0.5);
-    const hd = Math.hypot(n.x - p.x, n.y - p.y);
+    const ln = localPos(map, n.x, n.y), lp = localPos(map, p.x, p.y), fd = Math.abs(ln.f - lp.f);
+    // loud noises (gunfire, blasts, sirens) are heard through the whole building, a floor up or down too, unless it is huge
+    const r = n.r >= 900 && fd <= 1 ? Math.max(n.r, 2400 - fd * 600) : n.r * (fd === 0 ? 1 : 0.5);
+    const hd = Math.hypot(ln.x - lp.x, ln.y - lp.y);
     if (hd < r * (p.pro ? 0.8 : 1)) { if (p.pro) { const e = hd * 0.22 + (floorAt(map, n.x, n.y) === floorAt(map, p.x, p.y) ? 0 : 60), a = Math.random() * 6.28, rr = Math.random() * e; ai.heard = { x: n.x + Math.cos(a) * rr, y: n.y + Math.sin(a) * rr, t: n.t }; } else ai.heard = { x: n.x, y: n.y, t: n.t }; } // pros hear like people: roughly where, not exactly
   }
   // --- team intel: an enemy a teammate (or camera) spotted close by is worth turning to face, once in a while ---
@@ -524,7 +541,12 @@ export function botThink(game, p, dt) {
     else goal = ai.push || (ai.push = nearBomb(game, site, 60));
   } else {
     if (game.planted) { goal = game.planted; if (Math.hypot(goal.x - p.x, goal.y - p.y) < 24) act = 'defuse'; }
-    else goal = ai.hold || (ai.hold = nearBomb(game, site, 70));
+    else if (game.phase === PHASE.PREP && ai.stairWatch) { goal = ai.stairWatch; ai.watchingStairs = true; } // waits for drones there
+    else {
+      // he asked: defenders wander a little: every so often, while nothing is heard, a new spot round the site
+      if (!heardRecently && game.time > (ai.holdT || 0)) { ai.hold = nearBomb(game, site, ai.role === 'anchor' ? 60 : 100); ai.holdT = game.time + 10 + Math.random() * 18; }
+      goal = ai.hold || (ai.hold = nearBomb(game, site, 70));
+    }
   }
   if (act) { if (p.pro && !ai.actSaid) { ai.actSaid = true; proSay(game, p, act === 'plant' ? `Planting ${(ai.bomb || {}).id || ''}, cover me` : 'Defusing, cover me!', act, true); } inp.interact = 1; inp.crouch = 1; return; }
   if (!goal) return;
@@ -719,6 +741,14 @@ function botDrone(game, p, dt) {
     if (!(ai.dCalled || (ai.dCalled = new Set())).has(q.id) && [...game.players.values()].some(o => !o.bot && o.squad === p.squad) && game.markOk(p)) {
       ai.dCalled.add(q.id); game.mark(p, q.x, q.y, 'ENEMY ' + OPERATORS[q.op].name, q.id);
     }
+  }
+  // he asked: higher ranks keep their drone alive. From Gold up (not the risk-takers), once a defender is close to the
+  // drone or preparation is nearly over, it backs off to where it was a few seconds ago, out of the way, and stays parked.
+  const keep = (p.pro ? !(p.persona && p.persona.aggr > 0.75) : lvlOf(game, p) >= 3);
+  ai.dTrailT = (ai.dTrailT || 0) - dt; if (ai.dTrailT <= 0) { ai.dTrailT = 1; (ai.dTrail || (ai.dTrail = [])).push({ x: d.x, y: d.y }); if (ai.dTrail.length > 8) ai.dTrail.shift(); }
+  if (keep && !ai.dHide && game.phase === PHASE.PREP && ai.dTrail && ai.dTrail.length > 3) {
+    const close = [...game.players.values()].some(q => q.alive && game.side(q) !== team && Math.hypot(q.x - d.x, q.y - d.y) < 200 && los(map, d.x, d.y, q.x, q.y));
+    if (close || game.timer < 8) { ai.dHide = true; ai.droneGoal = ai.dTrail[0]; ai.droneGoalT = 999; ai.dPath = null; }
   }
   const g = ai.droneGoal, W = map.W, sk = Math.floor(d.y / CELL) * W + Math.floor(d.x / CELL);
   if (Math.hypot(g.x - d.x, g.y - d.y) < 18) { p.aim += dt * 0.7; return; } // parked: look round the room

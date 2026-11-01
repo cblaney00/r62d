@@ -95,7 +95,10 @@ function out(x, y, gain, range = 900, wet = 0.25) {
   if (x !== undefined) {
     const dd = distTo(x, y); d = dd.d;
     vert = (L(x, y).f ?? 0) - (L(listener.x, listener.y).f ?? 0); // +: from the floor above, -: from below
-    gain *= Math.max(0, 1 - d / range) ** 1.7;
+    // he asked: loud sounds (gunshots, blasts, breaking glass) carry through the whole building, faint and muffled,
+    // unless it is very big or they are more than a floor away
+    const carry = range >= 1000 && Math.abs(vert) <= 1 && d < 2600 ? 0.06 * (1 - d / 2600) : 0;
+    gain *= Math.max(carry, Math.max(0, 1 - d / range) ** 1.7);
     if (gain < 0.003) return null;
     pan = Math.max(-0.9, Math.min(0.9, (dd.dx * Math.cos(lrot) - dd.dy * Math.sin(lrot)) / 260));
     walls = d > 20 ? occlude(x, y) : 0;
@@ -310,7 +313,7 @@ export function foley(kind, x, y, own) {
 // --- impacts by material ---
 export function impact(mat, x, y) {
   C = 'impacts';
-  const g = out(x, y, 0.4, 650, 0.2); if (!g) return;
+  const g = out(x, y, mat === 'glass' ? 0.55 : 0.4, mat === 'glass' ? 1100 : 650, 0.2); if (!g) return; // breaking glass carries
   const t = ac.currentTime + rnd(0, 0.01);
   switch (mat) {
     case 'drywall': noise(g, t, 0.1, 'bandpass', 900, 0.8, 0.8); noise(g, t, 0.25, 'highpass', 3000, 0.5, 0.15, 0.02); break;

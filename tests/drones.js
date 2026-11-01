@@ -29,5 +29,21 @@ for (const id of MAP_LIST) {
     if (near + lost < Math.ceil(atk.length / 2)) fail(id, 'most drones never got near a site');
   }
 }
+// he asked: higher ranks keep their drones alive through preparation (Diamond here), Silver loses more
+const kept = {};
+for (const lv of [2, 5]) { let alive = 0, all = 0;
+  for (const id of MAP_LIST) {
+    const g = new Game(); g.botLevel = lv;
+    for (let i = 0; i < 10; i++) g.addBot();
+    g.mapId = id; g.map = buildMap(id); g.startMatch();
+    while (g.phase !== PHASE.PREP) g.tick(1 / 30);
+    const atk = [...g.players.values()].filter(q => g.side(q) === TEAM.ATK);
+    while (g.phase === PHASE.PREP && g.timer > 0.1) g.tick(1 / 30);
+    for (const q of atk) { all++; if (g.ents.some(e => e.type === 'drone' && e.owner === q.id)) alive++; }
+  }
+  kept[lv] = alive / all; console.log(`level ${lv}: ${alive}/${all} drones still alive when preparation ended`);
+}
+if (!(kept[5] >= 0.5)) fail('Diamond bots lost most of their drones in preparation');
+if (!(kept[5] > kept[2])) fail('Diamond bots did not keep more drones than Silver');
 console.log(fails ? `${fails} failure(s)` : 'PASS drones');
 process.exit(fails ? 1 : 0);
