@@ -6,6 +6,8 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { attachWebSocket } from './ws.js';
+import { Worker } from 'node:worker_threads';
+import { training, addResults, saveTraining, needsTraining, newVersion } from './training.js';
 import { Game } from './game.js';
 import { store, publicProfile } from './store.js';
 import { TICK_RATE, SNAP_RATE } from '../shared/constants.js';
@@ -62,6 +64,8 @@ function api(req, res) {
     urls.sort((a, b) => rank(a) - rank(b));
     return json(200, { urls, host: os.hostname(), version: VERSION, port: PORT });
   }
+  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, plans: training.plans, running: !!trainer, session: trainer ? trainer.rounds : 0, current: VERSION.id });
+  if (u.pathname === '/api/train' && req.method === 'POST') { const r = trainCheck(true); return json(200, { running: !!trainer, why: r || '' }); } // TRAIN THE PROS button
   if (u.pathname === '/api/match') { const m = store.match(q('id')); return m ? json(200, m) : json(404, { error: 'no such match' }); }
   if (u.pathname === '/api/players') return json(200, Object.values(store.profiles).map(p => ({ id: p.id, name: p.name, matches: p.stats.matches, wins: p.stats.wins, kills: p.stats.kills, deaths: p.stats.deaths })));
   json(404, { error: 'unknown' });
@@ -89,6 +93,22 @@ setInterval(() => {
     if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = 0; game.broadcast(); for (const g of tutorials) g.broadcast(); }
   }
 }, 1000 / 120);
+
+// Daily practice for the pro teams (he asked): once a day, and whenever the game's version changes, practice matches run
+// in a background thread while nobody is playing (they stop the moment someone joins a match). No AI service: all here.
+let trainer = null;
+function trainCheck(force = false) {
+  const busy = game.phase !== 'lobby' || [...tutorials].some(g => g.phase !== 'lobby'); // a match being played (people in the menus are fine)
+  if (trainer && busy) { trainer.terminate(); trainer = null; return 'a match is being played'; } // someone is playing: practice another time
+  if (busy) return 'a match is being played';
+  if (trainer || !VERSION.id || (!force && !needsTraining(VERSION.id))) return trainer ? '' : 'already trained today';
+  newVersion(VERSION.id);
+  trainer = new Worker(new URL('./train-worker.js', import.meta.url), { workerData: { minutes: Number(process.env.R62D_TRAIN_MIN) || 20 } }); trainer.rounds = 0;
+  trainer.on('message', m => { if (m.done) { training.version = VERSION.id; training.at = Date.now(); console.log(`Pro teams trained on version ${VERSION.id}: ${training.rounds} practice rounds so far.`); } else { addResults(m); if (trainer) trainer.rounds += m.rounds || 0; } saveTraining(); });
+  trainer.on('error', e => console.log('Pro training stopped:', e.message));
+  trainer.on('exit', () => { trainer = null; });
+}
+setInterval(trainCheck, 5 * 60 * 1000); setTimeout(trainCheck, 60 * 1000);
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`R62D is running.  On this computer open:  http://localhost:${PORT}`);

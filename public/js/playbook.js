@@ -14,6 +14,7 @@ let S = null;
 
 export function openPlaybook(el) {
   el.classList.remove('hidden');
+  fetch('/api/training').then(r => r.json()).then(t => { if (S) { S.train = t; render(el); } }).catch(() => {});
   if (!S) S = { team: 0, id: MAP_LIST[0], side: 'atk', site: 0, plan: 0 };
   S.resize = () => draw(el); addEventListener('resize', S.resize);
   render(el);
@@ -45,7 +46,8 @@ function render(el) {
   for (const b of el.querySelectorAll('#pbSites button')) b.onclick = () => { audio.ui(); S.site = +b.dataset.i; S.plan = 0; render(el); };
   S.plans = playbook(m, S.site, side, T);
   S.plan = Math.min(S.plan, S.plans.length - 1);
-  el.querySelector('#pbPlans').innerHTML = S.plans.map((p, i) => `<button data-i="${i}" class="${i === S.plan ? 'on' : ''}">${esc(p.name)}<span>${esc(p.tempo)}${p.go !== undefined ? ' · go at ' + clock(p.go) : ''}</span></button>`).join('');
+  const won = p => { const r = S.train && S.train.plans[`${S.id}|${S.site}|${side}|${p.id}`]; return r && r.n >= 3 ? ` · won ${Math.round(r.w / r.n * 100)}% in practice (${r.n})` : ''; }; // what practice says
+  el.querySelector('#pbPlans').innerHTML = S.plans.map((p, i) => `<button data-i="${i}" class="${i === S.plan ? 'on' : ''}">${esc(p.name)}<span>${esc(p.tempo)}${p.go !== undefined ? ' · go at ' + clock(p.go) : ''}${won(p)}</span></button>`).join('');
   for (const b of el.querySelectorAll('#pbPlans button')) b.onclick = () => { audio.ui(); if (S.anim) { cancelAnimationFrame(S.anim.raf); S.anim = null; } S.plan = +b.dataset.i; render(el); };
   const plan = S.plans[S.plan], jobs = side === 'atk' ? ATK_JOBS : DEF_JOBS;
   el.querySelector('#pbDetail').innerHTML = !plan ? '<p class="dim">No plan for this site.</p>' : `<h3>${esc(plan.name)}</h3><p>${esc(plan.idea)}</p>`

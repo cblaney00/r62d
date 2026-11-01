@@ -288,6 +288,18 @@ function renderTv() {
   }
   for (const b of el.children) b.classList.toggle('on', b.dataset.id === tvPick.map);
 }
+// TRAIN THE PROS (he asked: a button too, as well as the daily practice): starts a practice session now, and shows when they last trained
+const ago = t => { const h = (Date.now() - t) / 3600000; return !t ? 'never' : h < 1 ? 'less than an hour ago' : h < 48 ? Math.round(h) + ' hours ago' : Math.round(h / 24) + ' days ago'; };
+function trainInfo() {
+  fetch('/api/training').then(r => r.json()).then(t => {
+    const txt = t.running ? `Practising now… ${t.session} rounds so far` : `Last practice: ${ago(t.at)}${t.version ? ` (version ${t.version}${t.version !== t.current ? ', older than this one' : ''})` : ''}, ${t.rounds} rounds in all`;
+    for (const el of document.querySelectorAll('.trainInfo')) el.textContent = txt;
+    for (const b of document.querySelectorAll('.trainBtn')) { b.disabled = t.running; b.textContent = t.running ? 'TRAINING…' : 'TRAIN THE PROS'; }
+    st.training = t;
+  }).catch(() => {});
+}
+for (const b of document.querySelectorAll('.trainBtn')) b.onclick = () => { audio.ui(); fetch('/api/train', { method: 'POST' }).then(r => r.json()).then(r => { if (!r.running && r.why) for (const el of document.querySelectorAll('.trainInfo')) el.textContent = 'Can\'t train right now: ' + r.why + '.'; else trainInfo(); }); };
+setInterval(() => { if (!$('tab-tv').classList.contains('on') && $('playbookPage').classList.contains('hidden')) return; trainInfo(); }, 4000);
 $('tvGo').onclick = () => switchMatch(null, null, { map: tvPick.map === 'random' ? null : tvPick.map });
 // ---------------- free play page ----------------
 // Pick a map and how many enemy bots, then play alone with no clock, switching operator with N / B.
@@ -2465,14 +2477,14 @@ function setTab(tab) {
   if (tab === 'profile') { showProfile(); return; }
   if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR }); return; }
   if (tab === 'maps') { audio.ui('open'); openMapInfo($('mapsPage')); return; }
-  if (tab === 'playbook') { audio.ui('open'); openPlaybook($('playbookPage')); return; }
+  if (tab === 'playbook') { audio.ui('open'); trainInfo(); openPlaybook($('playbookPage')); return; }
   if (tab === 'settings') { toggleSettings(); return; }
   if (tab === 'quit') { $('quitDlg').classList.remove('hidden'); audio.ui('open'); return; }
   for (const b of $('mnav').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);
   for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t.id === 'tab-' + tab);
   if (tab === 'controls') renderControls();
   if (tab === 'free') renderFree();
-  if (tab === 'tv') renderTv();
+  if (tab === 'tv') { renderTv(); trainInfo(); }
   updateNav();
 }
 function updateNav() {

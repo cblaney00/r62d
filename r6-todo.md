@@ -6,11 +6,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] Train the pro teams every day on the newest version of the game (without using up tokens if possible)
 - [ ] The pros talk to each other and you can see what they say live: not everything, but changes of plan always, and specific information (pings are limited)
 
 ## Done
 
+- [x] The pros train every day: your computer plays practice matches between them in the background (no AI service, so no tokens): once a day, and again when the game's version changes, only while no match is being played (it stops the moment one starts). They try every plan and operator, and in real matches they lean towards what has won on that map, site and side. TRAIN THE PROS button on the Esports TV and Playbook pages starts a session now and shows when they last practised; the Playbook shows each plan's practice win rate.
 - [x] Esports TV (menu tab): pick a map or Random and watch Northwind play Ironclad Collective, match after match on a new map. A broadcast view: the camera cuts by itself to where it matters (a plant or defuse, a fight, the defuser carrier, the last one alive), 1-5 / 6-0 or clicking a player card follows someone, A goes back to the director, M shows the whole map. Team names, score and player cards (operator, health, alive) at the sides, the kill feed, and each team's plan calls in the corner. Checked for clutter (he asked: the view is sacred): no player HUD, prompts, compass, crosshair, big death marks or corner buttons over the action; calls are one short line each.
 - [x] Playbook: ▶ WATCH THIS PLAY shows each plan playing out like a coach's whiteboard: the players as dots moving through it (drones in preparation, stacking, the breach, the go, the plant and the spread), the clock, a caption for each beat, and the other team faded in its usual spots.
 - [x] The pros spread out instead of bunching on one spot (he asked: one grenade or gas cloud could take a whole stack): about 2 m apart when waiting, a little tighter for a fast rush; defenders too.

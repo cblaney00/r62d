@@ -747,3 +747,5 @@ html.tv .tvSide { width: 168px; gap: 4px; }
 html.tv .tvCard { background: rgba(8,10,14,0.58); padding: 4px 9px 6px; }
 html.tv #tvHelp { opacity: 0.55; font-size: 12px; }
 .tvTeam { white-space: nowrap; font-size: 15px; } .tvTeam small { display: block; font: 700 12px var(--head); letter-spacing: 0.14em; }
+.trainBox { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; } .trainInfo { font-size: 13px; color: var(--dim); }
+.pagehead .trainBox { margin-left: auto; margin-right: 12px; } #tab-tv .row { display: flex; align-items: center; gap: 14px; }

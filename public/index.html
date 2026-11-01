@@ -77,7 +77,7 @@
           <p class="hint">Sit back and watch the pro teams, <b>Northwind</b> and <b>Ironclad Collective</b>, play a full match. The camera cuts to the action by itself; press 1-5 or 6-0 (or click a player) to follow someone, A to go back to the director, M for the map. When a match ends the next one starts on another map.</p>
           <h4 class="freeH">MAP</h4>
           <div id="tvMaps" class="mapRow"></div>
-          <div class="row"><button id="tvGo" class="primary big">START WATCHING</button></div>
+          <div class="row"><button id="tvGo" class="primary big">START WATCHING</button><span class="trainBox"><span class="trainInfo"></span><button class="trainBtn">TRAIN THE PROS</button></span></div>
         </div>
       </section>
       <section class="tab" id="tab-free">
@@ -201,7 +201,7 @@
   <div id="opsPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>OPERATORS</h2><button class="close">Close</button></div><div class="opsWrap"><div id="opsList"></div><div id="opsDetail"></div></div></div></div>
   <div id="mapsPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>MAP KNOWLEDGE</h2><span class="hint">Learn each map: where the bomb sites can be, and the ways in</span><button class="close">Close</button></div>
     <div class="mkWrap"><div id="mkList"></div><div class="mkMid"><div id="mkFloors" class="seg"></div><canvas id="mkCanvas"></canvas></div><div id="mkSide"></div></div></div></div>
-  <div id="playbookPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>PLAYBOOK</h2><span class="hint">The pro teams' game plans: study them, then try to run them yourself</span><button class="close">Close</button></div>
+  <div id="playbookPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>PLAYBOOK</h2><span class="hint">The pro teams' game plans: study them, then try to run them yourself</span><span class="trainBox"><span class="trainInfo"></span><button class="trainBtn">TRAIN THE PROS</button></span><button class="close">Close</button></div>
     <div class="pbWrap"><div id="pbTeams"></div><div class="pbMid"><div class="pbBars"><div id="pbMaps" class="seg"></div></div><div class="pbBars"><div id="pbSide" class="seg"></div><div id="pbSites" class="seg"></div></div><div id="pbPlans" class="seg"></div><canvas id="pbCanvas"></canvas></div><div id="pbDetail"></div></div></div></div>
   <div id="armoryPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>ARMORY</h2><span class="hint">Your private shooting range — try any gun</span><button class="close">Close</button></div>
     <div class="armWrap"><div id="armList"></div><div class="armMid"><div class="armBar"><span>Distance</span><span id="armDist" class="seg"><button data-d="5">5 m</button><button data-d="10">10 m</button><button data-d="15">15 m</button><button data-d="20">20 m</button><button data-d="25">25 m</button></span><button id="armReset">Reset targets</button></div><canvas id="armCanvas"></canvas></div><div id="armStats"></div></div></div></div>
