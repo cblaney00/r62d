@@ -4,7 +4,7 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, openHatch, hatchNear, hatc
 import { findVault } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, SELF_UP, SELF_UP_TIME } from '../shared/operators.js';
-import { botThink, botPickOp, botPrep } from './bots.js';
+import { botThink, botPickOp, botPrep, assignPros } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
@@ -133,7 +133,7 @@ export class Game {
       else if (m.a === 'removeBot') this.removeBot(m.squad);
       else if (m.a === 'fillBots') { for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); }
       else if (m.a === 'switch') this.switchSquad(p);
-      else if (m.a === 'botLevel' && BOT_LEVELS[m.lv] && m.lv !== this.botLevel) { this.botLevel = m.lv; this.msg(`${p.name} set the bot skill to ${BOT_LEVELS[m.lv]}`); }
+      else if (m.a === 'botLevel' && BOT_LEVELS[m.lv] && m.lv !== this.botLevel) { this.botLevel = m.lv; assignPros(this); this.msg(m.lv === 4 ? `${p.name} brought in the pro teams: Northwind and Ironclad Collective` : `${p.name} set the bot skill to ${BOT_LEVELS[m.lv]}`); }
       else if (m.a === 'map' && this.phase === PHASE.LOBBY && MAPS[m.id] && m.id !== this.mapId) {
         this.mapId = m.id; this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
         this.msg(`${p.name} chose the map ${MAPS[m.id].name}`);
@@ -175,10 +175,11 @@ export class Game {
     const b = this.blankPlayer('[BOT] ' + name, true, squad);
     this.players.set(b.id, b);
     if (this.phase !== PHASE.LOBBY && this.phase !== PHASE.SELECT) b.alive = false;
+    assignPros(this); // at Pro skill, bots are the pro teams' players
   }
   removeBot(squad) {
     const b = [...this.players.values()].reverse().find(q => q.bot && (squad === undefined || q.squad === squad));
-    if (b) { if (b.hasDefuser) this.dropDefuser(b); this.players.delete(b.id); }
+    if (b) { if (b.hasDefuser) this.dropDefuser(b); this.players.delete(b.id); assignPros(this); }
   }
   switchSquad(p) {
     if (this.phase !== PHASE.LOBBY) return;
@@ -198,6 +199,7 @@ export class Game {
   // ---------------- match flow ----------------
   startMatch() {
     if (this.players.size === 0) return;
+    assignPros(this); this.proState = {}; this.proLast = {}; this.proLog = [];
     this.score = [0, 0]; this.round = 0; // round 1: squad 0 attacks (the tutorial: you attack, then defend)
     for (const p of this.players.values()) { p.kills = 0; p.deaths = 0; p.ms = this.blankMatchStats(); }
     this.departed = []; this.roundLog = []; this.matchStart = Date.now();
@@ -875,6 +877,7 @@ export class Game {
   kill(q, src, wname) {
     if (!q.alive) return;
     this.ropeFall(q);
+    if (q.pro && src && src !== q) (this.proTrade || (this.proTrade = {}))[q.squad] = { x: q.x, y: q.y, from: { x: src.x, y: src.y }, t: this.time }; // the pros trade a teammate's death
     q.alive = false; q.downed = false; q.hp = 0; q.deaths++; q.busy = null; q.scanning = false; q.bracing = false;
     if (q.ctrl !== 'body') q.ctrl = 'body';
     if (src && src !== q && this.side(src) !== this.side(q)) { src.kills++; if (src.ms) { src.ms.kills++; this.opStat(src).kills++; } this.pts(src, this.headshot ? 120 : 100, this.headshot ? 'HEADSHOT KILL' : 'KILL'); }
@@ -1597,7 +1600,7 @@ export class Game {
     if (m.a === 'start') {
       for (const q of [...this.players.values()]) if (q.bot) this.players.delete(q.id);
       F.bots = Math.max(0, Math.min(TEAM_SIZE, m.bots | 0));
-      if (BOT_LEVELS[m.level]) this.botLevel = m.level;
+      if (BOT_LEVELS[m.level] !== undefined) this.botLevel = m.level;
       if (MAPS[m.map] && m.map !== this.mapId) { this.mapId = m.map; this.map = buildMap(this.mapId); }
       p.squad = 0;
       for (let i = 0; i < F.bots; i++) this.addBot(1);

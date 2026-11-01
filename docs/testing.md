@@ -30,3 +30,9 @@ several fingers at once) at 914×412 and prints position / aim / shots after eac
 3. `node tests/thumbs.mjs 9333 <outdir> http://localhost:6263/` — free play by thumb; `SCENARIO=tut` taps through the
    tutorial, `SCENARIO=menus` opens every menu page (and shoots in the Armory).
 Don't `pkill -f` a pattern that also appears in the same shell command line (it kills that shell); put it in a script.
+
+## The pro teams are the test subjects
+`tests/sim.js` and `tests/balance.js` play with the pro teams (bot skill Pro) by default; add `--plain` for Expert bots.
+`node tests/pros.js [--only <map>] [--rounds N]` checks the pros themselves: a plan from the playbook every round,
+the leader's calls and switches, human reaction times (first sight to first shot never under ~0.17 s), and a pro team
+beating Expert bots over N maps.

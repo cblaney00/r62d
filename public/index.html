@@ -42,6 +42,7 @@
       <button data-tab="ops">OPERATORS</button>
       <button data-tab="armory">ARMORY</button>
       <button data-tab="maps">MAP KNOWLEDGE</button>
+      <button data-tab="playbook">PLAYBOOK</button>
       <button data-tab="profile">PROFILE</button>
       <button data-tab="settings">SETTINGS</button>
       <button data-tab="controls">CONTROLS</button>
@@ -64,7 +65,7 @@
             <div class="vs">VS</div>
             <div class="squad" id="sq1"><h3>TEAM BRAVO</h3><ul></ul><div class="row"><button data-bot="1">+ Bot</button><button data-unbot="1">− Bot</button></div></div>
           </div>
-          <div class="row center botLv"><span class="hint">BOT SKILL</span><div class="seg" id="botLevel"><button data-lv="0">Easy</button><button data-lv="1">Normal</button><button data-lv="2">Hard</button><button data-lv="3">Expert</button></div></div>
+          <div class="row center botLv"><span class="hint">BOT SKILL</span><div class="seg" id="botLevel"><button data-lv="0">Easy</button><button data-lv="1">Normal</button><button data-lv="2">Hard</button><button data-lv="3">Expert</button><button data-lv="4" title="The pro teams: Northwind and Ironclad Collective">Pro</button></div></div>
           <div class="row center"><button id="switchBtn">Switch team</button><button id="fillBtn">Fill empty slots with bots</button>
             <button id="lobbyOpsBtn" class="hidden">Operators</button><button id="lobbyProfBtn" class="hidden">Profile</button></div>
         </div>
@@ -78,7 +79,7 @@
           <h4 class="freeH">ENEMY BOTS</h4>
           <div class="seg" id="freeBots"><button data-n="0">None</button><button data-n="1">1</button><button data-n="3">3</button><button data-n="5">5</button></div>
           <h4 class="freeH">BOT SKILL</h4>
-          <div class="seg" id="freeLevel"><button data-lv="0">Easy</button><button data-lv="1">Normal</button><button data-lv="2">Hard</button><button data-lv="3">Expert</button></div>
+          <div class="seg" id="freeLevel"><button data-lv="0">Easy</button><button data-lv="1">Normal</button><button data-lv="2">Hard</button><button data-lv="3">Expert</button><button data-lv="4" title="The pro teams: Northwind and Ironclad Collective">Pro</button></div>
           <div class="row"><button id="freeGo" class="primary big">START FREE PLAY</button></div>
         </div>
       </section>
@@ -190,6 +191,8 @@
   <div id="opsPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>OPERATORS</h2><button class="close">Close</button></div><div class="opsWrap"><div id="opsList"></div><div id="opsDetail"></div></div></div></div>
   <div id="mapsPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>MAP KNOWLEDGE</h2><span class="hint">Learn each map: where the bomb sites can be, and the ways in</span><button class="close">Close</button></div>
     <div class="mkWrap"><div id="mkList"></div><div class="mkMid"><div id="mkFloors" class="seg"></div><canvas id="mkCanvas"></canvas></div><div id="mkSide"></div></div></div></div>
+  <div id="playbookPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>PLAYBOOK</h2><span class="hint">The pro teams' game plans: study them, then try to run them yourself</span><button class="close">Close</button></div>
+    <div class="pbWrap"><div id="pbTeams"></div><div class="pbMid"><div class="pbBars"><div id="pbMaps" class="seg"></div></div><div class="pbBars"><div id="pbSide" class="seg"></div><div id="pbSites" class="seg"></div></div><div id="pbPlans" class="seg"></div><canvas id="pbCanvas"></canvas></div><div id="pbDetail"></div></div></div></div>
   <div id="armoryPage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>ARMORY</h2><span class="hint">Your private shooting range — try any gun</span><button class="close">Close</button></div>
     <div class="armWrap"><div id="armList"></div><div class="armMid"><div class="armBar"><span>Distance</span><span id="armDist" class="seg"><button data-d="5">5 m</button><button data-d="10">10 m</button><button data-d="15">15 m</button><button data-d="20">20 m</button><button data-d="25">25 m</button></span><button id="armReset">Reset targets</button></div><canvas id="armCanvas"></canvas></div><div id="armStats"></div></div></div></div>
   <div id="profilePage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>PROFILE</h2><button class="close">Close</button></div><div id="profBody"></div></div></div>

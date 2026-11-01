@@ -4,10 +4,11 @@
 // call out what they see, and react no faster than a fairly experienced player. The bot skill setting
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
-import { CELL, T, TEAM, PHASE, PX_PER_M, blocksMove, blocksDrone } from '../shared/constants.js';
+import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks, stairEnds } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
+import { PRO_TEAMS, playbook } from '../shared/pros.js';
 
 // Per skill level. react: seconds before the first shot at someone who surprised them (plus up to reactX more);
 // expect: the same when they were already listening for that enemy. turn: how fast they swing their aim (radians/s).
@@ -19,7 +20,7 @@ const SKILL = [
   { react: 0.36, reactX: 0.24, expect: 0.22, turn: 10, err: 0.75, settle: 1.9, tol: 0.15, see: 720, body: 8, drone: 0.4 },    // Hard
   { react: 0.28, reactX: 0.14, expect: 0.18, turn: 12.5, err: 0.55, settle: 2.5, tol: 0.12, see: 780, body: 6, drone: 0.3 },  // Expert // turn: he asked for faster turning
 ];
-const skill = (game, p) => SKILL[game.tut ? 0 : Math.max(0, Math.min(3, p.level ?? game.botLevel ?? 1))]; // p.level: a test can give one bot its own
+const skill = (game, p) => p.pro ? proSkill(p) : SKILL[game.tut ? 0 : Math.max(0, Math.min(3, p.level ?? game.botLevel ?? 1))]; // p.level: a test can give one bot its own
 
 // A bot's personality stays with it all match: aggr = how pushy, patience = how long it waits and watches.
 function persona(p) {
@@ -35,6 +36,7 @@ function roleFor(game, p, team) {
 }
 
 export function botPickOp(game, p) {
+  if (p.pro && proPickOp(game, p)) return;
   const team = game.side(p);
   const taken = new Set([...game.players.values()].filter(q => q.squad === p.squad && q.op).map(q => q.op));
   const free = opsForTeam(team).filter(o => !taken.has(o));
@@ -187,7 +189,7 @@ function visibleEnemy(game, p, see) {
     const d = Math.hypot(q.x - p.x, q.y - p.y);
     if (d > see || d > bd) continue;
     const a = Math.atan2(q.y - p.y, q.x - p.x);
-    if (d > 70 && Math.abs(angDiff(a, p.aim)) > 1.2) continue;
+    if (d > 70 && Math.abs(angDiff(a, p.aim)) > (p.pro ? 0.9 : 1.2)) continue; // pros: a human 103° view
     if (!los(game.map, p.x, p.y, q.x, q.y, smokes)) continue;
     best = q; bd = d;
   }
@@ -198,7 +200,7 @@ function visibleEnemy(game, p, see) {
     const gh = stairGhost(game.map, q.x, q.y);
     if (!gh || gh.fl !== fl || !stairLooks(game.map, gh.s, p.x, p.y)) continue;
     const d = Math.hypot(gh.x - p.x, gh.y - p.y);
-    if (d > see || d > bd || (d > 70 && Math.abs(angDiff(Math.atan2(gh.y - p.y, gh.x - p.x), p.aim)) > 1.2)) continue;
+    if (d > see || d > bd || (d > 70 && Math.abs(angDiff(Math.atan2(gh.y - p.y, gh.x - p.x), p.aim)) > (p.pro ? 0.9 : 1.2))) continue;
     if (!los(game.map, p.x, p.y, gh.x, gh.y, smokes)) continue;
     const seen = Object.create(q); seen.x = gh.x; seen.y = gh.y; // the person, where they show
     best = seen; bd = d;
@@ -257,7 +259,10 @@ function downedMate(game, p, team) {
 }
 
 // Turn toward an angle at most `rate` radians per second.
-function turnTo(p, a, rate, dt) { p.aim += Math.max(-dt * rate, Math.min(dt * rate, angDiff(a, p.aim))); }
+function turnTo(p, a, rate, dt) {
+  if (p.pro) return mouseTurn(p, a, rate, dt);
+  p.aim += Math.max(-dt * rate, Math.min(dt * rate, angDiff(a, p.aim)));
+}
 // Aim along an angle and set the throw point (grenades land where you aim, up to 300 px away).
 function aimAt(p, x, y) {
   p.aim = Math.atan2(y - p.y, x - p.x);
@@ -345,7 +350,15 @@ export function botThink(game, p, dt) {
   const ai = p.ai;
   const inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
   p.input = inp;
-  if (p.alive && p.ctrl === 'drone') { botDrone(game, p, dt); return; }
+  if (p.alive && p.ctrl === 'drone') {
+    if (p.pro && game.phase === PHASE.ACTION) { const st = proPlan(game, p.squad, 'atk'), j = st.plan && st.plan.jobs[p.pro.pl.jobs.atk]; if (!j || !j.keepDrone || elapsedAction(game) > j.keepDrone + (TIMING[p.pro.pl.name] || 0) || game.planted) { game.toggleView(p); p.ai.droneDone = true; return; } }
+    botDrone(game, p, dt); return;
+  }
+  if (p.pro && p.alive && p.ctrl === 'body' && game.phase === PHASE.ACTION && game.side(p) === TEAM.ATK && !p.ai.droneDone && !p.downed) { // the intel player goes back to the drone left inside
+    const st = proPlan(game, p.squad, 'atk'), j = st.plan && st.plan.jobs[p.pro.pl.jobs.atk];
+    if (j && j.keepDrone && elapsedAction(game) < 1.5 && game.ent(p.droneId)) { game.toggleView(p); return; }
+    if (elapsedAction(game) > 1.5) p.ai.droneDone = true;
+  }
   if (!p.alive || p.ctrl !== 'body') return;
   if (game.phase === PHASE.PREP && game.side(p) === TEAM.ATK) return;
   const team = game.side(p), map = game.map, site = map.sites[game.site], S = skill(game, p), me = persona(p);
@@ -359,7 +372,8 @@ export function botThink(game, p, dt) {
   for (const n of game.noises || []) {
     if (n.team === team || game.time - n.t > 1.5 || (ai.heard && ai.heard.t >= n.t)) continue;
     const r = n.r * (floorAt(map, n.x, n.y) === floorAt(map, p.x, p.y) ? 1 : 0.5);
-    if (Math.hypot(n.x - p.x, n.y - p.y) < r) ai.heard = { x: n.x, y: n.y, t: n.t };
+    const hd = Math.hypot(n.x - p.x, n.y - p.y);
+    if (hd < r * (p.pro ? 0.8 : 1)) { if (p.pro) { const e = hd * 0.22 + (floorAt(map, n.x, n.y) === floorAt(map, p.x, p.y) ? 0 : 60), a = Math.random() * 6.28, rr = Math.random() * e; ai.heard = { x: n.x + Math.cos(a) * rr, y: n.y + Math.sin(a) * rr, t: n.t }; } else ai.heard = { x: n.x, y: n.y, t: n.t }; } // pros hear like people: roughly where, not exactly
   }
   // --- team intel: an enemy a teammate (or camera) spotted close by is worth turning to face, once in a while ---
   if (!ai.heard || game.time - ai.heard.t > 3) for (const id of game.spots[team].keys()) {
@@ -391,9 +405,9 @@ export function botThink(game, p, dt) {
     const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
     if (ai.seen !== enemy.id) { // a surprise takes longer to react to than something they were listening for
       const expected = heardRecently && Math.hypot(ai.heard.x - enemy.x, ai.heard.y - enemy.y) < 200;
-      ai.seen = enemy.id; ai.ox = (Math.random() - 0.5) * S.body; ai.oy = (Math.random() - 0.5) * S.body;
+      ai.seen = enemy.id; ai.seenT = game.time; ai.shotAtSeen = false; ai.ox = (Math.random() - 0.5) * S.body; ai.oy = (Math.random() - 0.5) * S.body;
       ai.react = -(expected ? S.expect : S.react) - Math.random() * S.reactX * (expected ? 0.6 : 1);
-      ai.err = (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.4) * S.err;
+      ai.err = p.pro ? (Math.random() < 0.5 ? -1 : 1) * 0.02 * (1 + S.err) : (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.4) * S.err; // a pro's error comes from their hand (mouseTurn): pre-aimed at the angle, they are nearly on
       ai.called = false;
       if (game.tut) { ai.react -= 0.7; ai.err *= 1.8; } // tutorial bots are slow and shaky, so a beginner can win
     }
@@ -420,7 +434,7 @@ export function botThink(game, p, dt) {
     // the arc gun zaps a defender in reach as well as gadgets
     if (abId === 'arc' && p.abilityCount > 0 && ai.react > 0 && d < 300 && Math.abs(angDiff(want, p.aim)) < 0.1 && Math.random() < dt * 0.5) useAbility();
     ai.strafeT = (ai.strafeT || 0) - dt;
-    if (ai.strafeT <= 0) { ai.strafeT = 0.6 + Math.random(); ai.strafe = Math.random() < 0.55 - me.aggr * 0.2 ? 0 : Math.random() < 0.5 ? -1 : 1; } // often just stand and shoot
+    if (ai.strafeT <= 0) { ai.strafeT = 0.6 + Math.random(); ai.strafe = Math.random() < peekSkill(game, p) ? (Math.random() < 0.5 ? -1 : 1) : 0; } // he asked: strafe-peeking in a fight is a hard skill, used now and then by a few, not by everyone all the time
     if (ai.strafe) { const sa = p.aim + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); inp.walk = 1; }
     return;
   }
@@ -462,6 +476,9 @@ export function botThink(game, p, dt) {
     return moveTo(game, p, inp, mate, dt);
   }
   if (abId === 'stim' && p.abilityCount > 1 && p.hp < 45 && action) { useAbility(); return; } // patch yourself up (the dart lands on you when no teammate is in line)
+
+  // --- a pro's part of the team plan ---
+  if (p.pro && (action || game.phase === PHASE.PREP) && proAct(game, p, inp, dt, team)) return;
 
   // --- objective ---
   let goal = null, act = null;
@@ -663,6 +680,7 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
 function botDrone(game, p, dt) {
   const ai = p.ai, inp = p.input, d = game.ent(p.droneId), map = game.map, team = game.side(p);
   if (!d) return;
+  if (p.pro && (!ai.droneGoal || (ai.droneGoalT -= dt) <= 0 || (game.siteRevealed && !ai.droneFound))) { ai.droneFound = game.siteRevealed; ai.droneGoal = proDroneGoal(game, p); ai.droneVisits = (ai.droneVisits || 0) + 1; ai.dPath = null; ai.droneGoalT = 14; ai.dStuck = 0; }
   if (!ai.droneGoal || (ai.droneGoalT -= dt) <= 0) {
     const sites = map.sites, s = !ai.droneVisits && Math.random() < 0.4 ? sites[Math.floor(Math.random() * sites.length)] : sites[game.site];
     const name = s.rooms[Math.floor(Math.random() * s.rooms.length)], r = map.rooms.find(r => r.name === name);
@@ -698,6 +716,7 @@ function botDrone(game, p, dt) {
 // Easy never (they look where they walk). A threat point: the nearest doorway, window, staircase end or open hatch
 // they can see, roughly ahead of them (dir), 2–11 m away.
 function preAims(game, p) {
+  if (p.pro) return true; // pros always check where an enemy could come from
   const lvl = game.tut ? 0 : Math.max(0, Math.min(3, p.level ?? game.botLevel ?? 1));
   if (lvl >= 2) return true;
   if (lvl === 0) return false;
@@ -742,3 +761,237 @@ function setDir(inp, dx, dy) {
   inp.down = dy > 0.38 ? 1 : 0; inp.up = dy < -0.38 ? 1 : 0;
 }
 export const __findPath = (...a) => findPath(...a); // for tests
+
+// ======================================================================================================================
+// PRO TEAMS (he asked: 10 bots that play like professional R62D players in a tournament; the test subjects for game
+// tests). Bot skill "Pro": squad 0's bots are Northwind, squad 1's Ironclad Collective (shared/pros.js). Each team's
+// in-game leader picks a plan from the team's playbook for the map, site and side; every player has a job in it
+// (where to drone, where to stack, what to open, when to go, what to hold) and the leader changes the plan on the fly
+// (too many down, time running out, the main door stacked, a plant to retake) and calls it in team chat. They are
+// held to human limits: human reaction times (each player their own), aim that overshoots and settles, a human field
+// of view, hearing as vague as a person's, and their own strengths and flaws (shakier under pressure, over-peeking,
+// lurking too long, never rotating ...).
+// ======================================================================================================================
+// how often someone strafe-peeks in a fight (he asked: a hard skill, not something everyone does all the time)
+const PEEK = { Kaze: 0.35, Torvi: 0.3, Wisp: 0.15, Juno: 0.12 }, PEEK_LVL = [0.03, 0.06, 0.12, 0.18];
+function peekSkill(game, p) { return p.pro ? (PEEK[p.pro.pl.name] ?? 0.06) : PEEK_LVL[Math.max(0, Math.min(3, p.level ?? game.botLevel ?? 1))]; }
+const PERSONA = { Halden: [0.45, 0.8], Kaze: [0.95, 0.2], Brick: [0.6, 0.6], Moth: [0.2, 0.85], Juno: [0.5, 0.9], Sable: [0.35, 0.9], Torvi: [0.9, 0.3], Pax: [0.5, 0.6], Grit: [0.3, 0.95], Wisp: [0.7, 0.35] };
+const TIMING = { Wisp: -6, Moth: 5, Juno: 8 }; // seconds early (-) or late (+) to their part of the plan: their flaws
+const ROTATE_DELAY = { Halden: 4, Grit: Infinity }; // slow to rotate; never rotates
+export function assignPros(game) {
+  const on = game.botLevel === 4 && !game.tut;
+  for (const squad of [0, 1]) {
+    const bots = [...game.players.values()].filter(q => q.bot && q.squad === squad).sort((a, b) => +a.id.slice(1) - +b.id.slice(1));
+    const team = PRO_TEAMS[squad];
+    bots.forEach((b, i) => {
+      if (!b.baseName) b.baseName = b.name;
+      if (on && i < team.players.length) { const pl = team.players[i]; b.pro = { team: team.id, tag: team.tag, i, pl }; b.name = `[${team.tag}] ${pl.name}`; const pp = PERSONA[pl.name]; b.persona = { aggr: pp[0], patience: pp[1] }; }
+      else if (b.pro) { b.pro = null; b.name = b.baseName; b.persona = null; }
+    });
+  }
+}
+// A pro aims with a mouse on a mousepad (he asked). The hand moves at most at its own speed; how far the aim turns for
+// a centimetre of hand depends on the player's sensitivity; the hand can't go past the pad's edge, so a long turn (a 180
+// on a low sensitivity) means lifting the mouse and putting it back (~0.15 s with no turning); a long flick overshoots
+// (more on a high sensitivity) and has to come back; and the hand never holds perfectly still (worse on a high one).
+function mouseTurn(p, a, rate, dt) {
+  const ai = p.ai, M = p.pro.pl.mouse, k = 2 * Math.PI / M.cm360; // radians per cm of hand
+  if (ai.hand === undefined) { ai.hand = 0; ai.lift = 0; ai.over = 0; }
+  const wob = (Math.random() - 0.5) * M.steady * k * Math.sqrt(dt * 30); // the hand is never perfectly still
+  if (ai.lift > 0) { ai.lift -= dt; if (ai.lift <= 0) ai.hand = -Math.sign(ai.liftDir) * M.pad * 0.35; p.aim += wob; return; }
+  let diff = angDiff(a, p.aim);
+  const cm = diff / k; // how far the hand must go
+  if (Math.abs(cm) > 6 && !ai.flick) { ai.flick = true; ai.over = Math.sign(cm) * Math.min(Math.abs(cm) * 0.06, 2.5) * (30 / M.cm360) * (0.5 + Math.random()); } // a long flick lands a bit past the target
+  if (Math.abs(cm) < 1.5) ai.flick = false;
+  const want = cm + ai.over; ai.over *= Math.exp(-dt * 6); // ...then comes back
+  const speed = M.hand * Math.max(0.2, Math.min(1, rate / 10)); // slow looking round uses a slow hand
+  let move = Math.max(-speed * dt, Math.min(speed * dt, want * Math.min(1, dt * 14)));
+  if (Math.abs(ai.hand + move) > M.pad / 2) { // out of mousepad: lift it and put it back
+    move = Math.sign(move) * Math.max(0, M.pad / 2 - Math.abs(ai.hand));
+    ai.lift = 0.12 + Math.random() * 0.06; ai.liftDir = Math.sign(want);
+  }
+  ai.hand += move; p.aim += move * k + wob;
+}
+function proSkill(p) { // human limits, per player; under pressure (hurt) a nervous player gets slower and shakier
+  const pl = p.pro.pl, press = p.hp < p.maxHp * 0.45 ? 1 - pl.calm : 0;
+  return { react: pl.react + press * 0.08, reactX: 0.08, expect: Math.max(0.17, pl.react * 0.85), turn: pl.turn, err: pl.aim * (1 + press * 0.7), settle: 2.6, tol: 0.1, see: 700, body: 6, drone: 0.32 };
+}
+const proSide = (game, p) => (game.side(p) === TEAM.ATK ? 'atk' : 'def');
+function proState(game, squad) {
+  const all = game.proState || (game.proState = {});
+  let st = all[squad];
+  if (!st || st.round !== game.round || st.map !== game.map.id) st = all[squad] = { round: game.round, map: game.map.id, plan: null, go: 0, calls: [] };
+  return st;
+}
+function proPlan(game, squad, side) {
+  const st = proState(game, squad);
+  if (!st.plan || st.side !== side || st.site !== game.site) {
+    const team = PRO_TEAMS[squad], list = playbook(game.map, game.site, side, team);
+    if (!list.length) return st;
+    const last = (game.proLast || {})[squad]; // don't run the same plan twice in a row after losing with it
+    const w = list.map((pl, i) => (pl.id === last ? 0.25 : 1) / Math.pow(1 + i, 1.1));
+    let r = Math.random() * w.reduce((a, b) => a + b, 0), pick = list[0];
+    for (let i = 0; i < list.length; i++) if ((r -= w[i]) <= 0) { pick = list[i]; break; }
+    Object.assign(st, { plan: pick, side, site: game.site, go: pick.go || 0, gone: false, swapped: false, rotate: null, retake: false, called: false });
+    (game.proLast || (game.proLast = {}))[squad] = pick.id;
+  }
+  return st;
+}
+function proCall(game, squad, text) { // the leader (or whoever is left) says it in team chat
+  const mates = [...game.players.values()].filter(q => q.pro && q.squad === squad);
+  const who = mates.find(q => q.pro.pl.igl && q.alive) || mates.find(q => q.alive) || mates[0];
+  const st = proState(game, squad); st.calls.push({ t: game.time, text });
+  (game.proLog || (game.proLog = [])).push({ round: game.round, squad, team: PRO_TEAMS[squad].tag, text });
+  if (who) game.chat(who, { text: text.slice(0, 140), team: true });
+}
+export function proPickOp(game, p) {
+  const side = proSide(game, p), pl = p.pro.pl, st = proPlan(game, p.squad, side), job = pl.jobs[side], j = st.plan && st.plan.jobs[job];
+  let pool = game.proAnyOp ? opsForTeam(side === 'atk' ? TEAM.ATK : TEAM.DEF).filter(o => jobOf(o) === job).sort(() => Math.random() - 0.5) : pl.pool[side].slice(); // balance tests: any operator of their job
+  if (side === 'atk' && job === 'breach' && j) { const hard = o => ['ember', 'rivet'].includes(o) ? 1 : 0; pool.sort((a, b) => j.hatch ? hard(a) - hard(b) : hard(b) - hard(a)); } // a hard breacher for a reinforced wall, a soft one for a hatch
+  for (const op of pool) { game.pickOp(p, op); if (p.op === op) break; }
+  if (!p.op) return false;
+  if (side === 'atk' && j && game.map.atkSpawns) { // spawn closest to where this player sets up
+    const at = j.fake || j.hold || j.stack;
+    if (at) p.spawn = game.map.atkSpawns.slice().sort((a, b) => Math.hypot(a.x - at.x, a.y - at.y) - Math.hypot(b.x - at.x, b.y - at.y))[0].name;
+  }
+  return true;
+}
+function proDroneGoal(game, p) { // preparation: find the objective first (nearest sites first), then this player's spot
+  const m = game.map, side = proSide(game, p), st = proPlan(game, p.squad, side), j = st.plan && st.plan.jobs[p.pro.pl.jobs.atk];
+  if (!game.siteRevealed) {
+    const order = m.sites.map((s, i) => ({ i, b: s.bombs[0] })).sort((a, b) => Math.hypot(a.b.x - p.x, a.b.y - p.y) - Math.hypot(b.b.x - p.x, b.b.y - p.y));
+    const s = m.sites[order[(p.pro.i + (p.ai.droneVisits || 0)) % order.length].i];
+    const r = m.rooms.find(r => r.name === s.rooms[0]);
+    if (r) return game.freeSpotNear((r.x + r.w / 2) * CELL, (r.y + r.h / 2) * CELL, Math.min(r.w, r.h) * CELL * 0.3);
+  }
+  const at = (j && (j.drone || j.target)) || m.sites[game.site].bombs[0];
+  return game.freeSpotNear(at.x, at.y, 40);
+}
+const elapsedAction = game => DUR.action - game.timer;
+const near = (a, b, d) => a && b && Math.hypot(a.x - b.x, a.y - b.y) < d;
+function spottedNear(game, team, pt, r) { let n = 0; for (const id of game.spots[team].keys()) { const q = game.players.get(id); if (q && q.alive && near(q, pt, r)) n++; } return n; }
+// the leader's read of the round, once a second
+function proDirector(game, squad, st, team, el) {
+  if (game.time - (st.dT || 0) < 1) return; st.dT = game.time;
+  const plan = st.plan, mates = [...game.players.values()].filter(q => q.squad === squad), alive = mates.filter(q => q.alive && !q.downed).length, down = mates.length - alive;
+  if (team === TEAM.ATK) {
+    if (!st.called) { st.called = true; proCall(game, squad, `${plan.name}: ${plan.idea}`); }
+    if (st.gone || game.planted) return;
+    if (el >= st.go) { st.gone = true; proCall(game, squad, 'Go go go!'); }
+    else if (down >= 2) { st.go = el; st.gone = true; proCall(game, squad, 'Two down: we go now, together. Trade each other.'); }
+    else if (game.timer < 55) { st.go = el; st.gone = true; proCall(game, squad, 'Running out of time: go now.'); }
+    else if (!st.swapped && plan.ways.side && el > 8 && spottedNear(game, team, plan.ways.main.pos, 150) >= 2) {
+      st.swapped = true; st.go = Math.min(st.go, el + 6); proCall(game, squad, 'They are stacked on our door: switch, everyone through the other way in 6.');
+    }
+  } else {
+    if (!st.called) { st.called = true; proCall(game, squad, `${plan.name}: ${plan.idea}`); }
+    if (game.planted) {
+      if (!st.retake) { const near3 = mates.filter(q => q.alive && !q.downed && near(q, game.planted, 300)).length; if (near3 >= Math.min(3, alive) || game.planted.t < 30 || game.time - (st.plantSeen ?? (st.plantSeen = game.time)) > 8) { st.retake = true; proCall(game, squad, 'Retake now, all together, utility first.'); } }
+      return;
+    }
+    for (const w of [plan.ways.main, plan.ways.side]) if (w && spottedNear(game, team, w.pos, 170) >= 2 && (!st.rotate || st.rotate.w !== w)) {
+      st.rotate = { w, t: game.time, at: game.freeSpotNear(w.hold.x, w.hold.y, 20) }; proCall(game, squad, `Rotate: they are hitting ${w.kind === 'stairs' ? 'the stairs' : 'the ' + w.kind}.`); break;
+    }
+  }
+}
+const eff = (st, j, key) => { // after a switch, whoever was going through the main way goes through the side one
+  const w = st.plan.ways; if (!st.swapped || !w.side || !j[key]) return j[key];
+  if (key === 'stack' && near(j.stack, w.main.stack, 4)) return w.side.stack;
+  if (key === 'target' && near(j.target, w.main.inside, 4)) return w.side.inside;
+  return j[key];
+};
+function breachAt(game, p, k) { // the plan's wall, set up like planBreach would (stand outside it, face it)
+  const m = game.map, W = m.W, tool = breachTool(p); if (!tool || !BREACH_TOOLS[tool].types.includes(m.tiles[k])) return null;
+  const site = m.sites[game.site], inSite = siteTest(m, site);
+  for (const d of [1, -1, W, -W]) { const inK = k + d, out = k - d; if (!inSite(inK % W, Math.floor(inK / W)) || inSite(out % W, Math.floor(out / W))) continue;
+    return { k, d, sx: (out % W + 0.5) * CELL, sy: (Math.floor(out / W) + 0.5) * CELL, wx: (k % W + 0.5) * CELL, wy: (Math.floor(k / W) + 0.5) * CELL, tool }; }
+  return null;
+}
+// After the plant the attackers' job is the defuser (he asked: everything serves the objective): each takes a spot
+// 4-10 m from it with a clear view of it, off the line of the ways in, away from teammates' spots, and holds it.
+function postPlant(game, p, inp, dt, watch) {
+  const ai = p.ai, m = game.map, pl = game.planted, W = m.W;
+  if (!ai.pp || ai.ppFor !== pl) {
+    const taken = [...game.players.values()].filter(q => q !== p && q.squad === p.squad && q.ai && q.ai.pp).map(q => q.ai.pp);
+    const cx = Math.floor(pl.x / CELL), cy = Math.floor(pl.y / CELL); let best = null, bs = Infinity;
+    for (let dy = -10; dy <= 10; dy++) for (let dx = -10; dx <= 10; dx++) {
+      const k = (cy + dy) * W + cx + dx; if (k < 0 || k >= m.tiles.length || m.tiles[k] !== T.FLOOR && m.tiles[k] !== T.GROUND) continue;
+      const x = (cx + dx + 0.5) * CELL, y = (cy + dy + 0.5) * CELL, d = Math.hypot(x - pl.x, y - pl.y) / CELL;
+      if (d < 4 || d > 10 || !los(m, x, y, pl.x, pl.y) || floorAt(m, x, y) !== floorAt(m, pl.x, pl.y)) continue;
+      const cover = [1, -1, W, -W].some(o => blocksMove(m.tiles[k + o])) ? -2 : 0, crowd = taken.some(t => Math.hypot(t.x - x, t.y - y) < 90) ? 6 : 0;
+      const sc = Math.abs(d - 6.5) + cover + crowd + Math.hypot(x - p.x, y - p.y) / CELL * 0.15 + Math.random();
+      if (sc < bs) { bs = sc; best = { x, y }; }
+    }
+    ai.pp = best || game.freeSpotNear(pl.x, pl.y, 80); ai.ppFor = pl;
+  }
+  if (!near(p, ai.pp, 12)) { moveTo(game, p, inp, ai.pp, dt); inp.walk = near(p, ai.pp, 150) ? 1 : 0; return true; }
+  watch(pl, true); return true;
+}
+// One pro's part of the plan this tick. true: handled (movement set); false: the ordinary bot behaviour carries on.
+function proAct(game, p, inp, dt, team) {
+  const side = team === TEAM.ATK ? 'atk' : 'def', st = proPlan(game, p.squad, side), plan = st.plan; if (!plan) return false;
+  const ai = p.ai, j = plan.jobs[p.pro.pl.jobs[side]] || plan.jobs[jobOf(p.op)]; if (!j) return false;
+  const action = game.phase === PHASE.ACTION, el = action ? elapsedAction(game) : -1, S = skill(game, p), name = p.pro.pl.name;
+  if (action) proDirector(game, p.squad, st, team, el);
+  else if (!st.called && game.phase === PHASE.PREP && side === 'def') { st.called = true; proCall(game, p.squad, `${plan.name}: ${plan.idea}`); }
+  const watch = (pt, crouch) => { // hold an angle like a person: a noise first, now and then the other ways in, else the job's angle
+    if (ai.heard && game.time - ai.heard.t < 2.5) pt = ai.heard;
+    else { if ((ai.chkT = (ai.chkT ?? 3 + Math.random() * 3) - dt) <= 0) { ai.chkT = 3 + Math.random() * 4; ai.chk = Math.random() < 0.4 ? threatPoint(game, p, p.aim + (Math.random() - 0.5) * 3) : null; ai.chkUntil = game.time + 1.2; }
+      if (ai.chk && game.time < ai.chkUntil) pt = ai.chk; }
+    if (pt) turnTo(p, Math.atan2(pt.y - p.y, pt.x - p.x), S.turn * 0.6, dt); inp.crouch = crouch ? 1 : 0; // he asked: crosshair placement matters most — held still on the spot, no drifting
+  };
+  const trade = game.proTrade && game.proTrade[p.squad]; // a teammate just died close by: swing onto where it came from
+  const objectiveFirst = (team === TEAM.ATK && game.planted) || (team === TEAM.DEF && !game.planted && p.pro.pl.jobs.def === 'anchor'); // he asked: everything in service of the objective
+  if (trade && !objectiveFirst && game.time - trade.t < 4 && near(p, trade, 320) && !near(p, trade, 20)) { moveTo(game, p, inp, trade.from || trade, dt); inp.walk = near(p, trade, 120) ? 1 : 0; return true; }
+  if (side === 'atk') {
+    if (action && game.planted) return postPlant(game, p, inp, dt, watch); // the objective now: protect the defuser
+    if (!action || ai.inSite) return false;
+    if (game.timer < 35) return false; // the clock: forget the plan, everyone to the bomb
+    const dropped = game.ents.find(e => e.type === 'defuser');
+    if (dropped) { const mates = [...game.players.values()].filter(q => q.alive && !q.downed && q.squad === p.squad); const nearest = mates.sort((a, b) => Math.hypot(a.x - dropped.x, a.y - dropped.y) - Math.hypot(b.x - dropped.x, b.y - dropped.y))[0]; if (nearest === p) return false; } // the closest one fetches a dropped defuser
+    const go = st.go + (j.delay || 0) + (TIMING[name] || 0);
+    if (j.breach != null && !ai.breachDone && el >= st.go - 7) { // open the wall just before the push
+      if (ai.breachB === undefined) ai.breachB = breachAt(game, p, j.breach);
+      if (ai.breachB) { const r = doBreach(game, p, inp, ai.breachB, dt); if (r !== 'done') return true; }
+      ai.breachDone = true;
+    }
+    if (j.hatch && !ai.hatchDone && el >= st.go - 8) { // open the hatch above the site: swing at it from on top
+      const h = game.map.hatches.find(h => near(h, j.hatch, 4));
+      if (!h || game.map.tiles[h.cells[0]] === T.HOLE) ai.hatchDone = true;
+      else { if (!near(p, h, 10)) { moveTo(game, p, inp, h, dt); return true; } inp.crouch = 1; if (p.meleeCd <= 0) game.event(p, { k: OPERATORS[p.op].ability.id === 'hammer' ? 'ability' : 'melee' }); return true; }
+    }
+    if (j.fake && el < go) { // make noise at the other way in: break things, throw utility, then go round
+      if (!near(p, j.fake, 16)) { moveTo(game, p, inp, j.fake, dt); return true; }
+      const w = plan.ways.side; watch(w && w.pos, false);
+      if (el > st.go - 20 && w) { aimAt(p, w.pos.x, w.pos.y); if (Math.random() < dt * 3) inp.fire = 1; if (!ai.fakeNade && p.gadgetCount > 0 && ['stun', 'smoke', 'frag'].includes(p.gadget)) { ai.fakeNade = true; game.event(p, { k: 'gadget' }); } }
+      return true;
+    }
+    const holdUntil = (j.until || 0) + (TIMING[name] || 0);
+    if (el < go || (j.hold && el < holdUntil)) { // set up: quiet at the end, then hold an angle on the way in
+      const spot = j.hold && el < holdUntil ? j.hold : eff(st, j, 'stack');
+      if (!near(p, spot, 14)) { moveTo(game, p, inp, spot, dt); if (near(p, spot, 260)) inp.walk = 1; return true; }
+      watch(eff(st, j, 'target'), true); return true;
+    }
+    if (!ai.utilDone) { // utility in first
+      ai.utilDone = true; const tg = eff(st, j, 'target'), abId = OPERATORS[p.op].ability.id;
+      if (j.util === 'stun' && p.gadget === 'stun' && p.gadgetCount > 0) { aimAt(p, tg.x, tg.y); game.event(p, { k: 'gadget' }); }
+      if (j.util === 'smoke') { aimAt(p, tg.x, tg.y); if (abId === 'barrage' && p.abilityCount > 0) game.event(p, { k: 'ability' }); else if (p.gadget === 'smoke' && p.gadgetCount > 0) game.event(p, { k: 'gadget' }); }
+    }
+    const tg = eff(st, j, 'target');
+    if (!near(p, tg, 18) && !(ai.tgT = (ai.tgT || 0) + dt, ai.tgT > 25)) { moveTo(game, p, inp, tg, dt); return true; }
+    ai.inSite = true; if (j.plant) ai.bomb = j.plant; // in: the ordinary push to the bomb, plant, hold
+    return false;
+  }
+  // defence
+  if (game.planted) {
+    if (st.retake) return false; // all in: the ordinary defuse
+    const stage = ai.stage || (ai.stage = game.freeSpotNear(game.planted.x + (p.x - game.planted.x) * 0.5, game.planted.y + (p.y - game.planted.y) * 0.5, 40));
+    if (!near(p, stage, 14) && !near(p, game.planted, 200)) { moveTo(game, p, inp, stage, dt, true); return true; }
+    watch(game.planted, true); return true;
+  }
+  const rot = st.rotate && game.time > st.rotate.t + (ROTATE_DELAY[name] ?? 0) && ['support', 'intel', 'roamer'].includes(p.pro.pl.jobs.def) ? st.rotate : null;
+  const roaming = action && j.roam && el < (j.until || 0) + (TIMING[name] || 0) && !rot;
+  const spot = roaming ? (ai.roamAt || (ai.roamAt = game.freeSpotNear(j.roam.x, j.roam.y, 50))) : rot ? rot.at : (ai.holdAt || (ai.holdAt = game.freeSpotNear(j.hold.x, j.hold.y, 26)));
+  if (!near(p, spot, 14)) { moveTo(game, p, inp, spot, dt, true); if (roaming && near(p, spot, 200)) inp.walk = 1; return true; }
+  watch(rot ? rot.w.pos : j.watch, !roaming); return true;
+}

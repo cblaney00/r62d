@@ -12,7 +12,7 @@ const O = k => ops[k] || (ops[k] = { rounds: 0, won: 0, kills: 0, deaths: 0, dmg
 const Gn = k => guns[k] || (guns[k] = { kills: 0, dmg: 0, shots: 0, hits: 0, carried: 0, hs: 0 });
 let rounds = 0, atkWins = 0;
 for (const id of MAP_LIST) for (let n = 0; n < per; n++) {
-  const g = new Game(); g.mapId = id; g.map = buildMap(id);
+  const g = new Game(); g.mapId = id; g.map = buildMap(id); g.botLevel = process.argv.includes('--plain') ? 3 : 4; g.proAnyOp = true; // played by the pro teams, each on any operator of their job so every operator gets tested
   for (let i = 0; i < 10; i++) g.addBot();
   const dmg0 = g.damage.bind(g), fire0 = g.fire.bind(g);
   g.damage = (q, amount, s, wname, ang) => {

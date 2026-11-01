@@ -23,7 +23,7 @@ if (process.argv.includes('--map')) {
 let allOk = true;
 for (const id of arg('--only') ? [arg('--only')] : MAP_LIST) {
   const g = new Game();
-  g.mapId = id; g.map = buildMap(id);
+  g.mapId = id; g.map = buildMap(id); g.botLevel = process.argv.includes('--plain') ? 3 : 4; // he asked: the pro teams are the test subjects (--plain: Expert bots)
   for (let i = 0; i < 10; i++) g.addBot();
   g.startMatch();
   const dt = 1 / 30;
