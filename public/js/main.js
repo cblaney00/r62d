@@ -21,6 +21,7 @@ import { levelFor } from '/shared/progress.js';
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
 import { walkRay, tileAt, findVault } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
+import { drawQr } from './qr.js';
 import { touchPad, touchContext, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
 import { blocksSight, FL } from '/shared/constants.js';
 
@@ -770,7 +771,7 @@ function renderLobby(s) {
   for (const b of $('botLevel').children) b.classList.toggle('on', +b.dataset.lv === (s.bl ?? 1));
   // the address friends type to join (the first network card is the wired one)
   if (st.addr === undefined || (st.addrT && performance.now() - st.addrT > 15000)) { st.addr = st.addr || null; st.addrT = performance.now(); fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
-  const u = st.addr && st.addr.urls[0], jt = !u ? '' : u.vpn ? `Friends on the homelab VPN join at ${u.url}` : `Friends join at ${u.url} · turn on homelab-vpn to play over the VPN`;
+  const u = st.addr && st.addr.urls[0], jt = !u ? '' : `Friends at home join at ${u.url} · OPEN TO LAN shows a code to scan with a phone`;
   if ($('joinAddr').textContent !== jt) $('joinAddr').textContent = jt;
   for (const sq of [0, 1]) {
     const ul = document.querySelector(`#sq${sq} ul`);
@@ -2337,7 +2338,7 @@ function revealSeen() {
 function revealAll() { if (!st.unseen) return; for (const k of st.unseen) applyKnown(k); st.unseen.clear(); }
 
 // ---------------- pause menu & pages ----------------
-const OVERLAYS = ['settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage', 'freeOps', 'pause', 'quitDlg'];
+const OVERLAYS = ['lanDlg', 'settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage', 'freeOps', 'pause', 'quitDlg'];
 function menuOpen() { return OVERLAYS.some(id => !$(id).classList.contains('hidden')); }
 function inMatch() { const p = st.last && st.last.ph; return p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END || p === PHASE.SELECT; }
 function showOps(op) { audio.ui('open'); openOps($('opsPage'), { profile: st.profile, send, op }); }
@@ -2345,7 +2346,7 @@ function showProfile() { audio.ui('open'); if (st.token) openProfile($('profileP
 // Esc closes whatever is open, otherwise opens/closes the pause menu during a match.
 function escape() {
   if (!$('armoryPage').classList.contains('hidden') && armoryHoldsEsc()) return; // Esc first lets go of the captured mouse, as in a match
-  for (const id of ['settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage', 'freeOps']) if (!$(id).classList.contains('hidden')) {
+  for (const id of ['settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage', 'freeOps', 'lanDlg']) if (!$(id).classList.contains('hidden')) {
     if (id === 'opsPage') closeOps($(id)); else if (id === 'armoryPage') closeArmory($(id)); else if (id === 'mapsPage') closeMapInfo($(id)); else $(id).classList.add('hidden');
     return;
   }
@@ -2398,6 +2399,23 @@ for (const b of $('inputSeg').querySelectorAll('button')) {
   dz.value = tiltDead(); show();
   for (const b of seg.children) b.onclick = () => { audio.ui(); setTilt(b.dataset.t === '1'); show(); };
   dz.addEventListener('input', () => { setTiltDead(+dz.value); show(); }); }
+// ---- OPEN TO LAN (he asked, like Minecraft): the address and a QR code for phones, and which computer + version this is ----
+const lanText = a => a ? `${a.host} · version ${a.version.id}${a.version.date ? ' (' + a.version.date + ')' : ''}` : '';
+function openLan() {
+  audio.ui('open'); $('lanDlg').classList.remove('hidden');
+  fetch('/api/addr').then(r => r.json()).then(a => {
+    st.addr = a; const lan = a.urls.filter(u => !u.vpn), main = lan[0] || a.urls[0];
+    if (!main) { $('lanUrl').textContent = 'No network found: is this computer connected?'; return; }
+    drawQr($('lanQr'), main.url, 7);
+    $('lanUrl').innerHTML = `<b>${esc(main.url)}</b><span>over ${esc(main.net)}</span>`;
+    $('lanOther').innerHTML = a.urls.filter(u => u !== main).map(u => `<div>${esc(u.url)} <span>(${esc(u.net)}${u.vpn ? ', for friends on the VPN' : ''})</span></div>`).join('');
+    $('lanServer').textContent = 'Running on ' + lanText(a);
+  }).catch(() => { $('lanUrl').textContent = 'Could not reach the game server.'; });
+}
+$('lanBtn').onclick = openLan; $('pLan').onclick = () => { $('pause').classList.add('hidden'); openLan(); };
+$('lanClose').onclick = () => { audio.ui('back'); $('lanDlg').classList.add('hidden'); };
+// the title screen says which computer and version you are connected to (a phone might be on someone else's server)
+fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; $('serverTag').textContent = 'Connected to ' + lanText(a); }).catch(() => {});
 $('splash').addEventListener('click', () => {
   if (st.started) return;
   audio.initAudio(); audio.ui('open');

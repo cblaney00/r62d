@@ -9,6 +9,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] OPEN TO LAN (in the lobby next to START MATCH, and in the pause menu): shows your game's home-network address big, with a QR code a phone can scan with its camera, plus any other addresses (cable, Wi-Fi, homelab VPN). The game stays open to your home network as before (you chose that). The lobby now gives the home address first instead of the VPN one, and the title screen says which computer and version you are connected to ("Connected to blaney-pc · version …"), so a phone can tell your own PC's game from Lando's mini-server. Updating Lando's copy is the separate step in the config session, once phone play is good.
 - [x] VAPOR's Smoke Burst: a cone of thick smoke blasts out in front of him, spreads almost at once and fills the shape of the room (it follows doorways, never goes through walls), for 8 seconds.
 - [x] CROW reworked: Lunge (2 a round). For 5 seconds his melee becomes a silent 2-metre lunge that downs anyone it reaches, from any side (a shield from the front just gets knocked aside).
 - [x] STRIDER balanced: Ghost Step lasts 6 seconds instead of 10, and he moves 15% slower while it's on.

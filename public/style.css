@@ -679,3 +679,19 @@ html.touch * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) tr
 html.touch #armCanvas { touch-action: none; }
 #touchUI .tbtn.t6 { right: auto; left: max(20px, env(safe-area-inset-left)); top: auto; bottom: 168px; width: 84px; } /* ⟲ TILT, above the move stick */
 #settings .phoneOnly { display: none; } html.touch #settings .phoneOnly { display: flex; }
+/* OPEN TO LAN */
+.roomBtns { display: flex; gap: 10px; }
+html.fitui #lanDlg > * { zoom: var(--uiz, 1); }
+#lanDlg .lanMenu { width: min(760px, 92vw); }
+#lanDlg .lanBody { display: flex; gap: 24px; align-items: center; margin: 10px 0 16px; }
+#lanQr { width: 230px; height: 230px; image-rendering: pixelated; border-radius: 6px; flex: none; }
+#lanUrl b { display: block; font: 800 30px var(--head); letter-spacing: 0.04em; color: #f2c14e; word-break: break-all; }
+#lanUrl span, #lanOther span { color: var(--dim); font-size: 14px; }
+#lanOther { margin-top: 12px; font-size: 15px; } #lanOther div { margin: 3px 0; }
+#lanServer { margin-top: 14px; color: var(--dim); font-size: 13px; letter-spacing: 0.06em; }
+#serverTag { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); font: 600 13px var(--head); letter-spacing: 0.12em; color: var(--dim); white-space: nowrap; }
+html.touch #lanDlg .lanBody { gap: 14px; } html.touch #lanQr { width: 170px; height: 170px; }
+#lanDlg .menu { display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); padding: 22px 26px; }
+#lanDlg h2 { margin: 0; font: 800 44px var(--head); letter-spacing: 0.2em; }
+#lanDlg .hint { text-align: left; }
+#lanBtn { white-space: nowrap; }

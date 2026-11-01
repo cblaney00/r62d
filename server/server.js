@@ -12,6 +12,10 @@ import { TICK_RATE, SNAP_RATE } from '../shared/constants.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || 6262;
+// Which build this server is (OPEN TO LAN shows it, so a phone can tell his own PC's game from someone else's server):
+// the git commit when run from his project folder, otherwise R62D_VERSION if the packaged app sets it.
+let VERSION = { id: process.env.R62D_VERSION || 'packaged', date: '' };
+execFile('git', ['-C', ROOT, 'log', '-1', '--format=%h|%cs'], (err, out) => { if (!err && out.trim()) { const [id, date] = out.trim().split('|'); VERSION = { id, date }; } });
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
 
 const server = http.createServer((req, res) => {
@@ -49,9 +53,14 @@ function api(req, res) {
   // the addresses friends type to join this server (shown in the lobby)
   if (u.pathname === '/api/addr') {
     const urls = [];
-    for (const [dev, list] of Object.entries(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) urls.push({ url: `http://${a.address}:${PORT}`, vpn: /^wg|^tun/.test(dev) || a.address.startsWith('10.10.') });
-    urls.sort((a, b) => b.vpn - a.vpn); // the homelab VPN address first: that's how friends join from outside
-    return json(200, { urls });
+    // OPEN TO LAN (he asked): the home-network address first (cable, then Wi-Fi), the homelab VPN last
+    for (const [dev, list] of Object.entries(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) {
+      const vpn = /^wg|^tun|^tailscale/.test(dev) || a.address.startsWith('10.10.'), wifi = /^wl/.test(dev);
+      urls.push({ url: `http://${a.address}:${PORT}`, vpn, net: vpn ? 'homelab VPN' : wifi ? 'Wi-Fi' : 'cable' });
+    }
+    const rank = u => (u.vpn ? 2 : u.net === 'Wi-Fi' ? 1 : 0);
+    urls.sort((a, b) => rank(a) - rank(b));
+    return json(200, { urls, host: os.hostname(), version: VERSION, port: PORT });
   }
   if (u.pathname === '/api/match') { const m = store.match(q('id')); return m ? json(200, m) : json(404, { error: 'no such match' }); }
   if (u.pathname === '/api/players') return json(200, Object.values(store.profiles).map(p => ({ id: p.id, name: p.name, matches: p.stats.matches, wins: p.stats.wins, kills: p.stats.kills, deaths: p.stats.deaths })));
