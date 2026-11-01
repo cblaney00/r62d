@@ -470,7 +470,20 @@ export function botThink(game, p, dt) {
   }
 
   // --- a teammate is down: heal them from range with a stim, or go and pick them up ---
-  const mate = action || game.phase === PHASE.PREP ? downedMate(game, p, team) : null;
+  let mate = action || game.phase === PHASE.PREP ? downedMate(game, p, team) : null;
+  // he asked: no endless revives. Give up on one that can't be started within a few seconds (out of reach, blocked), and a
+  // pro doesn't walk into a revive with an enemy just seen or heard close by, unless the mate is about to bleed out alone
+  if (mate) {
+    const gu = ai.reviveGiveUp || (ai.reviveGiveUp = {});
+    if (gu[mate.id] > game.time) mate = null;
+    else if (p.pro && heardRecently && Math.hypot(ai.heard.x - mate.x, ai.heard.y - mate.y) < 260 && mate.hp > 8) mate = null;
+    else {
+      if (ai.reviveId !== mate.id) { ai.reviveId = mate.id; ai.reviveT = game.time; }
+      const started = p.busy && p.busy.k === 'revive';
+      if (started) ai.reviveT = game.time; // progressing: fine
+      else if (game.time - ai.reviveT > 7) { gu[mate.id] = game.time + 20; ai.reviveId = null; mate = null; }
+    }
+  }
   if (mate) {
     const d = Math.hypot(mate.x - p.x, mate.y - p.y);
     if (abId === 'stim' && p.abilityCount > 0 && d < 380 && los(map, p.x, p.y, mate.x, mate.y)) {

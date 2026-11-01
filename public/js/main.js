@@ -2581,12 +2581,12 @@ function playing() { const p = st.last && st.last.ph; return !!st.id && (p === P
 // Esc releases the mouse: treat that like pausing, as in CS2
 document.addEventListener('pointerlockchange', () => {
   st.lockAsked = false; // captured: clicks shoot; let go: the next click takes control again
-  if (isTouch) return;
+  if (isTouch || st.tv) return; // TV never takes the mouse
   if (!document.pointerLockElement && playing() && !menuOpen() && !st.quitting) $('pause').classList.remove('hidden');
 });
 // let go of the mouse whenever a menu is open or the match is over
 setInterval(() => { if (document.pointerLockElement && document.pointerLockElement !== $('armCanvas') && (menuOpen() || !playing())) document.exitPointerLock(); }, 150);
-$('pResume').addEventListener('click', () => { if (playing() && !isTouch) cv.requestPointerLock?.(); }); // a phone has no mouse to capture (asking anyway re-opened this menu)
+$('pResume').addEventListener('click', () => { if (playing() && !isTouch && !st.tv) cv.requestPointerLock?.(); }); // TV: nothing to aim, keep the mouse free // a phone has no mouse to capture (asking anyway re-opened this menu)
 const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; };
 for (const id of ['sens', 'adsSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
 try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; } } catch {}
