@@ -602,6 +602,10 @@ export function botThink(game, p, dt) {
     }
   }
 
+  // --- impatience (he asked: bots stood around too much; people get impatient and take a risk for a better position
+  // or the surprise) ---
+  if (action && !game.planted && !p.pro) impatience(game, p, team, site, me);
+
   // --- a pro's part of the team plan ---
   if (p.pro && (action || game.phase === PHASE.PREP) && proAct(game, p, inp, dt, team)) return;
 
@@ -649,6 +653,10 @@ export function botThink(game, p, dt) {
     else if (p.gadgetCount > 0 && heardRecently && Math.hypot(ai.heard.x - p.x, ai.heard.y - p.y) < 240 && Math.hypot(ai.heard.x - p.x, ai.heard.y - p.y) > 90 && los(map, p.x, p.y, ai.heard.x, ai.heard.y)) { aimAt(p, ai.heard.x, ai.heard.y); game.event(p, { k: 'gadget' }); }
   }
 
+  // he asked: paranoia. Alone (no teammate within 8 m) after hearing something, a bot keeps sweeping every way in
+  // round it, not just the one the noise came from, until it has been quiet for a few seconds
+  const alone = ![...game.players.values()].some(q => q !== p && q.alive && !q.downed && game.side(q) === team && Math.hypot(q.x - p.x, q.y - p.y) < 8 * PX_PER_M);
+  const paranoid = alone && heardRecently && game.time - ai.heard.t > 0.7;
   // heard something and can't see it: stop, turn to face it and listen for a moment (pushy bots don't stop as long)
   if (heardRecently && game.time - ai.heard.t < 1.6 - me.aggr * 0.6 && !p.hasDefuser && !(team === TEAM.DEF && game.planted)) {
     turnTo(p, Math.atan2(ai.heard.y - p.y, ai.heard.x - p.x), skill(game, p).turn * 0.6, dt);
@@ -720,11 +728,19 @@ export function botThink(game, p, dt) {
     if (ai.roamFor > 0 && game.timer > 60) { // the clock: back to the site
       ai.roamT = (ai.roamT || 0) - dt;
       if (!ai.roam || ai.roamT <= 0) { ai.roam = roamSpot(game, p); ai.roamT = 14 + Math.random() * 14; ai.watch = null; }
-      if (ai.roam) return moveTo(game, p, inp, ai.roam, dt, true);
+      if (ai.roam) {
+        const r = moveTo(game, p, inp, ai.roam, dt, true);
+        if (paranoid) checkAngles(game, p, dt, 1.5);
+        // no way there (it walked into a wall and stood there all round): another spot, and after a few, back to the site
+        if (ai.path && !ai.path.length && Math.hypot(ai.roam.x - p.x, ai.roam.y - p.y) > 2 * CELL && (ai.roamFail = (ai.roamFail || 0) + dt) > 1.5) { ai.roamFail = 0; ai.roamT = 0; if ((ai.roamBad = (ai.roamBad || 0) + 1) > 4) ai.roamFor = 0; }
+        return r;
+      }
     }
   }
 
-  return moveTo(game, p, inp, goal, dt, !atk);
+  const r = moveTo(game, p, inp, goal, dt, !atk);
+  if (paranoid) checkAngles(game, p, dt, 1.5); // alone and something heard: every angle, not just the noise
+  return r;
 }
 
 // On the cameras: flick through the feeds, spot what they see for the team, and get back to the body after a few
@@ -777,6 +793,35 @@ function doBreach(game, p, inp, b, dt) {
   b.backUntil = game.time + tool.back; return 'wait';
 }
 
+// Impatience: a bot that has stayed in one small area (3 m) with nothing going on (no enemy seen) gets restless,
+// sooner the less patient it is, and makes a play. Attackers stop waiting and push to a fresh spot, and experienced
+// ones (higher ranks) often go round to come in from an unexpected side. Defenders take a new angle; pushy and
+// experienced ones go out into a room beside the site for the surprise. A fight or a noise resets the clock.
+function impatience(game, p, team, site, me) {
+  const ai = p.ai, lvl = lvlOf(game, p), atk = team === TEAM.ATK, at = ai.stillAt;
+  if (!at || Math.hypot(p.x - at.x, p.y - at.y) > 3 * PX_PER_M) { ai.stillAt = { x: p.x, y: p.y, t: game.time }; return; }
+  const busy = game.time - (ai.seenT ?? -99) < 5; // a fight on. (Noises don't count: in a busy round there is always one; alone, they make it paranoid instead)
+  const stuck = (ai.noPathT || 0) > 2; // walking into a wall towards a spot it can't reach: a new plan at once
+  if (busy && !stuck) { at.t = game.time; return; }
+  // he asked: experienced bots are less affected (they know when holding is right); it is mostly there so rounds don't go stale
+  const limit = (atk ? 3 : 4) + me.patience * (atk ? 4 : 6) + lvl * 0.8;
+  if (game.time - at.t < limit && !stuck) return;
+  ai.stillAt = null; ai.noPathT = 0;
+  const bold = me.aggr * 0.6 + lvl / TOP_BOT * 0.4; // how much of a risk it takes: personality and experience
+  if (atk) {
+    ai.startWait = 0; ai.supportDone = true; ai.pauseT = 4 + Math.random() * 3; // done waiting and checking angles
+    if (stuck && ai.breach) ai.breach = null; // a breach it cannot get to: forget it
+    if (Math.random() < bold * 0.7 && !ai.flanked) { ai.flank = flankPoint(game, p, site); if (ai.flank) { ai.role = 'flank'; ai.flanked = false; return; } }
+    ai.push = nearBomb(game, site, 40 + Math.random() * 60); ai.bomb = null;
+  } else {
+    const I = intelOf(game), rooms = I ? [...(I.near || []), I.roam].filter(Boolean) : [];
+    if (rooms.length && Math.random() < bold * 0.6) { const r = rooms[Math.floor(Math.random() * rooms.length)], c = I.centre(r); ai.hold = game.freeSpotNear(c.x, c.y, Math.min(r.w, r.h) * CELL * 0.35); }
+    else ai.hold = nearBomb(game, site, 60 + Math.random() * 60);
+    ai.holdT = game.time + 12 + Math.random() * 10;
+    if (ai.role === 'roamer') ai.roamT = 0; // a roamer: on to another room
+  }
+}
+
 // A spot outside the site's way in that is furthest from where the attackers come from.
 function flankPoint(game, p, site) {
   const m = game.map, W = m.W, inSite = siteTest(m, site), b = site.bombs[0];
@@ -806,6 +851,7 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
     ai.path = findPath(map, sx, sy, gx, gy, ai.noVault, false, team === TEAM.DEF) || []; ai.pathT = 1.2; ai.goalK = gy * map.W + gx;
   }
   { const i = ai.path.indexOf(sy * map.W + sx); if (i >= 0 && i < 6) ai.path.splice(0, i + 1); } // also skips the stair end after being carried to the other floor
+  ai.noPathT = !ai.path.length && Math.hypot(goal.x - p.x, goal.y - p.y) > 2 * CELL ? (ai.noPathT || 0) + dt : 0; // no way there: see impatience
   if (!ai.path.length) {
     if (Math.hypot(goal.x - p.x, goal.y - p.y) > 6) setDir(inp, goal.x - p.x, goal.y - p.y);
     else if (hold) { // hold an angle on the nearest way in

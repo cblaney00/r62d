@@ -7,10 +7,10 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
-- [ ] the bots should also just stand around less, they get impatient just like people do, they take risks for better position and the element of surprise or experience gained from lots of games
 
 ## Done
 
+- [x] Bots stand around less. A bot that stays in one small area with no enemy in sight gets impatient and makes a play: attackers stop waiting and push to a fresh spot, often going round to come in from an unexpected side; defenders take a new angle, and bolder ones step out into a room beside the site. The more experienced (higher rank) a bot is, the longer it waits first. Paranoia: a bot that is alone and hears something keeps sweeping every way in, not just the one the sound came from. Also fixed bots (roamers especially) that walked into a wall and stood there all round when they had no route to their spot. Measured: idle time without a fight went from about half the round to 40%, and the longest attacker standstill from 96 to 17 seconds.
 - [x] Esports TV: the auto director keeps count of how long each team has been on screen and leans toward the team that has had less, while a really exciting moment still wins. Viewers now see what both teams see, each team's sight faintly tinted in its own colour.
 - [x] Preparation is 10 seconds shorter (30 s instead of 40).
 - [x] Doors no longer start the match planked: the defending bots used to board every site door the instant preparation began; now they put the boards up one at a time through preparation, taking as long as a person would. Windows still start boarded.
