@@ -7,9 +7,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
+- [ ] seeing up and down stairs should be live and as part of the map if you can find a way to make floor transitions much smoother
 
 ## Done
 
+- [x] Operators window spread out: it fills almost the whole screen now, the picture is a little smaller so the words get the width, and the bio and skill text are bigger with more room between lines and sections. (The "Who are you?" name box was squashed into narrow columns by an old leftover style; fixed too.)
 - [x] Slow mouse moves now always reach the game: Firefox on this desktop throws away mouse steps smaller than a pixel, and mouse acceleration turns slow moves into exactly those. Opening the game now switches the mouse to flat (every step counts 1:1) and puts your old setting back when you close it, so nothing needs changing on your computer.
 - [x] Lighter server: the 12 GB came from connections that died without closing (a dropped VPN, a sleeping laptop): the server kept saving every update for them forever, and an Esports TV or Free Play game left behind that way kept running for nobody (which also slows the computer). Now every browser is checked every 5 s and dropped after 30 s of silence, a connection that stops taking updates is cut at 1 MB, and the pro practice thread can never use more than half a gigabyte. The game itself was checked over 56 back-to-back bot matches and doesn't grow. Lando gets it when you release it to him.
 - [x] Phones keep everything (he chose) but the menus are re-proportioned: the tabs are a strip across the top that scrolls sideways, every page gets the full width, and Settings is split into pages (Sound, Aiming, Controls, Screen, Crosshair, Keys).

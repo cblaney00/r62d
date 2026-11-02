@@ -47,7 +47,6 @@ input { font: 600 20px var(--head); padding: 10px 14px; background: rgba(0,0,0,0
 .logo { text-align: center; }
 .logo span { display: block; font: 800 140px/0.9 var(--head); letter-spacing: 0.08em; color: #f4f4f4; text-shadow: 0 6px 40px rgba(0,0,0,0.8); }
 .logo small { font: 600 18px var(--head); letter-spacing: 0.5em; color: var(--dim); }
-#join { display: flex; gap: 10px; }
 .squads { display: flex; gap: 24px; }
 #mapPick { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; margin: 4px 0 14px; } /* every map fits (Dust Town, the 7th, was off the edge) */
 #mapPick button { min-width: 0; padding: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; }
@@ -305,6 +304,18 @@ tr.me { color: var(--gold); } tr.dead { opacity: 0.5; }
 .mystats { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
 .mystats div { background: rgba(255,255,255,0.05); padding: 8px 14px; font: 600 11px var(--head); letter-spacing: 0.2em; color: var(--dim); }
 .mystats b { display: block; font: 800 26px var(--head); color: #fff; letter-spacing: 0.02em; } .mystats .none { letter-spacing: 0.05em; font-size: 14px; }
+/* Operators window spread out (he asked: the bios were good but the text too crunched): a bigger window, a smaller
+   picture so the words get the width, bigger bio text with room between the lines and between the blocks */
+html:not(.touch) #opsPage .page { width: min(1700px, calc(98vw / var(--uiz, 1))); height: calc(96vh / var(--uiz, 1)); max-height: none; }
+#opsDetail { padding: 26px 34px; } #opsDetail, #opsList { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+#opsDetail .ophero { gap: 40px; align-items: flex-start; }
+#opsDetail .ophero canvas { width: 280px; height: 280px; }
+#opsDetail .opinfo { flex: 1; min-width: 0; }
+#opsDetail .opinfo .real { margin-top: 12px; font-size: 16px; }
+#opsDetail .opinfo .bio { max-width: 820px; font-size: 17px; line-height: 1.75; margin: 14px 0 20px; }
+#opsDetail .opinfo .ability { margin-top: 20px; padding: 6px 16px; max-width: 820px; } #opsDetail .opinfo .ability p { line-height: 1.6; margin-top: 6px; font-size: 16px; }
+#opsDetail .mystats { margin-top: 22px; }
+#opsDetail h3 { margin-top: 34px; }
 .cards { display: flex; gap: 12px; flex-wrap: wrap; }
 .wcard { width: 300px; text-align: left; padding: 12px 14px; text-transform: none; letter-spacing: 0; }
 .wcard.on { border: 2px solid var(--gold); background: rgba(242,193,78,0.08); }
