@@ -1,11 +1,12 @@
 // Side-specific weapons (he asked): no gun is carried by both attackers and defenders, defence has no marksman or
 // sniper rifles but does have a slug shotgun, every gun is carried by someone, and each has its art, sound and spray.
 // Run: node tests/weapons.js
-import { WEAPONS, LOADOUTS, OPERATORS, SPRAY, SIDEARMS } from '../shared/operators.js';
+import { WEAPONS, LOADOUTS, OPERATORS, SPRAY, SIDEARMS, RIOT } from '../shared/operators.js';
 let fails = 0;
 const fail = (...a) => { fails++; console.log('FAIL', ...a); };
 const sides = {};
 for (const [op, L] of Object.entries(LOADOUTS)) for (const w of [...L.primaries, ...L.secondaries]) {
+  if (RIOT[w]) { if (RIOT[w].side !== OPERATORS[op].team) fail(op, 'has the other side\'s shield', w); continue; } // a riot shield, not a gun
   if (!WEAPONS[w]) { fail(op, 'carries an unknown gun', w); continue; }
   (sides[w] || (sides[w] = new Set())).add(OPERATORS[op].team);
   if (L.secondaries.includes(w) && !SIDEARMS.has(w)) fail(op, 'has', w, 'as a sidearm');

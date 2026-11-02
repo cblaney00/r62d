@@ -247,14 +247,14 @@ export const GADGET_COUNT = { smoke: 2, frag: 2, claymore: 1, breach: 2, stun: 2
 export const LOADOUTS = {
   ember:   { primaries: ['k4', 'tusk', 'rook'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'breach'] },
   kestrel: { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'claymore'] },
-  hammer:  { primaries: ['tusk', 'javelin', 'k4'], secondaries: ['p10', 'stub'], gadgets: ['claymore', 'frag'] },
+  hammer:  { primaries: ['tusk', 'javelin', 'ram'], secondaries: ['p10', 'stub'], gadgets: ['claymore', 'frag'] },
   talon:   { primaries: ['sabre', 'k4', 'trident'], secondaries: ['p10', 'stub'], gadgets: ['breach', 'stun'] },
   bulwark: { primaries: ['p10', 'bison'], secondaries: [], gadgets: ['stun', 'smoke'] }, // one hand on the shield: pistols only
   rivet:   { primaries: ['k4', 'sabre', 'tusk'], secondaries: ['p10', 'bison'], gadgets: ['stun', 'smoke'] },
   haze:    { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['breach', 'frag'] },
   glint:   { primaries: ['javelin', 'longbow', 'heron'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'claymore'] },
-  brisk:   { primaries: ['javelin', 'tusk', 'sabre'], secondaries: ['p10', 'bison'], gadgets: ['stun', 'smoke'] },
-  onyx:    { primaries: ['mule', 'ox', 'rook'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'breach'] },
+  brisk:   { primaries: ['javelin', 'tusk', 'visor'], secondaries: ['p10', 'bison'], gadgets: ['stun', 'smoke'] },
+  onyx:    { primaries: ['mule', 'ox', 'aegis'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'breach'] },
   prism:   { primaries: ['javelin', 'k4', 'heron'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'stun'] },
   volt:    { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['breach', 'claymore'] },
   tether:  { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'bison'], gadgets: ['claymore', 'smoke'] },
@@ -263,15 +263,15 @@ export const LOADOUTS = {
   mason:   { primaries: ['drummer', 'breaker', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
   veil:    { primaries: ['marten', 'wasp', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['nitro', 'impact'] },
   lynx:    { primaries: ['lark', 'hornet', 'wasp'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
-  solace:  { primaries: ['breaker', 'lark', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
-  wraith:  { primaries: ['lark', 'marten', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
+  solace:  { primaries: ['breaker', 'lark', 'glass'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
+  wraith:  { primaries: ['lark', 'marten', 'thorn'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
   bramble: { primaries: ['wasp', 'breaker', 'anvil'], secondaries: ['sparrow', 'vex50'], gadgets: ['wire', 'impact'] },
   kite:    { primaries: ['hornet', 'lark', 'sentry'], secondaries: ['vex50', 'gnat'], gadgets: ['dshield', 'nitro'] },
   gravel:  { primaries: ['lark', 'hornet', 'marten'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'wire'] },
   shunt:   { primaries: ['sentry', 'breaker', 'drummer'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'dshield'] },
   hush:    { primaries: ['marten', 'wasp', 'anvil'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'nitro'] },
   shade:   { primaries: ['wasp', 'breaker', 'lark'], secondaries: ['vex50', 'sparrow'], gadgets: ['nitro', 'wire'] },
-  rampart: { primaries: ['breaker', 'drummer', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
+  rampart: { primaries: ['breaker', 'drummer', 'bastion'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
   miasma:  { primaries: ['marten', 'breaker', 'sentry'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
   snare:   { primaries: ['breaker', 'lark', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['impact', 'nitro'] },
   argus:   { primaries: ['hornet', 'lark', 'marten'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
@@ -297,6 +297,29 @@ export const LOADOUTS = {
   ward: { primaries: ['marten', 'sentry', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['dshield', 'impact'] },
   girder: { primaries: ['drummer', 'breaker', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
 };
+// Riot shields (he asked: a few operators get one as their third primary, each with its own personality). Picked as the
+// primary, the shield is held up in front all the time and the pistol is drawn behind it (like BULWARK): aim in to swing
+// it aside and shoot. arc: how far it covers either side; speed: movement with it up; aside: seconds to swing it out of
+// the way; bash: melee damage and stagger (miss: seconds it is left down after a missed bash); hp: it cracks and is
+// gone for the round after that much damage (0 = never); hip: the pistol can fire round it without swinging it aside;
+// plant: crouched and still it covers this much instead; breaks: a bash smashes barricades; stun: a bash stuns.
+export const RIOT = {
+  aegis: { name: 'AEGIS WALL', side: 'atk', arc: 1.15, speed: 0.74, aside: 0.5, bash: 40, stagger: 1.0, miss: 1.4, hp: 0, col: '#2a2f36', rim: '#c9a23c',
+    trait: 'Huge and heavy: covers nearly your whole front and its bash hits hard, but you crawl and it takes an age to swing aside.' },
+  visor: { name: 'VISOR', side: 'atk', arc: 0.78, speed: 0.95, aside: 0.15, bash: 18, stagger: 0.5, miss: 0.9, hp: 0, hip: true, col: '#30363f', rim: '#7fd0ff',
+    trait: 'Light and quick: you can fire the pistol round it without lowering it, but it only covers a narrow strip.' },
+  ram: { name: 'BATTERING RAM', side: 'atk', arc: 0.95, speed: 0.82, aside: 0.35, bash: 30, stagger: 0.8, miss: 2.2, hp: 0, breaks: true, col: '#3a3330', rim: '#d86a3a',
+    trait: 'A breaching shield: one bash smashes a whole barricade, but a missed bash leaves you wide open for a long time.' },
+  bastion: { name: 'BASTION', side: 'def', arc: 1.0, plant: 1.45, speed: 0.72, aside: 0.4, bash: 30, stagger: 0.7, miss: 1.2, hp: 0, col: '#283038', rim: '#9aa6b2',
+    trait: 'Plant it: crouched and still it covers your front and sides, but it is the slowest shield to move with.' },
+  glass: { name: 'GLASS GUARD', side: 'def', arc: 1.0, speed: 0.9, aside: 0.12, bash: 22, stagger: 0.6, miss: 1.0, hp: 360, col: 'rgba(170,215,240,0.55)', rim: '#cfe8f6',
+    trait: 'Clear and light, the fastest to swing aside, but it cracks and is gone after it soaks up about three magazines.' },
+  thorn: { name: 'THORN', side: 'def', arc: 0.86, speed: 0.88, aside: 0.25, bash: 25, stagger: 0.6, stun: 1.3, cd: 2.2, miss: 1.2, hp: 0, col: '#2c2a33', rim: '#b05ad8',
+    trait: 'Shock studs: a bash stuns whoever it hits, but it recharges slowly and the shield is a little small.' },
+};
+export const isRiot = w => !!RIOT[w];
+// how far a riot shield (or BULWARK's) covers right now
+export const riotArc = (id, crouch, still) => { const R = RIOT[id]; return !R ? SHIELD_ARC : R.plant && crouch && still ? R.plant : R.arc; };
 export function defaultLoadout(op) {
   const L = LOADOUTS[op];
   return { primary: L.primaries[0], secondary: L.secondaries[0] || null, gadget: L.gadgets[0] };
@@ -306,10 +329,13 @@ export function cleanLoadout(op, l) {
   const L = LOADOUTS[op], d = defaultLoadout(op);
   if (!L || !l || typeof l !== 'object') return { ...d, att: {} };
   const att = {};
-  for (const w of [...L.primaries, ...L.secondaries]) if (l.att && l.att[w]) att[w] = cleanAtt(w, l.att[w]);
+  for (const w of [...L.primaries, ...L.secondaries]) if (WEAPONS[w] && l.att && l.att[w]) att[w] = cleanAtt(w, l.att[w]);
+  const primary = L.primaries.includes(l.primary) ? l.primary : d.primary;
+  let secondary = L.secondaries.includes(l.secondary) ? l.secondary : d.secondary;
+  if (RIOT[primary] && !(WEAPONS[secondary] && WEAPONS[secondary].cls === 'Pistol')) secondary = L.secondaries.find(w => WEAPONS[w].cls === 'Pistol') || secondary; // behind a shield: a pistol
   return {
-    primary: L.primaries.includes(l.primary) ? l.primary : d.primary,
-    secondary: L.secondaries.includes(l.secondary) ? l.secondary : d.secondary,
+    primary,
+    secondary,
     gadget: L.gadgets.includes(l.gadget) ? l.gadget : d.gadget,
     att,
   };
@@ -521,16 +547,16 @@ export const HEAD_AIM = 4.5;
 // Knocked aside by a melee hit (or a missed bash): no cover at all (off).
 export const SHIELD_ARC = 0.95;
 // aside: 0 = shield held in front, 1 = swung out of the way to aim (BULWARK holds aim-in: it glides there, he asked)
-export function shieldPose(gait, jogging, firing, knocked, aside = 0) {
+export function shieldPose(gait, jogging, firing, knocked, aside = 0, arc0 = SHIELD_ARC) {
   if (knocked) return { rot: 1.7, arc: 0.5, off: true };
   const s = firing ? 1 : Math.max(0, Math.min(1, aside));
-  if (s > 0) { const e = s * s * (3 - 2 * s); return { rot: -1.3 * e, arc: SHIELD_ARC + (0.55 - SHIELD_ARC) * e }; } // no jostling while it moves aside
+  if (s > 0) { const e = s * s * (3 - 2 * s); return { rot: -1.3 * e, arc: arc0 + (0.55 - arc0) * e }; } // no jostling while it moves aside
   if (jogging) { // jostled like something heavy (he asked: not a metronome): each footfall lurches it to one side fast, then it settles slowly
     const g = gait || 0, step = Math.floor(g / Math.PI), u = g / Math.PI - step, side = step % 2 ? -1 : 1;
     const lurch = u < 0.22 ? Math.sin(u / 0.22 * Math.PI / 2) : Math.exp(-(u - 0.22) * 4.2) * (1 - 0.18 * Math.sin((u - 0.22) * 14));
-    return { rot: side * lurch * 0.8 + Math.sin(g * 0.37) * 0.08, arc: 0.72 }; // about a third of each stride the front is open
+    return { rot: side * lurch * 0.8 + Math.sin(g * 0.37) * 0.08, arc: 0.72 * arc0 / SHIELD_ARC }; // about a third of each stride the front is open
   }
-  return { rot: 0, arc: SHIELD_ARC };
+  return { rot: 0, arc: arc0 };
 }
 export const onHead = (ax, ay, x, y) => ax === undefined || ax === null || Math.hypot(ax - x, ay - y) <= HEAD_AIM;
 

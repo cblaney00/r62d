@@ -502,7 +502,7 @@ export function botThink(game, p, dt) {
     if (gun && gun.ammo === 0) { game.startReload(p); if (d < 120 && p.guns[1] && p.slot === 0 && gun.reserve >= 0) game.event(p, { k: 'slot', n: 1 }); }
     // a shield facing us: circle round it and only shoot once its side shows (as people do)
     if (p.bracing && d < 32) { p.aim = Math.atan2(enemy.y - p.y, enemy.x - p.x); game.event(p, { k: 'melee' }); return; } // shield bash
-    if (p.bracing && Math.random() < dt * 0.8) inp.ability = 1; // now and then put the shield away to shoot
+    if (p.bracing && abId === 'brace' && Math.random() < dt * 0.8) inp.ability = 1; // now and then put the shield away to shoot (a riot shield stays up: aiming in swings it aside)
     if (!p.bracing && abId === 'brace' && d < 45 && Math.random() < dt) inp.ability = 1;
     const clear = shotClear(game, p, enemy);
     if (!clear && ai.react > 0) { // seen but not shootable (a shield or cover plate in the way, or a teammate): find an angle instead of wasting the magazine

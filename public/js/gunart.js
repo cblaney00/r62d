@@ -1,6 +1,6 @@
 // Side-view pictures of every gun, drawn in code, with their attachments fitted.
 // drawGunArt(ctx, weaponKey, attachments, x, y, w, h) fits the picture into the box.
-import { WEAPONS } from '/shared/operators.js';
+import { WEAPONS, RIOT } from '/shared/operators.js';
 
 // Each gun in a 100 x 40 drawing space: body colour, then the parts' sizes and styles.
 export const G = {
@@ -156,11 +156,30 @@ export function gunPicture(key, att, w = 200, h = 80) {
   let c = cache.get(id);
   if (!c) {
     c = document.createElement('canvas'); c.width = w * 2; c.height = h * 2;
-    const x = c.getContext('2d'); x.scale(2, 2); drawGunArt(x, key, att, 0, 0, w, h);
+    const x = c.getContext('2d'); x.scale(2, 2); if (RIOT[key]) drawRiotArt(x, key, w, h); else drawGunArt(x, key, att, 0, 0, w, h);
     cache.set(id, c);
   }
   const out = document.createElement('canvas'); out.width = c.width; out.height = c.height; out.className = 'gunpic';
   out.getContext('2d').drawImage(c, 0, 0);
   return out;
 }
-export const gunLabel = key => WEAPONS[key] ? WEAPONS[key].name : key;
+export const gunLabel = key => WEAPONS[key] ? WEAPONS[key].name : RIOT[key] ? RIOT[key].name : key;
+// a riot shield seen from the front, for the loadout cards: its shape, colour, rim and viewing slit
+function drawRiotArt(x, key, w, h) {
+  const R = RIOT[key], cx = w / 2, sh = h * 0.86, sw = sh * (0.42 + (R.arc - 0.78) * 0.55), top = (h - sh) / 2;
+  x.save(); x.translate(cx, top);
+  const body = () => { x.beginPath();
+    if (key === 'visor' || key === 'thorn') { x.moveTo(-sw / 2, sh * 0.08); x.quadraticCurveTo(0, -sh * 0.05, sw / 2, sh * 0.08); x.lineTo(sw / 2, sh * 0.72); x.quadraticCurveTo(0, sh * 1.02, -sw / 2, sh * 0.72); }
+    else { x.moveTo(-sw / 2 + 4, 0); x.lineTo(sw / 2 - 4, 0); x.quadraticCurveTo(sw / 2, 0, sw / 2, 4); x.lineTo(sw / 2, sh - 4); x.quadraticCurveTo(sw / 2, sh, sw / 2 - 4, sh); x.lineTo(-sw / 2 + 4, sh); x.quadraticCurveTo(-sw / 2, sh, -sw / 2, sh - 4); x.lineTo(-sw / 2, 4); x.quadraticCurveTo(-sw / 2, 0, -sw / 2 + 4, 0); }
+    x.closePath(); };
+  body(); x.fillStyle = R.col; x.fill(); x.lineWidth = 3; x.strokeStyle = R.rim; x.stroke();
+  const g = x.createLinearGradient(-sw / 2, 0, sw / 2, 0); g.addColorStop(0, 'rgba(255,255,255,0.12)'); g.addColorStop(0.5, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,0.25)');
+  body(); x.fillStyle = g; x.fill();
+  x.fillStyle = key === 'glass' ? 'rgba(255,255,255,0.35)' : '#8fd0f2'; x.fillRect(-sw * 0.3, sh * 0.16, sw * 0.6, sh * 0.07); // viewing slit
+  if (key === 'thorn') { x.fillStyle = R.rim; for (const [a, b] of [[-0.3, 0.45], [0.3, 0.45], [0, 0.62], [-0.3, 0.75], [0.3, 0.75]]) { x.beginPath(); x.arc(a * sw, b * sh, 2.4, 0, 7); x.fill(); } }
+  if (key === 'ram') { x.fillStyle = R.rim; x.fillRect(-sw / 2, sh * 0.82, sw, sh * 0.08); }
+  if (key === 'aegis') { x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = 1.2; for (const yy of [0.4, 0.62]) { x.beginPath(); x.moveTo(-sw / 2 + 3, yy * sh); x.lineTo(sw / 2 - 3, yy * sh); x.stroke(); } }
+  if (key === 'bastion') { x.fillStyle = 'rgba(0,0,0,0.4)'; x.fillRect(-sw / 2 - 5, sh * 0.25, 5, sh * 0.6); x.fillRect(sw / 2, sh * 0.25, 5, sh * 0.6); }
+  if (key === 'glass') { x.strokeStyle = 'rgba(255,255,255,0.5)'; x.lineWidth = 0.8; x.beginPath(); x.moveTo(sw * 0.1, sh * 0.5); x.lineTo(sw * 0.3, sh * 0.35); x.moveTo(sw * 0.1, sh * 0.5); x.lineTo(sw * 0.25, sh * 0.7); x.stroke(); }
+  x.restore();
+}

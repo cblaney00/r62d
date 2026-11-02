@@ -1,4 +1,5 @@
 // The Operators page: who each operator is, their gear choices (saved per player), and your stats with them.
+import { RIOT } from '/shared/operators.js';
 import { OPERATORS, WEAPONS, GADGETS, LOADOUTS, GADGET_COUNT, BIOS, JOBS, cleanLoadout, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
@@ -56,6 +57,7 @@ function render(el) {
 function bars(w) {
   const W = WEAPONS[w];
   const stat = (label, v) => `<div class="bar"><span>${label}</span><i><b style="width:${Math.max(4, Math.min(100, v))}%"></b></i></div>`;
+  const R = RIOT[w]; if (R) return stat('Cover', (R.plant || R.arc) / 1.45 * 100) + stat('Speed', (R.speed - 0.6) / 0.4 * 100) + stat('Swing aside', (0.6 - R.aside) / 0.5 * 100) + stat('Bash', R.bash / 0.45) + stat('Toughness', R.hp ? R.hp / 8 : 100); // a riot shield
   return stat('Damage', W.dmg * W.pellets / 1.2) + stat('Fire rate', W.rpm / 10) + stat('Magazine', W.mag / 0.8) +
     stat('Accuracy', 100 - W.ads * 1500) + stat('Range', W.range / 13);
 }
@@ -72,10 +74,10 @@ function fillDetail(d, k, anim, compact, force) {
   const pips = n => [1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('');
   const weaponCard = (w, slot) => `<button class="wcard ${cur[slot] === w ? 'on' : ''}" data-slot="${slot}" data-v="${w}">
       <div class="wpic" data-w="${w}"></div>
-      <div class="wn">${WEAPONS[w].name}<small>${CLASS_NAME[WEAPONS[w].cls]}</small></div><div class="wtip">${WEAPONS[w].trait || CLASS_TIP[WEAPONS[w].cls]}</div>${bars(w)}</button>`;
+      <div class="wn">${RIOT[w] ? RIOT[w].name : WEAPONS[w].name}<small>${RIOT[w] ? 'Riot shield + pistol' : CLASS_NAME[WEAPONS[w].cls]}</small></div><div class="wtip">${RIOT[w] ? RIOT[w].trait : WEAPONS[w].trait || CLASS_TIP[WEAPONS[w].cls]}</div>${bars(w)}</button>`;
   // attachments for the gun chosen in that slot: three rows of choices, each with what it does
   const attRows = slot => {
-    const w = cur[slot]; if (!w) return '';
+    const w = cur[slot]; if (!w || !WEAPONS[w]) return ''; // (a riot shield has no attachments)
     const a = cleanAtt(w, cur.att[w], k), opts = attachFor(w);
     return `<div class="atts" data-slot="${slot}"><div class="atthead">${WEAPONS[w].name} attachments</div>` + ATTACH_SLOTS.map(([s, label]) => `<div class="attrow"><span>${label}</span>` +
       opts[s].map(v => `<button class="att ${a[s] === v ? 'on' : ''}" data-w="${w}" data-s="${s}" data-v="${v}" title="${ATTACH[s][v].desc}">${ATTACH[s][v].short}</button>`).join('') +
@@ -113,7 +115,7 @@ function fillDetail(d, k, anim, compact, force) {
   }; };
   const pics = {}; // gun picture per card, redrawn only when that gun's attachments change
   const drawPics = () => { for (const p of d.querySelectorAll('.wpic')) {
-    const w = p.dataset.w, a = cleanAtt(w, cur.att[w], k), key = JSON.stringify(a);
+    const w = p.dataset.w, a = WEAPONS[w] ? cleanAtt(w, cur.att[w], k) : null, key = JSON.stringify(a);
     if (pics[w + p.closest('.wcard').dataset.slot] === key) continue;
     pics[w + p.closest('.wcard').dataset.slot] = key; p.replaceChildren(gunPicture(w, a, 270, 84));
   } };

@@ -6,33 +6,33 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] bots should know how and when to look at cameras, when it is safe to, when the risk of viewing your cameras is worth taking when enemies are nearby/approaching
 - [ ] consider removing features or UI things for the mobile version of the game, the two versions of the game should be updated alongside eachother and work as the same game but there should be a difference in how the game loads in when it knows what type of device is trying to play the game
-- [ ] the bots should understand two things, lining up so that one burst of bullets can kill multiple people is really stupid, it just happened in this desert map - also make sure bots on both defense and offtense understand the high value of space. If an attacker knows you dont take space and they can just sprint up the whole map then the clock is massively against you, make the adopt playstyles that favor tactical decision making and utility usage considering the clock at all times, if they can push up and not leave any objectives unprotected, the defenders should definitely play more spaced out
-- [ ] defense is pinging drones too frequently
-- [ ] i dont like that slow idle spinning that bots do when they dont know what to do, even pro bots do it and it looks bad
 - [ ] when you die you can rewatch your killcam and death perspective and the game will give you a BS rating on if the kill was fair and a "!" symbol when it found a bug that it will save the info about
-- [ ] the sites show always have at least 1 breakable wall between the two of them (unless the map is like a CS2 map)
-- [ ] we are stil having an issue with reviving not working. it happens all the time
-- [ ] i just saw one pro player try and shoot through the bomb to get the enemy on the other side of the bomb, both characters stood still while one of them just shot like 3 mags in a row unsuccesfully, this was in the Esport tv mode
-- [ ] defense is still just stacking on the top of stairs, im talking 4 people staring at the stairs, defenders are not defending windows, figure out why and if the fix is already in the to do list
-- [ ] maybe more windows into sites
-- [ ] make default loadout attachment selection for each character to save time if someone doesnt really care, if they change it then their change should overwrite the default, its just for starters
-- [ ] i found an issue with the aim, if i move my mouse slowly then the cursor doesnt even move at all, this would cause huge frustration from people with actually decent aim. make sure the cursor is very accurate to the mouse inputs (in progress: the desktop mouse was set to flat for this session; making it permanent needs vibe → "Change or fix something on your computer")
+- [ ] i found an issue with the aim, if i move my mouse slowly then the cursor doesnt even move at all, this would cause huge frustration from people with actually decent aim. make sure the cursor is very accurate to the mouse inputs (in progress: the desktop mouse was set to flat for this session; making it permanent needs vibe → "Change or fix something on your computer"; the game now also asks the browser for raw mouse movement)
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab.
-- [ ] one of the bots didn't click lock in when i played with lando on his vpn server
-- [ ] some of the view areas (seeable areas are jittering a lot at least during the bot gameplay)
-- [ ] the bots talk too much, only diamonds and above should be relied upon to talk about objectives, most ranks just ping for most things.
-- [ ] i think the pros practice too much, also "practising" is misspelled - pros should only do 200 rounds per update, that should usually be enough for them id think
-- [ ] a few characters should actually have a riot shield as their 3rd primary weapon option, the shield itself should work similarly to bulwarks but each character's shield should have its own personality and pros and cons, make sure to tests these characters out thouroughly with the pros to balance them and make them fun
-- [ ] make it more obvious when stairs are going upstairs or downstairs
-- [ ] halden and wisp just stood in the same spot doing nothing with no communication or exploration for over a minute in a pro match
+- [ ] a few characters should actually have a riot shield as their 3rd primary weapon option, the shield itself should work similarly to bulwarks but each character's shield should have its own personality and pros and cons, make sure to tests these characters out thouroughly with the pros to balance them and make them fun (in progress: 6 shields added — Onyx AEGIS WALL, Brisk VISOR, Hammer BATTERING RAM, Rampart BASTION, Solace GLASS GUARD, Wraith THORN; `node tests/riot.js` passes; still needs a longer balance run with `node tests/riotbalance.js 6`)
 - [ ] the autodirector still needs a massive overhaul, see if you can read up on what eports broadcasters do and how they decide what to focus on
-- [ ] dusty just improperly tried to hit a planked window and failed for a minute and a half
-- [ ] dusty's failure seems to be an issue with rampart
 
 ## Done
 
+- [x] Defender bots look through the cameras when it is quiet, or for a quick look when enemies are heard coming and nobody knows where; never with an enemy close. They spot what the cameras see.
+- [x] Bots never shoot when a teammate is in the line of fire and step off a teammate's line; one defender takes space in a room beside the site while two hold it; everyone watches the clock (attackers stop waiting and run late in the round, roamers come back).
+- [x] Audit's radar pings each drone once, then only again when it has moved on.
+- [x] No more slow spinning: bots (and parked drones) look at one doorway or angle, hold it, then snap to the next.
+- [x] Every site has a breakable wall between its two rooms (Harbor Office's 2F Boardroom / IT Room was solid).
+- [x] Reviving works: the downed person can no longer crawl out of reach mid-revive, and F next to a downed teammate revives instead of grabbing a rope.
+- [x] Bots no longer shoot at someone they can see but not hit (behind a deployable shield or cover): they move for an angle or throw a grenade.
+- [x] Found why: every pro defence plan had nearly everyone watch the same way in (often the stairs). Now each defender watches a different way in, windows included, and ordinary bots spread out too.
+- [x] Site rooms above ground get windows until they have two where one fits (a few sites have no outside wall to put one in).
+- [x] Every operator has a starter set of attachments (by gun type and role); changing one saves your choice instead.
+- [x] Bots always lock in (a role left over could make a bot's pick fail forever).
+- [x] Watched views (spectating, Esports TV) no longer jitter: bots' hands drift smoothly and the watched view cone is eased.
+- [x] Bots talk much less: below Diamond they mostly ping; Diamond and up talk about the objective; pros leave longer gaps.
+- [x] Pros practice 200 rounds per new version, not daily; "Practising" is now "Practicing".
+- [x] Stairs show chevrons along the steps (gold up, blue down) and a label at each end: "▲ UP TO 2F" / "▼ DOWN TO 1F".
+- [x] Pros waiting for the go move between spots round the stack and say how it looks; defenders shift angle every 20–30 s.
+- [x] Bots no longer swing at a boarded window forever: the swing could land on Rampart's deployable shield beside it and hit nothing. Fixed, and bots go another way if a swing can't reach.
+- [x] Yes, Rampart's deployable shield was it (see the item above). Defender bots also stop smashing their own panels and barricades.
 - [x] Defenders can walk outside any time: outside doors start open (windows stay boarded). A defender standing outside is shown to the attackers and told so.
 - [x] Glint's pulse reaches the floor above and below (a little less far than on its own floor).
 - [x] Talon's EMP: 3 a round, about 1 m wide, destroys every enemy gadget, blinds cameras 20 s, and fries the skill and gadget of defenders caught in it for 8 s (they're told).

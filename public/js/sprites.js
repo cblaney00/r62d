@@ -1,5 +1,5 @@
 // Top-down drawings of operators, drones, gadgets and the objective.
-import { OPERATORS, WEAPONS, bodyW } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, bodyW, RIOT } from '/shared/operators.js';
 import { shade } from './textures.js';
 import { G } from './gunart.js';
 import { HEADGEAR, PACK, VEST } from './headgear.js';
@@ -219,7 +219,7 @@ export function drawOperator(ctx, p, t) {
   if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean)); ctx.translate(0, L * 5.5); ctx.rotate(L * 0.14); } // arms, gun and head lean with the torso
 
   // ---- weapon & arms ----
-  const shield = id === 'brace' && p.brace, shieldBack = id === 'brace' && !p.brace;
+  const shield = (id === 'brace' || p.riot) && p.brace, shieldBack = id === 'brace' && !p.brace && !p.riot, R = RIOT[p.riot];
   const pistol = WEAPONS[p.w] && (WEAPONS[p.w].cls === 'Pistol' || WEAPONS[p.w].cls === 'MP');
   const rec = p.recoil || 0, mel = p.melee || 0, L = WEAPONS[p.w] ? WEAPONS[p.w].len : 12;
   ctx.save();
@@ -262,8 +262,9 @@ export function drawOperator(ctx, p, t) {
     ctx.save(); ctx.rotate(sp.rot); if (sp.off) ctx.globalAlpha *= 0.75;
     ctx.lineCap = 'butt';
     ctx.strokeStyle = OUT; ctx.lineWidth = 5.4; ctx.beginPath(); ctx.arc(-2, 0, 14, -arc, arc); ctx.stroke();
-    ctx.strokeStyle = '#22252a'; ctx.lineWidth = 4.4; ctx.beginPath(); ctx.arc(-2, 0, 14, -arc, arc); ctx.stroke();
-    ctx.strokeStyle = '#5a626b'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(-2, 0, 15.8, -arc, arc); ctx.stroke();
+    ctx.strokeStyle = R ? R.col : '#22252a'; ctx.lineWidth = R && R.plant && arc > R.arc ? 5.2 : 4.4; ctx.beginPath(); ctx.arc(-2, 0, 14, -arc, arc); ctx.stroke();
+    ctx.strokeStyle = R ? R.rim : '#5a626b'; ctx.lineWidth = R ? 1.3 : 0.9; ctx.beginPath(); ctx.arc(-2, 0, 15.8, -arc, arc); ctx.stroke();
+    if (R && R.stun) { ctx.fillStyle = R.rim; for (const a of [-0.5, 0, 0.5]) { ctx.beginPath(); ctx.arc(-2 + Math.cos(a * arc) * 16.6, Math.sin(a * arc) * 16.6, 1, 0, 7); ctx.fill(); } } // THORN's studs
     ctx.save(); ctx.rotate(-0.12); ctx.fillStyle = '#8fd0f2'; ctx.fillRect(11.3, -2, 1.6, 4); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(11.4, -1.8, 0.5, 1.5); ctx.restore();
     ctx.save(); ctx.rotate(0.5); ctx.fillStyle = '#d84a4a'; ctx.fillRect(11.2, -1, 2.2, 2); ctx.restore();
     ctx.restore();

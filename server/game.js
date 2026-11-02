@@ -3,7 +3,7 @@ import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOL
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
-import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep, assignPros, proSay } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
@@ -363,7 +363,8 @@ export class Game {
     p.alive = true; p.downed = false; p.maxHp = ARMOR_HP[o.armor]; p.hp = p.maxHp;
     const L = p.bot ? this.botLoadout(p.op) : store.loadout(p.token, p.op);
     p.loadout = L; p.gadget = L.gadget;
-    p.guns = [L.primary, L.secondary].filter(Boolean).map(w => {
+    p.riot = RIOT[L.primary] ? L.primary : null; p.riotBroken = false; p.riotHp = p.riot ? RIOT[p.riot].hp : 0; // a riot shield as the primary: held up in front, pistol behind it
+    p.guns = [p.riot ? null : L.primary, L.secondary].filter(Boolean).map(w => {
       const att = cleanAtt(w, L.att && L.att[w], p.op); // nothing chosen: the operator's starter set
       return { w, ammo: WEAPONS[w].mag, reserve: WEAPONS[w].reserve, att, m: gunMods(w, att) };
     });
@@ -471,7 +472,7 @@ export class Game {
     const o = OPERATORS[p.op] || { armor: 2 };
     let mul = 1;
     if (this.time < p.slowUntil) mul *= 0.45;
-    if (p.bracing) mul *= 0.82; // shield up: a little slower, never a crawl (he asked)
+    if (p.bracing) mul *= p.riot ? RIOT[p.riot].speed : 0.82; // shield up: a little slower, never a crawl (he asked); each riot shield its own
     if (p.prep) mul *= p.prep.mode === 'place' ? 0 : 0.6; // setting something down: still; winding up a throw: slowed
     if (p.scanning) mul *= 0.6;
     if (this.time < (p.boostUntil || 0)) mul *= 1.25; // Adrenal Shot
@@ -577,6 +578,7 @@ export class Game {
       if (inp.ability && !prev.ability && p.ctrl === 'body' && !p.downed && !(p.switchUntil > this.time)) { p.switchUntil = this.time + 0.6; p.shieldMode = p.shieldMode === 'shield' ? 'gun' : 'shield'; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); }
       p.bracing = p.shieldMode === 'shield' && !(p.switchUntil > this.time);
     }
+    if (p.riot) p.bracing = !p.riotBroken && !p.downed && p.ctrl === 'body' && !(p.switchUntil > this.time); // a riot shield is always up (until it cracks)
     if (op.ability.id === 'scan') {
       // a toggle (he asked): press to start, press again to stop; it stops by itself after 4 s or when the battery runs out
       const press = inp.ability && !p.scanIn; p.scanIn = !!inp.ability;
@@ -677,8 +679,9 @@ export class Game {
 
     // shooting
     // BULWARK (he asked): holding aim-in glides the shield aside over SHIELD_ASIDE s; he can only shoot once it is fully out of the way
-    if (p.bracing) p.aside = Math.max(0, Math.min(1, (p.aside || 0) + (p.input.ads ? dt / SHIELD_ASIDE : -dt / (SHIELD_ASIDE * 0.75)))); else p.aside = 0;
-    const canShoot = p.ctrl === "body" && !p.staged && !p.prep && !(p.bracing && p.aside < 1) && !p.busy && !p.vault && !(p.rope && p.rope.st !== 'hang') && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && gun &&
+    const asT = p.riot ? RIOT[p.riot].aside : SHIELD_ASIDE;
+    if (p.bracing) p.aside = Math.max(0, Math.min(1, (p.aside || 0) + (p.input.ads ? dt / asT : -dt / (asT * 0.75)))); else p.aside = 0;
+    const canShoot = p.ctrl === "body" && !p.staged && !p.prep && !(p.bracing && p.aside < 1 && !(p.riot && RIOT[p.riot].hip)) && !p.busy && !p.vault && !(p.rope && p.rope.st !== 'hang') && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && gun &&
       !(p.switchUntil > this.time) && !(p.staggerUntil > this.time);
     // a click made a hair before the gun is ready is kept until it is (up to 0.15 s), so fast tapping never loses a shot
     const click = p.click && !(this.time - (p.click.t ?? this.time) > 0.15) ? p.click : null; p.click = null;
@@ -818,10 +821,11 @@ export class Game {
     const ex = x0 + dx * stopT, ey = y0 + dy * stopT;
     if (best && best.q) {
       const q = best.q;
-      if (OPERATORS[q.op].ability.id === 'brace' && !q.downed && q.ctrl === 'body' && !(this.time < (q.shieldDownUntil || 0))) {
+      if (this.hasShield(q) && !q.downed && q.ctrl === 'body' && !(this.time < (q.shieldDownUntil || 0))) {
         const pose = this.shieldOf(q), off = Math.abs(angDiff(Math.atan2(y0 - q.y, x0 - q.x), q.aim + pose.rot)), switching = q.switchUntil > this.time;
-        if (!switching && (q.bracing ? off < pose.arc : Math.abs(angDiff(Math.atan2(y0 - q.y, x0 - q.x), q.aim)) > Math.PI - 0.8)) {
+        if (!switching && (q.bracing ? off < pose.arc : !q.riot && Math.abs(angDiff(Math.atan2(y0 - q.y, x0 - q.x), q.aim)) > Math.PI - 0.8)) {
           this.events.push({ e: 'hit', k: 'shield', x: r1(ex), y: r1(ey) });
+          if (q.riot && q.riotHp > 0 && (q.riotHp -= dmg) <= 0) { q.riotBroken = true; q.bracing = false; this.events.push({ e: 'snd', s: 'break', x: r1(q.x), y: r1(q.y) }); this.msg(`${q.name}'s shield cracked apart`, this.side(q)); } // GLASS GUARD
           return { x: ex, y: ey, k: 'shield' };
         }
       }
@@ -1055,7 +1059,8 @@ export class Game {
   }
 
   // the shield's pose right now (shieldPose in shared/operators.js); the drawing uses the same rule from the snapshot
-  shieldOf(q) { return shieldPose(q.gait, q.moving === 2, false, this.time < (q.shieldDownUntil || 0), q.aside || 0); }
+  shieldOf(q) { return shieldPose(q.gait, q.moving === 2, false, this.time < (q.shieldDownUntil || 0), q.aside || 0, riotArc(q.riot, q.input && q.input.crouch, !q.moving)); }
+  hasShield(q) { return OPERATORS[q.op].ability.id === 'brace' || (!!q.riot && !q.riotBroken); } // BULWARK, or a riot shield that hasn't cracked
 
   // ---------------- rappelling (he asked: attackers need a quicker way up; see addRopes in shared/map.js) ----------------
   // p.rope = { st: 'move' | 'hang', r: the window you hang at (-1 = none), from, to (-1 = the ground), t, dur, base }
@@ -1274,8 +1279,15 @@ export class Game {
     if (p.lungeUntil > this.time && this.time >= (p.lungeReady || 0) && !p.bracing && !p.rope) { this.lunge(p); return; }
     if (p.bracing) { // shield bash: staggers whoever it hits; a miss leaves the shield down for a while
       const q = [...this.players.values()].find(q => q.alive && q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 34 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.0);
-      if (q) { this.damage(q, 30, p, 'Shield Bash', p.aim); q.staggerUntil = this.time + 0.7; q.slowUntil = Math.max(q.slowUntil, this.time + 1); p.meleeCd = 0.8; }
-      else { p.meleeCd = 1.4; p.shieldDownUntil = this.time + 1.2; }
+      const R = RIOT[p.riot] || { bash: 30, stagger: 0.7, miss: 1.2 };
+      if (R.cd && this.time < (p.bashReady || 0)) { p.meleeCd = 0; return; } // THORN: the studs are still charging
+      if (q) { this.damage(q, R.bash, p, 'Shield Bash', p.aim); q.staggerUntil = this.time + R.stagger; q.slowUntil = Math.max(q.slowUntil, this.time + 1); if (R.stun) q.stunUntil = Math.max(q.stunUntil || 0, this.time + R.stun); if (R.cd) p.bashReady = this.time + R.cd; p.meleeCd = 0.8; }
+      else { // into a barricade or a wall: the shield's edge works like a swing (the RAM smashes a whole barricade at once)
+        const f = this.facingCell(p, 22);
+        if (f && f.t === T.BARRI) { for (let i = 0; i < (R.breaks ? 3 : 1); i++) if (this.map.tiles[f.k] === T.BARRI) this.barriHit(f.k); this.events.push({ e: 'hit', k: 'wood', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) }); p.meleeCd = 0.9; }
+        else if (f && f.t === T.SOFT) { this.damageCell(f.k, 25); this.events.push({ e: 'hit', k: 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) }); p.meleeCd = 0.9; }
+        else { p.meleeCd = 1.4; p.shieldDownUntil = this.time + R.miss; }
+      }
       return;
     }
     for (const q of this.players.values()) {
@@ -1283,7 +1295,7 @@ export class Game {
       const d = Math.hypot(q.x - p.x, q.y - p.y);
       if (d < 28 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.1 && los(this.map, p.x, p.y, q.x, q.y)) {
         // hitting a shield from the front knocks it aside for a moment instead of hurting
-        if (OPERATORS[q.op].ability.id === 'brace' && !q.downed && q.ctrl === 'body' && Math.abs(angDiff(Math.atan2(p.y - q.y, p.x - q.x), q.aim)) < 0.8 && !(this.time < (q.shieldDownUntil || 0))) {
+        if (this.hasShield(q) && !q.downed && q.ctrl === 'body' && Math.abs(angDiff(Math.atan2(p.y - q.y, p.x - q.x), q.aim)) < 0.8 && !(this.time < (q.shieldDownUntil || 0))) {
           q.shieldDownUntil = this.time + 1.0; p.meleeCd = 1.3; p.fireCd = Math.max(p.fireCd, 0.9); this.events.push({ e: 'hit', k: 'shield', x: r1(q.x), y: r1(q.y) }); this.events.push({ e: 'snd', s: 'panel', x: r1(q.x), y: r1(q.y) }); return;
         }
         this.damage(q, q.downed ? 999 : 55, p, 'Melee', p.aim); return;
@@ -1543,7 +1555,7 @@ export class Game {
     p.lungeUntil = 0; p.meleeCd = 1.0; p.lungeTarget = null;
     if (Math.hypot(x - p.x, y - p.y) > 4) p.vault = { x0: p.x, y0: p.y, x1: x, y1: y, t: 0, dur: 0.16 };
     if (!hit) return;
-    if (OPERATORS[hit.op].ability.id === 'brace' && !hit.downed && hit.ctrl === 'body' && Math.abs(angDiff(Math.atan2(p.y - hit.y, p.x - hit.x), hit.aim)) < 0.8) { // into the front of a shield: knocked aside, nobody downed
+    if (this.hasShield(hit) && !hit.downed && hit.ctrl === 'body' && Math.abs(angDiff(Math.atan2(p.y - hit.y, p.x - hit.x), hit.aim)) < 0.8) { // into the front of a shield: knocked aside, nobody downed
       hit.shieldDownUntil = this.time + 1.0; this.events.push({ e: 'hit', k: 'shield', x: r1(hit.x), y: r1(hit.y) }); return;
     }
     this.damage(hit, hit.downed ? 999 : hit.hp + 5, p, 'Lunge', p.aim); // enough to down (the last one standing goes down for good, as always)
@@ -2329,7 +2341,7 @@ export class Game {
   botLoadout(op) {
     const L = LOADOUTS[op], pick = a => a.length ? a[Math.floor(Math.random() * a.length)] : null;
     const l = { primary: pick(L.primaries), secondary: pick(L.secondaries), gadget: pick(L.gadgets), att: {} };
-    for (const w of [l.primary, l.secondary]) if (w) { const o = attachFor(w); l.att[w] = { barrel: pick(o.barrel), grip: pick(o.grip), sight: pick(o.sight) }; }
+    for (const w of [l.primary, l.secondary]) if (w && WEAPONS[w]) { const o = attachFor(w); l.att[w] = { barrel: pick(o.barrel), grip: pick(o.grip), sight: pick(o.sight) }; }
     return cleanLoadout(op, l);
   }
   statLine(p, left = false) {
@@ -2365,7 +2377,7 @@ export class Game {
         el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ct: p.ctrl,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
-        gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
+        gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
         aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,
