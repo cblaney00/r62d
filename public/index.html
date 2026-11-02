@@ -75,6 +75,8 @@
         <div class="tutPage">
           <h2>ESPORTS TV</h2>
           <p class="hint">Sit back and watch the pro teams, <b>Northwind</b> and <b>Ironclad Collective</b>, play a full match. The camera cuts to the action by itself; press 1-5 or 6-0 (or click a player) to follow someone, A to go back to the director, M for the map. When a match ends the next one starts on another map.</p>
+          <h4 class="freeH">LEAGUE</h4>
+          <div id="tvLeague"><button data-l="7">PRO LEAGUE</button><span class="hint">AMATEUR HOUR:</span><button data-l="0">Copper</button><button data-l="1">Bronze</button><button data-l="2">Silver</button><button data-l="3">Gold</button><button data-l="4">Platinum</button><button data-l="5">Diamond</button><button data-l="6">Champion</button></div>
           <h4 class="freeH">MAP</h4>
           <div id="tvMaps" class="mapRow"></div>
           <div class="row"><button id="tvGo" class="primary big">START WATCHING</button><span class="trainBox"><span class="trainInfo"></span><button class="trainBtn">TRAIN THE PROS</button></span></div>
@@ -139,7 +141,8 @@
     <div id="prompt"></div>
     <div id="progress"><div class="label"></div><div class="bar"><i></i></div></div>
     <div id="banner"><div class="t"></div><div class="s"></div></div>
-    <div id="siteFound" class="hidden"><div class="sfT">OBJECTIVE FOUND</div><div class="sfS"></div><canvas width="560" height="340"></canvas><div class="sfF"></div></div>
+    <div id="siteFound" class="hidden"><div class="sfT">OBJECTIVE FOUND</div><div class="sfF"></div><div class="sfY"></div><div class="sfS"></div><canvas width="300" height="180"></canvas></div>
+    <div id="allies" class="hidden"></div>
     <div id="viewlabel"></div>
     <div id="stairPip"><canvas></canvas><b></b></div>
     <div id="cambar"></div>

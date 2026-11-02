@@ -1,10 +1,11 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
-import { CELL, PHASE, T, MAT, PX_PER_M } from '/shared/constants.js';
+import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
+import { drawWebcam } from './webcam.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading } from './sprites.js';
@@ -232,7 +233,7 @@ function connect(mode = '') { // '' = the shared match, 'tut' / 'free' = a priva
     if (m.t === 'welcome') {
       if (st.tutorial) send({ t: 'tut', a: 'start', lesson: st.tutorial });
       if (st.free) send({ t: 'free', a: 'start', map: st.free.map, bots: st.free.bots, level: st.free.level });
-      if (st.tv) send({ t: 'tv', a: 'start', map: st.tv.map });
+      if (st.tv) send({ t: 'tv', a: 'start', map: st.tv.map, level: st.tv.level });
       st.id = m.id;
       if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
         resetMap(m.mapVersion);
@@ -268,7 +269,7 @@ $('coach').addEventListener('click', e => { if ((coach.blocking && !e.target.clo
 // free = { map, bots } for a free-play match (see the FREE PLAY page below)
 function switchMatch(lesson, free = null, tv = null) {
   if (!st.token) { setTab('play'); $('name').focus(); return; }
-  st.tutorial = lesson; st.free = free; st.tv = tv ? { map: tv.map, auto: true, follow: null, overview: false, cutT: 0, shot: {} } : null; st.rejoin = true; st.marks = [];
+  st.tutorial = lesson; st.free = free; st.tv = tv ? { map: tv.map, level: tv.level, auto: true, follow: null, overview: false, cutT: 0, shot: {} } : null; st.rejoin = true; st.marks = [];
   document.documentElement.classList.toggle('tv', !!tv);
   if (lesson) coach.start(lesson); else coach.stop();
   const leave = lesson ? 'Leave tutorial' : free ? 'Leave free play' : tv ? 'Leave Esports TV' : '';
@@ -279,8 +280,9 @@ function switchMatch(lesson, free = null, tv = null) {
 for (const b of document.querySelectorAll('[data-lesson]')) b.onclick = () => switchMatch(b.dataset.lesson);
 
 // ---------------- ESPORTS TV page: pick a map (or random), then watch ----------------
-const tvPick = { map: 'random' };
+const tvPick = { map: 'random', level: 7 };
 function renderTv() {
+  for (const b of $('tvLeague').querySelectorAll('button')) { b.classList.toggle('on', +b.dataset.l === tvPick.level); b.onclick = () => { audio.ui(); tvPick.level = +b.dataset.l; renderTv(); }; }
   const el = $('tvMaps');
   if (!el.children.length) for (const id of ['random', ...MAP_LIST]) {
     const b = document.createElement('button'); b.dataset.id = id;
@@ -303,7 +305,7 @@ function trainInfo() {
 }
 for (const b of document.querySelectorAll('.trainBtn')) b.onclick = () => { audio.ui(); fetch('/api/train', { method: 'POST' }).then(r => r.json()).then(r => { if (!r.running && r.why) for (const el of document.querySelectorAll('.trainInfo')) el.textContent = 'Can\'t train right now: ' + r.why + '.'; else trainInfo(); }); };
 setInterval(() => { if (!$('tab-tv').classList.contains('on') && $('playbookPage').classList.contains('hidden')) return; trainInfo(); }, 4000);
-$('tvGo').onclick = () => switchMatch(null, null, { map: tvPick.map === 'random' ? null : tvPick.map });
+$('tvGo').onclick = () => switchMatch(null, null, { map: tvPick.map === 'random' ? null : tvPick.map, level: tvPick.level });
 // ---------------- free play page ----------------
 // Pick a map and how many enemy bots, then play alone with no clock, switching operator with N / B.
 const freePick = { map: 'harbor', bots: 0, level: 2 };
@@ -973,7 +975,9 @@ function siteFound(s) {
   const fl = Math.max(0, floorAt(m, site.bombs[0].x, site.bombs[0].y)), F = m.floors[fl];
   const flNames = [...new Set(site.bombs.map(b => m.floors[Math.max(0, floorAt(m, b.x, b.y))].name))];
   box.querySelector('.sfS').textContent = site.bombs.map(b => `${b.id}: ${b.room}`).join('   ·   ');
-  box.querySelector('.sfF').textContent = `FLOOR ${flNames.join(' & ')}`;
+  box.querySelector('.sfF').textContent = `BOMB ON ${flNames.join(' & ')}`; // the floor first and biggest (he asked)
+  { const myF = st.me && st.me.a ? m.floors[Math.max(0, floorAt(m, st.pred.x, st.pred.y))] : null, bf = m.floors[fl];
+    box.querySelector('.sfY').textContent = !myF ? '' : myF === bf ? 'YOU ARE ON THIS FLOOR' : `YOU ARE ON ${myF.name} · ${m.floors.indexOf(bf) > m.floors.indexOf(myF) ? 'GO UP ▲' : 'GO DOWN ▼'}`; }
   // the floor plan: walls light, floors dark, the bomb rooms gold
   let x0 = m.W, y0 = m.H, x1 = 0, y1 = 0;
   for (let k = 0; k < m.tiles.length; k++) if (m.flAt[k] === fl && m.tiles[k] !== T.VOID && m.tiles[k] !== T.GROUND) { const x = k % m.W, y = (k / m.W) | 0; if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
@@ -993,15 +997,15 @@ function siteFound(s) {
   for (const b of site.bombs) {
     if (floorAt(m, b.x, b.y) !== fl) continue;
     const q = P(b.x, b.y);
-    g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(q.x, q.y, 14, 0, 7); g.fill(); g.lineWidth = 3; g.strokeStyle = '#000'; g.stroke();
-    g.fillStyle = '#000'; g.font = '800 18px Barlow Condensed, sans-serif'; g.fillText(b.id, q.x, q.y + 1);
+    g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(q.x, q.y, 9, 0, 7); g.fill(); g.lineWidth = 2; g.strokeStyle = '#000'; g.stroke();
+    g.fillStyle = '#000'; g.font = '800 12px Barlow Condensed, sans-serif'; g.fillText(b.id, q.x, q.y + 1);
   }
   const me = st.me;
   if (me && me.a && floorAt(m, st.pred.x, st.pred.y) === fl) { const q = P(st.pred.x, st.pred.y); g.fillStyle = '#3aa0ff'; g.beginPath(); g.arc(q.x, q.y, 6, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); g.font = '700 13px Barlow Condensed, sans-serif'; g.fillStyle = '#fff'; g.fillText('YOU', q.x, q.y - 14); }
   g.textBaseline = 'alphabetic';
   box.classList.remove('hidden', 'out'); void box.offsetWidth; box.classList.add('show');
   audio.ui('level');
-  clearTimeout(st.foundT); st.foundT = setTimeout(() => { box.classList.add('out'); setTimeout(() => box.classList.add('hidden'), 600); }, 6000);
+  clearTimeout(st.foundT); st.foundT = setTimeout(() => { box.classList.add('out'); setTimeout(() => box.classList.add('hidden'), 600); }, 3500); // shorter (he asked)
 }
 
 // Compass to the bomb site (he asked): once the objective is found (defenders always know it), a dial under the score
@@ -1038,10 +1042,22 @@ function compassRoute(s, from) {
   }
   return { cell: path[Math.min(path.length - 1, 10)], cells: path.length };
 }
+// where your teammates are, in words (he asked): name, room and floor, updated a few times a second
+function drawAllies(s, me, now) {
+  const box = $('allies'), show = s && me && st.id && !st.tv && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION) && st.map;
+  box.classList.toggle('hidden', !show); if (!show || now - (st.alT || 0) < 0.4) return; st.alT = now;
+  const mates = s.players.filter(p => p.sq === me.sq && p.id !== st.id);
+  const h = mates.map(p => { const o = OPERATORS[p.op]; let where = 'waiting at spawn';
+    if (!p.a) where = 'dead'; else if (p.x !== undefined) { const fl = floorAt(st.map, p.x, p.y), F = st.map.floors[Math.max(0, fl)]; where = (roomAt(st.map, p.x, p.y) || 'outside') + (st.map.floors.length > 1 ? ' · ' + F.name : ''); }
+    if (p.ct === 'drone') where += ' (on drone)'; else if (p.ct === 'cam') where += ' (on cams)';
+    return `<div class="${p.a ? (p.dn ? 'dn' : '') : 'dead'}"><b>${esc(p.n.replace(/^\[\w+\] /, ''))}</b> <i>${o ? esc(o.name) : ''}</i> <span>${esc(where)}</span></div>`; }).join('');
+  if (box.innerHTML !== h) box.innerHTML = h;
+}
 function drawCompass(s, me, now) {
   const box = $('compass');
   const show = fxOn('compass') && s && me && me.a && s.ph === PHASE.ACTION && (me.tm === 'def' || s.rev) && !st.tutorialHideCompass && st.map && st.map.sites[s.site];
   box.classList.toggle('hidden', !show);
+  st.cmpDir = null;
   if (!show) return;
   const from = { x: st.pred.x, y: st.pred.y };
   if (!st.cmp || now - st.cmp.t > 0.35 || Math.hypot(from.x - st.cmp.x, from.y - st.cmp.y) > CELL * 2) st.cmp = { t: now, x: from.x, y: from.y, r: compassRoute(s, from) };
@@ -1055,7 +1071,7 @@ function drawCompass(s, me, now) {
   else if (r.here) { text = 'ON SITE'; g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(48, 48, 9, 0, 7); g.fill(); }
   else {
     const k = r.aim ?? r.cell, tx = (k % st.map.W + 0.5) * CELL, ty = (Math.floor(k / st.map.W) + 0.5) * CELL;
-    const a = Math.atan2(ty - from.y, tx - from.x) + (st.rot || 0);
+    const a = Math.atan2(ty - from.y, tx - from.x) + (st.rot || 0); st.cmpDir = a - (st.rot || 0); // also a small arrow by your character (he asked)
     g.save(); g.translate(48, 48); g.rotate(a);
     g.fillStyle = '#f2c14e'; g.strokeStyle = '#000'; g.lineWidth = 2.5;
     g.beginPath(); g.moveTo(34, 0); g.lineTo(-10, -15); g.lineTo(-3, 0); g.lineTo(-10, 15); g.closePath(); g.stroke(); g.fill();
@@ -1342,7 +1358,7 @@ function frame(nowMs) {
   revealSeen(); t1 = pfa('viewers', t1);
   bodySounds(me, dt);
   draw(s, view, now, dt); ctx = ctx0;
-  drawCompass(st.last, st.me, now);
+  drawCompass(st.last, st.me, now); drawAllies(st.last, st.me, now);
   drawStairPip(s, me, now); pfa('total', T0);
   watchPerf(rawGap, performance.now() - T0);
 }
@@ -1709,7 +1725,13 @@ function draw(s, view, now, dt) {
     }
     // Silent Shroud: drones and cameras can't see her, only eyes can
     const vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
-    if (!vis) continue;
+    if (st.tv) (st.tvPos || (st.tvPos = new Map())).set(p.id, { x: p.x, y: p.y, p });
+    if (!vis) { // ESPORTS TV (he asked): everyone's outline shows through walls; only the followed player's sight is live
+      if (st.tv && !p.dn && p.x !== undefined) { const col = p.sq ? '255,138,61' : '70,168,255';
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ag || 0); ctx.strokeStyle = `rgba(${col},0.9)`; ctx.lineWidth = 1.2; ctx.fillStyle = `rgba(${col},0.14)`;
+        ctx.beginPath(); ctx.ellipse(0, 0, 7.5, 10, 0, 0, 7); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(17, 0); ctx.stroke(); ctx.restore(); }
+      continue;
+    }
     // up on furniture or mid-jump (he asked: an obvious but tidy marker): a shadow below, a dashed ring, drawn a little bigger
     const elv = isMe ? (st.pred.air > 0 ? 2 : st.pred.up ? 1 : 0) : p.el || 0;
     if (elv) { ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 5, 11, 9, 0, 0, 7); ctx.fill();
@@ -1881,6 +1903,7 @@ function draw(s, view, now, dt) {
   if (me && me.a && me.dn) { ctx.fillStyle = 'rgba(90,0,0,0.25)'; ctx.fillRect(0, 0, VW, VH); }
   const fl = st.flashUntil - now;
   if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(1, fl / 1.2)})`; ctx.fillRect(0, 0, VW, VH); }
+  if (st.tv && inGame) tvBubbles(now);
   if (inGame && me && me.a && me.ct === 'body' && !me.br) crosshair(me, now);
   else if (inGame) { // drone / camera / spectating: a clear reticle (he asked: the old dot was too hard to see)
     const c = cursor(), r = 10 * DPR, t = 6 * DPR;
@@ -1894,6 +1917,19 @@ function draw(s, view, now, dt) {
   if (inGame && padOn && aimMode === 'pad' && !gpRecent() && !menuOpen()) aimPad();
 }
 
+// ESPORTS TV: what a player says floats above them for a few seconds, on a solid dark card in their own colour (he asked)
+function tvBubbles(now) {
+  const t = performance.now() / 1000;
+  for (const [id, said] of st.tvSay || []) {
+    const age = t - said.t, q = st.tvPos && st.tvPos.get(id); if (age > 4.5 || !q || q.x === undefined) continue;
+    const P = w2s(q.x, q.y), a = Math.min(1, (4.5 - age) / 0.6), txt = said.text.length > 60 ? said.text.slice(0, 58) + '…' : said.text;
+    ctx.save(); ctx.globalAlpha = a; ctx.font = `700 ${15 * DPR}px Barlow Condensed, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const w = ctx.measureText(txt).width + 16 * DPR, h = 24 * DPR, x = P.x, y = P.y - 38 * DPR - Math.min(1, age * 6) * 4 * DPR;
+    ctx.fillStyle = 'rgba(8,10,14,0.92)'; ctx.strokeStyle = sayCol(q.p); ctx.lineWidth = 2 * DPR;
+    ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, 6 * DPR); ctx.moveTo(x - 5 * DPR, y + h / 2); ctx.lineTo(x, y + h / 2 + 7 * DPR); ctx.lineTo(x + 5 * DPR, y + h / 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = sayCol(q.p); ctx.fillText(txt, x, y + DPR); ctx.restore();
+  }
+}
 // where a teammate died: a red cross with their name, shown through walls and kept at the screen edge (he asked for
 // these to be obvious now that you no longer see through teammates' eyes); pulses for the first few seconds.
 // Someone who died on another floor shows at the same spot of the building on yours, with ▲ / ▼.
@@ -1992,6 +2028,11 @@ function crosshair(me, now) {
   const cone = w ? spreadCone(w, gm, { at: me.at || 0, run, crouch: !!me.cr, shots: gunHeat(me, w, now) }) : 0;
   const spread = xh.dynamic ? Math.tan(cone) * Math.hypot(m.x - px, m.y - py) / DPR : 0;
   // aiming in: each enemy you can see shows the zone your crosshair must be on for a headshot; it lights red when it is
+  if (st.cmpDir != null) { // a discreet gold chevron at your feet pointing the way to the stairs / bomb site
+    const a = st.cmpDir + (st.rot || 0), r = 30 * DPR, cx0 = P0.x + Math.cos(a) * r, cy0 = P0.y + Math.sin(a) * r;
+    ctx.save(); ctx.translate(cx0, cy0); ctx.rotate(a); ctx.globalAlpha = 0.75; ctx.fillStyle = '#f2c14e'; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 1.5 * DPR;
+    ctx.beginPath(); ctx.moveTo(6 * DPR, 0); ctx.lineTo(-3 * DPR, -5 * DPR); ctx.lineTo(-1 * DPR, 0); ctx.lineTo(-3 * DPR, 5 * DPR); ctx.closePath(); ctx.stroke(); ctx.fill(); ctx.restore();
+  }
   if (me.at > 0.05 && me.ct === 'body' && fxOn('sight')) sightLook(attFromCode(me.aa).sight, x, y, Math.min(1, me.at));
   if (me.ad && st.heads) for (const h of st.heads) {
     const H = w2s(h.x, h.y), r = Math.max(2.5 * DPR, HEAD_AIM * (st.zoom || 1)), on = Math.hypot(x - H.x, y - H.y) <= r;
@@ -2193,7 +2234,7 @@ function hud(s) {
   }
   if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone', badge: st.tBadge || {} }); }
 }
-function setHTML(id, h) { const el = $(id); if (el.innerHTML !== h) el.innerHTML = h; }
+function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!el) return; if (el.innerHTML !== h) el.innerHTML = h; }
 
 function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;
@@ -2749,15 +2790,32 @@ function tvKey(e) {
   if (e.code === 'KeyM') { audio.ui(); st.tv.overview = !st.tv.overview; return true; }
   return false;
 }
+// the colour a player "speaks" in (he asked: thematic per character): their operator's own hue, kept bright enough to read
+const OP_HUE = op => { let h = 0; for (const c of String(op)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const sayCol = p => `hsl(${OP_HUE(p.op)}, 85%, 68%)`;
 function tvHud(s) {
-  const card = p => { const o = OPERATORS[p.op], hp = p.a ? Math.max(0, p.hp || 0) / (p.mhp || 100) : 0, on = p.id === st.tv.follow;
-    return `<button class="tvCard ${p.a ? '' : 'dead'} ${p.dn ? 'down' : ''} ${on ? 'on' : ''}" data-id="${p.id}"><b>${esc(p.n.replace(/^\[\w+\] /, ''))}${p.df ? ' <em>◆</em>' : ''}</b><span>${o ? esc(o.name) : '—'}</span><i style="width:${Math.round(hp * 100)}%"></i></button>`; };
+  const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL, now = performance.now() / 1000;
   for (const sq of [0, 1]) { const T = PRO_TEAMS[sq], el = $(sq ? 'tvR' : 'tvL');
-    const h = `<div class="tvTeam" style="--tc:${T.colour}">[${T.tag}] ${esc(T.name)}<small>${s.sc[sq]} · ${s.round || s.rd ? (s.players.find(p => p.sq === sq)?.tm === 'atk' ? 'ATTACK' : 'DEFENCE') : ''}</small></div>` + s.players.filter(p => p.sq === sq).map(card).join('');
-    if (el.innerHTML !== h) { el.innerHTML = h; for (const b of el.querySelectorAll('.tvCard')) b.onclick = () => { audio.ui(); tvFollow(b.dataset.id); }; } }
+    const name = pro ? `[${T.tag}] ${esc(T.name)}` : `${sq ? 'ORANGE' : 'BLUE'} · ${esc(RANKS[s.tvl] || '').toUpperCase()} LOBBY`, colour = pro ? T.colour : sq ? '#ff8a3d' : '#46a8ff';
+    const head = `<div class="tvTeam" style="--tc:${colour}">${name}<small>${s.sc[sq]} · ${s.round || s.rd ? (s.players.find(p => p.sq === sq)?.tm === 'atk' ? 'ATTACK' : 'DEFENCE') : ''}</small></div>`;
+    const list = s.players.filter(p => p.sq === sq), key = list.map(p => p.id).join(',') + pro;
+    if (el.dataset.k !== key) { // build the cards once per line-up; after that only their contents change (the webcams keep running)
+      el.dataset.k = key;
+      el.innerHTML = '<div class="tvHead"></div>' + list.map(p => `<button class="tvCard" data-id="${p.id}"><canvas class="tvCam" width="72" height="54"></canvas><div><b></b><span></span></div><i></i></button>`).join('');
+      for (const b of el.querySelectorAll('.tvCard')) b.onclick = () => { audio.ui(); tvFollow(b.dataset.id); };
+    }
+    setHTML(el.querySelector('.tvHead'), head);
+    for (const p of list) { const b = el.querySelector(`[data-id="${p.id}"]`); if (!b) continue; const o = OPERATORS[p.op], hp = p.a ? Math.max(0, p.hp || 0) / (p.mhp || 100) : 0;
+      b.className = `tvCard ${p.a ? '' : 'dead'} ${p.dn ? 'down' : ''} ${p.id === st.tv.follow ? 'on' : ''}`;
+      setHTML(b.querySelector('b'), `${esc(p.n.replace(/^\[\w+\] /, ''))}${p.df ? ' <em>◆</em>' : ''}`); setHTML(b.querySelector('span'), o ? esc(o.name) : '—'); b.querySelector('i').style.width = Math.round(hp * 100) + '%';
+      b.querySelector('b').style.color = sayCol(p);
+      const said = st.tvSay && st.tvSay.get(p.id), cv = b.querySelector('canvas');
+      if (now - (cv._t || 0) > 0.07) { cv._t = now; drawWebcam(cv, { name: p.n, pro, colour, talking: !!said && now - said.t < 2.5, dead: !p.a, down: p.dn }, now); }
+    } }
   setHTML('tvHelp', `${st.tv.overview ? 'MAP OVERVIEW' : st.tv.auto ? 'AUTO DIRECTOR' : 'FOLLOWING'} · 1-5 / 6-0 follow a player · A director ${st.tv.auto ? 'off' : 'on'} · M map · Esc menu`);
 }
 function addChat(m) {
+  if (st.tv && m.from) (st.tvSay || (st.tvSay = new Map())).set(m.from, { text: m.text, t: performance.now() / 1000 }); // spoken from the character (he asked)
   if (st.tv && m.squad !== undefined) { // ESPORTS TV: the team's comms, live, under that team's player cards
     const el = $(m.squad ? 'tvCommsR' : 'tvCommsL'); if (!el) return;
     const d = document.createElement('div'); d.innerHTML = `<b>${esc(m.name.replace(/^\[\w+\] /, ''))}</b> ${esc(m.text)}`; el.appendChild(d);

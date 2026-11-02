@@ -9,7 +9,6 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] bots should know how and when to look at cameras, when it is safe to, when the risk of viewing your cameras is worth taking when enemies are nearby/approaching
 - [ ] onyx's ability should give an solid audio warning, maybe a second before it activates and it should activate 3 times with the final blast being slightly larger than the first two
 - [ ] volt's laser's strength is really its stealth so make sure it's a quiet noise that cant be heard too closely, unless you are half a room away (average distance, dont take me literally) you shouldnt be able to hear it unless you really focus, and at a certain point it would just be silent
-- [ ] make the operator's utility more detailed so one can tell what it is by looking at it and not having to ping it to see what it is necesarily
 - [ ] talon is going to need to get a buff, emp grenades are sort of on the strength of regular utility so its not very viable
 - [ ] enhance the animation to have each character's abilities more character, also make it necessary to take time to set up certain abilities, especially ones that are being placed in a location. There will be a difference between placed and thrown utility, being able to throw utlity is pretty strong, so the utility that is thrown either needs to be less valuable or there needs to be some other way to reverse-make up for it
 - [ ] torque's saws should go straight through wooden planks and make hole the size of the saw but doesnt do damage to the door aside from that
@@ -21,20 +20,13 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] glint cannot sonar pulse up stairs
 - [ ] im not sure how lens periscope works, make sure it's more intuitive and it will say when periscoping is not possible when you try in a forbidden place
 - [ ] trench's cover needs to be thinner, vaultable, and able to be placed at an angle close to one another if the player wants
-- [ ] there should be a minimap that shows where your allies in the map in text form
 - [ ] consider removing features or UI things for the mobile version of the game, the two versions of the game should be updated alongside eachother and work as the same game but there should be a difference in how the game loads in when it knows what type of device is trying to play the game
 - [ ] ferro's hammer should have a decent sized downtime, also he shouldnt be ableto break soft walls with his hammer, only door and window barracades instantly. also make sure that other characters have a balanced amount of ability to break soft walls, it really shouldnt be every character that can do that without a breach charge or grenade
-- [ ] make sure that in the esport tv section the viewer can see the outlines of all players no matter the team but you have it right that the vision should only be on the currently viewed character
 - [ ] the bots should understand two things, lining up so that one burst of bullets can kill multiple people is really stupid, it just happened in this desert map - also make sure bots on both defense and offtense understand the high value of space. If an attacker knows you dont take space and they can just sprint up the whole map then the clock is massively against you, make the adopt playstyles that favor tactical decision making and utility usage considering the clock at all times, if they can push up and not leave any objectives unprotected, the defenders should definitely play more spaced out
-- [ ] make esports tv text a little bigger and coming from the characters in opaque text that is still easily legible in any environment and colored thematically with the players character
 - [ ] defense is pinging drones too frequently
 - [ ] the defenders cannot exit the building before the preparation phase ends, its like an invisible sheild (realism breaking but dont worry about it)
-- [ ] there should also be a mode titled "amateur hour" (make sure thats spelled right) and it should be exactly like pro league but scaled for the bots skill level (copper and bronze should be comedically bad at communicating, one could literally be rapping or singing the whole round or arguing with their mom on open mic)
 - [ ] i dont like that slow idle spinning that bots do when they dont know what to do, even pro bots do it and it looks bad
-- [ ] make esport tv and amatuer hour have little boxes that show the webcam for the players (the noobs should looks like and the pros should look like chads but each pro keeps their look and has a pro profile under the pro biographies
-- [ ] the pros should have different names than the noob bots you play with in the play mode
 - [ ] when you die you can rewatch your killcam and death perspective and the game will give you a BS rating on if the kill was fair and a "!" symbol when it found a bug that it will save the info about
-- [ ] friendly cameras should have a green dot and enemy ones should have a red one
 - [ ] the sites show always have at least 1 breakable wall between the two of them (unless the map is like a CS2 map)
 - [ ] bulwark's headshot hitbox is much smaller than everyone else's and can only be hit if his shield doesnt block it
 - [ ] there should be an alarm that plays when the bom is being defused that isn't completely audio overpowering but is persistent and can make it a little harder to hear, look at what r6 alarm is like when the bomb is being defused
@@ -43,13 +35,21 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] defense is still just stacking on the top of stairs, im talking 4 people staring at the stairs, defenders are not defending windows, figure out why and if the fix is already in the to do list
 - [ ] maybe more windows into sites
 - [ ] make default loadout attachment selection for each character to save time if someone doesnt really care, if they change it then their change should overwrite the default, its just for starters
-- [ ] the map hint screen blocks the entire screen and is on the screen too long, it should also be a bit opaque and should have an emphasis on which floor the bomb is on. there should also always be an arrow somewhere discreet that always shows you how to get to the stairs to get to the bomb
 - [ ] i found an issue with the aim, if i move my mouse slowly then the cursor doesnt even move at all, this would cause huge frustration from people with actually decent aim. make sure the cursor is very accurate to the mouse inputs
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab.
 - [ ] one of the bots didn't click lock in when i played with lando on his vpn server
 
 ## Done
 
+- [x] Teammates in words: a small list on the left shows each teammate, their operator and the room and floor they are in (or dead, downed, on a drone, on cams).
+- [x] The OBJECTIVE FOUND card is small, see-through, near the top and gone in 3.5 s; BOMB ON <floor> is the biggest line, with YOU ARE ON … GO UP/DOWN under it. A small gold arrow by your feet always points the way to the stairs / bomb site.
+- [x] Camera lights: your team's cameras blink green, the enemy's red (blue when knocked out).
+- [x] Every gadget is drawn a little bigger and wears a small symbol badge in its team's colour (claymore triangle, paint drop, barbed zigzag, radar, bell, gear, eye…), so you can tell what it is without pinging it.
+- [x] Esports TV: what a player says floats above them on a solid dark card in their own colour, and the side comms are bigger and solid.
+- [x] Esports TV: everyone's outline (team-coloured, with the way they face) shows through walls; only the followed player's sight is live.
+- [x] Every player card on the broadcast has a live drawn webcam: pros look sharp (headset, team jersey, studio light), everyday bots look like they're at home (messy hair, crooked glasses, crisps, a lamp). Each keeps the same face, and the Playbook's pro profiles show it too.
+- [x] AMATEUR HOUR: on the Esports TV tab pick a league: PRO LEAGUE or AMATEUR HOUR at any rank from Copper to Champion. The bots play at that rank and talk like it: Copper and Bronze each have a bit (singing, rapping, arguing with their mum, open mic, lost), Silver and Gold make basic calls, Platinum and up call like a team.
+- [x] Everyday bots have their own names (Dusty, Pickles, Gerald, Noodle, Biscuit…), never a pro's or a gun's.
 - [x] Each gun sets its own walking (Shift) and aiming-in speed: pistols and machine pistols quickest, then SMGs, shotguns, rifles, marksman rifles, LMGs slowest. Aiming in while holding Shift moves at the aiming speed (no extra benefit). How loud your steps are follows how fast you actually move: walking and crouching silent, moving while aiming in faint, jogging loud.
 - [x] Free play: O opens the free play menu (operators, add bots/dummies, and switches for GOD MODE and BOTS SHOOT). Settings moved to F1 so O isn't shared.
 - [x] New keys: Q / E lean left / right (hold), F use, 1/2/3 primary/secondary/melee (or the wheel), 4 skill, G gadget. Space jumps: you can jump up onto low furniture (walk off to get down); windows and wall stubs are still vaulted. Someone up on furniture or mid-jump has a shadow and a dashed ring and is drawn a little bigger; shots fired mid-jump spray wide; landing makes a thump. Everyone's keys switch to the new layout once.

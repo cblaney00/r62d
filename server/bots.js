@@ -367,6 +367,7 @@ function roamSpot(game, p) {
 }
 
 export function botThink(game, p, dt) {
+  amateurComms(game, p, dt);
   const ai = p.ai;
   const inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
   p.input = inp;
@@ -838,6 +839,29 @@ const ROTATE_DELAY = { Halden: 4, Grit: Infinity }; // slow to rotate; never rot
 // repeated by a teammate, and they only say what they actually saw, heard or know.
 const place = (game, x, y) => { const r = roomAt(game.map, x, y); return r ? r.replace(/^\dF /, '') : 'outside'; };
 const opName = q => (OPERATORS[q.op] ? OPERATORS[q.op].name[0] + OPERATORS[q.op].name.slice(1).toLowerCase() : 'someone');
+// AMATEUR HOUR (he asked): the everyday bots on a broadcast talk too, scaled to their rank. Copper and Bronze are
+// comically bad on comms: each has a "bit" for the match (singing, arguing with family, an open mic, lost); Silver and
+// Gold make basic and sometimes wrong calls; Platinum and up sound like a team. All lines are our own.
+const BITS = {
+  singer: ['♪ my drone goes vroom, vroom in the room ♪', '♪ oh the stairs, the stairs, nobody cares ♪', '♪ reinforce my heart, baby, breach charge me apart ♪', '♪ la la la, defuser, la ♪', '♪ (humming loudly) ♪', '♪ I got a barricade and a dream ♪'],
+  rapper: ['yo, I\'m on the floor, kicking down the door, don\'t know the score, still want some more', 'mic check, one two, drone check, where are you', 'they call me the breacher, softest walls teacher', 'bars on bars, also there\'s someone in the bathroom maybe'],
+  mom: ['MUM I\'M IN A ROUND', 'no I can\'t take the bins out, it\'s round three', 'five more minutes! FIVE!', 'she says dinner\'s ready, cover me', 'I DID tidy it. I did. guys she\'s in the room', 'MUM that\'s my headset cable'],
+  mic: ['*heavy breathing*', '*crunching crisps*', '*keyboard noises*', 'can you guys hear me? hello? hellooo?', '*a dog barking*', 'wait was my mic on this whole time'],
+  lost: ['which button is crouch again', 'where is the bomb, is it the red thing', 'I think they\'re… somewhere?', 'why is everything grey', 'is the drone supposed to be upside down', 'I just shot my own camera, is that bad'],
+};
+const BIT_KEYS = Object.keys(BITS);
+const MID = ['one on the stairs I think', 'where\'s the bomb again?', 'nice shot!', 'sorry, my bad', 'I heard something', 'pushing!', 'someone help me', 'is anyone watching cams?', 'they\'re coming from… left? my left'];
+const HIGH = ['two in {room}', 'droning {room}, looks clear', 'I\'ll hold this angle', 'going in, follow me', 'heard steps above', 'one down, keep pushing', 'watch the window'];
+export function amateurComms(game, p, dt) {
+  if (!game.tv || p.pro || game.phase === PHASE.SELECT || game.phase === PHASE.LOBBY) return;
+  const lv = lvlOf(game, p), ai = p.ai || (p.ai = {});
+  p.chatT = (p.chatT ?? (2 + Math.random() * 6)) - dt; if (p.chatT > 0) return;
+  let text;
+  if (lv <= 1) { const bit = p.bit || (p.bit = BIT_KEYS[(+p.id.slice(1) * 7 + game.round) % BIT_KEYS.length]); const L = BITS[bit]; text = L[Math.floor(Math.random() * L.length)]; p.chatT = 8 + Math.random() * 9; }
+  else if (lv <= 3) { text = MID[Math.floor(Math.random() * MID.length)]; p.chatT = 9 + Math.random() * 10; }
+  else { text = HIGH[Math.floor(Math.random() * HIGH.length)].replace('{room}', place(game, p.x, p.y) || 'there'); p.chatT = 10 + Math.random() * 10; }
+  game.chat(p, { text: text.slice(0, 140), team: true });
+}
 export function proSay(game, p, text, key, prio = false) {
   if (!p || !p.pro) return;
   const t = game.time, team = (game.proSaid || (game.proSaid = {}))[p.squad] || (game.proSaid[p.squad] = { keys: {}, last: 0 });

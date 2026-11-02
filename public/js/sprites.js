@@ -344,6 +344,12 @@ export function drawDrone(ctx, d, t, ally) {
   ctx.restore();
 }
 
+function camDot(ctx, x, y, r, off, ally, t) {
+  const on = Math.floor(t * 1.2) % 2;
+  ctx.fillStyle = off ? 'rgba(80,110,255,0.85)' : ally ? (on ? '#46ff7a' : '#1f8a3f') : (on ? '#ff3a30' : '#7a1610');
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  if (!off) { ctx.fillStyle = ally ? 'rgba(70,255,120,0.25)' : 'rgba(255,58,48,0.25)'; ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, 7); ctx.fill(); }
+}
 export function drawCam(ctx, c, t, ally) {
   if (c.wn !== undefined) return drawWallCam(ctx, c, t, ally);
   ctx.save(); ctx.translate(c.x, c.y);
@@ -359,7 +365,7 @@ export function drawCam(ctx, c, t, ally) {
       ctx.strokeStyle = '#2a2d31'; ctx.lineWidth = 0.6; ctx.stroke();
     } else { ctx.fillStyle = '#d7d9db'; ctx.beginPath(); ctx.arc(0, 0, 4.4, 0, 7); ctx.fill(); }
     ctx.fillStyle = '#1b1d20'; ctx.beginPath(); ctx.arc(0, 0, 2.8, 0, 7); ctx.fill();
-    ctx.fillStyle = c.off ? '#4060ff' : (Math.floor(t * 2) % 2 ? '#ff3030' : '#601010'); ctx.beginPath(); ctx.arc(2.6, -2.6, 0.9, 0, 7); ctx.fill();
+    camDot(ctx, 2.6, -2.6, 1.1, c.off, ally, t); // green = your team's, red = the enemy's (he asked)
   }
   ctx.restore();
 }
@@ -381,13 +387,56 @@ function drawWallCam(ctx, c, t, ally) {
     ctx.save(); ctx.rotate(ag); ctx.fillStyle = '#26282c'; ctx.fillRect(0.4, -1.2, 2.6, 2.4); ctx.fillStyle = '#0d0e10'; ctx.fillRect(2.6, -0.8, 0.8, 1.6); ctx.restore();
     ctx.fillStyle = '#34373c'; ctx.beginPath(); ctx.arc(0, 0, 2.3, 0, 7); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(-0.6, -0.7, 1, 0, 7); ctx.fill();
-    ctx.fillStyle = c.off ? 'rgba(80,110,255,0.8)' : (Math.floor(t * 1.2) % 2 ? 'rgba(255,50,40,0.75)' : 'rgba(110,20,20,0.6)'); ctx.beginPath(); ctx.arc(0, 0, 0.55, 0, 7); ctx.fill();
+    camDot(ctx, 0, 0, 0.8, c.off, ally, t);
   }
   ctx.restore();
 }
 
+// Each gadget wears a small symbol badge in its team's colour (he asked: tell what it is by looking, without pinging).
+// Glyphs are drawn in a 6 x 6 box round the badge centre with plain strokes so they read at any zoom.
+const GLYPH = {
+  jammer: g => { g.arc(0, 1.6, 0.6, 0, 7); g.moveTo(-1.8, -0.2); g.arc(0, 1.6, 2.4, -2.4, -0.74); g.moveTo(-1.1, 0.6); g.arc(0, 1.6, 1.4, -2.5, -0.64); },
+  mine: g => { g.moveTo(0, -2.2); g.quadraticCurveTo(2, 0.6, 0, 2.2); g.quadraticCurveTo(-2, 0.6, 0, -2.2); },
+  claymore: g => { g.moveTo(-2.2, 1.6); g.lineTo(0, -2); g.lineTo(2.2, 1.6); g.closePath(); g.moveTo(0, -0.6); g.lineTo(0, 0.5); },
+  wire: g => { g.moveTo(-2.4, 0); for (let i = 0; i < 5; i++) g.lineTo(-2.4 + (i + 1) * 0.96, i % 2 ? 1 : -1); },
+  cutter: g => { g.moveTo(0, 2.2); g.quadraticCurveTo(-2.2, 0, 0, -2.2); g.quadraticCurveTo(2.2, 0, 0, 2.2); },
+  breach: g => { g.rect(-2.2, -1.4, 4.4, 2.8); g.moveTo(-1, -1.4); g.lineTo(-1, 1.4); g.moveTo(1, -1.4); g.lineTo(1, 1.4); },
+  dart: g => { g.moveTo(-2.2, 2.2); g.lineTo(2.2, -2.2); g.moveTo(2.2, -2.2); g.lineTo(0.6, -2); g.moveTo(2.2, -2.2); g.lineTo(2, -0.6); },
+  prox: g => { g.arc(0, 0, 0.7, 0, 7); g.moveTo(1.6, 0); g.arc(0, 0, 1.6, 0, 7); g.moveTo(2.4, 0); g.arc(0, 0, 2.4, 0, 7); },
+  concuss: g => { for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, r = i % 2 ? 1 : 2.4; i ? g.lineTo(Math.cos(a) * r, Math.sin(a) * r) : g.moveTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); },
+  clamp: g => { g.arc(0, 0, 2, 0.6, Math.PI * 2 - 0.6); },
+  sensor: g => { g.moveTo(-2.4, 0); g.quadraticCurveTo(0, -2.4, 2.4, 0); g.quadraticCurveTo(0, 2.4, -2.4, 0); g.moveTo(0.7, 0); g.arc(0, 0, 0.7, 0, 7); },
+  grid: g => { g.moveTo(0.6, -2.4); g.lineTo(-1.2, 0.3); g.lineTo(0.8, 0.3); g.lineTo(-0.6, 2.4); },
+  plates: g => { g.moveTo(0, -2.4); g.lineTo(2, -1.4); g.lineTo(1.6, 1.2); g.lineTo(0, 2.4); g.lineTo(-1.6, 1.2); g.lineTo(-2, -1.4); g.closePath(); },
+  cluster: g => { for (const [x, y] of [[-1.3, 1], [1.3, 1], [0, -1.3]]) { g.moveTo(x + 0.8, y); g.arc(x, y, 0.8, 0, 7); } },
+  sticky: g => { for (const [x, y] of [[-1.3, 1], [1.3, 1], [0, -1.3]]) { g.moveTo(x + 0.8, y); g.arc(x, y, 0.8, 0, 7); } },
+  pace: g => { g.moveTo(-2, 1.4); g.lineTo(0, -0.4); g.lineTo(2, 1.4); g.moveTo(-2, -0.4); g.lineTo(0, -2.2); g.lineTo(2, -0.4); },
+  scope: g => { g.moveTo(1.6, 0); g.arc(0, 0, 1.6, 0, 7); g.moveTo(-2.5, 0); g.lineTo(2.5, 0); g.moveTo(0, -2.5); g.lineTo(0, 2.5); },
+  slug: g => { g.moveTo(-2.2, -0.9); g.lineTo(0.8, -0.9); g.quadraticCurveTo(2.4, 0, 0.8, 0.9); g.lineTo(-2.2, 0.9); g.closePath(); },
+  saw: g => { for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, r = i % 2 ? 1.5 : 2.4; i ? g.lineTo(Math.cos(a) * r, Math.sin(a) * r) : g.moveTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); },
+  spike: g => { g.moveTo(0, -2.4); g.lineTo(1, 2); g.lineTo(-1, 2); g.closePath(); },
+  pick: g => { g.moveTo(-2, 2); g.lineTo(1.2, -1.2); g.lineTo(2.2, -1); g.moveTo(1.2, -1.2); g.lineTo(1, -2.2); },
+  alarm: g => { g.moveTo(-1.8, 1.2); g.quadraticCurveTo(-1.8, -2.2, 0, -2.2); g.quadraticCurveTo(1.8, -2.2, 1.8, 1.2); g.closePath(); g.moveTo(0.5, 2); g.arc(0, 2, 0.5, 0, 7); },
+  echobox: g => { g.rect(-2.2, -0.9, 1.4, 1.8); g.moveTo(-0.8, -0.9); g.lineTo(0.8, -2.2); g.lineTo(0.8, 2.2); g.lineTo(-0.8, 0.9); g.moveTo(1.6, -1); g.quadraticCurveTo(2.4, 0, 1.6, 1); },
+  radar: g => { g.arc(0, 0, 2.3, Math.PI, Math.PI * 2); g.moveTo(0, 0); g.lineTo(1.7, -1.6); g.moveTo(-2.3, 0); g.lineTo(2.3, 0); },
+  station: g => { g.moveTo(-2.2, 0); g.lineTo(2.2, 0); g.moveTo(0, -2.2); g.lineTo(0, 2.2); },
+  catcher: g => { g.moveTo(-1.8, -2); g.lineTo(-1.8, 0.4); g.arc(0, 0.4, 1.8, Math.PI, 0, true); g.lineTo(1.8, -2); },
+};
+const NO_BADGE = new Set(['defuser', 'healzone', 'nade']);
+function badge(ctx, e, ally) {
+  const f = GLYPH[e.ty]; if (!f || NO_BADGE.has(e.ty)) return;
+  ctx.save(); ctx.translate(e.x + 6.5, e.y - 6.5);
+  ctx.fillStyle = 'rgba(10,12,16,0.85)'; ctx.beginPath(); ctx.arc(0, 0, 3.9, 0, 7); ctx.fill();
+  ctx.strokeStyle = ally ? '#46a8ff' : '#ff8a3d'; ctx.lineWidth = 0.7; ctx.stroke();
+  ctx.scale(0.95, 0.95); ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); f(ctx); ctx.stroke();
+  ctx.restore();
+}
 export function drawGadget(ctx, e, t, ally) {
-  ctx.save(); ctx.translate(e.x, e.y);
+  drawGadgetBody(ctx, e, t, ally);
+  badge(ctx, e, ally);
+}
+function drawGadgetBody(ctx, e, t, ally) {
+  ctx.save(); ctx.translate(e.x, e.y); if (!NO_BADGE.has(e.ty)) ctx.scale(1.2, 1.2); // a little bigger, so the shapes read
   const blink = Math.floor(t * 4) % 2 === 0;
   switch (e.ty) {
     case 'jammer':

@@ -14,7 +14,8 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
-const BOT_NAMES = ['Viper', 'Moss', 'Rook-7', 'Static', 'Juno', 'Kilo', 'Brine', 'Ozone', 'Pike', 'Wick', 'Saber', 'Flint'];
+// everyday bots: their own names, never a pro's (he asked) or a gun's
+const BOT_NAMES = ['Dusty', 'Pickles', 'Gerald', 'Noodle', 'Biscuit', 'Lenny', 'Toast', 'Wobbles', 'Mittens', 'Chonk', 'Sprout', 'Tumbleweed'];
 const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0 };
 const JAM_R = 90;
 const VAULT_TIME = 0.6, VAULT_RECOVER = 0.35; // climbing over (no shooting, gun down), then a moment before you can aim again
@@ -96,19 +97,20 @@ export class Game {
         sock.send(JSON.stringify({ t: 'welcome', id: null, tv: 1, mapVersion: this.mapVersion, mapId: this.mapId, token: login.token, profile: publicProfile(login.profile),
           tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp), holes: this.map.holes }));
       } else if (m.t === 'tv' && joined) {
-        if (m.a === 'start' && this.phase === PHASE.LOBBY) this.tvStart(m.map);
+        if (m.a === 'start' && this.phase === PHASE.LOBBY) this.tvStart(m.map, m.level);
         else if (m.a === 'follow') this.tv.follow = this.players.has(m.id) ? m.id : null;
       }
     });
     sock.on('close', () => { this.tv.socks.delete(sock); if (!this.tv.socks.size && this.onEmpty) this.onEmpty(); });
   }
-  tvStart(want) {
+  tvStart(want, level) { // level: PRO_LEVEL = the pro league; a rank 0-6 = AMATEUR HOUR at that rank (he asked)
+    if (BOT_LEVELS[level] !== undefined) this.tv.level = level;
     const list = MAP_LIST.filter(k => k !== this.mapId);
     const id = MAPS[want] ? want : list[Math.floor(Math.random() * list.length)];
     this.tv.want = want;
     if (id !== this.mapId) { this.mapId = id; this.map = buildMap(id); }
     for (const q of [...this.players.values()]) this.players.delete(q.id);
-    this.botLevel = PRO_LEVEL;
+    this.botLevel = this.tv.level ?? PRO_LEVEL;
     for (let i = 0; i < 10; i++) this.addBot(i % 2);
     this.startMatch();
   }
@@ -2302,7 +2304,7 @@ export class Game {
     const common = JSON.stringify({
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId,
       site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
-      rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
+      tvl: this.tv ? this.botLevel : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];

@@ -568,13 +568,14 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 #opsList .opsRole h4 { margin: 14px 4px 6px; color: #f2c14e; letter-spacing: 0.22em; }
 #opsList .opsRole h4 small { display: block; font: 500 12px var(--body); letter-spacing: 0; color: var(--dim); margin-top: 3px; text-transform: none; }
 /* objective found (he asked: a massive deal, show where and which floor) */
-#siteFound { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 45; pointer-events: none; text-align: center;
-  background: rgba(8,11,15,0.92); border-top: 4px solid #f2c14e; padding: 18px 24px 16px; box-shadow: 0 12px 50px rgba(0,0,0,0.7); }
+#siteFound { position: absolute; left: 50%; top: 12%; transform: translate(-50%, 0); z-index: 45; pointer-events: none; text-align: center;
+  background: rgba(8,11,15,0.62); border-top: 3px solid #f2c14e; padding: 10px 16px 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); }
 #siteFound.show { animation: sfIn 0.35s cubic-bezier(.2,1.4,.4,1) both; } #siteFound.out { transition: opacity 0.6s; opacity: 0; }
-#siteFound .sfT { font: 800 46px var(--head); letter-spacing: 0.14em; color: #f2c14e; text-shadow: 0 0 24px rgba(242,193,78,0.45); }
-#siteFound .sfS { font: 700 22px var(--head); letter-spacing: 0.06em; color: #fff; margin: 4px 0 10px; }
-#siteFound .sfF { font: 800 26px var(--head); letter-spacing: 0.3em; color: #f2c14e; margin-top: 8px; }
-#siteFound canvas { display: block; width: 560px; height: 340px; border: 1px solid rgba(255,255,255,0.12); }
+#siteFound .sfT { font: 800 20px var(--head); letter-spacing: 0.14em; color: #f2c14e; text-shadow: 0 0 24px rgba(242,193,78,0.45); }
+#siteFound .sfS { font: 700 15px var(--head); letter-spacing: 0.06em; color: #fff; margin: 2px 0 6px; }
+#siteFound .sfF { font: 800 38px var(--head); letter-spacing: 0.18em; color: #f2c14e; text-shadow: 0 0 18px rgba(242,193,78,0.5); }
+#siteFound .sfY { font: 700 16px var(--head); letter-spacing: 0.14em; color: #fff; }
+#siteFound canvas { display: block; margin: 0 auto; width: 300px; height: 180px; opacity: 0.85; border: 1px solid rgba(255,255,255,0.12); }
 @keyframes sfIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 /* compass to the bomb site (he asked): under the score bar */
 #compass { position: absolute; top: 92px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
@@ -724,7 +725,7 @@ html.touch #lanDlg .lanBody { gap: 14px; } html.touch #lanQr { width: 170px; hei
 #tvHud { display: none; }
 html.tv #tvHud { display: block; position: fixed; inset: 0; pointer-events: none; z-index: 3; } /* below the menus (Esc, settings, pages) */
 html.tv #hud #bl, html.tv #hud #br, html.tv #coach { display: none; }
-.tvSide { position: absolute; top: 120px; width: 190px; display: flex; flex-direction: column; gap: 5px; pointer-events: auto; }
+.tvSide { position: absolute; top: 110px; width: 230px; display: flex; flex-direction: column; gap: 5px; pointer-events: auto; }
 #tvL { left: 14px; } #tvR { right: 14px; }
 .tvTeam { font: 800 16px var(--head); letter-spacing: 0.06em; color: var(--tc); text-shadow: 0 2px 6px #000; margin-bottom: 2px; } .tvTeam small { color: #fff; font-size: 13px; }
 .tvCard { position: relative; display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 6px 10px 8px; background: rgba(8,10,14,0.78); border: 1px solid rgba(255,255,255,0.12); overflow: hidden; }
@@ -750,9 +751,9 @@ html.tv #tvHelp { opacity: 0.55; font-size: 12px; }
 .trainBox { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; } .trainInfo { font-size: 13px; color: var(--dim); }
 .pagehead .trainBox { margin-left: auto; margin-right: 12px; } #tab-tv .row { display: flex; align-items: center; gap: 14px; }
 /* TV: what each team is saying, live, under its cards */
-.tvComms { position: absolute; top: 430px; width: 230px; display: flex; flex-direction: column; gap: 3px; font: 500 12px var(--body); }
+.tvComms { position: absolute; top: 560px; width: 260px; display: flex; flex-direction: column; gap: 3px; font: 600 15px var(--body); }
 #tvCommsL { left: 14px; } #tvCommsR { right: 14px; text-align: right; }
-.tvComms div { background: rgba(0,0,0,0.45); padding: 3px 7px; color: #e8edf2; animation: rise 0.2s both; transition: opacity 1s; text-shadow: 0 1px 2px #000; }
+.tvComms div { background: rgba(6,8,12,0.9); padding: 3px 7px; color: #e8edf2; animation: rise 0.2s both; transition: opacity 1s; text-shadow: 0 1px 2px #000; }
 .tvComms div.old { opacity: 0; }
 #tvCommsL b { color: #5ec8ff; } #tvCommsR b { color: #f2a65a; }
 html.tv #chat { display: none; }
@@ -772,3 +773,19 @@ html.tv #chat { display: none; }
 #fxList { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 #fxList .tog { font-size: 13px; padding: 4px 9px; opacity: 0.6; }
 #fxList .tog.on { opacity: 1; }
+
+/* teammates in words (he asked) */
+#allies { position: absolute; left: 12px; top: 34%; z-index: 20; pointer-events: none; font: 600 13px var(--body, sans-serif); color: #cfe6ff; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
+#allies div { margin: 2px 0; } #allies b { color: #6fb8ff; } #allies i { color: #9aa7b4; font-style: normal; font-size: 11px; } #allies span { color: #fff; }
+#allies .dead { opacity: 0.4; text-decoration: line-through; } #allies .dn span { color: #ff7a6a; }
+html.tv #allies { display: none !important; }
+html.fitui #allies { zoom: var(--hudz, 1); }
+
+/* TV cards with a webcam each (he asked) */
+.tvCard { flex-direction: row !important; align-items: center !important; gap: 8px; padding: 4px 8px 6px 4px !important; }
+.tvCard .tvCam { width: 72px; height: 54px; border-radius: 3px; flex: none; background: #000; }
+.tvCard > div { display: flex; flex-direction: column; min-width: 0; }
+.tvHead { margin-bottom: 2px; }
+#tvLeague { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; } #tvLeague button.on { background: var(--accent, #f2c14e); color: #000; }
+.pbPlayer .pbCam { float: left; width: 96px; height: 72px; margin: 2px 10px 4px 0; border-radius: 4px; }
+.pbPlayer { overflow: hidden; }
