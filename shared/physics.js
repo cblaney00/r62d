@@ -1,5 +1,5 @@
 // Movement, collision, line of sight and ray casting on the tile grid.
-import { CELL, PX_PER_M, T, FL, HOLE_R, PLAYER_R, DRONE_R, DRONE_SPRINT, blocksMove, blocksDrone, blocksSight } from './constants.js';
+import { CELL, PX_PER_M, T, FL, HOLE_R, PLAYER_R, DRONE_R, DRONE_SPRINT, blocksMove, blocksDrone, blocksSight, underAt } from './constants.js';
 
 // What stops a body: everything blocksMove says, plus window openings (you vault through those, see findVault).
 export const bodyBlocks = map => (t, k) => blocksMove(t) || (t === T.OPEN && !!map.win && map.win[k] === 1);
@@ -94,7 +94,7 @@ export const standable = (map, k) => map.tiles[k] === T.LOW && map.floor[k] !== 
 export function moveCircle(map, o, dx, dy, r, drone = false, up = false) {
   // drones also slip through the drone holes at the foot of plain walls (gone once the wall is reinforced)
   const body = bodyBlocks(map);
-  const fn = drone ? (t, k) => blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) : up ? (t, k) => body(t, k) && !standable(map, k) : body;
+  const fn = drone ? (t, k) => blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) && !underAt(map, k, t) : up ? (t, k) => body(t, k) && !standable(map, k) : body;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (r * 0.5)));
   for (let s = 0; s < steps; s++) {
     o.x += dx / steps; resolve(map, o, r, fn); pushCovers(map, o, r);
@@ -107,7 +107,10 @@ export function moveCircle(map, o, dx, dy, r, drone = false, up = false) {
 //   running (the default, like CS2 — no sprint) is a tactical jog with a gun up, 2.6 m/s for a 2-speed
 //   operator (2.3 heavy, 3.0 light); walking (Shift) 1.4 m/s, a normal walk; aiming down sights 1.5 m/s;
 //   crouch-walking 0.9 m/s; crawling while downed 0.5 m/s; a drone 3.2 m/s, a little quicker than a jog.
-export const M_S = { run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, downed: 0.5, drone: 3.2, rope: 1.0 };
+export const M_S = { run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, prone: 0.9, downed: 0.5, drone: 3.2, rope: 1.0 };
+// lying down (C, he asked: a quick drop, crawl as fast as a crouch, aim like a crouch): o.pr goes 0 → 1 in PRONE_T seconds
+export const PRONE_T = 0.3;
+export const isProne = o => (o.pr || 0) >= 1;
 export const JUMP_T = 0.42, LEAN_PX = 6, LEAN_SPEED = 40; // a hop's airtime (s); how far and fast a lean moves you (px, px/s)
 export const BASE_SPEED = M_S.run * PX_PER_M;   // ~94 px/s (was 118)
 export const DRONE_SPEED = M_S.drone * PX_PER_M; // ~115 px/s (was 200)
@@ -133,6 +136,7 @@ export function stepMove(map, o, input, dt, mods) {
   else {
     spd = BASE_SPEED * (ARMOR_SPEED[mods.armor] || 1) * (mods.mul || 1);
     if (mods.downed) spd = M_S.downed * PX_PER_M;
+    else if (input.prone || o.pr > 0) spd *= M_S.prone / M_S.run; // lying down (or getting down / up): a crawl
     else if (input.crouch) spd *= M_S.crouch / M_S.run; // crouch: slowest, silent, most accurate
     if (input.lean) spd *= 0.7; // leaning: careful steps
     if (o.up && !(o.air > 0)) spd *= 0.75; // up on furniture
@@ -157,14 +161,16 @@ export function stepMove(map, o, input, dt, mods) {
   if (!mods.drone) {
     const v = Math.hypot(o.vx, o.vy);
     // real step lengths: ~0.95 m jogging, ~0.7 m walking, ~0.45 m crouched, ~0.35 m crawling
-    const stride = mods.downed ? 13 : v > BASE_SPEED * 0.78 ? 34 : v > BASE_SPEED * 0.42 ? 25 : 16;
+    const stride = mods.downed || o.pr > 0 ? 13 : v > BASE_SPEED * 0.78 ? 34 : v > BASE_SPEED * 0.42 ? 25 : 16;
     o.gait = (o.gait || 0) + v * dt / stride * Math.PI;
   }
   const bx = o.x, by = o.y;
   // jumping (he asked): Space hops for JUMP_T; in the air or up on furniture, low furniture doesn't block you
   if (!mods.drone) {
     o.jcd = Math.max(0, (o.jcd || 0) - dt);
-    if (input.jump && !(o.air > 0) && !o.jcd && !mods.downed && !input.crouch) { o.air = JUMP_T; o.jcd = JUMP_T + 0.35; }
+    const down = !!input.prone && !mods.downed && !o.up && !(o.air > 0); // no lying down while downed, in the air or up on furniture
+    o.pr = Math.max(0, Math.min(1, (o.pr || 0) + (down ? dt : -dt) / PRONE_T)); if (!o.pr) delete o.pr;
+    if (input.jump && !(o.air > 0) && !o.jcd && !mods.downed && !input.crouch && !o.pr) { o.air = JUMP_T; o.jcd = JUMP_T + 0.35; }
   }
   const wasAir = o.air > 0;
   moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? DRONE_R : PLAYER_R, !!mods.drone, !mods.drone && (wasAir || !!o.up));
@@ -213,13 +219,14 @@ export function walkRay(x0, y0, dx, dy, maxT, cb) {
 
 // Distance a ray travels before something opaque (or a smoke cloud) stops it. soft = true: soft walls and
 // barricades don't stop it (bullets go through them), so it ends at the first wall a bullet can't pass.
-export function castSight(map, x0, y0, ang, maxD, smokes, soft = false) {
+// low = true: the eye is at floor level (a drone, or someone lying down), so it sees under tables, desks and cars (map.under).
+export function castSight(map, x0, y0, ang, maxD, smokes, soft = false, low = false) {
   const dx = Math.cos(ang), dy = Math.sin(ang);
   const startCx = Math.floor(x0 / CELL), startCy = Math.floor(y0 / CELL);
   let exact = -1;
   let d = walkRay(x0, y0, dx, dy, maxD, (cx, cy) => {
     const t = tileAt(map, cx, cy);
-    if (!blocksSight(t) || (soft && (t === T.SOFT || t === T.BARRI))) return false;
+    if (!blocksSight(t) || (soft && (t === T.SOFT || t === T.BARRI)) || (low && underAt(map, cy * map.W + cx, t))) return false;
     const sh = shapeAt(map, cx, cy);
     if (sh) { // an angled or curved bit of wall: only its solid part stops sight
       const h = rayShape(sh, x0, y0, dx, dy);
@@ -262,10 +269,10 @@ function raySmoke(x0, y0, dx, dy, s) {
   return t > 0 ? t + 10 : null;
 }
 
-export function los(map, x0, y0, x1, y1, smokes) {
+export function los(map, x0, y0, x1, y1, smokes, low = false) {
   const d = Math.hypot(x1 - x0, y1 - y0);
   if (d < 1) return true;
-  return castSight(map, x0, y0, Math.atan2(y1 - y0, x1 - x0), d, smokes) >= d - 2;
+  return castSight(map, x0, y0, Math.atan2(y1 - y0, x1 - x0), d, smokes, false, low) >= d - 2;
 }
 
 // Visibility polygon: list of points around (x, y). Cone of width fov facing ang,

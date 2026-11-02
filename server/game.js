@@ -1,5 +1,5 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
-import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
+import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
@@ -17,7 +17,7 @@ const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
 // everyday bots: their own names, never a pro's (he asked) or a gun's
 const BOT_NAMES = ['Dusty', 'Pickles', 'Gerald', 'Noodle', 'Biscuit', 'Lenny', 'Toast', 'Wobbles', 'Mittens', 'Chonk', 'Sprout', 'Tumbleweed'];
-const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0 };
+const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, prone: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0 };
 const JAM_R = 90;
 const VAULT_TIME = 0.6, VAULT_RECOVER = 0.35; // climbing over (no shooting, gun down), then a moment before you can aim again
 const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free play's switching order
@@ -501,7 +501,7 @@ export class Game {
     stepMove(this.map, p, p.input, dt, m);
     const moved = Math.hypot(p.x - before.x, p.y - before.y) / dt;
     // how loud your steps are follows how fast you move (he asked): walking/crouching is silent, aiming in is faint, a jog is loud
-    const loud = p.input.crouch ? 0 : 320 * Math.max(0, Math.min(1, (moved / PX_PER_M - 1.45) / (M_S.run - 1.45)));
+    const loud = p.input.crouch || p.pr ? 0 : 320 * Math.max(0, Math.min(1, (moved / PX_PER_M - 1.45) / (M_S.run - 1.45)));
     p.moving = moved < 5 ? 0 : loud < 60 ? 1 : 2;
     if (p.landed) { p.landed = false; if (!p.shrouded) this.noise(p.x, p.y, this.side(p), 220); this.events.push({ e: 'snd', s: 'land', x: r1(p.x), y: r1(p.y), id: p.id }); } // a landing thump
     if (loud >= 30 && !this.ghost(p) && !p.shrouded && this.time - (p.noiseT || 0) > 0.3) { p.noiseT = this.time; this.noise(p.x, p.y, this.side(p), loud); } // running footsteps (none from HUSH's shroud)
@@ -724,7 +724,7 @@ export class Game {
     const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED + (p.air > 0 ? 1.5 : 0)), at = p.adsT || 0; // mid-jump: wild
     const m = gun.m || gunMods(gun.w);
     // the aiming model (shared/operators.js): exact first shot, a fixed cone after that, a fixed recoil pattern
-    const cone = spreadCone(w, m, { at, run, crouch: !!p.input.crouch, shots: aimHeat(w, p.shots || 0, this.time - p.lastShot, m) }) * (this.time < (p.dazeUntil || 0) && p.shots ? 1.7 : 1); // dazed: shaky follow-ups
+    const cone = spreadCone(w, m, { at, run, crouch: !!(p.input.crouch || p.pr >= 1), shots: aimHeat(w, p.shots || 0, this.time - p.lastShot, m) }) * (this.time < (p.dazeUntil || 0) && p.shots ? 1.7 : 1); // dazed: shaky follow-ups
     const aim = click ? click.a : p.aim, vt = p.viewTime;
     if (click && click.vt !== undefined) p.viewTime = click.vt; // judged against what they saw when they clicked
     const base = aim + (p.rc || 0);
@@ -871,6 +871,7 @@ export class Game {
       if (sh) { const h = rayShape(sh, x0, y0, dx, dy); if (h === null || h > bestT) return false; t = h; } // angled/curved wall: only its solid part
       else if (cx === sx && cy === sy) return false;
       if (stopsBullet(tile) && tracerWall > 0 && tile !== T.VOID) { tracerWall--; mult *= 0.75; pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) }); return false; }
+      if (src && src.pr >= 1 && underAt(this.map, k, tile)) return false; // lying down: shoots under the car / table it sees under
       if (stopsBullet(tile) && this.map.holes[k] && throughHole(this.map, k, x0, y0, dx, dy)) return false; // through a lance hole
       if (stopsBullet(tile)) { stopT = t; kind = tile === T.TALL ? 'prop' : 'hard'; best = null; return true; }
       if (penBullet(tile)) {
@@ -2460,7 +2461,7 @@ export class Game {
         el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ct: p.ctrl,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
-        gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
+        gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch || p.pr ? 1 : 0, pn: p.pr >= 1 ? 1 : undefined, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
         aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,
@@ -2472,7 +2473,7 @@ export class Game {
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur)] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
-        pp: p.prep ? [p.prep.mode === 'throw' ? 1 : 2, r2(Math.max(0, p.prep.until - this.time)), p.prep.dur] : undefined, m: this.mods(p), jp: [r2(p.air || 0), p.up ? 1 : 0, r2(p.jcd || 0), r1(p.lo || 0)], vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined, df: p.deafUntil > this.time ? 1 : undefined, su: p.downed && SELF_UP.has(p.op) ? r2(p.selfUp / SELF_UP_TIME) : undefined, scd: p.shroudCd > this.time ? r1(p.shroudCd - this.time) : undefined,
+        pp: p.prep ? [p.prep.mode === 'throw' ? 1 : 2, r2(Math.max(0, p.prep.until - this.time)), p.prep.dur] : undefined, m: this.mods(p), jp: [r2(p.air || 0), p.up ? 1 : 0, r2(p.jcd || 0), r1(p.lo || 0), r2(p.pr || 0)], vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined, df: p.deafUntil > this.time ? 1 : undefined, su: p.downed && SELF_UP.has(p.op) ? r2(p.selfUp / SELF_UP_TIME) : undefined, scd: p.shroudCd > this.time ? r1(p.shroudCd - this.time) : undefined,
       }));
       return o;
     });

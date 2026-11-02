@@ -7,8 +7,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
+- [ ] make 6 deploy your inventory bot and 5 is just to switch to bots and cameras, also you should be able to switch between the bots and cameras on your team with q and e though you cant control others bots
+- [ ] make the settings screen less cluttered and more intuitive
 
 ## Done
+- [x] Lie down with C (Ctrl is crouch only now): a quick drop (0.3 s), crawl as fast as a crouch, silent, aim like a crouch; Ctrl, Space or C again gets you up. Lying down you see (and shoot) under desks, tables, benches, market stalls, chairs, cars, vans and trains, but your body never fits under, so nobody can hide there. Drones (yours, teammates' and the bots') drive and see under the same things.
 
 - [x] Bots stand around less. A bot that stays in one small area with no enemy in sight gets impatient and makes a play: attackers stop waiting and push to a fresh spot, often going round to come in from an unexpected side; defenders take a new angle, and bolder ones step out into a room beside the site. The more experienced (higher rank) a bot is, the longer it waits first. Paranoia: a bot that is alone and hears something keeps sweeping every way in, not just the one the sound came from. Also fixed bots (roamers especially) that walked into a wall and stood there all round when they had no route to their spot. Measured: idle time without a fight went from about half the round to 40%, and the longest attacker standstill from 96 to 17 seconds.
 - [x] Esports TV: the auto director keeps count of how long each team has been on screen and leans toward the team that has had less, while a really exciting moment still wins. Viewers now see what both teams see, each team's sight faintly tinted in its own colour.

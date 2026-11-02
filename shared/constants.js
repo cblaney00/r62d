@@ -71,6 +71,10 @@ export const HOLE_MAX = 24;  // holes kept per wall cell
 
 export const blocksMove = t => MOVE_BLOCK.has(t);
 export const blocksDrone = t => DRONE_BLOCK.has(t);
+// Furniture with a gap underneath (he asked): drones drive under it, and drones and people lying down see under it.
+// A lying body still doesn't fit under, so nobody hides there from the top-down view. Marked per cell in map.under.
+export const UNDER_KINDS = new Set(['desk', 'meetingtable', 'coffeetable', 'workbench', 'bench', 'marketstall', 'chairs', 'car', 'van', 'train']);
+export const underAt = (map, k, t) => !!(map.under && map.under[k]) && (t === T.LOW || t === T.TALL);
 export const blocksSight = t => SIGHT_BLOCK.has(t);
 export const stopsBullet = t => BULLET_STOP.has(t);
 export const penBullet = t => BULLET_PEN.has(t);

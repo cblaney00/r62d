@@ -182,10 +182,13 @@ export function drawOperator(ctx, p, t) {
   // ---- legs (they step when walking AND when turning on the spot) ----
   const bw = bodyW(p.op); // skinnier build: legs, back gear and torso squeezed sideways (not the head)
   ctx.save(); ctx.scale(1, bw);
-  const walk = p.walk || 0, st = Math.sin(walk), cr = !!p.crouch;
+  const walk = p.walk || 0, st = Math.sin(walk), cr = !!p.crouch && !p.prone;
+  if (p.prone) { // lying down (he asked): legs stretched out behind, kicking a little as you crawl
+    for (const s of [1, -1]) { const k = s * st * 1.6 * (p.legs ?? 1); limb(ctx, [-3, s * 3, -10 + k, s * 4, -17 + k, s * 4.6], 3.6, u.clothD); ell(ctx, -18 + k, s * 4.6, 2.3, 2.2, '#1c1b1a'); }
+  }
   const stride = st * (cr ? 2.2 : 4.6) * (p.legs ?? 1); // feet come back together when standing still
   const feet = cr ? [[5.5 + stride * 0.3, 4.2], [4 - stride * 0.3, -4.6]] : [[stride, 4.8], [-stride, -4.8]];
-  for (const [fx, fy] of feet) {
+  for (const [fx, fy] of p.prone ? [] : feet) {
     const hip = [-1, fy > 0 ? 3.2 : -3.2];
     const knee = cr ? [fx + 2.5, fy * 1.15] : [(hip[0] + fx) / 2 + 0.8, (hip[1] + fy) / 2 + (fy > 0 ? 0.3 : -0.3)];
     limb(ctx, [hip[0], hip[1], knee[0], knee[1], fx, fy], 3.6, u.clothD);

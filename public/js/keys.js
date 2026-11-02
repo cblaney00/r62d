@@ -6,7 +6,8 @@ export const ACTIONS = [
   ['left', 'Move left', 'KeyA', 'ArrowLeft'],
   ['right', 'Move right', 'KeyD', 'ArrowRight'],
   ['walk', 'Walk — silent (hold)', 'ShiftLeft', ''],
-  ['crouch', 'Crouch — silent, most accurate (hold)', 'ControlLeft', 'KeyC'],
+  ['crouch', 'Crouch — silent, most accurate (hold)', 'ControlLeft', ''],
+  ['prone', 'Lie down / get up — sees under tables and cars', 'KeyC', ''],
   ['interact', 'Use — reinforce, barricade, plant, defuse, revive (hold)', 'KeyF', ''],
   ['leanL', 'Lean left (hold)', 'KeyQ', ''],
   ['leanR', 'Lean right (hold)', 'KeyE', ''],
@@ -31,10 +32,13 @@ export const ACTIONS = [
 const KEY = 'r62d-keys-v4'; // v4 = lean on Q/E, use on F, skill on 4, gadget on G, Space jumps (he asked)
 export const BINDS_VERSION = 4;
 let binds = {};
+// C used to be a second crouch key; it is now lie down (he asked), so older saved keys give it up
+function freeC() { if (binds.crouch[1] === 'KeyC' && binds.prone[0] === 'KeyC') binds.crouch[1] = ''; }
 export function loadBinds() {
   binds = {};
   for (const [id, , a, b] of ACTIONS) binds[id] = [a, b];
   try { const saved = JSON.parse(localStorage.getItem(KEY) || '{}'); for (const id in saved) if (binds[id]) binds[id] = saved[id]; } catch {}
+  freeC();
   return binds;
 }
 let onChange = null;
@@ -45,6 +49,7 @@ export const getBinds = () => JSON.parse(JSON.stringify(binds));
 export function applyBinds(saved) {
   loadBinds();
   if (saved && typeof saved === 'object') for (const id in saved) if (binds[id] && Array.isArray(saved[id])) binds[id] = saved[id].slice(0, 2).map(c => (typeof c === 'string' ? c.slice(0, 24) : ''));
+  freeC();
   try { localStorage.setItem(KEY, JSON.stringify(binds)); } catch {}
 }
 export function resetBinds() { try { localStorage.removeItem(KEY); } catch {} loadBinds(); if (onChange) onChange(binds); }

@@ -4,7 +4,7 @@
 // call out what they see, and react no faster than a fairly experienced player. The bot skill setting
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
-import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL } from '../shared/constants.js';
+import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR } from '../shared/operators.js';
@@ -153,7 +153,7 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false) {
   const heap = [[0, start]]; g[start] = 0;
   const droneCost = k => { // a drone: through drone holes and barricade gaps, never over furniture or through walls
     const t = map.tiles[k];
-    if (blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k])) return Infinity;
+    if (blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) && !underAt(map, k, t)) return Infinity;
     return 1;
   };
   const cost = drone ? droneCost : k => {

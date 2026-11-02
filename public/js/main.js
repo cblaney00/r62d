@@ -469,7 +469,7 @@ function reconcile() {
   if (st.predCtrl !== me.ct || st.predDid !== me.did) { st.predCtrl = me.ct; st.predDid = me.did; st.pending = []; }
   st.pending = st.pending.filter(i => i.s > me.ls);
   st.pred.x = pos.x; st.pred.y = pos.y; st.pred.vx = pos.vx || 0; st.pred.vy = pos.vy || 0; st.pred.gait = pos.gait || 0;
-  if (me.jp && me.ct !== 'drone') { st.pred.air = me.jp[0]; st.pred.up = !!me.jp[1]; st.pred.jcd = me.jp[2]; st.pred.lo = me.jp[3]; }
+  if (me.jp && me.ct !== 'drone') { st.pred.air = me.jp[0]; st.pred.up = !!me.jp[1]; st.pred.jcd = me.jp[2]; st.pred.lo = me.jp[3]; st.pred.pr = me.jp[4] || 0; }
   const mods = me.m || {};
   for (const i of st.pending) stepMove(st.map, st.pred, i.k, i.dt, mods);
 }
@@ -585,6 +585,8 @@ function pressAction(a, e) {
   const ev = st.evq;
   switch (a) {
     case 'reload': ev.push({ k: 'reload' }); break;
+    case 'prone': st.prone = !st.prone; break; // C lies down / gets up (he asked); Ctrl crouch or Space also gets up
+    case 'crouch': st.prone = false; break;
     case 'primary': ev.push({ k: 'slot', n: 0 }); break;
     case 'secondary': ev.push({ k: 'slot', n: 1 }); break;
     case 'melee': ev.push({ k: 'melee' }); break;
@@ -601,7 +603,7 @@ function pressAction(a, e) {
       const p = st.pred, m = st.map, me = st.me;
       const v = p && m && me && !(me.jp && me.jp[1]) ? findVault(m, p.x, p.y, vaultDir()) : null;
       if (v && !standable(m, v.k)) ev.push({ k: 'vault', a: Math.round(vaultDir() * 1000) / 1000 });
-      else st.jumpReq = performance.now();
+      else if (st.prone) st.prone = false; else st.jumpReq = performance.now();
       break; }
     case 'opNext': case 'opPrev': if (st.last && st.last.fp) send({ t: 'free', a: 'op', dir: a === 'opNext' ? 1 : -1 }); break;
     case 'opGrid': if (st.last && st.last.fp) toggleFreeOps(); break;
@@ -1222,9 +1224,9 @@ function frame(nowMs) {
   }
   let view = null, ctrl = me && me.a ? me.ct : null;
   if (inGame && me && me.a) {
-    if (ctrl === 'drone') view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: 230, near: 0, kind: 'drone' };
+    if (ctrl === 'drone') view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: 230, near: 0, kind: 'drone', low: true };
     else if (ctrl === 'cam') { const c = s.ents.find(e => e.id === me.fi); if (c) view = feedView(c, me); }
-    else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: 1100, near: 26, kind: 'body' }; } // you see from your (leaning) head
+    else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: 1100, near: 26, kind: 'body', low: (st.pred.pr || 0) >= 1 }; } // you see from your (leaning) head
   } else if (inGame && me) {
     const mates = s.players.filter(p => p.a && p.sq === me.sq && p.id !== me.id);
     if (mouse.wl > 0) { st.spect++; mouse.wl = 0; }
@@ -1393,7 +1395,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
   const k = {
     up: keys.has('up') || gpk.up ? 1 : 0, down: keys.has('down') || gpk.down ? 1 : 0, left: keys.has('left') || gpk.left ? 1 : 0, right: keys.has('right') || gpk.right ? 1 : 0,
-    walk: keys.has('walk') || gpk.walk ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
+    walk: keys.has('walk') || gpk.walk ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch ? 1 : 0, prone: st.prone && me && me.a && !me.dn ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
     lean: (keys.has('leanR') ? 1 : 0) - (keys.has('leanL') ? 1 : 0), jump: performance.now() - (st.jumpReq || -1e9) < 120 ? 1 : 0,
   };
@@ -1628,7 +1630,7 @@ function visionPolygon(v, sm, rays = 0) {
   if (!full) pts.push(v.x, v.y);
   for (let i = 0; i <= n; i++) {
     const a = v.ang - v.fov / 2 + v.fov * i / n;
-    const d = Math.min(v.range, castSight(st.map, v.x, v.y, a, v.range, sm) + 7);
+    const d = Math.min(v.range, castSight(st.map, v.x, v.y, a, v.range, sm, false, !!v.low) + 7);
     pts.push(v.x + Math.cos(a) * d, v.y + Math.sin(a) * d);
   }
   return pts;
@@ -1737,7 +1739,7 @@ function draw(s, view, now, dt) {
     const gh = !isMe && stairGhost(st.map, p.x, p.y);
     if (gh && (ally || (!p.sh && ghostSeen(gh)))) {
       ctx.globalAlpha = 0.9;
-      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x + u.x * 15, gh.y + u.y * 15);
@@ -1758,7 +1760,7 @@ function draw(s, view, now, dt) {
       ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.arc(p.x, p.y, 15.5, 0, 7); ctx.stroke(); ctx.restore();
       ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     drawOperator(ctx, {
-      x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, downed: p.dn,
+      x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn,
       lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
     if (elv) ctx.restore();
@@ -2351,7 +2353,7 @@ function feedKind(c) { return c.ty === 'drone' ? 'DRONE' : c.ty === 'scope' && c
 function ownerName(s, id) { const p = s.players.find(p => p.id === id); return p ? p.n.replace(/^\[BOT\] /, '') : 'TEAMMATE'; }
 function feedView(c, me) {
   const ro = c.ow && c.ow !== me.id ? 1 : 0;
-  if (c.ty === 'drone') { const ic = interp(c.id, 'ents') || c; return { x: ic.x, y: ic.y, ang: ic.ag || c.ag || 0, fov: Math.PI * 2, range: 230, near: 0, kind: 'cam', cam: c, dr: 1, ro: 1 }; }
+  if (c.ty === 'drone') { const ic = interp(c.id, 'ents') || c; return { x: ic.x, y: ic.y, ang: ic.ag || c.ag || 0, fov: Math.PI * 2, range: 230, near: 0, kind: 'cam', cam: c, dr: 1, ro: 1, low: true }; }
   if (c.ty === 'scope' && c.fl) return { x: c.x, y: c.y, ang: c.ag || 0, fov: 6.28, range: 230, near: 6, kind: 'cam', cam: c, ro: 1 }; // LENS: looking all round the room above / below
   if (c.ty === 'scope') return { x: c.x, y: c.y, ang: c.ag || 0, fov: 1.3, range: 420, near: 6, kind: 'cam', cam: c, ro: 1 };
   return { x: c.x, y: c.y, ang: ro ? c.ag || 0 : st.aim, fov: 1.9, range: 650, near: 14, kind: 'cam', off: c.off, cam: c, ro };
@@ -2491,7 +2493,7 @@ function drawStairView(s, me, now) {
     const ally = p.tm === side;
     if (!ally && (p.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue;
     const a = anim(p.id);
-    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
   }
   c.restore();
   // soft round edge, so it melts into this floor's map
