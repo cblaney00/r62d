@@ -7,10 +7,14 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
-- [ ] seeing up and down stairs should be live and as part of the map if you can find a way to make floor transitions much smoother
+- [ ] the autodirector should showcase both teams evenly more or less (whichever team is more exciting to view at the moment), also viewers should get to see the vision of both teams with a slight tint to the vision cones
+- [ ] the bots should also just stand around less, they get impatient just like people do, they take risks for better position and the element of surprise or experience gained from lots of games
+- [ ] lets just make those preparation phase like 10 seconds shorter
+- [ ] bullets should also be able to fully destroy wooden planked doors after 320 damage of bullets
 
 ## Done
 
+- [x] Seeing up and down stairs is now live and part of the map: near a staircase you can see, the floor at the other end shows right where the steps lead (the lobby at the bottom, the landing at the top), in live colour, with the people there, fading softly into the map, instead of the small window in the corner. Going up or down, the camera now carries straight on to the same spot on the new floor instead of jumping.
 - [x] Operators window spread out: it fills almost the whole screen now, the picture is a little smaller so the words get the width, and the bio and skill text are bigger with more room between lines and sections. (The "Who are you?" name box was squashed into narrow columns by an old leftover style; fixed too.)
 - [x] Slow mouse moves now always reach the game: Firefox on this desktop throws away mouse steps smaller than a pixel, and mouse acceleration turns slow moves into exactly those. Opening the game now switches the mouse to flat (every step counts 1:1) and puts your old setting back when you close it, so nothing needs changing on your computer.
 - [x] Lighter server: the 12 GB came from connections that died without closing (a dropped VPN, a sleeping laptop): the server kept saving every update for them forever, and an Esports TV or Free Play game left behind that way kept running for nobody (which also slows the computer). Now every browser is checked every 5 s and dropped after 30 s of silence, a connection that stops taking updates is cut at 1 MB, and the pro practice thread can never use more than half a gigabyte. The game itself was checked over 56 back-to-back bot matches and doesn't grow. Lando gets it when you release it to him.

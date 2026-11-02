@@ -1286,6 +1286,15 @@ function frame(nowMs) {
   } else { // menus: slow drift over the map
     cx = st.map.W * CELL / 2 + Math.cos(now * 0.05) * 300; cy = st.map.H * CELL / 2 + Math.sin(now * 0.07) * 160;
   }
+  { // up or down the stairs (or through a hatch): the camera is carried across to the same spot in the building with
+    // you, so it keeps gliding instead of jumping (he asked for smoother floor changes). Floors sit side by side in x.
+    const fi = view ? floorAt(st.map, view.x, view.y) : -1, lp = st.lastViewPos;
+    if (view && view.kind === 'body' && lp && fi >= 0 && st.camFloor >= 0 && fi !== st.camFloor) {
+      const jx = view.x - lp.x, jy = view.y - lp.y, fx = (st.map.floors[fi].gx - st.map.floors[st.camFloor].gx) * CELL;
+      if (Math.abs(jx - fx) < CELL * 4 && Math.abs(jy) < CELL * 4) { st.cam.x += jx; st.cam.y += jy; st.camFloor = fi; }
+    }
+    st.lastViewPos = view ? { x: view.x, y: view.y } : null;
+  }
   const k = 1 - Math.exp(-dt * 14);
   if (Math.hypot(cx - st.cam.x, cy - st.cam.y) > 420) { st.cam.x = cx; st.cam.y = cy; if (view) st.leadV = null; } // spawned, new round: be there at once
   st.cam.x += (cx - st.cam.x) * k; st.cam.y += (cy - st.cam.y) * k;
@@ -1370,7 +1379,7 @@ function frame(nowMs) {
   bodySounds(me, dt);
   draw(s, view, now, dt); ctx = ctx0;
   drawCompass(st.last, st.me, now); drawAllies(st.last, st.me, now);
-  drawStairPip(s, me, now); pfa('total', T0);
+  pfa('total', T0);
   watchPerf(rawGap, performance.now() - T0);
 }
 let overDirty = false, fogShown = false;
@@ -1829,6 +1838,7 @@ function draw(s, view, now, dt) {
     if (R > c) ctx.fillRect(c, Tp, R - c, B - Tp);
     if (B > d) ctx.fillRect(a, d, c - a, B - d);
   }
+  if (inGame && view) { drawStairView(s, st.me, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
 
   tq = pfa('fog', tq);
   // --- markers drawn above the blackout ---
@@ -2391,7 +2401,7 @@ function floorHints(view, now, vh) { // which floor a sound came from, never whi
 // Close to a staircase (on its steps, or within a few metres of its open end) a live corner window shows the other
 // end: what you would see standing at the top (or bottom) landing looking out. It is your own eyes for this, so
 // anything it shows is also seen on your side of the screen (marks, the remembered map).
-const PIP_R = 160; // world px from the middle of the window to its edge
+const PIP_R = 90; // world px from the middle of the stairs view to where it has faded out
 function stairPeek(view, me, inGame) {
   if (!view || view.kind !== 'body' || !me || !me.a || me.dn || !st.map || !(st.map.stairs || []).length) return null;
   const fl = floorAt(st.map, view.x, view.y);
@@ -2418,18 +2428,23 @@ function stairPeek(view, me, inGame) {
   v.fwd = Math.atan2(v.cy - v.y, v.cx - v.x); if (l < 0.01) v.fwd = best.ang;
   return v;
 }
-function drawStairPip(s, me, now) {
-  const box = $('stairPip'), pv = fxOn('pip') ? st.pip : null;
-  box.classList.toggle('on', !!pv);
-  box.classList.toggle('right', coach.active); // the tutorial coach sits top-left
-  if (!pv) return;
-  const cvp = box.querySelector('canvas'), px = Math.round(260 * DPR);
-  if (cvp.width !== px) { cvp.width = px; cvp.height = px; }
-  const c = cvp.getContext('2d'), z = px / (PIP_R * 2), R = st.rend, k = R.c.width / R.Wp, sm = smokes(s);
-  // the window is centred a little past the landing, turned the same way as your own view
-  const cx = pv.cx, cy = pv.cy, rot = st.rot || 0;
+// Seeing up and down stairs (he asked: live and part of the map, not a window in the corner): near a staircase you
+// can see, the other floor's landing is drawn right where the steps lead, in the map, fading out at its edges.
+// Floors sit side by side in the map grid, so it is that floor's picture moved by the staircase's offset.
+const stairCv = document.createElement('canvas');
+function drawStairView(s, me, now) {
+  const pv = fxOn('pip') ? st.pip : null;
+  if (!pv || !me) return;
+  const S = st.map.stairs[pv.s], W = st.map.W, sdx = (S.gb % W - S.ga % W) * CELL, sdy = (Math.floor(S.gb / W) - Math.floor(S.ga / W)) * CELL;
+  const offX = pv.up ? -sdx : sdx, offY = pv.up ? -sdy : sdy; // the other floor -> this floor
+  const z = st.zoom || 1, px = Math.ceil(PIP_R * 2 * z);
+  if (px < 8 || px > 4096) return;
+  if (stairCv.width !== px) { stairCv.width = px; stairCv.height = px; }
+  const c = stairCv.getContext('2d'), R = st.rend, k = R.c.width / R.Wp, sm = smokes(s);
+  // drawn at the same zoom and turn as your own view, centred a little past the landing
+  const cx = pv.x + Math.cos(pv.ang) * PIP_R * 0.55, cy = pv.y + Math.sin(pv.ang) * PIP_R * 0.55, rot = st.rot || 0; // just past the end of the steps, so it never covers you on them
   const F = st.map.floors[Math.max(0, floorAt(st.map, pv.x, pv.y))], fx0 = F.gx * CELL, fx1 = (F.gx + F.w) * CELL, fy1 = F.h * CELL;
-  c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#050607'; c.fillRect(0, 0, px, px);
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, px, px);
   const cs = Math.cos(rot), sn = Math.sin(rot);
   c.setTransform(z * cs, z * sn, -z * sn, z * cs, px / 2 - z * (cs * cx - sn * cy), px / 2 - z * (sn * cx + cs * cy));
   const D = PIP_R * 1.5, x0 = Math.max(fx0, cx - D), x1 = Math.min(fx1, cx + D), y0 = Math.max(0, cy - D), y1 = Math.min(fy1, cy + D);
@@ -2462,13 +2477,20 @@ function drawStairPip(s, me, now) {
     drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
   }
   c.restore();
-  // where you come out of the stairs: a dashed white ring
-  c.setTransform(1, 0, 0, 1, 0, 0);
-  const dx = (pv.x - cx) * z, dy = (pv.y - cy) * z, Lx = px / 2 + dx * cs - dy * sn, Ly = px / 2 + dx * sn + dy * cs;
-  c.setLineDash([4 * DPR, 3 * DPR]); c.lineWidth = 2 * DPR; c.strokeStyle = 'rgba(255,255,255,0.85)';
-  c.beginPath(); c.arc(Lx, Ly, 11 * DPR, 0, 7); c.stroke(); c.setLineDash([]);
-  const t = box.querySelector('b'), label = pv.up ? '▲ TOP OF THE STAIRS' : '▼ BOTTOM OF THE STAIRS';
-  if (t.textContent !== label) t.textContent = label;
+  // soft round edge, so it melts into this floor's map
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'destination-in';
+  const gr = c.createRadialGradient(px / 2, px / 2, px * 0.3, px / 2, px / 2, px / 2);
+  gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = gr; c.fillRect(0, 0, px, px); c.globalCompositeOperation = 'source-over';
+  // onto the top layer, where the steps lead on this floor
+  const P = w2s(cx + offX, cy + offY);
+  octx.save(); octx.setTransform(1, 0, 0, 1, 0, 0);
+  octx.drawImage(stairCv, P.x - px / 2, P.y - px / 2);
+  octx.font = `700 ${Math.round(12 * DPR)}px Barlow, sans-serif`; octx.textAlign = 'center';
+  octx.fillStyle = 'rgba(255,255,255,0.7)'; octx.strokeStyle = 'rgba(0,0,0,0.8)'; octx.lineWidth = 3 * DPR;
+  const L = pv.up ? '▲ UPSTAIRS' : '▼ DOWNSTAIRS', ly = P.y - px * 0.36;
+  octx.strokeText(L, P.x, ly); octx.fillText(L, P.x, ly);
+  octx.restore();
 }
 function ghostSeen(gh) {
   const sm = smokes(st.last);
