@@ -51,6 +51,7 @@ for (const id of MAP_LIST) {
   }
   for (const q of g.players.values()) { q.bot = false; q.alive = true; q.staged = false; q.ctrl = 'body'; q.downed = false; q.bracing = false; if (q.op === 'bulwark') q.op = 'ember'; } // the shield's melee is a bash
   const p = [...g.players.values()][0];
+  for (const q of g.players.values()) if (q !== p) { q.x = -4000; q.y = -4000; } // nobody else in the way of the hits
   // a 2-cell doorway in a straight wall, floor on both sides
   for (const o of m.openings) if (o.cells.every(c => m.tiles[c] === T.OPEN)) g.barricade(o.id, T.BARRI, true); // board everything up for the rest
   const o = m.openings.find(o => o.cells.length === 2 && o.cells.every(c => m.tiles[c] === T.BARRI) && o.cells.every(c => [W, -W].every(d => m.tiles[c + d] === T.FLOOR || m.tiles[c + d] === T.GROUND)));
@@ -76,6 +77,16 @@ for (const id of MAP_LIST) {
   g.barricade(o.id, T.BARRI);
   g.damageCell(o.cells[1], 1000);
   if (!o.cells.every(c => m.tiles[c] === T.OPEN)) fail(id, 'half a barricade left standing');
+  // rifle bullets wear it down: 320 damage of them in all breaks the whole board (10 rounds of 31 = 310 don't)
+  g.barricade(o.id, T.BARRI);
+  for (let i = 1; i <= 11; i++) {
+    p.x = cx + (i % 3 - 1) * 4; p.y = cy - CELL * 2; p.viewTime = null;
+    g.shotW = WEAPONS.k4; g.hitscan(p, p.x, p.y, Math.PI / 2, 600, 31, 'K4', 'AR'); g.shotW = null;
+    const broken = o.cells.every(c => m.tiles[c] === T.OPEN);
+    if (i < 11 && broken) fail(id, 'bullets broke the barricade after only', i * 31, 'damage');
+    if (i === 11 && !broken) fail(id, 'barricade still up after', i * 31, 'damage of bullets');
+  }
+  p.x = cx; p.y = cy - CELL * 1.2;
   // board it up again (defenders), then a shotgun: one blast is not enough, two are
   g.barricade(o.id, T.BARRI);
   if (m.holes[k]) fail(id, 'old bullet holes left in a new barricade');

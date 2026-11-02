@@ -75,7 +75,10 @@ export function botPrep(game, p) {
   // he asked: above Silver, defenders set the site up in earnest (every way in boarded, all their gadgets out); lower ranks are sloppy
   const lvl = p.pro ? TOP_BOT : lvlOf(game, p), earnest = lvl >= 3;
   const boardP = earnest ? 1 : lvl === 2 ? 0.6 : 0.35;
-  for (const o of siteOpenings) if (p.barri > 0 && m.tiles[o.cells[0]] === T.OPEN && Math.random() < boardP && game.barricade(o.id, T.BARRI)) p.barri--; // 3 each, like a person
+  // he asked: doors must not start the match planked. Boarding takes a person ~2.5 s each (holding E) plus the walk to
+  // the next one, so the bots' boards go up one at a time through preparation instead of all at once.
+  p.ai.boardQ = siteOpenings.filter(o => m.tiles[o.cells[0]] === T.OPEN && Math.random() < boardP).map(o => o.id);
+  p.ai.boardT = 2 + Math.random() * 4;
   // reinforce: hatches over the site first, then the site's breakable walls (outside-facing ones before the one
   // between the two site rooms), two each, like a team sharing out its reinforcements
   for (let n = 0; n < 2 && game.reinforce > 0; n++) {
@@ -418,6 +421,12 @@ function roamSpot(game, p) {
 export function botThink(game, p, dt) {
   amateurComms(game, p, dt);
   const ai = p.ai;
+  if (game.phase === PHASE.PREP && ai.boardQ && ai.boardQ.length && p.alive && !p.downed && (ai.boardT -= dt) <= 0) { // the next board of the queue set in botPrep
+    const id = ai.boardQ.shift(), o = game.map.openings[id];
+    if (p.barri > 0 && game.barricade(id, T.BARRI)) p.barri--;
+    else if (o && o.cells.every(c => game.map.tiles[c] === T.OPEN) && (ai.boardTry = (ai.boardTry || 0) + 1) < 12) ai.boardQ.push(id); // someone stood in it: try again later
+    ai.boardT = DUR.barricade + 1 + Math.random() * 2;
+  }
   const inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
   p.input = inp;
   if (p.alive && p.ctrl === 'drone') {

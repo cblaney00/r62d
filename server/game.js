@@ -9,6 +9,7 @@ import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
+const BARRI_BULLET_HP = 320; // bullet damage that breaks a whole wooden barricade (he asked)
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
@@ -875,6 +876,7 @@ export class Game {
       if (penBullet(tile)) {
         if ((tile === T.SOFT || tile === T.BARRI) && HOLE_ONLY.has(cls)) this.holeCell(k, cx, cy, x0, y0, dx, dy, t);
         else this.damageCell(k, dmg * (tile === T.BARRI ? 0.35 : 0.6)); // a shotgun needs two blasts for a barricade
+        if (tile === T.BARRI) this.barriShot(k, dmg * mult); // any bullets: 320 damage in all and the whole board goes
         // he asked: a wall takes damage off the bullet (how much depends on the gun and the wall), so spraying
         // through walls in someone's general direction doesn't win fights
         mult *= pen * (this.map.mat[k] === MAT.BRICK ? 0.7 : tile === T.BARRI ? 1.1 : 1); pens++; wallT = t;
@@ -1232,6 +1234,13 @@ export class Game {
     for (const o of m.openings) if (o.kind === 'window' && o.cells.every(c => m.tiles[c] === T.OPEN)) this.barricade(o.id, T.BARRI, true);
   }
 
+  // he asked: bullets wear a planked door or window right down: 320 damage of bullets in all breaks the whole board
+  barriShot(k, dmg) {
+    const id = this.map.openId[k]; if (id < 0 || id === undefined) return;
+    const D = this.map.barriDmg || (this.map.barriDmg = {});
+    if ((D[id] = (D[id] || 0) + dmg) >= BARRI_BULLET_HP) { delete D[id]; this.destroyCell(k); }
+  }
+
   // A melee hit on a barricade: three break it (the whole board across the doorway or window, like R6)
   barriHit(k) {
     const o = this.map.openings[this.map.openId[k]], cells = o ? o.cells.filter(c => this.map.tiles[c] === T.BARRI) : [k];
@@ -1251,6 +1260,7 @@ export class Game {
     if (o.cells.some(c => this.cellOccupied(c))) return false;
     if (type === T.BARRI && !this.canBarricade(openingId)) return false;
     for (const c of o.cells) { this.map.tiles[c] = type; this.map.hp[c] = CELL_HP[type]; this.changed.add(c); if (this.map.holes[c]) delete this.map.holes[c]; }
+    if (this.map.barriDmg) delete this.map.barriDmg[openingId]; // fresh boards
     if (quiet) return true;
     const c0 = o.cells[0], W = this.map.W;
     this.events.push({ e: 'snd', s: type === T.PANEL ? 'panel' : 'barricade', x: (c0 % W + 0.5) * CELL, y: (Math.floor(c0 / W) + 0.5) * CELL });

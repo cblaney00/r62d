@@ -9,11 +9,12 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
 - [ ] the autodirector should showcase both teams evenly more or less (whichever team is more exciting to view at the moment), also viewers should get to see the vision of both teams with a slight tint to the vision cones
 - [ ] the bots should also just stand around less, they get impatient just like people do, they take risks for better position and the element of surprise or experience gained from lots of games
-- [ ] lets just make those preparation phase like 10 seconds shorter
-- [ ] bullets should also be able to fully destroy wooden planked doors after 320 damage of bullets
 
 ## Done
 
+- [x] Preparation is 10 seconds shorter (30 s instead of 40).
+- [x] Doors no longer start the match planked: the defending bots used to board every site door the instant preparation began; now they put the boards up one at a time through preparation, taking as long as a person would. Windows still start boarded.
+- [x] Bullets break wooden planks: any gun's bullets wear a planked door or window down, and 320 damage of bullets in all brings the whole board down (about 11 rifle rounds). Holes and the shotgun/melee rules work as before.
 - [x] Seeing up and down stairs is now live and part of the map: near a staircase you can see, the floor at the other end shows right where the steps lead (the lobby at the bottom, the landing at the top), in live colour, with the people there, fading softly into the map, instead of the small window in the corner. Going up or down, the camera now carries straight on to the same spot on the new floor instead of jumping.
 - [x] Operators window spread out: it fills almost the whole screen now, the picture is a little smaller so the words get the width, and the bio and skill text are bigger with more room between lines and sections. (The "Who are you?" name box was squashed into narrow columns by an old leftover style; fixed too.)
 - [x] Slow mouse moves now always reach the game: Firefox on this desktop throws away mouse steps smaller than a pixel, and mouse acceleration turns slow moves into exactly those. Opening the game now switches the mouse to flat (every step counts 1:1) and puts your old setting back when you close it, so nothing needs changing on your computer.
