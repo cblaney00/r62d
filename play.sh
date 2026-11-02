@@ -25,6 +25,7 @@ user_pref("media.autoplay.default", 0);
 user_pref("full-screen-api.warning.timeout", 0);
 user_pref("browser.tabs.warnOnClose", false);
 user_pref("dom.disable_beforeunload", true);
-user_pref("permissions.default.shortcuts", 2);
+user_pref("permissions.default.shortcuts", 1); // the game may keep Ctrl+W / Ctrl+Q etc. (he lost a match mashing Ctrl to crouch)
+user_pref("browser.quitShortcut.disabled", true);
 PREFS
 exec firefox --kiosk --no-remote --profile "$PROFILE" "http://localhost:6262/?app=1"

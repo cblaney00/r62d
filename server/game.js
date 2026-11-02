@@ -1,9 +1,9 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
-import { findVault } from '../shared/physics.js';
+import { findVault, M_S } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
-import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, SELF_UP, SELF_UP_TIME } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, SELF_UP, SELF_UP_TIME, moveOf } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep, assignPros, proSay } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
@@ -15,7 +15,7 @@ const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
 const BOT_NAMES = ['Viper', 'Moss', 'Rook-7', 'Static', 'Juno', 'Kilo', 'Brine', 'Ozone', 'Pike', 'Wick', 'Saber', 'Flint'];
-const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
+const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0 };
 const JAM_R = 90;
 const VAULT_TIME = 0.6, VAULT_RECOVER = 0.35; // climbing over (no shooting, gun down), then a moment before you can aim again
 const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free play's switching order
@@ -470,7 +470,8 @@ export class Game {
     const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || !!p.rope || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') ||
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
       (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK);
-    return { armor: o.armor, mul, downed: p.downed, frozen };
+    const gw = p.guns && p.guns[p.slot] ? moveOf(WEAPONS[p.guns[p.slot].w]) : [1, 1];
+    return { armor: o.armor, mul, downed: p.downed, frozen, gw: gw[0], ga: gw[1] };
   }
 
   applyMove(p, dt) {
@@ -485,8 +486,11 @@ export class Game {
     const before = { x: p.x, y: p.y };
     stepMove(this.map, p, p.input, dt, m);
     const moved = Math.hypot(p.x - before.x, p.y - before.y) / dt;
-    p.moving = moved < 5 ? 0 : (p.input.crouch || p.input.walk) ? 1 : 2;
-    if (p.moving === 2 && !this.ghost(p) && !p.shrouded && this.time - (p.noiseT || 0) > 0.3) { p.noiseT = this.time; this.noise(p.x, p.y, this.side(p), 320); } // running footsteps (none from HUSH's shroud)
+    // how loud your steps are follows how fast you move (he asked): walking/crouching is silent, aiming in is faint, a jog is loud
+    const loud = p.input.crouch ? 0 : 320 * Math.max(0, Math.min(1, (moved / PX_PER_M - 1.45) / (M_S.run - 1.45)));
+    p.moving = moved < 5 ? 0 : loud < 60 ? 1 : 2;
+    if (p.landed) { p.landed = false; if (!p.shrouded) this.noise(p.x, p.y, this.side(p), 220); this.events.push({ e: 'snd', s: 'land', x: r1(p.x), y: r1(p.y), id: p.id }); } // a landing thump
+    if (loud >= 30 && !this.ghost(p) && !p.shrouded && this.time - (p.noiseT || 0) > 0.3) { p.noiseT = this.time; this.noise(p.x, p.y, this.side(p), loud); } // running footsteps (none from HUSH's shroud)
   }
 
   tickPlayer(p, dt) {
@@ -509,7 +513,7 @@ export class Game {
       if (this.time < (p.sprintUntil || 0) && this.time - (p.sprintNoiseT || 0) > 0.4) { const d = this.ent(p.droneId); if (d) { p.sprintNoiseT = this.time; this.noise(d.x, d.y, team, 260); } }
     } else if (this.time < (p.sprintUntil || 0)) { p.sprintUntil = this.time; p.sprintCd = this.time + DRONE_SPRINT.wait; }
     this.tickRope(p, dt);
-    if (this.free && !p.bot && p.sock && p.alive) this.godMode(p); // (only a real connected player, not the test harness)
+    if (this.free && this.free.god !== false && !p.bot && p.sock && p.alive) this.godMode(p); // (only a real connected player, not the test harness)
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
     { const g = p.guns[p.slot], rate = (1 / (g ? adsTime(WEAPONS[g.w]) : 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
       const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time) && !p.vault && !(p.recoverUntil > this.time);
@@ -683,7 +687,7 @@ export class Game {
     gun.ammo--; p.fireCd = Math.max(p.fireCd, -1 / 30) + 60 / w.rpm; // keep the leftover: guns fire at their real rate, not rounded up to whole ticks
     if (p.ms) p.ms.shots += w.pellets;
     // hip fire is a loose cone that widens while moving; aimed fire is accurate even on the move (R6 rules)
-    const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED), at = p.adsT || 0;
+    const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED + (p.air > 0 ? 1.5 : 0)), at = p.adsT || 0; // mid-jump: wild
     const m = gun.m || gunMods(gun.w);
     // the aiming model (shared/operators.js): exact first shot, a fixed cone after that, a fixed recoil pattern
     const cone = spreadCone(w, m, { at, run, crouch: !!p.input.crouch, shots: aimHeat(w, p.shots || 0, this.time - p.lastShot, m) }) * (this.time < (p.dazeUntil || 0) && p.shots ? 1.7 : 1); // dazed: shaky follow-ups
@@ -1667,6 +1671,8 @@ export class Game {
       if (dummy) { const at = this.freeSpotNear(p.x + Math.cos(p.aim) * 3 * PX_PER_M, p.y + Math.sin(p.aim) * 3 * PX_PER_M, 30); b.hold = true; b.dummyAt = at; }
       this.freeSpawn(b, true);
       if (dummy) this.dummyPlace(b, p);
+    } else if (m.a === 'god') { F.god = !!m.on; // the free play menu's switches (he asked)
+    } else if (m.a === 'botsFire') { F.noFire = !m.on;
     } else if (m.a === 'clearBots') {
       for (const q of [...this.players.values()]) if (q.bot) { if (q.hasDefuser) this.dropDefuser(q); this.players.delete(q.id); }
     } else if (m.a === 'pick' && this.phase === PHASE.ACTION && OPERATORS[m.op]) { // the operator grid
@@ -2255,7 +2261,7 @@ export class Game {
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
-        rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
+        el: p.up ? 1 : p.air > 0 ? 2 : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ct: p.ctrl,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
         gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && (this.time < (p.shieldOpenUntil || 0) || this.time < (p.shieldDownUntil || 0)) ? (this.time < (p.shieldDownUntil || 0) ? 2 : 1) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
@@ -2270,7 +2276,7 @@ export class Game {
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur)] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
-        m: this.mods(p), vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined, df: p.deafUntil > this.time ? 1 : undefined, su: p.downed && SELF_UP.has(p.op) ? r2(p.selfUp / SELF_UP_TIME) : undefined, scd: p.shroudCd > this.time ? r1(p.shroudCd - this.time) : undefined,
+        m: this.mods(p), jp: [r2(p.air || 0), p.up ? 1 : 0, r2(p.jcd || 0), r1(p.lo || 0)], vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined, df: p.deafUntil > this.time ? 1 : undefined, su: p.downed && SELF_UP.has(p.op) ? r2(p.selfUp / SELF_UP_TIME) : undefined, scd: p.shroudCd > this.time ? r1(p.shroudCd - this.time) : undefined,
       }));
       return o;
     });

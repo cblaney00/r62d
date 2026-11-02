@@ -529,6 +529,9 @@ export const recoilOf = w => { const r = RECOIL[w.cls] || RECOIL.AR; return { ki
 export const falloffOf = w => w.fall || FALLOFF[w.cls] || FALLOFF.AR;
 // how much of a bullet's damage is left after one soft wall (brick takes 30% more off, a wooden barricade a little less)
 export const PEN = { AR: 0.5, LMG: 0.62, DMR: 0.68, SMG: 0.4, MP: 0.35, Pistol: 0.4, Shotgun: 0.3 };
+// how a gun changes your walking (Shift) and aiming-in speed (he asked): light guns move quicker, heavy ones slower
+export const GUN_MOVE = { Pistol: [1.08, 1.12], MP: [1.05, 1.08], SMG: [1.0, 1.0], Shotgun: [0.97, 0.95], AR: [0.95, 0.92], DMR: [0.92, 0.85], LMG: [0.88, 0.8] };
+export const moveOf = w => (w && (w.move || GUN_MOVE[w.cls])) || [1, 1];
 export const penOf = w => w.pen || PEN[w.cls] || 0.5;
 // how "hot" the gun still is: the shots of this burst, cooling to 0 over the settle time (fractions make a smaller cone)
 export const aimHeat = (w, shots, idle, m) => shots * Math.max(0, 1 - Math.max(0, idle - 60 / w.rpm * 1.05) / (settleTime(w) * (m && m.settle || 1)));

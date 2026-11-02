@@ -766,3 +766,9 @@ html.tv #chat { display: none; }
 #freeOps .foBots b { font: 700 14px var(--head); letter-spacing: 0.2em; color: var(--dim); }
 #freeOps .foBots button { font: 700 15px var(--head); letter-spacing: 0.08em; padding: 7px 14px; }
 #freeOps .foBots .foCount { color: var(--dim); margin-left: auto; }
+
+/* screen effect switches (he asked) */
+.fxToggles { margin: 8px 0 4px; }
+#fxList { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+#fxList .tog { font-size: 13px; padding: 4px 9px; opacity: 0.6; }
+#fxList .tog.on { opacity: 1; }

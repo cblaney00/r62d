@@ -15,10 +15,10 @@ export const VAULT_DEPTH = 2.2;  // the thickest thing you can vault over, in ce
 export function findVault(map, x, y, ang) {
   const dx = Math.cos(ang), dy = Math.sin(ang), blk = bodyBlocks(map);
   const cellK = d => { const cx = Math.floor((x + dx * d) / CELL), cy = Math.floor((y + dy * d) / CELL); return cx < 0 || cy < 0 || cx >= map.W || cy >= map.H ? -1 : cy * map.W + cx; };
-  let start = -1;
+  let start = -1, sk = -1;
   for (let d = 2; d <= PLAYER_R + VAULT_REACH; d += 1.5) {
     const k = cellK(d); if (k < 0) return null;
-    if (vaultable(map, k)) { start = d; break; }
+    if (vaultable(map, k)) { start = d; sk = k; break; }
     if (blk(map.tiles[k], k)) return null;
   }
   if (start < 0) return null;
@@ -26,7 +26,7 @@ export function findVault(map, x, y, ang) {
     const k = cellK(d); if (k < 0) return null;
     if (blk(map.tiles[k], k) && !vaultable(map, k)) return null;
     const px = x + dx * d, py = y + dy * d;
-    if (d > start + 4 && !circleBlocked(map, px, py, PLAYER_R, blk)) return { x: px, y: py };
+    if (d > start + 4 && !circleBlocked(map, px, py, PLAYER_R, blk)) return { x: px, y: py, k: sk };
   }
   return null;
 }
@@ -60,9 +60,12 @@ function resolve(map, o, r, blockFn) {
   return hit;
 }
 
-export function moveCircle(map, o, dx, dy, r, drone = false) {
+// standing on (or jumping onto) furniture (he asked): low furniture and wall stubs can be stood on; drop ledges and windows can't
+export const standable = (map, k) => map.tiles[k] === T.LOW && map.floor[k] !== FL.VOID;
+export function moveCircle(map, o, dx, dy, r, drone = false, up = false) {
   // drones also slip through the drone holes at the foot of plain walls (gone once the wall is reinforced)
-  const fn = drone ? (t, k) => blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) : bodyBlocks(map);
+  const body = bodyBlocks(map);
+  const fn = drone ? (t, k) => blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) : up ? (t, k) => body(t, k) && !standable(map, k) : body;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (r * 0.5)));
   for (let s = 0; s < steps; s++) {
     o.x += dx / steps; resolve(map, o, r, fn);
@@ -76,6 +79,7 @@ export function moveCircle(map, o, dx, dy, r, drone = false) {
 //   operator (2.3 heavy, 3.0 light); walking (Shift) 1.4 m/s, a normal walk; aiming down sights 1.5 m/s;
 //   crouch-walking 0.9 m/s; crawling while downed 0.5 m/s; a drone 3.2 m/s, a little quicker than a jog.
 export const M_S = { run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, downed: 0.5, drone: 3.2, rope: 1.0 };
+export const JUMP_T = 0.42, LEAN_PX = 8, LEAN_SPEED = 60; // a hop's airtime (s); how far and fast a lean moves you (px, px/s)
 export const BASE_SPEED = M_S.run * PX_PER_M;   // ~94 px/s (was 118)
 export const DRONE_SPEED = M_S.drone * PX_PER_M; // ~115 px/s (was 200)
 export const ARMOR_SPEED = { 1: 0.88, 2: 1.0, 3: 1.14 };
@@ -95,8 +99,10 @@ export function stepMove(map, o, input, dt, mods) {
     spd = BASE_SPEED * (ARMOR_SPEED[mods.armor] || 1) * (mods.mul || 1);
     if (mods.downed) spd = M_S.downed * PX_PER_M;
     else if (input.crouch) spd *= M_S.crouch / M_S.run; // crouch: slowest, silent, most accurate
-    else if (input.walk) spd *= M_S.walk / M_S.run;     // walk (Shift): silent
-    else if (input.ads) spd *= M_S.ads / M_S.run;       // aiming down sights: slow and steady
+    if (input.lean) spd *= 0.7; // leaning: careful steps
+    if (o.up && !(o.air > 0)) spd *= 0.75; // up on furniture
+    else if (input.ads) spd *= M_S.ads * (mods.ga || 1) / M_S.run; // aiming in: the gun's own pace; holding Shift too adds nothing (he asked)
+    else if (input.walk) spd *= M_S.walk * (mods.gw || 1) / M_S.run; // walk (Shift): silent, the gun's own pace
   }
   // Weight: velocity eases toward where you want to go instead of jumping there.
   o.vx = o.vx || 0; o.vy = o.vy || 0;
@@ -120,7 +126,22 @@ export function stepMove(map, o, input, dt, mods) {
     o.gait = (o.gait || 0) + v * dt / stride * Math.PI;
   }
   const bx = o.x, by = o.y;
-  moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? DRONE_R : PLAYER_R, !!mods.drone);
+  // jumping (he asked): Space hops for JUMP_T; in the air or up on furniture, low furniture doesn't block you
+  if (!mods.drone) {
+    o.jcd = Math.max(0, (o.jcd || 0) - dt);
+    if (input.jump && !(o.air > 0) && !o.jcd && !mods.downed && !input.crouch) { o.air = JUMP_T; o.jcd = JUMP_T + 0.35; }
+  }
+  const wasAir = o.air > 0;
+  moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? DRONE_R : PLAYER_R, !!mods.drone, !mods.drone && (wasAir || !!o.up));
+  if (!mods.drone) {
+    if (wasAir) { o.air -= dt; if (o.air <= 0) { o.air = 0; o.up = standable(map, Math.floor(o.y / CELL) * map.W + Math.floor(o.x / CELL)); o.landed = true; } }
+    else if (o.up && !standable(map, Math.floor(o.y / CELL) * map.W + Math.floor(o.x / CELL))) o.up = false; // stepped off: back on the floor
+    // leaning (he asked, Q / E): the upper body slides up to LEAN_PX to the side you lean, against walls like a step would
+    const want = (input.lean | 0) * LEAN_PX; o.lo = o.lo || 0;
+    let d = Math.max(-LEAN_SPEED * dt, Math.min(LEAN_SPEED * dt, want - o.lo));
+    if (Math.abs(d) > 0.01) { const a = (Number(input.la) || 0) + Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a), px = o.x, py = o.y;
+      moveCircle(map, o, ca * d, sa * d, PLAYER_R, false, !!o.up); const got = (o.x - px) * ca + (o.y - py) * sa; o.lo += got; } // only what really moved is undone when you stop leaning
+  }
   takeStairs(map, o);
   // walking into a wall soaks up the velocity in that direction
   if (dt > 0) {

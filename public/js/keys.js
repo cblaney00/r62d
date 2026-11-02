@@ -7,27 +7,29 @@ export const ACTIONS = [
   ['right', 'Move right', 'KeyD', 'ArrowRight'],
   ['walk', 'Walk — silent (hold)', 'ShiftLeft', ''],
   ['crouch', 'Crouch — silent, most accurate (hold)', 'ControlLeft', 'KeyC'],
-  ['interact', 'Use — reinforce, barricade, plant, defuse, revive (hold)', 'KeyE', 'KeyF'],
+  ['interact', 'Use — reinforce, barricade, plant, defuse, revive (hold)', 'KeyF', ''],
+  ['leanL', 'Lean left (hold)', 'KeyQ', ''],
+  ['leanR', 'Lean right (hold)', 'KeyE', ''],
   ['reload', 'Reload', 'KeyR', ''],
   ['primary', 'Primary weapon', 'Digit1', ''],
   ['secondary', 'Secondary weapon', 'Digit2', ''],
-  ['gadget', 'Gadget / grenade', 'Digit4', 'KeyG'],
-  ['ability', 'Operator skill', 'KeyQ', 'KeyZ'],
+  ['gadget', 'Gadget / grenade', 'KeyG', ''],
+  ['ability', 'Operator skill', 'Digit4', 'KeyZ'],
   ['view', 'Drone / Cameras', 'Digit5', ''],
   ['melee', 'Melee (knife)', 'Digit3', 'KeyV'],
-  ['vault', 'Vault over low furniture, windows and knocked-through walls', 'Space', ''],
+  ['vault', 'Jump (onto furniture) — vaults windows and wall stubs', 'Space', ''],
   ['spot', 'Ping what is under your aim (enemy, gadget, wall, door, place)', 'KeyT', ''],
   ['chat', 'Chat (opens team chat; / switches team ⇄ all)', 'KeyY', 'Enter'],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['opNext', 'Free play: next operator', 'KeyN', ''],
   ['opPrev', 'Free play: previous operator', 'KeyB', ''],
   ['opGrid', 'Free play: choose any operator', 'KeyO', ''],
-  ['settings', 'Settings', 'KeyO', 'F1'],
+  ['settings', 'Settings', 'F1', ''],
   ['pause', 'Pause menu', 'Escape', 'KeyP'],
 ];
 
-const KEY = 'r62d-keys-v3'; // v3 = CS2-style defaults
-export const BINDS_VERSION = 3;
+const KEY = 'r62d-keys-v4'; // v4 = lean on Q/E, use on F, skill on 4, gadget on G, Space jumps (he asked)
+export const BINDS_VERSION = 4;
 let binds = {};
 export function loadBinds() {
   binds = {};

@@ -22,7 +22,7 @@ import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
 const rankTag = i => i == null ? '' : `<span class="rankTag" style="color:${RANK_COL[i]};border-color:${RANK_COL[i]}">${RANKS[i].toUpperCase()}</span>`;
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
-import { walkRay, tileAt, findVault } from '/shared/physics.js';
+import { walkRay, tileAt, findVault, standable } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
 import { drawQr } from './qr.js';
 import { touchPad, touchContext, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
@@ -139,6 +139,7 @@ let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return 
 // the screen edge slides the camera after it (and zooms out if it has to), out to st.reachW. Nearer walls only hold
 // the crosshair on the wall while they are in the way; it comes back out when you aim past them.
 let aimOff = { x: 150, y: 0 };
+const AHEAD = () => Math.max(36 * DPR, VH * 0.13); // screen room always left beyond the crosshair
 const AIM_MIN = () => 46 * DPR / (st.zoom || 1), AIM_MAX = () => st.reachW || 400;
 // how far a view can grow to fit you and your crosshair: further when aiming in, furthest with a 2x scope
 const FIT_H = me => me && me.ad ? (String(me.aa).includes('scope') ? 1000 : 820) : 700;
@@ -460,6 +461,7 @@ function reconcile() {
   if (st.predCtrl !== me.ct || st.predDid !== me.did) { st.predCtrl = me.ct; st.predDid = me.did; st.pending = []; }
   st.pending = st.pending.filter(i => i.s > me.ls);
   st.pred.x = pos.x; st.pred.y = pos.y; st.pred.vx = pos.vx || 0; st.pred.vy = pos.vy || 0; st.pred.gait = pos.gait || 0;
+  if (me.jp && me.ct !== 'drone') { st.pred.air = me.jp[0]; st.pred.up = !!me.jp[1]; st.pred.jcd = me.jp[2]; st.pred.lo = me.jp[3]; }
   const mods = me.m || {};
   for (const i of st.pending) stepMove(st.map, st.pred, i.k, i.dt, mods);
 }
@@ -516,7 +518,7 @@ function onEvent(e, s, players) {
     case 'down': { const v = players.get(e.id); if (v) addFeed(`${v.n} is down`); break; }
     case 'msg': if (!e.team || e.team === mySide()) addFeed(e.text); break;
     case 'banner': if (!e.team || e.team === mySide()) banner(e.text, e.sub); audio.ui('round'); break;
-    case 'found': if (e.team === mySide()) siteFound(s); break;
+    case 'found': if (e.team === mySide() && fxOn('site')) siteFound(s); break;
     case 'roundEnd': {
       if (st.tv) { const T = PRO_TEAMS[e.squad]; banner(T ? `${T.name.toUpperCase()} WIN THE ROUND` : 'ROUND OVER', e.reason, T ? T.colour : '#fff'); break; }
       const won = st.me && e.squad === st.me.sq;
@@ -560,7 +562,7 @@ addEventListener('keydown', e => {
   if ((e.code === 'Enter' || e.code === 'NumpadEnter') && coach.blocking && !e.repeat) { coach.space(st.last); e.preventDefault(); return; } // Enter dismisses a tutorial card too
   if (st.tv && !menuOpen() && tvKey(e)) { e.preventDefault(); return; }
   const a = actionFor(e.code);
-  if (a || e.code === 'AltLeft' || e.code === 'AltRight' || e.code === 'Tab') e.preventDefault();
+  if (a || e.code === 'AltLeft' || e.code === 'AltRight' || e.code === 'Tab' || ((e.ctrlKey || e.metaKey) && playing())) e.preventDefault(); // Ctrl is crouch: Ctrl+W etc. must not close the game
   if (!a || keys.has(a)) return;
   pressAction(a, e);
 });
@@ -582,7 +584,12 @@ function pressAction(a, e) {
     case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
     case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
-    case 'vault': ev.push({ k: 'vault', a: Math.round(vaultDir() * 1000) / 1000 }); break;
+    case 'vault': { // Space: vault a window or wall stub in front of you, otherwise jump (he asked)
+      const p = st.pred, m = st.map, me = st.me;
+      const v = p && m && me && !(me.jp && me.jp[1]) ? findVault(m, p.x, p.y, vaultDir()) : null;
+      if (v && !standable(m, v.k)) ev.push({ k: 'vault', a: Math.round(vaultDir() * 1000) / 1000 });
+      else st.jumpReq = performance.now();
+      break; }
     case 'opNext': case 'opPrev': if (st.last && st.last.fp) send({ t: 'free', a: 'op', dir: a === 'opNext' ? 1 : -1 }); break;
     case 'opGrid': if (st.last && st.last.fp) toggleFreeOps(); break;
     case 'camPrev': case 'camNext': if (st.me && (st.me.ct === 'cam' || st.me.ct === 'drone')) ev.push({ k: a }); break;
@@ -674,7 +681,21 @@ cv.addEventListener('mousedown', e => { if (e.button === 1) { e.preventDefault()
 
 // ---------------- settings ----------------
 function toggleSettings() { $('settings').classList.toggle('hidden'); renderSettings(); }
+// screen effects anyone can switch off (he asked), remembered on this computer
+const FX_OPTS = [['shake', 'Screen shake'], ['hurt', 'Red edges when hurt'], ['hit', 'Hit markers'], ['pts', 'Points pop-ups'], ['sight', 'Sight glow when aiming in'],
+  ['compass', 'Bomb-site compass'], ['pip', 'Stairs preview window'], ['site', 'Bomb-site found card'], ['vignette', 'Dark screen corners']];
+let fxOff = new Set(); try { fxOff = new Set(JSON.parse(localStorage.getItem('r62d-fxoff') || '[]')); } catch {}
+const fxOn = k => !fxOff.has(k);
+function renderFxList() {
+  const el = $('fxList'); if (!el) return;
+  el.innerHTML = FX_OPTS.map(([k, n]) => `<button class="tog${fxOn(k) ? ' on' : ''}" data-fx="${k}">${n}: ${fxOn(k) ? 'ON' : 'OFF'}</button>`).join('');
+  for (const b of el.querySelectorAll('button')) b.onclick = () => { audio.ui(); const k = b.dataset.fx; fxOff.has(k) ? fxOff.delete(k) : fxOff.add(k);
+    try { localStorage.setItem('r62d-fxoff', JSON.stringify([...fxOff])); } catch {} renderFxList(); applyFx(); };
+}
+function applyFx() { const v = $('vignette'); if (v) v.style.display = fxOn('vignette') ? '' : 'none'; }
+applyFx();
 function renderSettings() {
+  renderFxList();
   const el = $('settings'); if (el.classList.contains('hidden')) return;
   const rows = ACTIONS.map(([id, name]) => {
     const b = bindsFor(id);
@@ -1019,7 +1040,7 @@ function compassRoute(s, from) {
 }
 function drawCompass(s, me, now) {
   const box = $('compass');
-  const show = s && me && me.a && s.ph === PHASE.ACTION && (me.tm === 'def' || s.rev) && !st.tutorialHideCompass && st.map && st.map.sites[s.site];
+  const show = fxOn('compass') && s && me && me.a && s.ph === PHASE.ACTION && (me.tm === 'def' || s.rev) && !st.tutorialHideCompass && st.map && st.map.sites[s.site];
   box.classList.toggle('hidden', !show);
   if (!show) return;
   const from = { x: st.pred.x, y: st.pred.y };
@@ -1063,6 +1084,9 @@ function toggleFreeOps(force) {
     send({ t: 'free', a: k === 'clear' ? 'clearBots' : k === 'dummy' ? 'dummy' : 'bot', side: k === 'team' ? 'team' : 'enemy' });
     if (k === 'dummy') el.classList.add('hidden'); // back to the game to see it
   };
+  for (const b of el.querySelectorAll('[data-fs]')) { const k = b.dataset.fs, on = () => (st.freeSw || (st.freeSw = { god: true, fire: true }))[k];
+    const show = () => { b.textContent = `${k === 'god' ? 'GOD MODE' : 'BOTS SHOOT'}: ${on() ? 'ON' : 'OFF'}`; b.classList.toggle('primary', on()); }; show();
+    b.onclick = () => { audio.ui(); st.freeSw[k] = !on(); send({ t: 'free', a: k === 'god' ? 'god' : 'botsFire', on: on() }); show(); }; }
   { const n = (st.last ? st.last.players : []).filter(p => p.b).length; el.querySelector('.foCount').textContent = `${n} bot${n === 1 ? '' : 's'} in the match · up to 9`; }
   el.classList.remove('hidden'); audio.ui('open');
 }
@@ -1279,7 +1303,7 @@ function frame(nowMs) {
   const freeAim = !st.tv && view && view.kind === 'body' && padOn && aimMode === 'free' && !gpRecent();
   if (freeAim) {
     const q = freeAimPoint(), cA = Math.abs(Math.cos(st.aim)), sA = Math.abs(Math.sin(st.aim));
-    const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), mg = 86 * DPR / (st.zoom || 1);
+    const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), mg = (50 * DPR + AHEAD()) / (st.zoom || 1);
     const capH = FIT_H(me), need = Math.min(capH, (q.ad + mg) / (2 * e));
     st.reachW = Math.max(160, capH * 2 * e - mg);
     st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need;
@@ -1290,7 +1314,7 @@ function frame(nowMs) {
   if (freeAim) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
     const keep = (x, y, m) => { st.cam.x = Math.min(x + hw - m, Math.max(x - hw + m, st.cam.x)); st.cam.y = Math.min(y + hh - m, Math.max(y - hh + m, st.cam.y)); };
-    keep(st.pred.x, st.pred.y, 50 * DPR / st.zoom); keep(q.ax, q.ay, 36 * DPR / st.zoom);
+    keep(st.pred.x, st.pred.y, 50 * DPR / st.zoom); keep(q.ax, q.ay, AHEAD() / st.zoom); // always some room past the crosshair (he asked)
   }
   if (view && view.kind === 'cam' && !view.dr) { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
   { // never look past the edge of the floor you are on (other floors sit beside it in the map grid)
@@ -1335,7 +1359,9 @@ function sendInput(dt, me, ctrl, view, s, now) {
     up: keys.has('up') || gpk.up ? 1 : 0, down: keys.has('down') || gpk.down ? 1 : 0, left: keys.has('left') || gpk.left ? 1 : 0, right: keys.has('right') || gpk.right ? 1 : 0,
     walk: keys.has('walk') || gpk.walk ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
+    lean: (keys.has('leanR') ? 1 : 0) - (keys.has('leanL') ? 1 : 0), jump: performance.now() - (st.jumpReq || -1e9) < 120 ? 1 : 0,
   };
+  if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
   if (st.rot) k.rot = Math.round(-st.rot * 1000) / 1000; // Rotate aiming: W walks up the screen
   // ping whatever is under your aim: an enemy you can see, else a gadget, camera or the objective, else the wall, door or floor you point at
@@ -1584,7 +1610,7 @@ function fillPoly(c, pts) { c.beginPath(); c.moveTo(pts[0], pts[1]); for (let i 
 
 function draw(s, view, now, dt) {
   const z = st.zoom, m = st.map; let tq = performance.now();
-  const shake = fx.shake;
+  const shake = fxOn('shake') ? fx.shake : 0;
   const cr = Math.cos(st.rot || 0), sr = Math.sin(st.rot || 0), TA = z * cr, TB = z * sr, TC = -z * sr, TD = z * cr; // world -> screen (turned with Rotate aiming)
   const ox = VW / 2 - (TA * st.cam.x + TC * st.cam.y) + (Math.random() - 0.5) * shake * DPR, oy = VH / 2 - (TB * st.cam.x + TD * st.cam.y) + (Math.random() - 0.5) * shake * DPR;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1684,10 +1710,16 @@ function draw(s, view, now, dt) {
     // Silent Shroud: drones and cameras can't see her, only eyes can
     const vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
     if (!vis) continue;
+    // up on furniture or mid-jump (he asked: an obvious but tidy marker): a shadow below, a dashed ring, drawn a little bigger
+    const elv = isMe ? (st.pred.air > 0 ? 2 : st.pred.up ? 1 : 0) : p.el || 0;
+    if (elv) { ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 5, 11, 9, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.arc(p.x, p.y, 15.5, 0, 7); ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     drawOperator(ctx, {
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, downed: p.dn,
       recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, p.so === 1, p.so === 2) : null, scan: p.sc, melee: a.melee,
     }, now);
+    if (elv) ctx.restore();
     drawn.push(p);
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x, y: p.y });
     if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see
@@ -1837,7 +1869,7 @@ function draw(s, view, now, dt) {
   if (view && view.kind === 'cam') { if (view.dr) droneOverlay(now, ents, view.cam); else camOverlay(view, now); }
   if (me && me.a && me.sc) { ctx.fillStyle = 'rgba(70,90,255,0.12)'; ctx.fillRect(0, 0, VW, VH); }
   const hurtK = Math.max(0, 1 - (now - st.hurtT) / 0.8);
-  if (hurtK > 0) {
+  if (hurtK > 0 && fxOn('hurt')) {
     const g = ctx.createRadialGradient(VW / 2, VH / 2, VH * 0.3, VW / 2, VH / 2, VH * 0.8);
     g.addColorStop(0, 'rgba(160,0,0,0)'); g.addColorStop(1, `rgba(160,0,0,${0.45 * hurtK})`);
     ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
@@ -1850,7 +1882,15 @@ function draw(s, view, now, dt) {
   const fl = st.flashUntil - now;
   if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(1, fl / 1.2)})`; ctx.fillRect(0, 0, VW, VH); }
   if (inGame && me && me.a && me.ct === 'body' && !me.br) crosshair(me, now);
-  else if (inGame) { const c = cursor(); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(c.x, c.y, 2 * DPR, 0, 7); ctx.fill(); }
+  else if (inGame) { // drone / camera / spectating: a clear reticle (he asked: the old dot was too hard to see)
+    const c = cursor(), r = 10 * DPR, t = 6 * DPR;
+    for (const [col, w] of [['rgba(0,0,0,0.85)', 3.4 * DPR], ['#7dffb0', 1.6 * DPR]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, 7);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(c.x + dx * (r + 2 * DPR), c.y + dy * (r + 2 * DPR)); ctx.lineTo(c.x + dx * (r + t), c.y + dy * (r + t)); }
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(c.x, c.y, 2.6 * DPR, 0, 7); ctx.fill(); ctx.fillStyle = '#7dffb0'; ctx.beginPath(); ctx.arc(c.x, c.y, 1.6 * DPR, 0, 7); ctx.fill();
+  }
   if (inGame && padOn && aimMode === 'pad' && !gpRecent() && !menuOpen()) aimPad();
 }
 
@@ -1952,7 +1992,7 @@ function crosshair(me, now) {
   const cone = w ? spreadCone(w, gm, { at: me.at || 0, run, crouch: !!me.cr, shots: gunHeat(me, w, now) }) : 0;
   const spread = xh.dynamic ? Math.tan(cone) * Math.hypot(m.x - px, m.y - py) / DPR : 0;
   // aiming in: each enemy you can see shows the zone your crosshair must be on for a headshot; it lights red when it is
-  if (me.at > 0.05 && me.ct === 'body') sightLook(attFromCode(me.aa).sight, x, y, Math.min(1, me.at));
+  if (me.at > 0.05 && me.ct === 'body' && fxOn('sight')) sightLook(attFromCode(me.aa).sight, x, y, Math.min(1, me.at));
   if (me.ad && st.heads) for (const h of st.heads) {
     const H = w2s(h.x, h.y), r = Math.max(2.5 * DPR, HEAD_AIM * (st.zoom || 1)), on = Math.hypot(x - H.x, y - H.y) <= r;
     ctx.lineWidth = (on ? 2 : 1.2) * DPR;
@@ -1965,7 +2005,7 @@ function crosshair(me, now) {
   drawXhair(ctx, x, y, xh, spread, DPR);
   ctx.globalAlpha = 1;
   // points popups under the crosshair (he asked, R6-style): newest at the top, each fades after a couple of seconds
-  if (st.ptsPops && st.ptsPops.length) {
+  if (st.ptsPops && st.ptsPops.length && fxOn('pts')) {
     st.ptsPops = st.ptsPops.filter(q => now - q.t < 2.4);
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     st.ptsPops.slice().reverse().forEach((q, i) => {
@@ -1998,7 +2038,7 @@ function crosshair(me, now) {
     }
   }
   const hk = 1 - (now - st.hitT) / 0.18;
-  if (hk > 0) {
+  if (hk > 0 && fxOn('hit')) {
     ctx.strokeStyle = st.hitKill ? `rgba(255,60,60,${hk})` : `rgba(255,255,255,${hk})`; ctx.lineWidth = 2 * DPR;
     ctx.beginPath();
     for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { ctx.moveTo(x + dx * 5 * DPR, y + dy * 5 * DPR); ctx.lineTo(x + dx * 11 * DPR, y + dy * 11 * DPR); }
@@ -2182,7 +2222,7 @@ function promptText(s, me) {
     if (f.t === T.OPEN && m.openId[f.k] >= 0 && me.op === 'girder' && me.ac > 0 && s.ph === PHASE.ACTION) return `<b>${label('interact')}</b>HOLD TO BARRICADE  ·  <b>${label('ability')}</b>STEEL BRACE`;
   }
   if (f && f.t === T.BARRI) return '<b>' + label('melee') + '</b>MELEE TO BREAK BARRICADE';
-  if (!me.vt && findVault(m, x, y, vaultDir())) return '<b>' + label('vault') + '</b>VAULT';
+  if (!me.vt && !(me.jp && me.jp[1])) { const v = findVault(m, x, y, vaultDir()); if (v) return '<b>' + label('vault') + '</b>' + (standable(m, v.k) ? 'JUMP UP' : 'VAULT'); }
   const h = hatchNear(m, x, y, st.aim, 14), ht = h && m.tiles[h.cells[0]];
   if (h && !(f && Math.hypot((f.cx + 0.5) * CELL - x, (f.cy + 0.5) * CELL - y) < Math.hypot(h.x - x, h.y - y))) {
     if (ht === T.HATCH && side === 'def' && s.rf > 0) return `<b>${label('interact')}</b>HOLD TO REINFORCE HATCH (${s.rf} LEFT)`;
@@ -2320,7 +2360,7 @@ function stairPeek(view, me, inGame) {
   return v;
 }
 function drawStairPip(s, me, now) {
-  const box = $('stairPip'), pv = st.pip;
+  const box = $('stairPip'), pv = fxOn('pip') ? st.pip : null;
   box.classList.toggle('on', !!pv);
   box.classList.toggle('right', coach.active); // the tutorial coach sits top-left
   if (!pv) return;
