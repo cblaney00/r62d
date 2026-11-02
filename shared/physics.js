@@ -14,6 +14,8 @@ export const VAULT_DEPTH = 2.2;  // the thickest thing you can vault over, in ce
 // (or no room on the far side). Everything crossed must be vaultable; walls or the void stop it.
 export function findVault(map, x, y, ang) {
   const dx = Math.cos(ang), dy = Math.sin(ang), blk = bodyBlocks(map);
+  { const c = rayCovers(map, x, y, dx, dy, PLAYER_R + VAULT_REACH + 2); // over a cover plate
+    if (c) { for (let d = c.t + PLAYER_R + COVER_TH + 1; d < c.t + PLAYER_R * 2 + 10; d += 1.5) { const px = x + dx * d, py = y + dy * d; if (!circleBlocked(map, px, py, PLAYER_R, blk) && !rayCovers(map, x + dx * (c.t + 1), y + dy * (c.t + 1), dx, dy, d - c.t)) return { x: px, y: py, k: -1 }; } return null; } }
   const cellK = d => { const cx = Math.floor((x + dx * d) / CELL), cy = Math.floor((y + dy * d) / CELL); return cx < 0 || cy < 0 || cx >= map.W || cy >= map.H ? -1 : cy * map.W + cx; };
   let start = -1, sk = -1;
   for (let d = 2; d <= PLAYER_R + VAULT_REACH; d += 1.5) {
@@ -37,6 +39,33 @@ export function tileAt(map, cx, cy) {
 }
 
 // Push a circle out of any blocking cells. Returns true if it touched something.
+// ---- thin covers (TRENCH's Drop Cover, he asked: thin, at any angle, side by side, vaultable) ----
+// map.covers: [{ x1, y1, x2, y2, th }] — a plate from (x1,y1) to (x2,y2), th thick each side. Bodies and drones are
+// pushed off them, bullets and sight stop at them, and you vault over them.
+export const COVER_TH = 2;
+export function coverOf(e) { const c = Math.cos(e.ag ?? e.ang), s = Math.sin(e.ag ?? e.ang), h = e.hl || 18; return { x1: e.x - c * h, y1: e.y - s * h, x2: e.x + c * h, y2: e.y + s * h, th: COVER_TH, id: e.id }; }
+function pushCovers(map, o, r) {
+  let hit = false;
+  for (const s of map.covers || []) {
+    const dx = s.x2 - s.x1, dy = s.y2 - s.y1, L2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((o.x - s.x1) * dx + (o.y - s.y1) * dy) / L2)), px = s.x1 + dx * t, py = s.y1 + dy * t;
+    const ex = o.x - px, ey = o.y - py, d = Math.hypot(ex, ey), need = r + s.th;
+    if (d >= need) continue;
+    hit = true;
+    if (d > 1e-6) { o.x = px + ex / d * need; o.y = py + ey / d * need; } else { const L = Math.sqrt(L2); o.x = px - dy / L * need; o.y = py + dx / L * need; }
+  }
+  return hit;
+}
+// the first cover a ray from (x0,y0) along (dx,dy) meets within maxT: { t, s } or null
+export function rayCovers(map, x0, y0, dx, dy, maxT) {
+  let best = null;
+  for (const s of map.covers || []) {
+    const ex = s.x2 - s.x1, ey = s.y2 - s.y1, den = dx * ey - dy * ex; if (Math.abs(den) < 1e-9) continue;
+    const t = ((s.x1 - x0) * ey - (s.y1 - y0) * ex) / den, u = ((s.x1 - x0) * dy - (s.y1 - y0) * dx) / den;
+    if (t > 0.5 && t < maxT && u >= 0 && u <= 1 && (!best || t < best.t)) best = { t, s };
+  }
+  return best;
+}
 function resolve(map, o, r, blockFn) {
   let hit = false;
   const x0 = Math.floor((o.x - r) / CELL), x1 = Math.floor((o.x + r) / CELL);
@@ -68,8 +97,8 @@ export function moveCircle(map, o, dx, dy, r, drone = false, up = false) {
   const fn = drone ? (t, k) => blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) : up ? (t, k) => body(t, k) && !standable(map, k) : body;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (r * 0.5)));
   for (let s = 0; s < steps; s++) {
-    o.x += dx / steps; resolve(map, o, r, fn);
-    o.y += dy / steps; resolve(map, o, r, fn);
+    o.x += dx / steps; resolve(map, o, r, fn); pushCovers(map, o, r);
+    o.y += dy / steps; resolve(map, o, r, fn); pushCovers(map, o, r);
   }
 }
 
@@ -194,13 +223,14 @@ export function castSight(map, x0, y0, ang, maxD, smokes, soft = false) {
     const sh = shapeAt(map, cx, cy);
     if (sh) { // an angled or curved bit of wall: only its solid part stops sight
       const h = rayShape(sh, x0, y0, dx, dy);
-      if (h === null || ((t === T.SOFT || t === T.BARRI) && throughHole(map, cy * map.W + cx, x0, y0, dx, dy))) return false;
+      if (h === null || (HOLED.has(t) && throughHole(map, cy * map.W + cx, x0, y0, dx, dy))) return false;
       exact = h; return true;
     }
     if (cx === startCx && cy === startCy) return false;
-    return !((t === T.SOFT || t === T.BARRI) && throughHole(map, cy * map.W + cx, x0, y0, dx, dy)); // look through bullet holes
+    return !(HOLED.has(t) && throughHole(map, cy * map.W + cx, x0, y0, dx, dy)); // look through bullet holes (and RIVET's lance holes)
   });
   if (exact >= 0) d = exact;
+  { const c = rayCovers(map, x0, y0, dx, dy, d); if (c) d = c.t; } // a cover plate blocks the view
   if (smokes) for (const s of smokes) {
     const t = raySmoke(x0, y0, dx, dy, s);
     if (t !== null && t < d) d = t;
@@ -209,7 +239,8 @@ export function castSight(map, x0, y0, ang, maxD, smokes, soft = false) {
 }
 
 // Does a sight line pass through one of the bullet holes in this soft wall cell?
-function throughHole(map, k, x0, y0, dx, dy) {
+const HOLED = new Set([T.SOFT, T.BARRI, T.HARD, T.REINF, T.PANEL]);
+export function throughHole(map, k, x0, y0, dx, dy) {
   const h = map.holes && map.holes[k];
   if (!h) return false;
   for (let i = 0; i < h.length; i += 2) {

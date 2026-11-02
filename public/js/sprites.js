@@ -427,7 +427,7 @@ const GLYPH = {
   station: g => { g.moveTo(-2.2, 0); g.lineTo(2.2, 0); g.moveTo(0, -2.2); g.lineTo(0, 2.2); },
   catcher: g => { g.moveTo(-1.8, -2); g.lineTo(-1.8, 0.4); g.arc(0, 0.4, 1.8, Math.PI, 0, true); g.lineTo(1.8, -2); },
 };
-const NO_BADGE = new Set(['defuser', 'healzone', 'nade']);
+const NO_BADGE = new Set(['defuser', 'healzone', 'nade', 'cover']);
 function badge(ctx, e, ally) {
   const f = GLYPH[e.ty]; if (!f || NO_BADGE.has(e.ty)) return;
   ctx.save(); ctx.translate(e.x + 6.5, e.y - 6.5);
@@ -444,6 +444,13 @@ function drawGadgetBody(ctx, e, t, ally) {
   ctx.save(); ctx.translate(e.x, e.y); if (!NO_BADGE.has(e.ty)) ctx.scale(1.2, 1.2); // a little bigger, so the shapes read
   const blink = Math.floor(t * 4) % 2 === 0;
   switch (e.ty) {
+    case 'cover': { // TRENCH's plate: thin steel on two little feet, with a narrow sight slit
+      const h = e.hl || 17; ctx.rotate(e.ag || 0);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(-h + 1, -1, h * 2, 4.5);
+      ctx.fillStyle = '#4b535c'; ctx.fillRect(-h, -2, h * 2, 4); ctx.fillStyle = '#6d7782'; ctx.fillRect(-h, -2, h * 2, 1.2);
+      ctx.fillStyle = '#1b1e22'; ctx.fillRect(-4, -0.6, 8, 1.2); ctx.fillStyle = ally ? '#46a8ff' : '#ff8a3d'; ctx.fillRect(-h, 1.2, h * 2, 0.8);
+      for (const s of [-1, 1]) { ctx.fillStyle = '#2a2e33'; ctx.fillRect(s * (h - 4) - 1.5, 2, 3, 2.5); }
+      break; }
     case 'jammer':
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(-3, -2, 8, 6);
       ctx.fillStyle = '#2b2f36'; ctx.fillRect(-4, -3, 8, 6); ctx.fillStyle = '#55c1e8'; ctx.fillRect(-3, -2, 2, 1.2);

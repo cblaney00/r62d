@@ -18,11 +18,17 @@ b.moving = 0; b.gait = 0; let h = volley(); if (h) fail('standing shield let', h
 b.moving = 1; h = volley(); if (h) fail('walking shield let', h, 'shots through');
 b.moving = 2; let jog = 0; for (let k = 0; k < 16; k++) { b.gait = k / 16 * Math.PI * 2; jog += volley(); }
 if (!jog) fail('jogging shield never opens up');
-b.moving = 0; b.shieldOpenUntil = g.time + 0.5; h = volley(); if (h < 5) fail('just fired: front should be open, hits', h); b.shieldOpenUntil = 0;
+b.moving = 0; b.aside = 1; h = volley(); if (h < 5) fail('swung aside to aim: front should be open, hits', h); b.aside = 0;
 b.shieldDownUntil = g.time + 1; h = volley(); if (h < 5) fail('knocked aside: front should be open, hits', h); b.shieldDownUntil = 0;
-// firing with the shield up opens it
-b.fireCd = 0; b.reloadT = 0; b.slot = 0; const gun = b.guns && b.guns[0];
-if (gun) { g.fire(b, gun, { ...g.constructor.W || {}, ...gun, rpm: 400, pellets: 1, dmg: 1, range: 10, cls: 'Pistol' }); if (!(b.shieldOpenUntil > g.time)) fail('firing did not swing the shield aside'); }
+// holding aim-in glides the shield aside over ~0.45 s, and he can't shoot until it's out of the way (he asked)
+b.input = { ads: 1, fire: 1 }; const am0 = b.guns && b.guns[b.slot] ? b.guns[b.slot].ammo : 0; b.fireCd = 0; b.reloadT = 0;
+for (let i = 0; i < 6; i++) { b.input = { ads: 1, fire: 1 }; g.tickPlayer(b, 1 / 30); }
+if (b.guns && b.guns[b.slot] && b.guns[b.slot].ammo !== am0) fail('fired before the shield was out of the way');
+if (!(b.aside > 0.2 && b.aside < 1)) fail('shield did not start gliding aside', b.aside);
+for (let i = 0; i < 20; i++) { b.input = { ads: 1 }; g.tickPlayer(b, 1 / 30); }
+if (b.aside !== 1) fail('shield not fully aside after holding aim-in', b.aside);
+for (let i = 0; i < 20; i++) { b.input = {}; g.tickPlayer(b, 1 / 30); }
+if (b.aside !== 0) fail('shield did not come back', b.aside);
 // speed with the shield up: jog at least 1.8 m/s
 b.vx = b.vy = 0; b.x = X; b.y = Y; const x0 = b.x; for (let i = 0; i < 60; i++) { b.input = { right: 1 }; g.applyMove(b, 1 / 30); }
 const v = (b.x - x0) / 2 / PX_PER_M; if (v < 1.7) fail('shield up jogs too slowly', v.toFixed(2), 'm/s');

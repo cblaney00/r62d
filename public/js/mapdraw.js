@@ -437,7 +437,7 @@ export class MapRenderer {
       if (horiz) ctx.fillRect(X + 4.5, Y, 1.5, CELL); else ctx.fillRect(X, Y + 4.5, CELL, 1.5);
     }
     // bullet holes from rifles, SMGs and pistols: tiny dark pits with a pin of light through them
-    const holes = t === T.SOFT && m.holes && m.holes[k];
+    const holes = (t === T.SOFT || t === T.HARD || t === T.REINF || t === T.PANEL) && m.holes && m.holes[k]; // RIVET's lance burns through any wall
     if (holes) for (let i = 0; i < holes.length; i += 2) {
       const hx = holes[i], hy = holes[i + 1];
       ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.arc(hx, hy, 1.9, 0, 7); ctx.fill();

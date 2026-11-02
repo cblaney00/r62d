@@ -2,7 +2,7 @@
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen } from '/shared/map.js';
-import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED } from '/shared/physics.js';
+import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawWebcam } from './webcam.js';
@@ -446,6 +446,7 @@ function onSnap(s) {
   const prevMe = st.me;
   if (st.tv) { tvDirector(s, players, now); st.id = st.tv.follow; } // ESPORTS TV: ride along with whoever the director (or you) picked
   st.last = s; st.me = players.get(st.tv ? st.tv.follow : s.you) || null;
+  if (st.map) st.map.covers = s.ents.filter(e => e.ty === 'cover').map(coverOf); // TRENCH's plates block you here too (prediction, sight)
   for (const e of s.ev) onEvent(e, s, players);
   reconcile(prevMe);
 }
@@ -533,7 +534,7 @@ function onEvent(e, s, players) {
     case 'pts': if (e.to === st.id) { (st.ptsPops || (st.ptsPops = [])).push({ n: e.n, w: e.w, t: now }); if (st.ptsPops.length > 5) st.ptsPops.shift(); } break;
     case 'pingwait': if (e.to === st.id && performance.now() - (st.pingWaitT || 0) > 600) { st.pingWaitT = performance.now(); addFeed(`Ping ready in ${Math.ceil(e.t)} s`); audio.ui('back'); } break;
     case 'hitmark': if (e.to === st.id) { st.hitT = now; st.hitKill = e.kill; audio.ui(e.kill ? 'kill' : 'hit'); } break;
-    case 'arc': fx.tracer(e.x, e.y, e.x2, e.y2, '130,200,255'); fx.tracer(e.x, e.y, e.x2 + 2, e.y2 - 2, '200,230,255'); fx.impact(e.x2, e.y2, 'spark'); audio.impact('electronic', e.x2, e.y2); break;
+    case 'arc': fx.tracer(e.x, e.y, e.x2, e.y2, '130,200,255'); fx.tracer(e.x, e.y, e.x2 + 2, e.y2 - 2, '200,230,255'); fx.impact(e.x2, e.y2, 'spark'); if (e.v) audio.quietZap(e.x2, e.y2); else audio.impact('electronic', e.x2, e.y2); break;
     case 'laser': fx.tracer(e.x, e.y, e.x2, e.y2, '255,50,50'); fx.impact(e.x2, e.y2, 'spark'); audio.foley('tick', e.x, e.y); break;
     case 'daze': if (st.me && e.id === st.me.id) { st.dazeUntil = now + e.dur; audio.tinnitus(1); } break;
     case 'mark': if (e.team === mySide()) {
@@ -541,6 +542,9 @@ function onEvent(e, s, players) {
       st.marks.push({ ...e, t: now }); fx.ping(e.x, e.y, e.w.startsWith('ENEMY') ? '255,70,70' : '255,210,74');
       if (e.from !== st.id) audio.foley('spot');
     } break;
+    case 'lungeWarn': if (e.id === st.id) { addFeed('CROW drew a blade on you: a lunge is coming in 1.5 s'); audio.play('unsheathe', st.pred.x, st.pred.y); st.lungeWarnT = now; } break;
+    case 'deny': if (e.id === st.id) addFeed(e.why); break;
+    case 'emped': if (e.id === st.id) { addFeed('EMP! Your skill and gadget are fried for 8 seconds'); audio.foley('beep', st.pred.x, st.pred.y); st.empUntil = now + e.dur; } break; // TALON
     case 'scanned': if (e.id === st.id) { addFeed('A scanner just picked you up — they can see you through walls'); audio.foley('beep', st.pred.x, st.pred.y); } break; // WRAITH
     case 'paint': if (e.id === st.id) addFeed('You walked into a paint trap — the defenders can see you for 12 s'); fx.ping(e.x, e.y, '120,255,90'); break; // LYNX
     case 'ping': if (e.team === mySide()) { fx.ping(e.x, e.y, e.any ? '255,90,60' : '79,179,169'); audio.foley('beep', e.x, e.y); } break;
@@ -1717,7 +1721,7 @@ function draw(s, view, now, dt) {
     const gh = !isMe && stairGhost(st.map, p.x, p.y);
     if (gh && (ally || (!p.sh && ghostSeen(gh)))) {
       ctx.globalAlpha = 0.9;
-      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, p.so === 1, p.so === 2) : null }, now);
+      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0) : null }, now);
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x + u.x * 15, gh.y + u.y * 15);
@@ -1739,7 +1743,7 @@ function draw(s, view, now, dt) {
       ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     drawOperator(ctx, {
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, downed: p.dn,
-      lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, p.so === 1, p.so === 2) : null, scan: p.sc, melee: a.melee,
+      lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0) : null, scan: p.sc, melee: a.melee,
     }, now);
     if (elv) ctx.restore();
     drawn.push(p);
@@ -1772,7 +1776,7 @@ function draw(s, view, now, dt) {
     audio.droneLoop(e.id, x, y, a.spd, own);
     if (e.tm === side || seen(x, y)) drawDrone(ctx, { ...e, x, y, ag: a.heading, wheel: a.wheel, spd: a.spd, mvAng: a.mvAng ?? a.heading, sway: a.sway }, now, e.tm === side);
   }
-  audio.pruneLoops(); tq = pfa('actors', tq);
+  audio.pruneLoops(); audio.defuserAlarm(!!(s.pl && s.ph === PHASE.ACTION), s.pl && s.pl.x, s.pl && s.pl.y); tq = pfa('actors', tq);
   fx.draw(ctx);
   for (const e of ents) if (e.ty === 'decoy') { // Holo Decoy: looks, moves and sounds like the real operator
     const a = anim(e.id), mv = Math.hypot(e.x - (a.dx ?? e.x), e.y - (a.dy ?? e.y)); a.dx = e.x; a.dy = e.y;
@@ -2028,6 +2032,12 @@ function crosshair(me, now) {
   const cone = w ? spreadCone(w, gm, { at: me.at || 0, run, crouch: !!me.cr, shots: gunHeat(me, w, now) }) : 0;
   const spread = xh.dynamic ? Math.tan(cone) * Math.hypot(m.x - px, m.y - py) / DPR : 0;
   // aiming in: each enemy you can see shows the zone your crosshair must be on for a headshot; it lights red when it is
+  if (me.pp) { // winding up a throw / setting something down (he asked): a ring filling round you, and what it is
+    const [kd, left, dur] = me.pp, f = Math.max(0, Math.min(1, 1 - (left - (now - (st.mineAt || now))) / dur));
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 5 * DPR; ctx.beginPath(); ctx.arc(P0.x, P0.y, 22 * DPR, -Math.PI / 2, Math.PI * 1.5); ctx.stroke();
+    ctx.strokeStyle = kd === 1 ? '#f2c14e' : '#7dffb0'; ctx.lineWidth = 3 * DPR; ctx.beginPath(); ctx.arc(P0.x, P0.y, 22 * DPR, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.stroke();
+    ctx.font = `700 ${11 * DPR}px Barlow Condensed, sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText(kd === 1 ? 'THROWING' : 'SETTING UP', P0.x, P0.y + 36 * DPR);
+  }
   if (st.cmpDir != null) { // a discreet gold chevron at your feet pointing the way to the stairs / bomb site
     const a = st.cmpDir + (st.rot || 0), r = 30 * DPR, cx0 = P0.x + Math.cos(a) * r, cy0 = P0.y + Math.sin(a) * r;
     ctx.save(); ctx.translate(cx0, cy0); ctx.rotate(a); ctx.globalAlpha = 0.75; ctx.fillStyle = '#f2c14e'; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 1.5 * DPR;
@@ -2441,7 +2451,7 @@ function drawStairPip(s, me, now) {
     const ally = p.tm === side;
     if (!ally && (p.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue;
     const a = anim(p.id);
-    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, p.so === 1, p.so === 2) : null }, now);
+    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0) : null }, now);
   }
   c.restore();
   // where you come out of the stairs: a dashed white ring

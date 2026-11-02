@@ -27,5 +27,6 @@ user_pref("browser.tabs.warnOnClose", false);
 user_pref("dom.disable_beforeunload", true);
 user_pref("permissions.default.shortcuts", 1); // the game may keep Ctrl+W / Ctrl+Q etc. (he lost a match mashing Ctrl to crouch)
 user_pref("browser.quitShortcut.disabled", true);
+user_pref("dom.event.pointer.fractional_coordinates.enabled", true); // keep tiny mouse movements instead of rounding them away (he noticed slow aiming didn't move)
 PREFS
 exec firefox --kiosk --no-remote --profile "$PROFILE" "http://localhost:6262/?app=1"

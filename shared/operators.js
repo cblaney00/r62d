@@ -86,16 +86,16 @@ export const OPERATORS = {
              ability: { id: 'dart', name: 'Seeker Dart', count: 3, desc: 'Fire a dart into a wall. For 10 seconds it pings every enemy near it, through walls, for your whole team.' },
              gadget: 'frag', gadgetCount: 2, color: '#4fb3a9', helmet: '#5a5f4a', look: 'cap' },
   hammer:  { team: 'atk', name: 'HAMMER',  role: 'Soft Breacher', armor: 2, primary: 'tusk', secondary: 'p10',
-             ability: { id: 'slug', name: 'Breaching Rounds', count: 5, desc: 'Launch an explosive round that blows open soft walls, barricades and anyone standing behind them.' },
+             ability: { id: 'slug', name: 'Breaching Rounds', count: 3, desc: 'Launch an explosive round that blows open soft walls, barricades and anyone standing behind them.' },
              gadget: 'claymore', gadgetCount: 1, color: '#c9b037', helmet: '#4a4032', look: 'helmet' },
   talon:   { team: 'atk', name: 'TALON',   role: 'Disruptor',     armor: 3, primary: 'sabre',      secondary: 'p10',
-             ability: { id: 'emp', name: 'EMP Grenade', count: 2, desc: 'Throw an EMP that sticks where it hits. In a circle about a door wide — right through the wall it is on — it destroys jammers, traps and enemy gadgets and blinds cameras for 12 seconds.' },
+             ability: { id: 'emp', name: 'EMP Grenade', count: 3, desc: 'Throw an EMP that sticks where it hits. In a circle about a metre wide — right through the wall it is on — it destroys every enemy gadget, blinds cameras for 20 seconds, and fries the skill and gadget of any defender caught in it for 8 seconds.' },
              gadget: 'breach', gadgetCount: 2, color: '#a46ad6', helmet: '#4a5164', look: 'goggles' },
   bulwark: { team: 'atk', name: 'BULWARK', role: 'Shield',        armor: 1, primary: 'p10',     secondary: null,
              ability: { id: 'brace', name: 'Ballistic Shield', count: 0, desc: 'Shield up: bullets cannot get through the front, but you cannot shoot; melee is a shield bash that staggers (a miss leaves you open). Press to put the shield on your back and draw your pistol (takes a moment); it then guards your back.' },
              gadget: 'stun', gadgetCount: 2, color: '#d84a4a', helmet: '#46484c', look: 'visor' },
   rivet   : { team: 'atk', name: 'RIVET', role: 'Hard Breacher', armor: 2, primary: 'k4', secondary: 'p10',
-             ability: {id: "lance",name: "Thermal Lance",count: 0,battery: 14,desc: "Hold facing a wall to burn through it one block at a time — even reinforced walls and steel panels. Quiet, but the glow gives you away."},
+             ability: {id: "lance",name: "Thermal Lance",count: 0,battery: 14,desc: "Hold facing any wall — even concrete, reinforced walls and steel panels — to burn a small hole you can see and shoot through; keep carving to widen it until the block falls out. Quiet, but the glow gives you away."},
              gadget: 'stun', gadgetCount: 2, color: '#ff8a3d', helmet: '#4d4436', look: 'goggles' },
   haze    : { team: 'atk', name: 'HAZE', role: 'Smoke Support', armor: 2, primary: 'k4', secondary: 'p10',
              ability: {id: "barrage",name: "Smoke Barrage",count: 2,desc: "Fire a canister that lays a thin wall of smoke across your aim, about 6 metres wide, cutting a sightline for 12 seconds."},
@@ -107,7 +107,7 @@ export const OPERATORS = {
              ability: {id: "adrenal",name: "Adrenal Shot",count: 2,desc: "Inject yourself: for 6 seconds you move a quarter faster and aim down sights twice as quickly."},
              gadget: 'stun', gadgetCount: 2, color: '#e84a7a', helmet: '#4a2a36', look: 'cap' },
   onyx    : { team: 'atk', name: 'ONYX', role: 'Area Denial', armor: 1, primary: 'mule', secondary: 'p10',
-             ability: {id: "cluster",name: "Cluster Charge",count: 3,desc: "Stick it on a soft wall. After 3 seconds it fires four bomblets into the room on the other side."},
+             ability: {id: "cluster",name: "Cluster Charge",count: 3,desc: "Stick it on a soft wall. It beeps loudly a second before going off, then fires three waves of bomblets into the room on the other side, the last a little bigger."},
              gadget: 'smoke', gadgetCount: 2, color: '#3a3d44', helmet: '#1f2125', look: 'helmet' },
   prism   : { team: 'atk', name: 'PRISM', role: 'Deception', armor: 3, primary: 'javelin', secondary: 'p10',
              ability: {id: "decoy",name: "Holo Decoy",count: 3,desc: "Send a hologram of yourself running ahead. Defenders see and hear a real attacker until they shoot it."},
@@ -122,7 +122,7 @@ export const OPERATORS = {
              ability: {id: "ghost",name: "Ghost Step",count: 2,desc: "For 6 seconds your footsteps are silent and you set off no traps, sensors, scanners or darts — but you move 15% slower while you concentrate."},
              gadget: 'frag', gadgetCount: 2, color: '#8ab4d8', helmet: '#2b3a48', look: 'hood' },
   ferro   : { team: 'atk', name: 'FERRO', role: 'Soft Breacher', armor: 1, primary: 'tusk', secondary: 'p10',
-             ability: {id: "hammer",name: "Breaching Hammer",count: 0,desc: "A sledgehammer that never runs out: smashes soft walls and barricades open in one swing — and flattens anyone in reach."},
+             ability: {id: "hammer",name: "Breaching Hammer",count: 0,desc: "A sledgehammer that never runs out: smashes a door or window barricade open in one swing, or flattens anyone in reach — but each swing needs 4 seconds to recover. It can't break walls."},
              gadget: 'stun', gadgetCount: 2, color: '#b0703c', helmet: '#4a3828', look: 'helmet' },
   // ---- added to fill every role to 5 (he asked) ----
   salvo: { team: 'atk', name: 'SALVO', role: 'Launcher Breacher', armor: 2, primary: 'rook', secondary: 'p10',
@@ -156,7 +156,7 @@ export const OPERATORS = {
              ability: { id: 'burst', name: 'Smoke Burst', count: 2, desc: 'Blast a cone of thick smoke out in front of you. It spreads almost instantly and fills the shape of the room for 8 seconds.' },
              gadget: 'frag', gadgetCount: 2, color: '#9aa8b8', helmet: '#40444c', look: 'mask' },
   crow: { team: 'atk', name: 'CROW', role: 'Lunge Flanker', armor: 3, primary: 'sabre', secondary: 'p10',
-             ability: { id: 'lunge', name: 'Lunge', count: 2, desc: 'For 5 seconds your melee becomes a silent 2-metre lunge that downs anyone it hits, from any side.' },
+             ability: { id: 'lunge', name: 'Lunge', count: 2, desc: 'Aim at an enemy within 4 metres and draw your blade: they hear it and are warned. After 1.5 seconds, for 5 seconds, your melee is a 4-metre lunge straight at them that downs them, from any side.' },
              gadget: 'stun', gadgetCount: 2, color: '#3a3d46', helmet: '#2a2c32', look: 'hood' },
   // ---------- Defence ----------
   mason:   { team: 'def', name: 'MASON',   role: 'Fortifier',     armor: 1, primary: 'drummer',    secondary: 'vex50',
@@ -172,7 +172,7 @@ export const OPERATORS = {
              ability: { id: 'stim', name: 'Stim Pistol', count: 3, desc: 'Shoot a teammate to heal them (or revive them if they are down). With nobody in your sights, it heals you. Passive: if downed, gets back up by himself after 12 seconds.' },
              gadget: 'wire', gadgetCount: 2, color: '#f2f2f2', helmet: '#7a2b2b', look: 'helmet' },
   wraith:  { team: 'def', name: 'WRAITH',  role: 'Intel Roamer',  armor: 3, primary: 'lark', secondary: 'vex50',
-             ability: { id: 'scan', name: 'Pulse Scanner', count: 0, battery: 8, desc: 'Hold to scan, for up to 4 seconds at a time. While scanning you see every attacker within range through walls, but you cannot shoot — and the attackers you see hear a warning ping.' },
+             ability: { id: 'scan', name: 'Pulse Scanner', count: 0, battery: 8, desc: 'Press to start scanning and again to stop (up to 4 seconds at a time). While scanning you see every attacker within range through walls, but you cannot shoot — and the attackers you see hear a warning ping.' },
              gadget: 'impact', gadgetCount: 2, color: '#6c7cf0', helmet: '#3c4260', look: 'mask' },
   bramble : { team: 'def', name: 'BRAMBLE', role: 'Trapper', armor: 2, primary: 'wasp', secondary: 'sparrow',
              ability: {id: "prox",name: "Proximity Charge",count: 2,desc: "Hide a charge by a door or window. When an attacker comes close it beeps once, then explodes."},
@@ -501,9 +501,11 @@ export const HEAD_AIM = 4.5;
 // with every step and covers less, so its edges open up. Just fired: swung out of the way to shoot, the front is open.
 // Knocked aside by a melee hit (or a missed bash): no cover at all (off).
 export const SHIELD_ARC = 0.95;
-export function shieldPose(gait, jogging, firing, knocked) {
+// aside: 0 = shield held in front, 1 = swung out of the way to aim (BULWARK holds aim-in: it glides there, he asked)
+export function shieldPose(gait, jogging, firing, knocked, aside = 0) {
   if (knocked) return { rot: 1.7, arc: 0.5, off: true };
-  if (firing) return { rot: -1.3, arc: 0.55 };
+  const s = firing ? 1 : Math.max(0, Math.min(1, aside));
+  if (s > 0) { const e = s * s * (3 - 2 * s); return { rot: -1.3 * e, arc: SHIELD_ARC + (0.55 - SHIELD_ARC) * e }; } // no jostling while it moves aside
   if (jogging) { // jostled like something heavy (he asked: not a metronome): each footfall lurches it to one side fast, then it settles slowly
     const g = gait || 0, step = Math.floor(g / Math.PI), u = g / Math.PI - step, side = step % 2 ? -1 : 1;
     const lurch = u < 0.22 ? Math.sin(u / 0.22 * Math.PI / 2) : Math.exp(-(u - 0.22) * 4.2) * (1 - 0.18 * Math.sin((u - 0.22) * 14));

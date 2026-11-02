@@ -7,40 +7,40 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] bots should know how and when to look at cameras, when it is safe to, when the risk of viewing your cameras is worth taking when enemies are nearby/approaching
-- [ ] onyx's ability should give an solid audio warning, maybe a second before it activates and it should activate 3 times with the final blast being slightly larger than the first two
-- [ ] volt's laser's strength is really its stealth so make sure it's a quiet noise that cant be heard too closely, unless you are half a room away (average distance, dont take me literally) you shouldnt be able to hear it unless you really focus, and at a certain point it would just be silent
-- [ ] talon is going to need to get a buff, emp grenades are sort of on the strength of regular utility so its not very viable
-- [ ] enhance the animation to have each character's abilities more character, also make it necessary to take time to set up certain abilities, especially ones that are being placed in a location. There will be a difference between placed and thrown utility, being able to throw utlity is pretty strong, so the utility that is thrown either needs to be less valuable or there needs to be some other way to reverse-make up for it
-- [ ] torque's saws should go straight through wooden planks and make hole the size of the saw but doesnt do damage to the door aside from that
-- [ ] rivet's thermal lance should make a much smaller hole in soft and hard walls, it should be enough for a bullet at minimum and can be widened with more time carving out the wall
-- [ ] when bulwark is shift walking with his shield it should not swing at all, only when full walking, it should also not swing when its being moved out of the way when moving to ADS
-- [ ] crow should be able to lunge from quite a distance and their ability should have to be targeted at the person they want to lunge at, the person that is being targted will get a notification that crow unshealths/makes a noise with their weapon 1.5 seconds before they can be lunged at
-- [ ] when bulwark holds his ADS button he should have a smooth animation between holding the shield and moving it out of the way to aim, there should be a downtime during most of this animation if not all of it
-- [ ] wraith's scanner should be toggle
-- [ ] glint cannot sonar pulse up stairs
-- [ ] im not sure how lens periscope works, make sure it's more intuitive and it will say when periscoping is not possible when you try in a forbidden place
-- [ ] trench's cover needs to be thinner, vaultable, and able to be placed at an angle close to one another if the player wants
 - [ ] consider removing features or UI things for the mobile version of the game, the two versions of the game should be updated alongside eachother and work as the same game but there should be a difference in how the game loads in when it knows what type of device is trying to play the game
-- [ ] ferro's hammer should have a decent sized downtime, also he shouldnt be ableto break soft walls with his hammer, only door and window barracades instantly. also make sure that other characters have a balanced amount of ability to break soft walls, it really shouldnt be every character that can do that without a breach charge or grenade
 - [ ] the bots should understand two things, lining up so that one burst of bullets can kill multiple people is really stupid, it just happened in this desert map - also make sure bots on both defense and offtense understand the high value of space. If an attacker knows you dont take space and they can just sprint up the whole map then the clock is massively against you, make the adopt playstyles that favor tactical decision making and utility usage considering the clock at all times, if they can push up and not leave any objectives unprotected, the defenders should definitely play more spaced out
 - [ ] defense is pinging drones too frequently
 - [ ] the defenders cannot exit the building before the preparation phase ends, its like an invisible sheild (realism breaking but dont worry about it)
 - [ ] i dont like that slow idle spinning that bots do when they dont know what to do, even pro bots do it and it looks bad
 - [ ] when you die you can rewatch your killcam and death perspective and the game will give you a BS rating on if the kill was fair and a "!" symbol when it found a bug that it will save the info about
 - [ ] the sites show always have at least 1 breakable wall between the two of them (unless the map is like a CS2 map)
-- [ ] bulwark's headshot hitbox is much smaller than everyone else's and can only be hit if his shield doesnt block it
-- [ ] there should be an alarm that plays when the bom is being defused that isn't completely audio overpowering but is persistent and can make it a little harder to hear, look at what r6 alarm is like when the bomb is being defused
 - [ ] we are stil having an issue with reviving not working. it happens all the time
 - [ ] i just saw one pro player try and shoot through the bomb to get the enemy on the other side of the bomb, both characters stood still while one of them just shot like 3 mags in a row unsuccesfully, this was in the Esport tv mode
 - [ ] defense is still just stacking on the top of stairs, im talking 4 people staring at the stairs, defenders are not defending windows, figure out why and if the fix is already in the to do list
 - [ ] maybe more windows into sites
 - [ ] make default loadout attachment selection for each character to save time if someone doesnt really care, if they change it then their change should overwrite the default, its just for starters
-- [ ] i found an issue with the aim, if i move my mouse slowly then the cursor doesnt even move at all, this would cause huge frustration from people with actually decent aim. make sure the cursor is very accurate to the mouse inputs
+- [ ] i found an issue with the aim, if i move my mouse slowly then the cursor doesnt even move at all, this would cause huge frustration from people with actually decent aim. make sure the cursor is very accurate to the mouse inputs (in progress: the desktop mouse was set to flat for this session; making it permanent needs vibe → "Change or fix something on your computer")
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab.
 - [ ] one of the bots didn't click lock in when i played with lando on his vpn server
 
 ## Done
 
+- [x] Glint's pulse reaches the floor above and below (a little less far than on its own floor).
+- [x] Talon's EMP: 3 a round, about 1 m wide, destroys every enemy gadget, blinds cameras 20 s, and fries the skill and gadget of defenders caught in it for 8 s (they're told).
+- [x] Onyx's charge beeps loudly for a second before it goes, then fires three waves of bomblets 0.6 s apart, the last a little bigger.
+- [x] Volt's arc gun only makes a faint crackle, heard up close and silent past about half a room.
+- [x] Ferro's hammer only breaks door and window barricades (no walls), with 4 s between swings. Hammer's breaching rounds went from 5 to 3, so only Ember, Hammer, Salvo and Rivet open walls without a charge or grenade.
+- [x] Torque's disc goes straight through a wooden barricade leaving one round disc-sized hole, nothing else broken.
+- [x] Rivet's lance works on any wall (even concrete): first a bullet-sized hole you can see and shoot through, widening as you keep carving until the block falls out (~9 s).
+- [x] Bulwark's shield only sways when jogging, never when walking or aiming.
+- [x] Bulwark: holding aim-in glides the shield aside over ~0.45 s and he can only shoot once it's fully aside; letting go brings it back.
+- [x] Bulwark's head is a smaller target (60%), and the shield still covers it from the front.
+- [x] Crow aims at one enemy within 4 m to mark them; they hear the blade and get a warning; after 1.5 s her melee is a 4 m lunge straight at them.
+- [x] Wraith's scanner is a toggle: press to start, press again to stop (4 s at most).
+- [x] Lens's periscope says why it can't go somewhere, and where it went (and to open the camera feeds) when it does.
+- [x] Trench's cover is a thin steel plate at any angle (square to your aim), can stand right next to another, stops bullets, sight and bodies, and can be vaulted.
+- [x] Placed gadgets and skills take 1.2 s to set up (you stand still); thrown ones have a 0.5 s wind-up (slowed, can't shoot). A ring round you fills with THROWING / SETTING UP.
+- [x] While the defuser runs, a pulsing two-tone alarm plays through the building: louder close by, muffled far away, never overpowering.
 - [x] Teammates in words: a small list on the left shows each teammate, their operator and the room and floor they are in (or dead, downed, on a drone, on cams).
 - [x] The OBJECTIVE FOUND card is small, see-through, near the top and gone in 3.5 s; BOMB ON <floor> is the biggest line, with YOU ARE ON … GO UP/DOWN under it. A small gold arrow by your feet always points the way to the stairs / bomb site.
 - [x] Camera lights: your team's cameras blink green, the enemy's red (blue when knocked out).

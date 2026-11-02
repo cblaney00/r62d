@@ -311,6 +311,12 @@ export function foley(kind, x, y, own) {
 }
 
 // --- impacts by material ---
+// VOLT's arc gun (he asked: its strength is stealth): a faint tick-and-crackle only heard up close, gone by about half a room
+export function quietZap(x, y) {
+  C = 'impacts';
+  const g = out(x, y, 0.13, 240, 0.04); if (!g) return;
+  const t = ac.currentTime; noise(g, t, 0.07, 'bandpass', 5200, 3, 0.6); tone(g, t, 0.04, 2400, 1800, 'square', 0.15);
+}
 export function impact(mat, x, y) {
   C = 'impacts';
   const g = out(x, y, mat === 'glass' ? 0.55 : 0.4, mat === 'glass' ? 1100 : 650, 0.2); if (!g) return; // breaking glass carries
@@ -473,6 +479,10 @@ export function play(name, x, y) {
     case 'beep': return foley('beep', x, y);
     case 'siren': { const g = out(x, y, 0.5, 900, 0.2); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 6; i++) tone(g, t + i * 0.32, 0.3, i % 2 ? 1250 : 820, i % 2 ? 820 : 1250, 'square', 0.12, 0.01); return; } // LATCH's siren wire
     case 'ghost': return foley('cloth', x, y);
+    case 'clusterWarn': { const g = out(x, y, 0.8, 1100, 0.2); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 6; i++) tone(g, t + i * 0.16, 0.1, 1400 + i * 160, 1500 + i * 160, 'square', 0.5); return; } // ONYX: a second of rising beeps
+    case 'unsheathe': { const g = out(x, y, 0.55, 700, 0.15); if (!g) return; const t = ac.currentTime; noise(g, t, 0.35, 'highpass', 4200, 2, 0.7, 0.01, 7000); ring(g, t + 0.3, 3100, 0.25, 0.4); return; } // CROW's blade coming out
+    case 'pin': { const g = out(x, y, 0.3, 380, 0.05); if (!g) return; const t = ac.currentTime; ring(g, t, 4200, 0.15, 0.12); noise(g, t + 0.05, 0.05, 'highpass', 5000, 1, 0.4); return; } // a pin pulled
+    case 'setup': { const g = out(x, y, 0.25, 320, 0.05); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 3; i++) noise(g, t + i * 0.3, 0.08, 'bandpass', 1800, 2, 0.5); return; } // clicks of something being set down
     case 'land': { const g = out(x, y, 0.45, 520, 0.15); if (!g) return; noise(g, ac.currentTime, 0.14, 'lowpass', 260, 1, 0.9); return; } // a jump's landing thump
     case 'vault': { foley('cloth', x, y); const g = out(x, y, 0.35, 380, 0.12); if (!g) return; const t = ac.currentTime; noise(g, t + 0.05, 0.14, 'lowpass', 600, 0.9, 0.6); noise(g, t + 0.45, 0.12, 'lowpass', 500, 1, 0.5); return; } // a hand on the ledge, then the landing
     case 'clamp': impact('metal', x, y); return foley('hurt', x, y);
@@ -558,6 +568,27 @@ export function droneLoop(id, x, y, speed, own) {
   L.hum.frequency.setTargetAtTime(95 + move * 40, t, 0.2);
   L.p.pan.setTargetAtTime(own ? 0 : Math.max(-0.9, Math.min(0.9, distTo(x, y).dx / 260)), t, 0.05);
   L.seen = t;
+}
+// the defuser alarm (he asked, like the one in a siege game but our own): a pulsing two-tone siren heard all through the
+// building while the defuser runs; steady and a bit in the way, never overpowering (louder close by, muffled far off)
+let alarmL = null;
+export function defuserAlarm(on, x, y) {
+  if (!ac || (ac.state !== 'running' && !ac.offline)) return;
+  const t = ac.currentTime;
+  if (!on) { if (alarmL) { alarmL.g.gain.setTargetAtTime(0, t, 0.15); const L = alarmL; alarmL = null; setTimeout(() => { try { L.a.stop(); L.b.stop(); L.lfo.stop(); } catch {} L.g.disconnect(); }, 800); } return; }
+  if (!alarmL) {
+    const a = ac.createOscillator(), b = ac.createOscillator(); a.type = 'square'; b.type = 'square'; a.frequency.value = 880; b.frequency.value = 660;
+    const lfo = ac.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 1.6; // swaps tone ~3 times a second
+    const ga = ac.createGain(), gb = ac.createGain(), inv = ac.createGain(); ga.gain.value = 0.5; gb.gain.value = 0.5; inv.gain.value = -0.5;
+    lfo.connect(ga.gain); lfo.connect(inv); inv.connect(gb.gain);
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
+    const g = ac.createGain(); g.gain.value = 0;
+    a.connect(ga); b.connect(gb); ga.connect(lp); gb.connect(lp); lp.connect(g); g.connect(sfx);
+    a.start(); b.start(); lfo.start(); alarmL = { a, b, lfo, g, lp };
+  }
+  const d = distTo(x, y).d, near = Math.max(0, 1 - d / 900);
+  alarmL.g.gain.setTargetAtTime((0.012 + 0.028 * near) * (MIX.loops ?? 1), t, 0.2);
+  alarmL.lp.frequency.setTargetAtTime(700 + 2200 * near, t, 0.2);
 }
 export function pruneLoops() {
   if (!ac) return;
