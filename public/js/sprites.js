@@ -194,6 +194,10 @@ export function drawOperator(ctx, p, t) {
     ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(fx + 2.6, fy - 1.4, 1.2, 2.8);
   }
 
+  // ---- leaning (he asked): the legs stay planted, everything from the hips up tips to the side ----
+  if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean));
+    ctx.fillStyle = u.cloth || '#333'; ctx.beginPath(); ctx.ellipse(0, L * 2.2, 3.2, 4 + Math.abs(L) * 2, 0, 0, 7); ctx.fill(); // the hips bend toward the lean
+    ctx.translate(0, L * 5.5 / bw); ctx.rotate(L * 0.14); }
   // ---- back gear ----
   const id = o.ability.id;
   if (id === 'cutter') { box(ctx, -12.5, -4.5, 5.5, 9, 2.6, '#c8601f'); ctx.fillStyle = '#222'; ctx.fillRect(-12, -1, 4.5, 2); cap(ctx, -9, 3.5, -3, 8, 0.8, '#222'); }
@@ -212,6 +216,7 @@ export function drawOperator(ctx, p, t) {
   if (id === 'panel') { for (const yy of [-1, 1]) { ctx.save(); ctx.scale(1, yy); box(ctx, -4.5, 6.5, 6, 3.4, 1.5, '#5d666f'); ctx.restore(); } }
 
   ctx.restore();
+  if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean)); ctx.translate(0, L * 5.5); ctx.rotate(L * 0.14); } // arms, gun and head lean with the torso
 
   // ---- weapon & arms ----
   const shield = id === 'brace' && p.brace, shieldBack = id === 'brace' && !p.brace;

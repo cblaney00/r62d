@@ -23,7 +23,7 @@ import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
 const rankTag = i => i == null ? '' : `<span class="rankTag" style="color:${RANK_COL[i]};border-color:${RANK_COL[i]}">${RANKS[i].toUpperCase()}</span>`;
 import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
-import { walkRay, tileAt, findVault, standable } from '/shared/physics.js';
+import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
 import { drawQr } from './qr.js';
 import { touchPad, touchContext, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
@@ -1213,7 +1213,7 @@ function frame(nowMs) {
   if (inGame && me && me.a) {
     if (ctrl === 'drone') view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: 230, near: 0, kind: 'drone' };
     else if (ctrl === 'cam') { const c = s.ents.find(e => e.id === me.fi); if (c) view = feedView(c, me); }
-    else view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: fovFor(me), range: 1100, near: 26, kind: 'body' };
+    else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: 1100, near: 26, kind: 'body' }; } // you see from your (leaning) head
   } else if (inGame && me) {
     const mates = s.players.filter(p => p.a && p.sq === me.sq && p.id !== me.id);
     if (mouse.wl > 0) { st.spect++; mouse.wl = 0; }
@@ -1739,7 +1739,7 @@ function draw(s, view, now, dt) {
       ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     drawOperator(ctx, {
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, downed: p.dn,
-      recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, p.so === 1, p.so === 2) : null, scan: p.sc, melee: a.melee,
+      lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, p.so === 1, p.so === 2) : null, scan: p.sc, melee: a.melee,
     }, now);
     if (elv) ctx.restore();
     drawn.push(p);

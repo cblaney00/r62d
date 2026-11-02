@@ -1,7 +1,7 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
-import { findVault, M_S } from '../shared/physics.js';
+import { findVault, M_S, leanPoint } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, SELF_UP, SELF_UP_TIME, moveOf } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep, assignPros, proSay } from './bots.js';
@@ -701,7 +701,8 @@ export class Game {
     for (let i = 0; i < w.pellets; i++) {
       const a = base + shotOffset(w, cone, i);
       const into = this.aimedHatch(p, a); // aimed into a hatch: the bullet goes down (or up) there, not on across the room
-      const end = this.hitscan(p, p.x, p.y, a, into ? into.ad : w.range, w.dmg * m.dmg, w.name, w.cls);
+      const eye = leanPoint(this.map, p.x, p.y, p.aim, p.lo || 0); // a lean shoots from the tipped upper body
+      const end = this.hitscan(p, eye.x, eye.y, a, into ? into.ad : w.range, w.dmg * m.dmg, w.name, w.cls);
       if (into && end.k === 'none') this.shotThroughHatch(p, a, into, w.dmg * m.dmg, w.name, w.cls);
       if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
     }
@@ -740,7 +741,8 @@ export class Game {
     for (const q of this.players.values()) {
       if (q === src || !q.alive) continue; // friendly fire: teammates get hit too
       if (this.phase === PHASE.PREP && this.side(q) === this.side(src)) continue; // ...except in preparation: shots pass teammates (he asked: shotgunning walls to set up)
-      const at = src.viewTime !== null && src.viewTime !== undefined ? this.posAt(q, src.viewTime) : q; // favour the shooter
+      const at0 = src.viewTime !== null && src.viewTime !== undefined ? this.posAt(q, src.viewTime) : q; // favour the shooter
+      const at = q.lo ? leanPoint(this.map, at0.x, at0.y, q.aim, q.lo) : at0; // a leaning target's upper body (and head) is where it leans to
       const t = rayCircle(x0, y0, dx, dy, at.x, at.y, hitR(q.op));
       if (t !== null && t < bestT) { bestT = t; best = { q, at }; }
       // up or down a staircase: someone on its steps or landing can be hit where they show on this floor's steps
@@ -2263,7 +2265,7 @@ export class Game {
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
-        el: p.up ? 1 : p.air > 0 ? 2 : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
+        el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ct: p.ctrl,
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
         gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && (this.time < (p.shieldOpenUntil || 0) || this.time < (p.shieldDownUntil || 0)) ? (this.time < (p.shieldDownUntil || 0) ? 2 : 1) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch ? 1 : 0, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,

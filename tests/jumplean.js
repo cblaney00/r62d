@@ -1,6 +1,6 @@
 // Jumping onto furniture and leaning (he asked). Run: node tests/jumplean.js
 import { buildMap } from '../shared/map.js';
-import { stepMove, standable, LEAN_PX } from '../shared/physics.js';
+import { stepMove, standable, LEAN_PX, leanPoint } from '../shared/physics.js';
 import { CELL, T } from '../shared/constants.js';
 
 let fails = 0;
@@ -18,12 +18,13 @@ for (let i = 0; i < 40; i++) stepMove(m, o, { right: 1, jump: i === 0 ? 1 : 0 },
 const onIt = standable(m, Math.floor(o.y / CELL) * W + Math.floor(o.x / CELL));
 console.log('after a jump: up =', !!o.up, 'standing on furniture =', onIt);
 if (!o.up && !onIt) fail('jumping did not get onto the furniture');
-// lean right while facing up: moves to +x (screen right) by LEAN_PX, and back
-const p = { x: cx - 2.2 * CELL, y: cy, vx: 0, vy: 0 }, x0 = p.x;
+// leaning never moves the body (he noticed tapping Q walked you sideways); only the upper body tips (o.lo)
+const p = { x: cx - 2.2 * CELL, y: cy, vx: 0, vy: 0 }, x0 = p.x, y0 = p.y;
+for (let n = 0; n < 30; n++) for (let i = 0; i < 3; i++) stepMove(m, p, { lean: n % 2 ? 0 : -1, la: -Math.PI / 2 }, 1 / 30, mods); // rapid taps
+if (Math.hypot(p.x - x0, p.y - y0) > 0.01) fail('tapping lean moved the body', p.x - x0, p.y - y0);
 for (let i = 0; i < 20; i++) stepMove(m, p, { lean: 1, la: -Math.PI / 2 }, 1 / 30, mods);
-console.log('lean right moved', (p.x - x0).toFixed(1), 'px');
-if (Math.abs(p.x - x0 - LEAN_PX) > 1.5) fail('lean did not move LEAN_PX sideways', p.x - x0);
-for (let i = 0; i < 20; i++) stepMove(m, p, { lean: 0, la: -Math.PI / 2 }, 1 / 30, mods);
-if (Math.abs(p.x - x0) > 1) fail('did not come back from the lean', p.x - x0);
+const e = leanPoint(m, p.x, p.y, -Math.PI / 2, p.lo);
+console.log('lean right: body moved', Math.hypot(p.x - x0, p.y - y0).toFixed(2), 'px, upper body', (e.x - p.x).toFixed(1), 'px to the right');
+if (Math.abs(p.lo - LEAN_PX) > 0.1 || Math.abs(e.x - p.x - LEAN_PX) > 0.6) fail('upper body did not tip LEAN_PX to the right', p.lo, e.x - p.x);
 console.log(fails ? `FAIL jumplean (${fails})` : 'PASS jumplean');
 process.exit(fails ? 1 : 0);

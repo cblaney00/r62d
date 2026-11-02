@@ -79,13 +79,19 @@ export function moveCircle(map, o, dx, dy, r, drone = false, up = false) {
 //   operator (2.3 heavy, 3.0 light); walking (Shift) 1.4 m/s, a normal walk; aiming down sights 1.5 m/s;
 //   crouch-walking 0.9 m/s; crawling while downed 0.5 m/s; a drone 3.2 m/s, a little quicker than a jog.
 export const M_S = { run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, downed: 0.5, drone: 3.2, rope: 1.0 };
-export const JUMP_T = 0.42, LEAN_PX = 8, LEAN_SPEED = 60; // a hop's airtime (s); how far and fast a lean moves you (px, px/s)
+export const JUMP_T = 0.42, LEAN_PX = 6, LEAN_SPEED = 40; // a hop's airtime (s); how far and fast a lean moves you (px, px/s)
 export const BASE_SPEED = M_S.run * PX_PER_M;   // ~94 px/s (was 118)
 export const DRONE_SPEED = M_S.drone * PX_PER_M; // ~115 px/s (was 200)
 export const ARMOR_SPEED = { 1: 0.88, 2: 1.0, 3: 1.14 };
 
 // Apply one input step to whatever the player controls. Shared so the client
 // can predict its own movement exactly like the server does.
+// where a leaning upper body is: the body's spot moved o.lo to the side of `ang`, stopped short of a wall
+export function leanPoint(map, x, y, ang, lo) {
+  if (!lo) return { x, y };
+  const a = ang + (lo > 0 ? Math.PI / 2 : -Math.PI / 2), d = Math.min(Math.abs(lo), Math.max(0, castSight(map, x, y, a, Math.abs(lo) + 2, null, true) - 2));
+  return { x: x + Math.cos(a) * d, y: y + Math.sin(a) * d };
+}
 export function stepMove(map, o, input, dt, mods) {
   let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   let my = (input.down ? 1 : 0) - (input.up ? 1 : 0);
@@ -136,11 +142,10 @@ export function stepMove(map, o, input, dt, mods) {
   if (!mods.drone) {
     if (wasAir) { o.air -= dt; if (o.air <= 0) { o.air = 0; o.up = standable(map, Math.floor(o.y / CELL) * map.W + Math.floor(o.x / CELL)); o.landed = true; } }
     else if (o.up && !standable(map, Math.floor(o.y / CELL) * map.W + Math.floor(o.x / CELL))) o.up = false; // stepped off: back on the floor
-    // leaning (he asked, Q / E): the upper body slides up to LEAN_PX to the side you lean, against walls like a step would
+    // leaning (he asked, Q / E): only the upper body (torso, arms, gun, head) tips up to LEAN_PX to that side; the feet
+    // stay where they are, so leaning never moves you. o.lo is how far it has tipped (+ right of where you face).
     const want = (input.lean | 0) * LEAN_PX; o.lo = o.lo || 0;
-    let d = Math.max(-LEAN_SPEED * dt, Math.min(LEAN_SPEED * dt, want - o.lo));
-    if (Math.abs(d) > 0.01) { const a = (Number(input.la) || 0) + Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a), px = o.x, py = o.y;
-      moveCircle(map, o, ca * d, sa * d, PLAYER_R, false, !!o.up); const got = (o.x - px) * ca + (o.y - py) * sa; o.lo += got; } // only what really moved is undone when you stop leaning
+    o.lo += Math.max(-LEAN_SPEED * dt, Math.min(LEAN_SPEED * dt, want - o.lo));
   }
   takeStairs(map, o);
   // walking into a wall soaks up the velocity in that direction
