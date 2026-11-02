@@ -429,7 +429,7 @@ export class Game {
       p.prevInput = p.input;
     }
     this.tickEnts(dt);
-    this.recordHistory();
+    this.recordHistory(); this.recordCam();
 
     this.revealCheck -= dt;
     if (this.revealCheck <= 0) { this.revealCheck = 0.25; this.checkReveal(); }
@@ -747,6 +747,77 @@ export class Game {
 
   // Bullet: stops at the first enemy, goes through soft walls (damaging them), stops on hard ones.
   // Where everyone was, a few times a second back — so a shot can be judged against what the shooter saw.
+  // ---- killcam (he asked: rewatch your death, a BS rating on how fair it was, and a "!" when it caught a bug) ----
+  // everyone's pose 15 times a second for the last 6 s
+  recordCam() {
+    if ((this.camTick = (this.camTick || 0) + 1) % 2) return;
+    const ps = [];
+    for (const p of this.players.values()) if (p.alive && !p.staged) ps.push([p.id, r1(p.x), r1(p.y), r2(p.aim), (p.downed ? 1 : 0) | (p.input && p.input.ads ? 2 : 0) | (p.input && p.input.crouch ? 4 : 0) | (p.bracing ? 8 : 0), Math.round(p.hp), p.op, p.guns && p.guns[p.slot] ? p.guns[p.slot].w : null]);
+    (this.camBuf || (this.camBuf = [])).push({ t: this.time, ps });
+    while (this.camBuf.length > 95) this.camBuf.shift();
+  }
+  solidBetween(a, b) { // a bullet from a to b would have to cross concrete, furniture or a panel
+    const d = Math.hypot(b.x - a.x, b.y - a.y); if (d < 2) return false;
+    const dx = (b.x - a.x) / d, dy = (b.y - a.y) / d, sx = Math.floor(a.x / CELL), sy = Math.floor(a.y / CELL); let hit = false;
+    walkRay(a.x, a.y, dx, dy, d, (cx, cy) => {
+      if (cx === sx && cy === sy) return false;
+      const t = tileAt(this.map, cx, cy); if (!stopsBullet(t)) return false;
+      const sh = shapeAt(this.map, cx, cy); if (sh) { const h = rayShape(sh, a.x, a.y, dx, dy); if (h === null || h > d) return false; }
+      const k = cy * this.map.W + cx; if (this.map.holes[k] && throughHole(this.map, k, a.x, a.y, dx, dy)) return false;
+      hit = true; return true;
+    });
+    return hit;
+  }
+  judgeKill(q, src, wname, frames) {
+    const why = [], bug = []; let score = 0;
+    if (!src || src === q) return { rating: 0, why: ['Nobody else was involved'], bug: null };
+    const gun = Object.values(WEAPONS).some(w => w.name === wname), fl = (x, y) => floorAt(this.map, x, y);
+    if (this.side(src) === this.side(q)) { score += 3; why.push('A teammate did it'); }
+    let seenAt = null; // did they ever show on your screen (your 103° view, a clear line) in the last 3 s?
+    for (const f of frames) {
+      if (f.t < this.time - 3) continue;
+      const v = f.ps.find(e => e[0] === q.id), k = f.ps.find(e => e[0] === src.id); if (!v || !k) continue;
+      if (fl(v[1], v[2]) === fl(k[1], k[2]) && Math.abs(angDiff(Math.atan2(k[2] - v[2], k[1] - v[1]), v[3])) < 0.9 && los(this.map, v[1], v[2], k[1], k[2])) { seenAt = f.t; break; }
+    }
+    if (seenAt === null) { score += 3; why.push('They were never on your screen'); }
+    else if (this.time - seenAt < 0.35) { score += 2; why.push(`Dead ${Math.round((this.time - seenAt) * 1000)} ms after they showed up`); }
+    const lh = this.lastHit && this.lastHit.q === q.id && this.time - this.lastHit.t < 0.5 ? this.lastHit : null;
+    if (lh && lh.pens) { score += 2; why.push('Shot through a wall'); }
+    if (Math.abs(angDiff(Math.atan2(src.y - q.y, src.x - q.x), q.aim)) > 1.9) { score += 1; why.push('Shot from behind'); }
+    if (gun && src.viewTime !== null && src.viewTime !== undefined) { // lag: no clear line now, but there was where the shooter saw you
+      const p0 = this.posAt(q, src.viewTime);
+      if (Math.hypot(p0.x - q.x, p0.y - q.y) > 6 && !los(this.map, src.x, src.y, q.x, q.y) && los(this.map, src.x, src.y, p0.x, p0.y)) { score += 3; why.push('You were already behind cover on your screen (their lag)'); }
+    }
+    if (!gun) why.push(`Killed by ${wname || 'utility'}`);
+    if (this.headshot) why.push('A headshot');
+    if (!score) why.unshift('A fair fight');
+    // things that should never happen: a bug, saved for fixing
+    if (gun) {
+      if (!src.alive) bug.push('the shooter was already dead');
+      if (fl(src.x, src.y) === fl(q.x, q.y) && !(src.tracerUntil > this.time) && this.solidBetween(src, q) && (src.viewTime === null || src.viewTime === undefined || this.solidBetween(src, this.posAt(q, src.viewTime)))) bug.push('the bullet went through concrete or furniture');
+      if (Math.hypot(src.x - q.x, src.y - q.y) > 2200) bug.push('shot from further than any gun reaches');
+    }
+    const st0 = tileAt(this.map, Math.floor(src.x / CELL), Math.floor(src.y / CELL));
+    if (src.alive && !src.vault && !src.rope && (st0 === T.HARD || st0 === T.REINF || st0 === T.TALL || st0 === T.VOID)) bug.push('the shooter was standing inside a wall');
+    let prev = null;
+    for (const f of frames) { const k = f.ps.find(e => e[0] === src.id); if (k && prev && Math.hypot(k[1] - prev[1], k[2] - prev[2]) > 70 && fl(k[1], k[2]) === fl(prev[1], prev[2])) { bug.push('the shooter jumped across the map'); break; } prev = k; }
+    return { rating: Math.min(10, score), why, bug: bug.length ? bug : null };
+  }
+  sendKillcam(q, src, wname) {
+    const now = this.time, frames = (this.camBuf || []).filter(f => f.t >= now - 5.5), ids = new Set([q.id]);
+    if (src) ids.add(src.id);
+    const last = frames[frames.length - 1];
+    if (last) for (const e of last.ps) if (!ids.has(e[0]) && [q, src].some(o => o && Math.hypot(o.x - e[1], o.y - e[2]) < 320)) ids.add(e[0]); // others close by, for the picture
+    const j = this.judgeKill(q, src, wname, frames);
+    const m = { t: 'killcam', killer: src ? src.id : null, kn: src ? src.name : '', victim: q.id, w: wname || '', hs: this.headshot ? 1 : 0, rating: j.rating, why: j.why, bug: j.bug,
+      fr: frames.map(f => ({ t: r2(f.t - now), ps: f.ps.filter(e => ids.has(e[0])) })),
+      shots: (this.shotLog || []).filter(s => s.t >= now - 5.5 && ids.has(s.id)).map(s => ({ ...s, t: r2(s.t - now) })),
+      names: Object.fromEntries([...ids].map(id => { const p = this.players.get(id); return [id, p ? [p.name, this.side(p) === this.side(q) ? 1 : 0] : ['?', 0]]; })) };
+    if (j.bug) m.bugId = store.saveBug({ at: new Date().toISOString(), version: process.env.R62D_VERSION || null, map: this.map.id, round: this.round, site: this.site, weapon: wname, bug: j.bug, why: j.why,
+      killer: src && { id: src.id, name: src.name, op: src.op, x: src.x, y: src.y, aim: src.aim, viewTime: src.viewTime, alive: src.alive }, victim: { id: q.id, name: q.name, op: q.op, x: q.x, y: q.y, aim: q.aim }, time: now, frames: m.fr, shots: m.shots });
+    q.sock.send(JSON.stringify(m));
+  }
+
   recordHistory() {
     const snap = new Map();
     for (const q of this.players.values()) if (q.alive) snap.set(q.id, { x: q.x, y: q.y });
@@ -830,6 +901,7 @@ export class Game {
         }
       }
       if (src.ms) src.ms.hits++;
+      this.lastHit = { q: q.id, src: src.id, pens, t: this.time }; // for the killcam's fairness check
       // headshot: the bullet passes through the very centre of the body — instant kill, no getting downed
       const at = best.at || q, cx = at.x - x0, cy = at.y - y0, miss = Math.abs(cx * dy - cy * dx);
       const W = this.shotW && this.shotW.cls === cls ? this.shotW : null, pellet = W ? W.pellets > 1 : cls === 'Shotgun';
@@ -976,6 +1048,7 @@ export class Game {
     if (src && src.sock) this.events.push({ e: 'hitmark', to: src.id, kill: true });
     this.events.push({ e: 'kill', killer: src ? src.id : null, victim: q.id, w: wname || '', hs: this.headshot ? 1 : 0 });
     if (q.hasDefuser) this.dropDefuser(q);
+    if (q.sock && q.sock.open && !this.tv) try { this.sendKillcam(q, src, wname); } catch (err) { console.log('killcam:', err.message); }
     const d = this.ent(q.droneId); if (d && this.phase === PHASE.PREP) this.removeEnt(d);
   }
 
@@ -2424,3 +2497,10 @@ export class Game {
     if (this.tv) { const f = this.tv.follow, msg = '{"t":"snap","tv":1,"you":' + JSON.stringify(f) + ',' + (f && mine.has(f) ? '"mine":' + mine.get(f) + ',' : '') + common.slice(1); for (const sk of this.tv.socks) if (sk.open) sk.send(msg); }
   }
 }
+// every shot's line, for the killcam (kept 6 s)
+const hitscan0 = Game.prototype.hitscan;
+Game.prototype.hitscan = function (src, x0, y0, ...rest) {
+  const r = hitscan0.call(this, src, x0, y0, ...rest);
+  if (src) { const L = this.shotLog || (this.shotLog = []); L.push({ t: this.time, id: src.id, x0: r1(x0), y0: r1(y0), x: r1(r.x), y: r1(r.y) }); if (L.length > 400) L.splice(0, 150); }
+  return r;
+};

@@ -6,15 +6,15 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] consider removing features or UI things for the mobile version of the game, the two versions of the game should be updated alongside eachother and work as the same game but there should be a difference in how the game loads in when it knows what type of device is trying to play the game
-- [ ] when you die you can rewatch your killcam and death perspective and the game will give you a BS rating on if the kill was fair and a "!" symbol when it found a bug that it will save the info about
 - [ ] i found an issue with the aim, if i move my mouse slowly then the cursor doesnt even move at all, this would cause huge frustration from people with actually decent aim. make sure the cursor is very accurate to the mouse inputs (in progress: the desktop mouse was set to flat for this session; making it permanent needs vibe → "Change or fix something on your computer"; the game now also asks the browser for raw mouse movement)
-- [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab.
-- [ ] a few characters should actually have a riot shield as their 3rd primary weapon option, the shield itself should work similarly to bulwarks but each character's shield should have its own personality and pros and cons, make sure to tests these characters out thouroughly with the pros to balance them and make them fun (in progress: 6 shields added — Onyx AEGIS WALL, Brisk VISOR, Hammer BATTERING RAM, Rampart BASTION, Solace GLASS GUARD, Wraith THORN; `node tests/riot.js` passes; still needs a longer balance run with `node tests/riotbalance.js 6`)
-- [ ] the autodirector still needs a massive overhaul, see if you can read up on what eports broadcasters do and how they decide what to focus on
+- [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
 
 ## Done
 
+- [x] Phones keep everything (he chose) but the menus are re-proportioned: the tabs are a strip across the top that scrolls sideways, every page gets the full width, and Settings is split into pages (Sound, Aiming, Controls, Screen, Crosshair, Keys).
+- [x] Killcam: when you die, F (or WATCH KILLCAM) replays the last seconds through their eyes, then yours, then a BS rating out of 10 with the reasons (never on your screen, through a wall, lag, from behind, too fast, teammate). A "!" shows when something impossible happened, and it is saved as a bug report in the game's data/bugs folder.
+- [x] Riot shields as the 3rd primary for six operators, each with its own personality: Onyx AEGIS WALL (huge, slow, hard bash), Brisk VISOR (light, fire round it, narrow), Hammer BATTERING RAM (bash smashes barricades, long miss), Rampart BASTION (plant it crouched for more cover), Solace GLASS GUARD (fastest to swing aside, cracks), Wraith THORN (stun bash, recharges). Balanced over 200+ pro rounds (docs/balance.md).
+- [x] Esports TV director rebuilt the way broadcast observers work: it reads the map for fights about to happen and cuts there a few seconds early, holds each shot, never leaves a fight in progress, cuts to the killer when the followed player dies, stays with clutches and players on a streak, opens the action with a map shot and moves on from quiet players.
 - [x] Defender bots look through the cameras when it is quiet, or for a quick look when enemies are heard coming and nobody knows where; never with an enemy close. They spot what the cameras see.
 - [x] Bots never shoot when a teammate is in the line of fire and step off a teammate's line; one defender takes space in a room beside the site while two hold it; everyone watches the clock (attackers stop waiting and run late in the round, roamers come back).
 - [x] Audit's radar pings each drone once, then only again when it has moved on.

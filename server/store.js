@@ -139,4 +139,11 @@ class Store {
 }
 
 export const store = new Store();
+// a kill the killcam found something wrong with (he asked: "!" and the info saved): one file each in data/bugs
+let bugN = 0;
+store.saveBug = rec => {
+  const id = `kill-${new Date().toISOString().replace(/[:.]/g, '-')}-${++bugN}`;
+  try { fs.mkdirSync(path.join(DIR, 'bugs'), { recursive: true }); fs.writeFileSync(path.join(DIR, 'bugs', id + '.json'), JSON.stringify(rec, null, 1)); } catch (e) { console.log('could not save bug', e.message); }
+  return id;
+};
 export const publicProfile = p => p && ({ id: p.id, name: p.name, created: p.created, lastSeen: p.lastSeen, loadouts: p.loadouts, stats: p.stats, settings: p.settings || null, xp: p.xp || 0, level: levelFor(p.xp || 0), mmr: p.mmr ?? START_MMR, rank: rankOf(p.mmr ?? START_MMR) });

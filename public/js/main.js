@@ -9,6 +9,7 @@ import { drawWebcam } from './webcam.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading } from './sprites.js';
+import { openKillcam, killcamOpen } from './killcam.js';
 import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
 import { openOps, closeOps, updateOpsProfile, showLoadout } from './ops.js';
@@ -253,6 +254,7 @@ function connect(mode = '') { // '' = the shared match, 'tut' / 'free' = a priva
       try { localStorage.setItem('r62d-token', m.token); } catch {}
       $('join').classList.add('hidden'); $('room').classList.remove('hidden');
     } else if (m.t === 'snap') onSnap(m);
+    else if (m.t === 'killcam') { st.killcam = m; m.got = performance.now(); } // watched from the death screen (F or the button)
     else if (m.t === 'full') alert('The game is full (10 players).');
     else if (m.t === 'taken') alert(`Someone is already playing as ${m.name}. Type a different name.`);
     else if (m.t === 'chat') addChat(m);
@@ -575,7 +577,9 @@ addEventListener('keydown', e => {
   if (!a || keys.has(a)) return;
   pressAction(a, e);
 });
+function watchKillcam() { if (!st.killcam || !st.rend || killcamOpen()) return; if (document.pointerLockElement) document.exitPointerLock(); openKillcam(st.killcam, st.rend, st.map); }
 function pressAction(a, e) {
+  if (a === 'interact' && st.killcam && st.me && !st.me.a && playing()) { watchKillcam(); return; } // dead: F replays how you died
   keys.add(a);
   audio.initAudio();
   const ev = st.evq;
@@ -2195,9 +2199,10 @@ function hud(s) {
     $('prompt').innerHTML = ''; $('progress').style.display = 'none';
     const mates = s.players.filter(p => p.a && p.sq === me.sq);
     $('viewlabel').textContent = mates.length ? `SPECTATING ${mates[st.spect % mates.length].n.toUpperCase()} · CLICK TO SWITCH` : '';
+    $('kcBtn').classList.toggle('hidden', !st.killcam || st.tv); $('kcBtn').innerHTML = `<b>${label('interact')}</b> WATCH KILLCAM`;
     return;
   }
-  $('br').style.visibility = '';
+  $('br').style.visibility = ''; $('kcBtn').classList.add('hidden'); if (st.killcam && performance.now() - st.killcam.got > 3000) st.killcam = null; // alive again: the old killcam is gone
   const o = OPERATORS[me.op];
   $('opname').innerHTML = `${o.name}<small>${o.role.toUpperCase()}</small>`;
   $('hpnum').textContent = me.hp;
@@ -2778,21 +2783,58 @@ function tvDirector(s, players, now) {
   // he asked: in preparation, show the defenders setting up (gadgets placed, walls reinforced, doors boarded)
   const prep = s.ph === PHASE.PREP; T.util = T.util || {}; if (!prep) T.prepSeen = null; else T.prepSeen = T.prepSeen || new Set();
   for (const e of s.ev) if (e.e === 'snd' && ['place', 'reinforce', 'panel', 'clamp', 'beep'].includes(e.s)) { let b = null, bd = 90; for (const p of s.players) if (p.a && p.x !== undefined) { const d = Math.hypot(p.x - e.x, p.y - e.y); if (d < bd) { bd = d; b = p; } } if (b) T.util[b.id] = now; }
+  // The director, rebuilt the way broadcast observers work (he asked): they read the map for fights that are ABOUT to
+  // happen and cut to a player a few seconds before contact (not at the shot, which gives the result away), hold each
+  // shot steadily, never leave a fight until it is over, cut to the killer when the player they follow dies, stay with
+  // a clutch or a player on a streak, open the action with a map shot, and move on from someone with nothing going on.
+  for (const e of s.ev) if (e.e === 'kill' && e.killer) (T.kills || (T.kills = {}))[e.killer] = [...((T.kills || {})[e.killer] || []).filter(t => now - t < 10), now];
+  if (s.ph === PHASE.ACTION && T.lastPh !== PHASE.ACTION) { T.lastPh = s.ph; if (T.auto) { T.overview = true; T.ovUntil = now + 3.5; } } // the opening map shot
+  if (s.ph !== PHASE.ACTION) T.lastPh = s.ph;
+  if (T.ovUntil && now > T.ovUntil) { T.ovUntil = 0; if (T.auto) T.overview = false; }
   const cur = players.get(T.follow), curOk = cur && cur.a && !cur.dn;
   if (!T.auto && curOk) return;
-  if (curOk && now - T.cutT < (prep ? 5 : 3)) return;
-  let best = null, bs = -1;
+  if (T.ovUntil) return;
   const alive = s.players.filter(p => p.a && !p.dn && p.x !== undefined);
-  for (const p of alive) {
-    let sc = 0;
-    if (p.bu) sc += 100; if (now - (T.shot[p.id] || -9) < 1.5) sc += 40; if (p.df) sc += 10;
-    if (alive.filter(q => q.sq === p.sq).length === 1) sc += 25;
-    for (const q of alive) if (q.sq !== p.sq) sc += Math.max(0, 30 - Math.hypot(q.x - p.x, q.y - p.y) / 15) * 0.5;
-    if (prep && p.tm === 'def') { if (now - (T.util[p.id] || -9) < 4) sc += 30; if (!T.prepSeen.has(p.id)) sc += 12; if (s.ents.some(e => e.tm === 'def' && Math.hypot(e.x - p.x, e.y - p.y) < 80)) sc += 6; } // the action above still wins
-    if (p.id === T.follow) sc += 8; sc += Math.random();
-    if (sc > bs) { bs = sc; best = p; }
-  }
-  if (best && best.id !== T.follow) { T.follow = best.id; T.cutT = now; if (T.prepSeen) T.prepSeen.add(best.id); send({ t: 'tv', a: 'follow', id: best.id }); }
+  const fl = p => floorAt(st.map, p.x, p.y), recentShot = (p, w) => now - (T.shot[p.id] || -9) < w;
+  const fighting = p => recentShot(p, 1.8) || alive.some(q => q.sq !== p.sq && fl(q) === fl(p) && Math.hypot(q.x - p.x, q.y - p.y) < 260 && recentShot(q, 1.8));
+  // the followed player died or went down: one beat on it, then the killer (the trade is the story)
+  if (cur && (!cur.a || cur.dn)) {
+    if (!T.diedT) T.diedT = now;
+    if (now - T.diedT < 1.2) return;
+    T.diedT = 0;
+    const killer = Object.entries(T.kills || {}).filter(([, ts]) => now - ts[ts.length - 1] < 2.5).map(([id]) => players.get(id)).find(q => q && q.a && !q.dn);
+    if (killer) { T.follow = killer.id; T.cutT = now; send({ t: 'tv', a: 'follow', id: killer.id }); return; }
+  } else T.diedT = 0;
+  const score = p => {
+    let sc = 0, contact = 0;
+    if (p.bu) sc += 120; // planting / defusing / reviving: the objective
+    if (fighting(p)) sc += 70;
+    for (const q of alive) { // anticipation: an enemy close on the same floor, and closing in
+      if (q.sq === p.sq || fl(q) !== fl(p)) continue;
+      const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || 1, close = -(((q.vx || 0) - (p.vx || 0)) * dx + ((q.vy || 0) - (p.vy || 0)) * dy) / d;
+      const tta = close > 5 ? d / close : 99; // seconds until they meet
+      contact = Math.max(contact, Math.max(0, 1 - d / 420) * 40 + (tta < 7 ? (7 - tta) * 6 : 0));
+    }
+    sc += contact;
+    const mates = alive.filter(q => q.sq === p.sq).length, foes = alive.filter(q => q.sq !== p.sq).length;
+    if (mates === 1 && foes >= 1) sc += 35 + foes * 8; // a clutch
+    sc += Math.min(3, ((T.kills || {})[p.id] || []).length) * 12; // a hot streak
+    if (p.df) sc += 12;
+    if (s.pl && p.tm === 'def') sc += Math.max(0, 30 - Math.hypot(s.pl.x - p.x, s.pl.y - p.y) / 12); // the retake
+    if (prep && p.tm === 'def') { if (now - (T.util[p.id] || -9) < 4) sc += 30; if (!T.prepSeen.has(p.id)) sc += 12; if (s.ents.some(e => e.tm === 'def' && Math.hypot(e.x - p.x, e.y - p.y) < 80)) sc += 6; }
+    return sc;
+  };
+  const held = now - (T.cutT || -99);
+  const curSc = curOk ? score(cur) : -1;
+  if (curOk && fighting(cur)) return; // never cut away from a fight in progress
+  const quiet = curOk && curSc < 15;
+  const minHold = prep ? 5 : 4;
+  if (curOk && held < minHold) return;
+  let best = null, bs = -1;
+  for (const p of alive) { const sc = score(p) + Math.random() * 2 + (p.id === T.follow ? 10 - (quiet ? Math.max(0, held - 8) * 3 : 0) : 0); if (sc > bs) { bs = sc; best = p; } }
+  if (!best || best.id === T.follow) return;
+  if (curOk && bs < curSc * 1.35 + 12 && !(quiet && held > 12)) return; // only a clearly better shot is worth a cut
+  T.follow = best.id; T.cutT = now; if (T.prepSeen) T.prepSeen.add(best.id); send({ t: 'tv', a: 'follow', id: best.id });
 }
 function tvFollow(id) { const T = st.tv; T.auto = !id; T.overview = false; if (id) { T.follow = id; T.cutT = performance.now() / 1000; send({ t: 'tv', a: 'follow', id }); } }
 function tvKey(e) {
@@ -2855,3 +2897,16 @@ function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {});
 }
 if (inApp()) for (const id of ['fsBtn', 'pFs']) $(id).style.display = 'none'; // nothing to switch in the desktop app
+$('kcBtn').onclick = () => { audio.ui(); watchKillcam(); };
+// Phones (he asked: the same menus, re-proportioned, with more pages so everything fits): Settings is split into pages
+// with a bar of buttons at the top instead of one long crowded window.
+if (isTouch) {
+  const S = $('settings'), pages = [['SOUND', 'volMaster'], ['AIMING', 'sens'], ['CONTROLS', 'inputSeg'], ['SCREEN', 'fsToggle'], ['CROSSHAIR', 'xhPreview'], ['KEYS', 'bindTable']];
+  const kids = [...S.children].filter(c => c.tagName !== 'H2' && !c.classList.contains('center'));
+  let last = 'SOUND';
+  for (const c of kids) { const p = pages.find(([, id]) => c.querySelector('#' + id)); if (p) last = p[0]; else if (c.classList.contains('fxToggles')) last = 'SCREEN'; else if (/Click a key/.test(c.textContent)) last = 'KEYS'; c.dataset.page = last; }
+  const bar = document.createElement('div'); bar.className = 'seg setPages'; S.querySelector('h2').after(bar);
+  const show = n => { for (const c of kids) c.classList.toggle('pageOff', c.dataset.page !== n); for (const b of bar.children) b.classList.toggle('on', b.textContent === n); };
+  for (const [n] of pages) if (kids.some(c => c.dataset.page === n)) { const b = document.createElement('button'); b.textContent = n; b.onclick = () => { audio.ui(); show(n); }; bar.appendChild(b); }
+  show('SOUND');
+}

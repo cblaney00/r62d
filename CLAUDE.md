@@ -179,4 +179,6 @@ His wishes so far:
 - Starter attachments: `defaultAtt(w, op)`; `cleanAtt(w, a, op)` gives it when nothing was chosen.
 - Bots: `shotClear`, `linedUp`, `checkAngles` (no spinning), `botCams` (defenders on cameras), 'space' defender role, `intelOf`; pro defence plans give each job its own way in (end of `playbook`). `facingCell` skips stairs/side glances at shields. `node tests/stuckbots.js --level N`, `node tests/revive.js`.
 - Maps: `siteWindows` in mapkit.js adds windows to site rooms. Pro practice: 200 rounds per version (`ROUNDS_PER_VERSION`).
-- Not done yet: killcam + BS rating (design notes in docs/batch-22.md), Esports TV director overhaul, phone trim, Lando LAN hosting.
+- Killcam: server `recordCam` (15 Hz, 6 s), shot log (hitscan wrapped at the end of game.js), `judgeKill` (BS rating + bug checks), `sendKillcam` (direct `killcam` message); bugs saved by `store.saveBug` to `$R62D_DATA/bugs`. Client `public/js/killcam.js` (`openKillcam`), F or `#kcBtn` while dead. `node tests/killcam.js`.
+- Esports TV `tvDirector`: anticipation (enemy distance + closing speed), never cuts mid-fight, killer after a death, clutch/streak bonuses, opening map shot (`ovUntil`), boredom rotation.
+- Phones: `html.touch` lobby = top tab strip; Settings split into pages (`.setPages`, end of main.js). Not done: Lando LAN (his firewall), permanent flat mouse (config).

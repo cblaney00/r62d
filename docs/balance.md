@@ -58,3 +58,8 @@ kicked too hard for bots: its spray kick 1.4→1.2.
 
 ## Shield pass (he asked)
 - Bulwark can shoot with the shield up, but each shot swings it aside for 0.5 s; jogging swings it with each step (~20% of front shots get through); standing/walking/crouching covers the whole front. Shield-up speed ×0.82 (was ×0.45). 6-match run: Bulwark 48% (56 rounds).
+
+## Riot shields (2026-11-02, `node tests/riotbalance.js 6`, pros)
+Before: Bastion K/r 0.79 D/r 0.55 (gun 0.41/0.77) — too strong: plant 1.45→1.3, arc 1.0→0.95. Aegis win 42% vs gun 54%:
+speed 0.74→0.78, aside 0.5→0.42. Thorn win 45% vs 56%: arc 0.86→0.92, recharge 2.2→1.6 s, speed 0.88→0.9, aside 0.25→0.22.
+Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glass fair. Ram: too few rounds to judge (Hammer rarely picked).

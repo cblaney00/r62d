@@ -304,17 +304,17 @@ export const LOADOUTS = {
 // gone for the round after that much damage (0 = never); hip: the pistol can fire round it without swinging it aside;
 // plant: crouched and still it covers this much instead; breaks: a bash smashes barricades; stun: a bash stuns.
 export const RIOT = {
-  aegis: { name: 'AEGIS WALL', side: 'atk', arc: 1.15, speed: 0.74, aside: 0.5, bash: 40, stagger: 1.0, miss: 1.4, hp: 0, col: '#2a2f36', rim: '#c9a23c',
+  aegis: { name: 'AEGIS WALL', side: 'atk', arc: 1.15, speed: 0.78, aside: 0.42, bash: 40, stagger: 1.0, miss: 1.4, hp: 0, col: '#2a2f36', rim: '#c9a23c',
     trait: 'Huge and heavy: covers nearly your whole front and its bash hits hard, but you crawl and it takes an age to swing aside.' },
-  visor: { name: 'VISOR', side: 'atk', arc: 0.78, speed: 0.95, aside: 0.15, bash: 18, stagger: 0.5, miss: 0.9, hp: 0, hip: true, col: '#30363f', rim: '#7fd0ff',
+  visor: { name: 'VISOR', side: 'atk', arc: 0.82, speed: 0.95, aside: 0.15, bash: 22, stagger: 0.5, miss: 0.9, hp: 0, hip: true, col: '#30363f', rim: '#7fd0ff',
     trait: 'Light and quick: you can fire the pistol round it without lowering it, but it only covers a narrow strip.' },
   ram: { name: 'BATTERING RAM', side: 'atk', arc: 0.95, speed: 0.82, aside: 0.35, bash: 30, stagger: 0.8, miss: 2.2, hp: 0, breaks: true, col: '#3a3330', rim: '#d86a3a',
     trait: 'A breaching shield: one bash smashes a whole barricade, but a missed bash leaves you wide open for a long time.' },
-  bastion: { name: 'BASTION', side: 'def', arc: 1.0, plant: 1.45, speed: 0.72, aside: 0.4, bash: 30, stagger: 0.7, miss: 1.2, hp: 0, col: '#283038', rim: '#9aa6b2',
+  bastion: { name: 'BASTION', side: 'def', arc: 0.95, plant: 1.3, speed: 0.72, aside: 0.4, bash: 30, stagger: 0.7, miss: 1.2, hp: 0, col: '#283038', rim: '#9aa6b2',
     trait: 'Plant it: crouched and still it covers your front and sides, but it is the slowest shield to move with.' },
   glass: { name: 'GLASS GUARD', side: 'def', arc: 1.0, speed: 0.9, aside: 0.12, bash: 22, stagger: 0.6, miss: 1.0, hp: 360, col: 'rgba(170,215,240,0.55)', rim: '#cfe8f6',
     trait: 'Clear and light, the fastest to swing aside, but it cracks and is gone after it soaks up about three magazines.' },
-  thorn: { name: 'THORN', side: 'def', arc: 0.86, speed: 0.88, aside: 0.25, bash: 25, stagger: 0.6, stun: 1.3, cd: 2.2, miss: 1.2, hp: 0, col: '#2c2a33', rim: '#b05ad8',
+  thorn: { name: 'THORN', side: 'def', arc: 0.92, speed: 0.9, aside: 0.22, bash: 25, stagger: 0.6, stun: 1.3, cd: 1.6, miss: 1.2, hp: 0, col: '#2c2a33', rim: '#b05ad8',
     trait: 'Shock studs: a bash stuns whoever it hits, but it recharges slowly and the shield is a little small.' },
 };
 export const isRiot = w => !!RIOT[w];
