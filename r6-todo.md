@@ -7,11 +7,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
-- [ ] the autodirector should showcase both teams evenly more or less (whichever team is more exciting to view at the moment), also viewers should get to see the vision of both teams with a slight tint to the vision cones
 - [ ] the bots should also just stand around less, they get impatient just like people do, they take risks for better position and the element of surprise or experience gained from lots of games
 
 ## Done
 
+- [x] Esports TV: the auto director keeps count of how long each team has been on screen and leans toward the team that has had less, while a really exciting moment still wins. Viewers now see what both teams see, each team's sight faintly tinted in its own colour.
 - [x] Preparation is 10 seconds shorter (30 s instead of 40).
 - [x] Doors no longer start the match planked: the defending bots used to board every site door the instant preparation began; now they put the boards up one at a time through preparation, taking as long as a person would. Windows still start boarded.
 - [x] Bullets break wooden planks: any gun's bullets wear a planked door or window down, and 320 damage of bullets in all brings the whole board down (about 11 rifle rounds). Holes and the shotgun/melee rules work as before.

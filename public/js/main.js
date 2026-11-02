@@ -1839,6 +1839,15 @@ function draw(s, view, now, dt) {
     if (B > d) ctx.fillRect(a, d, c - a, B - d);
   }
   if (inGame && view) { drawStairView(s, st.me, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
+  if (st.tv && inGame) { // each team's sight, faintly in its own colour (pro team colours, else blue / orange)
+    const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
+    for (const sq of [0, 1]) {
+      const col = pro && PRO_TEAMS[sq] ? PRO_TEAMS[sq].colour : sq ? '#ff8a3d' : '#46a8ff';
+      ctx.fillStyle = col; ctx.globalAlpha = 0.13; ctx.beginPath();
+      for (const v of st.viewers) if (v.tvSq === sq && !v.off) { const pts = visionPolygon(v, sm, 140); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); }
+      ctx.fill('nonzero'); ctx.globalAlpha = 1;
+    }
+  }
 
   tq = pfa('fog', tq);
   // --- markers drawn above the blackout ---
@@ -2373,6 +2382,14 @@ function camBar(s, me) {
 function teamViewers(s, view, me, inGame) {
   const vs = [];
   if (view) vs.push(view);
+  if (st.tv && s && inGame) { // ESPORTS TV (he asked): viewers see what BOTH teams see, each team's sight tinted its colour
+    if (view && me) view.tvSq = me.sq;
+    for (const sp of s.players) {
+      if (!sp.a || sp.dn || sp.id === (me && me.id)) continue;
+      const p = interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
+      vs.push({ x: p.x, y: p.y, ang: p.ag || 0, fov: fovFor(p), range: 1100, near: 26, kind: 'body', tvSq: sp.sq });
+    }
+  }
   if (!s || !me || !inGame) return vs;
   // an open hatch someone can see into shows a little of the room on the other side of it
   const m = st.map, sm = smokes(s), n = vs.length;
@@ -2814,6 +2831,12 @@ function tvDirector(s, players, now) {
   if (s.ph !== PHASE.ACTION) T.lastPh = s.ph;
   if (T.ovUntil && now > T.ovUntil) { T.ovUntil = 0; if (T.auto) T.overview = false; }
   const cur = players.get(T.follow), curOk = cur && cur.a && !cur.dn;
+  // he asked: show both teams about evenly. Screen time per team is counted (older time fades out over ~2 minutes) and
+  // the team that has had less gets a lift that grows with the gap; the more exciting shot still wins when it really is.
+  const sdt = Math.min(0.5, now - (T.sqNow || now)); T.sqNow = now; T.sqTime = T.sqTime || [0, 0];
+  for (const i of [0, 1]) T.sqTime[i] *= Math.exp(-sdt / 120);
+  if (cur && cur.sq !== undefined && !T.overview) T.sqTime[cur.sq] += sdt;
+  const share = sq => { const a = T.sqTime[sq], b = T.sqTime[1 - sq]; return (b - a) / Math.max(20, a + b); }; // > 0: this team is owed screen time
   if (!T.auto && curOk) return;
   if (T.ovUntil) return;
   const alive = s.players.filter(p => p.a && !p.dn && p.x !== undefined);
@@ -2842,6 +2865,7 @@ function tvDirector(s, players, now) {
     if (mates === 1 && foes >= 1) sc += 35 + foes * 8; // a clutch
     sc += Math.min(3, ((T.kills || {})[p.id] || []).length) * 12; // a hot streak
     if (p.df) sc += 12;
+    sc += Math.max(0, share(p.sq)) * 60; // the team that has been on screen less
     if (s.pl && p.tm === 'def') sc += Math.max(0, 30 - Math.hypot(s.pl.x - p.x, s.pl.y - p.y) / 12); // the retake
     if (prep && p.tm === 'def') { if (now - (T.util[p.id] || -9) < 4) sc += 30; if (!T.prepSeen.has(p.id)) sc += 12; if (s.ents.some(e => e.tm === 'def' && Math.hypot(e.x - p.x, e.y - p.y) < 80)) sc += 6; }
     return sc;
