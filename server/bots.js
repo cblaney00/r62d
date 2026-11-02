@@ -809,7 +809,24 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
     }
     return;
   }
-  const next = ai.path[0];
+  let next = ai.path[0];
+  // he asked: bots walked on top of each other along the same path. Like a team pushing in a tactical shooter, they
+  // keep 1.5-2.5 m apart in a line (close enough to trade, not so close one burst gets both), and go through a doorway
+  // as a swing: the first one in, the next a beat later through the other half of the doorway.
+  const mate = spacingMate(game, p, next);
+  if (mate && game.time < (ai.yieldUntil ?? (ai.yieldUntil = game.time + 2.5))) {
+    const d = Math.hypot(mate.x - p.x, mate.y - p.y);
+    if (d < 20) { const a = Math.atan2(p.y - mate.y, p.x - mate.x) + (p.id < mate.id ? 0.6 : -0.6); setDir(inp, Math.cos(a), Math.sin(a)); inp.walk = 1; } // right on top: step off
+    if (preAims(game, p)) { if ((ai.threatT = (ai.threatT || 0) - dt) <= 0) { ai.threatT = 0.7; ai.threat = threatPoint(game, p, Math.atan2(mate.y - p.y, mate.x - p.x)); } if (ai.threat) turnTo(p, Math.atan2(ai.threat.y - p.y, ai.threat.x - p.x), skill(game, p).turn * 0.8, dt); }
+    return; // let them get ahead
+  }
+  if (!mate) ai.yieldUntil = undefined;
+  else if (game.time > ai.yieldUntil + 1.5) ai.yieldUntil = undefined; // waited long enough: go anyway, then wait again later
+  const oi = map.openId ? map.openId[next] : -1;
+  if (oi >= 0 && map.openings[oi] && map.openings[oi].cells.length > 1) { // a doorway: take the half a teammate isn't using
+    const o = map.openings[oi], used = [...game.players.values()].filter(q => q !== p && q.alive && q.squad === p.squad && Math.hypot(q.x - p.x, q.y - p.y) < 120);
+    if (used.length) { const far = o.cells.slice().sort((a, b) => Math.min(...used.map(q => Math.hypot((b % map.W + 0.5) * CELL - q.x, (Math.floor(b / map.W) + 0.5) * CELL - q.y))) - Math.min(...used.map(q => Math.hypot((a % map.W + 0.5) * CELL - q.x, (Math.floor(a / map.W) + 0.5) * CELL - q.y))))[0]; next = far; }
+  }
   const nx = (next % map.W + 0.5) * CELL, ny = (Math.floor(next / map.W) + 0.5) * CELL;
   const dirA = Math.atan2(ny - p.y, nx - p.x);
   let lookA = dirA; // where they walk, or (better bots) where an enemy would come from
@@ -835,6 +852,25 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   if (Math.hypot(p.x - (ai.lx || 0), p.y - (ai.ly || 0)) < 0.5) { ai.stuck = (ai.stuck || 0) + dt; if (ai.stuck > 1) { ai.path = null; ai.stuck = 0; } }
   else ai.stuck = 0;
   ai.lx = p.x; ai.ly = p.y;
+}
+
+// A teammate just ahead on the way this bot is going (closer than the spacing we keep), or, entering a doorway, one
+// who is going through it right now. Only the one behind waits; side by side, the lower id goes first.
+function spacingMate(game, p, next) {
+  if (p.downed || game.phase !== PHASE.ACTION) return null;
+  const map = game.map, nx = (next % map.W + 0.5) * CELL, ny = (Math.floor(next / map.W) + 0.5) * CELL;
+  const dl = Math.hypot(nx - p.x, ny - p.y) || 1, ux = (nx - p.x) / dl, uy = (ny - p.y) / dl, fl = floorAt(map, p.x, p.y);
+  const door = map.openId && (map.openId[next] >= 0 || (p.ai.path || []).slice(0, 3).some(k => map.openId[k] >= 0));
+  let best = null, bd = Infinity;
+  for (const q of game.players.values()) {
+    if (q === p || !q.alive || q.downed || q.squad !== p.squad || q.ctrl !== 'body' || floorAt(map, q.x, q.y) !== fl) continue;
+    const ax = q.x - p.x, ay = q.y - p.y, d = Math.hypot(ax, ay), along = ax * ux + ay * uy;
+    if (d < 1 && p.id < q.id) continue;
+    const keep = door ? 72 : 52; // ~2 m at a doorway (the swing), ~1.5 m in a corridor
+    if (d > keep || along < (Math.abs(along) < 6 ? (p.id < q.id ? 1 : -1) : 0) || Math.abs(ax * uy - ay * ux) > 30) continue;
+    if (d < bd) { bd = d; best = q; }
+  }
+  return best;
 }
 
 // Every attacker bot drones in preparation (he asked: some never did; in fact none drove theirs). The drone heads for

@@ -2828,12 +2828,12 @@ function tvDirector(s, players, now) {
   const curSc = curOk ? score(cur) : -1;
   if (curOk && fighting(cur)) return; // never cut away from a fight in progress
   const quiet = curOk && curSc < 15;
-  const minHold = prep ? 5 : 4;
+  const minHold = prep ? 9 : 7; // he asked: it cut too often
   if (curOk && held < minHold) return;
   let best = null, bs = -1;
-  for (const p of alive) { const sc = score(p) + Math.random() * 2 + (p.id === T.follow ? 10 - (quiet ? Math.max(0, held - 8) * 3 : 0) : 0); if (sc > bs) { bs = sc; best = p; } }
+  for (const p of alive) { const sc = score(p) + Math.random() * 2 + (p.id === T.follow ? 18 - (quiet ? Math.max(0, held - 12) * 3 : 0) : 0); if (sc > bs) { bs = sc; best = p; } }
   if (!best || best.id === T.follow) return;
-  if (curOk && bs < curSc * 1.35 + 12 && !(quiet && held > 12)) return; // only a clearly better shot is worth a cut
+  if (curOk && bs < curSc * 1.7 + 30 && !(quiet && held > 16)) return; // only a much better shot is worth a cut
   T.follow = best.id; T.cutT = now; if (T.prepSeen) T.prepSeen.add(best.id); send({ t: 'tv', a: 'follow', id: best.id });
 }
 function tvFollow(id) { const T = st.tv; T.auto = !id; T.overview = false; if (id) { T.follow = id; T.cutT = performance.now() / 1000; send({ t: 'tv', a: 'follow', id }); } }
