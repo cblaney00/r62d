@@ -13,8 +13,13 @@ export class Socket extends EventEmitter {
     super();
     this.deflate = deflate; this.zipped = false;
     this.sock = sock; this.buf = Buffer.alloc(0); this.open = true; this.parts = [];
-    sock.setNoDelay(true);
-    sock.on('data', d => { this.buf = Buffer.concat([this.buf, d]); this.parse(); });
+    sock.setNoDelay(true); sock.setKeepAlive(true, 10000);
+    // a connection that died without saying goodbye (a dropped VPN, a sleeping laptop) used to stay "open" forever:
+    // every update for it piled up in memory (Lando's server reached 12 GB) and a TV or free-play game kept running for
+    // nobody. Now the browser is pinged every 5 s (it answers by itself) and anyone silent for 30 s is let go.
+    this.heard = Date.now();
+    this.beat = setInterval(() => { if (Date.now() - this.heard > 30000) this.close(); else this.frame(0x9, Buffer.alloc(0)); }, 5000);
+    sock.on('data', d => { this.heard = Date.now(); this.buf = this.buf.length ? Buffer.concat([this.buf, d]) : d; this.parse(); });
     sock.on('close', () => this.close());
     sock.on('error', () => this.close());
   }
@@ -49,6 +54,7 @@ export class Socket extends EventEmitter {
   }
   frame(op, data, zip = false) {
     if (!this.open) return;
+    if (this.sock.writableLength > 1 << 20) return this.close(); // over 1 MB not getting through: the other end is gone or hopeless
     const len = data.length, b0 = 0x80 | op | (zip ? 0x40 : 0);
     let head;
     if (len < 126) head = Buffer.from([b0, len]);
@@ -66,8 +72,8 @@ export class Socket extends EventEmitter {
   }
   close() {
     if (!this.open) return;
-    this.open = false;
-    try { this.sock.end(); } catch {}
+    this.open = false; clearInterval(this.beat);
+    try { this.sock.destroy(); } catch {}
     this.emit('close');
   }
 }

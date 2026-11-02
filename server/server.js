@@ -104,7 +104,7 @@ function trainCheck(force = false) {
   if (trainer || !VERSION.id) return '';
   newVersion(VERSION.id);
   if (!needsTraining(VERSION.id)) return `they have done their ${training.verRounds} rounds on this version`;
-  trainer = new Worker(new URL('./train-worker.js', import.meta.url), { workerData: { minutes: Number(process.env.R62D_TRAIN_MIN) || 60, rounds: roundsLeft(VERSION.id) } }); trainer.rounds = 0;
+  trainer = new Worker(new URL('./train-worker.js', import.meta.url), { resourceLimits: { maxOldGenerationSizeMb: 512 }, workerData: { minutes: Number(process.env.R62D_TRAIN_MIN) || 60, rounds: roundsLeft(VERSION.id) } }); trainer.rounds = 0;
   trainer.on('message', m => { if (m.done) { training.at = Date.now(); console.log(`Pro teams trained on version ${VERSION.id}: ${training.rounds} practice rounds so far.`); } else { addResults(m); if (trainer) trainer.rounds += m.rounds || 0; } saveTraining(); });
   trainer.on('error', e => console.log('Pro training stopped:', e.message));
   trainer.on('exit', () => { trainer = null; });
