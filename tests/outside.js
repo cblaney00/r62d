@@ -14,7 +14,8 @@ for (const id of MAP_LIST) {
     const out = o.ext || o.cells.some(c => [1, -1, W, -W].some(d => { const k = c + d, t = m.tiles[k]; return !o.cells.includes(k) && m.flAt[k] === m.flAt[c] && (t === T.GROUND || t === T.VOID || (t === T.LOW && m.floor[k] === FL.VOID)); }));
     if (o.kind !== 'window' && !out) continue;
     if (o.kind === 'window') wins++; else doors++;
-    if (!o.cells.every(c => m.tiles[c] === T.BARRI)) fail(id, o.kind, o.id, 'not boarded');
+    if (o.kind === 'window' && !o.cells.every(c => m.tiles[c] === T.BARRI)) fail(id, o.kind, o.id, 'not boarded');
+    if (o.kind !== 'window' && !o.cells.every(c => m.tiles[c] === T.OPEN)) fail(id, o.kind, o.id, 'outside door should start open (he asked: defenders may walk out)');
     if (o.kind !== 'window') continue;
     for (const c of o.cells) m.tiles[c] = T.OPEN; // boards broken
     const c = o.cells[o.cells.length >> 1], cx = (c % W + 0.5) * CELL, cy = (Math.floor(c / W) + 0.5) * CELL;

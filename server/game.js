@@ -506,6 +506,11 @@ export class Game {
 
   tickPlayer(p, dt) {
     this.tickPrep(p);
+    // a defender outside the building (preparation or action) is spotted by the attackers, and told so (he asked)
+    if (p.alive && this.side(p) === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION) && !this.tut) {
+      const k = Math.floor(p.y / CELL) * this.map.W + Math.floor(p.x / CELL), out = this.map.tiles[k] === T.GROUND;
+      if (out) { this.spot(TEAM.ATK, p.id, 1); if (!(p.outWarnT > this.time)) { p.outWarnT = this.time + 6; this.events.push({ e: 'deny', id: p.id, why: 'You are outside: the attackers can see where you are' }); } }
+    }
     if (!p.alive) return;
     if (p.vault) { // carried over the obstacle along a fixed path
       const v = p.vault; v.t += dt;
@@ -1143,7 +1148,8 @@ export class Game {
   boardWindows() {
     const m = this.map, W = m.W;
     const outside = o => o.ext || o.cells.some(c => [1, -1, W, -W].some(d => { const k = c + d, t = m.tiles[k]; return !o.cells.includes(k) && m.flAt[k] === m.flAt[c] && (t === T.GROUND || t === T.VOID || (t === T.LOW && m.floor[k] === FL.VOID)); }));
-    for (const o of m.openings) if ((o.kind === 'window' || outside(o)) && o.cells.every(c => m.tiles[c] === T.OPEN)) this.barricade(o.id, T.BARRI, true);
+    // he asked: defenders may walk outside in preparation (no wall keeping them in), so outside DOORS start open; windows stay boarded
+    for (const o of m.openings) if (o.kind === 'window' && o.cells.every(c => m.tiles[c] === T.OPEN)) this.barricade(o.id, T.BARRI, true);
   }
 
   // A melee hit on a barricade: three break it (the whole board across the doorway or window, like R6)

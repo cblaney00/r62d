@@ -10,7 +10,6 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] consider removing features or UI things for the mobile version of the game, the two versions of the game should be updated alongside eachother and work as the same game but there should be a difference in how the game loads in when it knows what type of device is trying to play the game
 - [ ] the bots should understand two things, lining up so that one burst of bullets can kill multiple people is really stupid, it just happened in this desert map - also make sure bots on both defense and offtense understand the high value of space. If an attacker knows you dont take space and they can just sprint up the whole map then the clock is massively against you, make the adopt playstyles that favor tactical decision making and utility usage considering the clock at all times, if they can push up and not leave any objectives unprotected, the defenders should definitely play more spaced out
 - [ ] defense is pinging drones too frequently
-- [ ] the defenders cannot exit the building before the preparation phase ends, its like an invisible sheild (realism breaking but dont worry about it)
 - [ ] i dont like that slow idle spinning that bots do when they dont know what to do, even pro bots do it and it looks bad
 - [ ] when you die you can rewatch your killcam and death perspective and the game will give you a BS rating on if the kill was fair and a "!" symbol when it found a bug that it will save the info about
 - [ ] the sites show always have at least 1 breakable wall between the two of them (unless the map is like a CS2 map)
@@ -25,6 +24,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Defenders can walk outside any time: outside doors start open (windows stay boarded). A defender standing outside is shown to the attackers and told so.
 - [x] Glint's pulse reaches the floor above and below (a little less far than on its own floor).
 - [x] Talon's EMP: 3 a round, about 1 m wide, destroys every enemy gadget, blinds cameras 20 s, and fries the skill and gadget of defenders caught in it for 8 s (they're told).
 - [x] Onyx's charge beeps loudly for a second before it goes, then fires three waves of bomblets 0.6 s apart, the last a little bigger.
