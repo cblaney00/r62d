@@ -29,4 +29,16 @@ user_pref("permissions.default.shortcuts", 1); // the game may keep Ctrl+W / Ctr
 user_pref("browser.quitShortcut.disabled", true);
 user_pref("dom.event.pointer.fractional_coordinates.enabled", true); // keep tiny mouse movements instead of rounding them away (he noticed slow aiming didn't move)
 PREFS
+# Slow mouse moves (he noticed the crosshair not moving at all): with the desktop's mouse acceleration on, a slow move
+# becomes steps of less than a pixel and Firefox on Wayland throws those away before the game sees them. While the game
+# window is open the mouse is set to flat (every step 1:1, nothing lost); the old setting comes back when it closes.
+HC=$(command -v hyprctl)
+if [ -n "$HC" ] && [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+  old=$("$HC" getoption input:accel_profile | sed -n "s/^str: //p")
+  case "$old" in ""|"[[EMPTY]]") old=adaptive ;; esac
+  "$HC" keyword input:accel_profile flat > /dev/null
+  firefox --kiosk --no-remote --profile "$PROFILE" "http://localhost:6262/?app=1"
+  "$HC" keyword input:accel_profile "$old" > /dev/null
+  exit 0
+fi
 exec firefox --kiosk --no-remote --profile "$PROFILE" "http://localhost:6262/?app=1"
