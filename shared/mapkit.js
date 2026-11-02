@@ -241,6 +241,45 @@ export function makeMap({ id, name, floors }) {
     }
   };
 
+  // More windows into sites (he asked): every site room above the ground gets windows in its outside walls until it has
+  // two (where a 2-cell window fits: a straight wall, clear floor inside, open ground / air / a balcony outside, away from
+  // other doors, windows, stairs and corners). Basements have no outside. Same spots every round.
+  const siteWindows = (sites) => {
+    const groundI = fl.findIndex(f => f.ground);
+    const roomAt = k => rooms.find(r => { const x = k % W, y = (k / W) | 0; return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; });
+    const outsideOk = k => tiles[k] === T.GROUND || tiles[k] === T.VOID || tiles[k] === T.FLOOR && !roomAt(k);
+    const wallT = t => t === T.SOFT || t === T.HARD;
+    const bxy = k => { const f = fl[flAt[k]]; return { x: k % W - f.gx + f.x0, y: ((k / W) | 0) + f.y0 }; }; // building frame
+    for (const s of sites || []) for (const name of s.rooms || []) {
+      const r = rooms.find(q => q.name === name); if (!r || r.fl < groundI) continue;
+      const touches = o => o.cells.some(k => [1, -1, W, -W].some(d => roomAt(k + d) === r));
+      let have = openings.filter(o => o.kind === 'window' && touches(o)).length;
+      const busy = openings.filter(touches).flatMap(o => o.cells);
+      const cands = [];
+      const sides = [ // [first wall cell, step along the wall, step outward, length]
+        [(r.y - 1) * W + r.x, 1, -W, r.w], [(r.y + r.h) * W + r.x, 1, W, r.w],
+        [r.y * W + r.x - 1, W, -1, r.h], [r.y * W + r.x + r.w, W, 1, r.h]];
+      for (const [k0, al, out, len] of sides) for (let i = 2; i + 3 < len; i++) {
+        const a = k0 + i * al, b = a + al, cells = [a, b];
+        if (!cells.every(k => wallT(tiles[k]) && !shape[k] && flAt[k] === r.fl)) continue;
+        if (!wallT(tiles[a - al]) || !wallT(tiles[b + al])) continue;
+        if (!cells.every(k => tiles[k - out] === T.FLOOR && tiles[k - 2 * out] === T.FLOOR && outsideOk(k + out) && outsideOk(k + 2 * out))) continue;
+        if (cells.some(k => portal[k - out] >= 0 || tiles[k + out] === T.STAIR)) continue;
+        const gap = busy.length ? Math.min(...busy.map(q => Math.hypot(q % W - a % W, ((q / W) | 0) - ((a / W) | 0)))) : 99;
+        if (gap < 3) continue;
+        const bf = bxy(a); if (r.fl > groundI && openings.some(o => o.kind === 'window' && flAt[o.cells[0]] !== r.fl && flAt[o.cells[0]] > groundI && o.cells.some(q => { const c = bxy(q); return Math.abs(c.x - bf.x) + Math.abs(c.y - bf.y) < 6; }))) continue; // not over/under another floor's window (their ropes would clash)
+        cands.push({ cells, sc: Math.min(gap, 12) - Math.abs(i + 0.5 - len / 2) * 0.15 });
+      }
+      cands.sort((p, q) => q.sc - p.sc);
+      for (const c of cands) {
+        if (have >= 2) break;
+        if (c.cells.some(k => busy.some(q => Math.hypot(q % W - k % W, ((q / W) | 0) - ((k / W) | 0)) < 3))) continue;
+        for (const k of c.cells) { tiles[k] = T.OPEN; hp[k] = 0; openId[k] = openings.length; win[k] = 1; busy.push(k); }
+        openings.push({ id: openings.length, cells: c.cells, kind: 'window', ext: true, auto: true }); have++;
+      }
+    }
+  };
+
   // Drone holes, like the small gaps at the foot of walls in R6: a drone (radius 5) fits, a body doesn't.
   // One per pair of rooms (or room and outside) that share a plain wall, near the middle of that wall,
   // only where there is clear floor on both sides for a drone to drive up to it.
@@ -352,6 +391,7 @@ export function makeMap({ id, name, floors }) {
         if (tiles[ny * W + nx] === T.FLOOR) { floor[k] = floor[ny * W + nx]; break; }
       }
     }
+    siteWindows(extra && extra.sites);
     hardenWalls(extra && extra.sites);
     droneHoles();
     placeHatches(extra && extra.sites);

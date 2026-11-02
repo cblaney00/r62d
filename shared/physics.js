@@ -305,8 +305,8 @@ export function facingCell(map, px, py, aim, reach) {
       const x = px + Math.cos(aim + off) * d, y = py + Math.sin(aim + off) * d;
       const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
       const t = tileAt(map, cx, cy);
-      if (t === T.FLOOR || t === T.GROUND || t === T.LOW || t === T.HATCH || t === T.HATCHR || t === T.HOLE) continue; // hatches are floor here (see hatchNear)
-      if (off !== 0 && t === T.HARD) continue;
+      if (t === T.FLOOR || t === T.GROUND || t === T.LOW || t === T.HATCH || t === T.HATCHR || t === T.HOLE || t === T.STAIR) continue; // hatches are floor here (see hatchNear)
+      if (off !== 0 && (t === T.HARD || t === T.DSHIELD || t === T.TALL || t === T.VOID)) continue; // a glance to the side never picks something you can't use (he saw a bot swing at a boarded window for 90 s: the swing found the deployable shield beside it)
       return { k: cy * map.W + cx, t, cx, cy };
     }
   }

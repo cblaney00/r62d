@@ -64,3 +64,9 @@ export function keyName(code) {
 const TOUCH_NAMES = { interact: 'USE', vault: 'VAULT', melee: 'MELEE', ability: 'SKILL', gadget: 'GADGET', reload: 'RELOAD', spot: 'PING', crouch: 'CROUCH', ads: 'AIM', walk: 'a light push', view: 'DRONE / CAMS', scoreboard: 'SCORES' };
 export const label = id => (isTouch && TOUCH_NAMES[id]) || keyName((binds[id] || [])[0]);
 loadBinds();
+// Capture the mouse for aiming, asking for raw movement where the browser allows it (no system mouse acceleration,
+// which swallowed slow, careful moves: he noticed the crosshair didn't move at all when moving the mouse slowly).
+export function lockMouse(el) {
+  try { const r = el.requestPointerLock?.({ unadjustedMovement: true }); if (r && r.catch) r.catch(() => el.requestPointerLock?.()); }
+  catch { el.requestPointerLock?.(); }
+}

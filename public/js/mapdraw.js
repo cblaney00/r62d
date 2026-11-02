@@ -91,7 +91,7 @@ export class MapRenderer {
     const m = this.map, x = this.ctx;
     for (const st of m.stairs || []) for (const [g, up] of [[st.ga, true], [st.gb, false]]) {
       const gx = g % m.W, gy = Math.floor(g / m.W);
-      if (gx > x1 || gy > y1 || gx + st.w < x0 || gy + st.h < y0) continue;
+      if (gx - 2 > x1 || gy - 2 > y1 || gx + st.w + 2 < x0 || gy + st.h + 2 < y0) continue; // (the label sits just outside the steps)
       const X = gx * CELL, Y = gy * CELL, Wd = st.w * CELL, Hd = st.h * CELL;
       const vert = st.dir === 'n' || st.dir === 's', n = (vert ? st.h : st.w) * 2;
       // step k = 0 at the bottom end
@@ -104,16 +104,29 @@ export class MapRenderer {
         if (vert) x.fillRect(X, Y + along * CELL / 2 + CELL / 2 - 0.8, Wd, 0.8); else x.fillRect(X + along * CELL / 2 + CELL / 2 - 0.8, Y, 0.8, Hd);
       }
       x.strokeStyle = 'rgba(30,30,30,0.9)'; x.lineWidth = 1; x.strokeRect(X + 0.5, Y + 0.5, Wd - 1, Hd - 1);
-      // arrow pointing the way you walk to change floor
+      // he asked: make it obvious which way stairs go. Chevrons all along the steps point the way you walk to change
+      // floor (gold going up, blue going down), a coloured strip marks the end you step on from, and a label at each
+      // end says where it takes you ("▲ UP TO 2F" / "▼ DOWN TO 1F").
       const ang = { n: -Math.PI / 2, s: Math.PI / 2, e: 0, w: Math.PI }[st.dir] + (up ? 0 : Math.PI);
+      const col = up ? '242,193,78' : '110,175,255', len = vert ? Hd : Wd, wid = vert ? Wd : Hd;
       x.save(); x.translate(X + Wd / 2, Y + Hd / 2); x.rotate(ang);
-      x.fillStyle = up ? 'rgba(242,193,78,0.85)' : 'rgba(120,180,255,0.85)';
-      x.beginPath(); x.moveTo(9, 0); x.lineTo(1, -6); x.lineTo(1, -2.5); x.lineTo(-9, -2.5); x.lineTo(-9, 2.5); x.lineTo(1, 2.5); x.lineTo(1, 6); x.closePath(); x.fill();
+      const g2 = x.createLinearGradient(-len / 2, 0, -len / 2 + CELL * 0.9, 0); g2.addColorStop(0, `rgba(${col},0.55)`); g2.addColorStop(1, `rgba(${col},0)`);
+      x.fillStyle = g2; x.fillRect(-len / 2, -wid / 2, CELL * 0.9, wid); // the way on
+      const cw = Math.min(5.5, wid * 0.28);
+      for (let a = -len / 2 + CELL * 0.75; a <= len / 2 - CELL * 0.4; a += CELL * 0.85) {
+        x.strokeStyle = 'rgba(0,0,0,0.55)'; x.lineWidth = 3.2; x.lineJoin = 'round'; x.lineCap = 'round';
+        x.beginPath(); x.moveTo(a - cw * 0.75, -cw); x.lineTo(a, 0); x.lineTo(a - cw * 0.75, cw); x.stroke();
+        x.strokeStyle = `rgba(${col},0.95)`; x.lineWidth = 1.7;
+        x.beginPath(); x.moveTo(a - cw * 0.75, -cw); x.lineTo(a, 0); x.lineTo(a - cw * 0.75, cw); x.stroke();
+      }
       x.restore();
-      x.save(); x.translate(X + Wd / 2, Y + Hd / 2 + (vert ? 0 : 10));
-      if (vert) { x.translate(Wd / 2 + 1, 0); x.rotate(Math.PI / 2); }
-      x.font = '700 6px Barlow Condensed, sans-serif'; x.textAlign = 'center'; x.fillStyle = 'rgba(255,255,255,0.75)';
-      x.fillText(up ? 'UP · ' + m.floors[st.b].name : 'DOWN · ' + m.floors[st.a].name, 0, vert ? -2 : 0);
+      const label = up ? '▲ UP TO ' + m.floors[st.b].name : '▼ DOWN TO ' + m.floors[st.a].name;
+      const [ux, uy] = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[st.dir].map(v => v * (up ? 1 : -1));
+      const lx = X + Wd / 2 - ux * (len / 2 + 6), ly = Y + Hd / 2 - uy * (len / 2 + 6); // just before the way on
+      x.save(); x.font = '800 8px Barlow Condensed, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      const tw = x.measureText(label).width + 6;
+      x.fillStyle = 'rgba(10,12,16,0.72)'; x.fillRect(lx - tw / 2, ly - 5.5, tw, 11);
+      x.fillStyle = `rgba(${col},1)`; x.fillText(label, lx, ly + 0.5);
       x.restore();
     }
   }

@@ -21,6 +21,15 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] i found an issue with the aim, if i move my mouse slowly then the cursor doesnt even move at all, this would cause huge frustration from people with actually decent aim. make sure the cursor is very accurate to the mouse inputs (in progress: the desktop mouse was set to flat for this session; making it permanent needs vibe → "Change or fix something on your computer")
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab.
 - [ ] one of the bots didn't click lock in when i played with lando on his vpn server
+- [ ] some of the view areas (seeable areas are jittering a lot at least during the bot gameplay)
+- [ ] the bots talk too much, only diamonds and above should be relied upon to talk about objectives, most ranks just ping for most things.
+- [ ] i think the pros practice too much, also "practising" is misspelled - pros should only do 200 rounds per update, that should usually be enough for them id think
+- [ ] a few characters should actually have a riot shield as their 3rd primary weapon option, the shield itself should work similarly to bulwarks but each character's shield should have its own personality and pros and cons, make sure to tests these characters out thouroughly with the pros to balance them and make them fun
+- [ ] make it more obvious when stairs are going upstairs or downstairs
+- [ ] halden and wisp just stood in the same spot doing nothing with no communication or exploration for over a minute in a pro match
+- [ ] the autodirector still needs a massive overhaul, see if you can read up on what eports broadcasters do and how they decide what to focus on
+- [ ] dusty just improperly tried to hit a planked window and failed for a minute and a half
+- [ ] dusty's failure seems to be an issue with rampart
 
 ## Done
 

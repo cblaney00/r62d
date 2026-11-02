@@ -7,14 +7,15 @@ import { PHASE, TEAM } from '../shared/constants.js';
 import { planKey, opKey } from './training.js';
 
 const until = Date.now() + (workerData.minutes || 15) * 60 * 1000, dt = 1 / 30;
+let left = workerData.rounds || 200;
 let mi = Math.floor(Math.random() * MAP_LIST.length);
-while (Date.now() < until) {
+while (Date.now() < until && left > 0) {
   const id = MAP_LIST[mi++ % MAP_LIST.length];
   const g = new Game(); g.mapId = id; g.map = buildMap(id); g.botLevel = 7; g.proExplore = true;
   for (let i = 0; i < 10; i++) g.addBot();
   g.startMatch();
   let t = 0, last = null;
-  while (t < 60 * 30 && Date.now() < until) {
+  while (t < 60 * 30 && Date.now() < until && left > 0) {
     g.tick(dt); t += dt; g.events = [];
     if (g.phase !== last) {
       if (g.phase === PHASE.ROUND_END && g.winner !== null && g.winner !== undefined) {
@@ -25,7 +26,7 @@ while (Date.now() < until) {
           if (st && st.plan) res.plans[planKey(id, st.site, side, st.plan.id)] = [1, win];
           for (const p of g.players.values()) if (p.squad === sq && p.op) { const k = opKey(id, side, p.op), o = res.ops[k] || (res.ops[k] = [0, 0]); o[0]++; o[1] += win; }
         }
-        parentPort.postMessage(res);
+        parentPort.postMessage(res); left--;
       }
       last = g.phase;
     }

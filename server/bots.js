@@ -4,11 +4,11 @@
 // call out what they see, and react no faster than a fairly experienced player. The bot skill setting
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
-import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL } from '../shared/constants.js';
-import { tileAt, los, angDiff, vaultable, castSight } from '../shared/physics.js';
+import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL } from '../shared/constants.js';
+import { tileAt, los, angDiff, vaultable, castSight, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt } from '../shared/map.js';
-import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf } from '../shared/operators.js';
-import { PRO_TEAMS, playbook } from '../shared/pros.js';
+import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR } from '../shared/operators.js';
+import { PRO_TEAMS, playbook, siteIntel } from '../shared/pros.js';
 import { planWeight, opWeight } from './training.js';
 
 // Per skill level. react: seconds before the first shot at someone who surprised them (plus up to reactX more);
@@ -33,7 +33,7 @@ function persona(p) {
 }
 
 // The job for this round. Bots on a side split the roles between them; the order shifts every round.
-const ROLES = { [TEAM.ATK]: ['entry', 'support', 'flank', 'intel', 'entry'], [TEAM.DEF]: ['anchor', 'roamer', 'anchor', 'anchor', 'roamer'] };
+const ROLES = { [TEAM.ATK]: ['entry', 'support', 'flank', 'intel', 'entry'], [TEAM.DEF]: ['anchor', 'roamer', 'space', 'anchor', 'roamer'] }; // space: holds a room beside the site (he asked: take space, the clock is the attackers' enemy)
 function roleFor(game, p, team) {
   const mates = [...game.players.values()].filter(q => q.bot && game.side(q) === team).sort((a, b) => +a.id.slice(1) - +b.id.slice(1));
   const list = ROLES[team];
@@ -53,7 +53,9 @@ export function botPickOp(game, p) {
   let r = Math.random() * roles.reduce((a, x) => a + x.w, 0), job = roles[roles.length - 1].j;
   for (const x of roles) if ((r -= x.w) <= 0) { job = x.j; break; }
   const pool = free.filter(o => job.ops.includes(o));
+  p.job = job.id; // the bot's role this round (a role left over from last round made the pick bounce: he saw a bot never lock in)
   game.pickOp(p, pool[Math.floor(Math.random() * pool.length)]);
+  if (!p.op) { p.job = null; game.pickOp(p, free[Math.floor(Math.random() * free.length)]); } // never stuck: any free operator
 }
 
 // is cell k inside (or in the wall round) one of the site's rooms?
@@ -141,7 +143,7 @@ export function botPrep(game, p) {
 
 // ---- path finding (A* over cells; barricades are passable but costly) ----
 // avoid: cells this bot found it can't vault over (too deep, nowhere to land)
-function findPath(map, sx, sy, gx, gy, avoid, drone = false) {
+function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false) {
   const W = map.W, H = map.H, N = W * H;
   const start = sy * W + sx, goal = gy * W + gx;
   const g = new Float32Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
@@ -153,11 +155,13 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false) {
   };
   const cost = drone ? droneCost : k => {
     const t = map.tiles[k];
+    if (avoid && avoid.has(k)) return Infinity; // tried and failed (a vault with nowhere to land, a wall the swing can't reach)
     if (map.shape && map.shape[k] && map.shapeFill[k] < 10 && t !== T.VOID) return 2.5; // the open side of a sloped wall: a body slides along it
+    if (def && t === T.PANEL) return 3000; // a defender never smashes the team's own steel panel unless there's truly no other way
+    if (def && t === T.BARRI) return 300; // ...or its own barricade
     if (t === T.BARRI) return 8;
     if (t === T.SOFT && map.hp[k] > 0) return 30; // a plain wall: attackers will knock a hole in it if there's no other way
-    if (t === T.PANEL) return 70; // a steel panel: very slow to hammer through, only when there is no other way in
-    if (avoid && avoid.has(k)) return Infinity;
+    if (t === T.PANEL) return 150; // a steel panel: very slow to hammer through, only when there is no other way in
     if (vaultable(map, k)) return t === T.LOW ? 10 : 4; // vault over it (low furniture only when it saves a long way round)
     if (blocksMove(t)) return Infinity;
     // keep a little away from walls so the bot's body fits
@@ -236,6 +240,51 @@ function behindDrone(game, p, e, d) {
     if (along > d - 10 && along < d + 400 && Math.abs(ax * uy - ay * ux) < 30) return true;
   }
   return false;
+}
+
+// Can a bullet get from p to q? Sight is not enough: a deployable shield or cover plate lets you see through it but
+// stops bullets (he saw a pro empty three magazines into one), and a teammate in the way would be shot (friendly fire).
+function shotClear(game, p, q) {
+  const m = game.map, d = Math.hypot(q.x - p.x, q.y - p.y); if (d < 1) return true;
+  const dx = (q.x - p.x) / d, dy = (q.y - p.y) / d, sx = Math.floor(p.x / CELL), sy = Math.floor(p.y / CELL);
+  let ok = true;
+  walkRay(p.x, p.y, dx, dy, d, (cx, cy) => {
+    if (cx === sx && cy === sy) return false;
+    const t = tileAt(m, cx, cy); if (!stopsBullet(t)) return false;
+    const sh = shapeAt(m, cx, cy); if (sh) { const h = rayShape(sh, p.x, p.y, dx, dy); if (h === null || h > d) return false; }
+    ok = false; return true;
+  });
+  if (!ok || rayCovers(m, p.x, p.y, dx, dy, d - 4)) return false;
+  for (const o of game.players.values()) {
+    if (o === p || !o.alive || game.side(o) !== game.side(p)) continue;
+    const ax = o.x - p.x, ay = o.y - p.y, along = ax * dx + ay * dy;
+    if (along > 0 && along < d && Math.abs(ax * dy - ay * dx) < hitR(o.op) + 4) return false;
+  }
+  return true;
+}
+// A teammate on the same line from a threat (in front of or behind this bot): one burst could hit both (he asked: bots
+// must never line up). Returns the side to step to (-1 / 1), or 0 when the line is clear.
+function linedUp(game, p, from) {
+  if (!from) return 0;
+  const d = Math.hypot(p.x - from.x, p.y - from.y); if (d < 30) return 0;
+  const ux = (p.x - from.x) / d, uy = (p.y - from.y) / d;
+  for (const o of game.players.values()) {
+    if (o === p || !o.alive || o.downed || game.side(o) !== game.side(p)) continue;
+    const ax = o.x - from.x, ay = o.y - from.y, along = ax * ux + ay * uy, side = ax * uy - ay * ux;
+    if (along > 20 && along < d + 220 && Math.abs(along - d) > 8 && Math.abs(side) < 16) return side > 0 ? -1 : 1;
+  }
+  return 0;
+}
+// Look round like a person (he asked: no slow idle spinning): pick a spot an enemy could come from, swing to it,
+// hold it for a moment, then the next.
+function checkAngles(game, p, dt, rate = 0.7) {
+  const ai = p.ai;
+  if (!ai.lookUntil || game.time > ai.lookUntil) {
+    ai.lookPt = threatPoint(game, p, p.aim + (Math.random() - 0.5) * 4) || (Math.random() < 0.5 ? watchPoint(game, p) : null);
+    ai.lookA = p.aim + (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 1.2);
+    ai.lookUntil = game.time + 1.4 + Math.random() * 2.4;
+  }
+  turnTo(p, ai.lookPt ? Math.atan2(ai.lookPt.y - p.y, ai.lookPt.x - p.x) : ai.lookA, skill(game, p).turn * rate, dt);
 }
 
 function enemyDrone(game, p) {
@@ -380,6 +429,7 @@ export function botThink(game, p, dt) {
     if (j && j.keepDrone && elapsedAction(game) < 1.5 && game.ent(p.droneId)) { game.toggleView(p); return; }
     if (elapsedAction(game) > 1.5) p.ai.droneDone = true;
   }
+  if (p.alive && p.ctrl === 'cam' && p.bot) { botCams(game, p, dt); return; }
   if (!p.alive || p.ctrl !== 'body') return;
   if (game.phase === PHASE.PREP && game.side(p) === TEAM.ATK) return;
   const team = game.side(p), map = game.map, site = map.sites[game.site], S = skill(game, p), me = persona(p);
@@ -406,7 +456,7 @@ export function botThink(game, p, dt) {
     ai.spotT[id] = game.time; ai.heard = { x: q.x, y: q.y, t: game.time }; break;
   }
   const heardRecently = ai.heard && game.time - ai.heard.t < 4;
-  if (p.pro && heardRecently && ai.heard.t !== ai.heardSaid && game.phase === PHASE.ACTION && Math.random() < 0.25) { ai.heardSaid = ai.heard.t;
+  if (p.pro && heardRecently && ai.heard.t !== ai.heardSaid && game.phase === PHASE.ACTION && Math.random() < 0.1) { ai.heardSaid = ai.heard.t;
     const up = floorAt(map, ai.heard.x, ai.heard.y) !== floorAt(map, p.x, p.y); proSay(game, p, up ? 'Hearing them on another floor' : `Footsteps, ${place(game, ai.heard.x, ai.heard.y)}`, 'hear' + place(game, ai.heard.x, ai.heard.y)); }
   if (p.pro && p.alive && !p.downed && p.hp < p.maxHp * 0.3 && !ai.lowSaid) { ai.lowSaid = true; proSay(game, p, "I'm one shot", null, true); }
 
@@ -447,13 +497,22 @@ export function botThink(game, p, dt) {
       ai.called = true; game.spot(team, enemy.id, 3);
       if (p.pro) { const near = [...game.players.values()].filter(q => q.alive && game.side(q) !== team && Math.hypot(q.x - enemy.x, q.y - enemy.y) < 120).length;
         proSay(game, p, `${opName(enemy)}, ${place(game, enemy.x, enemy.y)}${near > 1 ? `, ${near} of them` : ''}${enemy.hp < enemy.maxHp * 0.4 ? ', he is hurt' : ''}`, 'see' + enemy.id); }
-      if ([...game.players.values()].some(q => !q.bot && q.squad === p.squad) && game.markOk(p)) game.mark(p, enemy.x, enemy.y, 'ENEMY ' + OPERATORS[enemy.op].name, enemy.id);
+      if (([...game.players.values()].some(q => !q.bot && q.squad === p.squad) || (game.tv && !p.pro)) && game.markOk(p)) game.mark(p, enemy.x, enemy.y, 'ENEMY ' + OPERATORS[enemy.op].name, enemy.id); // he asked: most ranks ping rather than talk
     }
     if (gun && gun.ammo === 0) { game.startReload(p); if (d < 120 && p.guns[1] && p.slot === 0 && gun.reserve >= 0) game.event(p, { k: 'slot', n: 1 }); }
     // a shield facing us: circle round it and only shoot once its side shows (as people do)
     if (p.bracing && d < 32) { p.aim = Math.atan2(enemy.y - p.y, enemy.x - p.x); game.event(p, { k: 'melee' }); return; } // shield bash
     if (p.bracing && Math.random() < dt * 0.8) inp.ability = 1; // now and then put the shield away to shoot
     if (!p.bracing && abId === 'brace' && d < 45 && Math.random() < dt) inp.ability = 1;
+    const clear = shotClear(game, p, enemy);
+    if (!clear && ai.react > 0) { // seen but not shootable (a shield or cover plate in the way, or a teammate): find an angle instead of wasting the magazine
+      ai.blockT = (ai.blockT || 0) + dt;
+      if (!ai.blockSide || ai.blockT > 3) { ai.blockSide = ai.blockSide ? -ai.blockSide : (Math.random() < 0.5 ? -1 : 1); ai.blockT = ai.blockT > 3 ? 0.01 : ai.blockT; }
+      if (['frag', 'impact'].includes(p.gadget) && p.gadgetCount > 0 && d > 70 && d < 260 && !ai.blockNade && ai.blockT > 1) { ai.blockNade = true; aimAt(p, enemy.x, enemy.y); game.event(p, { k: 'gadget' }); }
+      const sa = Math.atan2(enemy.y - p.y, enemy.x - p.x) + Math.PI / 2 * ai.blockSide; setDir(inp, Math.cos(sa), Math.sin(sa));
+      return;
+    }
+    ai.blockT = 0;
     const esp = enemy.bracing ? game.shieldOf(enemy) : null; // a shield swung aside (firing, knocked, a jogging gap) is a chance to shoot
     const shieldUp = enemy.bracing && !enemy.downed && !esp.off && Math.abs(angDiff(Math.atan2(p.y - enemy.y, p.x - enemy.x), enemy.aim + esp.rot)) < esp.arc - 0.1;
     if (shieldUp && d < 26) { p.aim = Math.atan2(enemy.y - p.y, enemy.x - p.x); game.event(p, { k: 'melee' }); return; } // knock the shield aside
@@ -462,7 +521,8 @@ export function botThink(game, p, dt) {
     // the arc gun zaps a defender in reach as well as gadgets
     if (abId === 'arc' && p.abilityCount > 0 && ai.react > 0 && d < 300 && Math.abs(angDiff(want, p.aim)) < 0.1 && Math.random() < dt * 0.5) useAbility();
     ai.strafeT = (ai.strafeT || 0) - dt;
-    if (ai.strafeT <= 0) { ai.strafeT = 0.6 + Math.random(); ai.strafe = Math.random() < peekSkill(game, p) ? (Math.random() < 0.5 ? -1 : 1) : 0; } // he asked: strafe-peeking in a fight is a hard skill, used now and then by a few, not by everyone all the time
+    if (ai.strafeT <= 0) { ai.strafeT = 0.6 + Math.random(); ai.strafe = Math.random() < peekSkill(game, p) ? (Math.random() < 0.5 ? -1 : 1) : 0; }
+    { const lu = linedUp(game, p, enemy); if (lu) { ai.strafe = lu; ai.strafeT = 0.5; } } // a teammate on the same line from the enemy: step off it // he asked: strafe-peeking in a fight is a hard skill, used now and then by a few, not by everyone all the time
     if (ai.strafe) { const sa = p.aim + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); inp.walk = 1; }
     return;
   }
@@ -517,6 +577,21 @@ export function botThink(game, p, dt) {
     return moveTo(game, p, inp, mate, dt);
   }
   if (abId === 'stim' && p.abilityCount > 1 && p.hp < 45 && action) { useAbility(); return; } // patch yourself up (the dart lands on you when no teammate is in line)
+
+  // --- cameras (he asked): a defender looks through the team's cameras when it is safe, or for a quick look when
+  // enemies are heard coming and nobody knows where; never with an enemy close by ---
+  if (team === TEAM.DEF && action && !p.busy && (p.pro || lvlOf(game, p) >= 2)) {
+    if (ai.camNext === undefined) ai.camNext = game.time + 6 + Math.random() * 14;
+    const feeds = game.feeds(team).filter(f => f.type === 'cam' && !(f.offUntil > game.time));
+    const hd = ai.heard ? Math.hypot(ai.heard.x - p.x, ai.heard.y - p.y) : Infinity, ago = ai.heard ? game.time - ai.heard.t : Infinity;
+    const settled = !ai.path || !ai.path.length, known = game.spots[team].size > 0;
+    const safe = ago > 8 || hd > 900, worth = ago < 6 && hd > 300 && hd < 900 && !known; // coming, but from where?
+    if (feeds.length && settled && game.time > ai.camNext && !(hd < 300 && ago < 6) && (safe || worth)) {
+      ai.camUntil = game.time + (worth ? 2.5 : 3.5 + Math.random() * 3); ai.camFlip = game.time + 1.2; ai.camHp = p.hp;
+      ai.camNext = game.time + (p.pro && p.pro.pl.jobs.def === 'intel' ? 10 : 18) + Math.random() * 16;
+      game.watch(p, feeds[Math.floor(Math.random() * feeds.length)]); return;
+    }
+  }
 
   // --- a pro's part of the team plan ---
   if (p.pro && (action || game.phase === PHASE.PREP) && proAct(game, p, inp, dt, team)) return;
@@ -585,7 +660,8 @@ export function botThink(game, p, dt) {
       const base = { entry: [1, 3], support: [4, 4], flank: [3, 4], intel: [7, 5] }[ai.role] || [2, 6];
       ai.startWait = base[0] + Math.random() * base[1] * (0.5 + me.patience);
     }
-    if ((ai.startWait -= dt) > 0) { p.aim += dt * 0.5 * (ai.look || (ai.look = Math.random() < 0.5 ? -1 : 1)); return; }
+    if (game.timer < 120) ai.startWait = 0; // the clock: no more waiting
+    if ((ai.startWait -= dt) > 0) { checkAngles(game, p, dt); return; }
     // abilities on the way in
     if (action && p.abilityCount > 0) {
       if (abId === 'ghost' && toGoal < 450 && !(game.time < (p.ghostUntil || 0))) useAbility();
@@ -610,20 +686,29 @@ export function botThink(game, p, dt) {
       else { turnTo(p, lead.aim, 2, dt); return; }
     }
     // close to the objective: walk (quiet), and now and then stop to check the angles
-    if (toGoal < (ai.role === 'entry' ? 220 : 360) - me.aggr * 80) {
+    if (toGoal < (ai.role === 'entry' ? 220 : 360) - me.aggr * 80 && game.timer > 45) { // close: walk quietly and check angles, unless the clock says run
       inp.walk = 1;
       ai.pauseT = (ai.pauseT ?? 2 + Math.random() * 3) - dt;
-      if (ai.pauseT < 0) { if (ai.pauseT < -(0.4 + me.patience)) ai.pauseT = 2 + Math.random() * 4; p.aim += dt * 1.2 * (ai.look || 1); return; }
+      if (ai.pauseT < 0 && game.timer > 75) { if (ai.pauseT < -(0.4 + me.patience)) ai.pauseT = 2 + Math.random() * 4; checkAngles(game, p, dt, 1); return; }
     }
     // an entry fragger throws a stun into the site just before going in
     if (action && ai.role === 'entry' && p.gadget === 'stun' && p.gadgetCount > 0 && toGoal < 200 && !ai.stunned && los(map, p.x, p.y, goal.x, goal.y)) { ai.stunned = true; aimAt(p, goal.x, goal.y); game.event(p, { k: 'gadget' }); }
   }
 
+  // he asked: defenders take space when they can do it without leaving the site open. The 'space' defender holds a room
+  // beside the site on the attackers' side (two anchors stay on it) until the clock runs down or the team is losing people.
+  if (!atk && ai.role === 'space' && action && !game.planted) {
+    const mates = [...game.players.values()].filter(q => q.squad === p.squad), lost = mates.filter(q => !q.alive || q.downed).length;
+    if (game.timer > 70 && lost < 2) {
+      if (!ai.spaceAt) { const I = intelOf(game), r = I && (I.near[0] || I.roam); ai.spaceAt = r ? game.freeSpotNear(...Object.values(I.centre(r)), Math.min(r.w, r.h) * CELL * 0.3) : null; }
+      if (ai.spaceAt) return moveTo(game, p, inp, ai.spaceAt, dt, true);
+    }
+  }
   // a roaming defender spends the first part of the round in rooms around the site, then falls back to it
   if (!atk && ai.role === 'roamer' && action && !game.planted) {
     ai.roamFor = ai.roamFor ?? 50 + me.aggr * 70;
     ai.roamFor -= dt;
-    if (ai.roamFor > 0) {
+    if (ai.roamFor > 0 && game.timer > 60) { // the clock: back to the site
       ai.roamT = (ai.roamT || 0) - dt;
       if (!ai.roam || ai.roamT <= 0) { ai.roam = roamSpot(game, p); ai.roamT = 14 + Math.random() * 14; ai.watch = null; }
       if (ai.roam) return moveTo(game, p, inp, ai.roam, dt, true);
@@ -631,6 +716,31 @@ export function botThink(game, p, dt) {
   }
 
   return moveTo(game, p, inp, goal, dt, !atk);
+}
+
+// On the cameras: flick through the feeds, spot what they see for the team, and get back to the body after a few
+// seconds, or at once when something is heard close by or the body is hit.
+function botCams(game, p, dt) {
+  const ai = p.ai, team = game.side(p), c = game.feed(p), list = game.feeds(team).filter(f => f.type === 'cam' && !(f.offUntil > game.time));
+  const close = (game.noises || []).some(n => n.team !== team && game.time - n.t < 0.5 && Math.hypot(n.x - p.x, n.y - p.y) < 260);
+  if (!c || close || p.downed || p.hp < (ai.camHp ?? p.hp) || game.time > (ai.camUntil || 0) || game.phase !== PHASE.ACTION || game.planted) { p.ctrl = 'body'; return; }
+  if (game.time > ai.camFlip && list.length > 1) { ai.camFlip = game.time + 1.2 + Math.random(); game.watch(p, list[(list.indexOf(c) + 1) % list.length]); return; }
+  p.aim = c.ang || 0;
+  const smokes = game.smokeList();
+  for (const q of game.players.values()) {
+    if (!q.alive || game.side(q) === team || q.shrouded || Math.hypot(q.x - c.x, q.y - c.y) > 420 || floorAt(game.map, q.x, q.y) !== floorAt(game.map, c.x, c.y)) continue;
+    if (Math.abs(angDiff(Math.atan2(q.y - c.y, q.x - c.x), c.ang || 0)) > 0.85 || !los(game.map, c.x, c.y, q.x, q.y, smokes)) continue;
+    game.spot(team, q.id, 3);
+    if (!(ai.camSaid || (ai.camSaid = new Set())).has(q.id + ':' + game.round)) { ai.camSaid.add(q.id + ':' + game.round);
+      if (p.pro) proSay(game, p, `Cam: ${opName(q)} in ${place(game, q.x, q.y)}`, 'see' + q.id);
+      else if (([...game.players.values()].some(o => !o.bot && o.squad === p.squad) || game.tv) && game.markOk(p)) game.mark(p, q.x, q.y, 'ENEMY ' + OPERATORS[q.op].name, q.id); }
+  }
+}
+// the site's ways in, rooms beside it and the attackers' route (shared/pros.js), worked out once a round
+function intelOf(game) {
+  const key = game.map.id + '|' + game.site;
+  if (game._intelKey !== key) { game._intelKey = key; game._intel = siteIntel(game.map, game.site); }
+  return game._intel;
 }
 
 // Open the planned wall: walk to the spot outside it, face it, use the tool, stand back while it goes off.
@@ -684,15 +794,17 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   const sx = Math.floor(p.x / CELL), sy = Math.floor(p.y / CELL);
   ai.pathT = (ai.pathT || 0) - dt;
   if (!ai.path || ai.pathT <= 0 || ai.goalK !== gy * map.W + gx) {
-    ai.path = findPath(map, sx, sy, gx, gy, ai.noVault) || []; ai.pathT = 1.2; ai.goalK = gy * map.W + gx;
+    ai.path = findPath(map, sx, sy, gx, gy, ai.noVault, false, team === TEAM.DEF) || []; ai.pathT = 1.2; ai.goalK = gy * map.W + gx;
   }
   { const i = ai.path.indexOf(sy * map.W + sx); if (i >= 0 && i < 6) ai.path.splice(0, i + 1); } // also skips the stair end after being carried to the other floor
   if (!ai.path.length) {
     if (Math.hypot(goal.x - p.x, goal.y - p.y) > 6) setDir(inp, goal.x - p.x, goal.y - p.y);
     else if (hold) { // hold an angle on the nearest way in
       if (!ai.watch) ai.watch = watchPoint(game, p) || { x: p.x + Math.cos(p.aim) * 50, y: p.y + Math.sin(p.aim) * 50 };
-      const a = Math.atan2(ai.watch.y - p.y, ai.watch.x - p.x);
-      turnTo(p, a + Math.sin(game.time * 0.5 + p.x) * 0.25, skill(game, p).turn * 0.4, dt);
+      if ((ai.chkT = (ai.chkT ?? 4 + Math.random() * 4) - dt) <= 0) { ai.chkT = 4 + Math.random() * 5; ai.chk = threatPoint(game, p, p.aim + (Math.random() - 0.5) * 3); ai.chkUntil = game.time + 1 + Math.random(); }
+      const at = ai.chk && game.time < ai.chkUntil ? ai.chk : ai.watch; // the angle held still, now and then a glance at another
+      turnTo(p, Math.atan2(at.y - p.y, at.x - p.x), skill(game, p).turn * 0.6, dt);
+      if (linedUp(game, p, ai.watch) && game.time > (ai.lineT || 0)) { ai.lineT = game.time + 3; if (ai.hold === goal) ai.hold = null; if (ai.spread) ai.spread = null; } // in a teammate's line: another spot
       inp.crouch = team === TEAM.DEF || persona(p).patience > 0.5 ? 1 : 0;
     }
     return;
@@ -711,7 +823,12 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
     return;
   }
   if (map.tiles[next] === T.BARRI || map.tiles[next] === T.SOFT || map.tiles[next] === T.PANEL) {
-    if (Math.hypot(nx - p.x, ny - p.y) < 26) { p.aim = dirA; game.event(p, { k: 'melee' }); return; }
+    if (Math.hypot(nx - p.x, ny - p.y) < 26) {
+      p.aim = dirA; const f = game.facingCell(p, 20);
+      if (f && f.k === next) { ai.hitT = 0; game.event(p, { k: 'melee' }); return; }
+      ai.hitT = (ai.hitT || 0) + dt; // the swing wouldn't reach it from here: step in, and after a while go another way
+      if (ai.hitT > 2.5) { ai.hitT = 0; (ai.noVault || (ai.noVault = new Set())).add(next); ai.path = null; return; }
+    }
   }
   setDir(inp, nx - p.x, ny - p.y);
   // stuck? nudge
@@ -752,7 +869,7 @@ function botDrone(game, p, dt) {
     if (close || game.timer < 8) { ai.dHide = true; ai.droneGoal = ai.dTrail[0]; ai.droneGoalT = 999; ai.dPath = null; }
   }
   const g = ai.droneGoal, W = map.W, sk = Math.floor(d.y / CELL) * W + Math.floor(d.x / CELL);
-  if (Math.hypot(g.x - d.x, g.y - d.y) < 18) { p.aim += dt * 0.7; return; } // parked: look round the room
+  if (Math.hypot(g.x - d.x, g.y - d.y) < 18) { if (!ai.dLookT || game.time > ai.dLookT) { ai.dLookT = game.time + 1.5 + Math.random() * 2; ai.dLookA = p.aim + (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random()); } p.aim += Math.max(-dt * 4, Math.min(dt * 4, angDiff(ai.dLookA, p.aim))); return; } // parked: looks one way, then another (no slow spin)
   ai.dPathT = (ai.dPathT || 0) - dt;
   if (!ai.dPath || ai.dPathT <= 0) { ai.dPath = findPath(map, Math.floor(d.x / CELL), Math.floor(d.y / CELL), Math.floor(g.x / CELL), Math.floor(g.y / CELL), null, true) || []; ai.dPathT = 2; }
   { const i = ai.dPath.indexOf(sk); if (i >= 0 && i < 6) ai.dPath.splice(0, i + 1); }
@@ -799,8 +916,9 @@ function watchPoint(game, p) {
   for (const o of m.openings) {
     const k = o.cells[0], x = (k % W + 0.5) * CELL, y = (Math.floor(k / W) + 0.5) * CELL;
     if (atSite && !inSite(k % W, Math.floor(k / W))) continue;
-    const d = Math.hypot(x - p.x, y - p.y);
-    if (d < bd && d > 40 && d < 400 && los(m, p.x, p.y, x, y)) { bd = d; best = { x, y }; }
+    const watched = [...game.players.values()].filter(q => q !== p && q.alive && q.squad === p.squad && q.ai && q.ai.watch && Math.hypot(q.ai.watch.x - x, q.ai.watch.y - y) < 20).length;
+    const d = Math.hypot(x - p.x, y - p.y) + watched * 260; // he asked: not four people on one way in while the windows go unwatched
+    if (d < bd && d > 40 && d < 400 + watched * 260 && los(m, p.x, p.y, x, y)) { bd = d; best = { x, y }; }
   }
   return best;
 }
@@ -855,18 +973,18 @@ const HIGH = ['two in {room}', 'droning {room}, looks clear', 'I\'ll hold this a
 export function amateurComms(game, p, dt) {
   if (!game.tv || p.pro || game.phase === PHASE.SELECT || game.phase === PHASE.LOBBY) return;
   const lv = lvlOf(game, p), ai = p.ai || (p.ai = {});
-  p.chatT = (p.chatT ?? (2 + Math.random() * 6)) - dt; if (p.chatT > 0) return;
+  p.chatT = (p.chatT ?? (6 + Math.random() * 12)) - dt; if (p.chatT > 0) return; // he asked: the bots talked too much
   let text;
-  if (lv <= 1) { const bit = p.bit || (p.bit = BIT_KEYS[(+p.id.slice(1) * 7 + game.round) % BIT_KEYS.length]); const L = BITS[bit]; text = L[Math.floor(Math.random() * L.length)]; p.chatT = 8 + Math.random() * 9; }
-  else if (lv <= 3) { text = MID[Math.floor(Math.random() * MID.length)]; p.chatT = 9 + Math.random() * 10; }
-  else { text = HIGH[Math.floor(Math.random() * HIGH.length)].replace('{room}', place(game, p.x, p.y) || 'there'); p.chatT = 10 + Math.random() * 10; }
+  if (lv <= 1) { const bit = p.bit || (p.bit = BIT_KEYS[(+p.id.slice(1) * 7 + game.round) % BIT_KEYS.length]); const L = BITS[bit]; text = L[Math.floor(Math.random() * L.length)]; p.chatT = 20 + Math.random() * 20; }
+  else if (lv <= 4) { text = MID[Math.floor(Math.random() * MID.length)]; p.chatT = 35 + Math.random() * 30; } // most ranks mostly ping instead
+  else { text = HIGH[Math.floor(Math.random() * HIGH.length)].replace('{room}', place(game, p.x, p.y) || 'there'); p.chatT = 22 + Math.random() * 18; } // Diamond and up: the ones who talk about the objective
   game.chat(p, { text: text.slice(0, 140), team: true });
 }
 export function proSay(game, p, text, key, prio = false) {
   if (!p || !p.pro) return;
   const t = game.time, team = (game.proSaid || (game.proSaid = {}))[p.squad] || (game.proSaid[p.squad] = { keys: {}, last: 0 });
   if (key && t - (team.keys[key] ?? -99) < 8) return; // a teammate just said it
-  if (!prio && (t - (p.saidT ?? -99) < 3 || t - team.last < 1.2)) return; // not constant chatter
+  if (!prio && (t - (p.saidT ?? -99) < 6 || t - team.last < 2.5)) return; // not constant chatter (he asked: less)
   if (key) team.keys[key] = t; p.saidT = t; team.last = t;
   (game.proLog || (game.proLog = [])).push({ round: game.round, squad: p.squad, team: p.pro.tag, text, who: p.pro.pl.name });
   game.chat(p, { text: text.slice(0, 140), team: true });
@@ -890,7 +1008,9 @@ export function assignPros(game) {
 function mouseTurn(p, a, rate, dt) {
   const ai = p.ai, M = p.pro.pl.mouse, k = 2 * Math.PI / M.cm360; // radians per cm of hand
   if (ai.hand === undefined) { ai.hand = 0; ai.lift = 0; ai.over = 0; }
-  const wob = (Math.random() - 0.5) * M.steady * k * Math.sqrt(dt * 30); // the hand is never perfectly still
+  // the hand is never perfectly still: a slow, smooth drift (not a new random twitch every tick, which made their view shake)
+  if ((ai.wobN = (ai.wobN ?? 0) - dt) <= 0) { ai.wobN = 0.25 + Math.random() * 0.35; ai.wobTgt = (Math.random() - 0.5) * M.steady * k * 2.5; }
+  const wobTo = (ai.wobO || 0) + ((ai.wobTgt || 0) - (ai.wobO || 0)) * Math.min(1, dt * 5), wob = wobTo - (ai.wobO || 0); ai.wobO = wobTo;
   if (ai.lift > 0) { ai.lift -= dt; if (ai.lift <= 0) ai.hand = -Math.sign(ai.liftDir) * M.pad * 0.35; p.aim += wob; return; }
   let diff = angDiff(a, p.aim);
   const cm = diff / k; // how far the hand must go
@@ -1024,8 +1144,8 @@ function postPlant(game, p, inp, dt, watch) {
 // Spread out (he asked: one grenade, gas cloud or charge can take out a whole stack): around the plan's spot each player
 // takes their own, at least gap px from teammates' spots, still in sight of the plan's spot (same side of the walls).
 // A fast rush packs tighter (speed matters more), a slow setup spreads wider.
-function spreadSpot(game, p, base, gap) {
-  const ai = p.ai, key = Math.round(base.x) + ',' + Math.round(base.y);
+function spreadSpot(game, p, base, gap, look = null) {
+  const ai = p.ai, key = Math.round(base.x) + ',' + Math.round(base.y), off = ai.spreadOff || { x: 0, y: 0 };
   if (ai.spreadKey === key && ai.spread) return ai.spread;
   const m = game.map, taken = [...game.players.values()].filter(q => q !== p && q.squad === p.squad && q.alive && q.ai && q.ai.spread).map(q => q.ai.spread);
   let best = null, bs = Infinity;
@@ -1033,8 +1153,12 @@ function spreadSpot(game, p, base, gap) {
     const x = base.x + dx * CELL, y = base.y + dy * CELL, k = Math.floor(y / CELL) * m.W + Math.floor(x / CELL);
     if (k < 0 || k >= m.tiles.length || blocksMove(m.tiles[k]) || m.tiles[k] === T.BARRI || floorAt(m, x, y) !== floorAt(m, base.x, base.y)) continue;
     if ((dx || dy) && !los(m, base.x, base.y, x, y)) continue;
-    const crowd = taken.reduce((n, t) => n + (Math.hypot(t.x - x, t.y - y) < gap ? 1 : 0), 0);
-    const sc = crowd * 100 + Math.hypot(dx, dy) + Math.random() * 0.5;
+    let crowd = taken.reduce((n, t) => n + (Math.hypot(t.x - x, t.y - y) < gap ? 1 : 0), 0);
+    if (look) for (const t of taken) { // on one line from the watched spot: one burst hits both (he asked)
+      const d = Math.hypot(x - look.x, y - look.y) || 1, ux = (x - look.x) / d, uy = (y - look.y) / d, ax = t.x - look.x, ay = t.y - look.y;
+      if (ax * ux + ay * uy > 20 && Math.abs(ax * uy - ay * ux) < 18) crowd++;
+    }
+    const sc = crowd * 100 + Math.hypot(dx - off.x, dy - off.y) + Math.random() * 0.5;
     if (sc < bs) { bs = sc; best = { x, y }; }
   }
   ai.spreadKey = key; ai.spread = best || base; return ai.spread;
@@ -1080,8 +1204,14 @@ function proAct(game, p, inp, dt, team) {
     }
     const holdUntil = (j.until || 0) + (TIMING[name] || 0);
     if (el < go || (j.hold && el < holdUntil)) { // set up: quiet at the end, then hold an angle on the way in
-      const spot = spreadSpot(game, p, j.hold && el < holdUntil ? j.hold : eff(st, j, 'stack'), st.plan.tempo === 'fast' ? 40 : 64);
+      const spot = spreadSpot(game, p, j.hold && el < holdUntil ? j.hold : eff(st, j, 'stack'), st.plan.tempo === 'fast' ? 40 : 64, eff(st, j, 'target'));
       if (!near(p, spot, 14)) { moveTo(game, p, inp, spot, dt); if (near(p, spot, 260)) inp.walk = 1; return true; }
+      // he asked: two pros stood in one spot for over a minute, saying and doing nothing. While waiting they work the
+      // area: every so often another spot round the stack (a new angle, clearing the corners), and a word to the team.
+      if ((ai.waitT = (ai.waitT ?? 9 + Math.random() * 6) - dt) <= 0) {
+        ai.waitT = 10 + Math.random() * 8; ai.spreadOff = { x: Math.round((Math.random() - 0.5) * 6), y: Math.round((Math.random() - 0.5) * 6) }; ai.spread = null;
+        if (!game.spots[team].size && Math.random() < 0.35) proSay(game, p, `${place(game, p.x, p.y)} is quiet, holding for the go (${Math.max(0, Math.round(go - el))} s)`, 'wait' + place(game, p.x, p.y));
+      }
       watch(eff(st, j, 'target'), true); return true;
     }
     if (!ai.utilDone) { // utility in first
@@ -1103,7 +1233,8 @@ function proAct(game, p, inp, dt, team) {
   }
   const rot = st.rotate && game.time > st.rotate.t + (ROTATE_DELAY[name] ?? 0) && ['support', 'intel', 'roamer'].includes(p.pro.pl.jobs.def) ? st.rotate : null;
   const roaming = action && j.roam && el < (j.until || 0) + (TIMING[name] || 0) && !rot;
-  const spot = roaming ? (ai.roamAt || (ai.roamAt = game.freeSpotNear(j.roam.x, j.roam.y, 50))) : spreadSpot(game, p, rot ? rot.at : j.hold, 56); // defenders don't bunch either
+  if (!roaming && (ai.reposT = (ai.reposT ?? 16 + Math.random() * 14) - dt) <= 0) { ai.reposT = 18 + Math.random() * 16; ai.spreadOff = { x: Math.round((Math.random() - 0.5) * 4), y: Math.round((Math.random() - 0.5) * 4) }; ai.spread = null; } // a new angle now and then
+  const spot = roaming ? (ai.roamAt || (ai.roamAt = game.freeSpotNear(j.roam.x, j.roam.y, 50))) : spreadSpot(game, p, rot ? rot.at : j.hold, 72, rot ? rot.w.pos : j.watch); // defenders don't bunch either
   if (!near(p, spot, 14)) { moveTo(game, p, inp, spot, dt, true); if (roaming && near(p, spot, 200)) inp.walk = 1; return true; }
   watch(rot ? rot.w.pos : j.watch, !roaming); return true;
 }

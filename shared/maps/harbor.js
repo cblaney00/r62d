@@ -121,7 +121,7 @@ export function build() {
 
   U.box(12, 10, 71, 49, T.SOFT, MAT.BRICK);
   U.wall(13, 22, 70, 22); U.wall(13, 28, 70, 28);
-  U.wall(28, 11, 28, 21); U.wall(49, 11, 49, 21, T.HARD, MAT.CONCRETE);
+  U.wall(28, 11, 28, 21); U.wall(49, 11, 49, 21); // drywall: the two site rooms always share a breakable wall (he asked)
   U.wall(43, 29, 43, 48); U.wall(56, 29, 56, 37); U.wall(44, 38, 70, 38);
   U.pillar([[12, 10], [71, 10], [12, 49], [71, 49], [12, 22], [12, 28], [71, 22], [71, 28], [28, 22], [49, 22], [43, 28], [56, 28], [43, 38], [56, 38], [43, 49], [28, 10], [49, 10]]);
   U.door(20, 22, 21, 22); U.door(38, 22, 39, 22); U.door(60, 22, 61, 22); U.door(28, 15, 28, 16);

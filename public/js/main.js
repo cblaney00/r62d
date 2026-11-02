@@ -22,7 +22,7 @@ import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
 const rankTag = i => i == null ? '' : `<span class="rankTag" style="color:${RANK_COL[i]};border-color:${RANK_COL[i]}">${RANKS[i].toUpperCase()}</span>`;
-import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION } from './keys.js';
+import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION, lockMouse } from './keys.js';
 import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
 import { drawQr } from './qr.js';
@@ -162,6 +162,9 @@ function adsReset() { const l = Math.hypot(aimOff.x, aimOff.y) || 1, d = st.me &
 const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
 let padOn = false, padAng = 0, padReach = 0.6;
 const wrapAng = a => Math.atan2(Math.sin(a), Math.cos(a));
+// someone else's aim, watched (spectating, Esports TV): eased so their view cone doesn't shake with every tiny hand
+// movement (he asked: the seeable areas jittered a lot watching bots); real turns still come through at once
+const smoothAng = (prev, a, dt) => !Number.isFinite(prev) ? a : prev + wrapAng(a - prev) * Math.min(1, dt * (Math.abs(wrapAng(a - prev)) > 0.35 ? 30 : 12));
 function padMove(dx, dy) { // a captured-mouse move, in screen pixels, applied to the knob
   const R = pad().r, c = Math.cos(padAng), sn = Math.sin(padAng);
   const along = dx * c + dy * sn, across = -dx * sn + dy * c;
@@ -293,11 +296,11 @@ function renderTv() {
   }
   for (const b of el.children) b.classList.toggle('on', b.dataset.id === tvPick.map);
 }
-// TRAIN THE PROS (he asked: a button too, as well as the daily practice): starts a practice session now, and shows when they last trained
+// TRAIN THE PROS (he asked: a button too; 200 rounds per version): starts a practice session now, and shows when they last trained
 const ago = t => { const h = (Date.now() - t) / 3600000; return !t ? 'never' : h < 1 ? 'less than an hour ago' : h < 48 ? Math.round(h) + ' hours ago' : Math.round(h / 24) + ' days ago'; };
 function trainInfo() {
   fetch('/api/training').then(r => r.json()).then(t => {
-    const txt = t.running ? `Practising now… ${t.session} rounds so far` : `Last practice: ${ago(t.at)}${t.version ? ` (version ${t.version}${t.version !== t.current ? ', older than this one' : ''})` : ''}, ${t.rounds} rounds in all`;
+    const txt = t.running ? `Practicing now… ${t.session} of ${t.perVersion || 200} rounds` : `Last practice: ${ago(t.at)}${t.version ? ` (version ${t.version}${t.version !== t.current ? ', older than this one' : ''})` : ''}, ${t.verRounds || 0} of ${t.perVersion || 200} rounds on this version`;
     for (const el of document.querySelectorAll('.trainInfo')) el.textContent = txt;
     for (const b of document.querySelectorAll('.trainBtn')) { b.disabled = t.running; b.textContent = t.running ? 'TRAINING…' : 'TRAIN THE PROS'; }
     st.training = t;
@@ -667,11 +670,11 @@ cv.addEventListener('mousedown', e => {
   if (touchActive()) return; // on a phone, firing and aiming come from the touch controls (touch.js), not taps on the map
   if (coach.blocking && e.button === 0) { // a tutorial card to read: the click dismisses it (and takes control), it doesn't shoot
     coach.space(st.last);
-    if (playing() && !menuOpen() && document.pointerLockElement !== cv) { st.lockAsked = true; cv.requestPointerLock?.(); }
+    if (playing() && !menuOpen() && document.pointerLockElement !== cv) { st.lockAsked = true; lockMouse(cv); }
     return;
   }
   if (playing() && !menuOpen() && document.pointerLockElement !== cv && !st.lockAsked) { // the first click just takes control, it doesn't shoot
-    st.lockAsked = true; cv.requestPointerLock?.(); return;
+    st.lockAsked = true; lockMouse(cv); return;
   }
   if (e.button === 0) { mouse.l = true; mouse.wl++; }
   if (e.button === 2) { mouse.r = true; mouse.wr++; if (aimMode === 'free' && padOn && st.me && st.me.ct === 'body') adsReset(); }
@@ -1211,7 +1214,7 @@ function frame(nowMs) {
   if (st.tv && me && me.a) { // ride along: their position and aim, smoothed like everyone else's
     const pv = me.ct === 'drone' ? interp(me.did, 'ents') : interp(me.id, 'players');
     if (pv && Number.isFinite(pv.x) && Number.isFinite(pv.y)) { st.pred.x = pv.x; st.pred.y = pv.y; st.pred.vx = pv.vx || 0; st.pred.vy = pv.vy || 0; st.pred.gait = Number.isFinite(pv.gt) ? pv.gt : 0; } // no position for a moment (waiting off the map, just died): keep the last one
-    const pa = interp(me.id, 'players'); if (pa && Number.isFinite(pa.ag)) st.aim = pa.ag;
+    const pa = interp(me.id, 'players'); if (pa && Number.isFinite(pa.ag)) st.aim = st.tvAimS = smoothAng(st.tvAimS, pa.ag, dt);
   }
   let view = null, ctrl = me && me.a ? me.ct : null;
   if (inGame && me && me.a) {
@@ -1223,7 +1226,7 @@ function frame(nowMs) {
     if (mouse.wl > 0) { st.spect++; mouse.wl = 0; }
     if (mates.length) {
       const m = interp(mates[st.spect % mates.length].id, 'players');
-      if (m) view = { x: m.x, y: m.y, ang: m.ag, fov: fovFor(m), range: 1100, near: 26, kind: 'spect', name: m.n };
+      if (m) view = { x: m.x, y: m.y, ang: st.spAimS = smoothAng(st.spAimS, m.ag, dt), fov: fovFor(m), range: 1100, near: 26, kind: 'spect', name: m.n };
     }
   }
 
@@ -2254,6 +2257,8 @@ function promptText(s, me) {
     const what = !atW ? 'MOVE TO SLIDE ALONG THE WALL' : ropeWindowOpen(m, r) ? `<b>${label('vault')}</b>CLIMB IN` : `<b>${label('melee')}</b>BREAK THE BOARDS (OR SHOOT A WAY IN)`;
     return `${what}  ·  <b>${label('interact')}</b>LET GO`;
   }
+  const down = s.players.find(p => p.a && p.dn && p.tm === side && p.id !== me.id && Math.hypot(p.x - x, p.y - y) < 26);
+  if (down && !me.dn && me.ct === 'body') return `<b>${label('interact')}</b>HOLD TO REVIVE ${esc(down.n.toUpperCase())}`; // before ropes (the server puts reviving first too)
   if (side === 'atk' && s.ph === PHASE.ACTION && me.ct === 'body' && !me.dn && floorAt(m, x, y) === m.groundFloor) {
     const h = ropeAt(m, x, y);
     if (h) return `<b>${label('interact')}</b>RAPPEL UP TO ${m.floors[h[0].f].name}`;
@@ -2263,8 +2268,6 @@ function promptText(s, me) {
     if (b) return `<b>${label('interact')}</b>HOLD TO PLANT DEFUSER (BOMB ${b.id})`;
   }
   if (side === 'def' && s.pl && Math.hypot(s.pl.x - x, s.pl.y - y) < 30) return '<b>' + label('interact') + '</b>HOLD TO DISABLE DEFUSER';
-  const down = s.players.find(p => p.a && p.dn && p.tm === side && p.id !== me.id && Math.hypot(p.x - x, p.y - y) < 26);
-  if (down) return `<b>${label('interact')}</b>HOLD TO REVIVE ${esc(down.n.toUpperCase())}`;
   const f = facingCell(m, x, y, st.aim, 28);
   if (side === 'def' && f) {
     if (f.t === T.SOFT && s.rf > 0) return `<b>${label('interact')}</b>HOLD TO REINFORCE WALL (${s.rf} LEFT)`;
@@ -2714,7 +2717,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 // let go of the mouse whenever a menu is open or the match is over
 setInterval(() => { if (document.pointerLockElement && document.pointerLockElement !== $('armCanvas') && (menuOpen() || !playing())) document.exitPointerLock(); }, 150);
-$('pResume').addEventListener('click', () => { if (playing() && !isTouch && !st.tv) cv.requestPointerLock?.(); }); // TV: nothing to aim, keep the mouse free // a phone has no mouse to capture (asking anyway re-opened this menu)
+$('pResume').addEventListener('click', () => { if (playing() && !isTouch && !st.tv) lockMouse(cv); }); // TV: nothing to aim, keep the mouse free // a phone has no mouse to capture (asking anyway re-opened this menu)
 const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; };
 for (const id of ['sens', 'adsSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
 try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; } } catch {}

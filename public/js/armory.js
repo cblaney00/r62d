@@ -5,6 +5,7 @@
 // it is your own crosshair, distances are real metres, the view widens when you aim in and follows the crosshair out.
 import { PX_PER_M } from '/shared/constants.js';
 import { drawXhair } from './crosshair.js';
+import { lockMouse } from './keys.js';
 import { WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
@@ -47,7 +48,7 @@ export function openArmory(el, opts) {
   };
   cv.onmousedown = e => {
     audio.initAudio();
-    if (document.pointerLockElement !== cv && !S.lockAsked) { S.lockAsked = true; cv.requestPointerLock?.(); return; } // the first click just takes control
+    if (document.pointerLockElement !== cv && !S.lockAsked) { S.lockAsked = true; lockMouse(cv); return; } // the first click just takes control
     if (e.button === 0) { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; }
     if (e.button === 2) { S.mouse.r = true; adsAim(); } // aiming in: 2.5 m out, as in a match
   };

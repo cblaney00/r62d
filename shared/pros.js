@@ -169,13 +169,13 @@ export function playbook(m, si, side, team) {
   const bombNear = w => I.bombs.slice().sort((a, b) => Math.hypot(a.x - w.inside.x, a.y - w.inside.y) - Math.hypot(b.x - w.inside.x, b.y - w.inside.y))[0];
   if (side === 'atk') {
     const B = I.wall || I.main, b = bombNear(I.main);
-    plans.push({ id: 'default', name: 'Default', tempo: 'slow', go: 55, idea: `Full drones, then the breacher opens ${doorName(B)} while the team holds ${doorName(I.main)}; everyone goes in together and plants at ${b.id}.`,
+    plans.push({ id: 'default', name: 'Default', tempo: 'slow', go: 42, idea: `Full drones, then the breacher opens ${doorName(B)} while the team holds ${doorName(I.main)}; everyone goes in together and plants at ${b.id}.`,
       jobs: {
         intel: { task: 'Drones the site all preparation and keeps a drone alive inside; calls the anchors for the first part of the round, then joins the push last.', drone: I.siteCentre, keepDrone: 35, stack: I.main.stack, target: I.main.inside },
         breach: { task: `Opens ${doorName(B)} a few seconds before the push, then follows the entry in.`, breach: B.kind === 'wall' ? B.k : null, stack: B.stack, target: B.inside },
         entry: { task: `Stacks on ${doorName(I.main)} and goes in first when the wall opens.`, stack: I.main.stack, target: I.main.inside, util: 'stun' },
         support: { task: 'Smokes the main angle for the breacher, then trades the entry and carries the defuser to the plant.', stack: I.main.stack, target: I.main.inside, util: 'smoke', plant: b },
-        flank: { task: 'Holds the defenders\' rotation route outside the site until the push, then cuts off anyone running back.', hold: I.side ? I.side.stack : I.main.stack, until: 70, target: (I.side || I.main).inside },
+        flank: { task: 'Holds the defenders\' rotation route outside the site until the push, then cuts off anyone running back.', hold: I.side ? I.side.stack : I.main.stack, until: 55, target: (I.side || I.main).inside },
       } });
     plans.push({ id: 'fast', name: 'Fast hit', tempo: 'fast', go: 4, idea: `No waiting: everyone runs straight at ${doorName(I.main)} the moment the round starts, before the site is set up, and plants at ${b.id}.`,
       jobs: {
@@ -217,7 +217,7 @@ export function playbook(m, si, side, team) {
       jobs: {
         anchor: { task: `Anchors the site, watching ${doorName(I.main)}.`, hold: hold(I.main), watch: I.main.pos },
         trapper: { task: 'Traps the doors and windows, then holds the second angle on the site.', hold: hold(I.side || I.wall), watch: (I.side || I.wall || I.main).pos },
-        intel: { task: 'Holds a corner of the site with a camera feed in mind; calls rotations.', hold: I.siteCentre, watch: I.main.pos },
+        intel: { task: 'Takes space in the room beside the site early (he asked: space matters), then holds a corner of the site with a camera feed in mind; calls rotations.', roam: nearRoom, until: 75, hold: I.siteCentre, watch: I.main.pos },
         support: { task: 'Plays next to the anchor for the trade and keeps everyone healthy.', hold: hold(I.main), watch: I.main.pos, nearAnchor: true },
         roamer: { task: 'Roams on the attackers\' route to slow them, back on site by 1:30.', roam: roamAt, until: 90, hold: I.siteCentre, watch: I.main.pos },
       } });
@@ -253,6 +253,16 @@ export function playbook(m, si, side, team) {
         support: { task: 'Holds the site with the anchor.', hold: hold(I.side || I.main), watch: I.main.pos },
         roamer: { task: 'Roams, then plays the hatch floor too.', roam: roamAt, until: 75, hold: up, watch: up },
       } }); }
+  }
+  if (side === 'def') { // he asked: four defenders stared at the stairs and nobody watched the windows. One player per way
+    // in: the first job keeps the main way, everyone else who would also watch it takes the next way in (windows too)
+    const list = [];
+    for (const w of [...I.ways.filter(w => w.kind !== 'wall'), ...I.ways.filter(w => w.kind === 'wall')]) if (!list.some(o => Math.hypot(o.pos.x - w.pos.x, o.pos.y - w.pos.y) < 3 * CELL)) list.push(w);
+    for (const pl of plans) { let n = 0;
+      for (const id of DEF_JOBS) { const j = pl.jobs[id]; if (!j || j.watch !== I.main.pos) continue;
+        const w = list[n++ % list.length]; if (w === I.main) continue;
+        if (j.hold === I.main.hold) j.hold = w.hold; j.watch = w.pos; j.task += ` Watches ${doorName(w)}.`; }
+    }
   }
   const way = w => w && { kind: w.kind, pos: w.pos, stack: w.stack, inside: w.inside, hold: w.hold };
   for (const p of plans) { p.site = si; p.ways = { main: way(I.main), side: way(I.side) }; p.spawn = I.spawn && I.spawn.name; }

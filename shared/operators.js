@@ -399,8 +399,27 @@ export function attachFor(w) {
   if (W && SIDEARMS.has(w) && W.cls !== 'MP' && W.cls !== 'Pistol') { grip = grip.filter(g => g !== 'vertical' && g !== 'handstop'); } // sidearms: nothing bulky underneath
   return { barrel, grip, sight: f.sight }; // at least 3 in every slot (he asked)
 }
-export function cleanAtt(w, a) {
-  const ok = attachFor(w), out = { barrel: 'none', grip: 'none', sight: 'iron' };
+// Starter attachments (he asked: for players who don't care, a sensible set per operator; the moment they change one,
+// their choice is saved and replaces it). The gun type sets the base, the operator's role tweaks it: quiet jobs
+// (flank, intel, roamer, trapper) get a suppressor, anchors a longer barrel, entry players quick handling.
+const START_ATT = {
+  AR: { barrel: 'compensator', grip: 'vertical', sight: 'reddot' }, LMG: { barrel: 'heavy', grip: 'handstop', sight: 'holo' },
+  DMR: { barrel: 'match', grip: 'pad', sight: 'prism' }, Shotgun: { barrel: 'choke', grip: 'angled', sight: 'holo' },
+  SMG: { barrel: 'compensator', grip: 'angled', sight: 'reddot' }, MP: { barrel: 'compensator', grip: 'stubby', sight: 'reddot' },
+  Pistol: { barrel: 'none', grip: 'laser', sight: 'reddot' },
+};
+export function defaultAtt(w, op) {
+  const W = WEAPONS[w], ok = attachFor(w), base = { ...(START_ATT[W ? W.cls : 'AR'] || START_ATT.AR) }, job = op ? jobOf(op) : null;
+  if (W && W.pellets === 1 && W.cls === 'Shotgun') { base.barrel = 'extended'; base.sight = 'reddot'; } // a slug reaches
+  if (['flank', 'intel', 'roamer', 'trapper'].includes(job) && !SIDEARMS.has(w)) base.barrel = 'suppressor';
+  else if (job === 'anchor' && ['AR', 'LMG', 'SMG'].includes(W && W.cls)) base.barrel = 'extended';
+  else if (job === 'entry' && ['SMG', 'Shotgun'].includes(W && W.cls) && !(W.pellets === 1)) base.barrel = 'short';
+  const out = { barrel: 'none', grip: 'none', sight: 'iron' };
+  for (const s of Object.keys(out)) if (ok[s].includes(base[s])) out[s] = base[s];
+  return out;
+}
+export function cleanAtt(w, a, op = null) {
+  const ok = attachFor(w), out = a && typeof a === 'object' ? { barrel: 'none', grip: 'none', sight: 'iron' } : defaultAtt(w, op); // never chosen: the starter set
   if (a && typeof a === 'object') for (const s of Object.keys(out)) if (ok[s].includes(a[s])) out[s] = a[s];
   return out;
 }

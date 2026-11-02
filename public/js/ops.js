@@ -76,7 +76,7 @@ function fillDetail(d, k, anim, compact, force) {
   // attachments for the gun chosen in that slot: three rows of choices, each with what it does
   const attRows = slot => {
     const w = cur[slot]; if (!w) return '';
-    const a = cleanAtt(w, cur.att[w]), opts = attachFor(w);
+    const a = cleanAtt(w, cur.att[w], k), opts = attachFor(w);
     return `<div class="atts" data-slot="${slot}"><div class="atthead">${WEAPONS[w].name} attachments</div>` + ATTACH_SLOTS.map(([s, label]) => `<div class="attrow"><span>${label}</span>` +
       opts[s].map(v => `<button class="att ${a[s] === v ? 'on' : ''}" data-w="${w}" data-s="${s}" data-v="${v}" title="${ATTACH[s][v].desc}">${ATTACH[s][v].short}</button>`).join('') +
       `<em>${ATTACH[s][a[s]].desc}</em></div>`).join('') + '</div>';
@@ -108,12 +108,12 @@ function fillDetail(d, k, anim, compact, force) {
   };
   const bindAtts = root => { for (const b of root.querySelectorAll('.att')) b.onclick = () => {
     const l = loadoutOf(k), w = b.dataset.w;
-    l.att = { ...l.att, [w]: { ...cleanAtt(w, l.att[w]), [b.dataset.s]: b.dataset.v } };
+    l.att = { ...l.att, [w]: { ...cleanAtt(w, l.att[w], k), [b.dataset.s]: b.dataset.v } };
     save(l);
   }; };
   const pics = {}; // gun picture per card, redrawn only when that gun's attachments change
   const drawPics = () => { for (const p of d.querySelectorAll('.wpic')) {
-    const w = p.dataset.w, a = cleanAtt(w, cur.att[w]), key = JSON.stringify(a);
+    const w = p.dataset.w, a = cleanAtt(w, cur.att[w], k), key = JSON.stringify(a);
     if (pics[w + p.closest('.wcard').dataset.slot] === key) continue;
     pics[w + p.closest('.wcard').dataset.slot] = key; p.replaceChildren(gunPicture(w, a, 270, 84));
   } };

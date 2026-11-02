@@ -120,7 +120,7 @@ export function createCoach({ el, send, onExit, getMap }) {
         lastPh = s.ph;
         render(`<div class="cHead">TUTORIAL</div><div class="cTitle">TUTORIAL COMPLETE</div>
           <div class="cBody">That's the game. Remember: <b>information wins rounds</b> — drone and watch cameras before you commit,
-          move quietly, and ping everything your team needs to know. Try <b>Free Play</b> to practise any operator, and
+          move quietly, and ping everything your team needs to know. Try <b>Free Play</b> to practice any operator, and
           <b>Map Knowledge</b> to learn the maps.</div>
           <div class="cBtns"><button data-c="retry">GO AGAIN</button><button data-c="exit" class="primary">MAIN MENU</button></div>`);
         for (const b of el.querySelectorAll('[data-c]')) b.onclick = () => {

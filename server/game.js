@@ -364,7 +364,7 @@ export class Game {
     const L = p.bot ? this.botLoadout(p.op) : store.loadout(p.token, p.op);
     p.loadout = L; p.gadget = L.gadget;
     p.guns = [L.primary, L.secondary].filter(Boolean).map(w => {
-      const att = cleanAtt(w, L.att && L.att[w]);
+      const att = cleanAtt(w, L.att && L.att[w], p.op); // nothing chosen: the operator's starter set
       return { w, ammo: WEAPONS[w].mag, reserve: WEAPONS[w].reserve, att, m: gunMods(w, att) };
     });
     p.slot = 0; p.fireCd = 0; p.reloadT = 0; p.bloom = 0; p.vx = 0; p.vy = 0; p.gait = 0;
@@ -478,7 +478,8 @@ export class Game {
     if (p.shrouded) mul *= 0.8;
     if (this.ghost(p)) mul *= 0.85; // STRIDER's Ghost Step: careful, slower steps (he asked: it was too strong)
     for (const e of this.ents) if (e.type === 'wire' && e.team !== this.side(p) && Math.hypot(e.x - p.x, e.y - p.y) < 24) { mul *= 0.3; break; }
-    const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || !!p.rope || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') ||
+    const beingRevived = p.downed && [...this.players.values()].some(q => q.busy && q.busy.k === 'revive' && q.busy.target === p.id); // he asked: revives kept failing — the downed crawled out of reach
+    const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || !!p.rope || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') || beingRevived ||
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
       (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK);
     const gw = p.guns && p.guns[p.slot] ? moveOf(WEAPONS[p.guns[p.slot].w]) : [1, 1];
@@ -1027,7 +1028,7 @@ export class Game {
     const b = p.busy;
     if (b.k === 'revive') {
       const q = this.players.get(b.target);
-      if (!q || !q.alive || !q.downed || Math.hypot(q.x - p.x, q.y - p.y) > 32) { p.busy = null; return; }
+      if (!q || !q.alive || !q.downed || Math.hypot(q.x - p.x, q.y - p.y) > 44) { p.busy = null; return; }
     }
     b.t += dt;
     if (b.t < b.dur) return;
@@ -1063,6 +1064,7 @@ export class Game {
     if (!inp.interact) p.ropeHeld = false; // E that started or ended a climb doesn't also start something else
     if (!p.rope) {
       if (!edge('interact') || this.phase !== PHASE.ACTION || this.side(p) !== TEAM.ATK || p.ctrl !== 'body' || p.downed || p.busy || p.vault || !p.alive) return;
+      if ([...this.players.values()].some(q => q !== p && q.alive && q.downed && this.side(q) === TEAM.ATK && Math.hypot(q.x - p.x, q.y - p.y) < 26)) return; // E next to a downed teammate revives, never climbs
       const hit = ropeAt(this.map, p.x, p.y); if (!hit) return;
       const [r, s] = hit;
       p.rope = { st: 'move', r: -1, from: -1, to: r.i, s, t: 0, dur: ROPE_CLIMB * r.lvl, base: ropeGround(this.map, r, s) }; p.ropeHeld = true;
@@ -1880,8 +1882,8 @@ export class Game {
             for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving === 2 && Math.hypot(q.x - e.x, q.y - e.y) < 10 * PX_PER_M) { this.spot(e.team, q.id, 1.5); any = true; }
             e.pingT -= 0.5; if (any && e.pingT <= 0) { e.pingT = 1.5; this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); }
           } else { // AUDIT: every attacker drone nearby is marked for the defenders, again and again
-            e.t = 1.5; const o = this.players.get(e.owner);
-            for (const d of this.ents) if (d.type === 'drone' && d.team !== e.team && Math.hypot(d.x - e.x, d.y - e.y) < 15 * PX_PER_M)
+            e.t = 1.5; const o = this.players.get(e.owner), seen = e.seen || (e.seen = {});
+            for (const d of this.ents) if (d.type === 'drone' && d.team !== e.team && Math.hypot(d.x - e.x, d.y - e.y) < 15 * PX_PER_M && (!seen[d.id] || this.time - seen[d.id].t > 10 && Math.hypot(d.x - seen[d.id].x, d.y - seen[d.id].y) > 3 * PX_PER_M) && (seen[d.id] = { t: this.time, x: d.x, y: d.y })) // he asked: fewer drone pings — once, then only when it has moved on
               this.events.push({ e: 'mark', team: e.team, x: r1(d.x), y: r1(d.y), w: 'DRONE', by: o ? o.name : 'Radar', from: e.owner, id: d.id });
           }
           break;
