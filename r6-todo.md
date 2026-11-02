@@ -6,7 +6,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] i found an issue with the aim, if i move my mouse slowly then the cursor doesnt even move at all, this would cause huge frustration from people with actually decent aim. make sure the cursor is very accurate to the mouse inputs (in progress: the desktop mouse was set to flat for this session; making it permanent needs vibe → "Change or fix something on your computer"; the game now also asks the browser for raw mouse movement)
+- [ ] i found an issue with the aim, if i move my mouse slowly then the cursor doesnt even move at all, this would cause huge frustration from people with actually decent aim. make sure the cursor is very accurate to the mouse inputs (in progress: confirmed in Firefox's own code that on this desktop it throws away any mouse step smaller than one pixel, which mouse acceleration makes of slow moves, so the game never receives them; flat mouse (already on for this session) fixes it fully; making it permanent needs vibe → "Change or fix something on your computer"; the game now also asks the browser for raw mouse movement)
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
 
 ## Done
