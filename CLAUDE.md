@@ -219,6 +219,10 @@ His wishes so far:
 - Esports TV loads separately (he asked): its client code is `public/js/tv.js` (director, cards, `tvDraft`, bubbles, casters, re-exports tvreplay.js), fetched by `loadTv()` in main.js the first time `switchMatch` gets a tv (`TV` is null until then; main.js calls `TV.*` only while `st.tv`). Leaving keeps the server match paused 20 s (`heldTv`/`held` in server.js, `R62D_TV_HOLD_MS`): reopening with the same picks reuses `st.tvHold.key` (`/ws?tv=1&key=`) and resumes it. `node tests/tvhold.js`.
 - TV camera cones: snapshot players `cf` (TV only), `tvCamCone` cache; watched cameras become viewers. Casters: `public/js/casters.js` (`castEvent`/`castPhase`/`castTick`, `#tvCast`), Pro level only.
 
+## Batch of 2026-11-03 (spawns, Ball Knowledge cards)
+- Safe spawns (he asked: attackers died as the round began): `makeMap` gives the ground floor `PAD` 20 more cells on every side (building-frame coords unchanged, `padGround` carries the usual ground out, roads widen 3 cells), `finish` runs `coverSpawn` on each atkSpawn: moved over open ground to ≥ `SPAWN_BACK` 30 cells from the building, then van/container slabs (`spawnCover` props, T.TALL) toward the nearest wall, the building's middle and whatever inside cells still see it (`exposed`). Defender bots: `keepInside` in bots.js `moveTo` keeps their goals indoors in PREP and the first 15 s of ACTION (not near their own site). `node tests/spawnsafe.js [rounds] [--why]`.
+- Ball Knowledge cards: click opens one in place spanning 3×2 cards (`S.open`, `detail()` in knowledge.js; tips are [text, example] pairs).
+
 ## Batch of 2026-11-03 (Ball Knowledge)
 - Bots headshot: in a fight `p.aimX/aimY` follow their aim (it used to stay where the last throw went, so `onHead` failed). Per sighting `ai.oh` (go for the head, `head` in `SKILL`/`proSkill`) sets `ai.os` (offset across the body); when not going for the head the crosshair point is kept off it. Copper ~12% of kills … Pro ~39%.
 - Ball Knowledge: train-worker counts skill uses from the full count (defender bots place traps inside `beginPrep`); `opx[8]` = rounds the uses were counted in; old uses/headshots reset on load (`x.length < 9`).

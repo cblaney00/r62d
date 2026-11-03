@@ -29,6 +29,9 @@ function clipBox(pts, x0, y0, x1, y1) {
 }
 
 const GAP = 8; // void cells between floors in the grid
+// he asked (attackers died the moment the round started): every map's ground gets PAD more cells of open ground on each
+// side, and each attacker spawn moves back to at least SPAWN_BACK cells from the building, behind a van or container
+export const PAD = 20, SPAWN_BACK = 30;
 
 // floors: [{ name: '1F', x0, y0, w, h, ground: true }] — each floor's area in the building frame.
 // The ground floor usually covers the whole lot (garden, road...); upper floors and basements only
@@ -36,6 +39,7 @@ const GAP = 8; // void cells between floors in the grid
 // (open air above ground, solid earth below), except on the ground floor (grass).
 export function makeMap({ id, name, floors }) {
   let gx = 0;
+  floors = floors.map(f => f.ground ? { ...f, x0: f.x0 - PAD, y0: f.y0 - PAD, w: f.w + 2 * PAD, h: f.h + 2 * PAD, pad: PAD } : f);
   const fl = floors.map((f, i) => { const o = { ...f, i, gx, gy: 0 }; gx += f.w + GAP; return o; });
   const W = gx - GAP, H = Math.max(...floors.map(f => f.h)), N = W * H;
   const tiles = new Uint8Array(N).fill(T.VOID), floor = new Uint8Array(N).fill(FL.VOID);
@@ -379,6 +383,79 @@ export function makeMap({ id, name, floors }) {
     }
   };
 
+  // the added ground round the edge carries on the ground at the old edge (a road stays a road, sand stays sand)
+  // (only the map's usual ground goes all the way out; a road or yard at the edge widens by 3 cells, then the usual ground)
+  const padGround = () => {
+    for (const f of fl) if (f.pad) {
+      const p = f.pad, n = {}; let base = FL.GRASS, bn = 0;
+      for (let y = p; y < f.h - p; y++) for (let x = p; x < f.w - p; x++) { const k = y * W + f.gx + x; if (tiles[k] === T.GROUND && (n[floor[k]] = (n[floor[k]] || 0) + 1) > bn) { bn = n[floor[k]]; base = floor[k]; } }
+      for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) {
+        const cx = Math.min(f.w - 1 - p, Math.max(p, x)), cy = Math.min(f.h - 1 - p, Math.max(p, y));
+        if (cx === x && cy === y) continue;
+        const k = y * W + f.gx + x, e = cy * W + f.gx + cx; if (tiles[k] !== T.GROUND) continue;
+        floor[k] = tiles[e] === T.GROUND && (floor[e] === base || Math.max(Math.abs(cx - x), Math.abs(cy - y)) <= 3) ? floor[e] : base;
+      }
+    }
+  };
+  // Move a spawn back from the building (if it is closer than SPAWN_BACK cells) over open ground, then put a van or
+  // container between it and the nearest building wall, and a second piece if the building's middle lies off to a side.
+  const coverSpawn = (s, i) => {
+    const gf = fl.find(f => f.ground); if (!gf) return s;
+    const inG = k => flAt[k] === gf.i, open = k => inG(k) && tiles[k] === T.GROUND && !propAt(k);
+    const dist = new Int32Array(N).fill(-1), src = new Int32Array(N).fill(-1), q = [];
+    for (let k = 0; k < N; k++) if (inG(k) && tiles[k] !== T.GROUND && tiles[k] !== T.LOW && tiles[k] !== T.TALL && tiles[k] !== T.VOID) { dist[k] = 0; src[k] = k; q.push(k); }
+    for (let h = 0; h < q.length; h++) { const k = q[h]; for (const d of [1, -1, W, -W]) { const n = k + d; if (n < 0 || n >= N || dist[n] >= 0 || !inG(n) || Math.abs((n % W) - (k % W)) > 1) continue; dist[n] = dist[k] + 1; src[n] = src[k]; q.push(n); } }
+    const k0 = Math.floor(s.y / CELL) * W + Math.floor(s.x / CELL);
+    const clear = k => { for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const n = k + dy * W + dx; if (n < 0 || n >= N || !open(n)) return false; } return true; };
+    let best = k0;
+    if (!(dist[k0] >= SPAWN_BACK && clear(k0))) { // walk out over open ground from the old spot to the nearest good one
+      const seen = new Map([[k0, 0]]), w = [k0]; let bs = -Infinity;
+      for (let h = 0; h < w.length; h++) {
+        const k = w[h], g = seen.get(k);
+        if (clear(k)) { const sc = Math.min(dist[k], SPAWN_BACK) * 4 - g; if (sc > bs) { bs = sc; best = k; } }
+        if (g > 60) continue;
+        for (const d of [1, -1, W, -W]) { const n = k + d; if (n < 0 || n >= N || seen.has(n) || !(open(n) || tiles[n] === T.GROUND) || Math.abs((n % W) - (k % W)) > 1) continue; seen.set(n, g + 1); w.push(n); }
+      }
+    }
+    const bx = best % W, by = (best / W) | 0, out = { ...s, x: (bx + 0.5) * CELL, y: (by + 0.5) * CELL };
+    // cover: a slab 8 cells long, 4 cells in front, square to the way the building lies
+    const slab = (tx, ty, kind, at = 5) => {
+      const L = Math.hypot(tx, ty) || 1, ux = tx / L, uy = ty / L, horiz = Math.abs(uy) >= Math.abs(ux);
+      const cx = Math.round(bx + ux * at), cy = Math.round(by + uy * at), w = horiz ? 8 : 3, h = horiz ? 3 : 8, x0 = cx - (w >> 1), y0 = cy - (h >> 1);
+      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (!open(y * W + x)) return false;
+      props.push({ kind, x: x0, y: y0, w, h, rot: horiz ? 1 : 0, spawnCover: 1 });
+      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) tiles[y * W + x] = T.TALL;
+      return true;
+    };
+    const kinds = ['van', 'container'], s0 = src[best];
+    if (s0 >= 0) {
+      const tx = s0 % W - bx, ty = ((s0 / W) | 0) - by; slab(tx, ty, kinds[i % 2]);
+      let mx = 0, my = 0, n = 0; for (let k = 0; k < N; k++) if (dist[k] === 0) { mx += k % W; my += (k / W) | 0; n++; }
+      const ax = mx / n - bx, ay = my / n - by, ang = Math.abs(Math.atan2(tx * ay - ty * ax, tx * ax + ty * ay));
+      if (ang > 0.6) slab(ax, ay, kinds[(i + 1) % 2]);
+    }
+    // then, while spots inside (doorways, windows, rooms) still see the spawn, a piece toward the middle of them
+    for (let n = 0; n < 4; n++) {
+      const seers = exposed(best); if (seers.length <= 3) break;
+      const ax = seers.reduce((a, k) => a + k % W, 0) / seers.length - bx, ay = seers.reduce((a, k) => a + ((k / W) | 0), 0) / seers.length - by;
+      if (!slab(ax, ay, kinds[(i + n) % 2], 4 + n) && !slab(ax, ay, kinds[(i + n) % 2], 7 + n)) break;
+    }
+    return out;
+  };
+  // inside cells on the ground floor (rooms, doorways, windows) within 45 m with a clear line to cell k
+  const SEE = new Set([T.FLOOR, T.OPEN, T.STAIR, T.GROUND, T.LOW, T.HATCH]);
+  const exposed = k => {
+    const x0 = k % W + 0.5, y0 = ((k / W) | 0) + 0.5, f = flAt[k], R = 101, out = [];
+    for (let y = Math.max(0, (y0 | 0) - R); y < Math.min(H, (y0 | 0) + R); y++) for (let x = Math.max(0, (x0 | 0) - R); x < Math.min(W, (x0 | 0) + R); x++) {
+      const c = y * W + x; if (flAt[c] !== f || !(tiles[c] === T.FLOOR || tiles[c] === T.OPEN || win[c])) continue;
+      const dx = x + 0.5 - x0, dy = y + 0.5 - y0, L = Math.hypot(dx, dy); if (L > R) continue;
+      let ok = true;
+      for (let t = 1; t < L - 0.5 && ok; t += 0.4) { const n = Math.floor(y0 + dy * t / L) * W + Math.floor(x0 + dx * t / L); if (n !== c && !SEE.has(tiles[n]) && !win[n]) ok = false; }
+      if (ok) out.push(c);
+    }
+    return out;
+  };
+  const propAt = k => { const x = k % W, y = (k / W) | 0; return props.some(p => x >= p.x && y >= p.y && x < p.x + p.w && y < p.y + p.h); };
   const finish = (extra) => {
     finishShapes();
     // walls take the floor of the room next to them, so a hole shows the right floor
@@ -395,6 +472,8 @@ export function makeMap({ id, name, floors }) {
     hardenWalls(extra && extra.sites);
     droneHoles();
     placeHatches(extra && extra.sites);
+    padGround();
+    if (extra && extra.atkSpawns) extra.atkSpawns = extra.atkSpawns.map((s, i) => coverSpawn(s, i));
     const under = new Uint8Array(N); // cells of furniture with a gap underneath (UNDER_KINDS)
     for (const p of props) if (UNDER_KINDS.has(p.kind)) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) under[y * W + x] = 1;
     return {

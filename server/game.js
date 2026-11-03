@@ -301,7 +301,7 @@ export class Game {
     this.spots = { atk: new Map(), def: new Map() };
     this.reinforce = 10;
     this.spawnName = this.map.atkSpawns[Math.floor(Math.random() * this.map.atkSpawns.length)].name;
-    this.spawnPlan = this.makeSpawnPlan();
+    this.spawnPlan = this.makeSpawnPlan(); this.insideCache = null;
     for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; p.locked = false; p.spawn = null; p.staged = false; p.job = null; }
     this.phase = PHASE.SELECT; this.timer = DUR.select;
     this.events.push({ e: 'newmap', v: this.mapVersion });

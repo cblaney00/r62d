@@ -241,7 +241,7 @@ export function botPrep(game, p) {
 
 // ---- path finding (A* over cells; barricades are passable but costly) ----
 // avoid: cells this bot found it can't vault over (too deep, nowhere to land)
-function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false) {
+function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside = false) {
   const W = map.W, H = map.H, N = W * H;
   const start = sy * W + sx, goal = gy * W + gx;
   const g = new Float32Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
@@ -262,6 +262,7 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false) {
     if (t === T.PANEL) return 150; // a steel panel: very slow to hammer through, only when there is no other way in
     if (vaultable(map, k)) return t === T.LOW ? 10 : 4; // vault over it (low furniture only when it saves a long way round)
     if (blocksMove(t)) return Infinity;
+    if (inside && t === T.GROUND) return 6; // early-round defender: the way round inside, not across the open ground by the spawns
     // keep a little away from walls so the bot's body fits
     const x = k % W, y = (k / W) | 0;
     const bl = (dx, dy) => blocksMove(tileAt(map, x + dx, y + dy));
@@ -1040,13 +1041,32 @@ function flankPoint(game, p, site) {
 }
 
 // Walk along a path to a goal; once there, a defender (or anyone told to hold) watches the nearest way in.
+// he asked (attackers died as the round began): defenders stay inside during preparation and the first 15 s of the
+// action phase. A goal out on open ground (and not by their own site, as on Dust Town) becomes the nearest spot
+// inside the building, so no bot runs out at the spawns.
+function keepInside(game, goal) {
+  const map = game.map, W = map.W, k0 = Math.floor(goal.y / CELL) * W + Math.floor(goal.x / CELL);
+  if (map.tiles[k0] !== T.GROUND) return goal;
+  const site = map.sites[game.site]; if (site && site.bombs.some(b => Math.hypot(b.x - goal.x, b.y - goal.y) < 10 * PX_PER_M)) return goal;
+  const c = game.insideCache || (game.insideCache = new Map()); if (c.has(k0)) return c.get(k0) || goal;
+  const seen = new Set([k0]), q = [k0]; let hit = null;
+  for (let h = 0; h < q.length && h < 40000 && hit === null; h++) for (const d of [1, -1, W, -W]) {
+    const n = q[h] + d; if (seen.has(n) || map.flAt[n] !== map.flAt[k0]) continue; seen.add(n);
+    if (map.tiles[n] === T.FLOOR && roomAt(map, (n % W + 0.5) * CELL, (Math.floor(n / W) + 0.5) * CELL)) { hit = n; break; }
+    q.push(n);
+  }
+  const r = hit === null ? null : { x: (hit % W + 0.5) * CELL, y: (Math.floor(hit / W) + 0.5) * CELL };
+  c.set(k0, r); return r || goal;
+}
 function moveTo(game, p, inp, goal, dt, hold = false) {
   const ai = p.ai, map = game.map, team = game.side(p);
+  const early = team === TEAM.DEF && (game.phase === PHASE.PREP || (game.phase === PHASE.ACTION && game.timer > DUR.action - 15)) && !game.free && !game.planted;
+  if (early) goal = keepInside(game, goal);
   const gx = Math.floor(goal.x / CELL), gy = Math.floor(goal.y / CELL);
   const sx = Math.floor(p.x / CELL), sy = Math.floor(p.y / CELL);
   ai.pathT = (ai.pathT || 0) - dt;
   if (!ai.path || ai.pathT <= 0 || ai.goalK !== gy * map.W + gx) {
-    ai.path = findPath(map, sx, sy, gx, gy, ai.noVault, false, team === TEAM.DEF) || []; ai.pathT = 1.2; ai.goalK = gy * map.W + gx;
+    ai.path = findPath(map, sx, sy, gx, gy, ai.noVault, false, team === TEAM.DEF, early) || []; ai.pathT = 1.2; ai.goalK = gy * map.W + gx;
   }
   { const i = ai.path.indexOf(sy * map.W + sx); if (i >= 0 && i < 6) ai.path.splice(0, i + 1); } // also skips the stair end after being carried to the other floor
   ai.noPathT = !ai.path.length && Math.hypot(goal.x - p.x, goal.y - p.y) > 2 * CELL ? (ai.noPathT || 0) + dt : 0; // no way there: see impatience
