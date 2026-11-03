@@ -4,7 +4,7 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatch
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
-import { botThink, botPickOp, botPrep, assignPros, proSay, tvTalk } from './bots.js';
+import { botThink, botPickOp, botPrep, assignPros, proSay, tvTalk, tvBanPick } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
@@ -35,6 +35,8 @@ const THROWN_AB = new Set(['emp', 'sonar', 'stickycam', 'gas', 'flare', 'medkit'
 const PLACED_AB = new Set(['prox', 'concuss', 'clamp', 'sensor', 'plates', 'turret', 'spike', 'alarm', 'pace', 'radar', 'station', 'catcher', 'jammer', 'mine', 'grid', 'cover', 'cutter', 'periscope', 'scope']);
 const LUNGE_M = 4; // CROW: how far the marked lunge reaches (m)
 const SHIELD_ASIDE = 0.45; // BULWARK: seconds to swing the shield out of the way when aiming in // FERRO: seconds between hammer swings // TALON's EMP: a circle about a door wide (he asked), centred inside the wall it stuck to
+const BAN_GAP = 2.6; // seconds between Esports TV bans, long enough to read each one
+
 export class Game {
   // opts.tut: a private tutorial match for one player (see tutAction), with its timers held
   // while the coach explains each step, and nothing saved to their profile.
@@ -240,8 +242,33 @@ export class Game {
     if (this.phase !== PHASE.SELECT || !OPERATORS[op] || p.locked) return; // locked in: no changing
     if (OPERATORS[op].team !== this.side(p)) return;
     if (p.job && jobOf(op) !== p.job) return; // only your role's operators
+    if (this.isBanned(op)) return;
     for (const q of this.players.values()) if (q !== p && q.squad === p.squad && q.op === op) return;
     p.op = op; p.job = jobOf(op);
+  }
+
+  isBanned(op) { return !!this.bans && this.bans.some(b => b.op === op); }
+  // ESPORTS TV bans (he asked, R6 rules): before the first round each team bans 2 attackers and 2 defenders, taking turns
+  // (4 banned on each side); every round after that each team bans 1 more, from the side the other team plays that round.
+  // Banned operators stay banned for the whole match. Returns true while the ban phase is still running.
+  tvBanStep() {
+    if (!this.bans) this.bans = [];
+    let B = this.banRun;
+    if (!B || B.round !== this.round) {
+      const atkSq = [0, 1].find(sq => [...this.players.values()].some(p => p.squad === sq && this.side(p) === TEAM.ATK)) ?? 0;
+      const order = this.round === 1 ? [[0, 'atk'], [1, 'atk'], [0, 'def'], [1, 'def'], [1, 'atk'], [0, 'atk'], [1, 'def'], [0, 'def']]
+        : [[atkSq, 'def'], [1 - atkSq, 'atk']];
+      B = this.banRun = { round: this.round, order, i: 0, t: this.time + 2.5 };
+    }
+    if (B.i < B.order.length) {
+      if (this.time >= B.t) {
+        const [sq, sd] = B.order[B.i++], op = tvBanPick(this, sq, sd);
+        if (op) { this.bans.push({ op, sq, rd: this.round }); this.events.push({ e: 'ban', op, sq }); }
+        B.t = this.time + BAN_GAP;
+      }
+      return true;
+    }
+    return this.time < B.t - BAN_GAP + 1.5; // the last stamp stays a moment before the picks start
   }
 
   // ---------------- match flow ----------------
@@ -257,7 +284,7 @@ export class Game {
     assignPros(this); this.proState = {}; this.proLast = {}; this.proLog = [];
     this.score = [0, 0]; this.round = 0; // round 1: squad 0 attacks (the tutorial: you attack, then defend)
     for (const p of this.players.values()) { p.kills = 0; p.deaths = 0; p.ms = this.blankMatchStats(); }
-    this.departed = []; this.roundLog = []; this.matchStart = Date.now();
+    this.departed = []; this.roundLog = []; this.matchStart = Date.now(); this.bans = []; this.banRun = null;
     this.nextRound();
   }
 
@@ -283,7 +310,7 @@ export class Game {
       const team = this.side(p);
       if (!p.op) { // random unpicked operator
         const taken = new Set([...this.players.values()].filter(q => q.squad === p.squad && q.op).map(q => q.op));
-        const free = opsForTeam(team).filter(o => !taken.has(o));
+        const free = opsForTeam(team).filter(o => !taken.has(o) && !this.isBanned(o));
         const inJob = free.filter(o => !p.job || jobOf(o) === p.job); // stay in the role they chose, if there's room
         p.op = inJob.length ? inJob[Math.floor(Math.random() * inJob.length)] : free.length ? free[Math.floor(Math.random() * free.length)] : opsForTeam(team)[0];
         p.job = jobOf(p.op);
@@ -392,7 +419,7 @@ export class Game {
     const held = (this.tut && this.tut.hold && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP)) || this.free;
     if (!held) this.timer -= dt;
     if (this.phase === PHASE.SELECT) {
-      if (this.tv) { tvTalk(this); if (this.allLocked()) this.beginPrep(); return; } // ESPORTS TV: 15 s of team talk, then go
+      if (this.tv) { if (this.tvBanStep()) return; tvTalk(this); if (this.allLocked()) this.beginPrep(); return; } // ESPORTS TV: bans, 15 s of team talk, then go
       // he asked: bots never pick before you. They wait until every person on their team has locked in.
       for (const p of this.players.values()) if (p.bot && !p.op && (this.tut || this.humansLocked(p.squad)) && Math.random() < dt * 2.5) botPickOp(this, p);
       for (const p of this.players.values()) if (p.bot && p.op && !p.locked) {
@@ -2564,7 +2591,8 @@ export class Game {
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId,
       site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
-      tvl: this.tv ? this.botLevel : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
+      tvl: this.tv ? this.botLevel : undefined, bn: this.tv && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
+      bq: this.tv && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, this.banRun.t - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];

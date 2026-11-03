@@ -62,6 +62,18 @@ export function tvTalk(game) {
   while (T.ev.length && T.ev[0].at <= el) T.ev.shift().fn();
   if (el >= TALK_TIME) for (const p of game.players.values()) if (p.bot) { if (!p.op) botPickOp(game, p); if (p.op) p.locked = true; }
 }
+// ESPORTS TV bans: the team (its leader says it) bans what has been winning on this map, more so what the other team
+// likes to play; never a viewer request or an operator already banned
+export function tvBanPick(game, sq, sd) {
+  const team = [...game.players.values()].filter(q => q.squad === sq), enemy = [...game.players.values()].filter(q => q.squad !== sq);
+  const fav = new Set(enemy.flatMap(q => q.pro ? q.pro.pl.pool[sd] : []));
+  const cand = opsForTeam(sd === 'atk' ? TEAM.ATK : TEAM.DEF).filter(o => !game.isBanned(o) && !(game.tv && game.tv.req && game.tv.req.includes(o)));
+  if (!cand.length) return null;
+  const best = cand.map(o => [o, opWeight(game.map.id, sd, o) * (fav.has(o) ? 1.8 : 1) * (0.6 + Math.random() * 0.8)]).sort((a, b) => b[1] - a[1])[0][0];
+  const lead = team.find(q => q.pro && q.pro.i === 0) || team[0];
+  if (lead) say(game, lead, pickOne([`Ban ${talkOp(best)}.`, `${talkOp(best)}, ban it.`, fav.has(best) ? `They love ${talkOp(best)}. Ban.` : `${talkOp(best)} has been winning here, ban it.`]));
+  return best;
+}
 function say(game, p, text) {
   if (!p) return;
   if (p.pro) (game.proLog || (game.proLog = [])).push({ round: game.round, squad: p.squad, team: p.pro.tag, text, who: p.pro.pl.name });
@@ -93,6 +105,7 @@ function planTalk(game) {
       const job = tgt.pro ? tgt.pro.pl.jobs[sd] : null;
       let cand = opsForTeam(side).filter(o => !job || jobOf(o) === job);
       if (game.tv && game.tv.req) cand = cand.filter(o => !game.tv.req.includes(o));
+      cand = cand.filter(o => !game.isBanned(o));
       const best = cand.map(o => [o, opWeight(m.id, sd, o) * (0.7 + Math.random() * 0.6)]).sort((a, b) => b[1] - a[1])[0];
       if (best) {
         const o = best[0], why = pickOne([`${talkOp(o)} has been winning us this map`, `we need a ${(JOBS[side].find(j => j.ops.includes(o)) || {}).name || 'support'}`, lostLast ? `their setup beat us, ${talkOp(o)} counters it` : `trust me, ${talkOp(o)} is good here`]);
@@ -122,7 +135,7 @@ export function botPickOp(game, p) {
   if (p.pro && proPickOp(game, p)) return;
   const team = game.side(p);
   const taken = new Set([...game.players.values()].filter(q => q.squad === p.squad && q.op).map(q => q.op));
-  const free = opsForTeam(team).filter(o => !taken.has(o));
+  const free = opsForTeam(team).filter(o => !taken.has(o) && !game.isBanned(o));
   if (!free.length) return;
   // he asked: bots lean toward roles nobody on the team has yet, so a team is roughly spread out (not strictly)
   const count = {};

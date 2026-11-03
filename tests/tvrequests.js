@@ -9,7 +9,7 @@ for (const level of [7, 2]) {
   const g = new Game({ tv: true }); g.tv.req = ['salvo', 'torque', 'lynx']; // torque: same role as salvo, the server's filter would drop it; here only one breacher plays
   g.tvStart('harbor', level);
   for (let r = 0; r < 3; r++) {
-    for (let i = 0; i < 30 * 40 && g.phase !== PHASE.PREP && g.phase !== PHASE.ACTION; i++) g.tick(1 / 30);
+    for (let i = 0; i < 30 * 80 && g.phase !== PHASE.PREP && g.phase !== PHASE.ACTION; i++) g.tick(1 / 30);
     const ops = [...g.players.values()].map(p => p.op);
     ok(ops.includes('salvo') && ops.includes('lynx'), `level ${level} round ${g.round}: requested operators missing`, ops.join(' '));
     console.log(`level ${level} round ${g.round}:`, ops.map(o => OPERATORS[o]?.name).join(' '));
