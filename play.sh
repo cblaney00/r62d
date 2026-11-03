@@ -27,6 +27,7 @@ user_pref("browser.tabs.warnOnClose", false);
 user_pref("dom.disable_beforeunload", true);
 user_pref("permissions.default.shortcuts", 1); // the game may keep Ctrl+W / Ctrl+Q etc. (he lost a match mashing Ctrl to crouch)
 user_pref("browser.quitShortcut.disabled", true);
+user_pref("dom.user_activation.transient.timeout", 86400.0); // a click in the menus still counts when the match starts, so the game can take the mouse by itself (he asked)
 user_pref("dom.event.pointer.fractional_coordinates.enabled", true); // keep tiny mouse movements instead of rounding them away (he noticed slow aiming didn't move)
 PREFS
 # Slow mouse moves (he noticed the crosshair not moving at all): with the desktop's mouse acceleration on, a slow move

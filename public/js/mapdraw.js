@@ -34,15 +34,14 @@ export class Tiled {
 }
 
 export class MapRenderer {
-  constructor(map, baseTiles, greyScale = 1.5) {
+  constructor(map, baseTiles) {
     this.map = map; this.base = baseTiles;
     this.Wp = map.W * CELL; this.Hp = map.H * CELL;
     this.c = new Tiled(Math.ceil(this.Wp * S), Math.ceil(this.Hp * S)); // the map picture (shown by mount)
     this.ctx = this.dctx = this.c.tiles[0].ctx; // set to each piece in turn while drawing (onTiles)
     this.pat = floorPatterns(this.ctx);
-    // a dull grey copy used for the parts of the map your team can't currently see
-    this.G = greyScale; // the grey "remembered" copy is drawn small on low graphics
-    this.grey = new Tiled(Math.ceil(this.Wp * this.G), Math.ceil(this.Hp * this.G));
+    // (there is no grey copy any more: the fog layer draws this picture and the browser greys it, CSS filter on #fog.
+    // Keeping a grey copy up to date with ctx.filter is what made his real Firefox slower the longer he played.)
     this.region(0, 0, map.W - 1, map.H - 1);
   }
   // run fn once for every piece of the map picture that a world rectangle touches, with this.ctx drawing in world units there
@@ -162,13 +161,12 @@ export class MapRenderer {
   }
 
   // Redraw a block of cells (inclusive), clipped so neighbours are untouched.
-  region(x0, y0, x1, y1, deferGrey = false) {
+  region(x0, y0, x1, y1) {
     const m = this.map;
     x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W - 1, x1); y1 = Math.min(m.H - 1, y1);
     const X = x0 * CELL, Y = y0 * CELL, Wd = (x1 - x0 + 1) * CELL, Hd = (y1 - y0 + 1) * CELL, P = S * CELL;
     this.onTiles(X, Y, X + Wd, Y + Hd, t => this.regionPart( // only the cells over this piece
       Math.max(x0, Math.floor(t.x / P)), Math.max(y0, Math.floor(t.y / P)), Math.min(x1, Math.floor((t.x + t.w - 1) / P)), Math.min(y1, Math.floor((t.y + t.h - 1) / P))));
-    if (deferGrey) (this.greyQ || (this.greyQ = [])).push([X, Y, Wd, Hd]); else this.greyRect(X, Y, Wd, Hd);
   }
   regionPart(x0, y0, x1, y1) {
     const m = this.map, ctx = this.ctx;
@@ -230,19 +228,6 @@ export class MapRenderer {
     }
     ctx.restore();
   }
-  // the dull grey copy of a block (world pixels): the slowest step, so it can wait a few frames
-  greyRect(X, Y, Wd, Hd) {
-    const G = this.G;
-    for (const t of this.grey.touching(X * G, Y * G, (X + Wd) * G, (Y + Hd) * G)) {
-      const gx = t.ctx; gx.setTransform(1, 0, 0, 1, -t.x, -t.y);
-      gx.save(); gx.beginPath(); gx.rect(X * G, Y * G, Wd * G, Hd * G); gx.clip();
-      gx.clearRect(X * G, Y * G, Wd * G, Hd * G);
-      gx.filter = 'grayscale(1) brightness(0.42) contrast(1.15)';
-      this.c.drawTo(gx, X * S - 2, Y * S - 2, Wd * S + 4, Hd * S + 4, X * G - 2 * G / S, Y * G - 2 * G / S, (Wd + 4 / S) * G, (Hd + 4 / S) * G);
-      gx.filter = 'none'; gx.restore();
-    }
-  }
-
   // Changed cells are redrawn a little at a time, nearest to the camera first, so seeing a whole
   // fortified room at once (or arriving on another floor) never stalls a frame.
   process(budgetMs, wx, wy) {
@@ -257,10 +242,8 @@ export class MapRenderer {
         if (Math.abs(x - bx) > 5 || Math.abs(y - by) > 5) continue;
         x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); P.delete(k);
       }
-      this.region(x0 - 1, y0 - 1, x1 + 1, y1 + 1, true);
+      this.region(x0 - 1, y0 - 1, x1 + 1, y1 + 1);
     }
-    const Q = this.greyQ;
-    while (Q && Q.length && performance.now() - t0 < budgetMs + 1.5) this.greyRect(...Q.shift());
   }
 
   // The map is shown by the browser itself as a stack of tiles that it moves and scales on the

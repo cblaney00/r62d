@@ -29,7 +29,7 @@ canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: b
 #loadTip { margin-top: 16px; font: 500 14px var(--body, inherit); color: rgba(255,255,255,0.45); letter-spacing: 0.02em; min-height: 18px; }
 #mapLayer { position: fixed; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 canvas#fog, canvas#over, #vignette { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; }
-canvas#fog { visibility: hidden; }
+canvas#fog { visibility: hidden; filter: grayscale(1) brightness(0.42) contrast(1.15); } /* greys the remembered map (main.js fog step) */
 #vignette { background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.5) 100%); }
 #ui { position: fixed; inset: 0; pointer-events: none; }
 #ui .screen, #ui button, #ui input, #corner { pointer-events: auto; }
@@ -492,6 +492,7 @@ button.big { font-size: 22px; padding: 14px 34px; }
 
 /* ---------- chat ---------- */
 #chat { position: absolute; left: 18px; bottom: 210px; width: 440px; pointer-events: none; z-index: 3; font: 500 15px var(--body); }
+#lobby:not(.hidden) ~ #chat, #splash:not(.hidden) ~ #chat { display: none; } /* he asked: in the main menu it covered buttons */
 #chatLog { display: flex; flex-direction: column; gap: 2px; justify-content: flex-end; }
 #chatLog div:not(:nth-last-child(-n+6)) { display: none; } /* short: the last 6 lines (he found it too long) */
 #chatLog div { background: rgba(0,0,0,0.55); padding: 3px 8px; animation: rise 0.2s both; transition: opacity 0.6s; text-shadow: 0 1px 2px #000; }

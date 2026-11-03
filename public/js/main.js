@@ -90,7 +90,7 @@ function applyGfx() {
   resize(); renderGfx();
   if (S !== gq.map || old.grey !== gq.grey) { // redraw the map picture at the new detail
     setMapScale(gq.map);
-    if (st.rend) { st.rend = new MapRenderer(st.known, st.base, gq.grey); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); st.warm = 4; }
+    if (st.rend) { st.rend = new MapRenderer(st.known, st.base); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); st.warm = 4; }
   }
   perfWatch.skip = 2;
 }
@@ -366,7 +366,7 @@ function loadMap(mv, tiles, hp, id, holes) {
   // broken glass lies in and just around every window; splinters appear where barricades get smashed
   st.glass = new Set(); st.splinters = new Set();
   for (const o of st.map.openings) if (o.kind === 'window') for (const k of o.cells) for (const d of [0, 1, -1, st.map.W, -st.map.W]) st.glass.add(k + d);
-  st.rend = new MapRenderer(st.known, st.base, gq.grey); st.rend.mount(mapLayer); perfWatch.skip = 2; st.warm = 4;
+  st.rend = new MapRenderer(st.known, st.base); st.rend.mount(mapLayer); perfWatch.skip = 2; st.warm = 4;
   st.rend.splinters = st.splinters;
   st.corpses = []; fx.clear(); st.pending = [];
   st.loadMs = Math.round(performance.now() - t0); // map build + picture (shown in __r62d for speed checks)
@@ -1309,6 +1309,11 @@ function frame(nowMs) {
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
   st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
   audio.setListenerRot(st.rot);
+  // he asked: no click needed to take the mouse when a match starts. Browsers only allow it soon after a click (any menu
+  // click counts; the desktop app's Firefox remembers it for the day, play.sh) or in full screen; else CLICK TO TAKE CONTROL shows
+  if (playing() && !st.tv && !isTouch && !menuOpen() && $('pause').classList.contains('hidden') && document.pointerLockElement !== cv && !gpRecent() &&
+      document.hasFocus() && (st.autoLockN || 0) < 3 && now - (st.autoLockT || -1e9) > 1.5) { st.autoLockT = now; st.autoLockN = (st.autoLockN || 0) + 1; lockMouse(cv); }
+  if (!playing()) st.autoLockN = 0; // a few tries per match; the browser said no: the click-in sign stays
   $('clickIn').classList.toggle('hidden', !(playing() && !st.tv && !menuOpen() && document.pointerLockElement !== cv && !gpRecent() && $('pause').classList.contains('hidden')));
   // Until you click into the game (or after tabbing out) the mouse isn't captured: your aim simply stays where it was.
   // (It used to follow the loose pointer, and the camera sliding after it made everything bounce — he noticed.)
@@ -1899,9 +1904,9 @@ function draw(s, view, now, dt) {
     fctx.globalCompositeOperation = 'source-over';
     fctx.fillStyle = '#000'; fctx.fillRect(0, 0, fog.width, fog.height);
     fctx.setTransform(TA * fk, TB * fk, TC * fk, TD * fk, ox * fk, oy * fk);
-    // the dull grey remembered map
-    const G = st.rend.G;
-    if (wx1 > wx0 && wy1 > wy0) st.rend.grey.drawTo(fctx, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
+    // the remembered map: the colour picture, greyed by the browser (CSS filter on #fog), not a grey copy of our own
+    const G = st.rend.c.width / st.rend.Wp;
+    if (wx1 > wx0 && wy1 > wy0) st.rend.c.drawTo(fctx, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
     // cut out everything your team can see right now
     fctx.globalCompositeOperation = 'destination-out';
     for (const v of st.viewers) {
@@ -2551,7 +2556,8 @@ function drawStairView(s, me, now) {
   const D = PIP_R * 1.5, x0 = Math.max(fx0, cx - D), x1 = Math.min(fx1, cx + D), y0 = Math.max(0, cy - D), y1 = Math.min(fy1, cy + D);
   if (x1 <= x0 || y1 <= y0) return;
   c.save(); c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip(); // only this floor
-  R.grey.drawTo(c, x0 * R.G, y0 * R.G, (x1 - x0) * R.G, (y1 - y0) * R.G, x0, y0, x1 - x0, y1 - y0); // remembered
+  R.c.drawTo(c, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0); // remembered: dulled with a plain dark wash (no filter)
+  c.fillStyle = 'rgba(28,30,32,0.68)'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
   c.save(); c.beginPath(); // what the landing can see right now, in colour
   const poly = visionPolygon(pv, sm, 160), near = nearPolygon(pv, sm);
   for (const pts of [poly, near]) { c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.closePath(); }
@@ -2810,7 +2816,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
@@ -2843,6 +2849,7 @@ function playing() { const p = st.last && st.last.ph; return !!st.id && (p === P
 // Esc releases the mouse: treat that like pausing, as in CS2
 document.addEventListener('pointerlockchange', () => {
   st.lockAsked = false; // captured: clicks shoot; let go: the next click takes control again
+  if (document.pointerLockElement) st.autoLockN = 0;
   if (isTouch || st.tv) return; // TV never takes the mouse
   if (!document.pointerLockElement && playing() && !menuOpen() && !st.quitting) $('pause').classList.remove('hidden');
 });
