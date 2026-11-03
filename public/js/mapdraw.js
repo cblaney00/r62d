@@ -202,6 +202,7 @@ export class MapRenderer {
     gx.clearRect(X * G, Y * G, Wd * G, Hd * G);
     gx.drawImage(this.c, X * S, Y * S, Wd * S, Hd * S, X * G, Y * G, Wd * G, Hd * G);
     gx.filter = 'none';
+    (this.greyDirty || (this.greyDirty = [])).push([X, Y, Wd, Hd]); // main.js keeps a ready copy of the grey map
   }
 
   // Changed cells are redrawn a little at a time, nearest to the camera first, so seeing a whole

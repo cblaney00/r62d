@@ -148,7 +148,7 @@ His wishes so far:
   saved per computer in localStorage `r62d-gfx`; default "auto" guesses from CPU cores/memory, then `watchPerf` drops a level
   when frames run slow and remembers it in `r62d-gfx-auto`) set render scale, fog resolution, particles, smoke puffs, sight
   rays and sprite shading. `window.__r62d.PF` holds per-section frame timings (ms, summed; divide by `frames`).
-  Measured 1600×900 headless: Low 3.7 ms, High 7.3 ms, Ultra 11.3 ms per frame (was 19.7 before the layers).
+  Measured 1600×900 headless free play: High ~4.6 ms per frame (was 6.7). The grey remembered map is kept as a ready pixel-aligned copy (`drawFogGrey` in main.js; the blackout canvas has a 1 px border and the browser slides it by the leftover fraction); scaled canvas copies and the first clear of each full-screen layer (~0.7-1 ms each) are the costly canvas operations, sight-line casting is cheap.
 - **Networking:** server ticks at 30/s, sends a JSON snapshot to everyone 20/s. Snapshots are compressed with permessage-deflate
   (`server/ws.js`, no context takeover; ~6 KB → ~1 KB) and each player's private details (ammo, gadget counts, recoil,
   prediction state) go only to them as `mine`, merged into `st.me` on arrival. Clients send
