@@ -658,7 +658,7 @@ function pressAction(a, e) {
     case 'spot': st.spotReq = true; break;
     case 'ptt': if (st.id && !st.tv && !st.tut) {
       const sn = st.snaps.length ? st.snaps[st.snaps.length - 1] : null;
-      if (st.map) pttVocab([...(st.map.rooms || []).map(r => r.name.replace(/^\dF /, '')), ...Object.values(OPERATORS).map(o => o.name), ...(sn ? [...sn.players.values()].map(p => String(p.n || '').replace(/^\[\w+\] /, '')) : [])]);
+      if (st.map) pttVocab((st.map.rooms || []).map(r => r.name), sn ? [...sn.players.values()].filter(p => p.bt).map(p => String(p.n || '').replace(/^\[\w+\] /, '')) : [], sn ? [...new Set([...sn.players.values()].map(p => p.op).filter(Boolean))].map(o => OPERATORS[o].name) : []);
       pttDown();
     } break;
     case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;

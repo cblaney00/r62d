@@ -1,26 +1,26 @@
 // Push to talk (he asked: talk to the bots with your real microphone). Words stay on this computer: only the text goes to the
 // team chat, where the bots read it like anything typed (shared/commands.js). Loaded the first time you press the key.
 // Recogniser: vosk-browser. He found it only caught him close to the mic, so the sound is levelled before it hears it (levelUp).
-import { COMMAND_WORDS } from '/shared/commands.js';
+import { COMMAND_WORDS, micPhrases } from '/shared/commands.js';
 let rec = null, model = null, ac = null, loading = null, held = false, tail = false, last = '', onDone = null, onState = null, onHear = null, finalAsked = false, recRate = 0;
-let vocab = [], vocabKey = '', recKey = null, stale = false;
+let vocab = {}, vocabKey = '', recKey = null, stale = false;
 let pending = 0; // sound sent to the recogniser that it has not answered yet
 const ring = []; // the moment before the key went down, so the first word isn't cut off
 const script = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
-const grammar = () => JSON.stringify([...new Set([...COMMAND_WORDS, ...vocab])].concat('[unk]'));
-async function makeRec(rate, useGrammar = true) {
+const grammar = mode => JSON.stringify(mode === 'words' ? [...new Set([...COMMAND_WORDS, ...vocab.flatMap(v => v.split(' '))])].concat('[unk]') : micPhrases(vocab.rooms || [], vocab.names || [], vocab.ops || []).concat('[unk]'));
+async function makeRec(rate, mode = 'phrases') {
   if (!window.Vosk) await script('/vendor/vosk/vosk.js');
   if (!model) { model = await window.Vosk.createModel('/vendor/vosk/model.tar.gz'); try { model.setLogLevel(-1); } catch {} }
-  const r = useGrammar ? new model.KaldiRecognizer(rate, grammar()) : new model.KaldiRecognizer(rate);
+  const r = mode !== 'free' ? new model.KaldiRecognizer(rate, grammar(mode)) : new model.KaldiRecognizer(rate);
   r.on('result', m => { const t = m.result && m.result.text; pending = Math.max(0, pending - 1); if (t) { last = (last + ' ' + t).trim(); if (onHear) onHear(last, 0); } if (finalAsked && onDone) finish(); });
   r.on('partialresult', m => { pending = Math.max(0, pending - 1); const t = m.result && m.result.partial; if (t && onHear) onHear((last + ' ' + t).trim(), 0); });
   recRate = rate; recKey = vocabKey; stale = false;
   return r;
 }
 // the rooms and names of this match, so the recogniser knows those words too
-export function pttVocab(words) {
-  const v = [...new Set(words.flatMap(w => String(w).toLowerCase().replace(/[^a-z' ]+/g, ' ').split(' ')).filter(w => w.length > 1))], k = v.join(' ');
-  if (k === vocabKey) return; vocab = v; vocabKey = k; if (rec && recKey !== k) stale = true;
+export function pttVocab(rooms, names, ops) {
+  const k = JSON.stringify([rooms, names, ops]); if (k === vocabKey) return;
+  vocab = { rooms, names, ops }; vocabKey = k; if (rec && recKey !== k) stale = true;
 }
 function finish() { const t = last.replace(/\[unk\]/g, ' ').replace(/\s+/g, ' ').trim(), cb = onDone; onDone = null; last = ''; finalAsked = false; if (cb) cb(t); }
 // Levelling: quiet speech is lifted to one steady level, far from the mic or close to it. The gain follows the loudest part
@@ -71,7 +71,7 @@ export async function pttDown() {
   held = true; last = ''; levelReset();
   try {
     if (!rec) { if (onState) onState('loading'); await (loading || (loading = setup())); }
-    else if (stale) { const old = rec; rec = await makeRec(ac.sampleRate); try { old.remove(); } catch {} }
+    else if (stale) rec = await makeRec(ac.sampleRate); // (the old one stays: removing one seemed to leave the next deaf in testing)
     if (ac.state === 'suspended') ac.resume();
     if (held && onState) onState('on');
   } catch (e) { loading = null; held = false; if (onState) onState('nomic'); }
@@ -87,8 +87,9 @@ export function pttUp(cb) {
 }
 // tests: feed samples straight in, no microphone
 export async function pttTest(samples, rate, opts = {}) {
-  if (opts.fresh && rec) { try { rec.remove(); } catch {} rec = null; }
-  if (!rec || recRate !== rate) rec = await makeRec(rate, opts.grammar !== false);
+  if (opts.fresh) rec = null;
+  if (opts.vocab) pttVocab(...opts.vocab);
+  if (!rec || recRate !== rate) rec = await makeRec(rate, opts.mode || 'phrases');
   levelReset(true); pending = 0;
   return new Promise(res => {
     last = ''; finalAsked = false; onDone = t => res(t);

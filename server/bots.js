@@ -1483,6 +1483,7 @@ function roomPoint(game, r) { // a spot inside a room that a body can stand on
 }
 // the named room nearest the speaker (the same name can be on several floors)
 function roomNamed(game, p, name) {
+  name = name.replace(/^\dF /, ''); // ("1F Kitchen" and "2F Kitchen" are both the kitchen: the nearest one)
   const fl = floorAt(game.map, p.x, p.y); let best = null, bd = Infinity;
   for (const r of game.map.rooms) {
     if (r.name.replace(/^\dF /, '') !== name) continue;

@@ -2,15 +2,15 @@
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { botHear } from '../server/bots.js';
-import { MAP_LIST } from '../shared/map.js';
+import { MAP_LIST, buildMap } from '../shared/map.js';
 import { PHASE, TEAM, PX_PER_M, CELL } from '../shared/constants.js';
 let bad = 0; const check = (ok, what) => { if (!ok) { console.log('FAIL', what); bad++; } return ok; };
 const only = process.argv[2];
 function make(id, side) { // you + two bots on one side, an empty enemy team, round in progress
-  const g = new Game({ free: false, map: id }); if (g.setMap) g.setMap(id); g.botLevel = 3;
+  const g = new Game({}); g.mapId = id; g.map = buildMap(id); g.botLevel = 3;
   for (let i = 0; i < 6; i++) g.addBot(i % 2);
   g.startMatch(); let n = 0; while (g.phase !== PHASE.ACTION && n++ < 8000) g.tick(1 / 30);
-  g.free = true; g.ranked = false;
+  check(g.mapId === id, `wanted ${id}, match is on ${g.mapId}`); g.free = true; g.ranked = false;
   const mine = [...g.players.values()].filter(q => g.side(q) === side);
   for (const q of [...g.players.values()]) if (g.side(q) !== side) g.players.delete(q.id);
   const me = mine[0], [a, b] = [mine[1], mine[2]]; me.bot = false; me.ai = null; me.hold = {};
@@ -28,7 +28,8 @@ for (const id of MAP_LIST) {
       const r = rooms[i], name = r.name.replace(/^\dF /, ''); if (seen.has(name)) continue; seen.add(name); tried++;
       me.x = a.x; me.y = a.y; const c = say(g, me, a, `go to ${name}`);
       if (!check(c.intent === 'goto' && c.who[0] === a.id, `${id}: "go to ${name}" read as ${c.intent}`)) continue;
-      const cmd = a.ai.cmd, t = run(g, 110, () => a.ai.cmd && a.ai.cmd.there);
+      const cmd = a.ai.cmd; if (!check(!!cmd, `${id}: "go to ${name}" gave no order`)) continue;
+      const t = run(g, 110, () => a.ai.cmd && a.ai.cmd.there);
       if (check(t !== null, `${id}: never reached ${name} (${Math.round(Math.hypot(cmd.x - a.x, cmd.y - a.y) / PX_PER_M)} m short)`)) { got++; slow = Math.max(slow, t); }
       botHear(g, me, 'forget it');
     }
