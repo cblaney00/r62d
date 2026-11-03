@@ -8,6 +8,12 @@ import { PHASE, TEAM } from '../shared/constants.js';
 import { planKey, opKey } from './training.js';
 
 const until = Date.now() + (workerData.minutes || 15) * 60 * 1000, dt = 1 / 30;
+// Gently (he asked: Lando's server sounded like a jet taking off): work DUTY of the time, rest the rest, so practice
+// uses about a third of one core (measured 38%) instead of 160% flat out; 200 rounds still take only ~15 minutes. Rounds left over carry on the next time it runs.
+const DUTY = Math.min(1, Math.max(0.05, Number(process.env.R62D_TRAIN_DUTY) || 0.15)), WORK_MS = 20;
+const rest = ms => new Promise(r => setTimeout(r, ms));
+let workT = performance.now();
+const breather = async () => { const w = performance.now() - workT; if (w >= WORK_MS) { await rest(w * (1 - DUTY) / DUTY); workT = performance.now(); } };
 let left = workerData.rounds || 200;
 let mi = Math.floor(Math.random() * MAP_LIST.length);
 while (Date.now() < until && left > 0) {
@@ -18,7 +24,7 @@ while (Date.now() < until && left > 0) {
   let t = 0, last = null, rs = null; // rs: this round's per-operator numbers (for BALL KNOWLEDGE)
   const GUNS = new Set(Object.values(WEAPONS).map(w => w.name).concat('Melee'));
   while (t < 60 * 30 && Date.now() < until && left > 0) {
-    g.tick(dt); t += dt;
+    g.tick(dt); t += dt; await breather();
     if (rs) for (const e of g.events) if (e.e === 'kill' && e.killer && e.killer !== e.victim) {
       const k = g.players.get(e.killer), v = g.players.get(e.victim); if (!k || !v || !k.op || g.side(k) === g.side(v)) continue;
       const a = rs[k.id], b = rs[v.id]; if (a) { a.k++; if (!GUNS.has(e.w)) a.sk++; if (e.hs) a.hs++; if (!rs.first) { rs.first = 1; a.fk++; } } if (b) b.d++;
