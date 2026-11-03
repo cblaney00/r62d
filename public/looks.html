@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- A gallery of how things look, drawn big by the game's own sprite code: ?show=ops (every operator, ally and enemy)
+     or ?show=gadgets (every ability's gadget, as your team sees it and as the enemy does). -->
+<html><head><meta charset="utf-8"><title>R62D looks</title>
+<style>html,body{margin:0;background:#15181b;color:#dfe6e0;font:600 13px 'Barlow Condensed',sans-serif;overflow:hidden}canvas{display:block}</style>
+</head><body><canvas id="c"></canvas>
+<script type="module">
+import { drawOperator, drawGadget } from './js/sprites.js';
+import { OPERATORS, OP_LIST } from '../shared/operators.js';
+const c = document.getElementById('c'), ctx = c.getContext('2d');
+const show = new URLSearchParams(location.search).get('show') || 'ops';
+const fit = () => { c.width = innerWidth; c.height = innerHeight; }; fit(); addEventListener('resize', fit);
+// gadgets: one entity per ability (what useAbility puts down), drawn for your team (left) and for the enemy (right)
+const GAD = window.GADGETS || [];
+function frame(ms) {
+  const t = ms / 1000, W = c.width, H = c.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#2b2c2a'; ctx.fillRect(0, 0, W, H);
+  const from = +(new URLSearchParams(location.search).get('from') || 0), n = +(new URLSearchParams(location.search).get('n') || 99);
+  const items = (show === 'ops' ? OP_LIST : GAD).slice(from, from + n), cols = show === 'ops' ? (n < 20 ? 6 : 13) : 8, rows = Math.ceil(items.length / cols);
+  const cw = W / cols, ch = H / rows, Z = Math.min(cw, ch) / (show === 'ops' ? 34 : 60);
+  items.forEach((it, i) => {
+    const x = (i % cols) * cw, y = Math.floor(i / cols) * ch;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = (i + Math.floor(i / cols)) % 2 ? '#30312e' : '#2a2b28'; ctx.fillRect(x, y, cw, ch);
+    ctx.fillStyle = '#dfe6e0'; ctx.fillText(show === 'ops' ? OPERATORS[it].name : it.label, x + 6, y + 14);
+    if (show === 'ops') {
+      ctx.setTransform(Z, 0, 0, Z, x + cw / 2, y + ch / 2 + 6);
+      drawOperator(ctx, { x: 0, y: 0, aim: -Math.PI / 2, op: it, w: OPERATORS[it].primary, ally: OPERATORS[it].team === 'def', walk: 0, legs: 1 }, t);
+    } else {
+      for (const [k, ally] of [[0.3, true], [0.7, false]]) {
+        ctx.setTransform(Z, 0, 0, Z, x + cw * k, y + ch / 2 + 6);
+        drawGadget(ctx, { ...it.e, x: 0, y: 0 }, t, ally);
+      }
+    }
+  });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>

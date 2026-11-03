@@ -57,7 +57,9 @@ function drawTorso(ctx, op, o, u, sh) {
   const kind = String(VEST[op] || 'carrier'), k = kind.replace(/\d+$/, ''), v = +(kind.match(/\d+$/) || [1])[0];
   const tint = { parka: '#9aa0a0', wetsuit: '#22282e', jacket: o.team === 'atk' ? '#6a6a52' : '#4e5a6e', leather: '#2a2420', jersey: o.color, field: '#8a7a58', shirt: '#5a5a5a', hoodie: '#3a3a40',
     coat: '#3a3a44', cloak: '#141518', tweed: '#7a6a4a', poncho: '#8a5a3a', suit: '#2a2a32', scrubs: '#5a9ab8', hazmat: '#c8d34a', ghillie: '#4f6a32', singlet: o.color, light: u.cloth, overalls: '#3a4a6a', apron: '#6a4a2a' }[k];
-  ell(ctx, -1, 0, 6.8 * sh, 9.4 * sh, tint ? shade(tint, 0.85 + v * 0.07) : u.cloth);
+  const own = !!u.pat; // operators with their own uniform wear it; the identity kits (hazmat, hi-vis, scrubs...) keep their look on top
+  ell(ctx, -1, 0, 6.8 * sh, 9.4 * sh, tint && !own ? shade(tint, 0.85 + v * 0.07) : u.cloth);
+  drawPattern(ctx, u, sh);
   const patches = () => { box(ctx, -3.6, -8.6, 3.6, 2.2, 0.6, o.color, false); box(ctx, -3.6, 6.4, 3.6, 2.2, 0.6, o.color, false); };
   const carrier = (col = u.vest, w = 10.2, hgt = 13.2) => {
     box(ctx, -6, -hgt / 2, w, hgt, 3, col);
@@ -90,15 +92,75 @@ const UNIFORM = {
   atk: { cloth: '#8a8360', clothD: '#625d43', vest: '#5d5b42', vestL: '#787556', dark: '#38372a', strap: '#47452f' },
   def: { cloth: '#62728b', clothD: '#46536a', vest: '#3e4a5e', vestL: '#56667f', dark: '#262e3b', strap: '#323b4a' },
 };
+// Every operator's own uniform (he asked: recognisable at a glance by uniform, helmet and accents; own colours, with the
+// team colour kept as a trim: the ring and the armbands). [cloth, vest, pattern, pattern colour]; patterns in drawPattern.
+const UNI = {
+  ember: ['#5a3a2a', '#3a2a22', 'char', '#d8602a'], kestrel: ['#d6dad6', '#8a9298', 'digital', '#9aa4aa'], hammer: ['#c89a3a', '#4a3e26', 'hazard', '#1e1e1e'],
+  talon: ['#2a2e3a', '#1a1d24', 'circuit', '#3ae0a0'], bulwark: ['#26304a', '#161c2a', 'hex', '#3a4a6a'], rivet: ['#22282e', '#3a4048', 'stripe', '#e0a030'],
+  haze: ['#7a7a6e', '#55554a', 'camo', '#9c9c8c'], glint: ['#7a6842', '#4a4030', 'camo', '#a08c5c'], brisk: ['#2f5a9a', '#1e3460', 'stripe', '#e8e8e8'],
+  onyx: ['#18181a', '#2a2a2e', 'hex', '#3c3c44'], prism: ['#5a3a7a', '#36264e', 'check', '#c080ff'], volt: ['#26384a', '#18222e', 'zig', '#ffe030'],
+  tether: ['#4a5a3a', '#343e2c', 'camo', '#6e7e4c'], strider: ['#3c4c38', '#262e24', 'tiger', '#141a12'], ferro: ['#7a3a2a', '#4a2a22', 'plain', null],
+  salvo: ['#5a6a4a', '#3a4a32', 'digital', '#7c8c5c'], torque: ['#2e221c', '#201814', 'stripe', '#c04020'], rush: ['#c03030', '#1a1a1a', 'stripe', '#ffffff'],
+  blaze: ['#d86a2a', '#4a2a1a', 'splatter', '#ffd040'], echo: ['#6a7a5a', '#4a5a42', 'digital', '#8ea474'], mark: ['#4a4a5a', '#2a2a36', 'tiger', '#7a7a92'],
+  patch: ['#e8eaea', '#b8c0c0', 'plain', null], trench: ['#6a5a42', '#4a4030', 'check', '#8a7a5a'], wren: ['#2a2a2a', '#5a4a3a', 'plain', null],
+  vapor: ['#8a8aa0', '#4a4a60', 'splatter', '#c4c4e4'], crow: ['#101012', '#1a1a1e', 'plain', null],
+  mason: ['#8a8a82', '#4a4a48', 'digital', '#aaaaa2'], veil: ['#3a3a52', '#24243a', 'zig', '#8080ff'], lynx: ['#a07a4a', '#5a442a', 'spots', '#3a2a1a'],
+  solace: ['#e0e4e8', '#3a8ab0', 'plain', null], wraith: ['#2a2a30', '#1a1a20', 'splatter', '#5a5a72'], bramble: ['#4a6a2a', '#2a3a1a', 'camo', '#7a9a3a'],
+  kite: ['#8a2a2a', '#3a1a1a', 'check', '#e05252'], gravel: ['#7a6a52', '#3a3a3a', 'digital', '#9c8c6c'], shunt: ['#2a4a8a', '#1a2a52', 'zig', '#ffffff'],
+  hush: ['#3a3e48', '#24262c', 'plain', null], shade: ['#4a3a6a', '#2a2242', 'hex', '#9b6be0'], rampart: ['#5a6068', '#3c4249', 'hex', '#8f9aa6'],
+  miasma: ['#c8d34a', '#6a7a2a', 'plain', null], snare: ['#7a5a3a', '#4a3422', 'tiger', '#33251a'], argus: ['#2a2a32', '#1a1a22', 'stripe', '#3ac4b0'],
+  solder: ['#5a4a3a', '#3a3028', 'splatter', '#ff9a3a'], latch: ['#d8e030', '#3a3a2a', 'stripe', '#e8e8e8'], hound: ['#8a5a3a', '#5a3a22', 'check', '#c26a3a'],
+  ruse: ['#3a3048', '#24202e', 'spots', '#8a6ad6'], rally: ['#e05a7a', '#46384a', 'stripe', '#ffffff'], lens: ['#4f6a32', '#3a4a22', 'camo', '#6a8a42'],
+  audit: ['#4a5a6a', '#2a343e', 'stripe', '#5ad0c0'], tonic: ['#5a9ab8', '#3a6a80', 'plain', null], ward: ['#3a4252', '#2a303c', 'hex', '#7aa0e8'],
+  girder: ['#e08a2a', '#4a4a4a', 'hazard', '#1e1e1e'], magpie: ['#1a1c1e', '#e6e6e0', 'split', '#f2f2ec'],
+};
+const uniCache = {};
+export function uniformOf(op, team) {
+  if (uniCache[op]) return uniCache[op];
+  const d = UNI[op]; if (!d) return UNIFORM[team] || UNIFORM.atk;
+  const [cloth, vest, pat, pc] = d;
+  return (uniCache[op] = { cloth, clothD: shade(cloth, 0.72), vest, vestL: shade(vest, 1.3), dark: shade(vest, 0.6), strap: shade(vest, 0.7), pat, pc });
+}
+export const UNIFORM_LIST = UNI;
+// the operator's pattern over their torso (clipped to the body), a handful of plain shapes: cheap to draw
+function drawPattern(ctx, u, sh) {
+  if (!u.pat || u.pat === 'plain') return;
+  ctx.save(); ctx.beginPath(); ctx.ellipse(-1, 0, 6.8 * sh, 9.4 * sh, 0, 0, 7); ctx.clip();
+  ctx.fillStyle = u.pc; ctx.strokeStyle = u.pc;
+  switch (u.pat) {
+    case 'camo': for (const [x, y, rx, ry, a] of [[-4, -6, 2.6, 1.6, 0.4], [1, -3, 2.2, 1.4, -0.6], [-3, 2, 2.8, 1.5, 1], [2, 6, 2.2, 1.6, 0.2], [-6, 6, 1.6, 1.2, 0]]) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, a, 0, 7); ctx.fill(); } break;
+    case 'digital': for (let i = 0; i < 14; i++) ctx.fillRect(-7 + (i * 5.3) % 12, -9 + (i * 7.1) % 18, 1.4, 1.4); break;
+    case 'tiger': ctx.lineWidth = 1; for (let y = -8; y <= 8; y += 3.2) { ctx.beginPath(); ctx.moveTo(-8, y); ctx.lineTo(-4, y + 1.2); ctx.lineTo(-1, y - 0.4); ctx.stroke(); } break;
+    case 'stripe': ctx.fillRect(-8, -1, 15, 2); break; // one bold band across the chest
+    case 'hazard': ctx.lineWidth = 1.3; for (let x = -12; x < 8; x += 3.4) { ctx.beginPath(); ctx.moveTo(x, -10); ctx.lineTo(x + 6, 10); ctx.stroke(); } break;
+    case 'check': for (let x = -8; x < 6; x += 3) for (let y = -10; y < 10; y += 3) if (((x + y) / 3 & 1) === 0) ctx.fillRect(x, y, 1.5, 1.5); break;
+    case 'hex': ctx.lineWidth = 0.4; for (let y = -9; y < 10; y += 3) for (let x = -8 + (y / 3 & 1) * 1.5; x < 6; x += 3) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx.lineTo(x + Math.cos(a) * 1.4, y + Math.sin(a) * 1.4); } ctx.closePath(); ctx.stroke(); } break;
+    case 'zig': ctx.lineWidth = 0.9; ctx.beginPath(); for (let i = 0; i <= 6; i++) ctx.lineTo(-7 + i * 2, i % 2 ? -3 : 3); ctx.stroke(); break;
+    case 'circuit': ctx.lineWidth = 0.4; for (const [x0, y0, x1, y1] of [[-7, -5, -2, -5], [-2, -5, -2, 1], [-2, 1, 3, 1], [-6, 4, 0, 4], [0, 4, 0, 7]]) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.fillRect(x1 - 0.5, y1 - 0.5, 1, 1); } break;
+    case 'spots': for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc(-6 + (i * 4.7) % 11, -8 + (i * 6.3) % 16, 0.9 + (i % 3) * 0.3, 0, 7); ctx.fill(); } break;
+    case 'splatter': for (let i = 0; i < 7; i++) { const x = -6 + (i * 5.1) % 10, y = -8 + (i * 7.7) % 16; ctx.beginPath(); ctx.arc(x, y, 1.1, 0, 7); ctx.fill(); ctx.fillRect(x, y - 0.25, 2.2, 0.5); } break;
+    case 'char': ctx.globalAlpha = 0.7; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.ellipse(-5 + (i * 4.3) % 9, -7 + (i * 5.9) % 14, 1.8, 0.9, i, 0, 7); ctx.fill(); } break;
+    case 'split': ctx.fillRect(-9, 0, 18, 10); break; // MAGPIE: black one side, white the other
+  }
+  ctx.restore();
+}
 const SKIN = ['#c99a78', '#a8785a', '#7a5238', '#e0b393', '#8d6346'];
 const OUT = 'rgba(6,7,9,0.6)';
 let LX = -0.6, LY = -0.8; // light direction in the character's rotated frame (world light comes from the top-left)
 
 function cap(ctx, x1, y1, x2, y2, w, col) { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+// the operator's pattern carried onto their sleeves and trouser legs, as a dashed inner line (cheap)
+const SLEEVE = { camo: [2.2, 1.4], digital: [0.8, 0.9], tiger: [0.6, 1.4], stripe: [], hazard: [1.3, 1.3], check: [1, 1], hex: [0.5, 0.8], zig: [1.6, 1], circuit: [2.5, 0.8], spots: [0.6, 1.6], splatter: [0.7, 2], char: [1.6, 1.6], split: [] };
+let curU = null;
 function limb(ctx, pts, w, col) { // outlined, two-segment limb
   for (const [lw, c] of [[w + 1.1, OUT], [w, col]]) {
     ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.stroke();
+  }
+  if (curU && curU.pc && SLEEVE[curU.pat] && (col === curU.cloth || col === curU.clothD)) {
+    ctx.strokeStyle = curU.pc; ctx.lineWidth = w * 0.42; ctx.lineCap = 'butt'; ctx.setLineDash(SLEEVE[curU.pat]);
+    ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.stroke();
+    ctx.setLineDash([]); ctx.lineCap = 'round';
   }
   ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = w * 0.35;
   ctx.beginPath(); ctx.moveTo(pts[0] + LX * w * 0.25, pts[1] + LY * w * 0.25); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i] + LX * w * 0.25, pts[i + 1] + LY * w * 0.25); ctx.stroke();
@@ -158,7 +220,7 @@ function drawGun(ctx, wkey, recoil) {
 // p: {x,y,aim,team,op,walk,ads,crouch,downed,recoil,reload,brace,scan,melee,ally,flash,w}
 export function drawOperator(ctx, p, t) {
   const o = OPERATORS[p.op]; if (!o) return;
-  const u = UNIFORM[o.team];
+  const u = curU = uniformOf(p.op, o.team);
   const skin = SKIN[(p.op.charCodeAt(0) + p.op.length) % SKIN.length];
   const ca = Math.cos(-p.aim), sa = Math.sin(-p.aim);
   LX = -0.6 * ca + 0.8 * sa; LY = -0.6 * sa - 0.8 * ca;
@@ -212,6 +274,8 @@ export function drawOperator(ctx, p, t) {
   // ---- torso & plate carrier ----
   const sh = cr ? 0.93 : 1;
   drawTorso(ctx, p.op, o, u, sh);
+  { const tc = p.ally === false ? '#ff8a3d' : '#46a8ff'; // team trim (he chose): an armband on each shoulder in your team's or the enemy's colour
+    for (const s of [-1, 1]) { ctx.fillStyle = tc; ctx.beginPath(); ctx.ellipse(-1.2, s * 7.9 * sh, 2, 1.25, 0, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.3; ctx.stroke(); } }
   if (o.team === 'def') { box(ctx, -1.8, -6.2, 1.8, 2.4, 0.4, '#141518'); cap(ctx, -1, -6, -1.5, -10, 0.5, '#111'); } // radio
   if (id === 'slug' || id === 'sticky') { cap(ctx, -4.5, -6.5, 3.5, 6.5, 1.6, '#3a2a1a'); ctx.fillStyle = '#b02a2a'; for (let i = 0; i < 6; i++) ctx.fillRect(-4 + i * 1.3, -5.2 + i * 2.05, 0.9, 1.1); }
   if (id === 'emp') { for (const yy of [-3, 1.5]) { ell(ctx, -2.5, yy, 1.4, 1.4, '#7d4fb0'); ctx.fillStyle = `rgba(200,150,255,${0.5 + 0.5 * Math.sin(t * 4 + yy)})`; ctx.beginPath(); ctx.arc(-2.5, yy, 0.5, 0, 7); ctx.fill(); } }
