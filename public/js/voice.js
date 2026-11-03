@@ -37,13 +37,14 @@ async function next(group) {
   const line = q[group].shift();
   if (nowS() - line.t > STALE[group]) return next(group);
   busy[group] = nowS() + 0.5; // while it loads
-  const bufs = await Promise.all(line.parts.map(id => load(line.v, id)));
+  const ids = line.parts.filter(id => id !== ','), bufs = await Promise.all(ids.map(id => load(line.v, id)));
+  const pauseAfter = []; { let n = -1; for (const id of line.parts) { if (id === ',') pauseAfter[n] = true; else n++; } } // pauses only where the writing has a comma or full stop
   if (bufs.some(b => !b)) { busy[group] = 0; if (line.onStart) line.onStart(0); return next(group); } // a missing clip: only the writing shows
   const g = ac.createGain(); g.gain.value = gains[line.ch] ?? 1; g.connect(group === 'team' ? duck : bus);
   let at = ac.currentTime + 0.06, total = 0;
   for (let i = 0; i < bufs.length; i++) {
     const s = ac.createBufferSource(); s.buffer = bufs[i]; s.connect(g); s.start(at);
-    at += bufs[i].duration + 0.035; total += bufs[i].duration + 0.035;
+    const step = bufs[i].duration + (pauseAfter[i] ? 0.14 : -0.012); at += step; total += step;
   }
   busy[group] = nowS() + total + 0.3;
   if (group === 'caster') { duck.gain.setTargetAtTime(0.5, ac.currentTime, 0.08); setTimeout(() => { if (!speaking('caster')) duck.gain.setTargetAtTime(1, ac.currentTime, 0.2); }, (total + 0.35) * 1000); }

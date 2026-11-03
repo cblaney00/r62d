@@ -719,7 +719,8 @@ addEventListener('keyup', e => {
   if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault(); // stop Firefox's menu bar popping up
   const a = actionFor(e.code); if (a) keys.delete(a);
   if (a === 'ptt') pttUp((text, intent) => { // what it heard shows to the team, then a bot answers
-    if (text && text !== '[unk]') { send({ t: 'chat', text, team: true }); if (intent) send({ t: 'ptt', intent }); }
+    if (text) { send({ t: 'chat', text, team: true }); if (intent) send({ t: 'ptt', intent }); }
+    if (!intent) addFeed("Didn't catch that: try \"where are they\", \"follow me\" or \"push\"");
     else pttMsg('DIDN\'T CATCH THAT', 1500);
   });
 });
@@ -3167,7 +3168,7 @@ function setBotVol(name, v) { try { const a = JSON.parse(localStorage.getItem('r
 function fillPauseVoices() {
   const el = $('pVoices'); if (!el) return;
   const snap = st.snaps.length ? st.snaps[st.snaps.length - 1] : null, me = st.me;
-  const bots = !st.tv && snap && me ? [...snap.players.values()].filter(p => p.sq === me.sq && p.id !== st.id && /^\[\w+\] /.test(p.n || '')) : [];
+  const bots = !st.tv && snap && me ? [...snap.players.values()].filter(p => p.sq === me.sq && p.id !== st.id && String(p.id).startsWith('b')) : [];
   el.classList.toggle('hidden', !bots.length);
   el.innerHTML = bots.length ? '<h3>TEAMMATE VOICES</h3>' : '';
   for (const p of bots) {

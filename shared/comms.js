@@ -155,10 +155,13 @@ export function compose(v, cat, slots = {}, recent = null) {
   const i = opts[Math.floor(Math.random() * opts.length)];
   if (recent) { recent.push(cat + i); while (recent.length > 24) recent.shift(); }
   const line = def.lines[i], parts = [];
-  for (const p of linePieces(line)) {
-    if (typeof p === 'string') parts.push(clipId(def.tone, p));
-    else parts.push(clipId(slotTone(v), String(slots[p.s])));
+  for (const b of lineText(line).split(/(\{\w+\})/)) { // ',' in parts = a short pause, only where the writing has one (he asked)
+    const m = b.match(/^\{(\w+)\}$/);
+    if (m) { parts.push(clipId(slotTone(v), String(slots[m[1]]))); continue; }
+    if (/^\s*[,.!?:;]/.test(b) && parts.length) parts.push(',');
+    if (/[a-z0-9]/i.test(b)) { parts.push(clipId(def.tone, b.trim())); if (/[,.!?:;]\s*$/.test(b) && b !== lineText(line).split(/(\{\w+\})/).at(-1)) parts.push(','); }
   }
+  while (parts.at(-1) === ',') parts.pop();
   return { text: lineText(line).replace(/\{(\w+)\}/g, (_, k) => slots[k]), parts, prio: def.prio };
 }
 const slotsFit = (line, slots) => [...line.matchAll(/\{(\w+)\}/g)].every(m => slots[m[1]] !== undefined && slots[m[1]] !== null && slots[m[1]] !== '');

@@ -15,7 +15,7 @@ const op = Object.values(OPERATORS)[0].name; const title = s => s[0] + s.slice(1
 let missing = 0, lines = 0;
 for (const v of Object.keys(SPEAKERS)) { const caster = CASTER_VOICE.includes(v), book = caster ? CAST : LINES;
   for (const [cat, def] of Object.entries(book)) { if (caster && (v === CASTER_VOICE[1]) !== (def.tone === 'desk')) continue;
-    for (let n = 0; n < 12; n++) { const c = compose(v, cat, { op: title(op), place: 'Archive', way: 'door', plan: 'Default', name: 'Halden', name2: 'Sable', team: 'Northwind', team2: 'Ironclad Collective', map: 'Harbor Office', n: '2', n2: '1', n3: '3' }); if (!c) continue; lines++; for (const id of c.parts) if (!fs.existsSync(`public/voice/${v}/${id}.ogg`)) { missing++; if (missing < 5) console.log('  no recording:', v, cat, c.text); } } } }
+    for (let n = 0; n < 12; n++) { const c = compose(v, cat, { op: title(op), place: 'Archive', way: 'door', plan: 'Default', name: 'Halden', name2: 'Sable', team: 'Northwind', team2: 'Ironclad Collective', map: 'Harbor Office', n: '2', n2: '1', n3: '3' }); if (!c) continue; lines++; for (const id of c.parts.filter(x => x !== ',')) if (!fs.existsSync(`public/voice/${v}/${id}.ogg`)) { missing++; if (missing < 5) console.log('  no recording:', v, cat, c.text); } } } }
 check(!missing, `every line has its recordings (${lines} tried, ${missing} pieces missing)`);
 check(!Object.keys(SPEAKERS).filter(v => SPEAKERS[v][0] === 'f').some(v => LINES.go.lines.some((l, i) => /go, go, go/i.test(l) && voiceHas(v, 'go', i))), 'no woman says "go, go, go"');
 // 2. match behaviour

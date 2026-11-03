@@ -26,3 +26,7 @@ stay silent after their last call. `hush` lines hold the team (not contact calls
 ## Push to talk (`public/js/ptt.js`, `pttAsk` in bots.js)
 Offline recogniser vosk-browser with the small English model, limited to the phrases in `PTT_PHRASES`. Loaded on first press.
 Browsers only allow a microphone on localhost or https, so people joining over a plain http address get "no microphone".
+
+## Next recording: Chatterbox (he allowed a newer engine, 2026-11-03; not recorded or heard by him yet)
+Chatterbox Turbo on the graphics card: about 2.5x faster than real time, 3 GB of its memory. Installed in `/var/tmp/r62d-tts` (venv, `env.sh`, models in `hf/`, about 10 GB; may be cleared, then reinstall with pip on nixpkgs python311). It speaks from short real samples: `refs.py` fetches VCTK clips (CC-BY, credit in docs/credits.md if used) through the Hugging Face dataset viewer. VCTK starts at 18, so ages are about 18-32, not 16.
+Plan: play him a sample first. Then record whole lines where a slot has few values (names, teams) and put every other slot at a comma, so joins sound natural and no fragment begins with "'s". Add many more lines per call.

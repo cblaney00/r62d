@@ -1583,7 +1583,7 @@ function proCall(game, squad, text, cat = null, slots = {}) { // the leader (or 
   if (cat && !talkAllowed(game, who, cat)) return; // nobody calls plays at someone clutching
   who.saidT = game.time;
   const c = cat && compose(voiceOf(who), cat, slots, who.saidRecent || (who.saidRecent = []));
-  game.chat(who, { text: text.slice(0, 140), team: true, vo: c ? { v: voiceOf(who), parts: c.parts } : undefined });
+  game.chat(who, { text: (c ? c.text : text).slice(0, 140), team: true, vo: c ? { v: voiceOf(who), parts: c.parts } : undefined }); // the writing matches what is said (he asked)
 }
 const HARD_BREACH = ['ember', 'rivet'];
 export function proPickOp(game, p) {
