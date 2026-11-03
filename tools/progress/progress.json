@@ -1,7 +1,7 @@
 {
- "title": "Making R62D its own program",
+ "title": "Making R62D its own program (+ updates)",
  "started": 1793734907703,
- "updated": 1793736158967,
+ "updated": 1793736409280,
  "steps": [
   {
    "name": "Plan and token estimate",
@@ -85,6 +85,40 @@
    "began": 1793735911863,
    "detail": "github.com/cblaney00/r62d/releases/tag/v1.0-test",
    "ended": 1793736158967
+  },
+  {
+   "name": "Update check when R62D opens",
+   "about": "Looks on your GitHub page for a newer release each time it starts.",
+   "state": "done",
+   "began": 1793736327377,
+   "detail": "Starter checks GitHub each time it opens (6 s at most, then plays what it has)",
+   "ended": 1793736409190
+  },
+  {
+   "name": "Download and swap in the new game",
+   "about": "Fetches only the game files (small), checks them, keeps the old copy if anything fails.",
+   "state": "done",
+   "ended": 1793736409220,
+   "detail": "Downloads only the game files, checks them, falls back to the old copy if anything fails"
+  },
+  {
+   "name": "Release script",
+   "about": "One command builds the program and the update and puts both on GitHub.",
+   "state": "done",
+   "ended": 1793736409250,
+   "detail": "desktop/release.sh builds and publishes a release in one go"
+  },
+  {
+   "name": "Test an update in Wine",
+   "about": "Open an old copy, see it update itself to the newest.",
+   "state": "doing",
+   "began": 1793736409280,
+   "detail": "Unit test of the unzip and update logic"
+  },
+  {
+   "name": "New download link",
+   "about": "Replace the first test download with one that can update itself.",
+   "state": "todo"
   }
  ],
  "log": [
@@ -167,6 +201,26 @@
   {
    "at": 1793736158967,
    "text": "Finished: Download link on GitHub — github.com/cblaney00/r62d/releases/tag/v1.0-test"
+  },
+  {
+   "at": 1793736327377,
+   "text": "Started: Update check when R62D opens — Splitting the program into a small starter and the game part"
+  },
+  {
+   "at": 1793736409190,
+   "text": "Finished: Update check when R62D opens — Starter checks GitHub each time it opens (6 s at most, then plays what it has)"
+  },
+  {
+   "at": 1793736409220,
+   "text": "Finished: Download and swap in the new game — Downloads only the game files, checks them, falls back to the old copy if anything fails"
+  },
+  {
+   "at": 1793736409250,
+   "text": "Finished: Release script — desktop/release.sh builds and publishes a release in one go"
+  },
+  {
+   "at": 1793736409280,
+   "text": "Started: Test an update in Wine — Unit test of the unzip and update logic"
   }
  ]
 }

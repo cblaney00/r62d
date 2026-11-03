@@ -1,65 +1,26 @@
-// R62D as its own program (Electron): the Host / Join screen, the built-in game server and one full-screen window.
-// The browser version is unchanged; this only wraps it. build.sh puts this together with server/, shared/ and public/.
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
-import net from 'node:net';
+// R62D as its own program (Electron). This file is the starter: it opens the window, looks on GitHub for a newer
+// release of the game and fetches it (updates.js), then runs the game part (app.js) from the newest copy it has.
+// The starter itself only changes with a new download; everything else (game, server, start screen) updates itself.
+import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { update } from './updates.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.R62D_PORT) || 6262; // R62D_PORT: only for testing beside a running server
-let win = null, hosting = false;
+const BUNDLED = path.resolve(HERE, '..'); // the game files that came in the download
 
-// what build.sh wrote down: which version of the game this program is
-let build = { version: 'dev', date: '' };
-try { build = JSON.parse(fs.readFileSync(path.join(HERE, 'build.json'), 'utf8')); } catch {}
-
-// profiles, match history and pro practice live in this friend's own folder (%APPDATA%\R62D\data on Windows)
-process.env.R62D_DATA = path.join(app.getPath('userData'), 'data');
-process.env.R62D_VERSION = build.version;
+process.env.R62D_DATA = path.join(app.getPath('userData'), 'data'); // %APPDATA%\R62D\data: profiles, matches, pro practice
 fs.mkdirSync(process.env.R62D_DATA, { recursive: true });
-
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 Menu.setApplicationMenu(null); // no menu, so no Ctrl+W / Ctrl+R shortcuts that close or reload the game
 
-const portFree = () => new Promise(ok => {
-  const s = net.createServer().once('error', () => ok(false)).once('listening', () => s.close(() => ok(true)));
-  s.listen(PORT, '0.0.0.0');
-});
+const LOADING = `<!doctype html><meta charset="utf-8"><body style="margin:0;height:100vh;display:grid;place-items:center;align-content:center;gap:18px;
+background:#05070a;color:#93a0ad;font:600 18px 'Segoe UI',sans-serif;letter-spacing:.12em"><div style="font:800 64px 'Segoe UI',sans-serif;color:#eef2f5;letter-spacing:.14em">R62D</div>
+<div id="s">STARTING…</div><div style="width:320px;height:4px;background:#1a2028"><div id="b" style="height:100%;width:0;background:#f2c14e;transition:width .2s"></div></div></body>`;
 
-// HOST: start the game server inside the program (once), then play on it
-ipcMain.handle('host', async () => {
-  if (!hosting) {
-    if (!(await portFree())) return { error: `Another program on this computer is already using port ${PORT} (maybe R62D is already hosting).` };
-    process.env.PORT = String(PORT);
-    await import('../server/server.js');
-    hosting = true;
-  }
-  win.loadURL(`http://localhost:${PORT}/?app=1`);
-  return { ok: true };
-});
-
-// JOIN: check a friend's game answers, then play on it
-ipcMain.handle('join', async (_e, addr) => {
-  let url;
-  try {
-    url = new URL(/^https?:\/\//.test(addr) ? addr : 'http://' + addr);
-    if (!url.port) url.port = String(PORT);
-  } catch { return { error: 'That doesn\'t look like an address.' }; }
-  try {
-    const r = await fetch(new URL('/api/addr', url), { signal: AbortSignal.timeout(5000) });
-    if (!r.ok) throw new Error();
-  } catch { return { error: `No R62D game answered at ${url.host}. Check the address and that your friend has clicked HOST.` }; }
-  win.loadURL(`${url.origin}/?app=1`);
-  return { ok: true };
-});
-
-ipcMain.handle('info', () => ({ ...build, hosting }));
-ipcMain.handle('quit', () => app.quit());
-ipcMain.handle('menu', () => win.loadFile(path.join(HERE, 'start.html')));
-
-app.whenReady().then(() => {
-  win = new BrowserWindow({
+app.whenReady().then(async () => {
+  const win = new BrowserWindow({
     fullscreen: true, width: 1600, height: 900, backgroundColor: '#05070a', title: 'R62D',
     icon: path.join(HERE, 'icon.png'), autoHideMenuBar: true,
     webPreferences: { preload: path.join(HERE, 'preload.cjs'), contextIsolation: true, sandbox: true, backgroundThrottling: false },
@@ -68,6 +29,17 @@ app.whenReady().then(() => {
     if (k.type === 'keyDown' && k.key === 'F11') { win.setFullScreen(!win.isFullScreen()); e.preventDefault(); }
   });
   win.webContents.on('page-title-updated', e => e.preventDefault());
-  win.loadFile(path.join(HERE, 'start.html'));
+  await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(LOADING));
+  const say = (text, frac) => win.webContents.executeJavaScript(`s.textContent=${JSON.stringify(text)};${frac != null ? `b.style.width='${Math.round(frac * 100)}%'` : ''}`).catch(() => {});
+
+  const dir = await update(BUNDLED, path.join(app.getPath('userData'), 'game'), say);
+  try {
+    await (await import(pathToFileURL(path.join(dir, 'desktop', 'app.js')).href)).start({ app, win, dir });
+  } catch (e) { // a downloaded copy that won't start: forget it and play the one from the download
+    console.log('Updated game failed to start, using the original:', e.message);
+    if (dir === BUNDLED) throw e;
+    fs.rmSync(dir, { recursive: true, force: true });
+    await (await import(pathToFileURL(path.join(BUNDLED, 'desktop', 'app.js')).href)).start({ app, win, dir: BUNDLED });
+  }
 });
 app.on('window-all-closed', () => app.quit());
