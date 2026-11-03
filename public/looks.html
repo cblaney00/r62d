@@ -11,13 +11,17 @@ const c = document.getElementById('c'), ctx = c.getContext('2d');
 const show = new URLSearchParams(location.search).get('show') || 'ops';
 const fit = () => { c.width = innerWidth; c.height = innerHeight; }; fit(); addEventListener('resize', fit);
 // gadgets: one entity per ability (what useAbility puts down), drawn for your team (left) and for the enemy (right)
-const GAD = window.GADGETS || [];
+const GAD = [['jammer', 'VEIL jammer'], ['mine', 'LYNX paint trap'], ['prox', 'BRAMBLE charge'], ['concuss', 'GRAVEL daze mine'], ['clamp', 'SNARE trap'], ['sensor', 'SHADE microphone'],
+  ['grid', 'SHUNT static grid'], ['plates', 'RAMPART armor bag', { c: 4 }], ['pace', 'RALLY pace beacon'], ['sticky', 'SALVO round (stuck)', { st: 1 }], ['saw', 'TORQUE saw disc'], ['spike', 'ECHO seismic spike'],
+  ['alarm', 'LATCH siren wire'], ['echobox', 'RUSE echo box'], ['radar', 'AUDIT drone radar'], ['station', 'TONIC heal station'], ['healzone', 'PATCH field kit'], ['catcher', 'WARD grenade catcher'],
+  ['dart', 'HOUND spotter dart'], ['scope', 'TETHER wall scope (shield)', { sh: 1 }], ['cluster', 'cluster charge'], ['cover', 'TRENCH cover'], ['cutter', 'cutter'], ['wire', 'barbed wire']]
+  .map(([ty, label, x]) => ({ label, e: { ty, ag: 0, ...(x || {}) } }));
 function frame(ms) {
   const t = ms / 1000, W = c.width, H = c.height;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#2b2c2a'; ctx.fillRect(0, 0, W, H);
   const from = +(new URLSearchParams(location.search).get('from') || 0), n = +(new URLSearchParams(location.search).get('n') || 99);
   const items = (show === 'ops' ? OP_LIST : GAD).slice(from, from + n), cols = show === 'ops' ? (n < 20 ? 6 : 13) : 8, rows = Math.ceil(items.length / cols);
-  const cw = W / cols, ch = H / rows, Z = Math.min(cw, ch) / (show === 'ops' ? 34 : 60);
+  const cw = W / cols, ch = H / rows, Z = Math.min(cw, ch) / (show === 'ops' ? 34 : 48);
   items.forEach((it, i) => {
     const x = (i % cols) * cw, y = Math.floor(i / cols) * ch;
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = (i + Math.floor(i / cols)) % 2 ? '#30312e' : '#2a2b28'; ctx.fillRect(x, y, cw, ch);

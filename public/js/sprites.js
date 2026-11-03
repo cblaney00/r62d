@@ -568,9 +568,25 @@ export function drawGadget(ctx, e, t, ally) {
   drawGadgetBody(ctx, e, t, ally);
   badge(ctx, e, ally);
 }
+// Ability looks (he asked): each gadget drawn as the real thing it is, in its operator's colours. The operator's colour
+// glows round it for their own team only (he asked: it must not make gadgets easier for the enemy to spot), and range
+// rings are for the owner's team only, dashed (a circle only where a circle is the real reach).
+const GADGET_OP = { jammer: 'veil', mine: 'lynx', prox: 'bramble', concuss: 'gravel', clamp: 'snare', sensor: 'shade', grid: 'shunt', plates: 'rampart',
+  pace: 'rally', sticky: 'salvo', saw: 'torque', spike: 'echo', pick: 'wren', alarm: 'latch', echobox: 'ruse', radar: 'audit', station: 'tonic', healzone: 'patch',
+  catcher: 'ward', dart: 'hound', cover: 'trench', cluster: 'ember', cutter: 'rivet', scope: 'tether' };
+const glowCache = {};
+function glow(ctx, ty, r = 9) { // a soft halo in the operator's colour, from a small cached picture (cheap to draw)
+  const op = OPERATORS[GADGET_OP[ty]]; if (!op || typeof document === 'undefined') return;
+  let g = glowCache[op.color];
+  if (!g) { g = glowCache[op.color] = document.createElement('canvas'); g.width = g.height = 32; const c = g.getContext('2d'), gr = c.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, op.color + '88'); gr.addColorStop(0.5, op.color + '33'); gr.addColorStop(1, op.color + '00'); c.fillStyle = gr; c.fillRect(0, 0, 32, 32); }
+  ctx.drawImage(g, -r, -r, r * 2, r * 2);
+}
+function reach(ctx, r, col, a = 0.22) { ctx.save(); ctx.setLineDash([3, 4]); ctx.strokeStyle = `rgba(${col},${a})`; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke(); ctx.restore(); }
+const opCol = ty => (OPERATORS[GADGET_OP[ty]] || {}).color || '#888';
 function drawGadgetBody(ctx, e, t, ally) {
   ctx.save(); ctx.translate(e.x, e.y); if (!NO_BADGE.has(e.ty)) ctx.scale(1.2, 1.2); // a little bigger, so the shapes read
   const blink = Math.floor(t * 4) % 2 === 0;
+  if (ally && GADGET_OP[e.ty] && e.ty !== 'cover' && e.ty !== 'healzone') glow(ctx, e.ty, e.ty === 'station' ? 11 : 9);
   switch (e.ty) {
     case 'cover': { // TRENCH's plate: thin steel on two little feet, with a narrow sight slit
       const h = e.hl || 17; ctx.rotate(e.ag || 0);
@@ -579,16 +595,19 @@ function drawGadgetBody(ctx, e, t, ally) {
       ctx.fillStyle = '#1b1e22'; ctx.fillRect(-4, -0.6, 8, 1.2); ctx.fillStyle = ally ? '#46a8ff' : '#ff8a3d'; ctx.fillRect(-h, 1.2, h * 2, 0.8);
       for (const s of [-1, 1]) { ctx.fillStyle = '#2a2e33'; ctx.fillRect(s * (h - 4) - 1.5, 2, 3, 2.5); }
       break; }
-    case 'jammer':
+    case 'jammer': // VEIL's jammer: a ribbed box with three antennas fanned out and a running LED bar
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(-3, -2, 8, 6);
-      ctx.fillStyle = '#2b2f36'; ctx.fillRect(-4, -3, 8, 6); ctx.fillStyle = '#55c1e8'; ctx.fillRect(-3, -2, 2, 1.2);
-      cap(ctx, 2, -2, 5, -6, 0.6, '#999');
-      if (ally) { ctx.strokeStyle = `rgba(85,193,232,${0.12 + Math.sin(t * 3) * 0.06})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, 90, 0, 7); ctx.stroke(); }
+      box(ctx, -4, -3, 8, 6, 1, '#2b2f36'); ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = -3; i < 3; i += 1.4) ctx.fillRect(-3.4, i, 6.8, 0.4);
+      for (const a of [-0.5, 0, 0.5]) cap(ctx, 3, 0, 3 + Math.cos(a) * 5, Math.sin(a) * 5, 0.5, '#9aa0a6');
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = Math.floor(t * 8) % 4 === i ? opCol('jammer') : '#1a1c20'; ctx.fillRect(-3 + i * 1.3, 1.6, 1, 0.8); }
+      if (ally) reach(ctx, 90, '85,193,232', 0.14 + Math.sin(t * 3) * 0.04);
       break;
-    case 'mine':
-      ctx.fillStyle = '#2b3325'; ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, 7); ctx.fill();
-      ctx.fillStyle = blink ? '#ff3b3b' : '#5a1010'; ctx.beginPath(); ctx.arc(0, 0, 1, 0, 7); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,40,40,0.35)'; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.stroke();
+    case 'mine': // LYNX's paint trap: a squat paint canister with a nozzle and drips of her colour
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(-2.6, -2, 6.4, 5.4);
+      box(ctx, -3.2, -2.8, 6.4, 5.6, 1.4, '#3a3d3a'); ctx.fillStyle = opCol('mine'); ctx.fillRect(-3.2, -0.6, 6.4, 1.2);
+      ctx.beginPath(); ctx.moveTo(-1, -2.8); ctx.lineTo(-1.4, -4.4); ctx.lineTo(-0.2, -4.4); ctx.lineTo(0.2, -2.8); ctx.fill(); // drip
+      cap(ctx, 3.2, 0, 4.6, 0, 1, '#1a1a1a'); ctx.fillStyle = blink ? '#ff3b3b' : '#5a1010'; ctx.fillRect(1.4, -2.3, 0.9, 0.9);
+      if (ally) reach(ctx, 22, '255,80,80');
       break;
     case 'claymore':
       ctx.rotate(e.ag || 0);
@@ -618,9 +637,12 @@ function drawGadgetBody(ctx, e, t, ally) {
       }
       break;
     }
-    case 'dart':
-      ctx.fillStyle = '#4fb3a9'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, 7); ctx.fill();
-      ctx.strokeStyle = `rgba(79,179,169,${0.25 + 0.2 * Math.sin(t * 6)})`; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(0, 0, 170, 0, 7); ctx.stroke();
+    case 'dart': // a spotter dart stuck in place: a needle with three fins and a blinking tip
+      ctx.rotate(e.ag || 0.6);
+      cap(ctx, -4, 0, 3, 0, 0.7, '#c8ccd2'); ctx.fillStyle = opCol('dart');
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(-5.5, s * 2); ctx.lineTo(-2.5, 0); ctx.fill(); }
+      ctx.fillStyle = blink ? '#7fffe8' : '#2a6a62'; ctx.fillRect(2.4, -0.6, 1.2, 1.2);
+      if (ally) reach(ctx, 170, '79,179,169', 0.12 + 0.08 * Math.sin(t * 6));
       break;
     case 'nade': {
       const col = { frag: '#3d4a2c', smoke: '#7a7f86', stun: '#2c3e5a', impact: '#6a3a2a', nitro: '#5a5f2c', emp: '#a46ad6', sonar: '#5fd3e8', gas: '#7f9c2c', cam: '#d7d9db' }[e.kd] || '#555';
@@ -631,38 +653,49 @@ function drawGadgetBody(ctx, e, t, ally) {
       if (e.kd === 'nitro') { ctx.fillStyle = blink ? '#ff3030' : '#601010'; ctx.fillRect(-0.6, -0.6, 1.2, 1.2); }
       break;
     }
-    case 'prox': // Proximity Charge: a flat green disc with a sensor eye
-      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.arc(0.8, 1, 4.4, 0, 7); ctx.fill();
-      ctx.fillStyle = '#3d4a22'; ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, 7); ctx.fill();
-      ctx.fillStyle = '#26301a'; ctx.beginPath(); ctx.arc(0, 0, 2.6, 0, 7); ctx.fill();
-      ctx.fillStyle = blink ? '#ffd040' : '#5a4a10'; ctx.beginPath(); ctx.arc(0, 0, 0.9, 0, 7); ctx.fill();
-      if (ally) { ctx.strokeStyle = 'rgba(255,200,60,0.25)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(0, 0, 42, 0, 7); ctx.stroke(); }
-      break;
-    case 'concuss': // Daze Mine: a squat sticky puck with yellow bands
-      ctx.fillStyle = '#4a3c22'; ctx.beginPath(); ctx.arc(0, 0, 3.2, 0, 7); ctx.fill();
-      ctx.strokeStyle = '#d8b04a'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, 7); ctx.stroke();
-      ctx.fillStyle = blink ? '#ffe070' : '#5a4a10'; ctx.beginPath(); ctx.arc(0, 0, 0.7, 0, 7); ctx.fill();
-      break;
-    case 'clamp': { // Clamp Trap: open steel jaws
-      ctx.strokeStyle = '#7a7f84'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(0, 0, 5, 0, 7); ctx.stroke();
-      ctx.fillStyle = '#9aa0a6'; for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 5, Math.sin(a) * 5); ctx.lineTo(Math.cos(a + 0.2) * 3, Math.sin(a + 0.2) * 3); ctx.lineTo(Math.cos(a + 0.4) * 5, Math.sin(a + 0.4) * 5); ctx.fill(); }
-      ctx.fillStyle = '#3a3d40'; ctx.fillRect(-1.2, -1.2, 2.4, 2.4);
+    case 'prox': { // BRAMBLE's charge: a brick of explosive wrapped in thorny wire, a sensor eye on top
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(-3.4, -2, 8, 5.4);
+      box(ctx, -4, -2.8, 8, 5.6, 0.8, '#4a5226'); ctx.fillStyle = '#5c6630'; ctx.fillRect(-3.4, -2.2, 6.8, 1.4);
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 0.45; ctx.beginPath(); for (let i = 0; i <= 8; i++) ctx.lineTo(-4.4 + i * 1.1, i % 2 ? -3.4 : 3.4); ctx.stroke(); // the thorn wire round it
+      ctx.fillStyle = '#1e2410'; ctx.beginPath(); ctx.ellipse(0, 0, 1.4, 1, 0, 0, 7); ctx.fill(); ctx.fillStyle = blink ? '#ffd040' : '#5a4a10'; ctx.fillRect(-0.4, -0.4, 0.8, 0.8);
+      if (ally) reach(ctx, 42, '255,200,60');
       break;
     }
-    case 'sensor': // Sound Sensor: a small microphone with sound rings for the defenders
-      ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.arc(0, 0, 2.6, 0, 7); ctx.fill();
-      ctx.fillStyle = '#9b6be0'; ctx.beginPath(); ctx.arc(0, 0, 1.3, 0, 7); ctx.fill();
-      if (ally) { const k = (t * 0.7) % 1; ctx.strokeStyle = `rgba(155,107,224,${0.35 * (1 - k)})`; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(0, 0, 190 * k, 0, 7); ctx.stroke(); }
+    case 'concuss': { // GRAVEL's daze mine: a hexagonal sticky puck, hazard-striped, with four grip spikes
+      ctx.fillStyle = '#9aa0a6'; for (let i = 0; i < 4; i++) { const a = i * 1.571 + 0.785; ctx.beginPath(); ctx.moveTo(Math.cos(a - 0.3) * 3, Math.sin(a - 0.3) * 3); ctx.lineTo(Math.cos(a) * 4.6, Math.sin(a) * 4.6); ctx.lineTo(Math.cos(a + 0.3) * 3, Math.sin(a + 0.3) * 3); ctx.fill(); }
+      ctx.fillStyle = '#3a3222'; ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * 1.047; ctx.lineTo(Math.cos(a) * 3.3, Math.sin(a) * 3.3); } ctx.closePath(); ctx.fill();
+      ctx.save(); ctx.clip(); ctx.strokeStyle = opCol('concuss'); ctx.lineWidth = 0.7; for (let x = -5; x < 5; x += 2) { ctx.beginPath(); ctx.moveTo(x, -4); ctx.lineTo(x + 3, 4); ctx.stroke(); } ctx.restore();
+      ctx.fillStyle = '#1a1a1a'; ctx.fillRect(-1, -1, 2, 2); ctx.fillStyle = blink ? '#ffe070' : '#5a4a10'; ctx.fillRect(-0.5, -0.5, 1, 1);
       break;
-    case 'grid': // Static Grid: a blue clamp with crackling arcs
-      ctx.fillStyle = '#26324e'; ctx.fillRect(-3.5, -3.5, 7, 7);
-      ctx.strokeStyle = '#4f86ff'; ctx.lineWidth = 0.6; ctx.strokeRect(-3.5, -3.5, 7, 7);
-      ctx.strokeStyle = `rgba(140,190,255,${0.4 + 0.4 * Math.random()})`; ctx.beginPath(); ctx.moveTo(-3, 0); for (let i = 1; i <= 4; i++) ctx.lineTo(-3 + i * 1.5, (Math.random() - 0.5) * 4); ctx.stroke();
+    }
+    case 'clamp': { // SNARE's trap: two half-moon steel jaws held open by flat springs on each side, a pressure plate between
+      ctx.fillStyle = '#3a3d40'; ctx.fillRect(-1.6, -1.6, 3.2, 3.2); ctx.fillStyle = opCol('clamp'); ctx.fillRect(-0.9, -0.9, 1.8, 1.8);
+      for (const s of [-1, 1]) {
+        ctx.strokeStyle = '#7a7f84'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(0, s * 1.2, 4.6, s > 0 ? 0.15 : Math.PI + 0.15, s > 0 ? Math.PI - 0.15 : -0.15); ctx.stroke();
+        ctx.fillStyle = '#b0b6bc'; for (let i = 1; i < 6; i++) { const a = (s > 0 ? 0 : Math.PI) + i * 0.52, x = Math.cos(a) * 4.6, y = s * 1.2 + Math.sin(a) * 4.6; ctx.beginPath(); ctx.moveTo(x - 0.5, y); ctx.lineTo(x * 0.8, s * 1.2 + (y - s * 1.2) * 0.72); ctx.lineTo(x + 0.5, y); ctx.fill(); }
+        box(ctx, s * 5 - 1.2, -1, 2.4, 2, 0.4, '#55595f');
+      }
       break;
-    case 'plates': // Armor Bag: a canvas bag with plates showing
+    }
+    case 'sensor': { // SHADE's microphone: a mesh capsule on a little tripod; her team sees sound arcs coming off it
+      for (const a of [0.6, 2.7, 4.8]) cap(ctx, 0, 0, Math.cos(a) * 4, Math.sin(a) * 4, 0.5, '#3a3e44');
+      ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.ellipse(0, 0, 1.6, 2.6, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = opCol('sensor'); ctx.lineWidth = 0.3; for (let y = -1.8; y <= 1.8; y += 0.9) { ctx.beginPath(); ctx.moveTo(-1.3, y); ctx.lineTo(1.3, y); ctx.stroke(); }
+      if (ally) { const k = (t * 0.9) % 1; ctx.strokeStyle = `rgba(155,107,224,${0.5 * (1 - k)})`; ctx.lineWidth = 0.5; for (const a of [0, 2.09, 4.19]) { ctx.beginPath(); ctx.arc(0, 0, 4 + k * 8, a - 0.45, a + 0.45); ctx.stroke(); } }
+      break;
+    }
+    case 'grid': { // SHUNT's static grid: a bracket clamped to the wall, a copper coil between two prongs, sparks jumping
+      ctx.rotate(e.ag || 0);
+      box(ctx, -3.5, -3, 3, 6, 0.6, '#26324e'); for (const s of [-1, 1]) cap(ctx, -0.5, s * 2.4, 3.5, s * 2.4, 0.7, '#9aa0a6');
+      ctx.strokeStyle = '#c88a3a'; ctx.lineWidth = 0.55; ctx.beginPath(); for (let i = 0; i <= 8; i++) ctx.lineTo(0 + i * 0.4, (i % 2 ? 1 : -1) * 1.6); ctx.stroke();
+      ctx.strokeStyle = `rgba(140,190,255,${0.4 + 0.4 * Math.random()})`; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(3.5, -2.4); for (let i = 1; i <= 3; i++) ctx.lineTo(3.5 + (Math.random() - 0.3) * 1.6, -2.4 + i * 1.6); ctx.stroke();
+      break;
+    }
+    case 'plates': // RAMPART's armor bag: a duffel with grab handles, plates stacked inside the open zip
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(-4, -2, 10, 7);
-      ctx.fillStyle = '#4a4f38'; ctx.fillRect(-5, -3.5, 10, 7);
-      for (let i = 0; i < (e.c || 0); i++) { ctx.fillStyle = '#8f9aa6'; ctx.fillRect(-4 + i * 1.8, -2.5, 1.4, 5); }
+      box(ctx, -5.5, -3.5, 11, 7, 2.6, '#4a4f38'); cap(ctx, -2.5, -3.5, 2.5, -3.5, 0.8, '#2a2d22'); cap(ctx, -2.5, 3.5, 2.5, 3.5, 0.8, '#2a2d22');
+      ctx.fillStyle = '#1e2018'; ctx.fillRect(-4.2, -1.6, 8.4, 3.2);
+      for (let i = 0; i < (e.c || 0); i++) { ctx.fillStyle = i % 2 ? '#8f9aa6' : '#a8b2bc'; ctx.fillRect(-3.8 + i * 1.6, -1.3, 1.2, 2.6); }
       break;
     case 'cluster': // Cluster Charge: a black box of four tubes
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(-4, -3, 9, 7);
@@ -670,9 +703,12 @@ function drawGadgetBody(ctx, e, t, ally) {
       for (const [cx, cy] of [[-2.2, -1.8], [2.2, -1.8], [-2.2, 1.8], [2.2, 1.8]]) { ctx.fillStyle = '#55595f'; ctx.beginPath(); ctx.arc(cx, cy, 1.4, 0, 7); ctx.fill(); }
       ctx.fillStyle = blink ? '#ff3030' : '#601010'; ctx.fillRect(-0.6, -0.6, 1.2, 1.2);
       break;
-    case 'pace': { // RALLY's pace beacon: a little post with a pulsing ring
-      const k = (t * 1.2) % 1; ctx.strokeStyle = `rgba(120,255,160,${0.6 * (1 - k)})`; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(0, 0, 4 + k * 20, 0, 7); ctx.stroke();
-      ctx.fillStyle = '#2a3a30'; ctx.beginPath(); ctx.arc(0, 0, 3, 0, 7); ctx.fill(); ctx.fillStyle = '#78ffa0'; ctx.beginPath(); ctx.arc(0, 0, 1.4, 0, 7); ctx.fill();
+    case 'pace': { // RALLY's pace beacon: a striped running cone; her team sees speed chevrons racing out of it
+      ctx.rotate(e.ag || 0);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.moveTo(4.5, 1); ctx.lineTo(-3, -2.4); ctx.lineTo(-3, 4); ctx.fill();
+      ctx.fillStyle = opCol('pace'); ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-3.5, -3.2); ctx.lineTo(-3.5, 3.2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#f2f2f2'; ctx.fillRect(-1.2, -2.1, 1, 4.2);
+      if (ally) { const k = (t * 1.6) % 1; for (let i = 0; i < 3; i++) { const x = 6 + ((k + i / 3) % 1) * 14; ctx.strokeStyle = `rgba(120,255,160,${0.6 * (1 - (k + i / 3) % 1)})`; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x - 2, -2.5); ctx.lineTo(x, 0); ctx.lineTo(x - 2, 2.5); ctx.stroke(); } }
       break;
     }
     case 'scope': // Wall Scope: a lens poking out of the wall (TETHER's: a shimmering energy shield for its first 3 s)
@@ -681,7 +717,9 @@ function drawGadgetBody(ctx, e, t, ally) {
         ctx.fillStyle = '#fff'; ctx.beginPath(); const d = e.fl === 'up' ? -1 : 1; ctx.moveTo(-1, 0.6 * d); ctx.lineTo(1, 0.6 * d); ctx.lineTo(0, -1 * d); ctx.fill();
         break;
       }
-      if (e.sh) { const k = Math.min(1, e.sh), w = 0.5 + 0.5 * Math.sin(t * 12); ctx.strokeStyle = `rgba(120,230,255,${(0.35 + 0.35 * w) * k})`; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(0, 0, 5.5 + w * 0.6, 0, 7); ctx.stroke(); ctx.fillStyle = `rgba(120,230,255,${0.12 * k})`; ctx.fill(); }
+      if (e.sh) { const k = Math.min(1, e.sh), w = 0.5 + 0.5 * Math.sin(t * 12); ctx.strokeStyle = `rgba(120,230,255,${(0.35 + 0.35 * w) * k})`; ctx.fillStyle = `rgba(120,230,255,${0.12 * k})`; ctx.lineWidth = 0.6; // a hex-cell energy shield
+        ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * 1.047; ctx.lineTo(Math.cos(a) * (5.6 + w * 0.5), Math.sin(a) * (5.6 + w * 0.5)); } ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * 1.047; ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * 5.6, Math.sin(a) * 5.6); } ctx.stroke(); }
       ctx.rotate(e.ag || 0);
       ctx.fillStyle = '#2b2f36'; ctx.fillRect(-4, -1.5, 5, 3);
       ctx.fillStyle = '#6fbf73'; ctx.beginPath(); ctx.arc(1.5, 0, 1.5, 0, 7); ctx.fill();
@@ -691,11 +729,13 @@ function drawGadgetBody(ctx, e, t, ally) {
       ctx.fillStyle = '#ffcf6a'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, 7); ctx.fill();
       break;
     // ---- the operators added to fill every role ----
-    case 'sticky': // SALVO's round: a red-banded slug; stuck and waiting for her, a slow red glow (it goes off when she says)
-      ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, 7); ctx.fill();
-      ctx.fillStyle = '#c0392b'; ctx.fillRect(-2.4, -0.5, 4.8, 1);
-      if (e.st) { const k = 0.5 + 0.5 * Math.sin(t * 3); ctx.fillStyle = `rgba(255,74,58,${0.25 + 0.5 * k})`; ctx.beginPath(); ctx.arc(0, 0, 1.2 + k * 0.6, 0, 7); ctx.fill(); }
+    case 'sticky': { // SALVO's round: a finned launcher shell with a red band; stuck, its nose is splayed into the wall and a light pulses
+      ctx.rotate(e.ag || 0);
+      box(ctx, -3.6, -1.4, 6, 2.8, 1.2, '#2a2a2a'); ctx.fillStyle = '#c0392b'; ctx.fillRect(-0.6, -1.4, 1.1, 2.8);
+      ctx.fillStyle = '#4a4a4a'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(-3.6, 0); ctx.lineTo(-5, s * 2.2); ctx.lineTo(-2.4, s * 1.2); ctx.fill(); }
+      if (e.st) { for (const s of [-1, 0, 1]) cap(ctx, 2.4, 0, 3.8, s * 1.4, 0.4, '#777'); const k = 0.5 + 0.5 * Math.sin(t * 3); ctx.fillStyle = `rgba(255,74,58,${0.4 + 0.5 * k})`; ctx.fillRect(1, -0.5, 1, 1); }
       break;
+    }
     case 'saw': { // TORQUE's saw disc: a spinning toothed blade with a blur ring
       ctx.rotate(t * 40);
       ctx.fillStyle = 'rgba(200,205,210,0.25)'; ctx.beginPath(); ctx.arc(0, 0, 5.2, 0, 7); ctx.fill();
@@ -704,40 +744,54 @@ function drawGadgetBody(ctx, e, t, ally) {
       ctx.closePath(); ctx.fill(); ctx.fillStyle = '#e0b53a'; ctx.beginPath(); ctx.arc(0, 0, 1.3, 0, 7); ctx.fill();
       break;
     }
-    case 'spike': // ECHO's seismic spike: a steel stake with ripples
-      ctx.strokeStyle = ally ? 'rgba(94,196,182,0.5)' : 'rgba(255,140,80,0.5)'; ctx.lineWidth = 0.5;
-      for (const r of [5, 8]) { ctx.beginPath(); ctx.arc(0, 0, r + (t * 4 % 3), 0, 7); ctx.stroke(); }
-      ctx.fillStyle = '#9aa0a6'; ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, 7); ctx.fill(); ctx.fillStyle = '#3a3e44'; ctx.beginPath(); ctx.arc(0, 0, 1, 0, 7); ctx.fill();
+    case 'spike': { // ECHO's seismic spike: a cross-headed stake hammered into the floor, cracks running out of the impact
+      ctx.strokeStyle = 'rgba(20,20,20,0.6)'; ctx.lineWidth = 0.35;
+      for (let i = 0; i < 5; i++) { const a = i * 1.26 + 0.3; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 2, Math.sin(a) * 2); ctx.lineTo(Math.cos(a + 0.2) * 4, Math.sin(a + 0.2) * 4); ctx.lineTo(Math.cos(a - 0.1) * 6.5, Math.sin(a - 0.1) * 6.5); ctx.stroke(); }
+      if (ally) { const k = (t * 2) % 1; ctx.strokeStyle = `rgba(94,196,182,${0.6 * (1 - k)})`; ctx.lineWidth = 0.4; for (let i = 0; i < 5; i++) { const a = i * 1.26 + 0.3; ctx.beginPath(); ctx.moveTo(Math.cos(a) * (2 + k * 5), Math.sin(a) * (2 + k * 5)); ctx.lineTo(Math.cos(a) * (3.5 + k * 5), Math.sin(a) * (3.5 + k * 5)); ctx.stroke(); } }
+      ctx.fillStyle = '#9aa0a6'; ctx.fillRect(-2.6, -0.8, 5.2, 1.6); ctx.fillRect(-0.8, -2.6, 1.6, 5.2); ctx.fillStyle = opCol('spike'); ctx.fillRect(-0.7, -0.7, 1.4, 1.4);
       break;
+    }
     case 'pick': // WREN's lockpick tools on the board
       ctx.strokeStyle = '#c8ccd2'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(-3, -1); ctx.lineTo(3, 1); ctx.moveTo(-3, 1); ctx.lineTo(2, -1.5); ctx.stroke();
       break;
-    case 'alarm': // LATCH's alarm wire: a thin taut line with two posts (defenders see it; attackers only up close)
+    case 'alarm': // LATCH's siren wire: a thin taut line between two posts, each with a little siren horn
       ctx.rotate(e.ag || 0);
       ctx.strokeStyle = 'rgba(220,230,120,0.75)'; ctx.lineWidth = 0.35; ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(0, 10); ctx.stroke();
-      ctx.fillStyle = '#4a4d3a'; ctx.fillRect(-1, -11, 2, 2); ctx.fillRect(-1, 9, 2, 2);
+      for (const s of [-1, 1]) { ctx.fillStyle = '#4a4d3a'; ctx.fillRect(-1, s * 10 - 1, 2, 2); ctx.fillStyle = opCol('alarm'); ctx.beginPath(); ctx.moveTo(1, s * 10 - 0.6); ctx.lineTo(2.8, s * 10 - 1.4); ctx.lineTo(2.8, s * 10 + 1.4); ctx.lineTo(1, s * 10 + 0.6); ctx.fill(); }
       break;
-    case 'echobox': // RUSE's echo box: a small speaker, pulsing
-      ctx.fillStyle = '#2b2f36'; ctx.fillRect(-3, -3, 6, 6);
-      ctx.fillStyle = '#8a6ad6'; ctx.beginPath(); ctx.arc(0, 0, 1.8 + (blink ? 0.4 : 0), 0, 7); ctx.fill();
+    case 'echobox': { // RUSE's echo box: a speaker cabinet with a big cone; her team sees the fake sound pouring out of it
+      ctx.rotate(e.ag || 0);
+      box(ctx, -3.2, -3, 5.4, 6, 0.8, '#2b2f36'); ctx.fillStyle = '#16181b'; ctx.beginPath(); ctx.moveTo(2.2, -2.6); ctx.lineTo(3.6, -3.4); ctx.lineTo(3.6, 3.4); ctx.lineTo(2.2, 2.6); ctx.fill();
+      ctx.fillStyle = opCol('echobox'); ctx.fillRect(-2.4, -0.8 - (blink ? 0.3 : 0), 1, 1.6 + (blink ? 0.6 : 0));
+      if (ally) { const k = (t * 2) % 1; ctx.strokeStyle = `rgba(138,106,214,${0.6 * (1 - k)})`; ctx.lineWidth = 0.5; for (const r of [5, 7.5]) { ctx.beginPath(); ctx.arc(0, 0, r + k * 3, -0.6, 0.6); ctx.stroke(); } }
       break;
-    case 'radar': // AUDIT's radar: a dish that sweeps
-      ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.arc(0, 0, 3, 0, 7); ctx.fill();
-      ctx.strokeStyle = '#5ad0c0'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(t * 3) * 4, Math.sin(t * 3) * 4); ctx.stroke();
+    }
+    case 'radar': { // AUDIT's drone radar: a parabolic dish on a tripod, turning; his team sees its sweep
+      for (const a of [1, 3.1, 5.2]) cap(ctx, 0, 0, Math.cos(a) * 3.6, Math.sin(a) * 3.6, 0.5, '#3a3e44');
+      ctx.rotate(t * 2);
+      if (ally) { ctx.fillStyle = 'rgba(90,208,192,0.12)'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 16, -0.25, 0.25); ctx.closePath(); ctx.fill(); }
+      ctx.strokeStyle = '#c8ccd2'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.ellipse(0.4, 0, 1.4, 3.4, 0, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+      cap(ctx, 0, 0, 2.8, 0, 0.4, '#9aa0a6'); ctx.fillStyle = opCol('radar'); ctx.fillRect(2.6, -0.4, 0.8, 0.8);
       break;
-    case 'station': // TONIC's heal station: a white case with a green cross
-      ctx.fillStyle = 'rgba(106,208,138,0.15)'; ctx.beginPath(); ctx.arc(0, 0, 24, 0, 7); ctx.fill();
-      ctx.fillStyle = '#e8ece8'; ctx.fillRect(-4, -3, 8, 6); ctx.fillStyle = '#3aa85a'; ctx.fillRect(-0.8, -2.2, 1.6, 4.4); ctx.fillRect(-2.2, -0.8, 4.4, 1.6);
+    }
+    case 'station': { // TONIC's heal station: an open medical case on fold-out legs, a pump and a drip line; her team sees its reach
+      if (ally) reach(ctx, 24, '106,208,138', 0.3);
+      for (const [x, y] of [[-4, -3], [4, -3], [-4, 3], [4, 3]]) cap(ctx, x * 0.8, y * 0.8, x * 1.25, y * 1.25, 0.6, '#55595f');
+      box(ctx, -4.5, -3.2, 9, 6.4, 1, '#e8ece8'); ctx.fillStyle = '#3aa85a'; ctx.fillRect(-0.8, -2.2, 1.6, 4.4); ctx.fillRect(-2.2, -0.8, 4.4, 1.6);
+      ctx.fillStyle = `rgba(106,208,138,${0.5 + 0.4 * Math.sin(t * 3)})`; ctx.fillRect(2.6, -2.6, 1.2, 1.2);
       break;
-    case 'healzone': // PATCH's field kit, burst open: a soft green circle
-      ctx.fillStyle = 'rgba(106,208,138,0.18)'; ctx.beginPath(); ctx.arc(0, 0, 40, 0, 7); ctx.fill();
-      ctx.strokeStyle = 'rgba(106,208,138,0.5)'; ctx.lineWidth = 0.6; ctx.stroke();
-      ctx.fillStyle = '#e8ece8'; ctx.fillRect(-2.5, -2, 5, 4); ctx.fillStyle = '#3aa85a'; ctx.fillRect(-0.5, -1.5, 1, 3); ctx.fillRect(-1.5, -0.5, 3, 1);
+    }
+    case 'healzone': { // PATCH's field kit burst open: drifting green mist puffs (not a circle), the empty kit in the middle
+      for (let i = 0; i < 9; i++) { const a = i * 0.7 + t * 0.15 * (i % 2 ? 1 : -1), r = 12 + (i * 9.3) % 24; ctx.fillStyle = 'rgba(106,208,138,0.10)'; ctx.beginPath(); ctx.ellipse(Math.cos(a) * r, Math.sin(a) * r, 9 + (i % 3) * 3, 6 + (i % 2) * 3, a, 0, 7); ctx.fill(); }
+      box(ctx, -3, -2.2, 6, 4.4, 0.8, '#e8ece8'); ctx.fillStyle = '#3aa85a'; ctx.fillRect(-0.5, -1.5, 1, 3); ctx.fillRect(-1.5, -0.5, 3, 1);
       break;
-    case 'catcher': // WARD's grenade catcher: a squat post with a blue emitter
-      ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.arc(0, 0, 3.2, 0, 7); ctx.fill();
-      ctx.fillStyle = blink ? '#9fc4ff' : '#4a78c8'; ctx.beginPath(); ctx.arc(0, 0, 1.6, 0, 7); ctx.fill();
+    }
+    case 'catcher': { // WARD's grenade catcher: a post with a three-pronged emitter crown, a blue spark jumping between the prongs
+      for (const a of [0, 2.09, 4.19]) { cap(ctx, 0, 0, Math.cos(a) * 3.6, Math.sin(a) * 3.6, 0.8, '#3a3e44'); ctx.fillStyle = '#9fc4ff'; ctx.fillRect(Math.cos(a) * 3.6 - 0.5, Math.sin(a) * 3.6 - 0.5, 1, 1); }
+      box(ctx, -1.6, -1.6, 3.2, 3.2, 0.6, '#2b2f36');
+      if (blink) { const a = Math.floor(t * 8) % 3 * 2.09; ctx.strokeStyle = 'rgba(160,200,255,0.9)'; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 3.6, Math.sin(a) * 3.6); ctx.lineTo(0.5, -0.4); ctx.lineTo(Math.cos(a + 2.09) * 3.6, Math.sin(a + 2.09) * 3.6); ctx.stroke(); }
       break;
+    }
     case 'defuser':
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(-4, -2, 9, 6);
       ctx.fillStyle = '#c9a227'; ctx.fillRect(-5, -3, 10, 6); ctx.fillStyle = '#222'; ctx.fillRect(-3, -1.5, 6, 3);
