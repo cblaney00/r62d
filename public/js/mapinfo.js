@@ -48,7 +48,7 @@ function pickMap(el, id) {
     c.fillStyle = 'rgba(255,255,255,0.6)'; c.font = '600 22px Barlow Condensed, sans-serif'; c.textAlign = 'center'; c.fillText('Drawing the map…', cv.width / 2, cv.height / 2);
     setTimeout(() => { // let the "drawing" note show first: building the picture takes a moment
       if (S.id !== id) return;
-      S.map = buildMap(id); S.rend = new MapRenderer(S.map, S.map.tiles.slice(), 0.25); S.loadedId = id;
+      S.map = buildMap(id); S.rend = new MapRenderer(S.map, S.map.tiles.slice(), 1); S.loadedId = id; // 1 picture px per world px: sharp at this page's zoom, ~3x quicker than match detail
       S.cams = (S.map.cams || []).map(c => wallMount(S.map, c.x, c.y));
       S.fl = S.map.groundFloor ?? 0; S.site = -1;
       side(el); floors(el); draw(el);

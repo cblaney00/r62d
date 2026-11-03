@@ -399,12 +399,20 @@ export function makeMap({ id, name, floors }) {
   };
   // Move a spawn back from the building (if it is closer than SPAWN_BACK cells) over open ground, then put a van or
   // container between it and the nearest building wall, and a second piece if the building's middle lies off to a side.
+  let spawnGeo = null;
   const coverSpawn = (s, i) => {
     const gf = fl.find(f => f.ground); if (!gf) return s;
     const inG = k => flAt[k] === gf.i, open = k => inG(k) && tiles[k] === T.GROUND && !propAt(k);
-    const dist = new Int32Array(N).fill(-1), src = new Int32Array(N).fill(-1), q = [];
-    for (let k = 0; k < N; k++) if (inG(k) && tiles[k] !== T.GROUND && tiles[k] !== T.LOW && tiles[k] !== T.TALL && tiles[k] !== T.VOID) { dist[k] = 0; src[k] = k; q.push(k); }
-    for (let h = 0; h < q.length; h++) { const k = q[h]; for (const d of [1, -1, W, -W]) { const n = k + d; if (n < 0 || n >= N || dist[n] >= 0 || !inG(n) || Math.abs((n % W) - (k % W)) > 1) continue; dist[n] = dist[k] + 1; src[n] = src[k]; q.push(n); } }
+    // how far every ground cell is from the building, and its nearest building cell: the same for every spawn, so
+    // worked out once per map (the slabs put down for earlier spawns don't change it)
+    if (!spawnGeo) {
+      const dist = new Int32Array(N).fill(-1), src = new Int32Array(N).fill(-1), q = [];
+      for (let k = 0; k < N; k++) if (inG(k) && tiles[k] !== T.GROUND && tiles[k] !== T.LOW && tiles[k] !== T.TALL && tiles[k] !== T.VOID) { dist[k] = 0; src[k] = k; q.push(k); }
+      for (let h = 0; h < q.length; h++) { const k = q[h]; for (const d of [1, -1, W, -W]) { const n = k + d; if (n < 0 || n >= N || dist[n] >= 0 || !inG(n) || Math.abs((n % W) - (k % W)) > 1) continue; dist[n] = dist[k] + 1; src[n] = src[k]; q.push(n); } }
+      let mx = 0, my = 0, n = 0; for (let k = 0; k < N; k++) if (dist[k] === 0) { mx += k % W; my += (k / W) | 0; n++; }
+      spawnGeo = { dist, src, mx: mx / n, my: my / n };
+    }
+    const { dist, src } = spawnGeo;
     const k0 = Math.floor(s.y / CELL) * W + Math.floor(s.x / CELL);
     const clear = k => { for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const n = k + dy * W + dx; if (n < 0 || n >= N || !open(n)) return false; } return true; };
     let best = k0;
@@ -430,8 +438,7 @@ export function makeMap({ id, name, floors }) {
     const kinds = ['van', 'container'], s0 = src[best];
     if (s0 >= 0) {
       const tx = s0 % W - bx, ty = ((s0 / W) | 0) - by; slab(tx, ty, kinds[i % 2]);
-      let mx = 0, my = 0, n = 0; for (let k = 0; k < N; k++) if (dist[k] === 0) { mx += k % W; my += (k / W) | 0; n++; }
-      const ax = mx / n - bx, ay = my / n - by, ang = Math.abs(Math.atan2(tx * ay - ty * ax, tx * ax + ty * ay));
+      const ax = spawnGeo.mx - bx, ay = spawnGeo.my - by, ang = Math.abs(Math.atan2(tx * ay - ty * ax, tx * ax + ty * ay));
       if (ang > 0.6) slab(ax, ay, kinds[(i + 1) % 2]);
     }
     // then, while spots inside (doorways, windows, rooms) still see the spawn, a piece toward the middle of them
@@ -455,7 +462,14 @@ export function makeMap({ id, name, floors }) {
     }
     return out;
   };
-  const propAt = k => { const x = k % W, y = (k / W) | 0; return props.some(p => x >= p.x && y >= p.y && x < p.x + p.w && y < p.y + p.h); };
+  // is there a prop on cell k? A grid filled in once (scanning every prop for every cell made building a map slow),
+  // kept up to date as props are added after that
+  let propGrid = null, propN = 0;
+  const propAt = k => {
+    if (!propGrid) propGrid = new Uint8Array(N);
+    for (; propN < props.length; propN++) { const p = props[propN]; for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) propGrid[y * W + x] = 1; }
+    return propGrid[k] === 1;
+  };
   const finish = (extra) => {
     finishShapes();
     // walls take the floor of the room next to them, so a hole shows the right floor

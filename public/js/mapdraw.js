@@ -34,10 +34,10 @@ export class Tiled {
 }
 
 export class MapRenderer {
-  constructor(map, baseTiles) {
-    this.map = map; this.base = baseTiles;
+  constructor(map, baseTiles, scale) { // scale: picture pixels per world pixel (default: the graphics setting's)
+    this.map = map; this.base = baseTiles; this.S = scale || S;
     this.Wp = map.W * CELL; this.Hp = map.H * CELL;
-    this.c = new Tiled(Math.ceil(this.Wp * S), Math.ceil(this.Hp * S)); // the map picture (shown by mount)
+    this.c = new Tiled(Math.ceil(this.Wp * this.S), Math.ceil(this.Hp * this.S)); // the map picture (shown by mount)
     this.ctx = this.dctx = this.c.tiles[0].ctx; // set to each piece in turn while drawing (onTiles)
     this.pat = floorPatterns(this.ctx);
     // (there is no grey copy any more: the fog layer draws this picture and the browser greys it, CSS filter on #fog.
@@ -46,6 +46,7 @@ export class MapRenderer {
   }
   // run fn once for every piece of the map picture that a world rectangle touches, with this.ctx drawing in world units there
   onTiles(x0, y0, x1, y1, fn) {
+    const S = this.S;
     for (const t of this.c.touching(x0 * S, y0 * S, x1 * S, y1 * S)) {
       this.ctx = this.dctx = t.ctx; t.ctx.setTransform(S, 0, 0, S, -t.x, -t.y); fn(t);
     }
@@ -164,7 +165,7 @@ export class MapRenderer {
   region(x0, y0, x1, y1) {
     const m = this.map;
     x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W - 1, x1); y1 = Math.min(m.H - 1, y1);
-    const X = x0 * CELL, Y = y0 * CELL, Wd = (x1 - x0 + 1) * CELL, Hd = (y1 - y0 + 1) * CELL, P = S * CELL;
+    const X = x0 * CELL, Y = y0 * CELL, Wd = (x1 - x0 + 1) * CELL, Hd = (y1 - y0 + 1) * CELL, P = this.S * CELL;
     this.onTiles(X, Y, X + Wd, Y + Hd, t => this.regionPart( // only the cells over this piece
       Math.max(x0, Math.floor(t.x / P)), Math.max(y0, Math.floor(t.y / P)), Math.min(x1, Math.floor((t.x + t.w - 1) / P)), Math.min(y1, Math.floor((t.y + t.h - 1) / P))));
   }

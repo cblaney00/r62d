@@ -40,7 +40,7 @@ function render(el) {
     const cv = el.querySelector('#pbCanvas'), c = cv.getContext('2d'); fit(cv);
     c.fillStyle = '#0b0e12'; c.fillRect(0, 0, cv.width, cv.height); c.fillStyle = 'rgba(255,255,255,0.6)'; c.font = '600 22px Barlow Condensed, sans-serif'; c.textAlign = 'center'; c.fillText('Drawing the map…', cv.width / 2, cv.height / 2);
     const want = S.id;
-    setTimeout(() => { if (S.id !== want) return; S.map = buildMap(want); S.rend = new MapRenderer(S.map, S.map.tiles.slice(), 0.25); S.loaded = want; render(el); }, 30);
+    setTimeout(() => { if (S.id !== want) return; S.map = buildMap(want); S.rend = new MapRenderer(S.map, S.map.tiles.slice(), 0.6); S.loaded = want; render(el); }, 30);
     return;
   }
   const m = S.map;
