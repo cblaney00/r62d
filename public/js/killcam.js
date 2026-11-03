@@ -37,7 +37,7 @@ function start() {
   cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
 }
 // where everyone was at time t (seconds before the death, negative), smoothly between frames
-function poses(t) {
+export function poses(t, kc) {
   const F = kc.fr; let i = F.findIndex(f => f.t >= t); if (i < 0) i = F.length - 1;
   const b = F[i], a = F[Math.max(0, i - 1)], u = b.t === a.t ? 1 : Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t)));
   const out = new Map();
@@ -55,14 +55,19 @@ function frame() {
   const pass = Math.floor(el2 / len);
   if (!kc.killer && pass === 0) { t0 -= len; return; } // nobody to ride along with: your view only
   if (pass >= PASSES.length) { showResult(); cancelAnimationFrame(raf); return; }
-  const t = first + (el2 % len), [who, title] = PASSES[pass], P = poses(Math.min(t, 0)), focusId = kc[who];
+  const t = first + (el2 % len), [who, title] = PASSES[pass], P = poses(Math.min(t, 0), kc), focusId = kc[who];
   const nm = id => (kc.names[id] || ['?'])[0];
   el.querySelector('.kcTitle').textContent = title;
   el.querySelector('.kcSub').textContent = who === 'killer' ? `${nm(kc.killer)} · ${kc.w}${kc.hs ? ' · HEADSHOT' : ''}` : 'what you could see';
   el.querySelector('.kcBar i').style.width = Math.round((el2 % len) / len * 100) + '%';
   const focus = P.get(focusId) || P.get(kc.victim) || [...P.values()][0];
   if (!focus) return;
-  const z = H / VIEW_H, cx = focus.x, cy = focus.y;
+  drawClip(c, W, H, kc, rend, map, t, P, focus, focus.x, focus.y, H / VIEW_H);
+}
+// one picture of a recorded clip at time t (seconds from the kill): the map, what focus could see, shots, people.
+// Also used by the Esports TV instant replays (tvreplay.js), with its own smoothly moving camera (cx, cy, z).
+export function drawClip(c, W, H, kc, rend, map, t, P, focus, cx, cy, z) {
+  const nm = id => (kc.names[id] || ['?'])[0];
   c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#07090c'; c.fillRect(0, 0, W, H);
   c.setTransform(z, 0, 0, z, W / 2 - cx * z, H / 2 - cy * z);
   const k = rend.c.width / rend.Wp, vx0 = cx - W / 2 / z, vy0 = cy - H / 2 / z, vw = W / z, vh = H / z;

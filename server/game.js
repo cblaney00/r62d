@@ -434,7 +434,7 @@ export class Game {
       p.prevInput = p.input;
     }
     this.tickEnts(dt);
-    this.recordHistory(); this.recordCam();
+    this.recordHistory(); this.recordCam(); if (this.tv) this.tvClips();
 
     this.revealCheck -= dt;
     if (this.revealCheck <= 0) { this.revealCheck = 0.25; this.checkReveal(); }
@@ -810,6 +810,32 @@ export class Game {
     for (const f of frames) { const k = f.ps.find(e => e[0] === src.id); if (k && prev && Math.hypot(k[1] - prev[1], k[2] - prev[2]) > 70 && fl(k[1], k[2]) === fl(prev[1], prev[2])) { bug.push('the shooter jumped across the map'); break; } prev = k; }
     return { rating: Math.min(10, score), why, bug: bug.length ? bug : null };
   }
+  // ESPORTS TV instant replays (he asked: short replays of big moments the camera missed): what made a kill big, and the
+  // clip sent ~1.2 s later (so it shows the moment after too). The viewer's screen decides whether its camera missed it.
+  tvKill(q, src, wname) {
+    const big = [], t = this.time, sq = src.squad;
+    const streak = ((src.tvKills || []).filter(k => t - k < 10)); streak.push(t); src.tvKills = streak;
+    if (streak.length >= 2) big.push(streak.length >= 3 ? 'TRIPLE KILL' : 'DOUBLE KILL');
+    if (this.headshot && Math.hypot(src.x - q.x, src.y - q.y) > 15 * PX_PER_M) big.push('LONG HEADSHOT');
+    const mates = [...this.players.values()].filter(o => o.squad === sq && o.alive && !o.downed).length;
+    if (mates === 1 && this.side(src) !== this.side(q)) big.push('CLUTCH');
+    if (wname && wname !== 'Melee' && !Object.values(WEAPONS).some(w => w.name === wname)) big.push(wname.toUpperCase()); // a skill or gadget kill
+    if (this.side(src) === this.side(q)) big.push('TEAMKILL');
+    (this.tvClipQ || (this.tvClipQ = [])).push({ due: t + 1.2, at: t, victim: q.id, killer: src.id, w: wname || '', hs: this.headshot ? 1 : 0, big, kx: r1(src.x), ky: r1(src.y), vx: r1(q.x), vy: r1(q.y) });
+  }
+  tvClips() {
+    if (!this.tvClipQ || !this.tvClipQ.length) return;
+    for (const c of this.tvClipQ.filter(c => this.time >= c.due)) {
+      const frames = (this.camBuf || []).filter(f => f.t >= c.at - 5 && f.t <= c.at + 1.2), ids = new Set([c.killer, c.victim]);
+      for (const f of frames) for (const e of f.ps) if (!ids.has(e[0]) && Math.min(Math.hypot(c.kx - e[1], c.ky - e[2]), Math.hypot(c.vx - e[1], c.vy - e[2])) < 260) ids.add(e[0]);
+      const m = JSON.stringify({ t: 'tvclip', killer: c.killer, victim: c.victim, w: c.w, hs: c.hs, big: c.big, kx: c.kx, ky: c.ky, vx: c.vx, vy: c.vy,
+        fr: frames.map(f => ({ t: r2(f.t - c.at), ps: f.ps.filter(e => ids.has(e[0])) })),
+        shots: (this.shotLog || []).filter(s => s.t >= c.at - 5 && s.t <= c.at + 1.2 && ids.has(s.id)).map(s => ({ ...s, t: r2(s.t - c.at) })),
+        names: Object.fromEntries([...ids].map(id => { const p = this.players.get(id); return [id, p ? [p.name.replace(/^\[\w+\] /, ''), p.squad === 0 ? 1 : 0] : ['?', 0]]; })) });
+      for (const sk of this.tv.socks) if (sk.open) sk.send(m);
+    }
+    this.tvClipQ = this.tvClipQ.filter(c => this.time < c.due);
+  }
   sendKillcam(q, src, wname) {
     const now = this.time, frames = (this.camBuf || []).filter(f => f.t >= now - 5.5), ids = new Set([q.id]);
     if (src) ids.add(src.id);
@@ -1058,6 +1084,7 @@ export class Game {
     this.events.push({ e: 'kill', killer: src ? src.id : null, victim: q.id, w: wname || '', hs: this.headshot ? 1 : 0 });
     if (q.hasDefuser) this.dropDefuser(q);
     if (q.sock && q.sock.open && !this.tv) try { this.sendKillcam(q, src, wname); } catch (err) { console.log('killcam:', err.message); }
+    if (this.tv && this.tv.socks.size && src && src !== q) this.tvKill(q, src, wname);
     const d = this.ent(q.droneId); if (d && this.phase === PHASE.PREP) this.removeEnt(d);
   }
 

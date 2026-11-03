@@ -10,6 +10,7 @@ import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
+import { offerReplay, tickReplay, stopReplay } from './tvreplay.js';
 import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
 import { openOps, closeOps, updateOpsProfile, showLoadout } from './ops.js';
@@ -254,6 +255,7 @@ function connect(mode = '') { // '' = the shared match, 'tut' / 'free' = a priva
       try { localStorage.setItem('r62d-token', m.token); } catch {}
       $('join').classList.add('hidden'); $('room').classList.remove('hidden');
     } else if (m.t === 'snap') onSnap(m);
+    else if (m.t === 'tvclip') { if (st.tv && ((m.big.length && !(st.tv.seen && st.tv.seen[m.victim])) || st.tvAllReplays)) offerReplay(m); } // (tvAllReplays: screenshot tests) // a big moment the camera missed
     else if (m.t === 'killcam') { st.killcam = m; m.got = performance.now(); } // watched from the death screen (F or the button)
     else if (m.t === 'full') alert('The game is full (10 players).');
     else if (m.t === 'taken') alert(`Someone is already playing as ${m.name}. Type a different name.`);
@@ -274,7 +276,7 @@ $('coach').addEventListener('click', e => { if ((coach.blocking && !e.target.clo
 // free = { map, bots } for a free-play match (see the FREE PLAY page below)
 function switchMatch(lesson, free = null, tv = null) {
   if (!st.token) { setTab('play'); $('name').focus(); return; }
-  st.tutorial = lesson; st.free = free; st.tv = tv ? { map: tv.map, level: tv.level, req: tv.req || [], auto: true, follow: null, overview: false, cutT: 0, shot: {} } : null; st.rejoin = true; st.marks = [];
+  stopReplay(); st.tutorial = lesson; st.free = free; st.tv = tv ? { map: tv.map, level: tv.level, req: tv.req || [], auto: true, follow: null, overview: false, cutT: 0, shot: {} } : null; st.rejoin = true; st.marks = [];
   document.documentElement.classList.toggle('tv', !!tv);
   if (lesson) coach.start(lesson); else coach.stop();
   const leave = lesson ? 'Leave tutorial' : free ? 'Leave free play' : tv ? 'Leave Esports TV' : '';
@@ -463,7 +465,7 @@ function onSnap(s) {
   const ents = new Map(s.ents.map(e => [e.id, e]));
   st.snaps.push({ t: now, st: s.time, players, ents }); if (st.snaps.length > 12) st.snaps.shift();
   const prevMe = st.me;
-  if (st.tv) { tvDirector(s, players, now); st.id = st.tv.follow; } // ESPORTS TV: ride along with whoever the director (or you) picked
+  if (st.tv) { tvDirector(s, players, now); st.id = st.tv.follow; if (st.rend) tickReplay(!!st.tv.calm && s.ph === PHASE.ACTION, st.rend, st.map); } // ESPORTS TV: ride along with whoever the director (or you) picked
   st.last = s; st.me = players.get(st.tv ? st.tv.follow : s.you) || null;
   if (st.map) st.map.covers = s.ents.filter(e => e.ty === 'cover').map(coverOf); // TRENCH's plates block you here too (prediction, sight)
   for (const e of s.ev) onEvent(e, s, players);
@@ -1330,7 +1332,10 @@ function frame(nowMs) {
   if (view) {
     cx = view.x; cy = view.y;
     if (view.kind === 'body') {
-      const c = cursor(), mw = st.tv ? { x: st.pred.x + Math.cos(st.aim) * 160, y: st.pred.y + Math.sin(st.aim) * 160 } : screenToWorld(c.x, c.y); // TV: lead the way they look
+      // he said the view was "super bouncy" when looking round: the lead used the crosshair's place on SCREEN, which itself
+      // moves with the camera (a feedback loop). Crosshair mode now leads from the aim point in the world.
+      const fa = !st.tv && padOn && aimMode === 'free' && !gpRecent() ? freeAimPoint() : null;
+      const c = cursor(), mw = st.tv ? { x: st.pred.x + Math.cos(st.aim) * 160, y: st.pred.y + Math.sin(st.aim) * 160 } : fa ? { x: fa.ax, y: fa.ay } : screenToWorld(c.x, c.y); // TV: lead the way they look
       const vh = st.viewH || 400;
       const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? (String(me.aa).includes('scope') ? 0.46 : 0.32) : 0.2); // a scope looks further ahead
       let ax = l > mx ? lx / l * mx : lx, ay = l > mx ? ly / l * mx : ly;
@@ -1338,7 +1343,7 @@ function frame(nowMs) {
       // ahead far enough that its far end is on screen (st.sightLead, worked out with the zoom below)
       const sl = st.sightLead || 0, al = Math.hypot(ax, ay);
       if (sl > al) { ax = Math.cos(view.ang) * sl; ay = Math.sin(view.ang) * sl; }
-      st.leadV = st.leadV || { x: ax, y: ay }; const kl = 1 - Math.exp(-dt * 4); // the lead swings round smoothly when you turn
+      st.leadV = st.leadV || { x: ax, y: ay }; const kl = 1 - Math.exp(-dt * 2.4); // the lead swings round smoothly (and slowly) when you turn
       st.leadV.x += (ax - st.leadV.x) * kl; st.leadV.y += (ay - st.leadV.y) * kl;
       let lvx = st.leadV.x, lvy = st.leadV.y;
       if (isTouch) { const hw = vh * VW / VH * 0.16, hh = vh * 0.12; lvx = Math.max(-hw, Math.min(hw, lvx)); lvy = Math.max(-hh, Math.min(hh, lvy)); } // phone: you stay near the middle, clear of thumbs and panels
@@ -1372,7 +1377,7 @@ function frame(nowMs) {
     for (let i = 0; i < 24; i++) sum += castSight(st.map, view.x, view.y, i / 24 * Math.PI * 2, 700, null);
     const avg = sum / 24, aimD = castSight(st.map, view.x, view.y, view.ang, 900, null);
     want = Math.max(240, Math.min(470, avg * 1.15 + 110));
-    want = Math.max(want, Math.min(view.kind === 'cam' ? 580 : 520, aimD * (view.kind === 'cam' ? 0.75 : 0.6)));
+    if (view.kind !== 'body') want = Math.max(want, Math.min(view.kind === 'cam' ? 580 : 520, aimD * (view.kind === 'cam' ? 0.75 : 0.6))); // (a body: farS below, steadier)
     if (view.kind === 'body') {
       // how far you can be seen (and so shot) from in the way you face: the 80th-percentile sightline across your
       // view cone, so one sliver through a doorway doesn't count. It grows quickly and shrinks slowly (no jumpy camera).
@@ -1380,7 +1385,7 @@ function frame(nowMs) {
       for (let i = 0; i < n; i++) ds.push(castSight(st.map, view.x, view.y, view.ang - fov / 2 + fov * i / (n - 1), 1100, null));
       ds.sort((a, b) => a - b);
       const far = ds[Math.floor(n * 0.8)];
-      st.farS = st.farS === undefined ? far : st.farS + (far - st.farS) * (1 - Math.exp(-dt * (far > st.farS ? 2 : 0.7))); // calm outdoors, where sightlines change a lot as you turn
+      st.farS = st.farS === undefined ? far : st.farS + (far - st.farS) * (1 - Math.exp(-dt * (far > st.farS ? 1.2 : 0.6))); // calm outdoors, where sightlines change a lot as you turn
       // the screen must hold you and that far point: its reach along your aim is viewH * e (e from the screen's shape)
       const cA = Math.abs(Math.cos(view.ang)), sA = Math.abs(Math.sin(view.ang));
       const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), m1 = 70, m2 = 40;
@@ -1393,7 +1398,7 @@ function frame(nowMs) {
   // your aim, and then settles quickly, so the view isn't always slowly drifting in and out (he asked for less slow panning)
   if (!st.envWant || Math.abs(want - st.envWant) > st.envWant * 0.15 || (view && view.kind !== 'body')) st.envWant = want;
   st.envH = st.envH || st.envWant;
-  st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * 6));
+  st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * (view && view.kind === 'body' ? 3 : 6))); // a gentle glide, not a pump
   // aiming down sights widens the view, fast (he asked: it used to zoom in, the opposite of what you want); a 2x scope widest
   const adsZ = view && view.kind === 'body' && me && me.ad ? (String(me.aa).includes('scope') ? 1.3 : 1.12) : 1;
   st.adsZ = st.adsZ || 1;
@@ -2927,6 +2932,10 @@ function tvDirector(s, players, now) {
   // shot steadily, never leave a fight until it is over, cut to the killer when the player they follow dies, stay with
   // a clutch or a player on a streak, open the action with a map shot, and move on from someone with nothing going on.
   for (const e of s.ev) if (e.e === 'kill' && e.killer) (T.kills || (T.kills = {}))[e.killer] = [...((T.kills || {})[e.killer] || []).filter(t => now - t < 10), now];
+  // instant replays: did this camera catch the kill? (the killer or victim followed, or on screen)
+  const onScreen = p => { if (!p || p.x === undefined || T.overview) return !!(p && T.overview); const q = w2s(p.x, p.y); return q.x > 0 && q.y > 0 && q.x < innerWidth && q.y < innerHeight; };
+  for (const e of s.ev) if (e.e === 'kill' && e.killer) { const k = s.players.find(p => p.id === e.killer), v = st.snaps.length > 1 ? st.snaps[st.snaps.length - 2].players.get(e.victim) : null;
+    (T.seen || (T.seen = {}))[e.victim] = e.killer === T.follow || e.victim === T.follow || onScreen(k) || onScreen(v); }
   if (s.ph === PHASE.ACTION && T.lastPh !== PHASE.ACTION) { T.lastPh = s.ph; if (T.auto) { T.overview = true; T.ovUntil = now + 3.5; } } // the opening map shot
   if (s.ph !== PHASE.ACTION) T.lastPh = s.ph;
   if (T.ovUntil && now > T.ovUntil) { T.ovUntil = 0; if (T.auto) T.overview = false; }
@@ -2937,11 +2946,12 @@ function tvDirector(s, players, now) {
   for (const i of [0, 1]) T.sqTime[i] *= Math.exp(-sdt / 120);
   if (cur && cur.sq !== undefined && !T.overview) T.sqTime[cur.sq] += sdt;
   const share = sq => { const a = T.sqTime[sq], b = T.sqTime[1 - sq]; return (b - a) / Math.max(20, a + b); }; // > 0: this team is owed screen time
-  if (!T.auto && curOk) return;
-  if (T.ovUntil) return;
   const alive = s.players.filter(p => p.a && !p.dn && p.x !== undefined);
   const fl = p => floorAt(st.map, p.x, p.y), recentShot = (p, w) => now - (T.shot[p.id] || -9) < w;
   const fighting = p => recentShot(p, 1.8) || alive.some(q => q.sq !== p.sq && fl(q) === fl(p) && Math.hypot(q.x - p.x, q.y - p.y) < 260 && recentShot(q, 1.8));
+  T.calm = !T.ovUntil && !(curOk && fighting(cur)) && !(T.overview && alive.some(fighting)); // (an instant replay waits for this)
+  if (!T.auto && curOk) return;
+  if (T.ovUntil) return;
   // the followed player died or went down: one beat on it, then the killer (the trade is the story)
   if (cur && (!cur.a || cur.dn)) {
     if (!T.diedT) T.diedT = now;

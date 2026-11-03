@@ -189,7 +189,13 @@ His wishes so far:
 - Dead connections: `server/ws.js` pings every 5 s, drops after 30 s silent or 1 MB unsent (that was the 12 GB on Lando's server; zombie TV/free games kept running). Practice worker `resourceLimits` 512 MB. `node tests/deadclient.js`.
 - Phones: `html.touch` lobby = top tab strip; Settings pages (now for every screen, see the second batch below). Not done: Lando LAN (his firewall). Slow mouse: play.sh sets Hyprland `input:accel_profile flat` while the kiosk window is open and restores it after (Firefox Wayland truncates sub-pixel relative motion, nsWindowWayland.cpp `relative_pointer_handle_relative_motion`).
 
-## Batch 23 in progress: see docs/batch-23.md (watch matches, fix what is found)
+## Batch 23 (done; notes in docs/batch-23.md)
+- Weak breachers: Hammer 4 slugs, Ferro `HAMMER_CD` 2.5 s and one swing clears T.BARRI/T.BEAM/T.DSHIELD or an unreinforced hatch (still no walls), Salvo 5, Torque 4 discs at 60. Bots: `BREACH_TOOLS` has sticky (`blow`: set off from the wait spot) and saw, no hammer (Ferro swings in `botAbility`); `proPickOp` puts `HARD_BREACH` first only when the plan opens a wall, and a soft breacher whose plan wall is reinforced uses `planBreach` instead.
+- Key layouts (he chose the games): `PRESETS`/`applyPreset` in keys.js, buttons `#keyPresets` in Settings → Keys.
+- TV viewer requests (he asked: up to 3, must play, one per role per side): `tvPick.req`/`#tvReq` in main.js, server `this.tv.req`, `requestPick` (amateurs) and the front of the pool in `proPickOp`. `node tests/tvrequests.js`.
+- TV instant replays (he asked: full screen ~6 s, fade-in/fade-out times, smooth): server `tvKill` (why it's big) → `tvClips` sends `tvclip` 1.2 s later; client `T.seen` (did the camera catch it), `T.calm` (nobody mid-fight), `public/js/tvreplay.js` (`offerReplay`/`tickReplay`; slow motion round the kill, eased camera, gold wipe, ≥18 s apart) drawing with `drawClip`/`poses` from killcam.js. `st.tvAllReplays` forces them for screenshot tests.
+- Camera bounce (he said: "super bouncy when you look around"): Crosshair mode leads from `freeAimPoint()` (world), not the screen cursor (feedback loop); no aim-distance zoom for bodies; slower lead/zoom glides.
+- Don't start long background runs (e.g. a 20-minute pro practice) without asking him.
 
 ## Batch of 2026-11-02 (second): six items from his list
 - Defender outside (he asked): server `p.outside` (T.GROUND under a living defender in PREP/ACTION) → snapshot `ou` (ids); attackers get `#outWarn` at the top ("⚠ DEFENDER OUTSIDE · ARGUS · NEAR WEST GARDEN", nearest `atkSpawns` name) from `drawOutWarn` in main.js, with `audio.ui('alert')` when the count rises.
