@@ -1937,6 +1937,18 @@ function draw(s, view, now, dt) {
       for (const v of st.viewers) if (v.tvSq === sq && !v.off) { const pts = visionPolygon(v, sm, 140); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); }
       ctx.fill('nonzero'); ctx.globalAlpha = 1;
     }
+    // every working camera's view as a faint cone; brighter outline in the team colour while someone looks through it
+    const watched = new Map(); for (const sp of s.players) if (sp.a && sp.cf) watched.set(sp.cf, sp.sq);
+    ctx.lineWidth = 1.4 / (st.zoom || 1);
+    for (const c of s.ents) {
+      if (c.ty !== 'cam' || !(c.hp > 0) || c.off || floorAt(st.map, c.x, c.y) !== floorAt(st.map, st.cam.x, st.cam.y)) continue;
+      const k = c.id + ':' + Math.round((c.ag || 0) * 50), pts = tvCamCone.get(k) || visionPolygon({ ...feedView(c, { id: null }), ang: c.ag || 0 }, [], 0);
+      tvCamCone.set(k, pts); if (tvCamCone.size > 200) tvCamCone.clear();
+      ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath();
+      const sq = watched.get(c.id), on = sq !== undefined, col = on ? (pro && PRO_TEAMS[sq] ? PRO_TEAMS[sq].colour : sq ? '#ff8a3d' : '#46a8ff') : '#ffffff';
+      ctx.globalAlpha = on ? 0.16 : 0.045; ctx.fillStyle = col; ctx.fill();
+      ctx.globalAlpha = on ? 0.75 : 0.16; ctx.strokeStyle = col; ctx.stroke(); ctx.globalAlpha = 1;
+    }
   }
 
   tq = pfa('fog', tq);
@@ -2470,6 +2482,7 @@ function camBar(s, me) {
 // Only what you look through (he asked): your own eyes, or the drone / camera feed you are watching (yours or a
 // teammate's), or the teammate you spectate once dead. Teammates' eyes, drones and cameras no longer light up your map;
 // their pings and spotted marks still show, and where a teammate died is marked clearly (deathMarks).
+const tvCamCone = new Map(); // ESPORTS TV: each camera's sight polygon by camera and angle (cameras hardly move)
 function teamViewers(s, view, me, inGame) {
   const vs = [];
   if (view) vs.push(view);
@@ -2480,6 +2493,8 @@ function teamViewers(s, view, me, inGame) {
       const p = interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
       vs.push({ x: p.x, y: p.y, ang: p.ag || 0, fov: fovFor(p), range: 1100, near: 26, kind: 'body', tvSq: sp.sq });
     }
+    // he asked: a camera someone is actually looking through shows its view live, in the watcher's team colour
+    for (const sp of s.players) if (sp.a && sp.cf) { const c = s.ents.find(e => e.id === sp.cf && e.ty === 'cam' && e.hp > 0 && !e.off); if (c) vs.push({ ...feedView(c, { id: null }), ang: c.ag || 0, ro: 1, tvSq: sp.sq, tvCam: 1 }); }
   }
   if (!s || !me || !inGame) return vs;
   // an open hatch someone can see into shows a little of the room on the other side of it
