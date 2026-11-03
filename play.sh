@@ -11,6 +11,16 @@ if ! up; then
   for i in $(seq 1 90); do up && break; sleep 1; done
 fi
 PROFILE="$HOME/.local/share/r62d/firefox-kiosk"
+# He asked: the server is only up while someone has the game open. Once the window has closed, wait until nobody
+# (a friend on another computer included) has been connected for 20 s in a row, then stop it.
+stop_server() {
+  local quiet=0
+  while [ "$quiet" -lt 20 ]; do
+    if [ -n "$(ss -Htn state established '( sport = :6262 )')" ]; then quiet=0; else quiet=$((quiet + 2)); fi
+    sleep 2
+  done
+  pkill -u "$(id -u)" -f '^node server/server.js$'
+}
 # already open? don't start a second copy
 pgrep -f "r62d/firefox-kiosk" > /dev/null && exit 0
 mkdir -p "$PROFILE"
@@ -40,6 +50,8 @@ if [ -n "$HC" ] && [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
   "$HC" keyword input:accel_profile flat > /dev/null
   firefox --kiosk --no-remote --profile "$PROFILE" "http://localhost:6262/?app=1"
   "$HC" keyword input:accel_profile "$old" > /dev/null
+  stop_server
   exit 0
 fi
-exec firefox --kiosk --no-remote --profile "$PROFILE" "http://localhost:6262/?app=1"
+firefox --kiosk --no-remote --profile "$PROFILE" "http://localhost:6262/?app=1"
+stop_server

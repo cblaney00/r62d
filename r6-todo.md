@@ -10,6 +10,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] The game server only runs while the game is open: when you close the game window it stops by itself, once nobody (a friend included) has been connected for 20 seconds.
 - [x] Bots keep their view on angles worth holding: when a wall is between them and what they guard, they now watch the corner it would come round instead of the wall, and when walking they look along their route. Measured over one pro match on each map: time spent staring into a wall close up halved (28% to 14%), and when an enemy first comes into clear view the aim is within 25° of them 53% of the time instead of 39%. Still not perfect: walking bots improved the most, but pros standing still on a hold were further off at first contact in this measure (about 45° instead of 23°).
 - [x] One-file installer: not needed, he decided the zip is fine (unzip, double-click R62D.exe).
 - [x] Main menu: the buttons on the left are smaller and grouped under PLAY, WATCH, LEARN and YOU, with QUIT at the bottom.
