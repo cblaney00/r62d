@@ -14,9 +14,7 @@ let rounds = 0, atkWins = 0;
 for (const id of only ? [only] : MAP_LIST) for (let n = 0; n < per; n++) {
   const g = new Game(); g.mapId = id; g.map = buildMap(id); g.botLevel = level;
   for (let i = 0; i < 10; i++) g.addBot();
-  const ua = g.useAbility.bind(g), ug = g.useGadget.bind(g);
-  g.useAbility = p => { const b = JSON.stringify([p.ability, p.abilityCount, p.charges]); const r = ua(p); if (JSON.stringify([p.ability, p.abilityCount, p.charges]) !== b || r) abil[p.op] = (abil[p.op] || 0) + 1; return r; };
-  g.useGadget = p => { const b = JSON.stringify(p.gadgets || p.gadget); const r = ug(p); if (JSON.stringify(p.gadgets || p.gadget) !== b) gad[p.op] = (gad[p.op] || 0) + 1; return r; };
+  const seen = new Set();
   g.startMatch();
   let t = 0, last = g.phase, rt = 0, fk = false;
   while (t < 60 * 30 && !(g.phase === PHASE.LOBBY && t > 5)) {
@@ -33,6 +31,7 @@ for (const id of only ? [only] : MAP_LIST) for (let n = 0; n < per; n++) {
       if (e.e === 'drone') inc('droneEvent');
     }
     g.events.length = 0;
+    for (const e of g.ents) if (!seen.has(e.id)) { seen.add(e.id); const o = g.players.get(e.owner); if (o && o.op && e.type !== 'drone') { const m = OPERATORS[o.op].ability && e.type === OPERATORS[o.op].ability.id ? abil : gad; (m[o.op] || (m[o.op] = {}))[e.type] = (m[o.op][e.type] || 0) + 1; } }
     if (g.phase !== last && g.phase === PHASE.ACTION) {
       rt = 0; fk = false;
       for (const p of g.players.values()) if (p.op) { const s = g.side(p); picks[s][p.op] = (picks[s][p.op] || 0) + 1; opRounds[p.op] = (opRounds[p.op] || 0) + 1; }
@@ -52,10 +51,10 @@ console.log(`${rounds} rounds, attackers won ${pct(atkWins, rounds)}; level ${le
 console.log('How rounds end:', top(reasons));
 const avg = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : 0;
 durs.sort((a, b) => a - b); console.log(`Action phase length: median ${durs[durs.length >> 1]} s, avg ${avg(durs)} s; first kill avg ${avg(firstKill)} s in`);
-console.log('Counts:', top(C));
+console.log('Counts:', top(Object.fromEntries(Object.entries(C).filter(([k]) => !k.startsWith('abilAvail')))));
 console.log('\nATTACK picks:', top(picks.atk)); console.log('\nDEFENCE picks:', top(picks.def));
 const never = Object.keys(OPERATORS).filter(k => !opRounds[k]); console.log('\nNever picked:', never.join(', ') || '-');
-console.log('\nAbility uses per round played:'); console.log(Object.keys(opRounds).sort((a, b) => (abil[a] || 0) / opRounds[a] - (abil[b] || 0) / opRounds[b]).map(k => `${k} ${((abil[k] || 0) / opRounds[k]).toFixed(1)}`).join(', '));
-console.log('\nGadget uses per round played:'); console.log(Object.keys(opRounds).sort((a, b) => (gad[a] || 0) / opRounds[a] - (gad[b] || 0) / opRounds[b]).map(k => `${k} ${((gad[k] || 0) / opRounds[k]).toFixed(1)}`).join(', '));
+console.log('\nThings placed or thrown per round played (operator: what):');
+for (const k of Object.keys(opRounds).sort()) { const all = { ...(abil[k] || {}), ...(gad[k] || {}) }; console.log(`  ${k.padEnd(8)} ${String(opRounds[k]).padStart(3)} rounds: ${Object.entries(all).map(([t, n]) => `${t} ${(n / opRounds[k]).toFixed(1)}`).join(', ') || '-'}`); }
 console.log('\nSome calls:'); for (const c of calls.slice(0, 30)) console.log('  ' + c);
 process.exit(0);

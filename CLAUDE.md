@@ -189,6 +189,8 @@ His wishes so far:
 - Dead connections: `server/ws.js` pings every 5 s, drops after 30 s silent or 1 MB unsent (that was the 12 GB on Lando's server; zombie TV/free games kept running). Practice worker `resourceLimits` 512 MB. `node tests/deadclient.js`.
 - Phones: `html.touch` lobby = top tab strip; Settings pages (now for every screen, see the second batch below). Not done: Lando LAN (his firewall). Slow mouse: play.sh sets Hyprland `input:accel_profile flat` while the kiosk window is open and restores it after (Firefox Wayland truncates sub-pixel relative motion, nsWindowWayland.cpp `relative_pointer_handle_relative_motion`).
 
+## Batch 23 in progress: see docs/batch-23.md (watch matches, fix what is found)
+
 ## Batch of 2026-11-02 (second): six items from his list
 - Defender outside (he asked): server `p.outside` (T.GROUND under a living defender in PREP/ACTION) → snapshot `ou` (ids); attackers get `#outWarn` at the top ("⚠ DEFENDER OUTSIDE · ARGUS · NEAR WEST GARDEN", nearest `atkSpawns` name) from `drawOutWarn` in main.js, with `audio.ui('alert')` when the count rises.
 - Settings rebuilt (he chose sections down the left): `#settings` = `.setSide` nav + `.setBody` pages (`.setPage[data-p]`: sound, aim, keys, screen, xhair), `showSetPage` remembers `r62d-setpage`. Each row is `.srow` (`.sl` name + plain hint, `.sctl` control; not `.sc`, that class is the scoreboard). Keys table grouped by `KEY_GROUPS`. The old phone-only page split is gone (all screens have pages).

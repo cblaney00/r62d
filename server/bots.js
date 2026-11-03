@@ -486,6 +486,7 @@ export function botThink(game, p, dt) {
     const mine = game.ents.filter(e => e.type === 'sticky' && e.owner === p.id && e.stuck && !e.go);
     if (mine.length && mine.every(e => Math.hypot(e.x - p.x, e.y - p.y) > 60) && Math.random() < dt * 2) useAbility();
   }
+  if (action && !p.downed && botAbility(game, p, ai, abId, enemy, heardRecently, team, site, useAbility, inp, dt)) return; // (welding: stand and hold)
   if (enemy) {
     const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
     if (ai.seen !== enemy.id) { // a surprise takes longer to react to than something they were listening for
@@ -616,6 +617,9 @@ export function botThink(game, p, dt) {
     const item = game.ents.find(e => e.type === 'defuser');
     if (game.planted) goal = ai.guard || (ai.guard = game.freeSpotNear(game.planted.x, game.planted.y, 70));
     else if (p.hasDefuser) {
+      // plant at whichever spot is reached first (watching pro rounds: carriers stood on one spot walking to the other)
+      const nb = site.bombs.reduce((a, c) => Math.hypot(c.x - p.x, c.y - p.y) < Math.hypot(a.x - p.x, a.y - p.y) ? c : a);
+      if (Math.hypot(nb.x - p.x, nb.y - p.y) < 90) ai.bomb = nb;
       const b = ai.bomb || (ai.bomb = site.bombs[Math.floor(Math.random() * 2)]);
       goal = b; const bd = Math.hypot(b.x - p.x, b.y - p.y);
       if (bd < 24) act = 'plant';
@@ -745,6 +749,51 @@ export function botThink(game, p, dt) {
 
 // On the cameras: flick through the feeds, spot what they see for the team, and get back to the body after a few
 // seconds, or at once when something is heard close by or the body is hit.
+// Abilities the bots never used before (watching pro matches showed ten operators whose skill never came out): each
+// one at the moment a player would reach for it. Rate-limited by ai.abT so nobody empties their charges in a second.
+function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp, dt) {
+  const ok = () => p.abilityCount > 0 && game.time > (ai.abT || 0), done = (wait = 4) => { ai.abT = game.time + wait; };
+  const d = enemy ? Math.hypot(enemy.x - p.x, enemy.y - p.y) : Infinity, bomb = site.bombs[0];
+  const toBomb = Math.min(...site.bombs.map(b => Math.hypot(b.x - p.x, b.y - p.y)));
+  if (abId === 'dash' || abId === 'pick') { // RUSH bursts through a board in the way, WREN takes it apart quietly
+    const f = game.facingCell(p, abId === 'dash' ? 40 : 28);
+    if (f && f.t === T.BARRI && !enemy && ok()) { useAbility(); done(3); }
+    else if (abId === 'dash' && enemy && d < 90 && ok() && Math.random() < dt * 2) { useAbility(); done(5); } // close the gap
+  } else if (abId === 'flare') { // BLAZE: into the room the defenders are heard in, before going in
+    if (!enemy && heard && ok()) { const h = ai.heard, hd = Math.hypot(h.x - p.x, h.y - p.y);
+      if (hd > 90 && hd < 300 && floorAt(game.map, h.x, h.y) === floorAt(game.map, p.x, p.y) && Math.random() < dt * 0.8) { aimAt(p, h.x, h.y); useAbility(); done(8); } }
+  } else if (abId === 'medkit') { // PATCH: onto a hurt teammate in sight, or at their own feet
+    if (!enemy && ok()) {
+      const hurt = [...game.players.values()].find(q => q.alive && !q.downed && game.side(q) === team && q.hp < q.maxHp * 0.6 && Math.hypot(q.x - p.x, q.y - p.y) < 150 && los(game.map, p.x, p.y, q.x, q.y));
+      if (hurt) { aimAt(p, hurt.x, hurt.y); useAbility(); done(6); }
+    }
+  } else if (abId === 'spike') { // ECHO: by the objective, to hear defenders moving round it
+    if (!enemy && toBomb < 260 && ok() && Math.random() < dt * 0.5) { useAbility(); done(15); }
+  } else if (abId === 'cover') { // TRENCH: cover between them and someone shooting from far
+    if (enemy && d > 140 && ok() && Math.random() < dt * 0.8) { aimAt(p, enemy.x, enemy.y); useAbility(); done(8); }
+  } else if (abId === 'tag') { // HOUND: dart the attacker in sight so the whole team sees them
+    if (enemy && d < 400 && ok() && ai.react > 0) { aimAt(p, enemy.x, enemy.y); useAbility(); done(6); }
+  } else if (abId === 'echobox') { // RUSE: fake footsteps out by a way into the site, early in the round
+    const el = DUR.action - game.timer;
+    if (!enemy && el > 8 && el < 90 && ok() && Math.random() < dt * 0.08) {
+      const m = game.map, cl = m.openings.filter(q => { const c = q.cells[0], d = Math.hypot((c % m.W + 0.5) * CELL - p.x, (Math.floor(c / m.W) + 0.5) * CELL - p.y); return d > 60 && d < 260 && los(m, p.x, p.y, (c % m.W + 0.5) * CELL, (Math.floor(c / m.W) + 0.5) * CELL); });
+      const o = cl[Math.floor(Math.random() * cl.length)], k = o && o.cells[0];
+      if (o) { aimAt(p, (k % m.W + 0.5) * CELL, (Math.floor(k / m.W) + 0.5) * CELL); useAbility(); done(20); }
+    }
+  } else if (abId === 'periscope') { // LENS: a periscope into the room above or below while holding
+    if (!enemy && ok() && Math.random() < dt * 0.1 && game.periscopeSpot(p)) { useAbility(); done(20); }
+  } else if (abId === 'weld') { // SOLDER: weld a broken wall back when one is close and nobody is shooting
+    if (!enemy && p.battery > 0.5 && game.baseTiles) {
+      const m = game.map, cx = Math.floor(p.x / CELL), cy = Math.floor(p.y / CELL);
+      for (let y = cy - 2; y <= cy + 2; y++) for (let x = cx - 2; x <= cx + 2; x++) {
+        const k = y * m.W + x; if (x < 0 || y < 0 || x >= m.W || y >= m.H) continue;
+        const t = m.tiles[k];
+        if (game.baseTiles[k] === T.SOFT && t !== T.SOFT && t !== T.REINF && !game.cellOccupied(k)) { aimAt(p, (x + 0.5) * CELL, (y + 0.5) * CELL); inp.ability = 1; return true; }
+      }
+    }
+  }
+}
+
 function botCams(game, p, dt) {
   const ai = p.ai, team = game.side(p), c = game.feed(p), list = game.feeds(team).filter(f => f.type === 'cam' && !(f.offUntil > game.time));
   const close = (game.noises || []).some(n => n.team !== team && game.time - n.t < 0.5 && Math.hypot(n.x - p.x, n.y - p.y) < 260);
@@ -1261,6 +1310,7 @@ function spreadSpot(game, p, base, gap, look = null) {
   ai.spreadKey = key; ai.spread = best || base; return ai.spread;
 }
 // One pro's part of the plan this tick. true: handled (movement set); false: the ordinary bot behaviour carries on.
+const site0 = game => game.map.sites[game.site];
 function proAct(game, p, inp, dt, team) {
   const side = team === TEAM.ATK ? 'atk' : 'def', st = proPlan(game, p.squad, side), plan = st.plan; if (!plan) return false;
   const ai = p.ai, j = plan.jobs[p.pro.pl.jobs[side]] || plan.jobs[jobOf(p.op)]; if (!j) return false;
@@ -1279,6 +1329,7 @@ function proAct(game, p, inp, dt, team) {
   if (side === 'atk') {
     if (action && game.planted) return postPlant(game, p, inp, dt, watch); // the objective now: protect the defuser
     if (!action || ai.inSite) return false;
+    if (p.hasDefuser && site0(game).bombs.some(b => near(p, b, 130)) && !visibleEnemy(game, p, skill(game, p).see)) { ai.inSite = true; return false; } // the carrier at the site with nobody in sight: plant now (he asked: play for the plant)
     if (game.timer < 35) return false; // the clock: forget the plan, everyone to the bomb
     const dropped = game.ents.find(e => e.type === 'defuser');
     if (dropped) { const mates = [...game.players.values()].filter(q => q.alive && !q.downed && q.squad === p.squad); const nearest = mates.sort((a, b) => Math.hypot(a.x - dropped.x, a.y - dropped.y) - Math.hypot(b.x - dropped.x, b.y - dropped.y))[0]; if (nearest === p) return false; } // the closest one fetches a dropped defuser

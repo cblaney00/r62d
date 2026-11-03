@@ -9,6 +9,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
 - [ ] give the maps a big rework to make them larger (not more floors but more floorspace) and make the buildings not rectangles, L shaped buildings could be good for 1 or 2 of them but lets get creative
 - [ ] lets see if we can get faster than 6.7ms a frame on high, if there are any optimization possible we can look at that help this run light as possible without sacrificing gameplay or UI (tried 2026-11-02: faster in the test browser but laggy in his real Firefox, undone)
+- [ ] play and watch rounds and fix what is found in gameplay, balance, ability and equipment use, pro operator picks, bot behaviour and the esports TV director (his answers: attackers play for the plant much more; make Hammer, Salvo, Torque and Ferro stronger until pros pick them; TV gets short instant replays of big moments the camera missed)
+- [ ] in esports TV the webcams and team cards should be along the bottom of the screen, not on the left and right
 
 ## Done
 
