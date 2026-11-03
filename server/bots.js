@@ -137,6 +137,24 @@ export function botPickOp(game, p) {
 }
 
 // is cell k inside (or in the wall round) one of the site's rooms?
+// the next thing a defender bot reinforces: hatches over the site first, then the site's breakable walls
+// (outside-facing ones before the one between the two site rooms)
+function reinforceNext(game) {
+  const m = game.map, site = m.sites[game.site], W = m.W, inSite = siteTest(m, site);
+  const h = (m.hatches || []).find(h => m.tiles[h.cells[0]] === T.HATCH && h.below.some(k => inRoomOf(m, site.rooms, k % W, Math.floor(k / W))));
+  if (h) { game.reinforceHatch(h.id); return true; }
+  let best = null, bs = -1;
+  for (let k = 0; k < m.tiles.length; k++) {
+    if (m.tiles[k] !== T.SOFT || !inSite(k % W, Math.floor(k / W)) || inRoomOf(m, site.rooms, k % W, Math.floor(k / W))) continue;
+    const sides = [1, -1, W, -W].map(d => k + d).filter(q => m.tiles[q] === T.FLOOR || m.tiles[q] === T.GROUND);
+    const inner = sides.filter(q => inRoomOf(m, site.rooms, q % W, Math.floor(q / W))).length;
+    const score = (sides.length - inner > 0 ? 2 : 1) + Math.random() * 0.5; // a wall to the outside of the site beats the partner wall
+    if (sides.length && inner && score > bs) { bs = score; best = k; }
+  }
+  if (best === null) return false;
+  game.reinforceWall(best); return true;
+}
+
 function siteTest(m, site) {
   const rs = m.rooms.filter(r => site.rooms.includes(r.name));
   return (x, y) => rs.some(r => x >= r.x - 1 && x <= r.x + r.w && y >= r.y - 1 && y <= r.y + r.h);
@@ -157,22 +175,9 @@ export function botPrep(game, p) {
   // the next one, so the bots' boards go up one at a time through preparation instead of all at once.
   p.ai.boardQ = siteOpenings.filter(o => m.tiles[o.cells[0]] === T.OPEN && Math.random() < boardP).map(o => o.id);
   p.ai.boardT = 2 + Math.random() * 4;
-  // reinforce: hatches over the site first, then the site's breakable walls (outside-facing ones before the one
-  // between the two site rooms), two each, like a team sharing out its reinforcements
-  for (let n = 0; n < 2 && game.reinforce > 0; n++) {
-    const h = (m.hatches || []).find(h => m.tiles[h.cells[0]] === T.HATCH && h.below.some(k => inRoomOf(m, site.rooms, k % W, Math.floor(k / W))));
-    if (h) { game.reinforceHatch(h.id); game.reinforce--; continue; }
-    let best = null, bs = -1;
-    for (let k = 0; k < m.tiles.length; k++) {
-      if (m.tiles[k] !== T.SOFT || !inSite(k % W, Math.floor(k / W)) || inRoomOf(m, site.rooms, k % W, Math.floor(k / W))) continue;
-      const sides = [1, -1, W, -W].map(d => k + d).filter(q => m.tiles[q] === T.FLOOR || m.tiles[q] === T.GROUND);
-      const inner = sides.filter(q => inRoomOf(m, site.rooms, q % W, Math.floor(q / W))).length;
-      const score = (sides.length - inner > 0 ? 2 : 1) + Math.random() * 0.5; // a wall to the outside of the site beats the partner wall
-      if (sides.length && inner && score > bs) { bs = score; best = k; }
-    }
-    if (best === null) break;
-    game.reinforceWall(best); game.reinforce--;
-  }
+  // reinforce: two each, one at a time through preparation (he asked: walls went solid the instant prep began,
+  // as if walking by did it; a person holds E for DUR.reinforce), run by the queue at the top of botThink
+  p.ai.reinfN = 2; p.ai.reinfT = 1 + Math.random() * 5;
   const bomb = site.bombs[Math.floor(Math.random() * 2)];
   const near = (d) => game.freeSpotNear(bomb.x, bomb.y, d);
   const id = op.ability.id;
@@ -506,6 +511,10 @@ export function botThink(game, p, dt) {
     if (p.barri > 0 && game.barricade(id, T.BARRI)) p.barri--;
     else if (o && o.cells.every(c => game.map.tiles[c] === T.OPEN) && (ai.boardTry = (ai.boardTry || 0) + 1) < 12) ai.boardQ.push(id); // someone stood in it: try again later
     ai.boardT = DUR.barricade + 1 + Math.random() * 2;
+  }
+  if (game.phase === PHASE.PREP && ai.reinfN > 0 && p.alive && !p.downed && (ai.reinfT -= dt) <= 0) {
+    if (game.reinforce > 0 && reinforceNext(game)) { game.reinforce--; ai.reinfN--; } else ai.reinfN = 0;
+    ai.reinfT = DUR.reinforce + 1.5 + Math.random() * 3;
   }
   const inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
   p.input = inp;
