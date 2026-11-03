@@ -123,7 +123,7 @@ export function build() {
   U.window(12, 50, 12, 51); U.window(12, 62, 12, 63); U.window(25, 72, 26, 72); U.window(35, 72, 36, 72);
   U.window(46, 49, 46, 50); U.window(46, 60, 46, 61);
   U.prop('bed', 15, 48, 5, 5, T.LOW); U.prop('cabinet', 25, 47, 1, 3, T.TALL); U.prop('plant', 30, 54, 1, 1, T.TALL);
-  U.prop('meetingtable', 16, 61, 10, 6, T.LOW); U.prop('cabinet', 14, 70, 4, 1, T.TALL);
+  U.prop('meetingtable', 16, 61, 10, 6, T.LOW); U.prop('cabinet', 18, 70, 4, 1, T.TALL);
   U.prop('desk', 34, 58, 5, 2, T.LOW); U.prop('bookshelf', 44, 58, 1, 5, T.TALL);
   U.prop('desk', 34, 67, 4, 2, T.LOW); U.prop('desk', 40, 67, 4, 2, T.LOW);
   U.outside([[12, 68.2], [12, 73], [16.8, 73]]); U.walls([[12.5, 68.5], [16.5, 72.5]], 1, T.SOFT, MAT.BRICK);

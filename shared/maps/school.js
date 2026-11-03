@@ -141,8 +141,7 @@ export function build() {
   U.prop('desk', 52, 46, 4, 2, T.LOW); U.prop('rack', 60, 45, 1, 6, T.TALL); U.prop('workbench', 52, 51, 5, 1, T.LOW);
   U.prop('cabinet', 40, 57, 1, 6, T.TALL); U.prop('bench', 46, 61, 6, 1, T.LOW);
   U.prop('chairs', 48, 69, 1, 6, T.LOW); U.prop('chairs', 51, 69, 1, 6, T.LOW);
-  U.prop('console', 58, 67, 8, 1, T.LOW); U.prop('crates', 70, 75, 2, 2, T.TALL); U.prop('shelf', 72, 67, 1, 5, T.TALL);
-  U.outside([[26, 73.2], [26, 79], [31.8, 79]]); U.walls([[26.5, 73.5], [31.5, 78.5]], 1, T.SOFT, MAT.BRICK);
+  U.prop('console', 58, 67, 8, 1, T.LOW); U.prop('crates', 65, 75, 2, 2, T.TALL); U.prop('shelf', 72, 67, 1, 5, T.TALL);
   U.outside([[75, 73.2], [75, 79], [69.2, 79]]); U.walls([[74.5, 73.5], [69.5, 78.5]], 1, T.SOFT, MAT.BRICK);
 
   // ================= 3F (the tower) =================

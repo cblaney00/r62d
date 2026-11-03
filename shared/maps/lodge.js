@@ -72,7 +72,7 @@ export function build() {
   G.prop('reception', -14, 18, 6, 1, T.LOW); G.prop('plant', -6, 14, 1, 1, T.TALL); G.prop('couch', -16, 14, 4, 1, T.LOW);
   G.prop('bed', -15, 25, 3, 3, T.LOW); G.prop('bed', -9, 25, 3, 3, T.LOW);
   G.prop('counter', -30, 29, 1, 7, T.LOW); G.prop('rack', -22, 28, 3, 1, T.TALL); G.prop('coffeetable', -26, 33, 2, 2, T.LOW); G.prop('coffeetable', -23, 37, 2, 2, T.LOW);
-  G.prop('rack', -12, 32, 1, 6, T.TALL); G.prop('rack', -9, 32, 1, 6, T.TALL); G.prop('counter', -7, 38, 2, 1, T.LOW);
+  G.prop('rack', -12, 32, 1, 6, T.TALL); G.prop('rack', -9, 32, 1, 6, T.TALL); G.prop('counter', -7, 32, 2, 1, T.LOW);
   G.outside([[-32, 12], [-28.2, 12], [-32, 15.8]], FL.GRASS); G.walls([[-31.5, 15.5], [-28.5, 12.5]], 1, T.SOFT, MAT.BRICK);
   G.outside([[-32, 36.2], [-32, 41], [-27.2, 41]], FL.GRASS); G.walls([[-31.5, 36.5], [-27.5, 40.5]], 1, T.SOFT, MAT.BRICK);
   G.outside([[-3, 36.2], [-3, 41], [-7.8, 41]], FL.GRASS); G.walls([[-3.5, 36.5], [-7.5, 40.5]], 1, T.SOFT, MAT.BRICK);
