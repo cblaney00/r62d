@@ -1,7 +1,7 @@
 {
  "title": "Making R62D its own program",
  "started": 1793734907703,
- "updated": 1793735911863,
+ "updated": 1793736158967,
  "steps": [
   {
    "name": "Plan and token estimate",
@@ -81,9 +81,10 @@
   {
    "name": "Download link on GitHub",
    "about": "Upload R62D.zip to your GitHub Releases page for your friends.",
-   "state": "doing",
+   "state": "done",
    "began": 1793735911863,
-   "detail": "Uploading R62D-windows.zip to GitHub"
+   "detail": "github.com/cblaney00/r62d/releases/tag/v1.0-test",
+   "ended": 1793736158967
   }
  ],
  "log": [
@@ -162,6 +163,10 @@
   {
    "at": 1793735911863,
    "text": "Started: Download link on GitHub — Uploading R62D-windows.zip to GitHub"
+  },
+  {
+   "at": 1793736158967,
+   "text": "Finished: Download link on GitHub — github.com/cblaney00/r62d/releases/tag/v1.0-test"
   }
  ]
 }
