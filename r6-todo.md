@@ -11,6 +11,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Settings: every slider has a box you can type the number into (Enter or click away to set it). Text size now changes when you let go of the slider (it used to resize the panel under the mouse while dragging), goes from 70% to 160%, and menus stop growing once they fill your screen instead of spilling off it.
 - [x] Faster frames on High: about 4.2–5.1 ms a frame instead of 5.2–6.7 (Low about 2.4) (same picture, same gameplay). The grey remembered map under the blackout used to be re-scaled every frame, which was the slowest step; now a ready copy is kept and only redrawn when the zoom or view really changes.
 - [x] The pros play many more operators: each can now pick any operator of their role (their favourites still come up most, what won in practice more, and last round's pick less). They also have more plays: attack adds Three-way pinch, Late hit, Window hit and Lurk and collapse; defence adds Turtle, Bait, Two rooms and Hunter (7–9 plays per site each side, was 3–5). Practice tries them all, and the later plays in a team's style still get called. Tested: 4–8 different plays per map, still beating Expert bots 6–1.
 - [x] Leaning is a toggle by default: Q or E once to lean, again (or the other side) to stand straight; dying or going down straightens you. Settings → Mouse & Aim → Leaning switches back to Hold.

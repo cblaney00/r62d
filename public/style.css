@@ -230,6 +230,10 @@ tr.me { color: var(--gold); } tr.dead { opacity: 0.5; }
 #settings .sl small { font-size: 13px; color: #8d97a1; line-height: 1.35; }
 #settings .sctl { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 #settings .sctl input[type=range] { width: 220px; vertical-align: middle; padding: 0; }
+#settings input.num { width: 64px; padding: 4px 6px; font: 600 15px var(--head); text-align: center; -moz-appearance: textfield; appearance: textfield; }
+#settings input.num::-webkit-inner-spin-button, #settings input.num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+#settings .numUnit { min-width: 14px; font: 600 14px var(--head); color: var(--dim, #93a0ad); }
+#settings .xhrow input.num { width: 52px; }
 #settings .sctl b { min-width: 46px; text-align: right; font: 600 14px var(--head); }
 #settings .sctl button { padding: 6px 14px; font-size: 14px; }
 #settings #fxList { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }

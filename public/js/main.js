@@ -2711,7 +2711,7 @@ for (const b of $('inputSeg').querySelectorAll('button')) {
 }
 { const u = $('uiScale'), v = $('viewMul'), show = () => { $('uiScaleVal').textContent = u.value + '%'; $('viewMulVal').textContent = v.value + '%'; };
   u.value = Math.round(uiScale() * 100); v.value = Math.round(viewMul() * 100); show();
-  u.addEventListener('input', () => { show(); setUiScale(u.value / 100); });
+  u.addEventListener('input', show); u.addEventListener('change', () => { show(); setUiScale(u.value / 100); }); // on letting go: resizing while dragging moved the slider under the mouse
   v.addEventListener('input', () => { show(); setViewMul(v.value / 100); }); }
 { // phone: tilt to move (on/off + dead zone), kept on this device
   const seg = $('tiltSeg'), dz = $('tiltDz'), show = () => { for (const b of seg.children) b.classList.toggle('on', (b.dataset.t === '1') === tiltOn()); $('tiltDzVal').textContent = dz.value + '°'; };
@@ -2866,6 +2866,27 @@ const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFi
 for (const id of ['sens', 'adsSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
 try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; } } catch {}
 showSens();
+// Every slider in Settings also has a box to type the number into (he asked). It shows the number the way the
+// slider's label did (sensitivity as 1.00, not 100) and keeps up when settings are loaded from the profile.
+{ const DIV = { sens: 100, adsSens: 100 }, rows = [];
+  for (const r of $('settings').querySelectorAll('input[type=range]')) {
+    const div = DIV[r.id] || 1, lab = $(r.id + 'Val') || $(r.id + 'V'), n = document.createElement('input'), unit = document.createElement('span');
+    n.type = 'number'; n.className = 'num'; n.min = r.min / div; n.max = r.max / div; n.step = (+r.step || 1) / div;
+    unit.className = 'numUnit'; if (lab) lab.classList.add('hidden');
+    const sync = () => {
+      if (document.activeElement !== n) n.value = div > 1 ? (r.value / div).toFixed(2) : String(Math.round(r.value * 100) / 100);
+      unit.textContent = lab ? lab.textContent.replace(/^[\d.,\s-]+/, '') : '';
+    };
+    n.addEventListener('change', () => {
+      if (n.value === '' || !Number.isFinite(+n.value)) { sync(); return; }
+      const st0 = +r.step || 1, v = Math.max(+r.min, Math.min(+r.max, Math.round(+n.value * div / st0) * st0));
+      r.value = v; r.dispatchEvent(new Event('input')); r.dispatchEvent(new Event('change')); n.blur(); sync();
+    });
+    n.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') n.blur(); });
+    r.addEventListener('input', () => setTimeout(sync));
+    r.after(n, unit); rows.push(sync); sync();
+  }
+  setInterval(() => { if (!$('settings').classList.contains('hidden')) for (const f of rows) f(); }, 250); }
 function setAim(m, save = true) {
   aimMode = m; try { localStorage.setItem('r62d-aim', m); localStorage.setItem('r62d-aim2', '1'); } catch {}
   for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
