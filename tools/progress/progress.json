@@ -1,0 +1,149 @@
+{
+ "title": "Making R62D its own program",
+ "started": 1793734907703,
+ "updated": 1793735207891,
+ "steps": [
+  {
+   "name": "Plan and token estimate",
+   "about": "Work out the steps and how many tokens the whole job takes.",
+   "state": "done",
+   "began": 1793734907703,
+   "detail": "About 3–5 million tokens in all (mostly re-reading), ~150k written",
+   "ended": 1793734951674
+  },
+  {
+   "name": "Get the Windows program shell",
+   "about": "Download Electron for Windows: a ready-made program window with a web engine inside, so the game runs the same as in the browser.",
+   "state": "done",
+   "began": 1793734951704,
+   "detail": "Electron 45.2.2 for Windows downloaded, checksum matches",
+   "ended": 1793734973031
+  },
+  {
+   "name": "Game server inside the program",
+   "about": "The program carries the game server, so whoever opens it can host.",
+   "state": "done",
+   "began": 1793734973062,
+   "detail": "Server starts inside the program when you click HOST",
+   "ended": 1793735039990
+  },
+  {
+   "name": "Host or Join screen",
+   "about": "First screen: HOST to start a game on this computer, or type a friend's address and JOIN.",
+   "state": "done",
+   "ended": 1793735040020,
+   "detail": "HOST / JOIN screen with recent addresses written"
+  },
+  {
+   "name": "Full screen window and keys",
+   "about": "Opens full screen, F11 switches to a window, Quit to desktop closes it.",
+   "state": "done",
+   "ended": 1793735040049,
+   "detail": "Full screen, F11, Quit closes the program"
+  },
+  {
+   "name": "Saved profiles in the friend's own folder",
+   "about": "Each friend's profiles and settings are kept on their own computer.",
+   "state": "done",
+   "ended": 1793735040076,
+   "detail": "Saved in %APPDATA%\\R62D\\data on each friend's PC"
+  },
+  {
+   "name": "Name and icon",
+   "about": "R62D.exe with its own icon.",
+   "state": "doing",
+   "began": 1793735040105,
+   "detail": "Making the icon"
+  },
+  {
+   "name": "Build R62D.zip",
+   "about": "Put it all together into one file to download.",
+   "state": "done",
+   "ended": 1793735174300,
+   "detail": "R62D-windows.zip built (147 MB, version 25c4eb3)"
+  },
+  {
+   "name": "Test it like a Windows PC would",
+   "about": "Run the .exe under Wine (Windows emulation) and check host, join and a match.",
+   "state": "fail",
+   "began": 1793735174329,
+   "detail": "Start screen and built-in server checked; running R62D.exe itself in Wine needs your OK",
+   "ended": 1793735194749
+  },
+  {
+   "name": "Browser version still works",
+   "about": "Run the usual game tests so nothing broke in the browser version.",
+   "state": "done",
+   "began": 1793735194783,
+   "detail": "Bot match on Harbor Office and free play test both PASS",
+   "ended": 1793735207891
+  },
+  {
+   "name": "Download link on GitHub",
+   "about": "Upload R62D.zip to your GitHub Releases page for your friends.",
+   "state": "todo"
+  }
+ ],
+ "log": [
+  {
+   "at": 1793734907703,
+   "text": "Started: Plan and token estimate — Working out the steps and the token estimate"
+  },
+  {
+   "at": 1793734951674,
+   "text": "Finished: Plan and token estimate — About 3–5 million tokens in all (mostly re-reading), ~150k written"
+  },
+  {
+   "at": 1793734951704,
+   "text": "Started: Get the Windows program shell — Asking GitHub for the newest Electron for Windows"
+  },
+  {
+   "at": 1793734973031,
+   "text": "Finished: Get the Windows program shell — Electron 45.2.2 for Windows downloaded, checksum matches"
+  },
+  {
+   "at": 1793734973062,
+   "text": "Started: Game server inside the program — Reading how the game server starts"
+  },
+  {
+   "at": 1793735039990,
+   "text": "Finished: Game server inside the program — Server starts inside the program when you click HOST"
+  },
+  {
+   "at": 1793735040020,
+   "text": "Finished: Host or Join screen — HOST / JOIN screen with recent addresses written"
+  },
+  {
+   "at": 1793735040049,
+   "text": "Finished: Full screen window and keys — Full screen, F11, Quit closes the program"
+  },
+  {
+   "at": 1793735040076,
+   "text": "Finished: Saved profiles in the friend's own folder — Saved in %APPDATA%\\R62D\\data on each friend's PC"
+  },
+  {
+   "at": 1793735040105,
+   "text": "Started: Name and icon — Making the icon"
+  },
+  {
+   "at": 1793735174300,
+   "text": "Finished: Build R62D.zip — R62D-windows.zip built (147 MB, version 25c4eb3)"
+  },
+  {
+   "at": 1793735174329,
+   "text": "Started: Test it like a Windows PC would — Checking the program's files and the built-in server"
+  },
+  {
+   "at": 1793735194749,
+   "text": "Problem with: Test it like a Windows PC would — Start screen and built-in server checked; running R62D.exe itself in Wine needs your OK"
+  },
+  {
+   "at": 1793735194783,
+   "text": "Started: Browser version still works — Running a bot match and the free-play test"
+  },
+  {
+   "at": 1793735207891,
+   "text": "Finished: Browser version still works — Bot match on Harbor Office and free play test both PASS"
+  }
+ ]
+}

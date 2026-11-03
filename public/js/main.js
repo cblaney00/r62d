@@ -2840,6 +2840,7 @@ const APP = new URLSearchParams(location.search).has('app');
 addEventListener('beforeunload', e => { if (st.id && !st.quitting && inMatch()) { e.preventDefault(); e.returnValue = ''; } }); // opened from the desktop icon (full-screen window)
 async function quitGame() {
   stopMusic(); st.quitting = true;
+  if (window.r62dApp) return window.r62dApp.quit(); // the R62D program (desktop/main.js) closes itself
   if (APP) { try { await fetch('/api/quit', { method: 'POST' }); } catch {} }
   window.close();
   setTimeout(() => { document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;font:700 28px Barlow Condensed,sans-serif;letter-spacing:.2em;color:#93a0ad">YOU CAN CLOSE THIS TAB NOW</div>'; }, 600);

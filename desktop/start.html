@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R62D</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --ally: #3aa0ff; --gold: #f2c14e; --text: #eef2f5; --dim: #93a0ad; --line: rgba(255,255,255,.12); --panel: rgba(10,13,18,.82);
+    --head: 'Barlow Condensed', 'Arial Narrow', sans-serif; --body: 'Barlow', 'Segoe UI', sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; color: var(--text); font-family: var(--body); user-select: none;
+    background: radial-gradient(ellipse at 50% 30%, #13202e 0%, #070a0e 60%, #030405 100%); }
+  body::before { content: ''; position: fixed; inset: 0; opacity: .5; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 36px), repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 36px); }
+  main { position: relative; height: 100%; display: grid; place-items: center; align-content: center; gap: 44px; }
+  h1 { margin: 0; font: 800 120px/0.9 var(--head); letter-spacing: .12em; text-align: center; }
+  h1 small { display: block; font: 600 18px var(--head); letter-spacing: .5em; color: var(--dim); margin-top: 14px; }
+  .cards { display: grid; grid-template-columns: 380px 380px; gap: 28px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 26px 28px; display: flex; flex-direction: column; gap: 14px; }
+  .card h2 { margin: 0; font: 700 30px var(--head); letter-spacing: .14em; }
+  .card p { margin: 0; color: var(--dim); font-size: 14.5px; line-height: 1.45; min-height: 64px; }
+  button { font: 700 22px var(--head); letter-spacing: .16em; color: #000; background: var(--gold); border: 0; border-radius: 4px; padding: 13px; cursor: pointer; }
+  button:hover { filter: brightness(1.12); } button:disabled { opacity: .5; cursor: default; }
+  button.join { background: var(--ally); }
+  input { font: 600 20px var(--head); letter-spacing: .06em; color: var(--text); background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 4px; padding: 11px 12px; outline: none; }
+  input:focus { border-color: var(--ally); }
+  .recent { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }
+  .recent span { font: 500 14px var(--head); letter-spacing: .05em; padding: 3px 9px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; color: var(--dim); }
+  .recent span:hover { color: var(--text); border-color: var(--ally); }
+  #msg { min-height: 24px; text-align: center; color: var(--gold); font: 600 17px var(--head); letter-spacing: .06em; max-width: 790px; }
+  #msg.bad { color: #ff7a6a; }
+  footer { position: fixed; left: 0; right: 0; bottom: 16px; display: flex; justify-content: space-between; padding: 0 26px; color: var(--dim); font: 500 14px var(--head); letter-spacing: .1em; }
+  footer a { color: var(--dim); cursor: pointer; } footer a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <h1>R62D<small>TACTICAL OPERATIONS</small></h1>
+  <div class="cards">
+    <div class="card">
+      <h2>HOST</h2>
+      <p>Start a game on this computer. Your friends join with the address shown in the lobby. If Windows asks about the firewall, click <b>Allow</b>.</p>
+      <button id="host">HOST A GAME</button>
+    </div>
+    <div class="card">
+      <h2>JOIN</h2>
+      <input id="addr" placeholder="Friend's address, e.g. 192.168.1.20" spellcheck="false">
+      <div class="recent" id="recent"></div>
+      <button class="join" id="join">JOIN</button>
+    </div>
+  </div>
+  <div id="msg"></div>
+</main>
+<footer><span id="ver"></span><a id="quit">QUIT</a></footer>
+<script>
+  const $ = id => document.getElementById(id), A = window.r62dApp;
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem('r62d-recent') || '[]'); } catch {}
+  const say = (t, bad) => { $('msg').textContent = t; $('msg').classList.toggle('bad', !!bad); };
+  const busy = on => { $('host').disabled = $('join').disabled = on; };
+  function showRecent() {
+    $('recent').innerHTML = '';
+    for (const r of recent) { const s = document.createElement('span'); s.textContent = r; s.onclick = () => { $('addr').value = r; join(); }; $('recent').append(s); }
+  }
+  async function host() {
+    busy(true); say('Starting the game server…');
+    const r = await A.host();
+    if (r.error) { busy(false); say(r.error, true); }
+  }
+  async function join() {
+    const a = $('addr').value.trim();
+    if (!a) { say('Type your friend\'s address first.', true); $('addr').focus(); return; }
+    busy(true); say('Looking for the game at ' + a + '…');
+    const r = await A.join(a);
+    if (r.error) { busy(false); say(r.error, true); return; }
+    recent = [a, ...recent.filter(x => x !== a)].slice(0, 5);
+    try { localStorage.setItem('r62d-recent', JSON.stringify(recent)); } catch {}
+  }
+  $('host').onclick = host; $('join').onclick = join; $('quit').onclick = () => A.quit();
+  $('addr').onkeydown = e => { if (e.key === 'Enter') join(); };
+  if (recent[0]) $('addr').value = recent[0];
+  showRecent();
+  A.info().then(i => { $('ver').textContent = 'VERSION ' + i.version + (i.date ? ' · ' + i.date : '') + '   ·   F11 WINDOW / FULL SCREEN'; });
+</script>
+</body>
+</html>
