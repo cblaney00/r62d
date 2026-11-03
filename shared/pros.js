@@ -14,7 +14,7 @@ export const PRO_TEAMS = [
   {
     id: 'nwd', tag: 'NWD', name: 'Northwind', colour: '#5ec8ff',
     style: 'Fast and aggressive. They hit before the defenders are set, trade kills tight and win on speed and surprise.',
-    prefer: { atk: ['fast', 'split', 'default', 'vertical', 'fake'], def: ['roam', 'hold', 'cross', 'vert', 'retake'] },
+    prefer: { atk: ['fast', 'split', 'window', 'pinch', 'default', 'vertical', 'lurk', 'fake', 'late'], def: ['roam', 'bait', 'hold', 'hunter', 'cross', 'vert', 'tworooms', 'retake', 'turtle'] },
     players: [
       { name: 'Halden', igl: true, jobs: { atk: 'support', def: 'anchor' }, pool: { atk: ['talon', 'volt', 'haze'], def: ['mason', 'shunt', 'girder'] },
         react: 0.23, aim: 0.6, turn: 10, over: 0.2, calm: 0.85, traits: ['In-game leader: calls the plan and the switches', 'Very calm in clutches', 'Slow to rotate: trusts his read too long'] },
@@ -31,7 +31,7 @@ export const PRO_TEAMS = [
   {
     id: 'irc', tag: 'IRC', name: 'Ironclad Collective', colour: '#f2a65a',
     style: 'Slow and methodical. Full droning, utility before every push, crossfires on defence; they win the last minute.',
-    prefer: { atk: ['default', 'vertical', 'fake', 'split', 'fast'], def: ['hold', 'cross', 'retake', 'vert', 'roam'] },
+    prefer: { atk: ['default', 'late', 'vertical', 'pinch', 'fake', 'lurk', 'split', 'window', 'fast'], def: ['hold', 'cross', 'turtle', 'tworooms', 'retake', 'vert', 'bait', 'hunter', 'roam'] },
     players: [
       { name: 'Sable', igl: true, jobs: { atk: 'intel', def: 'intel' }, pool: { atk: ['glint', 'kestrel', 'mark'], def: ['argus', 'kite', 'audit'] },
         react: 0.24, aim: 0.56, turn: 10, over: 0.2, calm: 0.9, traits: ['In-game leader who plays from information', 'Reads rotations early', 'Slow: sometimes runs the clock too low'] },
@@ -209,6 +209,40 @@ export function playbook(m, si, side, team) {
         support: { task: 'Smokes the main door and plants.', stack: I.main.stack, target: I.main.inside, util: 'smoke', plant: b },
         flank: { task: `Fakes with the breacher at ${doorName(I.side)}, then stays there to catch the rotation back.`, fake: I.side.stack, stack: I.side.stack, target: I.side.inside, delay: 8 },
       } });
+    // more plays (he asked: the pros should have more plays to learn from)
+    if (I.side && I.wall) plans.push({ id: 'pinch', name: 'Three-way pinch', tempo: 'slow', go: 50, idea: `The wall opens, and at the same moment the team comes through ${doorName(I.main)} and ${doorName(I.side)}: the defenders have three ways to watch and not enough eyes.`,
+      jobs: {
+        intel: { task: 'Drones the site, then goes in with the entry.', drone: I.siteCentre, keepDrone: 35, stack: I.main.stack, target: I.main.inside },
+        breach: { task: `Opens ${doorName(I.wall)} and plays through it.`, breach: I.wall.k, stack: I.wall.stack, target: I.wall.inside },
+        entry: { task: `Goes through ${doorName(I.main)} the moment the wall blows.`, stack: I.main.stack, target: I.main.inside, util: 'stun' },
+        support: { task: 'Covers the breacher at the wall, then plants from that side.', stack: I.wall.stack, target: I.wall.inside, util: 'smoke', plant: bombNear(I.wall) },
+        flank: { task: `Comes through ${doorName(I.side)} at the same moment.`, stack: I.side.stack, target: I.side.inside },
+      } });
+    plans.push({ id: 'late', name: 'Late hit', tempo: 'slow', go: 95, idea: `Hunt the roamers and drone everything first; the defenders get restless, then the team hits ${doorName(I.main)} with about 1:20 left.`,
+      jobs: {
+        intel: { task: 'Keeps a drone on the site for most of the round and calls every move.', drone: I.siteCentre, keepDrone: 80, stack: I.main.stack, target: I.main.inside },
+        breach: { task: `Opens ${doorName(B)} right before the late hit.`, breach: B.kind === 'wall' ? B.k : null, stack: B.stack, target: B.inside },
+        entry: { task: 'Clears the rooms round the site of roamers, then leads the hit.', hold: I.roam ? I.centre(I.roam) : I.main.stack, until: 85, stack: I.main.stack, target: I.main.inside, util: 'stun' },
+        support: { task: 'Hunts roamers with the entry, then plants.', hold: I.roam ? I.centre(I.roam) : I.main.stack, until: 85, stack: I.main.stack, target: I.main.inside, util: 'smoke', plant: b },
+        flank: { task: 'Holds the rotation route all round and catches anyone who peeks out.', hold: I.side ? I.side.stack : I.main.stack, until: 100, target: (I.side || I.main).inside },
+      } });
+    const win = I.ways.find(w => w.kind === 'window' && w !== I.main);
+    if (win) plans.push({ id: 'window', name: 'Window hit', tempo: 'medium', go: 38, idea: `Noise at ${doorName(I.main)} while the entry and support come in through ${doorName(win)} where nobody expects it.`,
+      jobs: {
+        intel: { task: 'Drones the window side and calls who is watching it.', drone: win.inside, keepDrone: 30, stack: win.stack, target: win.inside },
+        breach: { task: `Makes noise at ${doorName(I.main)} (barricade, utility), then pushes it.`, fake: I.main.stack, stack: I.main.stack, target: I.main.inside },
+        entry: { task: `First through ${doorName(win)}.`, stack: win.stack, target: win.inside, util: 'stun' },
+        support: { task: 'Follows the entry through the window and plants.', stack: win.stack, target: win.inside, util: 'smoke', plant: bombNear(win) },
+        flank: { task: `Pushes ${doorName(I.main)} with the breacher once the window is in.`, stack: I.main.stack, target: I.main.inside, delay: 4 },
+      } });
+    if (I.near[0]) plans.push({ id: 'lurk', name: 'Lurk and collapse', tempo: 'medium', go: 58, idea: `The flanker sneaks round to ${I.near[0].name.replace(/^\dF /, '')} beside the site and waits silently; when the team hits ${doorName(I.main)} the defenders turn and get shot in the back.`,
+      jobs: {
+        intel: { task: 'Drones the site and the lurk route.', drone: I.siteCentre, keepDrone: 40, stack: I.main.stack, target: I.main.inside },
+        breach: { task: `Opens ${doorName(B)} for the hit.`, breach: B.kind === 'wall' ? B.k : null, stack: B.stack, target: B.inside },
+        entry: { task: `Leads the hit through ${doorName(I.main)}.`, stack: I.main.stack, target: I.main.inside, util: 'stun' },
+        support: { task: 'Trades the entry and plants.', stack: I.main.stack, target: I.main.inside, util: 'smoke', plant: b },
+        flank: { task: 'Lurks quietly beside the site, then collapses from behind when the hit starts.', hold: I.centre(I.near[0]), until: 60, target: (I.side || I.main).inside },
+      } });
   } else {
     const hold = w => w ? w.hold : I.siteCentre;
     const nearRoom = I.near[0] ? I.centre(I.near[0]) : I.siteCentre, nearRoom2 = I.near[1] ? I.centre(I.near[1]) : nearRoom;
@@ -253,6 +287,42 @@ export function playbook(m, si, side, team) {
         support: { task: 'Holds the site with the anchor.', hold: hold(I.side || I.main), watch: I.main.pos },
         roamer: { task: 'Roams, then plays the hatch floor too.', roam: roamAt, until: 75, hold: up, watch: up },
       } }); }
+  }
+  if (side === 'def') { // more plays (he asked)
+    const hold = w => w ? w.hold : I.siteCentre, nearRoom = I.near[0] ? I.centre(I.near[0]) : I.siteCentre, nearRoom2 = I.near[1] ? I.centre(I.near[1]) : nearRoom;
+    const roamAt = I.roam ? I.centre(I.roam) : nearRoom, [bA, bB] = [I.bombs[0], I.bombs[1] || I.bombs[0]];
+    plans.push({ id: 'turtle', name: 'Turtle', tempo: 'slow', idea: 'Nobody leaves: all five on the site, every way in watched twice, every wall reinforced. Make them come to you.',
+      jobs: {
+        anchor: { task: `Holds ${doorName(I.main)} from deep in the site.`, hold: hold(I.main), watch: I.main.pos },
+        trapper: { task: 'Traps every way in, then holds the second angle.', hold: hold(I.side || I.wall), watch: (I.side || I.wall || I.main).pos },
+        intel: { task: 'Holds the middle of the site on cameras.', hold: I.siteCentre, watch: I.main.pos },
+        support: { task: 'Holds next to the anchor for the trade.', hold: hold(I.main), watch: I.main.pos, nearAnchor: true },
+        roamer: { task: 'Stays on site too, by the other defuser spot.', hold: { x: bB.x, y: bB.y }, watch: (I.side || I.main).pos },
+      } });
+    plans.push({ id: 'bait', name: 'Bait', tempo: 'medium', idea: 'The roamer shows up at the attackers\' door early, gets seen, then falls back through the room beside the site, where two teammates wait to catch whoever chases.',
+      jobs: {
+        anchor: { task: 'Holds the site.', hold: hold(I.main), watch: I.main.pos },
+        trapper: { task: 'Traps the door, then waits in the room beside the site for the chase.', hold: nearRoom, watch: I.main.pos },
+        intel: { task: 'Calls the chase on cameras from the site.', hold: I.siteCentre, watch: I.main.pos },
+        support: { task: 'Waits beside the trapper for the chase.', hold: nearRoom, watch: I.main.pos },
+        roamer: { task: 'Gets seen at the attackers\' door, then runs back past the trap.', roam: I.main.stack, until: 45, hold: nearRoom2, watch: I.main.pos },
+      } });
+    if (bA !== bB) plans.push({ id: 'tworooms', name: 'Two rooms', tempo: 'slow', idea: `A pair in each site room (${bA.room || 'A'} and ${bB.room || 'B'}), so whichever they hit, two are already there and the other two come through the shared wall.`,
+      jobs: {
+        anchor: { task: `Anchors ${bA.room || 'site A'}.`, hold: { x: bA.x, y: bA.y }, watch: I.main.pos },
+        support: { task: `Plays beside the anchor in ${bA.room || 'site A'}.`, hold: { x: bA.x, y: bA.y }, watch: I.main.pos, nearAnchor: true },
+        trapper: { task: `Traps both rooms, then holds ${bB.room || 'site B'}.`, hold: { x: bB.x, y: bB.y }, watch: (I.side || I.main).pos },
+        intel: { task: `Holds ${bB.room || 'site B'} on cameras.`, hold: { x: bB.x, y: bB.y }, watch: (I.side || I.main).pos },
+        roamer: { task: 'A short roam, then back to whichever room is hit.', roam: roamAt, until: 70, hold: I.siteCentre, watch: I.main.pos },
+      } });
+    plans.push({ id: 'hunter', name: 'Hunter', tempo: 'fast', idea: 'The roamer never comes back: hides far out all round and shoots the attackers in the back once they commit to the site.',
+      jobs: {
+        anchor: { task: 'Holds the site door.', hold: hold(I.main), watch: I.main.pos },
+        trapper: { task: 'Traps the ways in, then holds the other side.', hold: hold(I.side || I.main), watch: (I.side || I.main).pos },
+        intel: { task: 'Calls where the attackers are so the hunter knows when to strike.', hold: I.siteCentre, watch: I.main.pos },
+        support: { task: 'A short roam beside the site, back by 1:30.', roam: nearRoom2, until: 50, hold: hold(I.main), watch: I.main.pos },
+        roamer: { task: 'Hides far out all round, then hits the attackers from behind.', roam: roamAt, until: 170, hold: nearRoom, watch: I.main.pos },
+      } });
   }
   if (side === 'def') { // he asked: four defenders stared at the stairs and nobody watched the windows. One player per way
     // in: the first job keeps the main way, everyone else who would also watch it takes the next way in (windows too)

@@ -29,7 +29,7 @@ export function closePlaybook(el) {
 function render(el) {
   const T = PRO_TEAMS[S.team], side = S.side;
   el.querySelector('#pbTeams').innerHTML = PRO_TEAMS.map((t, i) => `<button data-i="${i}" class="${i === S.team ? 'on' : ''}" style="--tc:${t.colour}"><b>[${t.tag}] ${esc(t.name)}</b><span>${esc(t.style)}</span></button>`).join('')
-    + `<h4>Players</h4>` + T.players.map(p => `<div class="pbPlayer"><canvas class="pbCam" width="96" height="72" data-n="[${T.tag}] ${esc(p.name)}"></canvas><b>${esc(p.name)}${p.igl ? ' <em>IGL</em>' : ''}</b><span>${esc(JOB_NAME[p.jobs[side]] || p.jobs[side])}: ${p.pool[side].map(o => esc(OPERATORS[o].name)).join(' / ')}</span><ul>${p.traits.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>`).join('');
+    + `<h4>Players</h4>` + T.players.map(p => `<div class="pbPlayer"><canvas class="pbCam" width="96" height="72" data-n="[${T.tag}] ${esc(p.name)}"></canvas><b>${esc(p.name)}${p.igl ? ' <em>IGL</em>' : ''}</b><span>${esc(JOB_NAME[p.jobs[side]] || p.jobs[side])}: ${p.pool[side].map(o => esc(OPERATORS[o].name)).join(' / ')} <i>· favourites, plays every ${esc((JOB_NAME[p.jobs[side]] || '').toLowerCase())} operator</i></span><ul>${p.traits.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>`).join('');
   for (const c of el.querySelectorAll('.pbCam')) drawWebcam(c, { name: c.dataset.n, pro: true, colour: T.colour }, 1); // the same face as on the broadcast
   for (const b of el.querySelectorAll('#pbTeams button')) b.onclick = () => { audio.ui(); S.team = +b.dataset.i; S.plan = 0; render(el); };
   el.querySelector('#pbMaps').innerHTML = MAP_LIST.map(k => `<button data-id="${k}" class="${k === S.id ? 'on' : ''}">${esc(MAPS[k].name)}</button>`).join('');

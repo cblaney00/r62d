@@ -1134,7 +1134,7 @@ function proPlan(game, squad, side) {
     if (!list.length) return st;
     const last = (game.proLast || {})[squad]; // don't run the same plan twice in a row after losing with it
     const w = game.proExplore ? list.map(() => 1) // practice: try everything
-      : list.map((pl, i) => (pl.id === last ? 0.25 : 1) / Math.pow(1 + i, 1.1) * planWeight(game.map.id, game.site, side, pl.id) ** 2); // the team's style, and what has won in practice
+      : list.map((pl, i) => (pl.id === last ? 0.25 : 1) / (1 + i * 0.3) * planWeight(game.map.id, game.site, side, pl.id) ** 2); // the team's style, and what has won in practice
     let r = Math.random() * w.reduce((a, b) => a + b, 0), pick = list[0];
     for (let i = 0; i < list.length; i++) if ((r -= w[i]) <= 0) { pick = list[i]; break; }
     Object.assign(st, { plan: pick, side, site: game.site, go: pick.go || 0, gone: false, swapped: false, rotate: null, retake: false, called: false });
@@ -1151,10 +1151,16 @@ function proCall(game, squad, text) { // the leader (or whoever is left) says it
 }
 export function proPickOp(game, p) {
   const side = proSide(game, p), pl = p.pro.pl, st = proPlan(game, p.squad, side), job = pl.jobs[side], j = st.plan && st.plan.jobs[job];
-  let pool = game.proExplore ? pl.pool[side].slice().sort(() => Math.random() - 0.5) : !game.proAnyOp ? pl.pool[side].slice().sort((a, b) => opWeight(game.map.id, side, b) - opWeight(game.map.id, side, a)) : game.proAnyOp ? opsForTeam(side === 'atk' ? TEAM.ATK : TEAM.DEF).filter(o => jobOf(o) === job).sort(() => Math.random() - 0.5) : pl.pool[side].slice(); // balance tests: any operator of their job
+  // he asked: a wider variety of operators. Every operator of their job is in reach: their own favourites count double, what
+  // won in practice counts more, and last round's pick less, so the same player plays several operators over a match.
+  const all = opsForTeam(side === 'atk' ? TEAM.ATK : TEAM.DEF).filter(o => jobOf(o) === job), lastOp = (p.pro.lastOps || (p.pro.lastOps = {}))[side];
+  const weigh = o => (pl.pool[side].includes(o) ? 2 : 1) * opWeight(game.map.id, side, o) ** 2 * (o === lastOp ? 0.35 : 1);
+  const draw = list => { const out = [], left = list.map(o => [o, weigh(o)]); while (left.length) { let r = Math.random() * left.reduce((a, b) => a + b[1], 0), i = 0; while (i < left.length - 1 && (r -= left[i][1]) > 0) i++; out.push(left.splice(i, 1)[0][0]); } return out; };
+  let pool = game.proExplore || game.proAnyOp ? all.sort(() => Math.random() - 0.5) : draw(all); // practice / balance tests: any operator of their job
   if (side === 'atk' && job === 'breach' && j) { const hard = o => ['ember', 'rivet'].includes(o) ? 1 : 0; pool.sort((a, b) => j.hatch ? hard(a) - hard(b) : hard(b) - hard(a)); } // a hard breacher for a reinforced wall, a soft one for a hatch
   for (const op of pool) { game.pickOp(p, op); if (p.op === op) break; }
   if (!p.op) return false;
+  p.pro.lastOps[side] = p.op;
   if (side === 'atk' && j && game.map.atkSpawns) { // spawn closest to where this player sets up
     const at = j.fake || j.hold || j.stack;
     if (at) p.spawn = game.map.atkSpawns.slice().sort((a, b) => Math.hypot(a.x - at.x, a.y - at.y) - Math.hypot(b.x - at.x, b.y - at.y))[0].name;
