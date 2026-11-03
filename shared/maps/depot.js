@@ -1,12 +1,14 @@
 // "Rail Depot" — a train maintenance shed with two tracks and parked carriages, an office wing,
 // and catwalks running round the shed at first-floor height (you can see down across the gap).
+// The Station Wing (he asked for bigger maps that are not rectangles) sits north of the offices and sticks out past the
+// east wall, so the building steps out: ticket hall, signal room and baggage downstairs, the signal box upstairs.
 import { T, FL, MAT } from '../constants.js';
 import { makeMap } from '../mapkit.js';
 
 export function build() {
   const { kits: [G, U], stair, finish } = makeMap({ id: 'depot', name: 'Rail Depot', floors: [
-    { name: '1F', x0: 0, y0: 0, w: 80, h: 56, ground: true },
-    { name: '2F', x0: 6, y0: 8, w: 70, h: 38 },
+    { name: '1F', x0: 0, y0: -32, w: 84, h: 88, ground: true },
+    { name: '2F', x0: 6, y0: -24, w: 76, h: 70 },
   ] });
 
   // ================= 1F =================
@@ -22,10 +24,10 @@ export function build() {
   G.box(8, 10, 71, 43, T.SOFT, MAT.BRICK);
   G.pillar([[8, 10], [71, 10], [8, 43], [71, 43], [45, 10], [45, 43], [45, 21], [45, 31], [58, 10], [71, 21], [71, 31], [20, 10], [33, 10], [20, 43], [33, 43]]);
   G.open(8, 15, 8, 19, 'door', true); G.open(8, 32, 8, 36, 'door', true);   // rolling doors where the tracks come in
-  G.door(25, 10, 27, 10, true); G.door(25, 43, 27, 43, true); G.door(64, 10, 65, 10, true); G.door(60, 43, 62, 43, true); G.door(71, 25, 71, 26, true);
+  G.door(25, 10, 27, 10, true); G.door(25, 43, 27, 43, true); G.door(60, 43, 62, 43, true); G.door(71, 25, 71, 26, true);
   G.door(45, 15, 45, 16); G.door(45, 25, 45, 26); G.door(45, 36, 45, 38); G.door(58, 15, 58, 16); G.door(51, 21, 52, 21);
   G.door(64, 21, 65, 21); G.door(58, 26, 58, 27); G.door(51, 31, 52, 31); G.door(64, 31, 65, 31);
-  G.window(14, 10, 15, 10); G.window(38, 10, 39, 10); G.window(50, 10, 51, 10); G.window(14, 43, 15, 43); G.window(38, 43, 39, 43);
+  G.window(14, 10, 15, 10); G.window(38, 10, 39, 10); G.window(14, 43, 15, 43); G.window(38, 43, 39, 43);
   G.window(53, 43, 54, 43); G.window(67, 43, 68, 43); G.window(71, 15, 71, 16); G.window(71, 37, 71, 38);
   G.prop('train', 13, 16, 15, 3, T.TALL); G.prop('train', 22, 32, 18, 3, T.TALL); G.prop('train', 0, 32, 6, 3, T.TALL);
   for (const [px, py] of [[17, 24], [28, 24], [39, 24], [17, 28], [28, 28], [39, 28]]) G.prop('pillar', px, py, 1, 1, T.TALL);
@@ -37,7 +39,7 @@ export function build() {
   G.prop('counter', 60, 23, 10, 1, T.LOW); G.prop('meetingtable', 61, 26, 7, 3, T.LOW);
   G.prop('workbench', 52, 33, 6, 1, T.LOW); G.prop('workbench', 60, 33, 6, 1, T.LOW); G.prop('tank', 66, 38, 3, 3, T.TALL); G.prop('crates', 55, 39, 3, 2, T.TALL);
   G.prop('container', 22, 2, 8, 3, T.TALL, 1); G.prop('container', 2, 47, 8, 3, T.TALL, 1); G.prop('car', 74, 40, 3, 6, T.TALL); G.prop('van', 74, 48, 3, 7, T.TALL);
-  G.prop('tree', 50, 2, 2, 2, T.TALL); G.prop('tree', 66, 3, 2, 2, T.TALL); G.prop('bush', 46, 48, 3, 2, T.LOW); G.prop('dumpster', 64, 46, 3, 2, T.TALL);
+  G.prop('tree', 40, -6, 2, 2, T.TALL); G.prop('tree', 80, -2, 2, 2, T.TALL); G.prop('bush', 46, 48, 3, 2, T.LOW); G.prop('dumpster', 64, 46, 3, 2, T.TALL);
   // shapes (he asked for less blocky maps): the office wing's south-east corner is cut at an angle, and a few rooms get
   // rounded or angled corners (plastered structure, so they can't be blown open)
   G.outside([[69, 44], [72, 44], [72, 41]], FL.ASPHALT); G.walls([[71.5, 41.5], [69.5, 43.5]], 1, T.SOFT, MAT.BRICK);
@@ -52,6 +54,31 @@ export function build() {
     }
     x.fillStyle = 'rgba(230,190,50,0.6)'; x.fillRect(X(9), Y(23), X(45) - X(9), 1.2); x.fillRect(X(9), Y(29), X(45) - X(9), 1.2);
   });
+
+  // ---- Station Wing (1F)
+  G.ground(36, -27, 48, 6, FL.CONCRETE);   // the platform
+  G.prop('train', 38, -31, 40, 3, T.TALL);
+  G.room('Ticket Hall', 47, -6, 16, 16, FL.MARBLE);
+  G.room('Signal Room', 47, -19, 16, 12, FL.WOOD);
+  G.room('Waiting Room', 64, 0, 13, 10, FL.WOOD);
+  G.room('Baggage Room', 64, -10, 13, 9, FL.CONCRETE);
+  G.room('Platform Office', 64, -19, 13, 8, FL.TILE);
+  G.box(46, -20, 77, 10, T.SOFT, MAT.BRICK);
+  G.wall(63, -19, 63, 9); G.wall(47, -7, 62, -7); G.wall(64, -1, 76, -1); G.wall(64, -11, 76, -11);
+  G.pillar([[46, -20], [77, -20], [46, 10], [77, 10], [63, -20], [63, 10], [46, -7], [63, -7], [77, -1], [77, -11], [63, -1], [63, -11]]);
+  G.door(64, 10, 65, 10); G.window(50, 10, 51, 10);        // into the Locker Room / Parts Store below
+  G.door(52, -20, 55, -20, true); G.door(68, -20, 69, -20, true);   // onto the platform
+  G.door(46, 1, 46, 3, true); G.door(77, 4, 77, 5, true); G.door(77, -6, 77, -5, true);
+  G.door(54, -7, 55, -7); G.door(63, 3, 63, 4); G.door(63, -5, 63, -4); G.door(63, -16, 63, -15);
+  G.door(69, -1, 70, -1); G.door(70, -11, 71, -11);
+  G.window(46, -14, 46, -13); G.window(46, -4, 46, -3); G.window(58, -20, 59, -20);
+  G.prop('counter', 48, -5, 1, 7, T.LOW); G.prop('bench', 52, 0, 6, 1, T.LOW); G.prop('bench', 52, 4, 6, 1, T.LOW); G.prop('plant', 61, 8, 1, 1, T.TALL);
+  G.prop('console', 48, -18, 8, 1, T.LOW); G.prop('cabinet', 61, -18, 1, 4, T.TALL); G.prop('desk', 55, -12, 4, 2, T.LOW);
+  G.prop('bench', 66, 7, 8, 1, T.LOW); G.prop('chairs', 74, 1, 1, 4, T.LOW);
+  G.prop('crates', 66, -9, 2, 2, T.TALL); G.prop('crates', 72, -5, 3, 2, T.TALL); G.prop('shelf', 66, -3, 6, 1, T.TALL);
+  G.prop('desk', 66, -17, 4, 2, T.LOW); G.prop('cabinet', 75, -14, 1, 2, T.TALL);
+  G.outside([[72.2, -20], [78, -20], [78, -14.2]], FL.CONCRETE); G.walls([[72.5, -19.5], [77.5, -14.5]], 1, T.SOFT, MAT.BRICK); // angled NE corner
+  G.round(47, 9, 3, 'ne', T.HARD, MAT.DRYWALL);                                     // Ticket Hall
 
   // ================= 2F =================
   U.slab(72, 22, 2, 6, FL.CONCRETE);                     // fire-escape landing
@@ -72,7 +99,7 @@ export function build() {
   U.door(45, 12, 45, 13); U.door(45, 40, 45, 41); U.door(45, 26, 45, 27);
   U.door(58, 15, 58, 16); U.door(51, 21, 52, 21); U.door(64, 21, 65, 21); U.door(51, 25, 52, 25); U.door(64, 25, 65, 25);
   U.door(64, 34, 65, 34); U.door(58, 38, 58, 39); U.door(71, 23, 71, 24, true);
-  U.window(14, 10, 15, 10); U.window(38, 10, 39, 10); U.window(50, 10, 51, 10); U.window(64, 10, 65, 10); U.window(71, 15, 71, 16);
+  U.window(14, 10, 15, 10); U.window(38, 10, 39, 10); U.window(71, 15, 71, 16);
   U.window(71, 38, 71, 39); U.window(52, 43, 53, 43); U.window(66, 43, 67, 43); U.window(8, 12, 8, 12); U.window(8, 41, 8, 41);
   U.prop('console', 47, 12, 9, 1, T.LOW); U.prop('rack', 56, 15, 1, 5, T.TALL); U.prop('desk', 48, 16, 4, 2, T.LOW);
   U.prop('bookshelf', 60, 12, 10, 1, T.TALL); U.prop('desk', 62, 16, 4, 2, T.LOW); U.prop('cabinet', 69, 15, 1, 4, T.TALL);
@@ -83,7 +110,28 @@ export function build() {
   U.outside([[69, 44], [72, 44], [72, 41]]); U.walls([[71.5, 41.5], [69.5, 43.5]], 1, T.SOFT, MAT.BRICK); // same corner as downstairs
   U.chamfer(71, 21, 2, 'nw', T.HARD, MAT.DRYWALL);                                  // Records Office
 
+  // ---- Station Wing (2F)
+  U.room('Signal Box', 47, -19, 16, 12, FL.SERVER);
+  U.room('Timetable Office', 47, -6, 16, 16, FL.WOOD);
+  U.room('Station Archive', 64, -19, 13, 18, FL.CARPET);
+  U.room('Staff Lounge', 64, 0, 13, 10, FL.CARPET);
+  U.box(46, -20, 77, 10, T.SOFT, MAT.BRICK);
+  U.wall(63, -19, 63, 9); U.wall(47, -7, 62, -7); U.wall(64, -1, 76, -1);
+  U.pillar([[46, -20], [77, -20], [46, 10], [77, 10], [63, -20], [63, 10], [46, -7], [63, -7], [77, -1], [63, -1]]);
+  U.door(50, 10, 51, 10); U.door(64, 10, 65, 10);          // into the Control Room / Records Office below
+  U.door(56, -7, 57, -7); U.door(63, -14, 63, -13); U.door(63, 4, 63, 5); U.door(69, -1, 70, -1);
+  U.window(46, -15, 46, -14); U.window(46, 2, 46, 3); U.window(52, -20, 53, -20); U.window(60, -20, 61, -20); U.window(68, -20, 69, -20);
+  U.window(77, -9, 77, -8); U.window(77, 4, 77, 5);
+  U.prop('console', 52, -18, 10, 1, T.LOW); U.prop('rack', 61, -14, 1, 5, T.TALL);
+  for (const [dx, dy] of [[49, -4], [55, -4], [49, 2], [55, 2]]) U.prop('desk', dx, dy, 4, 2, T.LOW);
+  U.prop('bookshelf', 65, -16, 1, 8, T.TALL); U.prop('bookshelf', 68, -16, 1, 8, T.TALL); U.prop('bookshelf', 71, -16, 1, 8, T.TALL);
+  U.prop('couch', 66, 7, 6, 1, T.LOW); U.prop('coffeetable', 68, 3, 3, 2, T.LOW);
+  U.outside([[72.2, -20], [78, -20], [78, -14.2]]); U.walls([[72.5, -19.5], [77.5, -14.5]], 1, T.SOFT, MAT.BRICK);
+
   // ================= stairs =================
+  stair(0, 1, 49, -17, 2, 6, 'n', FL.WOOD);              // signal room -> signal box
+  G.prop('railing', 51, -18, 1, 7, T.LOW); G.prop('railing', 49, -18, 2, 1, T.LOW);
+  U.prop('railing', 51, -16, 1, 6, T.LOW); U.prop('railing', 49, -11, 2, 1, T.LOW);
   stair(0, 1, 9, 20, 2, 6, 'n', FL.CONCRETE);            // shed -> west catwalk
   G.prop('railing', 11, 19, 1, 7, T.LOW); G.prop('railing', 9, 19, 2, 1, T.LOW);
   U.prop('railing', 9, 26, 2, 1, T.LOW);
@@ -102,9 +150,9 @@ export function build() {
       { name: '2F Control Room / Records Office', bombs: [{ id: 'A', ...u(53, 18), room: 'Control Room' }, { id: 'B', ...u(66, 18), room: 'Records Office' }], rooms: ['Control Room', 'Records Office'] },
       { name: '2F Manager Office / Server Closet', bombs: [{ id: 'A', ...u(53, 38), room: 'Manager Office' }, { id: 'B', ...u(69, 31), room: 'Server Closet' }], rooms: ['Manager Office', 'Server Closet'] },
     ],
-    cams: [g(27, 22), g(30, 41), g(57, 41), u(58, 23), u(10, 12), g(76, 30)],
+    cams: [g(27, 22), g(30, 41), g(57, 41), u(58, 23), u(10, 12), g(76, 30), g(55, 2), u(70, -10), g(60, -24)],
     atkSpawns: [
-      { name: 'Rail Yard', ...g(3, 26) }, { name: 'North Siding', ...g(30, 7) },
+      { name: 'Rail Yard', ...g(3, 26) }, { name: 'North Siding', ...g(30, 7) }, { name: 'Platform', ...g(66, -24) },
       { name: 'Car Park', ...g(77, 52) }, { name: 'South Gate', ...g(40, 52) },
     ],
   });
