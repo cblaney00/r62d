@@ -1,5 +1,5 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
-import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M } from '../shared/constants.js';
+import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
@@ -500,7 +500,8 @@ export class Game {
     }
     if (p.ctrl === 'drone') {
       const d = this.ent(p.droneId);
-      return { drone: true, frozen: !d || this.jammedAt(d.x, d.y), sprint: this.time < (p.sprintUntil || 0) };
+      if (d && d.type === 'bird') return { drone: true, bird: true, frozen: !!d.perch }; // MAGPIE's bird: flies over furniture, still when landed
+      return { drone: true, frozen: !d || this.jammedAt(d.x, d.y) || !!d.grab, sprint: this.time < (p.sprintUntil || 0) }; // a drone the parasite has hold of can't move
     }
     const o = OPERATORS[p.op] || { armor: 2 };
     let mul = 1;
@@ -526,6 +527,8 @@ export class Game {
     if (p.ctrl === 'drone') {
       const d = this.ent(p.droneId); if (!d) return;
       stepMove(this.map, d, p.input, dt, m); d.ang = p.aim;
+      if (d.perch) { const off = angDiff(p.aim, d.perch.out); if (Math.abs(off) > 1.45) d.ang = d.perch.out + Math.sign(off) * 1.45; } // a landed bird looks out from its wall
+      if (d.type === 'bird' && !d.perch && Math.hypot(d.vx || 0, d.vy || 0) > 30 && this.time - (d.flapT || 0) > 0.7) { d.flapT = this.time; this.noise(d.x, d.y, TEAM.DEF, 150); this.events.push({ e: 'snd', s: 'flap', x: r1(d.x), y: r1(d.y) }); }
       return;
     }
     if (p.ctrl !== 'body') return;
@@ -557,7 +560,9 @@ export class Game {
     }
     const team = this.side(p);
     const inp = p.input, prev = p.prevInput;
-    if (p.ctrl === 'drone') { // drone sprint (he asked): Shift, 1.6x for up to 3 s, 3 a round, 6 s between; the motor whine carries
+    const myBird = p.ctrl === 'drone' ? this.ent(p.droneId) : null;
+    if (myBird && myBird.type === 'bird') { if (inp && inp.interact && !(prev && prev.interact)) this.birdPerch(p, myBird); } // E: land on a wall / take off
+    else if (p.ctrl === 'drone') { // drone sprint (he asked): Shift, 1.6x for up to 3 s, 3 a round, 6 s between; the motor whine carries
       const on = this.time < (p.sprintUntil || 0), held = inp && inp.walk, was = prev && prev.walk;
       if (on && !held) { p.sprintUntil = this.time; p.sprintCd = this.time + DRONE_SPRINT.wait; }
       else if (!on && held && !was && (p.sprints || 0) > 0 && this.time >= (p.sprintCd || 0)) {
@@ -882,7 +887,7 @@ export class Game {
   recordHistory() {
     const snap = new Map();
     for (const q of this.players.values()) if (q.alive) snap.set(q.id, { x: q.x, y: q.y });
-    for (const e of this.ents) if (e.type === 'drone') snap.set(e.id, { x: e.x, y: e.y }); // drones are judged where the shooter saw them too
+    for (const e of this.ents) if (e.type === 'drone' || e.type === 'bird') snap.set(e.id, { x: e.x, y: e.y }); // drones are judged where the shooter saw them too
     (this.hist || (this.hist = [])).push({ t: this.time, snap });
     while (this.hist.length > 40) this.hist.shift();
   }
@@ -918,8 +923,9 @@ export class Game {
     for (const e of this.ents) {
       if (!e.hp || e.team === team) continue;
       if (e.tu && Math.abs(angDiff(Math.atan2(y0 - e.y, x0 - e.x), e.ang || 0)) > 0.9) continue; // a turret is bulletproof except its lens, from the front (KITE)
-      const at = e.type === 'drone' && src.viewTime !== null && src.viewTime !== undefined ? this.posAt(e, src.viewTime) : e;
-      const t = rayCircle(x0, y0, dx, dy, at.x, at.y, e.type === 'decoy' ? hitR(e.op) : e.type === 'drone' ? 4.5 : 6); // drones are small
+      const small = e.type === 'drone' || e.type === 'bird';
+      const at = small && src.viewTime !== null && src.viewTime !== undefined ? this.posAt(e, src.viewTime) : e;
+      const t = rayCircle(x0, y0, dx, dy, at.x, at.y, e.type === 'decoy' ? hitR(e.op) : small ? 4.5 : 6); // drones are small
       if (t !== null && t < bestT) { bestT = t; best = { e }; }
     }
     const cov = rayCovers(this.map, x0, y0, dx, dy, bestT); if (cov) { bestT = cov.t; best = null; } // a cover plate in the way
@@ -1124,12 +1130,12 @@ export class Game {
 
   hitEnt(e, src) {
     if (e.shieldUntil > this.time) { this.events.push({ e: 'hit', k: 'shield', x: r1(e.x), y: r1(e.y) }); return; } // TETHER's scope: shielded for its first 3 s
-    if (src && e.team && e.team !== this.side(src) && (e.hp || e.type === 'drone')) this.pts(src, e.type === 'drone' ? 20 : 25, e.type === 'drone' ? 'DRONE DESTROYED' : e.type === 'cam' ? 'CAMERA DESTROYED' : 'GADGET DESTROYED');
+    if (src && e.team && e.team !== this.side(src) && (e.hp || e.type === 'drone')) this.pts(src, e.type === 'drone' ? 20 : 25, e.type === 'drone' ? 'DRONE DESTROYED' : e.type === 'bird' ? 'BIRD DESTROYED' : e.type === 'cam' ? 'CAMERA DESTROYED' : 'GADGET DESTROYED');
     if (e.type === 'cam') { e.hp = 0; this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) }); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); return; }
     this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) });
     this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) });
     this.removeEnt(e);
-    if (e.type === 'drone') this.droneLost(e);
+    if (e.type === 'drone' || e.type === 'bird') this.droneLost(e);
   }
 
   // a drone has 1 hp: one bullet, hit, blast or zap and it's gone; its pilot drops back into their body
@@ -1140,7 +1146,7 @@ export class Game {
       o.droneId = null;
       if (o.ctrl === 'drone') { o.ctrl = 'body'; const list = o.staged ? this.feeds(this.side(o)) : []; if (list.length) this.watch(o, list[0]); }
     }
-    this.msg(`${o.name}'s drone was destroyed`, e.team);
+    this.msg(`${o.name}'s ${e.type === 'bird' ? 'bird' : 'drone'} was destroyed`, e.team);
   }
 
   // ---------------- interaction ----------------
@@ -1339,10 +1345,11 @@ export class Game {
     if (p.staged && ['vault', 'melee', 'ability', 'gadget', 'reload'].includes(e.k)) return; // not on the map yet (he noticed shots before spawning)
     switch (e.k) {
       case 'vault': this.startVault(p, typeof e.a === 'number' && isFinite(e.a) ? e.a : p.aim); break;
-      case 'reload': if (!p.downed && p.ctrl === 'body') this.startReload(p); break;
+      case 'reload': if (!p.downed && p.ctrl === 'body') this.startReload(p); else this.birdAuto(p); break; // on a landed bird: AUTO on/off
       case 'slot': if (!p.downed && p.guns[e.n] && e.n !== p.slot) { p.slot = e.n; p.reloadT = 0; p.fireCd = 0.35; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); } break;
       case 'melee': this.melee(p); break;
-      case 'ability': if (!p.downed && p.ctrl === 'body' && !p.busy && !p.rope && !(this.time < (p.empUntil || 0))) this.startUse(p, 'ability'); break;
+      case 'ability': if (!p.downed && p.ctrl === 'drone' && OPERATORS[p.op].ability.id === 'swarm') { const b = this.ent(p.droneId); if (b && b.type === 'bird') this.releaseSwarm(p, b); break; } // MAGPIE: a swarm from her bird
+        if (!p.downed && p.ctrl === 'body' && !p.busy && !p.rope && !(this.time < (p.empUntil || 0))) this.startUse(p, 'ability'); break;
       case 'gadget': if (!p.downed && p.ctrl === 'body' && !p.busy && !p.rope && !(this.time < (p.empUntil || 0))) this.startUse(p, 'gadget'); break;
       case 'view': this.toggleView(p); break; // controller / touch: drone or cameras, one button
       case 'feeds': this.openFeeds(p); break; // 5
@@ -1390,7 +1397,7 @@ export class Game {
       const list = this.feeds(team); // no drone of your own left: watch a teammate's
       if (list.length) this.watch(p, list[0]);
     } else {
-      if (p.ctrl === 'cam') { p.ctrl = 'body'; return; }
+      if (p.ctrl === 'cam' || p.ctrl === 'drone') { p.ctrl = 'body'; return; } // (a defender 'drone' is MAGPIE's bird)
       if (p.ctrl !== 'body' || p.busy) return;
       const list = this.feeds(team);
       if (list.length) this.watch(p, list.find(f => f.id === p.feedId) || list[0]);
@@ -1424,7 +1431,7 @@ export class Game {
   // Everything a team can look through, flipped through with left/right or the mouse wheel:
   // defence every working camera (map, turret, sticky); attack every drone and wall scope.
   feeds(team) {
-    return this.ents.filter(e => e.team === team && (team === TEAM.DEF ? (e.type === 'cam' && e.hp > 0) || e.type === 'scope' : e.type === 'drone' || e.type === 'scope'));
+    return this.ents.filter(e => e.team === team && (team === TEAM.DEF ? (e.type === 'cam' && e.hp > 0) || e.type === 'scope' || e.type === 'bird' : e.type === 'drone' || e.type === 'scope'));
   }
   feed(p) { const f = this.ent(p.feedId); return f && this.feeds(this.side(p)).includes(f) ? f : null; }
   // only the one who placed a gadget camera can turn it or fire its laser; map cameras are anyone's
@@ -1432,6 +1439,7 @@ export class Game {
   // look through a feed: your own drone you drive, anything else you only watch (and mark from)
   watch(p, f) {
     if (f.type === 'drone' && f.id === p.droneId) { p.ctrl = 'drone'; return; }
+    if (f.type === 'bird' && f.owner === p.id) { p.droneId = f.id; p.ctrl = 'drone'; return; } // MAGPIE flies her own birds
     p.ctrl = 'cam'; p.feedId = f.id;
   }
 
@@ -1699,6 +1707,7 @@ export class Game {
       p.periDir = spot.dir === 'up' ? 'down' : 'up'; used(); this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y) });
       this.events.push({ e: 'deny', id: p.id, why: `Periscope pushed ${spot.dir === 'up' ? 'UP into' : 'DOWN into'} ${roomAt(this.map, spot.x, spot.y) || 'the floor ' + spot.dir} — open the camera feeds to watch it` });
     } else if (id === 'radar') place('radar', 8, { life: 15, t: 0 });
+    else if (id === 'swarm') this.releaseSwarm(p, p);
     else if (id === 'station') place('station', 14, { pool: 100 });
     else if (id === 'catcher') place('catcher', 10, { c: 2 });
   }
@@ -1846,6 +1855,96 @@ export class Game {
   // ---------------- entities ----------------
   eid() { return 'e' + (this.nextId++); }
   ent(id) { return id ? this.ents.find(e => e.id === id) : null; }
+  // ---------------- MAGPIE (he asked): a parasite swarm takes over attacker drones, which reshape into birds ----------------
+  // The swarm goes for the attacker drone in sight (within SWARM.reach) closest to where you aim (from your body) or to the
+  // bird you fly. It chases it; the drone escapes by getting SWARM.lose metres further ahead than it started, by
+  // staying out of the swarm's sight for SWARM.blind s, or by outlasting it. Caught: held SWARM.grab s, then it is a bird.
+  releaseSwarm(p, from) {
+    if (p.abilityCount <= 0) return;
+    const sm = this.smokeList(), fl = floorAt(this.map, from.x, from.y), body = from === p;
+    let best = null, bs = Infinity;
+    for (const d of this.ents) {
+      if (d.type !== 'drone' || d.team === this.side(p) || d.grab || this.ents.some(s => s.type === 'swarm' && s.target === d.id)) continue;
+      const dist = Math.hypot(d.x - from.x, d.y - from.y);
+      if (dist > SWARM.reach * PX_PER_M || floorAt(this.map, d.x, d.y) !== fl || !los(this.map, from.x, from.y, d.x, d.y, sm)) continue;
+      const off = body ? Math.abs(angDiff(Math.atan2(d.y - from.y, d.x - from.x), p.aim)) : 0;
+      if (body && off > 1.2) continue; // from your body: roughly where you look
+      const sc = dist + off * 200; if (sc < bs) { bs = sc; best = d; }
+    }
+    if (!best) { this.events.push({ e: 'deny', id: p.id, why: `No attacker drone in sight within ${SWARM.reach} m` }); return; }
+    p.abilityCount--;
+    const dist = Math.hypot(best.x - from.x, best.y - from.y);
+    this.ents.push({ id: this.eid(), type: 'swarm', x: from.x, y: from.y, team: this.side(p), owner: p.id, target: best.id, t: 0, seenT: 0, lx: best.x, ly: best.y,
+      lose: dist + SWARM.lose * PX_PER_M, from: from === p ? 'body' : 'bird' });
+    this.events.push({ e: 'snd', s: 'swarm', x: r1(from.x), y: r1(from.y) });
+    this.events.push({ e: 'deny', id: best.owner, why: 'A PARASITE SWARM IS CHASING YOUR DRONE: get away fast (Shift sprints) or break its sight' });
+    this.magpieSeen = { x: from.x, y: from.y, t: this.time, id: p.id }; // the attackers now know there is a MAGPIE (bots get wary)
+  }
+  tickSwarm(e, dt) {
+    const d = this.ent(e.target), gone = why => { this.removeEnt(e); this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) }); if (why && d) this.events.push({ e: 'deny', id: d.owner, why }); };
+    if (!d || d.type !== 'drone') return gone();
+    if (e.grab) { // latched on: the drone can't move while the parasite reshapes it
+      e.x = d.x; e.y = d.y; e.grab -= dt;
+      if (e.grab <= 0) this.captureDrone(e, d);
+      return;
+    }
+    e.t += dt;
+    const dist = Math.hypot(d.x - e.x, d.y - e.y);
+    if (floorAt(this.map, d.x, d.y) === floorAt(this.map, e.x, e.y) && los(this.map, e.x, e.y, d.x, d.y)) { e.seenT = 0; e.lx = d.x; e.ly = d.y; } else e.seenT += dt;
+    if (e.t > SWARM.life || e.seenT > SWARM.blind || dist > e.lose) return gone('Your drone shook off the parasite swarm');
+    if (dist < 7) { e.grab = SWARM.grab; d.grab = true; d.vx = d.vy = 0; this.events.push({ e: 'snd', s: 'swarmLatch', x: r1(d.x), y: r1(d.y) }); return; }
+    const sp = (e.t < SWARM.fresh ? SWARM.speed : SWARM.speed + (SWARM.tired - SWARM.speed) * Math.min(1, (e.t - SWARM.fresh) / (SWARM.life - SWARM.fresh))) * PX_PER_M;
+    const tx = e.lx - e.x, ty = e.ly - e.y, l = Math.hypot(tx, ty) || 1, step = Math.min(l, sp * dt);
+    moveCircle(this.map, e, tx / l * step, ty / l * step, 2, true); // tiny bugs: through drone holes and barricade gaps like the drone
+  }
+  captureDrone(s, d) {
+    this.removeEnt(s); this.removeEnt(d);
+    const a = this.players.get(d.owner);
+    if (a && a.droneId === d.id) { a.droneId = null; if (a.ctrl === 'drone') { a.ctrl = 'body'; const list = a.staged ? this.feeds(this.side(a)) : []; if (list.length) this.watch(a, list[0]); } }
+    if (a) this.msg(`${a.name}'s drone was taken over by a parasite`, d.team);
+    const m = this.players.get(s.owner);
+    const b = { id: this.eid(), type: 'bird', owner: s.owner, team: s.team, x: d.x, y: d.y, hp: 1, ang: d.ang || 0, vx: 0, vy: 0, perch: null, auto: false };
+    this.ents.push(b);
+    this.events.push({ e: 'snd', s: 'birdForm', x: r1(b.x), y: r1(b.y) }); this.events.push({ e: 'hit', k: 'spark', x: r1(b.x), y: r1(b.y) });
+    if (m) { this.pts(m, 30, 'DRONE CAPTURED'); this.events.push({ e: 'deny', id: m.id, why: 'Drone captured: it is your bird now (look through your feeds to fly it)' }); }
+    if (m && m.bot) this.birdPerch(m, b, 3 * CELL); // a bot's bird lands on the nearest wall and watches on AUTO
+  }
+  // E on your bird: land on the wall next to it (looking out from it, AUTO on), or take off again
+  birdPerch(p, b, reach = 14) {
+    if (b.perch) { b.perch = null; b.auto = false; this.events.push({ e: 'snd', s: 'flap', x: r1(b.x), y: r1(b.y) }); return; }
+    let ba = null, bd = Infinity;
+    for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, d = castSight(this.map, b.x, b.y, a, reach + 4, null); if (d < bd) { bd = d; ba = a; } }
+    if (ba === null || bd > reach) { this.events.push({ e: 'deny', id: p.id, why: 'Fly right up to a wall to land on it' }); return; }
+    const k = Math.max(0, bd - 4); b.x += Math.cos(ba) * k; b.y += Math.sin(ba) * k; b.vx = b.vy = 0;
+    b.perch = { out: ba + Math.PI }; b.ang = ba + Math.PI; b.auto = true; // he asked: AUTO is on by default when it lands
+    if (p.ctrl === 'drone' && p.droneId === b.id) p.aim = b.ang;
+    this.events.push({ e: 'snd', s: 'place', x: r1(b.x), y: r1(b.y) });
+  }
+  birdAuto(p) {
+    const b = p.ctrl === 'drone' ? this.ent(p.droneId) : null;
+    if (!b || b.type !== 'bird' || !b.perch) return;
+    b.auto = !b.auto; this.events.push({ e: 'snd', s: 'swap', x: r1(b.x), y: r1(b.y), id: p.id });
+  }
+  // a bird that sees anyone: AUTO (landed) pings the first attacker it sees for the team, then flashes and destroys itself
+  tickBird(b, dt) {
+    const o = this.players.get(b.owner);
+    if (o && !o.alive && o.ctrl === 'drone') o.ctrl = 'body';
+    if (!b.perch || !b.auto || this.phase !== PHASE.ACTION && this.phase !== PHASE.PREP) return;
+    if ((b.lookT = (b.lookT || 0) - dt) > 0) return; b.lookT = 0.15;
+    const sm = this.smokeList(), fl = floorAt(this.map, b.x, b.y);
+    for (const q of this.players.values()) {
+      if (!q.alive || q.staged || q.shrouded || this.side(q) === b.team || floorAt(this.map, q.x, q.y) !== fl) continue;
+      const d = Math.hypot(q.x - b.x, q.y - b.y);
+      if (d > 520 || Math.abs(angDiff(Math.atan2(q.y - b.y, q.x - b.x), b.ang)) > 0.95 || !los(this.map, b.x, b.y, q.x, q.y, sm)) continue;
+      this.spot(b.team, q.id, DUR.spot);
+      const w = 'BIRD: ENEMY ' + OPERATORS[q.op].name;
+      if (o) { this.mark(o, q.x, q.y, w, q.id); this.pts(o, 20, 'ENEMY SPOTTED'); } else this.events.push({ e: 'mark', team: b.team, x: r1(q.x), y: r1(q.y), w, by: 'BIRD', id: q.id });
+      this.removeEnt(b); this.droneLost(b);
+      this.detonate({ type: 'flare', x: b.x, y: b.y, team: b.team }); // the flash: blinds the attackers looking at it
+      return;
+    }
+  }
+
   removeEnt(e) { const i = this.ents.indexOf(e); if (i >= 0) this.ents.splice(i, 1); }
 
   ghost(q) { return this.time < (q.ghostUntil || 0); } // Ghost Step: traps and sensors don't notice
@@ -2026,6 +2125,8 @@ export class Game {
           if (!o || !o.alive) { if (o && o.ctrl === 'drone') o.ctrl = 'body'; }
           break;
         }
+        case 'swarm': this.tickSwarm(e, dt); break;
+        case 'bird': this.tickBird(e, dt); break;
         case 'nade': this.tickNade(e, dt); break;
         case 'smoke': {
           e.life -= dt; if (e.life <= 0) { this.removeEnt(e); break; }
@@ -2448,7 +2549,7 @@ export class Game {
     for (const g of [...this.ents]) {
       if (g === e || g.team === e.team || Math.hypot(g.x - e.x, g.y - e.y) > o.r) continue;
       if (g.type === 'cam') g.hp = 0;
-      else if (['drone', 'jammer', 'mine', 'wire', 'claymore', 'dart', 'cutter', 'breach'].includes(g.type)) { this.removeEnt(g); if (g.type === 'drone') this.droneLost(g); }
+      else if (['drone', 'bird', 'jammer', 'mine', 'wire', 'claymore', 'dart', 'cutter', 'breach'].includes(g.type)) { this.removeEnt(g); if (g.type === 'drone' || g.type === 'bird') this.droneLost(g); }
     }
   }
 
@@ -2583,7 +2684,9 @@ export class Game {
       if (e.type === 'scope' && e.shieldUntil > this.time) o.sh = r1(e.shieldUntil - this.time);
       if (e.type === 'sticky' && e.stuck) o.st = 1;
       if (e.type === 'cutter' || e.type === 'breach') { o.t = r1(e.t); o.j = this.jammedAt(e.x, e.y) ? 1 : 0; }
-      if (e.type === 'drone') { o.j = this.jammedAt(e.x, e.y) ? 1 : 0; o.vx = r1(e.vx || 0); o.vy = r1(e.vy || 0); }
+      if (e.type === 'drone') { o.j = this.jammedAt(e.x, e.y) ? 1 : 0; o.vx = r1(e.vx || 0); o.vy = r1(e.vy || 0); if (e.grab) o.gr = 1; }
+      if (e.type === 'bird') { o.vx = r1(e.vx || 0); o.vy = r1(e.vy || 0); if (e.perch) o.pe = 1; if (e.auto) o.au = 1; }
+      if (e.type === 'swarm') { o.tg = e.target; if (e.grab) o.gr = 1; }
       return o;
     });
     const spots = { atk: [...this.spots.atk.keys()], def: [...this.spots.def.keys()] };

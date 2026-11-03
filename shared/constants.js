@@ -13,6 +13,13 @@ export const PLAYER_R = 7;
 export const DRONE_R = 2.5;         // a small drone (he asked for smaller: was 3.5); passes the drone holes at the foot of walls (map.dhole)
 // drone sprint (he asked, like R6): hold Shift for 1.6x speed for up to 3 s; 3 a round; 6 s before the next one
 export const DRONE_SPRINT = { mul: 1.6, time: 3, wait: 6, charges: 3 };
+// MAGPIE (he asked): a parasite swarm chases an attacker drone. It flies 4.2 m/s for 3 s, then tires down to 2.8 m/s by the end
+// of its life: faster than a drone (3.2), slower than a sprinting one (5.1), so a drone that sprints away early enough, or
+// breaks sight through a drone hole, gets away; one that doesn't notice is caught.
+// reach = how far the target may be when it is released; lose = the drone gets this many metres further ahead than it
+// started: escaped; blind = seconds out of
+// its sight before it gives up; grab = seconds the parasite takes to reshape a caught drone. The bird flies 4 m/s over furniture.
+export const SWARM = { reach: 12, speed: 4.2, tired: 2.8, fresh: 3, lose: 2, blind: 1.2, life: 8, grab: 0.8, bird: 4.0, birdR: 3, keep: 14 };
 export const MAX_PLAYERS = 10;
 export const TEAM_SIZE = 5;
 export const BOT_LEVELS = ['Copper', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion', 'Pro']; // he asked: difficulty = the ranks, R6 order

@@ -231,6 +231,10 @@ export const HEADGEAR = {
     strap(h, ctx, '#3a2a1a'); h.ell(ctx, 1.4, -1.6, 1.2, 1.2, '#24282c'); h.ell(ctx, 1.4, 1.6, 1.2, 1.2, '#24282c');
     h.ell(ctx, 1.5, -1.6, 0.6, 0.6, '#5a8a6a', false); h.ell(ctx, 1.5, 1.6, 0.6, 0.6, '#5a8a6a', false);
   },
+  magpie(ctx, h) { // MAGPIE: dark hood with a black-and-white feather crest down the back and a green-lit visor slit
+    h.ell(ctx, -0.5, 0, 5.3, 5.2, h.o.helmet); h.cap(ctx, -5.6, 0, -1, 0, 1.3, '#101214'); h.cap(ctx, -5, -1.1, -1.6, -0.8, 0.5, '#e6e6e0'); h.cap(ctx, -5, 1.1, -1.6, 0.8, 0.5, '#e6e6e0');
+    h.box(ctx, 2.6, -3, 1.2, 6, 0.6, '#0d0f10'); lens(ctx, 3.3, -2.4, 0.5, 4.8, `rgba(110,240,140,${0.55 + 0.25 * Math.sin(h.t * 3)})`);
+  },
 };
 
 // What each operator carries on their back. Several kinds, spread so that operators who do similar jobs carry
@@ -241,7 +245,7 @@ export const PACK = {
   torque: 'discs', rush: 'none', blaze: 'flares', echo: 'spikes', mark: 'ammo', patch: 'medbag', trench: 'plates', wren: 'roll', vapor: 'tank3', crow: 'cloak',
   mason: 'panel', veil: 'jammer', lynx: 'pouches', solace: 'medbag2', wraith: 'cloak2', bramble: 'pouches2', kite: 'antennas', gravel: 'baton',
   shunt: 'toolbox', hush: 'none', shade: 'mics', rampart: 'armorbag', miasma: 'canisters2', snare: 'wire', argus: 'camcase', solder: 'tank4',
-  latch: 'wire2', hound: 'darts', ruse: 'speaker', rally: 'bottle', lens: 'tripod', audit: 'radio2', tonic: 'medcase', ward: 'radar', girder: 'girders',
+  latch: 'wire2', hound: 'darts', ruse: 'speaker', rally: 'bottle', lens: 'tripod', audit: 'radio2', tonic: 'medcase', ward: 'radar', girder: 'girders', magpie: 'hive',
 };
 // The cut of the vest/jacket over the torso
 export const VEST = {
@@ -250,5 +254,5 @@ export const VEST = {
   torque: 'leather', rush: 'jersey', blaze: 'jacket2', echo: 'field', mark: 'shirt', patch: 'medic', trench: 'heavy2', wren: 'coat2', vapor: 'hoodie2', crow: 'cloak',
   mason: 'heavy3', veil: 'rig3', lynx: 'rig4', solace: 'medic2', wraith: 'cloak2', bramble: 'field2', kite: 'jacket3', gravel: 'police',
   shunt: 'overalls2', hush: 'light3', shade: 'shirt2', rampart: 'heavy4', miasma: 'hazmat', snare: 'tweed', argus: 'suit', solder: 'apron2',
-  latch: 'hivis', hound: 'poncho', ruse: 'coat3', rally: 'singlet', lens: 'ghillie', audit: 'jacket4', tonic: 'scrubs', ward: 'carrier3', girder: 'hivis2',
+  latch: 'hivis', hound: 'poncho', ruse: 'coat3', rally: 'singlet', lens: 'ghillie', audit: 'jacket4', tonic: 'scrubs', ward: 'carrier3', girder: 'hivis2', magpie: 'field',
 };

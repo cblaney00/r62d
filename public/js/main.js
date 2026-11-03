@@ -7,7 +7,7 @@ import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, gunMods, 
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
-import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading } from './sprites.js';
+import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
 import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
@@ -1303,7 +1303,10 @@ function frame(nowMs) {
   }
   let view = null, ctrl = me && me.a ? me.ct : null;
   if (inGame && me && me.a) {
-    if (ctrl === 'drone') view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: 230, near: 0, kind: 'drone', low: true };
+    if (ctrl === 'drone') {
+      const b = s.ents.find(e => e.id === me.did && e.ty === 'bird'); // MAGPIE's bird: up in the air (no seeing under tables); landed, it looks out like a camera
+      view = b && b.pe ? { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: 1.9, range: 520, near: 6, kind: 'drone', bird: 1 } : { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: b ? 260 : 230, near: 0, kind: 'drone', low: !b, bird: b ? 1 : 0 };
+    }
     else if (ctrl === 'cam') { const c = s.ents.find(e => e.id === me.fi); if (c) view = feedView(c, me); }
     else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: 1100, near: 26, kind: 'body', low: (st.pred.pr || 0) >= 1 }; } // you see from your (leaning) head
   } else if (inGame && me) {
@@ -1812,7 +1815,7 @@ function draw(s, view, now, dt) {
   const ents = s.ents.map(e => interp(e.id, 'ents') || e);
   for (const e of ents) {
     const ally = e.tm === side;
-    if (e.ty === 'drone' || e.ty === 'cam' || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud') continue;
+    if (e.ty === 'drone' || e.ty === 'cam' || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud' || e.ty === 'bird' || e.ty === 'swarm') continue;
     if (TRAPS.has(e.ty) && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < TRAP_SEEN)) continue; // hidden traps: one rule for all (he asked), seen only within 2 m
     if (!ally && !seen(e.x, e.y)) continue;
     drawGadget(ctx, e, now, ally);
@@ -1893,6 +1896,17 @@ function draw(s, view, now, dt) {
       fx.add({ type: 'smoke', x: x - Math.cos(a.mvAng) * 5, y: y - Math.sin(a.mvAng) * 5, vx: -Math.cos(a.mvAng) * 15, vy: -Math.sin(a.mvAng) * 15, life: 0.5, max: 0.5, size: 1.2, grow: 5, col: '170,160,140', a: 0.25 });
     audio.droneLoop(e.id, x, y, a.spd, own);
     if (e.tm === side || seen(x, y)) drawDrone(ctx, { ...e, x, y, ag: a.heading, wheel: a.wheel, spd: a.spd, mvAng: a.mvAng ?? a.heading, sway: a.sway }, now, e.tm === side);
+  }
+  for (const e of ents) if (e.ty === 'swarm' && (e.tm === side || seen(e.x, e.y))) { // MAGPIE's swarm
+    const a = anim(e.id); a.vx = e.x - (a.sx ?? e.x); a.vy = e.y - (a.sy ?? e.y); a.sx = e.x; a.sy = e.y;
+    drawSwarm(ctx, { ...e, vx: a.vx / Math.max(dt, 0.001), vy: a.vy / Math.max(dt, 0.001) }, now);
+  }
+  for (const e of ents) if (e.ty === 'bird') { // MAGPIE's birds: the wings beat faster the faster it flies
+    const own = me && e.id === me.did && me.ct === 'drone';
+    const x = own ? st.pred.x : e.x, y = own ? st.pred.y : e.y, a = anim(e.id);
+    const sp = Math.hypot(x - (a.bx ?? x), y - (a.by ?? y)) / Math.max(dt, 0.001); a.bx = x; a.by = y;
+    a.fl = (a.fl ?? 0.4) + (Math.min(1, 0.3 + sp / 150) - (a.fl ?? 0.4)) * Math.min(1, dt * 6);
+    if (e.tm === side || seen(x, y)) drawBird(ctx, { ...e, x, y, ag: own ? st.aim : e.ag, fl: a.fl }, now, e.tm === side);
   }
   audio.pruneLoops(); audio.defuserAlarm(!!(s.pl && s.ph === PHASE.ACTION), s.pl && s.pl.x, s.pl && s.pl.y); tq = pfa('actors', tq);
   fx.draw(ctx);
@@ -2349,7 +2363,10 @@ function hud(s) {
     `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label
   let vl = '';
-  if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); const sp = me.dsl > 0 ? `SPRINTING ${me.dsl.toFixed(1)}s` : !me.ds ? 'NO SPRINTS LEFT' : me.dsc > 0 ? `SPRINT IN ${Math.ceil(me.dsc)}s (${me.ds} LEFT)` : `${gpRecent() ? (isTouch ? 'SPRINT' : 'B') : label('walk')}: SPRINT (${me.ds} LEFT)`.replace('SPRINT: SPRINT', 'HOLD SPRINT');
+  const myBird = me.ct === 'drone' ? s.ents.find(e => e.id === me.did && e.ty === 'bird') : null;
+  if (myBird) vl = myBird.pe ? `YOUR BIRD · LANDED · <b>${label('reload')}</b> AUTO PING: ${myBird.au ? 'ON (pings the first attacker it sees, then flashes and is gone)' : 'OFF (only watches)'} · <b>${label('interact')}</b> TAKE OFF · <b>${label('ability')}</b> SWARM`
+    : `YOUR BIRD · FLIES OVER FURNITURE · <b>${label('interact')}</b> LAND ON A WALL · <b>${label('ability')}</b> SWARM · ${label('view')} TO EXIT`;
+  else if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); const sp = me.dsl > 0 ? `SPRINTING ${me.dsl.toFixed(1)}s` : !me.ds ? 'NO SPRINTS LEFT' : me.dsc > 0 ? `SPRINT IN ${Math.ceil(me.dsc)}s (${me.ds} LEFT)` : `${gpRecent() ? (isTouch ? 'SPRINT' : 'B') : label('walk')}: SPRINT (${me.ds} LEFT)`.replace('SPRINT: SPRINT', 'HOLD SPRINT');
     vl = d && d.j ? 'DRONE JAMMED' : isTouch ? `YOUR DRONE · ${sp} · PING TO MARK · ◀ ▶ TEAM DRONES` : `YOUR DRONE · ${sp} · CLICK OR ${label('spot')} TO PING · ${label('leanL')} ${label('leanR')}: TEAM FEEDS · ${label('drone')} TO EXIT`; }
   else if (me.ct === 'cam') {
     const list = feedList(s, me), c = list.find(e => e.id === me.fi);
@@ -2447,14 +2464,15 @@ function bodySounds(me, dt) {
 // Everything your team can look through (the server's feeds()): defence every working camera, map,
 // turret or sticky; attack every drone and wall scope. Only your own drone/gadget is yours to steer.
 function feedList(s, me) {
-  return s.ents.filter(e => e.tm === me.tm && (me.tm === 'def' ? e.ty === 'cam' && e.hp > 0 : e.ty === 'drone' || e.ty === 'scope'));
+  return s.ents.filter(e => e.tm === me.tm && (me.tm === 'def' ? (e.ty === 'cam' && e.hp > 0) || e.ty === 'bird' : e.ty === 'drone' || e.ty === 'scope'));
 }
 const TRAPS = new Set(['clamp', 'prox', 'concuss', 'alarm', 'mine']), TRAP_SEEN = 2 * PX_PER_M;
-function feedKind(c) { return c.ty === 'drone' ? 'DRONE' : c.ty === 'scope' && c.fl ? (c.fl === 'up' ? 'PERISCOPE ▲' : 'PERISCOPE ▼') : c.ty === 'scope' ? 'WALL SCOPE' : c.tu ? 'TURRET' : c.ow ? 'STICKY CAM' : 'CAMERA'; }
+function feedKind(c) { return c.ty === 'drone' ? 'DRONE' : c.ty === 'bird' ? (c.pe ? 'BIRD · LANDED' : 'BIRD') : c.ty === 'scope' && c.fl ? (c.fl === 'up' ? 'PERISCOPE ▲' : 'PERISCOPE ▼') : c.ty === 'scope' ? 'WALL SCOPE' : c.tu ? 'TURRET' : c.ow ? 'STICKY CAM' : 'CAMERA'; }
 function ownerName(s, id) { const p = s.players.find(p => p.id === id); return p ? p.n.replace(/^\[BOT\] /, '') : 'TEAMMATE'; }
 function feedView(c, me) {
   const ro = c.ow && c.ow !== me.id ? 1 : 0;
   if (c.ty === 'drone') { const ic = interp(c.id, 'ents') || c; return { x: ic.x, y: ic.y, ang: ic.ag || c.ag || 0, fov: Math.PI * 2, range: 230, near: 0, kind: 'cam', cam: c, dr: 1, ro: 1, low: true }; }
+  if (c.ty === 'bird') { const ic = interp(c.id, 'ents') || c; return c.pe ? { x: ic.x, y: ic.y, ang: ic.ag || c.ag || 0, fov: 1.9, range: 520, near: 6, kind: 'cam', cam: c, ro: 1 } : { x: ic.x, y: ic.y, ang: ic.ag || c.ag || 0, fov: Math.PI * 2, range: 260, near: 0, kind: 'cam', cam: c, dr: 1, ro: 1 }; }
   if (c.ty === 'scope' && c.fl) return { x: c.x, y: c.y, ang: c.ag || 0, fov: 6.28, range: 230, near: 6, kind: 'cam', cam: c, ro: 1 }; // LENS: looking all round the room above / below
   if (c.ty === 'scope') return { x: c.x, y: c.y, ang: c.ag || 0, fov: 1.3, range: 420, near: 6, kind: 'cam', cam: c, ro: 1 };
   return { x: c.x, y: c.y, ang: ro ? c.ag || 0 : st.aim, fov: 1.9, range: 650, near: 14, kind: 'cam', off: c.off, cam: c, ro };
@@ -2464,12 +2482,12 @@ function feedView(c, me) {
 function camBar(s, me) {
   const bar = $('cambar');
   if (me.ct !== 'cam' && me.ct !== 'drone') { if (bar.innerHTML) bar.innerHTML = ''; return; }
-  const def = me.tm === 'def', list = def ? s.ents.filter(e => e.ty === 'cam' && e.tm === 'def') : feedList(s, me); // broken cameras stay listed, greyed
+  const def = me.tm === 'def', list = def ? s.ents.filter(e => (e.ty === 'cam' || e.ty === 'bird') && e.tm === 'def') : feedList(s, me); // broken cameras stay listed, greyed
   const cur = me.ct === 'drone' ? me.did : me.fi;
   let n = 0;
   const html = list.map(c => {
-    const live = !def || c.hp > 0, mine = c.ow === me.id;
-    const name = c.ow ? (mine ? 'MY ' : `${ownerName(s, c.ow).toUpperCase()}'S `) + (c.ty === 'cam' ? (c.tu ? 'TURRET' : 'STICKY') : c.ty === 'scope' ? 'SCOPE' : 'DRONE') : `CAM ${++n}`;
+    const live = !def || c.hp > 0 || c.ty === 'bird', mine = c.ow === me.id;
+    const name = c.ow ? (mine ? 'MY ' : `${ownerName(s, c.ow).toUpperCase()}'S `) + (c.ty === 'cam' ? (c.tu ? 'TURRET' : 'STICKY') : c.ty === 'scope' ? 'SCOPE' : c.ty === 'bird' ? 'BIRD' : 'DRONE') : `CAM ${++n}`;
     return `<button data-id="${live ? c.id : ''}" class="${c.id === cur ? 'on' : ''} ${live ? '' : 'dead'}">${esc(name)}<small>${esc((roomAt(st.map, c.x, c.y) || 'outside').toUpperCase())}${c.off || c.j ? ' · DISRUPTED' : ''}</small></button>`;
   }).join('');
   if (bar.innerHTML !== html) {

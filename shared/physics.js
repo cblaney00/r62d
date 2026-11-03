@@ -1,5 +1,5 @@
 // Movement, collision, line of sight and ray casting on the tile grid.
-import { CELL, PX_PER_M, T, FL, HOLE_R, PLAYER_R, DRONE_R, DRONE_SPRINT, blocksMove, blocksDrone, blocksSight, underAt } from './constants.js';
+import { CELL, PX_PER_M, T, FL, HOLE_R, PLAYER_R, DRONE_R, DRONE_SPRINT, SWARM, blocksMove, blocksDrone, blocksSight, underAt } from './constants.js';
 
 // What stops a body: everything blocksMove says, plus window openings (you vault through those, see findVault).
 export const bodyBlocks = map => (t, k) => blocksMove(t) || (t === T.OPEN && !!map.win && map.win[k] === 1);
@@ -94,7 +94,8 @@ export const standable = (map, k) => map.tiles[k] === T.LOW && map.floor[k] !== 
 export function moveCircle(map, o, dx, dy, r, drone = false, up = false) {
   // drones also slip through the drone holes at the foot of plain walls (gone once the wall is reinforced)
   const body = bodyBlocks(map);
-  const fn = drone ? (t, k) => blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) && !underAt(map, k, t) : up ? (t, k) => body(t, k) && !standable(map, k) : body;
+  // MAGPIE's bird (drone === 'bird') flies over low furniture, wall stubs and window sills
+  const fn = drone ? (t, k) => blocksDrone(t) && !(drone === 'bird' && t === T.LOW) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) && !underAt(map, k, t) : up ? (t, k) => body(t, k) && !standable(map, k) : body;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (r * 0.5)));
   for (let s = 0; s < steps; s++) {
     o.x += dx / steps; resolve(map, o, r, fn); pushCovers(map, o, r);
@@ -132,7 +133,8 @@ export function stepMove(map, o, input, dt, mods) {
   const len = Math.hypot(mx, my);
   if (len > 0) { mx /= len; my /= len; }
   let spd;
-  if (mods.drone) spd = DRONE_SPEED * (mods.sprint ? DRONE_SPRINT.mul : 1);
+  if (mods.bird) spd = SWARM.bird * PX_PER_M;
+  else if (mods.drone) spd = DRONE_SPEED * (mods.sprint ? DRONE_SPRINT.mul : 1);
   else {
     spd = BASE_SPEED * (ARMOR_SPEED[mods.armor] || 1) * (mods.mul || 1);
     if (mods.downed) spd = M_S.downed * PX_PER_M;
@@ -173,7 +175,7 @@ export function stepMove(map, o, input, dt, mods) {
     if (input.jump && !(o.air > 0) && !o.jcd && !mods.downed && !input.crouch && !o.pr) { o.air = JUMP_T; o.jcd = JUMP_T + 0.35; }
   }
   const wasAir = o.air > 0;
-  moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? DRONE_R : PLAYER_R, !!mods.drone, !mods.drone && (wasAir || !!o.up));
+  moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? DRONE_R : PLAYER_R, mods.bird ? 'bird' : !!mods.drone, !mods.drone && (wasAir || !!o.up));
   if (!mods.drone) {
     if (wasAir) { o.air -= dt; if (o.air <= 0) { o.air = 0; o.up = standable(map, Math.floor(o.y / CELL) * map.W + Math.floor(o.x / CELL)); o.landed = true; } }
     else if (o.up && !standable(map, Math.floor(o.y / CELL) * map.W + Math.floor(o.x / CELL))) o.up = false; // stepped off: back on the floor

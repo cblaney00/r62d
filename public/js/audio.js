@@ -490,6 +490,11 @@ export function play(name, x, y) {
     case 'fakeStep': return step(x, y, 'concrete', 2, false); // RUSE's echo box
     case 'fakeShot': return gunshot('lark', x, y, false);
     case 'droneSprint': { const g = out(x, y, 0.5, 300, 0.12); if (!g) return; const t = ac.currentTime; tone(g, t, 0.35, 600, 1500, 'sawtooth', 0.08); return; } // the motor winding up
+    // MAGPIE: the swarm comes out with a wet, rising buzz; it latching on is a crackle; the drone reshaping creaks and clicks; wings flap
+    case 'swarm': { const g = out(x, y, 0.4, 420, 0.1); if (!g) return; const t = ac.currentTime; tone(g, t, 0.7, 180, 260, 'sawtooth', 0.05); noise(g, t, 0.7, 'bandpass', 2400, 6, 0.35); return; }
+    case 'swarmLatch': { const g = out(x, y, 0.45, 380, 0.1); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 6; i++) noise(g, t + i * 0.07, 0.05, 'highpass', 3000, 1, 0.5); return; }
+    case 'birdForm': { const g = out(x, y, 0.5, 420, 0.12); if (!g) return; const t = ac.currentTime; tone(g, t, 0.5, 520, 180, 'square', 0.04); for (let i = 0; i < 4; i++) noise(g, t + 0.1 + i * 0.09, 0.05, 'bandpass', 1500, 3, 0.6); tone(g, t + 0.55, 0.12, 1200, 1700, 'sine', 0.05); return; }
+    case 'flap': { const g = out(x, y, 0.22, 220, 0.06); if (!g) return; const t = ac.currentTime; noise(g, t, 0.06, 'lowpass', 900, 1, 0.6); noise(g, t + 0.12, 0.06, 'lowpass', 800, 1, 0.5); return; }
     case 'empty': return foley('empty', x, y);
     case 'break': return impact('electronic', x, y);
     case 'barricade': for (let i = 0; i < 3; i++) setTimeout(() => foley('nail', x, y), i * 150); return;

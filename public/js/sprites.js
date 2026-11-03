@@ -46,6 +46,7 @@ function drawPack(ctx, kind, o, u) {
     case 'bottle': box(ctx, -10.5, -1.5, 4, 3, 1.4, '#4aa0d8'); cap(ctx, -6, -6, -6, 6, 1, u.strap); break;
     case 'tripod': for (const a of [-0.4, 0, 0.4]) cap(ctx, -6, 0, -6 - Math.cos(a) * 9, Math.sin(a) * 9, 0.7, '#3a3a3a'); break;
     case 'medcase': box(ctx, -12, -5, 5, 10, 0.8, '#e8f0f0'); ctx.fillStyle = '#2a9a5a'; ctx.fillRect(-10, -2, 1, 4); ctx.fillRect(-11.5, -0.5, 4, 1); break;
+    case 'hive': box(ctx, -12.5, -4.5, 5.5, 9, 2.4, 'rgba(60,90,70,0.85)'); ctx.fillStyle = `rgba(110,240,140,${0.35 + 0.2 * Math.sin(performance.now() / 333)})`; for (let i = 0; i < 7; i++) ctx.fillRect(-11.8 + (i * 1.7) % 4.2, -3.6 + i * 1.1, 0.6, 0.6); break; // MAGPIE's swarm jar
     case 'radar': box(ctx, -11, -3, 3.6, 6, 1, '#2a3036'); ctx.strokeStyle = col; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(-13, 0, 3, -1, 1); ctx.stroke(); break;
     case 'girders': for (const y of [-4, 3]) box(ctx, -14, y - 1, 9, 2.2, 0.2, '#8a5a3a'); break;
     default: box(ctx, -11.5, -5.5, 5, 11, 1.6, u.dark);
@@ -345,6 +346,7 @@ export function drawDrone(ctx, d, t, ally) {
   ctx.strokeStyle = '#6d7278'; ctx.lineWidth = 0.25; ctx.beginPath(); ctx.moveTo(-4.2, -0.8);
   ctx.lineTo(-5.8 - (d.sway || 0) * 0.6, -0.8 - (d.sway || 0) * 1.5); ctx.stroke();
   ctx.restore();
+  if (d.gr) parasiteVeins(ctx, t, 6); // MAGPIE's parasite has hold of it: green veins crawl over it while it reshapes
   if (d.j) {
     ctx.strokeStyle = `rgba(150,200,255,${0.4 + Math.random() * 0.5})`; ctx.lineWidth = 0.5; ctx.beginPath();
     for (let i = 0; i < 4; i++) { ctx.moveTo((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12); ctx.lineTo((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12); }
@@ -397,6 +399,64 @@ function drawWallCam(ctx, c, t, ally) {
     ctx.fillStyle = '#34373c'; ctx.beginPath(); ctx.arc(0, 0, 2.3, 0, 7); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(-0.6, -0.7, 1, 0, 7); ctx.fill();
     camDot(ctx, 0, 0, 0.8, c.off, ally, t);
+  }
+  ctx.restore();
+}
+
+// MAGPIE (he asked): green parasite veins, branching out from the middle and pulsing
+function parasiteVeins(ctx, t, r) {
+  ctx.save(); ctx.lineCap = 'round';
+  for (let i = 0; i < 6; i++) {
+    const a = i * 1.047 + Math.sin(t * 1.3 + i) * 0.25, l = r * (0.65 + 0.35 * Math.sin(t * 5 + i * 2.1));
+    ctx.strokeStyle = `rgba(110,240,140,${0.55 + 0.35 * Math.sin(t * 6 + i)})`; ctx.lineWidth = 0.35;
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    const mx = Math.cos(a) * l * 0.55 + Math.cos(a + 1.4) * 0.8, my = Math.sin(a) * l * 0.55 + Math.sin(a + 1.4) * 0.8;
+    ctx.quadraticCurveTo(mx, my, Math.cos(a) * l, Math.sin(a) * l);
+    ctx.moveTo(mx, my); ctx.lineTo(mx + Math.cos(a - 0.9) * l * 0.35, my + Math.sin(a - 0.9) * l * 0.35);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(140,255,160,0.8)'; ctx.beginPath(); ctx.arc(0, 0, 0.7, 0, 7); ctx.fill();
+  ctx.restore();
+}
+// MAGPIE's bird: the attacker drone's grey body bent into a bird. Its wheels have folded out into segmented wing
+// plates, the camera is now the eye at the tip of the head, the antenna is the tail, and green parasite veins glow
+// through it. Flying, the wings beat (faster the faster it goes); landed, they fold along the body. b.fl = 0..1 flap.
+export function drawBird(ctx, b, t, ally) {
+  const fl = b.pe ? 0 : (b.fl ?? 0.5), beat = b.pe ? 0 : Math.sin(t * (10 + fl * 10)) * (0.4 + fl * 0.6);
+  ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.ag || 0); ctx.scale(0.75, 0.75);
+  if (ally) { ctx.strokeStyle = 'rgba(70,170,255,0.45)'; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 7); ctx.stroke(); }
+  if (!b.pe) { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.ellipse(-1, 3.5, 4.5, 2.2, 0, 0, 7); ctx.fill(); } // shadow on the floor below: it is in the air
+  const body = ctx.createLinearGradient(-5, -2, 5, 2); body.addColorStop(0, '#50565c'); body.addColorStop(1, '#2a2d31');
+  for (const s of [-1, 1]) { // wing: three overlapping plates (the old wheels and side panels), tips forward
+    const open = b.pe ? 0.15 : 0.75 + beat * 0.5;
+    ctx.save(); ctx.scale(1, s); if (b.pe) { ctx.translate(-1.5, 0.6); ctx.scale(1.1, 0.32); } ctx.rotate(-open * 0.9); // landed: folded flat along the body
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = i === 2 ? '#1a1c1f' : i ? '#34383d' : '#464b51';
+      ctx.beginPath(); ctx.moveTo(-1 - i * 1.4, 0.8); ctx.lineTo(1.5 - i * 1.6, 7.5 - i * 0.6); ctx.lineTo(-1.2 - i * 1.6, 7 - i * 0.5); ctx.lineTo(-3 - i * 1.4, 1); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.2; ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(110,240,140,0.55)'; ctx.lineWidth = 0.25; ctx.beginPath(); ctx.moveTo(-1.5, 1); ctx.lineTo(0, 6.4); ctx.stroke(); // a vein along the wing
+    ctx.restore();
+  }
+  ctx.fillStyle = '#1e2124'; ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(-8.5, -1.6); ctx.lineTo(-8, 0); ctx.lineTo(-8.5, 1.6); ctx.closePath(); ctx.fill(); // tail (the antenna, split)
+  ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(-0.6, 0, 4.4, 2.1, 0, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 0.3; ctx.stroke();
+  ctx.fillStyle = '#3e4348'; ctx.beginPath(); ctx.ellipse(3.6, 0, 1.8, 1.4, 0, 0, 7); ctx.fill(); // head
+  ctx.fillStyle = '#16181b'; ctx.beginPath(); ctx.moveTo(5.1, -0.6); ctx.lineTo(7, 0); ctx.lineTo(5.1, 0.6); ctx.closePath(); ctx.fill(); // beak
+  ctx.fillStyle = `rgba(120,255,150,${0.7 + 0.3 * Math.sin(t * 4)})`; ctx.beginPath(); ctx.arc(4.2, 0, 0.55, 0, 7); ctx.fill(); // the camera, now a green eye
+  parasiteVeins(ctx, t, 3.4);
+  if (b.pe && b.au) { ctx.strokeStyle = `rgba(255,215,90,${0.6 + 0.3 * Math.sin(t * 5)})`; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.arc(0, 0, 6.5, -0.7, 0.7); ctx.stroke(); } // AUTO: armed (a gold arc in front)
+  ctx.restore();
+}
+// the swarm: a cloud of tiny dark parasites with green glints, swirling round itself and streaming behind
+export function drawSwarm(ctx, s, t) {
+  ctx.save(); ctx.translate(s.x, s.y);
+  const r = s.gr ? 4 : 6;
+  ctx.fillStyle = 'rgba(60,160,90,0.10)'; ctx.beginPath(); ctx.arc(0, 0, r + 2, 0, 7); ctx.fill();
+  for (let i = 0; i < 26; i++) {
+    const ph = i * 2.399, sp = 3 + (i % 5), a = ph + t * sp * (i % 2 ? 1 : -1), rr = r * (0.3 + 0.7 * ((i * 0.618) % 1)) * (0.8 + 0.2 * Math.sin(t * 7 + i));
+    const x = Math.cos(a) * rr - (s.vx || 0) * 0.02 * (i % 3), y = Math.sin(a) * rr * 0.8 - (s.vy || 0) * 0.02 * (i % 3);
+    ctx.fillStyle = i % 4 ? '#111410' : `rgba(110,240,140,${0.6 + 0.4 * Math.sin(t * 9 + i)})`;
+    ctx.fillRect(x - 0.35, y - 0.35, 0.7, 0.7);
   }
   ctx.restore();
 }

@@ -235,6 +235,9 @@ export const OPERATORS = {
   girder: { team: 'def', name: 'GIRDER', role: 'Steel Crew', armor: 1, primary: 'drummer', secondary: 'vex50',
              ability: { id: 'beam', name: 'Steel Brace', count: 2, desc: 'Brace an open doorway with a steel frame: nobody can walk through it, but everyone can still see and shoot through. Explosives, hammers and cutters break it. Passive: you reinforce walls and hatches twice as fast.' },
              gadget: 'wire', gadgetCount: 2, color: '#a0a0a0', helmet: '#4a4a4a', look: 'helmet' },
+  magpie: { team: 'def', name: 'MAGPIE', role: 'Drone Thief', armor: 2, primary: 'marten', secondary: 'sparrow',
+             ability: { id: 'swarm', name: 'Parasite Swarm', count: 3, desc: 'Release a parasite swarm at an attacker drone in sight (up to 12 m), from yourself or from your bird. It chases the drone; a drone that gets far enough away fast enough escapes, one it catches reshapes into a bird you fly over furniture and land on walls. A landed bird on AUTO pings the first attacker it sees, then flashes and destroys itself.' },
+             gadget: 'nitro', gadgetCount: 1, color: '#3f9a6a', helmet: '#24322c', look: 'hood' },
 };
 
 export const OP_LIST = Object.keys(OPERATORS);
@@ -292,6 +295,7 @@ export const LOADOUTS = {
   ruse: { primaries: ['wasp', 'lark', 'hornet'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
   rally: { primaries: ['hornet', 'marten', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
   lens: { primaries: ['lark', 'hornet', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'nitro'] },
+  magpie: { primaries: ['marten', 'wasp', 'lark'], secondaries: ['sparrow', 'vex50'], gadgets: ['nitro', 'impact'] },
   audit: { primaries: ['wasp', 'marten', 'lark'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'wire'] },
   tonic: { primaries: ['breaker', 'lark', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
   ward: { primaries: ['marten', 'sentry', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['dshield', 'impact'] },
@@ -355,7 +359,7 @@ export const JOBS = {
     { id: 'anchor', name: 'Anchor', desc: 'Hold the objective: fortify it and deny the area.', ops: ['mason', 'shunt', 'rampart', 'miasma', 'solder'] },
     { id: 'trapper', name: 'Trapper', desc: 'Hide traps where attackers will walk.', ops: ['lynx', 'bramble', 'snare', 'gravel', 'latch'] },
     { id: 'roamer', name: 'Roamer', desc: 'Leave the objective, slow the attack and flank.', ops: ['wraith', 'hush', 'hound', 'ruse', 'rally'] },
-    { id: 'intel', name: 'Intel', desc: 'Watch cameras and sensors and call out the attack.', ops: ['kite', 'shade', 'argus', 'lens', 'audit'] },
+    { id: 'intel', name: 'Intel', desc: 'Watch cameras and sensors and call out the attack.', ops: ['kite', 'shade', 'argus', 'lens', 'audit', 'magpie'] },
     { id: 'support', name: 'Support', desc: 'Heal the team and stop breaching gadgets.', ops: ['solace', 'veil', 'tonic', 'ward', 'girder'] },
   ],
 };
@@ -519,6 +523,7 @@ export const BIOS = {
   audit:   { real: 'Sam Okoro', from: 'Enugu', text: 'An air-traffic controller who can pick a drone motor out of two floors of noise. Attackers learn very little while he is on the site.' },
   tonic:   { real: 'Grace Mwangi', from: 'Nairobi', text: 'A field-hospital nurse who sets up shop on the objective. Defenders who hold near her station hold for longer.' },
   ward:    { real: 'Pavel Novak', from: 'Plzeň', text: 'An air-defence engineer who thinks small. Every grenade thrown into his room is one that never goes off.' },
+  magpie:  { real: 'Ines Duarte', from: 'Lisbon', text: 'A parasitologist who bred a swarm that eats machines from the inside. Every drone it catches grows wings and works for her.' },
   girder:  { real: 'Hank Brody', from: 'Pittsburgh', text: 'A skyscraper ironworker who walked beams forty floors up. The site is twice as hard to get into once he has walked round it.' },
 };
 

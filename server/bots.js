@@ -4,7 +4,7 @@
 // call out what they see, and react no faster than a fairly experienced player. The bot skill setting
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
-import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL } from '../shared/constants.js';
+import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM } from '../shared/operators.js';
@@ -391,15 +391,38 @@ function enemyDrone(game, p) {
   const smokes = game.smokeList();
   let best = null, bd = Infinity;
   for (const e of game.ents) {
-    if (e.type !== 'drone' || e.team === team) continue;
+    if ((e.type !== 'drone' && e.type !== 'bird') || e.team === team) continue; // (attackers shoot MAGPIE's birds too)
     const d = Math.hypot(e.x - p.x, e.y - p.y);
     if (d > 260 || d > bd || floorAt(game.map, e.x, e.y) !== floorAt(game.map, p.x, p.y)) continue;
     if (d > 60 && Math.abs(angDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > 1.2) continue;
     if (!los(game.map, p.x, p.y, e.x, e.y, smokes)) continue;
     if (behindDrone(game, p, e, d)) continue; // a miss would hit a person standing behind it (bullets go through soft walls)
+    if (e.type === 'drone' && leaveForMagpie(game, p, e)) continue;
     best = e; bd = d;
   }
   return best;
+}
+// MAGPIE (he asked): with a MAGPIE on the team who still has swarms, defender bots only shoot drones far from her reach,
+// and leave the rest for her to take over; the team says which (a drone a swarm is already on is always left alone).
+// A bot MAGPIE takes the drone herself if it is in her reach.
+const magpieOf = (game, team) => [...game.players.values()].filter(q => q.op === 'magpie' && q.alive && !q.downed && game.side(q) === team && q.abilityCount > 0);
+function leaveForMagpie(game, p, e) {
+  if (p.op === 'magpie' && p.abilityCount > 0) return false; // she deals with it (botThink)
+  if (game.ents.some(s => s.type === 'swarm' && s.target === e.id)) return true;
+  const mags = magpieOf(game, game.side(p)); if (!mags.length) return false;
+  const near = mags.find(q => Math.hypot(q.x - e.x, q.y - e.y) < SWARM.keep * PX_PER_M), where = place(game, e.x, e.y) || 'here';
+  if (near) { teamSay(game, p, `Drone ${where}: not shooting it, leaving it for ${near.name.replace(/^\[\w+\] /, '')}`, 'mgL' + e.id); return true; }
+  teamSay(game, p, `Drone ${where} is too far for MAGPIE, shooting it`, 'mgS' + e.id);
+  return false;
+}
+// a line to the team: pros through proSay; other bots only when a person is on their team (and not often)
+function teamSay(game, p, text, key) {
+  if (p.pro) return proSay(game, p, text, key);
+  if (![...game.players.values()].some(o => !o.bot && o.squad === p.squad)) return;
+  const said = game.botSaid || (game.botSaid = {});
+  if (game.time - (said[key] ?? -99) < 15 || game.time - (p.saidT ?? -99) < 6) return;
+  said[key] = p.saidT = game.time;
+  game.chat(p, { text: text.slice(0, 140), team: true });
 }
 
 // An enemy gadget in plain sight that an Arc Gun can fry (cameras, traps, jammers...).
@@ -651,6 +674,10 @@ export function botThink(game, p, dt) {
     ai.droneReact += dt;
     const want = Math.atan2(drone.y - p.y, drone.x - p.x);
     turnTo(p, want, S.turn, dt);
+    if (drone.type === 'drone' && abId === 'swarm' && p.abilityCount > 0 && Math.hypot(drone.x - p.x, drone.y - p.y) < SWARM.reach * PX_PER_M * 0.9) { // MAGPIE: take it over
+      if (ai.droneReact > 0 && Math.abs(angDiff(want, p.aim)) < 0.4) { useAbility(); teamSay(game, p, `Swarm on the drone ${place(game, drone.x, drone.y) || 'here'}, don't shoot it`, 'mgG' + drone.id); }
+      return;
+    }
     inp.ads = 1; inp.crouch = 1;
     if (gun && gun.ammo === 0) game.startReload(p);
     else if (ai.droneReact > 0 && Math.abs(angDiff(want, p.aim)) < 0.08) shootInput(inp, ai, gun);
@@ -1116,10 +1143,48 @@ function botDrone(game, p, dt) {
   for (const q of game.players.values()) {
     if (!q.alive || game.side(q) === team || q.shrouded || Math.hypot(q.x - d.x, q.y - d.y) > 320 || !los(map, d.x, d.y, q.x, q.y, smokes)) continue;
     game.spot(team, q.id, 3);
+    if (q.op === 'magpie') game.magpieSeen = { x: q.x, y: q.y, t: game.time, id: q.id };
     if (p.pro && !(ai.dSaid || (ai.dSaid = new Set())).has(q.id)) { ai.dSaid.add(q.id); proSay(game, p, `Drone: ${opName(q)} in ${place(game, q.x, q.y)}`, 'see' + q.id); }
     if (!(ai.dCalled || (ai.dCalled = new Set())).has(q.id) && [...game.players.values()].some(o => !o.bot && o.squad === p.squad) && game.markOk(p)) {
       ai.dCalled.add(q.id); game.mark(p, q.x, q.y, 'ENEMY ' + OPERATORS[q.op].name, q.id);
     }
+  }
+  // MAGPIE (he asked): a swarm after this drone. The higher the rank, the sooner the bot notices and the better it runs:
+  // Copper half the time never notices, Copper/Bronze only drive away, from Silver up they sprint, and every bot steers for
+  // the clearest way away from the swarm, through a drone hole if there is one (that breaks its sight).
+  const sw = game.ents.find(s => s.type === 'swarm' && s.target === d.id);
+  if (sw && !sw.grab) {
+    const lvl = p.pro ? 7 : lvlOf(game, p);
+    if (ai.swarmId !== sw.id) { ai.swarmId = sw.id; ai.swarmT = game.time + [1.9, 1.4, 1.0, 0.75, 0.55, 0.42, 0.32, 0.25][lvl] * (0.8 + Math.random() * 0.4); ai.swarmRun = lvl > 0 || Math.random() < 0.5; ai.fleeT = 0; }
+    if (ai.swarmRun && game.time >= ai.swarmT) {
+      if ((ai.fleeT -= dt) <= 0) {
+        ai.fleeT = 0.4;
+        const away = Math.atan2(d.y - sw.y, d.x - sw.x);
+        let bs = -Infinity;
+        for (let i = 0; i < 16; i++) {
+          const a = i / 16 * Math.PI * 2; let clear = 0, hole = 0;
+          for (let s = 4; s <= 200; s += 4) {
+            const cx = Math.floor((d.x + Math.cos(a) * s) / CELL), cy = Math.floor((d.y + Math.sin(a) * s) / CELL), k = cy * map.W + cx, t = tileAt(map, cx, cy);
+            if (blocksDrone(t) && !(map.dhole && map.dhole[k] && (t === T.SOFT || t === T.HARD))) break;
+            if (map.dhole && map.dhole[k]) hole = 1;
+            clear = s;
+          }
+          const sc = clear * (1 + Math.cos(a - away)) + (lvl >= 3 ? hole * 160 : 0);
+          if (sc > bs) { bs = sc; ai.fleeA = a; }
+        }
+      }
+      p.aim = ai.fleeA; setDir(inp, Math.cos(ai.fleeA), Math.sin(ai.fleeA));
+      if (lvl >= 2) inp.walk = 1; // sprint
+      teamSay(game, p, 'Swarm on my drone, MAGPIE is close', 'sw' + sw.id);
+      ai.dPath = null;
+      return;
+    }
+  }
+  // the attackers know there is a MAGPIE (seen, or a swarm came out): from Platinum up (and pros) drones keep out of her reach
+  const mg = game.magpieSeen;
+  if ((p.pro || lvlOf(game, p) >= 4) && mg && game.time - mg.t < 45 && Math.hypot(mg.x - d.x, mg.y - d.y) < (SWARM.reach + 2) * PX_PER_M && !(ai.mgBackT > game.time) && ai.dTrail && ai.dTrail.length) {
+    ai.mgBackT = game.time + 6; ai.droneGoal = ai.dTrail[0]; ai.droneGoalT = 6; ai.dPath = null;
+    teamSay(game, p, 'MAGPIE on defence: keep the drones away from her, sprint from the swarm', 'mgW');
   }
   // he asked: higher ranks keep their drone alive. From Gold up (not the risk-takers), once a defender is close to the
   // drone or preparation is nearly over, it backs off to where it was a few seconds ago, out of the way, and stays parked.

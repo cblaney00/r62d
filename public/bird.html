@@ -1,0 +1,28 @@
+<!doctype html>
+<!-- A look at MAGPIE's bird, swarm and a drone being taken over, drawn by the game's own sprite code, big. -->
+<html><head><meta charset="utf-8"><title>MAGPIE's bird</title>
+<style>html,body{margin:0;background:#15181b;color:#dfe6e0;font:600 18px 'Barlow Condensed',sans-serif;overflow:hidden}canvas{display:block}</style>
+</head><body><canvas id="c"></canvas>
+<script type="module">
+import { drawBird, drawSwarm, drawDrone } from './js/sprites.js';
+const c = document.getElementById('c'), ctx = c.getContext('2d');
+const fit = () => { c.width = innerWidth; c.height = innerHeight; }; fit(); addEventListener('resize', fit);
+const panels = ['FLYING (wings beat faster the faster it goes)', 'LANDED ON A WALL, AUTO ON (gold arc)', 'THE SWARM CHASING A DRONE', 'A CAUGHT DRONE RESHAPING'];
+function frame(ms) {
+  const t = ms / 1000, W = c.width, H = c.height, pw = W / 2, ph = H / 2, Z = Math.min(pw, ph) / 34;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#15181b'; ctx.fillRect(0, 0, W, H);
+  panels.forEach((name, i) => {
+    const ox = (i % 2) * pw, oy = Math.floor(i / 2) * ph;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = (i % 2) ^ Math.floor(i / 2) ? '#2a2c2a' : '#2e2b27'; ctx.fillRect(ox + 6, oy + 6, pw - 12, ph - 12); // floor
+    ctx.fillStyle = '#dfe6e0'; ctx.fillText(name, ox + 22, oy + 34);
+    ctx.setTransform(Z, 0, 0, Z, ox + pw / 2, oy + ph / 2 + 10);
+    if (i === 0) { const a = t * 0.9; drawBird(ctx, { x: Math.cos(a) * 9, y: Math.sin(a) * 6, ag: a + Math.PI / 2, fl: 0.5 + 0.5 * Math.sin(t * 0.7) }, t, true); }
+    if (i === 1) { ctx.fillStyle = '#585e63'; ctx.fillRect(-20, -12, 40, 4); drawBird(ctx, { x: 0, y: -5, ag: Math.PI / 2 + Math.sin(t * 0.8) * 0.9, pe: 1, au: 1 }, t, true); }
+    if (i === 2) { const x = ((t * 6) % 36) - 18; drawDrone(ctx, { x: x + 7, y: 0, ag: 0, spd: 100, wheel: t * 60, mvAng: 0 }, t, false); drawSwarm(ctx, { x, y: Math.sin(t * 3) * 0.6, vx: 160, vy: 0 }, t); }
+    if (i === 3) { drawDrone(ctx, { x: 0, y: 0, ag: 0.4, gr: 1 }, t, false); drawSwarm(ctx, { x: 0, y: 0, gr: 1 }, t); }
+  });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>
