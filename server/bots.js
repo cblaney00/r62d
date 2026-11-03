@@ -870,7 +870,7 @@ export function botThink(game, p, dt) {
       const base = { entry: [1, 3], support: [4, 4], flank: [3, 4], intel: [7, 5] }[ai.role] || [2, 6];
       ai.startWait = base[0] + Math.random() * base[1] * (0.5 + me.patience);
     }
-    if (game.timer < 120) ai.startWait = 0; // the clock: no more waiting
+    if (game.timer < DUR.action - 60) ai.startWait = 0; // the clock: no more waiting after a minute
     if ((ai.startWait -= dt) > 0) { checkAngles(game, p, dt); return; }
     // abilities on the way in
     if (action && p.abilityCount > 0) {

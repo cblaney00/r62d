@@ -35,7 +35,7 @@ export const PHASE = {
 export const BARRICADES_EACH = 999; // wooden barricades on doors and windows: unlimited (he asked; reinforcing soft walls stays limited)
 
 export const DUR = {
-  select: 15, prep: 30, action: 180, roundEnd: 7, matchEnd: 12,
+  select: 15, prep: 30, action: 160, roundEnd: 5, matchEnd: 12, // action 2:40 (he asked for slightly shorter rounds; R6 is 3:00 with smaller maps), 5 s between rounds
   plant: 7, defuse: 7, bomb: 45, reinforce: 3, barricade: 2.5, revive: 4, // a barricade takes about as long as in R6 (he asked)
   bleedout: 20, spot: 5, trapArm: 1.5, // every placed trap arms after the same time (he asked: one rule)
 };

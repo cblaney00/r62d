@@ -264,7 +264,7 @@ export function playbook(m, si, side, team) {
         trapper: { task: 'Traps the doors and windows, then holds the second angle on the site.', hold: hold(I.side || I.wall), watch: (I.side || I.wall || I.main).pos },
         intel: { task: 'Takes space in the room beside the site early (he asked: space matters), then holds a corner of the site with a camera feed in mind; calls rotations.', roam: nearRoom, until: 75, hold: I.siteCentre, watch: I.main.pos },
         support: { task: 'Plays next to the anchor for the trade and keeps everyone healthy.', hold: hold(I.main), watch: I.main.pos, nearAnchor: true },
-        roamer: { task: 'Roams on the attackers\' route to slow them, back on site by 1:30.', roam: roamAt, until: 90, hold: I.siteCentre, watch: I.main.pos },
+        roamer: { task: 'Roams on the attackers\' route to slow them, back on site by 1:30.', roam: roamAt, until: 70, hold: I.siteCentre, watch: I.main.pos },
       } });
     plans.push({ id: 'roam', name: 'Deep roam', tempo: 'fast', idea: 'Two roamers go out early and hunt the attackers on their way in; three anchors hold the site. Time spent fighting roamers is time the attack does not have.',
       jobs: {

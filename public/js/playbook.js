@@ -1,7 +1,7 @@
 // The PLAYBOOK (he asked: a tab to see the pro teams' game plans and try to execute them). Pick a team, a map, a site
 // and attack or defence; each plan is drawn on the site's floor: where every job stacks, what it opens, where it
 // drones, holds or roams, and where it ends up, with the team's players and what each one does.
-import { CELL } from '/shared/constants.js';
+import { CELL, DUR } from '/shared/constants.js';
 import { MAPS, MAP_LIST, buildMap } from '/shared/map.js';
 import { OPERATORS } from '/shared/operators.js';
 import { PRO_TEAMS, playbook, ATK_JOBS, DEF_JOBS, JOB_NAME } from '/shared/pros.js';
@@ -115,7 +115,7 @@ function startAnim(el) {
   render(el); S.anim.raf = requestAnimationFrame(loop);
 }
 function stopAnim(el) { if (S.anim) cancelAnimationFrame(S.anim.raf); S.anim = null; render(el); }
-const clock = s => `${Math.floor((180 - s) / 60)}:${String(Math.round((180 - s) % 60)).padStart(2, '0')}`;
+const clock = s => `${Math.floor((DUR.action - s) / 60)}:${String(Math.round((DUR.action - s) % 60)).padStart(2, '0')}`;
 function fit(cv) {
   const r = cv.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
   if (cv.width !== Math.round(r.width * d) || cv.height !== Math.round(r.height * d)) { cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); }
