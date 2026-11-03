@@ -30,7 +30,7 @@ import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX } from '/shar
 import { createCoach } from './tutorial.js';
 import { drawQr } from './qr.js';
 import { touchPad, touchContext, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
-import { blocksSight, FL } from '/shared/constants.js';
+import { blocksSight, FL, underAt } from '/shared/constants.js';
 
 const $ = id => document.getElementById(id);
 // Stacked layers: the map (moved and scaled by the browser, see MapRenderer.mount), the people and effects, the line-of-sight blackout (drawn small and stretched by
@@ -596,7 +596,7 @@ function onEvent(e, s, players) {
     case 'lungeWarn': if (e.id === st.id) { addFeed('CROW drew a blade on you: a lunge is coming in 1.5 s'); audio.play('unsheathe', st.pred.x, st.pred.y); st.lungeWarnT = now; } break;
     case 'deny': if (e.id === st.id) addFeed(e.why); break;
     case 'emped': if (e.id === st.id) { addFeed('EMP! Your skill and gadget are fried for 8 seconds'); audio.foley('beep', st.pred.x, st.pred.y); st.empUntil = now + e.dur; } break; // TALON
-    case 'scanned': if (e.id === st.id) { addFeed('A scanner just picked you up — they can see you through walls'); audio.foley('beep', st.pred.x, st.pred.y); } break; // WRAITH
+    case 'scanned': if (e.id === st.id) { addFeed('A scanner just picked up your heartbeat'); audio.foley('beep', st.pred.x, st.pred.y); } break; // WRAITH
     case 'paint': if (e.id === st.id) addFeed('You walked into a paint trap — the defenders can see you for 12 s'); fx.ping(e.x, e.y, '120,255,90'); break; // LYNX
     case 'ping': if (e.team === mySide()) { fx.ping(e.x, e.y, e.any ? '255,90,60' : '79,179,169'); audio.foley('beep', e.x, e.y); } break;
     case 'stim': fx.tracer(e.x, e.y, e.x2, e.y2, '120,255,160'); fx.ping(e.x2, e.y2, '120,255,160'); audio.foley('revive', e.x, e.y); break;
@@ -1816,6 +1816,15 @@ function nearPolygon(v, sm) {
 }
 function fillPoly(c, pts) { c.beginPath(); c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.closePath(); c.fill(); }
 
+function droneHidden(x, y) { const m = st.map; if (!m) return false; const k = Math.floor(y / CELL) * m.W + Math.floor(x / CELL); return underAt(m, k, m.tiles[k]); }
+function drawScanBlips(now) { // WRAITH: heartbeats, fuzzy
+  const me = st.me; if (!me || !me.bl || !me.sc) return;
+  for (const [x, y, age] of me.bl) {
+    const k = Math.min(1, age / 0.8), r = 7 + 11 * k, g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(150,170,255,${0.55 * (1 - k)})`); g.addColorStop(1, 'rgba(150,170,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  }
+}
 function draw(s, view, now, dt) {
   const z = st.zoom, m = st.map; let tq = performance.now();
   const shake = fxOn('shake') ? fx.shake : 0;
@@ -1974,7 +1983,12 @@ function draw(s, view, now, dt) {
     if (a.spd > DRONE_SPEED * 0.55 && Math.random() < dt * 12 && surfaceAt(x, y) !== 'carpet')
       fx.add({ type: 'smoke', x: x - Math.cos(a.mvAng) * 5, y: y - Math.sin(a.mvAng) * 5, vx: -Math.cos(a.mvAng) * 15, vy: -Math.sin(a.mvAng) * 15, life: 0.5, max: 0.5, size: 1.2, grow: 5, col: '170,160,140', a: 0.25 });
     audio.droneLoop(e.id, x, y, a.spd, own);
+    // he asked: under a vehicle or table it is covered. Its pilot sees a faint shape, nobody else sees it until it comes out
+    const hid = droneHidden(x, y), mineD = own || (view && view.cam && view.cam.id === e.id);
+    if (hid && !mineD) continue;
+    if (hid) ctx.globalAlpha = 0.35;
     if (e.tm === side || seen(x, y)) drawDrone(ctx, { ...e, x, y, ag: a.heading, wheel: a.wheel, spd: a.spd, mvAng: a.mvAng ?? a.heading, sway: a.sway }, now, e.tm === side);
+    ctx.globalAlpha = 1;
   }
   for (const e of ents) if (e.ty === 'swarm' && (e.tm === side || seen(e.x, e.y))) { // MAGPIE's swarm
     const a = anim(e.id); a.vx = e.x - (a.sx ?? e.x); a.vy = e.y - (a.sy ?? e.y); a.sx = e.x; a.sy = e.y;
@@ -2078,6 +2092,7 @@ function draw(s, view, now, dt) {
     if (side === 'def' || s.rev) for (const b of site.bombs) marker(b.x, b.y, b.id, '#f2c14e', view);
     if (s.pl) marker(s.pl.x, s.pl.y, '!', '#ff4040', view);
     if (side === 'atk') for (const e of ents) if (e.ty === 'defuser') marker(e.x, e.y, 'D', '#f2c14e', view);
+    drawScanBlips(now);
     drawMarks(view, now);
     if (!st.tv) deathMarks(view, now); // TV: the cards and kill feed already say who is down; no big marks over the action
     // an enemy your team can see who is off the edge of your screen: a mark at the edge, so nobody shoots you unseen
@@ -2414,7 +2429,7 @@ function hud(s) {
     $('prompt').innerHTML = ''; $('progress').style.display = 'none';
     const mates = s.players.filter(p => p.a && p.sq === me.sq);
     $('viewlabel').textContent = mates.length ? `SPECTATING ${mates[st.spect % mates.length].n.toUpperCase()} · CLICK TO SWITCH` : '';
-    $('kcBtn').classList.toggle('hidden', !st.killcam || st.tv); $('kcBtn').innerHTML = `<b>${label('interact')}</b> WATCH KILLCAM`;
+    $('kcBtn').classList.toggle('hidden', !st.killcam || st.tv); setHTML('kcBtn', `<b>${label('interact')}</b> WATCH KILLCAM`);
     return;
   }
   $('br').style.visibility = ''; $('kcBtn').classList.add('hidden'); if (st.killcam && performance.now() - st.killcam.got > 3000) st.killcam = null; // alive again: the old killcam is gone

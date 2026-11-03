@@ -38,6 +38,7 @@ const SHIELD_ASIDE = 0.45; // BULWARK: seconds to swing the shield out of the wa
 const MAX_BANS = 8; // he asked: at most 8 banned operators in a match
 const BAN_GAP = 2.6; // seconds between Esports TV bans, long enough to read each one
 
+const SCAN_BEAT = 0.8, SCAN_BLUR = 1.5 * PX_PER_M; // WRAITH's scanner: a new blip per heartbeat, this far off the real spot at most
 export class Game {
   // opts.tut: a private tutorial match for one player (see tutAction), with its timers held
   // while the coach explains each step, and nothing saved to their profile.
@@ -665,10 +666,13 @@ export class Game {
         p.scanning = true; p.battery = Math.max(0, p.battery - dt); p.scanRun = (p.scanRun || 0) + dt;
         for (const q of this.players.values())
           if (q.alive && this.side(q) === TEAM.ATK && !this.ghost(q) && Math.hypot(q.x - p.x, q.y - p.y) < 300) {
-            this.spot(TEAM.DEF, q.id, 0.4);
+            // he asked: no more wallhacks. Only WRAITH sees it, as a fuzzy blip up to SCAN_BLUR off, moved on each heartbeat
+            const b = (p.scanBlips || (p.scanBlips = new Map())); let z = b.get(q.id);
+            if (!z || this.time - z.t > SCAN_BEAT) { const a = Math.random() * 6.283, r = (0.4 + Math.random() * 0.6) * SCAN_BLUR; z = { t: this.time, x: q.x + Math.cos(a) * r, y: q.y + Math.sin(a) * r }; b.set(q.id, z); }
             if (!(q.scanWarnT > this.time)) { q.scanWarnT = this.time + 2; this.events.push({ e: 'scanned', id: q.id }); } // ...and they hear it
           }
       } else { p.scanOn = false; p.scanning = false; p.scanRun = 0; p.battery = Math.min(op.ability.battery, p.battery + dt * 0.35); }
+      if (p.scanBlips) for (const [id, z] of p.scanBlips) if (this.time - z.t > SCAN_BEAT + 0.1 || !p.scanning) p.scanBlips.delete(id);
     }
 
     if (op.ability.id === 'lance') { // Thermal Lance: burn the wall cell you face, one at a time
@@ -970,6 +974,7 @@ export class Game {
       if (!e.hp || e.team === team) continue;
       if (e.tu && Math.abs(angDiff(Math.atan2(y0 - e.y, x0 - e.x), e.ang || 0)) > 0.9) continue; // a turret is bulletproof except its lens, from the front (KITE)
       const small = e.type === 'drone' || e.type === 'bird';
+      if (e.type === 'drone' && !(src && src.pr >= 1)) { const dk = Math.floor(e.y / CELL) * this.map.W + Math.floor(e.x / CELL); if (underAt(this.map, dk, this.map.tiles[dk])) continue; } // under a vehicle or table: covered, unless you lie down too
       const at = small && src.viewTime !== null && src.viewTime !== undefined ? this.posAt(e, src.viewTime) : e;
       const t = rayCircle(x0, y0, dx, dy, at.x, at.y, e.type === 'decoy' ? hitR(e.op) : small ? 4.5 : 6); // drones are small
       if (t !== null && t < bestT) { bestT = t; best = { e }; }
@@ -2749,7 +2754,7 @@ export class Game {
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
       if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; } }
       if (p.alive && (p.sock || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
-        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
+        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur)] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),

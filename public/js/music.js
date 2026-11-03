@@ -110,14 +110,14 @@ function schedule(ac) {
     const chord = CHORDS[Math.floor(bar / 2) % 4], sec = section(bar), tense = mood === 'select';
     if (s16 === 0 && bar % 2 === 0) pad(ac, t, chord, S16 * 32, tense || sec.busy);
     if (sec.bass && [0, 6, 8, 14].includes(s16)) bass(ac, t, chord.bass + (s16 === 14 && bar % 2 ? 12 : 0));
-    if (sec.drums) {
+    if (sec.drums && !tense) {
       if (s16 === 0 || s16 === 10) kick(ac, t, s16 === 0 ? 1 : 0.7);
       if (s16 === 8) hit(ac, t, 'bandpass', 1700, 0.18, 0.14, 0.4);                         // soft clap
       if (sec.busy && s16 === 15 && Math.random() < 0.5) hit(ac, t, 'bandpass', 2200, 0.08, 0.06);
     }
-    if (sec.hats || tense) {
-      const v = HAT_VEL[s16] * (0.7 + Math.random() * 0.3) * (tense ? 1.2 : 1);
-      if (s16 % (tense ? 1 : 2) === 0 || Math.random() < 0.3) hit(ac, t, 'highpass', 7500, s16 === 14 && bar % 2 ? 0.2 : 0.035, 0.05 * v, 0.1);
+    if (sec.hats && !tense) { // (no ticking on the wait for operator select: he found it out of place)
+      const v = HAT_VEL[s16] * (0.7 + Math.random() * 0.3);
+      if (s16 % 2 === 0 || Math.random() < 0.3) hit(ac, t, 'highpass', 7500, s16 === 14 && bar % 2 ? 0.2 : 0.035, 0.05 * v, 0.1);
     }
     if (sec.arp && s16 % 2 === 0) { const a = chord.arp; pluck(ac, t, a[(step / 2 + bar) % a.length], s16 % 4 === 0 ? 1 : 0.7); }
     if (bar % 8 === 6 && s16 === 0) swell(ac, t, S16 * 32);

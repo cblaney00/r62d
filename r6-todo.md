@@ -12,6 +12,17 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] push to talk: talk to the bots with your microphone (where to go, where the enemies are) and they answer
 - [ ] finish recording the voice lines (about 5268 of 7915 clips made; a line with no clip only shows as writing): see docs/voice.md
 - [ ] try the voices, TV and Esc sliders and push to talk on screen and with a real microphone (not tried on screen yet; the speech recogniser has not heard anything yet)
+- [ ] i just saw a drone go on top of a bus outside, check all places drones go under and what their view is like when under things
+- [ ] the text should match up exactly with the new voice lines in both esports and games
+- [ ] the announcers need to be the least robotic voices, they are currently pretty robotic and have pronounciation issues with words ending in "'s"
+- [ ] when a female voice says "three" it sounds like "free" which should be fixed
+- [ ] i heard a male voice say "headshot" and it sounded like "headlot"
+- [ ] the mix input needs more work, its not understand me enough
+- [ ] the killcam suggestions cannot just flash, it should be red but not flashing
+- [ ] pulse too too strong, he just has crazy wallhacks
+- [ ] there is a rhythmic tapping sounds after a round is over and the players are waiting for the operator select screen, its just a little out of place is all, i see what you were going for
+- [ ] the bots are also pausing in their voice lines when there isnt a comma
+- [ ] lets make sure that wooden planks have 3 stages of being broken, 1 is a small hole, 2 is a bit larger, and 3 breaks it completely
 
 ## Done
 

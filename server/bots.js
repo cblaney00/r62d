@@ -446,6 +446,7 @@ function enemyDrone(game, p) {
   let best = null, bd = Infinity;
   for (const e of game.ents) {
     if ((e.type !== 'drone' && e.type !== 'bird') || e.team === team) continue; // (attackers shoot MAGPIE's birds too)
+    if (e.type === 'drone') { const dk = Math.floor(e.y / CELL) * game.map.W + Math.floor(e.x / CELL); if (underAt(game.map, dk, game.map.tiles[dk])) continue; } // hidden under a vehicle or table
     const d = Math.hypot(e.x - p.x, e.y - p.y);
     if (d > 260 || d > bd || floorAt(game.map, e.x, e.y) !== floorAt(game.map, p.x, p.y)) continue;
     if (d > 60 && Math.abs(angDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > 1.2) continue;
@@ -688,6 +689,7 @@ export function botThink(game, p, dt) {
   if (abId === 'scan' && action && !p.downed) { // a few seconds of scanning when something is heard, or every so often
     ai.scanT = (ai.scanT ?? 8 + Math.random() * 10) - dt;
     if ((heardRecently || ai.scanT < 0) && p.battery > 1) { inp.ability = 1; if (ai.scanT < -3) ai.scanT = 15 + Math.random() * 15; }
+    if (p.scanBlips && p.scanBlips.size) { const z = [...p.scanBlips.values()][0]; ai.heard = { x: z.x, y: z.y, t: game.time }; ai.heardSaid = game.time; talk(game, p, 'scanHit', { place: place(game, z.x, z.y) }, 'scan'); }
   }
 
   // --- fight ---
