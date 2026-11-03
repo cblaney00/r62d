@@ -1,7 +1,7 @@
 {
  "title": "Making R62D its own program (+ updates, Play/Host/Join)",
  "started": 1793734907703,
- "updated": 1793737532862,
+ "updated": 1793737903616,
  "steps": [
   {
    "name": "Plan and token estimate",
@@ -149,7 +149,9 @@
   {
    "name": "New download link",
    "about": "Publish the new version to GitHub.",
-   "state": "todo"
+   "state": "done",
+   "ended": 1793737903616,
+   "detail": "github.com/cblaney00/r62d/releases/tag/b239"
   }
  ],
  "log": [
@@ -284,6 +286,10 @@
   {
    "at": 1793737532862,
    "text": "Finished: Test it all in Wine — Wine: PLAY stays on this computer, HOST opens it, JOIN finds the homelab and joins, 'no games' after 1.5 s"
+  },
+  {
+   "at": 1793737903616,
+   "text": "Finished: New download link — github.com/cblaney00/r62d/releases/tag/b239"
   }
  ]
 }
