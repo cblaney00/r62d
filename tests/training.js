@@ -10,6 +10,7 @@ const got = await new Promise(res => {
   let n = 0; w.on('message', m => { if (m.done) { w.terminate(); res(n); } else { addResults(m); n += m.rounds; } }); w.on('error', e => { bad(e.message); res(n); });
 });
 const plans = Object.keys(training.plans).length, ops = Object.keys(training.ops).length;
+if (got && !Object.keys(training.opx || {}).length) bad('no per-operator numbers (opx) for BALL KNOWLEDGE'); else console.log('opx sample:', JSON.stringify(Object.entries(training.opx).slice(0, 3)));
 console.log(`${got} practice rounds: ${plans} plan results, ${ops} operator results`);
 if (got < 2 || !plans || !ops) bad('practice produced no results');
 // a plan that keeps winning gets picked more

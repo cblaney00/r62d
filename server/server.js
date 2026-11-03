@@ -70,7 +70,7 @@ function api(req, res) {
     let b = ''; req.on('data', d => { if (b.length < 8000) b += d; }); req.on('end', () => { try { perfLog.push({ ip: req.socket.remoteAddress, ...JSON.parse(b) }); if (perfLog.length > 200) perfLog.shift(); } catch {} json(200, { ok: true }); });
     return;
   }
-  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, running: !!trainer, session: trainer ? trainer.rounds : 0, current: VERSION.id });
+  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, running: !!trainer, session: trainer ? trainer.rounds : 0, current: VERSION.id });
   if (u.pathname === '/api/train' && req.method === 'POST') { const r = trainCheck(true); return json(200, { running: !!trainer, why: r || '' }); } // TRAIN THE PROS button
   if (u.pathname === '/api/match') { const m = store.match(q('id')); return m ? json(200, m) : json(404, { error: 'no such match' }); }
   if (u.pathname === '/api/players') return json(200, Object.values(store.profiles).map(p => ({ id: p.id, name: p.name, matches: p.stats.matches, wins: p.stats.wins, kills: p.stats.kills, deaths: p.stats.deaths })));

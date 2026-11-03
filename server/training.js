@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const DIR = process.env.R62D_DATA || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const FILE = path.join(DIR, 'pro-training.json');
-export const training = { version: null, at: 0, rounds: 0, verRounds: 0, plans: {}, ops: {} };
+export const training = { version: null, at: 0, rounds: 0, verRounds: 0, plans: {}, ops: {}, opx: {} }; // opx: per operator, all maps (BALL KNOWLEDGE)
 export const ROUNDS_PER_VERSION = 200; // he asked: 200 practice rounds per update is enough
 try { Object.assign(training, JSON.parse(fs.readFileSync(FILE, 'utf8'))); } catch {}
 export function saveTraining() { try { fs.mkdirSync(DIR, { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(training)); } catch {} }
@@ -23,6 +23,7 @@ export function addResults(res) {
   for (const [kind, tbl] of [['plans', res.plans || {}], ['ops', res.ops || {}]]) for (const [k, [n, w]] of Object.entries(tbl)) {
     const r = training[kind][k] || (training[kind][k] = { n: 0, w: 0 }); r.n += n; r.w += w;
   }
+  for (const [op, a] of Object.entries(res.opx || {})) { const x = training.opx[op] || (training.opx[op] = a.map(() => 0)); a.forEach((v, i) => { x[i] += v; }); }
   training.rounds += res.rounds || 0; training.verRounds = (training.verRounds || 0) + (res.rounds || 0);
 }
 // a new version of the game makes the old lessons less sure: keep them, but at half weight
@@ -30,6 +31,7 @@ export function newVersion(version) {
   if (training.version === version) return;
   training.version = version; training.verRounds = 0;
   for (const kind of ['plans', 'ops']) for (const r of Object.values(training[kind])) { r.n = Math.round(r.n / 2); r.w = Math.round(r.w / 2); }
+  for (const x of Object.values(training.opx || {})) x.forEach((v, i) => { x[i] = Math.round(v / 2); });
 }
 export const roundsLeft = version => training.version !== version ? ROUNDS_PER_VERSION : Math.max(0, ROUNDS_PER_VERSION - (training.verRounds || 0));
 export const needsTraining = version => roundsLeft(version) > 0;
