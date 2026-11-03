@@ -2739,7 +2739,7 @@ export class Game {
       const g = p.guns[p.slot];
       const o = {
         id: p.id, n: p.name, b: p.bot ? 1 : 0, sq: p.squad, tm: this.round ? this.side(p) : (p.squad === 0 ? 'atk' : 'def'),
-        op: p.op, a: p.alive ? 1 : 0, rn: p.bot || !p.token ? undefined : rankOf(p.mmr), k: p.kills, d: p.deaths, sc: p.score || 0, ms: p.rtt,
+        op: p.op, a: p.alive ? 1 : 0, bt: p.bot ? 1 : undefined, rn: p.bot || !p.token ? undefined : rankOf(p.mmr), k: p.kills, d: p.deaths, sc: p.score || 0, ms: p.rtt,
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,

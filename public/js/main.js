@@ -3168,7 +3168,7 @@ function setBotVol(name, v) { try { const a = JSON.parse(localStorage.getItem('r
 function fillPauseVoices() {
   const el = $('pVoices'); if (!el) return;
   const snap = st.snaps.length ? st.snaps[st.snaps.length - 1] : null, me = st.me;
-  const bots = !st.tv && snap && me ? [...snap.players.values()].filter(p => p.sq === me.sq && p.id !== st.id && String(p.id).startsWith('b')) : [];
+  const bots = !st.tv && snap && me ? [...snap.players.values()].filter(p => p.sq === me.sq && p.id !== st.id && p.bt) : [];
   el.classList.toggle('hidden', !bots.length);
   el.innerHTML = bots.length ? '<h3>TEAMMATE VOICES</h3>' : '';
   for (const p of bots) {
