@@ -6,7 +6,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 
-const RELEASES = 'https://api.github.com/repos/cblaney00/r62d/releases?per_page=15';
+const RELEASES = process.env.R62D_RELEASES || 'https://api.github.com/repos/cblaney00/r62d/releases?per_page=15'; // R62D_RELEASES: tests only
 const ASSET = 'R62D-update.zip';
 
 const buildOf = dir => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'desktop', 'build.json'), 'utf8')); } catch { return null; } };

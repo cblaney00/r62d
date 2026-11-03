@@ -1,7 +1,7 @@
 {
  "title": "Making R62D its own program (+ updates)",
  "started": 1793734907703,
- "updated": 1793736409280,
+ "updated": 1793736673327,
  "steps": [
   {
    "name": "Plan and token estimate",
@@ -111,9 +111,10 @@
   {
    "name": "Test an update in Wine",
    "about": "Open an old copy, see it update itself to the newest.",
-   "state": "doing",
+   "state": "done",
    "began": 1793736409280,
-   "detail": "Unit test of the unzip and update logic"
+   "detail": "In Wine: build 1 updated itself to build 237, hosted on it, and started fine with no internet",
+   "ended": 1793736673327
   },
   {
    "name": "New download link",
@@ -221,6 +222,10 @@
   {
    "at": 1793736409280,
    "text": "Started: Test an update in Wine — Unit test of the unzip and update logic"
+  },
+  {
+   "at": 1793736673327,
+   "text": "Finished: Test an update in Wine — In Wine: build 1 updated itself to build 237, hosted on it, and started fine with no internet"
   }
  ]
 }
