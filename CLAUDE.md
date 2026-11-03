@@ -195,6 +195,7 @@ His wishes so far:
 - TV viewer requests (he asked: up to 3, must play, one per role per side): `tvPick.req`/`#tvReq` in main.js, server `this.tv.req`, `requestPick` (amateurs) and the front of the pool in `proPickOp`. `node tests/tvrequests.js`.
 - TV instant replays (he asked: full screen ~6 s, fade-in/fade-out times, smooth): server `tvKill` (why it's big) → `tvClips` sends `tvclip` 1.2 s later; client `T.seen` (did the camera catch it), `T.calm` (nobody mid-fight), `public/js/tvreplay.js` (`offerReplay`/`tickReplay`; slow motion round the kill, eased camera, gold wipe, ≥18 s apart) drawing with `drawClip`/`poses` from killcam.js. `st.tvAllReplays` forces them for screenshot tests.
 - Camera bounce (he said: "super bouncy when you look around"): Crosshair mode leads from `freeAimPoint()` (world), not the screen cursor (feedback loop); no aim-distance zoom for bodies; slower lead/zoom glides.
+- TV team talk: `tvTalk`/`planTalk` in bots.js (15 s `TALK_TIME`, requests weighed by frag rank, `spread` bigger at low ranks), `node tests/tvtalk.js`. Trench plant cover / Lens site-floor periscope in `botAbility`; `shotClear` checks 300 px past the target.
 - Don't start long background runs (e.g. a 20-minute pro practice) without asking him.
 
 ## Batch of 2026-11-02 (second): six items from his list

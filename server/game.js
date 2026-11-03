@@ -4,7 +4,7 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatch
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
-import { botThink, botPickOp, botPrep, assignPros, proSay } from './bots.js';
+import { botThink, botPickOp, botPrep, assignPros, proSay, tvTalk } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
@@ -355,7 +355,7 @@ export class Game {
       p.ms.rounds++; o.rounds++;
       if (p.squad === squad) { p.ms.roundsWon++; o.roundsWon++; this.pts(p, 50, 'ROUND WON'); }
     }
-    this.winner = squad; this.reason = reason;
+    this.winner = squad; this.reason = reason; this.lastWinner = squad;
     this.phase = PHASE.ROUND_END; this.timer = DUR.roundEnd;
     this.events.push({ e: 'roundEnd', squad, side: winTeam, reason });
     for (const p of this.players.values()) { p.busy = null; if (p.ctrl !== 'body') p.ctrl = 'body'; }
@@ -392,6 +392,7 @@ export class Game {
     const held = (this.tut && this.tut.hold && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP)) || this.free;
     if (!held) this.timer -= dt;
     if (this.phase === PHASE.SELECT) {
+      if (this.tv) { tvTalk(this); if (this.allLocked()) this.beginPrep(); return; } // ESPORTS TV: 15 s of team talk, then go
       // he asked: bots never pick before you. They wait until every person on their team has locked in.
       for (const p of this.players.values()) if (p.bot && !p.op && (this.tut || this.humansLocked(p.squad)) && Math.random() < dt * 2.5) botPickOp(this, p);
       for (const p of this.players.values()) if (p.bot && p.op && !p.locked) {

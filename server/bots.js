@@ -52,6 +52,71 @@ function requestPick(game, p) {
   if (p.op !== o) { p.job = null; return false; }
   return true;
 }
+// ESPORTS TV team talk (he asked): 15 s before each round where each team talks over the map, spawns and picks like
+// people do. Someone asks a teammate to play something, for a reason from experience; whether they listen depends on
+// how the asker is fragging (top fraggers get listened to more), much more so at the lower ranks.
+const TALK_TIME = 15;
+export function tvTalk(game) {
+  const T = game.tvTalk && game.tvTalk.round === game.round ? game.tvTalk : (game.tvTalk = planTalk(game));
+  const el = game.time - T.t0;
+  while (T.ev.length && T.ev[0].at <= el) T.ev.shift().fn();
+  if (el >= TALK_TIME) for (const p of game.players.values()) if (p.bot) { if (!p.op) botPickOp(game, p); if (p.op) p.locked = true; }
+}
+function say(game, p, text) {
+  if (!p) return;
+  if (p.pro) (game.proLog || (game.proLog = [])).push({ round: game.round, squad: p.squad, team: p.pro.tag, text, who: p.pro.pl.name });
+  p.chatTimes = []; game.chat(p, { text: text.slice(0, 140), team: true });
+}
+const pickOne = a => a[Math.floor(Math.random() * a.length)];
+const talkOp = o => OPERATORS[o] ? OPERATORS[o].name : '?';
+function planTalk(game) {
+  const T = { round: game.round, t0: game.time, ev: [] }, at = (t, fn) => T.ev.push({ at: t, fn });
+  const lvl = game.botLevel ?? PRO_LEVEL, spread = lvl >= PRO_LEVEL ? 0.3 : 0.78 - lvl * 0.06; // how much the scoreboard decides who is heard
+  for (const squad of [0, 1]) {
+    const team = [...game.players.values()].filter(q => q.bot && q.squad === squad); if (!team.length) continue;
+    const side = game.side(team[0]), atk = side === TEAM.ATK, sd = atk ? 'atk' : 'def', m = game.map;
+    const byFrags = team.slice().sort((a, b) => (b.kills || 0) - (a.kills || 0) || (a.deaths || 0) - (b.deaths || 0));
+    const rank = q => byFrags.indexOf(q) / Math.max(1, team.length - 1); // 0 = top fragger, 1 = bottom
+    const lead = team.find(q => q.pro && q.pro.i === 0) || byFrags[0];
+    const lostLast = game.round > 1 && game.lastWinner !== undefined && game.lastWinner !== squad;
+    const off = 0.4 + squad * 0.5; // the two teams don't talk in lockstep
+    // the map / site call
+    const site = m.sites[game.site], siteName = site ? site.rooms.join(' / ') : 'the site';
+    at(off + 0.6, () => say(game, lead, atk
+      ? pickOne([lostLast ? 'They read us last round. Different angle this time, drones first.' : 'Same idea as before: drones first, find it, then we commit.', `${m.name || 'This map'}: they love the upstairs sites here, check those first.`, 'Full drones. Nobody peeks before we know where it is.'])
+      : pickOne([`We play ${siteName}. Reinforce the main walls first.`, lostLast ? `${siteName} again, but no one dies for free this time.` : `${siteName}. Same setup, it worked.`, `Setting up ${siteName}. One roamer, the rest hold.`])));
+    // picks, one by one, and a request from someone with an opinion
+    const order = team.slice().sort(() => Math.random() - 0.5), times = order.map((_, i) => off + 2 + i * 2.1 + Math.random() * 0.8);
+    const want = new Map(); // target -> requested operator (if they agreed)
+    if (order.length >= 2) {
+      const ti = 1 + Math.floor(Math.random() * (order.length - 1)), tgt = order[ti], asker = pickOne(order.slice(0, ti).concat(order.slice(ti + 1)));
+      const job = tgt.pro ? tgt.pro.pl.jobs[sd] : null;
+      let cand = opsForTeam(side).filter(o => !job || jobOf(o) === job);
+      if (game.tv && game.tv.req) cand = cand.filter(o => !game.tv.req.includes(o));
+      const best = cand.map(o => [o, opWeight(m.id, sd, o) * (0.7 + Math.random() * 0.6)]).sort((a, b) => b[1] - a[1])[0];
+      if (best) {
+        const o = best[0], why = pickOne([`${talkOp(o)} has been winning us this map`, `we need a ${(JOBS[side].find(j => j.ops.includes(o)) || {}).name || 'support'}`, lostLast ? `their setup beat us, ${talkOp(o)} counters it` : `trust me, ${talkOp(o)} is good here`]);
+        const askT = times[ti] - 1.6, nm = tgt.name.replace(/^\[\w+\] /, '');
+        const listen = Math.min(0.95, Math.max(0.05, 0.6 + spread * (0.5 - rank(asker)))), yes = Math.random() < listen;
+        at(askT, () => say(game, asker, `${nm}, can you play ${talkOp(o)}? ${why}.`));
+        at(askT + 1.1, () => say(game, tgt, yes ? pickOne([`Sure, ${talkOp(o)}.`, 'Yeah ok, got it.', 'Fine, I trust you.']) : rank(asker) > 0.6 && lvl < PRO_LEVEL ? pickOne([`You're bottom frag, I'll play what I want.`, 'Maybe get some kills first.', 'Nah.']) : pickOne(['Nah, I play better on my own pick.', "I'd rather not, I'm warm on mine.", 'Not this round.'])));
+        if (yes) want.set(tgt, o);
+      }
+    }
+    order.forEach((p, i) => at(times[i], () => {
+      if (p.op) return;
+      const o = want.get(p);
+      if (o && !(game.tv && game.tv.req && game.tv.req.some(r => OPERATORS[r].team === sd && jobOf(r) === jobOf(o)))) { p.job = jobOf(o); game.pickOp(p, o); }
+      if (!p.op) botPickOp(game, p); else if (p.pro) (p.pro.lastOps || (p.pro.lastOps = {}))[sd] = p.op;
+      if (!p.op) return;
+      if (atk && !p.pro && Math.random() < 0.3) p.spawn = pickOne(m.atkSpawns).name;
+      const line = Math.random() < 0.5 ? `${talkOp(p.op)} for me.` : pickOne([`I'll go ${talkOp(p.op)}.`, `Locking ${talkOp(p.op)}.`, `${talkOp(p.op)}.`]);
+      say(game, p, atk && p.spawn && Math.random() < 0.45 ? `${line} Spawning ${p.spawn}.` : line);
+    }));
+  }
+  T.ev.sort((a, b) => a.at - b.at);
+  return T;
+}
 export function botPickOp(game, p) {
   if (requestPick(game, p)) return;
   if (p.pro && proPickOp(game, p)) return;
@@ -274,7 +339,7 @@ function shotClear(game, p, q) {
   for (const o of game.players.values()) {
     if (o === p || !o.alive || game.side(o) !== game.side(p)) continue;
     const ax = o.x - p.x, ay = o.y - p.y, along = ax * dx + ay * dy;
-    if (along > 0 && along < d && Math.abs(ax * dy - ay * dx) < hitR(o.op) + 4) return false;
+    if (along > 0 && along < d + 300 && Math.abs(ax * dy - ay * dx) < hitR(o.op) + 4 + along * 0.05) return false; // a miss flies on past the target, and spreads
   }
   return true;
 }
@@ -788,8 +853,13 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
     }
   } else if (abId === 'spike') { // ECHO: by the objective, to hear defenders moving round it
     if (!enemy && toBomb < 260 && ok() && Math.random() < dt * 0.5) { useAbility(); done(15); }
-  } else if (abId === 'cover') { // TRENCH: cover between them and someone shooting from far
+  } else if (abId === 'cover') { // TRENCH: cover between them and someone shooting from far, and for the plant
     if (enemy && d > 140 && ok() && Math.random() < dt * 0.8) { aimAt(p, enemy.x, enemy.y); useAbility(); done(8); }
+    else if (!enemy && ok() && toBomb < 90 && (p.hasDefuser || game.planted || [...game.players.values()].some(q => q.busy && q.busy.k === 'plant' && game.side(q) === team))) {
+      const from = (heard && ai.heard) || [...game.players.values()].filter(q => q.alive && game.side(q) !== team && game.spots[team].has(q.id))[0];
+      const ang = from ? Math.atan2(from.y - p.y, from.x - p.x) : Math.atan2(p.y - bomb.y, p.x - bomb.x); // toward the threat, else away from the bomb
+      p.aim = ang; useAbility(); done(12);
+    }
   } else if (abId === 'tag') { // HOUND: dart the attacker in sight so the whole team sees them
     if (enemy && d < 400 && ok() && ai.react > 0) { aimAt(p, enemy.x, enemy.y); useAbility(); done(6); }
   } else if (abId === 'echobox') { // RUSE: fake footsteps out by a way into the site, early in the round
@@ -800,7 +870,10 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
       if (o) { aimAt(p, (k % m.W + 0.5) * CELL, (Math.floor(k / m.W) + 0.5) * CELL); useAbility(); done(20); }
     }
   } else if (abId === 'periscope') { // LENS: a periscope into the room above or below while holding
-    if (!enemy && ok() && Math.random() < dt * 0.1 && game.periscopeSpot(p)) { useAbility(); done(20); }
+    const el = DUR.action - game.timer, siteF = floorAt(game.map, bomb.x, bomb.y), myF = floorAt(game.map, p.x, p.y);
+    if (!game.periscopeSpot(p)) {} // no floor above or below here
+    else if (!enemy && ok() && el > 5 && el < 40 && Math.abs(siteF - myF) === 1 && Math.random() < dt * 0.5) { p.periDir = siteF > myF ? 'up' : 'down'; useAbility(); done(25); } // early: eyes on the site's floor
+    else if (!enemy && ok() && (heard || Math.random() < dt * 0.06)) { useAbility(); done(20); }
   } else if (abId === 'weld') { // SOLDER: weld a broken wall back when one is close and nobody is shooting
     if (!enemy && p.battery > 0.5 && game.baseTiles) {
       const m = game.map, cx = Math.floor(p.x / CELL), cy = Math.floor(p.y / CELL);
