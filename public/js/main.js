@@ -35,7 +35,7 @@ const $ = id => document.getElementById(id);
 // the browser for free) and markers/crosshair on top. 'ctx' points at whichever is being drawn.
 const cv = $('game'), ctx0 = cv.getContext('2d'), mapLayer = $('mapLayer');
 let ctx = ctx0;
-const fog = $('fog'), fctx = fog.getContext('2d'); let FK = 0.5; // blackout pixels per screen pixel
+const fog = $('fog'), fctx = fog.getContext('2d');
 const over = $('over'), octx = over.getContext('2d');
 // He asked for labels to stay upright with Rotate aiming: any text is turned back by however much the drawing is
 // turned at that moment, round its own spot. (UP() is "up the screen" in the world, for labels that sit above things.)
@@ -73,8 +73,7 @@ function resize() {
   const oldW = VW || 1, oldH = VH || 1;
   DPR = Math.min(2, Math.min(window.devicePixelRatio || 1, 1.5) * gq.scale);
   VW = cv.width = over.width = Math.round(innerWidth * DPR); VH = cv.height = over.height = Math.round(innerHeight * DPR);
-  FK = gq.fog; fog.width = Math.ceil(VW * FK) + 2; fog.height = Math.ceil(VH * FK) + 2; // +1 pixel all round, see drawFogGrey
-  const fc = 1 / FK / DPR; Object.assign(fog.style, { left: -fc + 'px', top: -fc + 'px', width: fog.width * fc + 'px', height: fog.height * fc + 'px' });
+  fog.width = Math.ceil(VW * gq.fog); fog.height = Math.ceil(VH * gq.fog);
   mouse.x *= VW / oldW; mouse.y *= VH / oldH;
 }
 function setGfx(name) {
@@ -1379,11 +1378,11 @@ function frame(nowMs) {
   // your aim, and then settles quickly, so the view isn't always slowly drifting in and out (he asked for less slow panning)
   if (!st.envWant || Math.abs(want - st.envWant) > st.envWant * 0.15 || (view && view.kind !== 'body')) st.envWant = want;
   st.envH = st.envH || st.envWant;
-  st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * 6)); if (Math.abs(st.envWant - st.envH) < 0.3) st.envH = st.envWant;
+  st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * 6));
   // aiming down sights widens the view, fast (he asked: it used to zoom in, the opposite of what you want); a 2x scope widest
   const adsZ = view && view.kind === 'body' && me && me.ad ? (String(me.aa).includes('scope') ? 1.3 : 1.12) : 1;
   st.adsZ = st.adsZ || 1;
-  st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18)); if (Math.abs(adsZ - st.adsZ) < 0.0005) st.adsZ = adsZ;
+  st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18));
   st.viewH = st.envH * st.adsZ;
   // Crosshair mode: the crosshair can go anywhere you can see; if you and it don't fit on screen, the view grows
   // (up to FIT_H) and st.reachW is how far it can go in the way you face at the largest view
@@ -1393,7 +1392,7 @@ function frame(nowMs) {
     const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), mg = (50 * DPR + AHEAD()) / (st.zoom || 1);
     const capH = FIT_H(me), need = Math.min(capH, (q.ad + mg) / (2 * e));
     st.reachW = Math.max(160, capH * 2 * e - mg);
-    st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need; if (Math.abs(need - st.fitH) < 0.3) st.fitH = need;
+    st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need;
     st.viewH = Math.max(st.viewH, st.fitH);
   } else st.fitH = 0;
   st.viewH *= viewMul(); // Settings: how much of the map you see (phones start further out)
@@ -1432,59 +1431,6 @@ function frame(nowMs) {
   drawOutWarn(st.last, st.me); drawCompass(st.last, st.me, now); drawAllies(st.last, st.me, now);
   pfa('total', T0);
   watchPerf(rawGap, performance.now() - T0);
-}
-// The grey remembered map under the blackout. Scaling it into the blackout every frame was the slowest single step
-// (~1.3 ms), while a straight pixel-for-pixel copy is ~10x cheaper. So it is kept ready at the current zoom, a little
-// bigger than the screen, and copied in at a whole-pixel offset; the browser slides the blackout layer by the leftover
-// fraction of a pixel on the graphics card. It is only redrawn when the zoom changes and then holds still, when the
-// view moves past its edge, or for the spots of the map that changed. While zooming or turned (Rotate aiming) it is
-// drawn the old way. Returns the blackout's own offset (whole pixels) for the cut-outs drawn on it.
-const greySnap = { c: document.createElement('canvas'), ok: false, sz: 0, lastSz: 0, x0: 0, y0: 0, rend: null };
-greySnap.ctx = greySnap.c.getContext('2d');
-let fogShift = '';
-function drawFogGrey(sx, sy, ox, oy, wx0, wy0, wx1, wy1) {
-  const R = st.rend, G = R.G, g = greySnap, W = fog.width, H = fog.height, Wm = st.map.W * CELL, Hm = st.map.H * CELL;
-  const dirty = R.greyDirty; R.greyDirty = null;
-  const still = !sy && sx === g.lastSz; g.lastSz = sy ? 0 : sx;
-  if (g.rend !== R || !still) g.ok = false;
-  let fx = Math.round(ox), fy = Math.round(oy);
-  if (still) {
-    if (g.ok && g.sz === sx) { // whole-pixel position of the copy's corner on the blackout
-      const dx = Math.round(g.x0 * sx + ox), dy = Math.round(g.y0 * sx + oy);
-      if (dx > 0 || dy > 0 || dx + g.c.width < W || dy + g.c.height < H) g.ok = false;
-    } else g.ok = false;
-    if (!g.ok) { // (re)build it around the current view
-      const M = Math.ceil(Math.max(W, H) * 0.2), c = g.ctx;
-      if (g.c.width !== W + 2 * M || g.c.height !== H + 2 * M) { g.c.width = W + 2 * M; g.c.height = H + 2 * M; }
-      g.sz = sx; g.rend = R; g.x0 = (-M - ox) / sx; g.y0 = (-M - oy) / sx; g.ok = true;
-      c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#000'; c.fillRect(0, 0, g.c.width, g.c.height);
-      greySnapPart(g.x0, g.y0, g.x0 + g.c.width / sx, g.y0 + g.c.height / sx);
-    } else if (dirty) for (const [X, Y, Wd, Hd] of dirty) greySnapPart(X - 1, Y - 1, X + Wd + 1, Y + Hd + 1, true);
-    const dx = Math.round(g.x0 * sx + ox), dy = Math.round(g.y0 * sx + oy);
-    fx = dx - g.x0 * sx; fy = dy - g.y0 * sx; // the blackout's offset that puts the copy exactly on whole pixels
-    fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.globalCompositeOperation = 'copy';
-    fctx.drawImage(g.c, dx, dy);
-    fctx.globalCompositeOperation = 'source-over';
-  } else {
-    fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.globalCompositeOperation = 'source-over';
-    fctx.fillStyle = '#000'; fctx.fillRect(0, 0, W, H);
-    fctx.setTransform(sx, sy, -sy, sx, fx, fy);
-    if (wx1 > wx0 && wy1 > wy0) fctx.drawImage(R.grey, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
-  }
-  // the leftover fraction of a pixel, moved by the browser
-  const k = 1 / FK / DPR, sh = `translate(${((ox - fx) * k).toFixed(3)}px, ${((oy - fy) * k).toFixed(3)}px)`;
-  if (sh !== fogShift) { fogShift = sh; fog.style.transform = sh; }
-  return [fx, fy];
-  function greySnapPart(x0, y0, x1, y1, clip) { // world rect, into the copy
-    const c = g.ctx, s = g.sz;
-    x0 = Math.max(x0, g.x0); y0 = Math.max(y0, g.y0); x1 = Math.min(x1, g.x0 + g.c.width / s); y1 = Math.min(y1, g.y0 + g.c.height / s);
-    if (x1 <= x0 || y1 <= y0) return;
-    c.setTransform(s, 0, 0, s, -g.x0 * s, -g.y0 * s);
-    if (clip) { c.save(); c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip(); c.fillStyle = '#000'; c.fillRect(x0, y0, x1 - x0, y1 - y0); }
-    const a = Math.max(0, x0 - 3), b = Math.max(0, y0 - 3), e = Math.min(Wm, x1 + 3), f = Math.min(Hm, y1 + 3); // a little extra so the edges blend
-    if (e > a && f > b) c.drawImage(R.grey, a * G, b * G, (e - a) * G, (f - b) * G, a, b, e - a, f - b);
-    if (clip) c.restore();
-  }
 }
 let overDirty = false, fogShown = false;
 function showFog(on) { if (on !== fogShown) { fogShown = on; fog.style.visibility = on ? 'visible' : 'hidden'; } }
@@ -1915,8 +1861,14 @@ function draw(s, view, now, dt) {
   // --- line-of-sight blackout ---
   showFog(!!(view && inGame));
   if (view && inGame) {
-    const fk = FK, [fox, foy] = drawFogGrey(TA * fk, TB * fk, ox * fk + 1, oy * fk + 1, wx0, wy0, wx1, wy1); // the dull grey remembered map
-    fctx.setTransform(TA * fk, TB * fk, TC * fk, TD * fk, fox, foy);
+    const fk = fog.width / VW;
+    fctx.setTransform(1, 0, 0, 1, 0, 0);
+    fctx.globalCompositeOperation = 'source-over';
+    fctx.fillStyle = '#000'; fctx.fillRect(0, 0, fog.width, fog.height);
+    fctx.setTransform(TA * fk, TB * fk, TC * fk, TD * fk, ox * fk, oy * fk);
+    // the dull grey remembered map
+    const G = st.rend.G;
+    if (wx1 > wx0 && wy1 > wy0) fctx.drawImage(st.rend.grey, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
     // cut out everything your team can see right now
     fctx.globalCompositeOperation = 'destination-out';
     for (const v of st.viewers) {
