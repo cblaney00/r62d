@@ -542,6 +542,7 @@ function onEvent(e, s, players) {
     }
     case 'down': { const v = players.get(e.id); if (v) addFeed(`${v.n} is down`); break; }
     case 'msg': if (!e.team || e.team === mySide()) addFeed(e.text); break;
+    case 'ban': if (st.tv) audio.ui('lock'); break;
     case 'banner': if (!e.team || e.team === mySide()) banner(e.text, e.sub); audio.ui('round'); break;
     case 'found': if (e.team === mySide() && fxOn('site')) siteFound(s); break;
     case 'roundEnd': {
@@ -2235,7 +2236,7 @@ function camOverlay(view, now) {
 // ---------------- screens & HUD ----------------
 function screens(s, phase, now) {
   const show = (id, on) => $(id).classList.toggle('hidden', !on);
-  const joined = !!st.id;
+  const joined = !!st.id || !!(st.tv && s); // ESPORTS TV: a viewer is in the match even before following anyone
   show('splash', !st.started);
   show('lobby', st.started && (phase === PHASE.LOBBY || !joined));
   // music in the menus, silence in the field
@@ -2245,7 +2246,8 @@ function screens(s, phase, now) {
     if (want) setMood(phase === PHASE.SELECT ? 'select' : 'menu');
   }
   countdown(s, phase);
-  show('select', joined && phase === PHASE.SELECT);
+  show('select', joined && phase === PHASE.SELECT && !st.tv);
+  show('tvDraft', !!st.tv && joined && phase === PHASE.SELECT); document.documentElement.classList.toggle('tvsel', !!st.tv && phase === PHASE.SELECT);
   show('hud', joined && (phase === PHASE.PREP || phase === PHASE.ACTION || phase === PHASE.ROUND_END));
   show('endscreen', joined && (phase === PHASE.MATCH_END || st.forceEnd));
   show('leaveBtn', joined && phase !== PHASE.LOBBY);
@@ -2253,7 +2255,7 @@ function screens(s, phase, now) {
   if (!s || now - st.lastHud < 0.08) return;
   st.lastHud = now;
   if (phase === PHASE.LOBBY) renderLobby(s);
-  else if (phase === PHASE.SELECT) buildSelect(s);
+  else if (phase === PHASE.SELECT) { if (st.tv) tvDraft(s); else buildSelect(s); }
   else if (phase !== PHASE.MATCH_END) hud(s);
   $('scoreboard').classList.toggle('hidden', !keys.has('scoreboard'));
   if (keys.has('scoreboard')) $('scoreboard').innerHTML = scoreTable(s);
@@ -3034,6 +3036,51 @@ function tvHud(s) {
       if (now - (cv._t || 0) > 0.07) { cv._t = now; drawWebcam(cv, { name: p.n, pro, colour, talking: !!said && now - said.t < 2.5, dead: !p.a, down: p.dn }, now); }
     } }
   setHTML('tvHelp', `${st.tv.req && st.tv.req.length ? 'REQUESTED: ' + st.tv.req.map(o => OPERATORS[o]?.name).join(', ') + ' · ' : ''}${st.tv.overview ? 'MAP OVERVIEW' : st.tv.auto ? 'AUTO DIRECTOR' : 'FOLLOWING'} · 1-5 / 6-0 follow a player · A director ${st.tv.auto ? 'off' : 'on'} · M map · Esc menu`);
+}
+// ESPORTS TV picking screen (he asked: two-sided like esports, with R6 bans): blue team down the left, orange down the
+// right, the bans in the middle one at a time with a BANNED stamp, then each player's operator flips in on their card.
+// Built once per round; after that only what changed is touched. Team talk shows in the comms boxes under each side.
+function tvDraft(s) {
+  const el = $('tvDraft'), pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
+  const team = sq => { const T = PRO_TEAMS[sq]; return pro && T ? { name: T.name, tag: T.tag, col: T.colour } : { name: sq ? 'ORANGE' : 'BLUE', tag: sq ? 'ORG' : 'BLU', col: sq ? '#ff8a3d' : '#46a8ff' }; };
+  const sideOf = sq => (s.players.find(p => p.sq === sq) || {}).tm;
+  const key = s.rd + '|' + s.players.map(p => p.id).join(',') + pro;
+  if (el.dataset.k !== key) {
+    el.dataset.k = key;
+    const col = sq => { const t = team(sq), sd = sideOf(sq);
+      return `<div class="tdTeam" style="--tc:${t.col}"><div class="tdName">${pro ? `<em>${t.tag}</em>` : ''}${esc(t.name.toUpperCase())}<small>${s.sc[sq]} · ${sd === 'atk' ? 'ATTACK' : 'DEFENCE'}</small></div>` +
+        s.players.filter(p => p.sq === sq).map(p => `<div class="tdCard" data-id="${p.id}"><canvas width="120" height="120"></canvas><div><b>${esc(p.n.replace(/^\[\w+\] /, ''))}</b><span class="tdRole"></span><span class="tdOp"></span></div></div>`).join('') + '</div>'; };
+    const M = MAPS[s.mp] || {};
+    el.innerHTML = `<div class="tdBg"></div><div class="tdTop"><small>ROUND ${s.rd} · ${esc((M.name || '').toUpperCase())}</small><b class="tdPhase"></b><span class="tdSub"></span></div>` +
+      `<div class="tdGrid">${col(0)}<div class="tdBans"><h4>ATTACKERS BANNED</h4><div class="tdRow" data-s="atk"></div><h4>DEFENDERS BANNED</h4><div class="tdRow" data-s="def"></div></div>${col(1)}</div>`;
+    const bg = el.querySelector('.tdBg'); if (MAPS[s.mp]) { const c = mapThumb(s.mp).cloneNode(); c.getContext('2d').drawImage(mapThumb(s.mp), 0, 0); bg.appendChild(c); }
+  }
+  const bans = s.bn || [], q = s.bq;
+  for (const sd of ['atk', 'def']) {
+    const row = el.querySelector(`.tdRow[data-s="${sd}"]`), list = bans.filter(b => OPERATORS[b[0]] && OPERATORS[b[0]].team === sd);
+    const want = list.map(b => b[0]).join(',') + (q && q[1] === sd ? '|q' + q[0] : '');
+    if (row.dataset.k === want) continue;
+    const had = new Set((row.dataset.k || '').split('|')[0].split(','));
+    row.dataset.k = want;
+    row.innerHTML = list.map(([op, sq, rd]) => `<div class="tdBan${had.has(op) ? '' : ' new'}" style="--tc:${team(sq).col}"><canvas width="90" height="90" data-op="${op}"></canvas><b>${esc(OPERATORS[op].name)}</b><span>${esc(team(sq).tag)} · R${rd}</span><i>BANNED</i></div>`).join('') +
+      (q && q[1] === sd ? `<div class="tdBan wait" style="--tc:${team(q[0]).col}"><div class="tdQ">?</div><b>${esc(team(q[0]).tag)}</b><span>BANNING…</span></div>` : '');
+    for (const c of row.querySelectorAll('canvas')) portraitCached(c, c.dataset.op);
+  }
+  setHTML(el.querySelector('.tdPhase'), q ? 'BAN PHASE' : 'OPERATOR SELECT');
+  setHTML(el.querySelector('.tdSub'), q ? `<span style="color:${team(q[0]).col}">${esc(team(q[0]).name.toUpperCase())}</span> ban ${q[1] === 'atk' ? 'an attacker' : 'a defender'} · ${q[3] + 1} / ${q[4]} · ${Math.ceil(q[2])}`
+    : s.players.every(p => p.lk) ? 'ALL LOCKED IN' : 'TEAM TALK · PICKING');
+  for (const p of s.players) {
+    const c = el.querySelector(`.tdCard[data-id="${p.id}"]`); if (!c) continue;
+    const job = p.jb && (JOBS[p.tm] || []).find(j => j.id === p.jb), cv = c.querySelector('canvas');
+    setHTML(c.querySelector('.tdRole'), job ? esc(job.name.toUpperCase()) : '');
+    setHTML(c.querySelector('.tdOp'), p.op && OPERATORS[p.op] ? esc(OPERATORS[p.op].name) : q ? '' : 'CHOOSING…');
+    c.classList.toggle('lk', !!p.lk);
+    if ((cv.dataset.op || '') !== (p.op || '')) {
+      cv.dataset.op = p.op || '';
+      if (p.op) { portraitCached(cv, p.op); c.classList.remove('flip'); void c.offsetWidth; c.classList.add('flip'); }
+      else cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+    }
+  }
 }
 function addChat(m) {
   if (st.tv && m.from) (st.tvSay || (st.tvSay = new Map())).set(m.from, { text: m.text, t: performance.now() / 1000 }); // spoken from the character (he asked)
