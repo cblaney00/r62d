@@ -28,7 +28,7 @@ if (typeof process !== 'undefined' && process.env.R62D_FAST) { DUR.select = 3; D
 const THROW_K = 5; // drag on thrown things: they come to rest where you aimed
 const EMP_R = 36; // buffed (he asked: it was no better than ordinary utility): ~1 m, and it fries defenders' electronics too
 const LANCE_STEP = 0.5; // RIVET: seconds per burnt-through point (the first is a bullet-sized hole)
-const HAMMER_CD = 4;
+const HAMMER_CD = 2.5; // was 4 (he asked: Ferro stronger, until the pros pick him)
 const WINDUP_T = 0.5, SETUP_T = 1.2;
 const THROWN_G = new Set(['smoke', 'frag', 'stun', 'impact', 'nitro']), PLACED_G = new Set(['breach', 'claymore', 'wire', 'dshield']);
 const THROWN_AB = new Set(['emp', 'sonar', 'stickycam', 'gas', 'flare', 'medkit', 'echobox']);
@@ -1530,15 +1530,18 @@ export class Game {
       used(); this.events.push({ e: 'arc', v: 1, x: r1(p.x), y: r1(p.y), x2: r1(p.x + ca * bt), y2: r1(p.y + sa * bt) }); // v: VOLT's, the quiet one
     } else if (id === 'hammer') { // he asked: only door and window barricades go in one swing (no soft walls), and a real wait between swings
       if (p.meleeCd > 0 || this.time < (p.hammerCd || 0)) return;
-      const f = this.facingCell(p, 30);
-      if (f && f.t === T.BARRI) {
+      const f = this.facingCell(p, 30), hs = !f || ![T.BARRI, T.BEAM, T.DSHIELD].includes(f.t) ? this.hatchSpot(p, [T.HATCH]) : null;
+      if (f && [T.BARRI, T.BEAM, T.DSHIELD].includes(f.t)) { // a barricade, steel brace or deployable shield: gone in one swing
         const across = Math.abs(ca) > Math.abs(sa) ? [0, 1] : [1, 0];
         for (const d of [0, 1, -1]) {
           const k = (f.cy + across[1] * d) * this.map.W + f.cx + across[0] * d, t = this.map.tiles[k];
-          if (t === T.BARRI) this.destroyCell(k);
+          if (t === f.t) this.destroyCell(k);
         }
-        this.events.push({ e: 'hit', k: f.t === T.BARRI ? 'wood' : 'wall', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) });
+        this.events.push({ e: 'hit', k: f.t === T.BARRI ? 'wood' : 'spark', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) });
         this.events.push({ e: 'snd', s: 'break', x: r1(p.x), y: r1(p.y) });
+      } else if (hs) { // an unreinforced floor hatch at your feet: smashed through in one swing
+        this.destroyCell(hs.k);
+        this.events.push({ e: 'hit', k: 'wood', x: r1(hs.x), y: r1(hs.y) }); this.events.push({ e: 'snd', s: 'break', x: r1(p.x), y: r1(p.y) });
       } else {
         const q = [...this.players.values()].find(q => q.alive && q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 30 &&
           Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.1);
@@ -2231,7 +2234,7 @@ export class Game {
     });
     if (hitQ && (stopT === null || hitT < stopT)) {
       const src = this.players.get(e.owner);
-      this.damage(hitQ, 45, src || null, 'Saw Disc', Math.atan2(dy, dx)); this.removeEnt(e);
+      this.damage(hitQ, 60, src || null, 'Saw Disc', Math.atan2(dy, dx)); this.removeEnt(e);
       this.events.push({ e: 'hit', k: 'flesh', x: r1(hitQ.x), y: r1(hitQ.y) }); return;
     }
     if (stopT !== null) { this.events.push({ e: 'hit', k: 'spark', x: r1(e.x + dx * stopT), y: r1(e.y + dy * stopT) }); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e); return; }

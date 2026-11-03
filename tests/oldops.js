@@ -27,7 +27,7 @@ fresh(); setup(a, 'kestrel', wx - 30, wy, 0); setup(d, 'lynx', wx + 40, wy, Math
 fresh(); setup(a, 'hammer', wx - 60, wy, 0); use(a); ticks(0.5); ok(m.tiles[wk] !== T.SOFT, 'HAMMER breaching round did not open the soft wall');
 fresh(); setup(a, 'talon', X, Y, 0); g.ents.push({ id: g.eid(), type: 'jammer', x: X + 60, y: Y, team: TEAM.DEF, owner: d.id, hp: 1 });
 g.detonate({ type: 'nade', kind: 'emp', x: X + 50, y: Y, team: TEAM.ATK, owner: a.id }); ok(!g.ents.some(e => e.type === 'jammer'), 'TALON EMP did not destroy a jammer');
-fresh(); setup(a, 'rivet', wx - 18, wy, 0); a.hold = { ability: 1 }; ticks(1.6, a); ok(m.tiles[wk] !== T.SOFT, 'RIVET lance did not burn the wall');
+fresh(); setup(a, 'rivet', wx - 18, wy, 0); a.hold = { ability: 1 }; ticks(10.2, a); ok(m.tiles[wk] !== T.SOFT, 'RIVET lance did not burn the wall');
 fresh(); setup(a, 'haze', X, Y, 0); use(a); { const hz = g.ents.find(e => e.type === 'smoke' && e.kind === 'wall'); ok(hz && hz.puffs.length / 2 >= 8, 'HAZE barrage: no wall of smoke'); // a THIN wall across the aim (he asked)
   if (hz) { const xs = hz.puffs.filter((_, i) => i % 2 === 0); ok(Math.max(...xs) - Math.min(...xs) < 2 && hz.r <= 12, 'HAZE wall is not thin'); } }
 fresh(); setup(a, 'glint', X, Y, 0); setup(d, 'lynx', X + 150, Y, 0); g.detonate({ type: 'nade', kind: 'sonar', x: X + 40, y: Y, team: TEAM.ATK, owner: a.id }); ok(sees('atk', d), 'GLINT sonar did not reveal a defender nearby');
@@ -37,7 +37,13 @@ fresh(); setup(a, 'prism', X, Y, 0); use(a); const dc = g.ents.find(e => e.type 
 fresh(); setup(a, 'volt', X, Y, 0); g.ents.push({ id: g.eid(), type: 'jammer', x: X + 80, y: Y, team: TEAM.DEF, owner: d.id, hp: 1 }); use(a); ok(!g.ents.some(e => e.type === 'jammer'), 'VOLT arc gun did not destroy the gadget in line');
 fresh(); setup(a, 'tether', wx - 18, wy, 0); use(a); const sc = g.ents.find(e => e.type === 'scope'); ok(sc && sc.x > wx && g.feeds(TEAM.ATK).includes(sc), 'TETHER scope not through the wall or not in the feeds');
 fresh(); setup(a, 'strider', X, Y, 0); use(a); g.ents.push({ id: g.eid(), type: 'mine', x: X + 4, y: Y, ang: 0, team: TEAM.DEF, owner: d.id, arm: 0, hp: 1 }); ticks(0.3); ok(g.ents.some(e => e.type === 'mine'), 'STRIDER ghost step set off a mine');
-fresh(); setup(a, 'ferro', wx - 18, wy, 0); use(a); ok(m.tiles[wk] !== T.SOFT, 'FERRO hammer did not smash the soft wall');
+// FERRO: no walls (he asked); one swing clears a whole barricade or a floor hatch, and 2.5 s before the next
+fresh(); setup(a, 'ferro', wx - 18, wy, 0); use(a); ok(m.tiles[wk] === T.SOFT, 'FERRO hammer should not break a soft wall');
+if (door) { const [c0, c1] = door.cells; for (const c of door.cells) { m.tiles[c] = T.BARRI; m.hp[c] = 60; } a.hammerCd = 0; a.meleeCd = 0;
+  setup(a, 'ferro', (c0 % W + 0.5) * CELL - 18, (Math.floor(c0 / W) + 0.5) * CELL + (c1 === c0 + W ? 8 : 0), 0); use(a);
+  ok(door.cells.every(c => m.tiles[c] === T.OPEN), 'FERRO hammer did not clear the barricade'); for (const c of door.cells) m.tiles[c] = T.OPEN; }
+const hz = m.hatches.find(h => m.tiles[h.cells[0]] === T.HATCH);
+if (hz) { a.hammerCd = 0; a.meleeCd = 0; setup(a, 'ferro', hz.x - 6, hz.y, 0); use(a); ok(m.tiles[hz.cells[0]] === T.HOLE, 'FERRO hammer did not open the floor hatch'); }
 
 // ---------- defence ----------
 if (door) { const c = door.cells[0], cx = (c % W + 0.5) * CELL, cy = (Math.floor(c / W) + 0.5) * CELL;

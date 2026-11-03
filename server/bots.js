@@ -349,9 +349,11 @@ const BREACH_TOOLS = {
   cutter: { types: [T.REINF, T.SOFT], use: 'ability', back: 6 },
   lance: { types: [T.REINF, T.SOFT], use: 'hold', back: 0 },
   cluster: { types: [T.SOFT], use: 'ability', back: 4 },
-  hammer: { types: [T.SOFT], use: 'swing', back: 0 },
   scope: { types: [T.SOFT], use: 'ability', back: 0 },
   slug: { types: [T.SOFT], use: 'ability', back: 0 },
+  sticky: { types: [T.SOFT], use: 'ability', back: 2.5, blow: true }, // SALVO: stick a round, step back, set it off
+  saw: { types: [T.SOFT], use: 'ability', back: 0 }, // TORQUE: a see-through slit onto the site
+  // (FERRO's hammer can't break walls: he swings at barricades, braces and hatches instead, in botAbility)
   breach: { types: [T.SOFT], use: 'gadget', back: 3.5 },
 };
 function breachTool(p) {
@@ -759,6 +761,10 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
     const f = game.facingCell(p, abId === 'dash' ? 40 : 28);
     if (f && f.t === T.BARRI && !enemy && ok()) { useAbility(); done(3); }
     else if (abId === 'dash' && enemy && d < 90 && ok() && Math.random() < dt * 2) { useAbility(); done(5); } // close the gap
+  } else if (abId === 'hammer') { // FERRO: one swing through a board, brace or shield in the way, or at someone in reach
+    const f = game.facingCell(p, 28);
+    if (f && [T.BARRI, T.BEAM, T.DSHIELD].includes(f.t) && !enemy && p.meleeCd <= 0) game.event(p, { k: 'ability' });
+    else if (enemy && d < 28 && p.meleeCd <= 0) { aimAt(p, enemy.x, enemy.y); game.event(p, { k: 'ability' }); }
   } else if (abId === 'flare') { // BLAZE: into the room the defenders are heard in, before going in
     if (!enemy && heard && ok()) { const h = ai.heard, hd = Math.hypot(h.x - p.x, h.y - p.y);
       if (hd > 90 && hd < 300 && floorAt(game.map, h.x, h.y) === floorAt(game.map, p.x, p.y) && Math.random() < dt * 0.8) { aimAt(p, h.x, h.y); useAbility(); done(8); } }
@@ -821,6 +827,7 @@ function intelOf(game) {
 function doBreach(game, p, inp, b, dt) {
   const map = game.map, ai = p.ai, tool = BREACH_TOOLS[b.tool];
   if (b.backUntil) { // charge placed: wait a few steps back from it
+    if (tool.blow && !b.blown && game.time > b.backUntil - 0.6) { b.blown = true; game.event(p, { k: 'ability' }); } // SALVO: now set it off
     if (game.time > b.backUntil) return 'done';
     const away = { x: b.sx - (b.wx - b.sx) * 3, y: b.sy - (b.wy - b.sy) * 3 };
     if (Math.hypot(away.x - p.x, away.y - p.y) > 8) moveTo(game, p, inp, away, dt);
@@ -832,7 +839,6 @@ function doBreach(game, p, inp, b, dt) {
   if (Math.hypot(b.sx - p.x, b.sy - p.y) > 6) { b.t = (b.t || 0) + dt; if (b.t > 25) return 'done'; return moveTo(game, p, inp, { x: b.sx, y: b.sy }, dt); }
   p.aim = Math.atan2(b.wy - p.y, b.wx - p.x);
   if (tool.use === 'hold') { inp.ability = 1; b.held = (b.held || 0) + dt; return b.held > 4.5 || p.battery <= 0 ? 'done' : 'wait'; }
-  if (tool.use === 'swing') { if (p.meleeCd <= 0) game.event(p, { k: 'ability' }); return 'wait'; } // FERRO's hammer never runs out; done once the wall is open
   const before = tool.use === 'gadget' ? p.gadgetCount : p.abilityCount;
   game.event(p, { k: tool.use });
   const after = tool.use === 'gadget' ? p.gadgetCount : p.abilityCount;
@@ -1198,6 +1204,7 @@ function proCall(game, squad, text) { // the leader (or whoever is left) says it
   (game.proLog || (game.proLog = [])).push({ round: game.round, squad, team: PRO_TEAMS[squad].tag, text });
   if (who) { who.saidT = game.time; game.chat(who, { text: text.slice(0, 140), team: true }); }
 }
+const HARD_BREACH = ['ember', 'rivet'];
 export function proPickOp(game, p) {
   const side = proSide(game, p), pl = p.pro.pl, st = proPlan(game, p.squad, side), job = pl.jobs[side], j = st.plan && st.plan.jobs[job];
   // he asked: a wider variety of operators. Every operator of their job is in reach: their own favourites count double, what
@@ -1206,7 +1213,8 @@ export function proPickOp(game, p) {
   const weigh = o => (pl.pool[side].includes(o) ? 2 : 1) * opWeight(game.map.id, side, o) ** 2 * (o === lastOp ? 0.35 : 1);
   const draw = list => { const out = [], left = list.map(o => [o, weigh(o)]); while (left.length) { let r = Math.random() * left.reduce((a, b) => a + b[1], 0), i = 0; while (i < left.length - 1 && (r -= left[i][1]) > 0) i++; out.push(left.splice(i, 1)[0][0]); } return out; };
   let pool = game.proExplore || game.proAnyOp ? all.sort(() => Math.random() - 0.5) : draw(all); // practice / balance tests: any operator of their job
-  if (side === 'atk' && job === 'breach' && j) { const hard = o => ['ember', 'rivet'].includes(o) ? 1 : 0; pool.sort((a, b) => j.hatch ? hard(a) - hard(b) : hard(b) - hard(a)); } // a hard breacher for a reinforced wall, a soft one for a hatch
+  if (side === 'atk' && job === 'breach' && j && j.breach != null && !(game.proExplore && Math.random() < 0.5)) pool = draw(pool.filter(o => HARD_BREACH.includes(o))).concat(pool.filter(o => !HARD_BREACH.includes(o))); // the plan opens a wall: a hard breacher, in case it is reinforced
+  else if (side === 'atk' && job === 'breach' && j && j.hatch && !game.proExplore) pool.sort((a, b) => HARD_BREACH.includes(a) - HARD_BREACH.includes(b)); // a hatch: a soft one
   for (const op of pool) { game.pickOp(p, op); if (p.op === op) break; }
   if (!p.op) return false;
   p.pro.lastOps[side] = p.op;
@@ -1335,7 +1343,7 @@ function proAct(game, p, inp, dt, team) {
     if (dropped) { const mates = [...game.players.values()].filter(q => q.alive && !q.downed && q.squad === p.squad); const nearest = mates.sort((a, b) => Math.hypot(a.x - dropped.x, a.y - dropped.y) - Math.hypot(b.x - dropped.x, b.y - dropped.y))[0]; if (nearest === p) return false; } // the closest one fetches a dropped defuser
     const go = st.go + (j.delay || 0) + (TIMING[name] || 0);
     if (j.breach != null && !ai.breachDone && el >= st.go - 7) { // open the wall just before the push
-      if (ai.breachB === undefined) ai.breachB = breachAt(game, p, j.breach);
+      if (ai.breachB === undefined) { ai.breachB = breachAt(game, p, j.breach); const tool = breachTool(p); if (!ai.breachB && tool && !BREACH_TOOLS[tool].types.includes(T.REINF)) { ai.breachB = planBreach(game, p, tool); if (ai.breachB) ai.breachB.tool = tool; } }
       if (ai.breachB) { const r = doBreach(game, p, inp, ai.breachB, dt); if (r !== 'done') return true; }
       ai.breachDone = true;
     }
