@@ -118,7 +118,7 @@ function draw(el) {
   c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#0b0e12'; c.fillRect(0, 0, cv.width, cv.height);
   c.setTransform(z, 0, 0, z, ox, oy);
   c.imageSmoothingQuality = 'high';
-  c.drawImage(R.c, F.gx * CELL * k, 0, F.w * CELL * k, F.h * CELL * k, F.gx * CELL, 0, F.w * CELL, F.h * CELL);
+  R.c.drawTo(c, F.gx * CELL * k, 0, F.w * CELL * k, F.h * CELL * k, F.gx * CELL, 0, F.w * CELL, F.h * CELL);
   const px = 1 / z * d; // one screen pixel (scaled for the screen) in world units
   const txt = (s, x, y, size, col, bold = 700) => {
     c.font = `${bold} ${size * px}px Barlow Condensed, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';

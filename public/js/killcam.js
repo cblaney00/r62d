@@ -66,7 +66,7 @@ function frame() {
   c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#07090c'; c.fillRect(0, 0, W, H);
   c.setTransform(z, 0, 0, z, W / 2 - cx * z, H / 2 - cy * z);
   const k = rend.c.width / rend.Wp, vx0 = cx - W / 2 / z, vy0 = cy - H / 2 / z, vw = W / z, vh = H / z;
-  c.drawImage(rend.c, Math.max(0, vx0 * k), Math.max(0, vy0 * k), vw * k, vh * k, Math.max(0, vx0), Math.max(0, vy0), vw, vh);
+  rend.c.drawTo(c, Math.max(0, vx0 * k), Math.max(0, vy0 * k), vw * k, vh * k, Math.max(0, vx0), Math.max(0, vy0), vw, vh);
   // what this person could see: everything else dimmed
   const pts = visionPoly(map, focus.x, focus.y, focus.aim, FOV, 900, [], 220);
   c.save(); c.beginPath(); c.rect(vx0, vy0, vw, vh);

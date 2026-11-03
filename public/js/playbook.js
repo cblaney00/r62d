@@ -128,7 +128,7 @@ function draw(el) {
   const W = F.w * CELL, H = F.h * CELL, z = Math.min(cv.width / W, cv.height / H) * 0.97, ox = (cv.width - W * z) / 2 - F.gx * CELL * z, oy = (cv.height - H * z) / 2;
   const R = S.rend, k = R.c.width / R.Wp, px = d / z;
   c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#0b0e12'; c.fillRect(0, 0, cv.width, cv.height);
-  c.setTransform(z, 0, 0, z, ox, oy); c.drawImage(R.c, F.gx * CELL * k, 0, F.w * CELL * k, F.h * CELL * k, F.gx * CELL, 0, W, H);
+  c.setTransform(z, 0, 0, z, ox, oy); R.c.drawTo(c, F.gx * CELL * k, 0, F.w * CELL * k, F.h * CELL * k, F.gx * CELL, 0, W, H);
   c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(F.gx * CELL, 0, W, H);
   for (const name of site.rooms) for (const r of m.rooms) if (r.name === name) { c.fillStyle = 'rgba(242,193,78,0.18)'; c.fillRect(r.x * CELL, r.y * CELL, r.w * CELL, r.h * CELL); c.strokeStyle = '#f2c14e'; c.lineWidth = 2 * px; c.strokeRect(r.x * CELL, r.y * CELL, r.w * CELL, r.h * CELL); }
   const txt = (s, x, y, col, size = 13) => { c.font = `700 ${size * px}px Barlow Condensed, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3 * px; c.strokeStyle = 'rgba(0,0,0,0.9)'; c.strokeText(s, x, y); c.fillStyle = col; c.fillText(s, x, y); };

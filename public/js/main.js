@@ -1881,7 +1881,7 @@ function draw(s, view, now, dt) {
     fctx.setTransform(TA * fk, TB * fk, TC * fk, TD * fk, ox * fk, oy * fk);
     // the dull grey remembered map
     const G = st.rend.G;
-    if (wx1 > wx0 && wy1 > wy0) fctx.drawImage(st.rend.grey, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
+    if (wx1 > wx0 && wy1 > wy0) st.rend.grey.drawTo(fctx, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
     // cut out everything your team can see right now
     fctx.globalCompositeOperation = 'destination-out';
     for (const v of st.viewers) {
@@ -2531,12 +2531,12 @@ function drawStairView(s, me, now) {
   const D = PIP_R * 1.5, x0 = Math.max(fx0, cx - D), x1 = Math.min(fx1, cx + D), y0 = Math.max(0, cy - D), y1 = Math.min(fy1, cy + D);
   if (x1 <= x0 || y1 <= y0) return;
   c.save(); c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip(); // only this floor
-  c.drawImage(R.grey, x0 * R.G, y0 * R.G, (x1 - x0) * R.G, (y1 - y0) * R.G, x0, y0, x1 - x0, y1 - y0); // remembered
+  R.grey.drawTo(c, x0 * R.G, y0 * R.G, (x1 - x0) * R.G, (y1 - y0) * R.G, x0, y0, x1 - x0, y1 - y0); // remembered
   c.save(); c.beginPath(); // what the landing can see right now, in colour
   const poly = visionPolygon(pv, sm, 160), near = nearPolygon(pv, sm);
   for (const pts of [poly, near]) { c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.closePath(); }
   c.clip('nonzero');
-  c.drawImage(R.c, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0);
+  R.c.drawTo(c, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0);
   c.restore();
   // people and gadgets there: your team always, the other side only where your team can see them
   const side = me.tm, inBox = (x, y) => x >= x0 && x < x1 && y >= y0 && y < y1;
