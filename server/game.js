@@ -4,7 +4,7 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatch
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
-import { botThink, botPickOp, botPrep, assignPros, proSay, tvTalk, tvBanPick } from './bots.js';
+import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, pttAsk, tvTalk, tvBanPick } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
@@ -208,7 +208,8 @@ export class Game {
       }
     }
     else if (m.t === 'settings') store.setSettings(p.token, m.s);
-    else if (m.t === 'chat') this.chat(p, m);
+    else if (m.t === 'chat') this.chat(p, { text: m.text, team: m.team });
+    else if (m.t === 'ptt') pttAsk(this, p, String(m.intent));
     else if (m.t === 'loadout') {
       const l = store.setLoadout(p.token, m.op, m.l);
       const prof = store.byToken(p.token);
@@ -1177,8 +1178,9 @@ export class Game {
     if (src && src !== q && this.side(src) !== this.side(q)) { // what the pros say about it: the one who died says who and where, the one who got the kill says so
       const nm = o => OPERATORS[o.op] ? OPERATORS[o.op].name[0] + OPERATORS[o.op].name.slice(1).toLowerCase() : 'someone', rm = (x, y) => (roomAt(this.map, x, y) || 'outside').replace(/^\dF /, '');
       const left = [...this.players.values()].filter(o => o.alive && o !== q && this.side(o) === this.side(q)).length;
-      if (q.pro) proSay(this, q, `Dead. ${nm(src)} got me from ${rm(src.x, src.y)}`, null, true);
-      if (src.pro) proSay(this, src, `Got ${nm(q)}${left === 1 ? ', one left' : left === 0 ? '' : ''}`, 'kill' + q.id, true);
+      talk(this, q, 'dead', { op: nm(src), place: rm(src.x, src.y) });
+      talk(this, src, left === 1 ? 'gotLast' : 'got', { op: nm(q) }, 'kill' + q.id);
+      kindWords(this, q, src);
     }
     q.alive = false; q.downed = false; q.hp = 0; q.deaths++; q.busy = null; q.scanning = false; q.bracing = false;
     if (q.ctrl !== 'body') q.ctrl = 'body';
@@ -2686,7 +2688,7 @@ export class Game {
     if (p.chatTimes.length >= 5) return;
     p.chatTimes.push(now);
     const team = !!m.team;
-    const msg = JSON.stringify({ t: 'chat', from: p.id, name: p.name, text, team, squad: p.squad, dead: !p.alive && this.phase === PHASE.ACTION });
+    const msg = JSON.stringify({ t: 'chat', from: p.id, name: p.name, text, team, squad: p.squad, dead: !p.alive && this.phase === PHASE.ACTION, vo: m.vo });
     for (const q of this.players.values()) if (q.sock && q.sock.open && (!team || q.squad === p.squad)) q.sock.send(msg);
     if (this.tv) for (const sk of this.tv.socks) if (sk.open) sk.send(msg); // TV viewers hear both teams' calls
   }

@@ -23,7 +23,7 @@ const FIND_PORT = 6264; // JOIN in the program asks the network "R62D?" on this 
 // the git commit when run from his project folder, otherwise R62D_VERSION if the packaged app sets it.
 let VERSION = { id: process.env.R62D_VERSION || 'packaged', date: '' };
 execFile('git', ['-C', ROOT, 'log', '-1', '--format=%h|%cs'], (err, out) => { if (!err && out.trim()) { const [id, date] = out.trim().split('|'); VERSION = { id, date }; } });
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.ogg': 'audio/ogg', '.wasm': 'application/wasm', '.tar.gz': 'application/gzip', '.gz': 'application/gzip' };
 
 const server = http.createServer((req, res) => {
   if (req.url.startsWith('/api/')) return api(req, res);

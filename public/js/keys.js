@@ -22,6 +22,7 @@ export const ACTIONS = [
   ['vault', 'Jump (onto furniture) — vaults windows and wall stubs', 'Space', ''],
   ['spot', 'Ping what is under your aim (enemy, gadget, wall, door, place)', 'KeyT', ''],
   ['chat', 'Chat (opens team chat; / switches team ⇄ all)', 'KeyY', 'Enter'],
+  ['ptt', 'Push to talk to the bots (hold)', 'KeyH', ''],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['opNext', 'Free play: next operator', 'KeyN', ''],
   ['opPrev', 'Free play: previous operator', 'KeyB', ''],

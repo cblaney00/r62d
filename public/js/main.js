@@ -1,6 +1,8 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
+import * as voice from './voice.js';
+import { pttDown, pttUp, pttSetState, pttTest } from './ptt.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
@@ -655,6 +657,7 @@ function pressAction(a, e) {
     case 'settings': toggleSettings(); break;
     case 'pause': escape(); break;
     case 'spot': st.spotReq = true; break;
+    case 'ptt': if (st.id && !st.tv && !st.tut) pttDown(); break;
     case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
     case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
@@ -715,7 +718,13 @@ function pollPad(dt, view) {
 addEventListener('keyup', e => {
   if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault(); // stop Firefox's menu bar popping up
   const a = actionFor(e.code); if (a) keys.delete(a);
+  if (a === 'ptt') pttUp((text, intent) => { // what it heard shows to the team, then a bot answers
+    if (text && text !== '[unk]') { send({ t: 'chat', text, team: true }); if (intent) send({ t: 'ptt', intent }); }
+    else pttMsg('DIDN\'T CATCH THAT', 1500);
+  });
 });
+function pttMsg(text, ms) { const el = $('pttInd'); el.textContent = text; el.classList.remove('hidden'); clearTimeout(el._t); if (ms) el._t = setTimeout(() => el.classList.add('hidden'), ms); }
+pttSetState(k => { if (k === 'on') pttMsg('🎤 LISTENING'); else if (k === 'loading') pttMsg('🎤 STARTING MICROPHONE…'); else if (k === 'nomic') pttMsg('NO MICROPHONE HERE (OR THE BROWSER REFUSED IT)', 4000); else $('pttInd').classList.add('hidden'); });
 addEventListener('blur', () => { keys.clear(); mouse.l = mouse.r = false; });
 cv.addEventListener('mousemove', e => {
   mouseT = performance.now();
@@ -811,7 +820,7 @@ $('setReset').onclick = () => { resetBinds(); renderSettings(); };
 for (const [id, name] of PRESETS) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => { audio.ui(); applyPreset(id); renderSettings(); }; $('keyPresets').appendChild(b); }
 const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'walk', 'crouch', 'prone', 'vault', 'leanL', 'leanR']],
   ['FIGHTING', ['primary', 'secondary', 'melee', 'reload', 'ability', 'gadget', 'interact']],
-  ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'chat', 'scoreboard']],
+  ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'chat', 'ptt', 'scoreboard']],
   ['MENUS & FREE PLAY', ['settings', 'pause', 'opNext', 'opPrev', 'opGrid']]];
 // crosshair: chosen in Settings, saved in your profile
 let xh = (() => { try { return cleanXhair(JSON.parse(localStorage.getItem('r62d-xh') || 'null')); } catch { return cleanXhair(); } })();
@@ -851,9 +860,35 @@ renderGfx();
 $('setClose').onclick = () => toggleSettings();
 $('setBtn').onclick = () => toggleSettings();
 $('lobbySetBtn').onclick = () => toggleSettings();
+// The TV's wide shot of a floor. The director's opening shot: the objective and whoever is near it. Your own map key
+// (M): the whole building. Both leave out the open ground round it.
+function tvBuildingBox(fi) {
+  const M = st.map, c = M._tvBox || (M._tvBox = {});
+  if (c[fi]) return c[fi];
+  const F = M.floors[fi]; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let y = 0; y < F.h; y++) for (let x = F.gx; x < F.gx + F.w; x++) {
+    const t = M.tiles[y * M.W + x]; if (t === T.GROUND || t === T.VOID) continue;
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return (c[fi] = x0 === Infinity ? { x0: F.gx * CELL, y0: 0, x1: (F.gx + F.w) * CELL, y1: F.h * CELL } : { x0: x0 * CELL, y0: y0 * CELL, x1: (x1 + 1) * CELL, y1: (y1 + 1) * CELL });
+}
+function tvShotBox(fi, s, site) {
+  const build = tvBuildingBox(fi);
+  if (!st.tv.ovUntil) return build;
+  const now = performance.now() / 1000, had = st.tv.shotBox;
+  if (had && had.f === fi && now < had.t) return had.b; // steady: looked at again twice a second
+  const pts = site.bombs.map(b => [b.x, b.y]), bx = site.bombs[0].x, by = site.bombs[0].y;
+  for (const p of s.players) if (p.a && p.x !== undefined && floorAt(st.map, p.x, p.y) === fi && Math.hypot(p.x - bx, p.y - by) < 26 * CELL) pts.push([p.x, p.y]);
+  const pad = 4 * CELL, minH = 620, minW = minH * 16 / 9;
+  let x0 = Math.min(...pts.map(q => q[0])) - pad, x1 = Math.max(...pts.map(q => q[0])) + pad, y0 = Math.min(...pts.map(q => q[1])) - pad, y1 = Math.max(...pts.map(q => q[1])) + pad;
+  if (x1 - x0 < minW) { const c = (x0 + x1) / 2; x0 = c - minW / 2; x1 = c + minW / 2; }
+  if (y1 - y0 < minH) { const c = (y0 + y1) / 2; y0 = c - minH / 2; y1 = c + minH / 2; }
+  const b = { x0, y0, x1, y1 }; st.tv.shotBox = { f: fi, t: now + 0.5, b };
+  return b;
+}
 // Volume sliders follow loudness, not raw gain: each step is 0.5 dB, so the whole slider spans 50 dB (audio.sliderGain).
 // He asked for a quieter start: the default master (70) is about a third as loud as full.
-const VOL_DEF = { volMaster: 70, volSfx: 100, volMusic: 88 };
+const VOL_DEF = { volMaster: 70, volSfx: 100, volMusic: 88, volVoice: 88, volCaster: 88, volTeamL: 88, volTeamR: 88 };
 // a slider saved before the curve was straight gain: convert it, and never come back louder than the new default
 const fromOld = (k, v) => Math.min(VOL_DEF[k], v <= 0 ? 0 : Math.max(0, Math.round(100 + 40 * Math.log10(v / 100))));
 const saveVol = () => { try { localStorage.setItem('r62d-vol2', JSON.stringify([+$('volMaster').value, +$('volSfx').value])); } catch {} };
@@ -1396,10 +1431,10 @@ function frame(nowMs) {
       if (isTouch) { const hw = vh * VW / VH * 0.16, hh = vh * 0.12; lvx = Math.max(-hw, Math.min(hw, lvx)); lvy = Math.max(-hh, Math.min(hh, lvy)); } // phone: you stay near the middle, clear of thumbs and panels
       cx += lvx; cy += lvy;
     }
-  } else if (st.tv && inGame) { // TV overview: the whole floor of the objective
-    const site = st.map.sites[s.site], fi = Math.max(0, floorAt(st.map, site.bombs[0].x, site.bombs[0].y)), F = st.map.floors[fi];
-    st.tvOv = { f: fi, h: Math.max(F.h * CELL, F.w * CELL * VH / VW) * 1.04 };
-    cx = (F.gx + F.w / 2) * CELL; cy = F.h * CELL / 2;
+  } else if (st.tv && inGame) { // TV overview (he asked: it was mostly empty ground): framed on the building, not the whole floor
+    const site = st.map.sites[s.site], fi = Math.max(0, floorAt(st.map, site.bombs[0].x, site.bombs[0].y)), B = tvShotBox(fi, s, site);
+    st.tvOv = { f: fi, h: Math.max(B.y1 - B.y0, (B.x1 - B.x0) * VH / VW) * 1.08 };
+    cx = (B.x0 + B.x1) / 2; cy = (B.y0 + B.y1) / 2;
   } else { // menus: slow drift over the map
     cx = st.map.W * CELL / 2 + Math.cos(now * 0.05) * 300; cy = st.map.H * CELL / 2 + Math.sin(now * 0.07) * 160;
   }
@@ -1436,7 +1471,7 @@ function frame(nowMs) {
       // the screen must hold you and that far point: its reach along your aim is viewH * e (e from the screen's shape)
       const cA = Math.abs(Math.cos(view.ang)), sA = Math.abs(Math.sin(view.ang));
       const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), m1 = 70, m2 = 40;
-      want = Math.max(want, Math.min(680, (st.farS + m1 + m2) / (2 * e)));
+      want = Math.max(want, Math.min(st.tv ? 520 : 680, (st.farS + m1 + m2) / (2 * e))); // (TV: staring out over a yard shouldn't make a wide, empty shot)
       const reach = (st.viewH || want) * e; // how far the screen reaches from its middle along your aim, right now
       st.sightLead = Math.max(0, Math.min(reach - m1, st.farS - (reach - m2)));
     } else st.sightLead = 0;
@@ -2991,13 +3026,13 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { pttTest, PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
   try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode };
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, volVoice: +$('volVoice').value, volCaster: +$('volCaster').value, volTeamL: +$('volTeamL').value, volTeamR: +$('volTeamR').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode };
 }
 let saveTimer = 0;
 function saveSettings() {
@@ -3006,7 +3041,7 @@ function saveSettings() {
 }
 function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
-  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
+  for (const k of ['volMaster', 'volSfx', 'volMusic', 'volVoice', 'volCaster', 'volTeamL', 'volTeamR', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.xh) setXhair(s.xh, false);
   if (s.lean) setLean(s.lean, false);
@@ -3017,7 +3052,8 @@ function applySettings(s) {
   renderSettings(); renderControls();
 }
 onBindsChange(() => saveSettings());
-for (const id of ['volMaster', 'volSfx', 'volMusic']) $(id).addEventListener('change', saveSettings);
+for (const id of ['volMaster', 'volSfx', 'volMusic', 'volVoice', 'volCaster', 'volTeamL', 'volTeamR']) $(id).addEventListener('change', saveSettings);
+setInterval(() => { if (st.tv) syncTvVols(); }, 1000);
 
 // ---------------- captured mouse & sensitivity ----------------
 function playing() { const p = st.last && st.last.ph; return !!st.id && (p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END); }
@@ -3103,7 +3139,42 @@ function chatKey(e) {
     closeChat();
   }
 }
+// who is talking out loud: on TV only the team the camera is on (he chose); in a match your bot teammates
+function hearChat(m) {
+  if (st.tv) { if (st.me && m.squad === st.me.sq) voice.sayVoice('team', 'team' + m.squad, m.vo.v, m.vo.parts); return; }
+  if (m.from === st.id) return;
+  const ch = 'bot:' + m.name; voice.setVoiceGain(ch, voice.sliderGain(+$('volVoice').value) * voice.sliderGain(botVol(m.name)));
+  voice.sayVoice('team', ch, m.vo.v, m.vo.parts);
+}
+function botVol(name) { try { const v = JSON.parse(localStorage.getItem('r62d-botvol') || '{}')[name]; return typeof v === 'number' ? v : 100; } catch { return 100; } }
+function setBotVol(name, v) { try { const a = JSON.parse(localStorage.getItem('r62d-botvol') || '{}'); a[name] = v; localStorage.setItem('r62d-botvol', JSON.stringify(a)); } catch {} }
+// Esc in a match: a slider for each bot on your team, so one who annoys you can be turned down (he asked). Kept per name.
+function fillPauseVoices() {
+  const el = $('pVoices'); if (!el) return;
+  const snap = st.snaps.length ? st.snaps[st.snaps.length - 1] : null, me = st.me;
+  const bots = !st.tv && snap && me ? [...snap.players.values()].filter(p => p.sq === me.sq && p.id !== st.id && /^\[\w+\] /.test(p.n || '')) : [];
+  el.classList.toggle('hidden', !bots.length);
+  el.innerHTML = bots.length ? '<h3>TEAMMATE VOICES</h3>' : '';
+  for (const p of bots) {
+    const d = document.createElement('label'); d.className = 'pVoice'; d.innerHTML = '<span></span><input type="range" min="0" max="100">';
+    d.firstChild.textContent = p.n.replace(/^\[\w+\] /, ''); const r = d.lastChild; r.value = botVol(p.n);
+    r.oninput = () => setBotVol(p.n, +r.value);
+    el.appendChild(d);
+  }
+}
+new MutationObserver(() => { if (!$('pause').classList.contains('hidden')) fillPauseVoices(); }).observe($('pause'), { attributes: true, attributeFilter: ['class'] });
+// the voice sliders: Settings → Sound, and the same three on the TV screen (he asked: usable with your cursor)
+const VOICE_VOLS = [['volCaster', 'caster'], ['volTeamL', 'team0'], ['volTeamR', 'team1']];
+function applyVoiceVols() { for (const [id, ch] of VOICE_VOLS) voice.setVoiceGain(ch, voice.sliderGain(+$(id).value)); }
+for (const [id] of VOICE_VOLS) {
+  const tv = $('tv' + id); $(id).addEventListener('input', () => { tv.value = $(id).value; applyVoiceVols(); });
+  tv.oninput = () => { $(id).value = tv.value; applyVoiceVols(); }; tv.onchange = () => saveSettings();
+  tv.addEventListener('mousedown', e => e.stopPropagation());
+}
+addEventListener('mousemove', () => { if (!st.tv) return; const el = $('tvVoice'); el.classList.add('on'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('on'), 4000); });
+function syncTvVols() { for (const [id] of VOICE_VOLS) $('tv' + id).value = $(id).value; applyVoiceVols(); }
 function addChat(m) {
+  if (m.vo) hearChat(m);
   if (st.tv && m.from) (st.tvSay || (st.tvSay = new Map())).set(m.from, { text: m.text, t: performance.now() / 1000 }); // spoken from the character (he asked)
   if (st.tv && m.squad !== undefined) { // ESPORTS TV: the team's comms, live, under that team's player cards
     const el = $(m.squad ? 'tvCommsR' : 'tvCommsL'); if (!el) return;

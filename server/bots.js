@@ -10,6 +10,7 @@ import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowVie
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel } from '../shared/pros.js';
 import { planWeight, opWeight } from './training.js';
+import { compose, LINES, FUN, PRO_VOICE, BOT_VOICES, WAYS } from '../shared/comms.js';
 
 // Per skill level. react: seconds before the first shot at someone who surprised them (plus up to reactX more);
 // expect: the same when they were already listening for that enemy. turn: how fast they swing their aim (radians/s).
@@ -677,9 +678,10 @@ export function botThink(game, p, dt) {
     ai.spotT[id] = game.time; ai.heard = { x: q.x, y: q.y, t: game.time }; break;
   }
   const heardRecently = ai.heard && game.time - ai.heard.t < 4;
-  if (p.pro && heardRecently && ai.heard.t !== ai.heardSaid && game.phase === PHASE.ACTION && Math.random() < 0.1) { ai.heardSaid = ai.heard.t;
-    const up = floorAt(map, ai.heard.x, ai.heard.y) !== floorAt(map, p.x, p.y); proSay(game, p, up ? 'Hearing them on another floor' : `Footsteps, ${place(game, ai.heard.x, ai.heard.y)}`, 'hear' + place(game, ai.heard.x, ai.heard.y)); }
-  if (p.pro && p.alive && !p.downed && p.hp < p.maxHp * 0.3 && !ai.lowSaid) { ai.lowSaid = true; proSay(game, p, "I'm one shot", null, true); }
+  if (heardRecently && ai.heard.t !== ai.heardSaid && game.phase === PHASE.ACTION && Math.random() < 0.1) { ai.heardSaid = ai.heard.t;
+    const up = floorAt(map, ai.heard.x, ai.heard.y) !== floorAt(map, p.x, p.y); if (up) talk(game, p, 'heardFloor', {}, 'hearUp'); else talk(game, p, 'heard', { place: place(game, ai.heard.x, ai.heard.y) }, 'hear' + place(game, ai.heard.x, ai.heard.y)); }
+  if (heardRecently && action0(game) && p.alive && !p.downed && game.time - ai.heard.t < 2 && floorAt(map, ai.heard.x, ai.heard.y) === floorAt(map, p.x, p.y) && Math.hypot(ai.heard.x - p.x, ai.heard.y - p.y) < 7 * PX_PER_M) listenUp(game, p);
+  if (p.alive && !p.downed && p.hp < p.maxHp * 0.3 && !ai.lowSaid) { ai.lowSaid = true; talk(game, p, 'low'); }
 
   // --- held abilities: let go unless something below holds them again ---
   if (abId === 'shroud') { const want = heardRecently && p.battery > 1.5 && !p.downed; inp.ability = want !== !!p.shrouded && !(p.prevInput && p.prevInput.ability) ? 1 : 0; } // go dark while enemies are close by (a toggle: press to switch)
@@ -719,8 +721,8 @@ export function botThink(game, p, dt) {
     // call it out to the team once they've taken it in (a ping with the operator's name and the room)
     if (!ai.called && ai.react > -0.1) {
       ai.called = true; game.spot(team, enemy.id, 3);
-      if (p.pro) { const near = [...game.players.values()].filter(q => q.alive && game.side(q) !== team && Math.hypot(q.x - enemy.x, q.y - enemy.y) < 120).length;
-        proSay(game, p, `${opName(enemy)}, ${place(game, enemy.x, enemy.y)}${near > 1 ? `, ${near} of them` : ''}${enemy.hp < enemy.maxHp * 0.4 ? ', he is hurt' : ''}`, 'see' + enemy.id); }
+      { const near = [...game.players.values()].filter(q => q.alive && game.side(q) !== team && Math.hypot(q.x - enemy.x, q.y - enemy.y) < 120).length;
+        talk(game, p, near > 1 ? 'seeMany' : enemy.hp < enemy.maxHp * 0.4 ? 'seeLow' : 'see', { op: opName(enemy), place: place(game, enemy.x, enemy.y) }, 'see' + enemy.id); }
       if (([...game.players.values()].some(q => !q.bot && q.squad === p.squad) || (game.tv && !p.pro)) && game.markOk(p)) game.mark(p, enemy.x, enemy.y, 'ENEMY ' + OPERATORS[enemy.op].name, enemy.id); // he asked: most ranks ping rather than talk
     }
     if (gun && gun.ammo === 0) { game.startReload(p); if (d < 120 && p.guns[1] && p.slot === 0 && gun.reserve >= 0) game.event(p, { k: 'slot', n: 1 }); }
@@ -831,6 +833,7 @@ export function botThink(game, p, dt) {
   if (action && !game.planted && !p.pro) impatience(game, p, team, site, me);
 
   // --- a pro's part of the team plan ---
+  if (ai.cmd && botCmd(game, p, inp, dt)) return; // a person on the team asked for something
   if (p.pro && (action || game.phase === PHASE.PREP) && proAct(game, p, inp, dt, team)) return;
 
   // --- objective ---
@@ -864,7 +867,7 @@ export function botThink(game, p, dt) {
       goal = ai.hold || (ai.hold = nearBomb(game, site, 70));
     }
   }
-  if (act) { if (p.pro && !ai.actSaid) { ai.actSaid = true; proSay(game, p, act === 'plant' ? `Planting ${(ai.bomb || {}).id || ''}, cover me` : 'Defusing, cover me!', act, true); } inp.interact = 1; inp.crouch = 1; return; }
+  if (act) { if (!ai.actSaid) { ai.actSaid = true; talk(game, p, act === 'plant' ? 'plant' : 'defuse', {}, act); } inp.interact = 1; inp.crouch = 1; return; }
   if (!goal) return;
   const toGoal = Math.hypot(goal.x - p.x, goal.y - p.y);
 
@@ -1042,8 +1045,8 @@ function botCams(game, p, dt) {
     if (Math.abs(angDiff(Math.atan2(q.y - c.y, q.x - c.x), c.ang || 0)) > 0.85 || !los(game.map, c.x, c.y, q.x, q.y, smokes)) continue;
     game.spot(team, q.id, 3);
     if (!(ai.camSaid || (ai.camSaid = new Set())).has(q.id + ':' + game.round)) { ai.camSaid.add(q.id + ':' + game.round);
-      if (p.pro) proSay(game, p, `Cam: ${opName(q)} in ${place(game, q.x, q.y)}`, 'see' + q.id);
-      else if (([...game.players.values()].some(o => !o.bot && o.squad === p.squad) || game.tv) && game.markOk(p)) game.mark(p, q.x, q.y, 'ENEMY ' + OPERATORS[q.op].name, q.id); }
+      talk(game, p, 'cam', { op: opName(q), place: place(game, q.x, q.y) }, 'see' + q.id);
+      if (!p.pro && ([...game.players.values()].some(o => !o.bot && o.squad === p.squad) || game.tv) && game.markOk(p)) game.mark(p, q.x, q.y, 'ENEMY ' + OPERATORS[q.op].name, q.id); }
   }
 }
 // the site's ways in, rooms beside it and the attackers' route (shared/pros.js), worked out once a round
@@ -1208,6 +1211,7 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
     }
   }
   setDir(inp, nx - p.x, ny - p.y);
+  if (teamHushed(game, p)) inp.walk = 1; // someone asked for quiet: don't stomp about either
   // stuck? nudge
   if (Math.hypot(p.x - (ai.lx || 0), p.y - (ai.ly || 0)) < 0.5) { ai.stuck = (ai.stuck || 0) + dt; if (ai.stuck > 1) { ai.path = null; ai.stuck = 0; } }
   else ai.stuck = 0;
@@ -1252,7 +1256,7 @@ function botDrone(game, p, dt) {
     if (!q.alive || game.side(q) === team || q.shrouded || Math.hypot(q.x - d.x, q.y - d.y) > 320 || !los(map, d.x, d.y, q.x, q.y, smokes)) continue;
     game.spot(team, q.id, 3);
     if (q.op === 'magpie') game.magpieSeen = { x: q.x, y: q.y, t: game.time, id: q.id };
-    if (p.pro && !(ai.dSaid || (ai.dSaid = new Set())).has(q.id)) { ai.dSaid.add(q.id); proSay(game, p, `Drone: ${opName(q)} in ${place(game, q.x, q.y)}`, 'see' + q.id); }
+    if (!(ai.dSaid || (ai.dSaid = new Set())).has(q.id)) { ai.dSaid.add(q.id); talk(game, p, 'drone', { op: opName(q), place: place(game, q.x, q.y) }, 'see' + q.id); }
     if (!(ai.dCalled || (ai.dCalled = new Set())).has(q.id) && [...game.players.values()].some(o => !o.bot && o.squad === p.squad) && game.markOk(p)) {
       ai.dCalled.add(q.id); game.mark(p, q.x, q.y, 'ENEMY ' + OPERATORS[q.op].name, q.id);
     }
@@ -1283,7 +1287,7 @@ function botDrone(game, p, dt) {
       }
       p.aim = ai.fleeA; setDir(inp, Math.cos(ai.fleeA), Math.sin(ai.fleeA));
       if (lvl >= 2) inp.walk = 1; // sprint
-      teamSay(game, p, 'Swarm on my drone, MAGPIE is close', 'sw' + sw.id);
+      talk(game, p, 'swarm', {}, 'sw' + sw.id);
       ai.dPath = null;
       return;
     }
@@ -1406,8 +1410,11 @@ const BIT_KEYS = Object.keys(BITS);
 const MID = ['one on the stairs I think', 'where\'s the bomb again?', 'nice shot!', 'sorry, my bad', 'I heard something', 'pushing!', 'someone help me', 'is anyone watching cams?', 'they\'re coming from… left? my left'];
 const HIGH = ['two in {room}', 'droning {room}, looks clear', 'I\'ll hold this angle', 'going in, follow me', 'heard steps above', 'one down, keep pushing', 'watch the window'];
 export function amateurComms(game, p, dt) {
-  if (!game.tv || p.pro || game.phase === PHASE.SELECT || game.phase === PHASE.LOBBY) return;
+  if (p.pro || game.phase === PHASE.SELECT || game.phase === PHASE.LOBBY) return;
   const lv = lvlOf(game, p), ai = p.ai || (p.ai = {});
+  if (!game.tv && lv > 1) return; // (in a match with people, only Copper and Bronze chat for the fun of it)
+  if (lv <= 1 && p.alive && (p.idleT = (p.idleT ?? (12 + Math.random() * 25)) - dt) <= 0) { p.idleT = 30 + Math.random() * 40; talk(game, p, 'idleFun'); }
+  if (!game.tv) return;
   p.chatT = (p.chatT ?? (6 + Math.random() * 12)) - dt; if (p.chatT > 0) return; // he asked: the bots talked too much
   let text;
   if (lv <= 1) { const bit = p.bit || (p.bit = BIT_KEYS[(+p.id.slice(1) * 7 + game.round) % BIT_KEYS.length]); const L = BITS[bit]; text = L[Math.floor(Math.random() * L.length)]; p.chatT = 20 + Math.random() * 20; }
@@ -1415,11 +1422,90 @@ export function amateurComms(game, p, dt) {
   else { text = HIGH[Math.floor(Math.random() * HIGH.length)].replace('{room}', place(game, p.x, p.y) || 'there'); p.chatT = 22 + Math.random() * 18; } // Diamond and up: the ones who talk about the objective
   game.chat(p, { text: text.slice(0, 140), team: true });
 }
+// ---- bots talking out loud (he asked: real voices, varied, not constantly; quiet when someone is clutching or listening;
+// someone can ask for quiet and the rest respect it; politer with rank, Copper and Bronze still funny) ----
+const action0 = game => game.phase === PHASE.ACTION;
+const talkTeam = (game, sq) => (game.proSaid || (game.proSaid = {}))[sq] || (game.proSaid[sq] = { keys: {}, last: 0 });
+export const voiceOf = p => (p.pro ? PRO_VOICE[p.pro.pl.name] : BOT_VOICES[(+String(p.id).slice(1) || 0) % BOT_VOICES.length]);
+const CONTACT = new Set(['see', 'seeMany', 'seeLow', 'got', 'gotLast', 'dead', 'low']);
+export const teamHushed = (game, p) => talkTeam(game, p.squad).hushUntil > game.time;
+// may this bot say this right now? (the same rule for the written line, so comms match what you hear)
+export function talkAllowed(game, p, cat) {
+  if (game.tut) return false;
+  const t = game.time, ts = talkTeam(game, p.squad);
+  if (action0(game)) {
+    const mates = [...game.players.values()].filter(q => q.squad === p.squad);
+    if (cat !== 'dead' && mates.length > 1 && mates.filter(q => q.alive && !q.downed).length === 1) return false; // someone is clutching: nobody says a word
+    if (!p.alive && cat !== 'dead') return false; // the dead give their last call, then let people play
+    if (ts.hushUntil > t && !CONTACT.has(cat)) return false; // someone asked for quiet: only what can't wait
+    if (ts.listen > t && !LINES[cat].prio) return false; // someone is close to hearing an enemy
+  }
+  return true;
+}
+export function talk(game, p, cat, slots = {}, key = null) {
+  if (!p || !p.bot || !LINES[cat]) return false;
+  if (!p.pro && !game.tv && ![...game.players.values()].some(o => !o.bot && o.squad === p.squad)) return false; // nobody to hear it
+  const name = !p.pro && lvlOf(game, p) <= 1 && FUN[cat] ? FUN[cat] : cat, t = game.time, ts = talkTeam(game, p.squad), prio = LINES[name].prio;
+  if (key && t - (ts.keys[key] ?? -99) < 12) return false; // a teammate just said it
+  if (!talkAllowed(game, p, cat)) return false;
+  if (prio ? t - ts.last < 1.2 : (t - (p.saidT ?? -99) < 12 || t - ts.last < 5)) return false; // he asked: not all the time
+  const v = voiceOf(p), c = compose(v, name, slots, p.saidRecent || (p.saidRecent = [])); if (!c) return false;
+  if (key) ts.keys[key] = t; p.saidT = t; ts.last = t;
+  if (slots.op && slots.place && !['dead', 'got', 'gotLast'].includes(cat)) ts.lastSeen = { op: slots.op, place: slots.place, t };
+  if (CONTACT.has(cat) && cat !== 'low') ts.hushUntil = 0; // a fight has started: it makes sense to talk again
+  if (p.pro) (game.proLog || (game.proLog = [])).push({ round: game.round, squad: p.squad, team: p.pro.tag, text: c.text, who: p.pro.pl.name });
+  game.chat(p, { text: c.text, team: true, vo: { v, parts: c.parts } });
+  return true;
+}
+// close to hearing an enemy: the team keeps it down, and now and then this bot says so out loud, which holds them for longer
+function listenUp(game, p) {
+  const ts = talkTeam(game, p.squad), t = game.time;
+  ts.listen = Math.max(ts.listen || 0, t + 2.5);
+  if (ts.hushUntil > t || t - (ts.hushSaid ?? -99) < 45 || t - ts.last > 4 || Math.random() > 0.25) return; // only worth saying when people are talking
+  if (talk(game, p, 'hush')) { ts.hushSaid = t; ts.hushUntil = t + 5 + Math.random() * 3; }
+}
+// A person asked something over push to talk (public/js/ptt.js): the nearest bot answers from what the team really knows.
+export function pttAsk(game, p, intent) {
+  const t = game.time, ts = talkTeam(game, p.squad); if (t - (p.pttT ?? -99) < 1) return; p.pttT = t;
+  if (intent === 'quiet') { ts.hushUntil = t + 10; return; }
+  const bots = [...game.players.values()].filter(q => q.bot && q.alive && !q.downed && q.squad === p.squad && !q.staged).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+  const who = bots[0]; if (!who) return;
+  const say = (cat, slots = {}) => { const v = voiceOf(who), c = compose(v, cat, slots, who.saidRecent || (who.saidRecent = [])); if (c) { who.saidT = t; ts.last = t; game.chat(who, { text: c.text, team: true, vo: { v, parts: c.parts } }); } };
+  const team = game.side(p), b0 = game.map.sites[game.site].bombs[0], siteKnown = team === TEAM.DEF || game.siteRevealed;
+  const cmd = (q, k, secs) => { q.ai = q.ai || {}; q.ai.cmd = { k, id: p.id, until: t + secs }; };
+  if (intent === 'enemies') {
+    for (const id of game.spots[team].keys()) { const q = game.players.get(id); if (q && q.alive) return say('ansEnemy', { op: opName(q), place: place(game, q.x, q.y) }); }
+    return ts.lastSeen && t - ts.lastSeen.t < 20 ? say('ansEnemy', { op: ts.lastSeen.op, place: ts.lastSeen.place }) : say('ansNone');
+  }
+  if (intent === 'site') return siteKnown ? say('ansSite', { place: place(game, b0.x, b0.y) }) : say('ansSiteNo');
+  if (intent === 'go') return siteKnown ? say('ansGo', { place: place(game, b0.x, b0.y) }) : say('ansGo', { place: place(game, bots[bots.length - 1].x, bots[bots.length - 1].y) });
+  if (intent === 'follow') { cmd(who, 'follow', 25); return say('ansFollow'); }
+  if (intent === 'help') { for (const q of bots.slice(0, 2)) cmd(q, 'follow', 12); return say('ansHelp'); }
+  if (intent === 'hold') { cmd(who, 'hold', 20); return say('ansHold'); }
+  if (intent === 'push') { for (const q of bots) { if (q.ai) { q.ai.cmd = null; q.ai.startWait = 0; q.ai.pauseT = 99; } } return say('ansPush'); }
+  say('ack');
+}
+function botCmd(game, p, inp, dt) {
+  const c = p.ai.cmd, o = game.players.get(c.id);
+  if (game.time > c.until || game.phase !== PHASE.ACTION || p.downed || !o || !o.alive) { p.ai.cmd = null; return false; }
+  if (c.k === 'hold') { checkAngles(game, p, dt); inp.crouch = 1; return true; }
+  if (Math.hypot(o.x - p.x, o.y - p.y) > 2.5 * PX_PER_M) moveTo(game, p, inp, o, dt); else checkAngles(game, p, dt);
+  return true;
+}
+// a kill or a death: the high ranks are good to each other, the lowest are funny about it
+export function kindWords(game, q, src) {
+  const near = o => o.bot && o.alive && !o.downed && Math.hypot(o.x - q.x, o.y - q.y) < 20 * PX_PER_M;
+  const say = (team, cat) => { const m = [...game.players.values()].filter(o => o !== src && o !== q && o.squad === team && near(o)); if (m.length && Math.random() < 0.3) talk(game, m[Math.floor(Math.random() * m.length)], cat); };
+  const rankOf = o => (o.pro ? 7 : lvlOf(game, o));
+  if (q.bot && (rankOf(q) >= 4 || rankOf(q) <= 1)) say(q.squad, 'nt');
+  if (src && src.bot && rankOf(src) >= 4) say(src.squad, 'nice');
+}
 export function proSay(game, p, text, key, prio = false) {
   if (!p || !p.pro) return;
+  if (!talkAllowed(game, p, 'heard')) return;
   const t = game.time, team = (game.proSaid || (game.proSaid = {}))[p.squad] || (game.proSaid[p.squad] = { keys: {}, last: 0 });
   if (key && t - (team.keys[key] ?? -99) < 8) return; // a teammate just said it
-  if (!prio && (t - (p.saidT ?? -99) < 6 || t - team.last < 2.5)) return; // not constant chatter (he asked: less)
+  if (!prio && (t - (p.saidT ?? -99) < 12 || t - team.last < 5)) return; // not constant chatter (he asked: less)
   if (key) team.keys[key] = t; p.saidT = t; team.last = t;
   (game.proLog || (game.proLog = [])).push({ round: game.round, squad: p.squad, team: p.pro.tag, text, who: p.pro.pl.name });
   game.chat(p, { text: text.slice(0, 140), team: true });
@@ -1486,12 +1572,16 @@ function proPlan(game, squad, side) {
   }
   return st;
 }
-function proCall(game, squad, text) { // the leader (or whoever is left) says it in team chat
+function proCall(game, squad, text, cat = null, slots = {}) { // the leader (or whoever is left) says it in team chat
   const mates = [...game.players.values()].filter(q => q.pro && q.squad === squad);
   const who = mates.find(q => q.pro.pl.igl && q.alive) || mates.find(q => q.alive) || mates[0];
   const st = proState(game, squad); st.calls.push({ t: game.time, text });
   (game.proLog || (game.proLog = [])).push({ round: game.round, squad, team: PRO_TEAMS[squad].tag, text });
-  if (who) { who.saidT = game.time; game.chat(who, { text: text.slice(0, 140), team: true }); }
+  if (!who) return;
+  if (cat && !talkAllowed(game, who, cat)) return; // nobody calls plays at someone clutching
+  who.saidT = game.time;
+  const c = cat && compose(voiceOf(who), cat, slots, who.saidRecent || (who.saidRecent = []));
+  game.chat(who, { text: text.slice(0, 140), team: true, vo: c ? { v: voiceOf(who), parts: c.parts } : undefined });
 }
 const HARD_BREACH = ['ember', 'rivet'];
 export function proPickOp(game, p) {
@@ -1533,22 +1623,22 @@ function proDirector(game, squad, st, team, el) {
   if (game.time - (st.dT || 0) < 1) return; st.dT = game.time;
   const plan = st.plan, mates = [...game.players.values()].filter(q => q.squad === squad), alive = mates.filter(q => q.alive && !q.downed).length, down = mates.length - alive;
   if (team === TEAM.ATK) {
-    if (!st.called) { st.called = true; proCall(game, squad, `${plan.name}: ${plan.idea}`); }
+    if (!st.called) { st.called = true; proCall(game, squad, `${plan.name}: ${plan.idea}`, 'plan', { plan: plan.name }); }
     if (st.gone || game.planted) return;
-    if (el >= st.go) { st.gone = true; proCall(game, squad, 'Go go go!'); }
-    else if (down >= 2) { st.go = el; st.gone = true; proCall(game, squad, 'Two down: we go now, together. Trade each other.'); }
-    else if (game.timer < 55) { st.go = el; st.gone = true; proCall(game, squad, 'Running out of time: go now.'); }
+    if (el >= st.go) { st.gone = true; proCall(game, squad, 'Go!', 'go'); }
+    else if (down >= 2) { st.go = el; st.gone = true; proCall(game, squad, 'Two down: we go now, together. Trade each other.', 'goDown'); }
+    else if (game.timer < 55) { st.go = el; st.gone = true; proCall(game, squad, 'Running out of time: go now.', 'goClock'); }
     else if (!st.swapped && plan.ways.side && el > 8 && spottedNear(game, team, plan.ways.main.pos, 150) >= 2) {
-      st.swapped = true; st.go = Math.min(st.go, el + 6); proCall(game, squad, 'They are stacked on our door: switch, everyone through the other way in 6.');
+      st.swapped = true; st.go = Math.min(st.go, el + 6); proCall(game, squad, 'They are stacked on our door: switch, everyone through the other way in 6.', 'swap');
     }
   } else {
-    if (!st.called) { st.called = true; proCall(game, squad, `${plan.name}: ${plan.idea}`); }
+    if (!st.called) { st.called = true; proCall(game, squad, `${plan.name}: ${plan.idea}`, 'plan', { plan: plan.name }); }
     if (game.planted) {
-      if (!st.retake) { const near3 = mates.filter(q => q.alive && !q.downed && near(q, game.planted, 300)).length; if (near3 >= Math.min(3, alive) || game.planted.t < 30 || game.time - (st.plantSeen ?? (st.plantSeen = game.time)) > 8) { st.retake = true; proCall(game, squad, 'Retake now, all together, utility first.'); } }
+      if (!st.retake) { const near3 = mates.filter(q => q.alive && !q.downed && near(q, game.planted, 300)).length; if (near3 >= Math.min(3, alive) || game.planted.t < 30 || game.time - (st.plantSeen ?? (st.plantSeen = game.time)) > 8) { st.retake = true; proCall(game, squad, 'Retake now, all together, utility first.', 'retake'); } }
       return;
     }
     for (const w of [plan.ways.main, plan.ways.side]) if (w && spottedNear(game, team, w.pos, 170) >= 2 && (!st.rotate || st.rotate.w !== w)) {
-      st.rotate = { w, t: game.time, at: game.freeSpotNear(w.hold.x, w.hold.y, 20) }; proCall(game, squad, `Rotate: they are hitting ${w.kind === 'stairs' ? 'the stairs' : 'the ' + w.kind}.`); break;
+      st.rotate = { w, t: game.time, at: game.freeSpotNear(w.hold.x, w.hold.y, 20) }; proCall(game, squad, `Rotate: they are hitting ${w.kind === 'stairs' ? 'the stairs' : 'the ' + w.kind}.`, 'rotate', { way: WAYS.includes(w.kind) ? w.kind : 'door' }); break;
     }
   }
 }
@@ -1614,7 +1704,7 @@ function proAct(game, p, inp, dt, team) {
   const ai = p.ai, j = plan.jobs[p.pro.pl.jobs[side]] || plan.jobs[jobOf(p.op)]; if (!j) return false;
   const action = game.phase === PHASE.ACTION, el = action ? elapsedAction(game) : -1, S = skill(game, p), name = p.pro.pl.name;
   if (action) proDirector(game, p.squad, st, team, el);
-  else if (!st.called && game.phase === PHASE.PREP && side === 'def') { st.called = true; proCall(game, p.squad, `${plan.name}: ${plan.idea}`); }
+  else if (!st.called && game.phase === PHASE.PREP && side === 'def') { st.called = true; proCall(game, p.squad, `${plan.name}: ${plan.idea}`, 'plan', { plan: plan.name }); }
   const watch = (pt, crouch) => { // hold an angle like a person: a noise first, now and then the other ways in, else the job's angle
     if (ai.heard && game.time - ai.heard.t < 2.5) pt = ai.heard;
     else { if ((ai.chkT = (ai.chkT ?? 3 + Math.random() * 3) - dt) <= 0) { ai.chkT = 3 + Math.random() * 4; ai.chk = Math.random() < 0.4 ? threatPoint(game, p, p.aim + (Math.random() - 0.5) * 3) : null; ai.chkUntil = game.time + 1.2; }
@@ -1656,7 +1746,7 @@ function proAct(game, p, inp, dt, team) {
       // area: every so often another spot round the stack (a new angle, clearing the corners), and a word to the team.
       if ((ai.waitT = (ai.waitT ?? 9 + Math.random() * 6) - dt) <= 0) {
         ai.waitT = 10 + Math.random() * 8; ai.spreadOff = { x: Math.round((Math.random() - 0.5) * 6), y: Math.round((Math.random() - 0.5) * 6) }; ai.spread = null;
-        if (!game.spots[team].size && Math.random() < 0.35) proSay(game, p, `${place(game, p.x, p.y)} is quiet, holding for the go (${Math.max(0, Math.round(go - el))} s)`, 'wait' + place(game, p.x, p.y));
+        if (!game.spots[team].size && Math.random() < 0.2) talk(game, p, 'quiet', { place: place(game, p.x, p.y) }, 'wait' + place(game, p.x, p.y));
       }
       if (j.clear != null && el > go - 9 && game.map.tiles[j.clear] === T.BARRI) { // a boarded window: shoot the boards off from the stack (as R6 teams do) instead of hitting them three times in the open
         const W = game.map.W, cx = (j.clear % W + 0.5) * CELL, cy = (Math.floor(j.clear / W) + 0.5) * CELL; aimAt(p, cx, cy); inp.ads = 1;
@@ -1666,8 +1756,8 @@ function proAct(game, p, inp, dt, team) {
     }
     if (!ai.utilDone) { // utility in first
       ai.utilDone = true; const tg = eff(st, j, 'target'), abId = OPERATORS[p.op].ability.id;
-      if (j.util === 'stun' && p.gadget === 'stun' && p.gadgetCount > 0) { aimAt(p, tg.x, tg.y); game.event(p, { k: 'gadget' }); proSay(game, p, 'Stun out!', 'util'); }
-      if (j.util === 'smoke') { aimAt(p, tg.x, tg.y); proSay(game, p, 'Smoking the door', 'util'); if (abId === 'barrage' && p.abilityCount > 0) game.event(p, { k: 'ability' }); else if (p.gadget === 'smoke' && p.gadgetCount > 0) game.event(p, { k: 'gadget' }); }
+      if (j.util === 'stun' && p.gadget === 'stun' && p.gadgetCount > 0) { aimAt(p, tg.x, tg.y); game.event(p, { k: 'gadget' }); talk(game, p, 'stun', {}, 'util'); }
+      if (j.util === 'smoke') { aimAt(p, tg.x, tg.y); talk(game, p, 'smoke', {}, 'util'); if (abId === 'barrage' && p.abilityCount > 0) game.event(p, { k: 'ability' }); else if (p.gadget === 'smoke' && p.gadgetCount > 0) game.event(p, { k: 'gadget' }); }
     }
     const tg = eff(st, j, 'target');
     if (!near(p, tg, 18) && !(ai.tgT = (ai.tgT || 0) + dt, ai.tgT > 25)) { moveTo(game, p, inp, tg, dt); return true; }

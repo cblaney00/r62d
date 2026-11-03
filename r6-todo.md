@@ -7,9 +7,17 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
+- [ ] add more volume options, it generally works but i also want realistic voices for people aged 16-32 and a variety of accents to say things. the voice chats should not be as repetitive, there should be lots of different ways the announcers and pros say things, your cursor should also be usable during tv esports to adjust sliders for the different voice volumes, i think this will be a decent sized job but it will make this more interesting to watch as i can gain information from how the pros communicate. this will probably take a bit of rework of how the bots communicate to eachother because i will be able to hear the voice and sounds they make. it shouldnt sounds like robot, it should sound pretty realistic as if people are talking over a game chat so not perfect audio quality but definitely understable - see how it sounds when the players talk in r6 esports to study this
+- [ ] in a match, Esc has a volume slider for each bot on your team, so one who annoys you can be tuned out
+- [ ] push to talk: talk to the bots with your microphone (where to go, where the enemies are) and they answer
+- [ ] finish recording the voice lines (about 5268 of 7915 clips made; a line with no clip only shows as writing): see docs/voice.md
+- [ ] try the voices, TV and Esc sliders and push to talk on screen and with a real microphone (not tried on screen yet; the speech recogniser has not heard anything yet)
 
 ## Done
 
+- [x] Esports TV director: the opening wide shot frames the objective and the people near it, and M frames the building, instead of the whole floor with its empty ground; following someone looking out over a yard no longer zooms out as far.
+- [x] Nobody talks when someone is clutching, or when a teammate is close to hearing an enemy. A bot can say "be quiet" or "shut up real quick" and the others hold off (and walk) until a fight starts or it passes. Casters also stop chatting in a clutch.
+- [x] Comms get more respectful with rank (nice try, my bad, good shot); Copper and Bronze stay funny.
 - [x] The game server only runs while the game is open: when you close the game window it stops by itself, once nobody (a friend included) has been connected for 20 seconds.
 - [x] Bots keep their view on angles worth holding: when a wall is between them and what they guard, they now watch the corner it would come round instead of the wall, and when walking they look along their route. Measured over one pro match on each map: time spent staring into a wall close up halved (28% to 14%), and when an enemy first comes into clear view the aim is within 25° of them 53% of the time instead of 39%. Still not perfect: walking bots improved the most, but pros standing still on a hold were further off at first contact in this measure (about 45° instead of 23°).
 - [x] One-file installer: not needed, he decided the zip is fine (unzip, double-click R62D.exe).

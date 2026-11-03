@@ -982,3 +982,11 @@ html.tv.tvsel .tvComms { top: auto; bottom: 3vh; width: 30vw; } html.tv.tvsel #t
 #tvCast b { display: block; font: 800 13px var(--head); letter-spacing: 0.16em; } #tvCast b small { margin-left: 8px; color: var(--dim); font-size: 10px; letter-spacing: 0.2em; }
 #tvCast span { font: 600 16px var(--body); color: #f1f4f7; line-height: 1.3; }
 html.tv.tvsel #tvCast { top: auto; bottom: 3vh; left: 50%; transform: translateX(-50%); width: min(520px, 30vw); }
+
+/* voice sliders: Esc in a match, and on the TV screen when the mouse moves */
+#pVoices { margin: 0 0 12px; } #pVoices h3 { font: 700 13px var(--head); letter-spacing: 0.14em; margin: 0 0 6px; opacity: 0.8; }
+.pVoice { display: flex; align-items: center; gap: 10px; font-size: 13px; margin: 3px 0; } .pVoice span { width: 90px; text-align: left; } .pVoice input { flex: 1; }
+#tvVoice { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); display: flex; gap: 18px; padding: 7px 14px; background: rgba(8,10,14,0.7); pointer-events: auto; opacity: 0; transition: opacity 0.25s; }
+#tvVoice.on, #tvVoice:hover { opacity: 1; } #tvVoice label { display: flex; align-items: center; gap: 7px; font: 700 11px var(--head); letter-spacing: 0.1em; color: #dfe6ee; } #tvVoice input { width: 110px; }
+html.tv canvas#game { cursor: default; }
+#pttInd { position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); padding: 5px 14px; background: rgba(8,10,14,0.75); color: #9dffb0; font: 700 13px var(--head); letter-spacing: 0.12em; z-index: 4; pointer-events: none; }
