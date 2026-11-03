@@ -952,3 +952,11 @@ html.touch #bkPage .bkBody { grid-template-columns: 1fr; overflow-y: auto; }
 /* the webcam cards and help line are the match's; on the picking screen only each team's comms stay, under its side */
 html.tv.tvsel .tvSide, html.tv.tvsel #tvHelp, html.tv.tvsel #killfeed { display: none !important; }
 html.tv.tvsel .tvComms { top: auto; bottom: 3vh; width: 30vw; } html.tv.tvsel #tvCommsL { left: 2.2vw; } html.tv.tvsel #tvCommsR { right: 2.2vw; }
+
+/* ESPORTS TV casters (casters.js): their lines, one at a time, top left */
+#tvCast { position: fixed; left: 18px; top: 18px; z-index: 4; width: min(430px, 32vw); display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
+#tvCast .cl { background: linear-gradient(90deg, rgba(6,8,12,0.92), rgba(6,8,12,0.7)); border-left: 3px solid var(--gold); padding: 6px 11px 7px; animation: rise 0.25s both; transition: opacity 0.8s; }
+#tvCast .cl.old { opacity: 0; } #tvCast .cl:not(:last-child) { opacity: 0.55; }
+#tvCast b { display: block; font: 800 13px var(--head); letter-spacing: 0.16em; } #tvCast b small { margin-left: 8px; color: var(--dim); font-size: 10px; letter-spacing: 0.2em; }
+#tvCast span { font: 600 16px var(--body); color: #f1f4f7; line-height: 1.3; }
+html.tv.tvsel #tvCast { top: auto; bottom: 3vh; left: 50%; transform: translateX(-50%); width: min(520px, 30vw); }

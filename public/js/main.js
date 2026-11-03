@@ -25,6 +25,7 @@ import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
 const rankTag = i => i == null ? '' : `<span class="rankTag" style="color:${RANK_COL[i]};border-color:${RANK_COL[i]}">${RANKS[i].toUpperCase()}</span>`;
+import { castEvent, castPhase, castTick, castReset } from './casters.js';
 import { ACTIONS, PRESETS, applyPreset, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION, lockMouse } from './keys.js';
 import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
@@ -466,6 +467,7 @@ function onSnap(s) {
   const ents = new Map(s.ents.map(e => [e.id, e]));
   st.snaps.push({ t: now, st: s.time, players, ents }); if (st.snaps.length > 12) st.snaps.shift();
   const prevMe = st.me;
+  if (st.tv) tvCasters(s, players);
   if (st.tv) { tvDirector(s, players, now); st.id = st.tv.follow; if (st.rend) tickReplay(!!st.tv.calm && s.ph === PHASE.ACTION, st.rend, st.map); } // ESPORTS TV: ride along with whoever the director (or you) picked
   st.last = s; st.me = players.get(st.tv ? st.tv.follow : s.you) || null;
   if (st.map) st.map.covers = s.ents.filter(e => e.ty === 'cover').map(coverOf); // TRENCH's plates block you here too (prediction, sight)
@@ -542,7 +544,7 @@ function onEvent(e, s, players) {
     }
     case 'down': { const v = players.get(e.id); if (v) addFeed(`${v.n} is down`); break; }
     case 'msg': if (!e.team || e.team === mySide()) addFeed(e.text); break;
-    case 'ban': if (st.tv) audio.ui('lock'); break;
+    case 'ban': if (st.tv) audio.ui('lock'); break; // (the casters read it below)
     case 'banner': if (!e.team || e.team === mySide()) banner(e.text, e.sub); audio.ui('round'); break;
     case 'found': if (e.team === mySide() && fxOn('site')) siteFound(s); break;
     case 'roundEnd': {
@@ -3031,6 +3033,21 @@ function tvKey(e) {
 // the colour a player "speaks" in (he asked: thematic per character): their operator's own hue, kept bright enough to read
 const OP_HUE = op => { let h = 0; for (const c of String(op)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
 const sayCol = p => `hsl(${OP_HUE(p.op)}, 85%, 68%)`;
+// the casters' view of the match (casters.js), Pro matches in Esports TV only
+function castCtx(s, players) {
+  const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
+  return { players, mapName: (MAPS[s.mp] || {}).name || 'this map', opName: o => (OPERATORS[o] || {}).name || '?',
+    teamName: sq => pro && PRO_TEAMS[sq] ? PRO_TEAMS[sq].name : sq ? 'Orange' : 'Blue',
+    alive: () => [0, 1].map(sq => s.players.filter(p => p.sq === sq && p.a).length) };
+}
+function tvCasters(s, players) {
+  const on = !!st.tv && (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
+  castTick(on);
+  if (!on) return;
+  const ctx = castCtx(s, players), ph = s.ph === PHASE.SELECT ? 'select' : s.ph === PHASE.PREP ? 'prep' : s.ph === PHASE.ACTION ? 'action' : null, key = s.rd + ph;
+  if (ph && st.castPh !== key) { if (s.rd === 1 && ph === 'select') castReset(); st.castPh = key; castPhase(ph, s, ctx); }
+  for (const e of s.ev || []) castEvent(e, ctx);
+}
 function tvHud(s) {
   const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL, now = performance.now() / 1000;
   for (const sq of [0, 1]) { const T = PRO_TEAMS[sq], el = $(sq ? 'tvR' : 'tvL');
