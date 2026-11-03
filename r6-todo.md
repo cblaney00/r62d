@@ -11,6 +11,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] Esports TV loads on its own: its code (the director, player cards, picking screen, casters, instant replays) is only fetched the first time you open Esports TV, so a normal match never carries it. When you leave it for the main menu, the broadcast is paused and kept for 20 seconds: open the same one again in that time and it carries on exactly where it was; after 20 seconds it is closed so it never slows down the game.
 - [x] Esports TV casters for Pro matches: MAX REYES calls the action and IRIS KANE explains it, their lines one at a time in a box at the top left (under the bans while picking): the welcome, every ban, kills and headshots, teamkills, clutches, the plant, round wins, match point.
 - [x] Esports TV picking screen like a real broadcast: blue team down the left, orange down the right, bans in the middle. R6 rules: before the match each team bans 2 attackers and 2 defenders, one at a time with a BANNED stamp (4 banned each side), and every round after that each team bans 1 more from the side the other team plays. The teams ban what has been winning on the map and what the other team likes; viewer requests are never banned. Then each player's operator flips in on their card while the team talk runs underneath.
 - [x] Esports TV: the webcams no longer sit on top of the picking screen (it also used to show the lobby behind them); while picking only each team's comms show, under its side.

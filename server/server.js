@@ -80,13 +80,24 @@ function api(req, res) {
 const game = new Game();
 // /ws?tut=1 gets its own private tutorial match (/ws?free=1 a free-play one), gone when that player leaves it
 const tutorials = new Set();
+// ESPORTS TV someone left (he asked): kept 20 s, paused, in case they come straight back (same key = the same broadcast),
+// then closed so it never slows down a real match
+const TV_HOLD_MS = +process.env.R62D_TV_HOLD_MS || 20000, heldTv = new Map();
 attachWebSocket(server, '/ws', (sock, req) => {
   const tut = /[?&]tut=1/.test(req.url), free = /[?&]free=1/.test(req.url), tv = /[?&]tv=1/.test(req.url);
   if (!tut && !free && !tv) return game.connect(sock);
+  const key = tv ? (/[?&]key=([a-z0-9]{6,24})(&|$)/.exec(req.url) || [])[1] : null;
+  if (key && heldTv.has(key)) { const g = heldTv.get(key); heldTv.delete(key); g.heldUntil = 0; return g.connect(sock); }
   const g = new Game({ tut, free, tv }); tutorials.add(g); // tv: ESPORTS TV, the pro teams playing while you watch
-  g.onEmpty = () => tutorials.delete(g);
+  g.onEmpty = tv ? () => { g.heldUntil = Date.now() + TV_HOLD_MS; if (key) heldTv.set(key, g); } : () => tutorials.delete(g);
+  g.tvKey = key;
   g.connect(sock);
 });
+const held = g => { // a TV nobody is watching: paused; gone after its 20 s
+  if (!g.heldUntil) return false;
+  if (Date.now() > g.heldUntil) { tutorials.delete(g); if (heldTv.get(g.tvKey) === g) heldTv.delete(g.tvKey); }
+  return true;
+};
 
 let last = performance.now(), acc = 0, snapAcc = 0;
 setInterval(() => {
@@ -94,9 +105,9 @@ setInterval(() => {
   acc += Math.min(0.25, (now - last) / 1000); last = now;
   const dt = 1 / TICK_RATE;
   while (acc >= dt) {
-    acc -= dt; game.tick(dt); for (const g of tutorials) g.tick(dt);
+    acc -= dt; game.tick(dt); for (const g of tutorials) if (!held(g)) g.tick(dt);
     snapAcc += dt;
-    if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = 0; game.broadcast(); for (const g of tutorials) g.broadcast(); }
+    if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = 0; game.broadcast(); for (const g of tutorials) if (!g.heldUntil) g.broadcast(); }
   }
 }, 1000 / 120);
 
@@ -104,7 +115,7 @@ setInterval(() => {
 // in a background thread while nobody is playing (they stop the moment someone joins a match). No AI service: all here.
 let trainer = null;
 function trainCheck(force = false) {
-  const busy = game.phase !== 'lobby' || [...tutorials].some(g => g.phase !== 'lobby'); // a match being played (people in the menus are fine)
+  const busy = game.phase !== 'lobby' || [...tutorials].some(g => g.phase !== 'lobby' && !g.heldUntil); // a match being played (people in the menus are fine)
   if (trainer && busy) { trainer.terminate(); trainer = null; return 'a match is being played'; } // someone is playing: practice another time
   if (busy) return 'a match is being played';
   if (trainer || !VERSION.id) return '';
