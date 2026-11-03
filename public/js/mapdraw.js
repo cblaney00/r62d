@@ -346,7 +346,20 @@ export class MapRenderer {
         ctx.restore();
       }
       const holes = m.holes && m.holes[k]; // bullet holes: pins of light you can look and shoot through
+      // the board's three stages (he asked): server barriStage leaves a cross of points round the middle, drawn here as one ragged hole
+      const mx = X + CELL / 2, my = Y + CELL / 2; let smash = 0;
+      if (holes) for (let i = 0; i < holes.length; i += 2) { const dx = holes[i] - mx, dy = holes[i + 1] - my; if (Math.abs(dx) < 0.11 && Math.abs(dy) >= 3.5 && Math.abs(dy) <= 6.5 || Math.abs(dy) < 0.11 && Math.abs(dx) >= 3.5 && Math.abs(dx) <= 6.5) smash = 2; else if (!smash && Math.abs(dx) < 0.11 && Math.abs(dy) < 0.11) smash = 1; }
+      if (smash) {
+        ctx.save(); ctx.translate(mx, my); if (!horiz) ctx.rotate(Math.PI / 2);
+        const rx = smash === 2 ? 7.6 : 3.8, ry = smash === 2 ? 6.2 : 5.2, N = 12;
+        const ragged = g => { ctx.beginPath(); for (let i = 0; i < N; i++) { const a = i / N * 6.283, r = 0.78 + hash(x + i, y, 40 + smash) * 0.4; ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rx * r * g, Math.sin(a) * ry * r * g); } ctx.closePath(); };
+        ctx.fillStyle = '#e0bc86'; ragged(1.12); ctx.fill(); // pale torn wood round the edge
+        ctx.fillStyle = '#0d0805'; ragged(1); ctx.fill();
+        ctx.fillStyle = 'rgba(255,230,180,0.14)'; ragged(0.55); ctx.fill(); // a little light through it
+        ctx.restore();
+      }
       if (holes) for (let i = 0; i < holes.length; i += 2) {
+        if (smash && (Math.abs(holes[i] - mx) < 0.11 || Math.abs(holes[i + 1] - my) < 0.11)) continue;
         ctx.fillStyle = 'rgba(255,230,180,0.25)'; ctx.beginPath(); ctx.arc(holes[i], holes[i + 1], 1.8, 0, 7); ctx.fill();
         ctx.fillStyle = '#120c06'; ctx.beginPath(); ctx.arc(holes[i], holes[i + 1], 1.2, 0, 7); ctx.fill();
         ctx.fillStyle = 'rgba(255,236,190,0.6)'; ctx.beginPath(); ctx.arc(holes[i], holes[i + 1], 0.45, 0, 7); ctx.fill();

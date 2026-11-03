@@ -65,6 +65,15 @@ for (const id of MAP_LIST) {
   if (!(m.holes[k] && m.holes[k].length)) fail(id, 'a rifle bullet left no hole');
   const after = castSight(m, p.x, p.y, Math.PI / 2, 200);
   if (!(after > before + CELL)) fail(id, 'cannot see through the bullet hole', before, after);
+  // melee: three stages, a small hole, a bigger one, then gone (he asked)
+  { const sight = off => castSight(m, cx + off, cy - 2 * CELL, Math.PI / 2, 4 * CELL, [], false, false) > 3 * CELL; // through the middle of the cell, off to the side
+    g.barricade(o.id, T.OPEN); g.barricade(o.id, T.BARRI, true);
+    if (sight(2)) fail(id, 'a whole board can be seen through');
+    p.x = cx; p.y = cy - CELL * 1.2; p.aim = Math.PI / 2; p.meleeCd = 0; g.melee(p);
+    const smallOk = sight(2) && !sight(6), reHit = m.tiles[k] === T.BARRI; if (!reHit || !smallOk) fail(id, 'first hit should leave a small hole', sight(2), sight(6));
+    p.meleeCd = 0; g.melee(p); if (!sight(6) || !sight(-6) || m.tiles[k] !== T.BARRI) fail(id, 'second hit should leave a bigger hole', sight(6), sight(-6));
+    p.meleeCd = 0; g.melee(p); if (m.tiles[k] !== T.OPEN) fail(id, 'third hit should break it');
+    p.y = cy - CELL * 3; if (!g.barricade(o.id, T.BARRI, true)) fail(id, 'could not re-board'); if (m.holes[k] && m.holes[k].length) fail(id, 're-boarding left holes'); }
   // melee: three hits
   p.y = cy - CELL * 1.2;
   for (let i = 1; i <= 3; i++) {

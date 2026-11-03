@@ -1553,14 +1553,14 @@ export function botHear(game, p, text, mic = false) {
     // ---- a place ----
     case 'goto': case 'watch': {
       if (!spot) { say(first, c.site ? 'ansSiteNo' : 'huh'); return c; }
-      for (const q of targets) order(q, 'goto', c.intent === 'watch' ? 40 : 30, { x: spot.x, y: spot.y, stay: true });
+      for (const q of targets) order(q, 'goto', 120, { x: spot.x, y: spot.y, stay: c.intent === 'watch' ? 40 : 25 }); // (a big map takes a while to cross)
       ackAll(c.intent === 'watch' ? 'ansWatch' : 'ansGoto', { place: where });
       return c; }
     case 'report': {
       const at = room ? roomPoint(game, room) : null; if (!at) { say(first, 'huh'); return c; }
       ts.lastSeen = { op: c.op || 'One', place: where, t };
       for (const q of bots) if (q.ai) q.ai.heard = { x: at.x, y: at.y, t };
-      const help = asked[0] || bots[0]; if (!waiting(help)) order(help, 'goto', 15, { x: at.x, y: at.y, stay: true });
+      const help = asked[0] || bots[0]; if (!waiting(help)) order(help, 'goto', 60, { x: at.x, y: at.y, stay: 15 });
       say(help, 'ansThanksInfo');
       return c; }
     // ---- orders ----
@@ -1572,23 +1572,23 @@ export function botHear(game, p, text, mic = false) {
       const foe = [...game.spots[team].keys()].map(id => game.players.get(id)).find(q => q && q.alive);
       const pt = foe ? { x: foe.x, y: foe.y } : team === TEAM.ATK && siteKnown ? { x: b0.x, y: b0.y } : null;
       if (first.pro && team === TEAM.ATK) proState(game, first.squad).gone = true;
-      for (const q of targets) { if (!q.ai) continue; q.ai.cmd = null; q.ai.startWait = 0; q.ai.pauseT = 99; if (pt) order(q, 'goto', 25, { x: pt.x, y: pt.y }); }
+      for (const q of targets) { if (!q.ai) continue; q.ai.cmd = null; q.ai.startWait = 0; q.ai.pauseT = 99; if (pt) order(q, 'goto', 90, { x: pt.x, y: pt.y }); }
       ackAll('ansPush'); return c; }
-    case 'flank': for (const q of targets) { const f = flankPoint(game, q, site); if (f) order(q, 'goto', 30, { x: f.x, y: f.y }); } ackAll('ansFlank'); return c;
+    case 'flank': for (const q of targets) { const f = flankPoint(game, q, site); if (f) order(q, 'goto', 90, { x: f.x, y: f.y }); } ackAll('ansFlank'); return c;
     case 'fallback': {
-      if (team === TEAM.DEF) for (const q of targets) order(q, 'goto', 25, { x: b0.x, y: b0.y, stay: true }); else for (const q of targets) order(q, 'follow', 25);
+      if (team === TEAM.DEF) for (const q of targets) order(q, 'goto', 90, { x: b0.x, y: b0.y, stay: 25 }); else for (const q of targets) order(q, 'follow', 25);
       ackAll('ansBack'); return c; }
     case 'plant': {
       if (team === TEAM.DEF) { say(first, 'ansWrongSide'); return c; }
       if (game.planted) { say(first, 'ansDrop'); return c; }
       if (p.hasDefuser) { say(first, 'ansYouHave'); return c; }
       const has = bots.find(q => q.hasDefuser); if (!has) { say(first, 'ansNoCarrier'); return c; }
-      order(has, 'goto', 30, { x: b0.x, y: b0.y, drop: 40 }); say(has, waiting(has) ? 'ansPrep' : 'ansPlant'); return c; }
+      order(has, 'goto', 90, { x: b0.x, y: b0.y, drop: 40 }); say(has, waiting(has) ? 'ansPrep' : 'ansPlant'); return c; }
     case 'defuse': {
       if (team === TEAM.ATK) { say(first, 'ansWrongSide'); return c; }
       if (!game.planted) { say(first, 'ansNotPlanted'); return c; }
       const pos = game.planted.x !== undefined ? game.planted : b0;
-      order(first, 'goto', 30, { x: pos.x, y: pos.y, drop: 40 }); say(first, 'ansDefuse'); return c; }
+      order(first, 'goto', 90, { x: pos.x, y: pos.y, drop: 40 }); say(first, 'ansDefuse'); return c; }
     case 'smoke': case 'stun': case 'frag': {
       const thrower = [...asked, ...bots].find(q => q.gadget === c.intent && q.gadgetCount > 0);
       if (!thrower || inPrep) { say(first, thrower ? 'ansPrep' : 'ansNoUtil'); return c; }
@@ -1626,7 +1626,7 @@ function botCmd(game, p, inp, dt) {
   if (c.k === 'hold') { checkAngles(game, p, dt); inp.crouch = 1; return true; }
   if (c.k === 'goto') {
     const d = Math.hypot(c.x - p.x, c.y - p.y);
-    if (d < (c.drop || 1.5 * PX_PER_M)) { if (!c.stay) { p.ai.cmd = null; return false; } checkAngles(game, p, dt); return true; }
+    if (d < (c.drop || 1.5 * PX_PER_M)) { if (!c.stay) { p.ai.cmd = null; return false; } if (!c.there) { c.there = true; c.until = game.time + c.stay; } checkAngles(game, p, dt); return true; }
     moveTo(game, p, inp, c, dt); return true;
   }
   if (Math.hypot(o.x - p.x, o.y - p.y) > 2.5 * PX_PER_M) moveTo(game, p, inp, o, dt); else checkAngles(game, p, dt);

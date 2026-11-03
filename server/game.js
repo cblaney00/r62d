@@ -1001,6 +1001,7 @@ export class Game {
       if (penBullet(tile)) {
         if ((tile === T.SOFT || tile === T.BARRI) && HOLE_ONLY.has(cls)) this.holeCell(k, cx, cy, x0, y0, dx, dy, t);
         else this.damageCell(k, dmg * (tile === T.BARRI ? 0.35 : 0.6)); // a shotgun needs two blasts for a barricade
+        if (tile === T.BARRI && !HOLE_ONLY.has(cls)) this.barriStage(k);
         if (tile === T.BARRI) this.barriShot(k, dmg * mult); // any bullets: 320 damage in all and the whole board goes
         // he asked: a wall takes damage off the bullet (how much depends on the gun and the wall), so spraying
         // through walls in someone's general direction doesn't win fights
@@ -1385,6 +1386,21 @@ export class Game {
     const id = this.map.openId[k]; if (id < 0 || id === undefined) return;
     const D = this.map.barriDmg || (this.map.barriDmg = {});
     if ((D[id] = (D[id] || 0) + dmg) >= BARRI_BULLET_HP) { delete D[id]; this.destroyCell(k); }
+    else this.barriStage(k);
+  }
+
+  // Three stages (he asked): a small hole, a bigger hole, then the whole board goes. The holes are a cross of see-through
+  // points round the middle of the cell that was hit, so sight, shots and drawing all use the ordinary hole rules.
+  barriStage(k) {
+    const m = this.map; if (m.tiles[k] !== T.BARRI) return;
+    const id = m.openId[k], worn = id >= 0 && m.barriDmg ? (m.barriDmg[id] || 0) / BARRI_BULLET_HP : 0, left = Math.min(m.hp[k] / CELL_HP[T.BARRI], 1 - worn);
+    const reach = left <= 0.34 ? 6 : left <= 0.67 ? 2 : 0; if (!reach) return;
+    const cx = r1((k % m.W + 0.5) * CELL), cy = r1((Math.floor(k / m.W) + 0.5) * CELL), h = m.holes[k] || (m.holes[k] = []);
+    for (let d = -reach; d <= reach; d += 2) for (const [x, y] of [[cx + d, cy], [cx, cy + d]]) {
+      let has = false; for (let i = 0; i < h.length; i += 2) if (h[i] === x && h[i + 1] === y) has = true;
+      if (!has) { h.push(x, y); this.newHoles.push(k, x, y); }
+    }
+    this.changed.add(k);
   }
 
   // A melee hit on a barricade: three break it (the whole board across the doorway or window, like R6)
@@ -1392,6 +1408,7 @@ export class Game {
     const o = this.map.openings[this.map.openId[k]], cells = o ? o.cells.filter(c => this.map.tiles[c] === T.BARRI) : [k];
     for (const c of cells) { this.map.hp[c] -= CELL_HP[T.BARRI] / 3 + 0.01; this.changed.add(c); }
     if (cells.some(c => this.map.hp[c] <= 0)) for (const c of cells) this.destroyCell(c);
+    else this.barriStage(k);
   }
 
   // Can a barricade go up across this doorway/window now? (all of it open, nobody standing in it)
