@@ -2988,7 +2988,7 @@ function tvHud(s) {
     const list = s.players.filter(p => p.sq === sq), key = list.map(p => p.id).join(',') + pro;
     if (el.dataset.k !== key) { // build the cards once per line-up; after that only their contents change (the webcams keep running)
       el.dataset.k = key;
-      el.innerHTML = '<div class="tvHead"></div>' + list.map(p => `<button class="tvCard" data-id="${p.id}"><canvas class="tvCam" width="72" height="54"></canvas><div><b></b><span></span></div><i></i></button>`).join('');
+      el.innerHTML = '<div class="tvHead"></div>' + list.map(p => `<button class="tvCard" data-id="${p.id}"><canvas class="tvCam" width="120" height="90"></canvas><div><b></b><span></span></div><i></i></button>`).join('');
       for (const b of el.querySelectorAll('.tvCard')) b.onclick = () => { audio.ui(); tvFollow(b.dataset.id); };
     }
     setHTML(el.querySelector('.tvHead'), head);
