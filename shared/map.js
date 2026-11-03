@@ -1,6 +1,6 @@
 // All maps. Each map file builds its floors with the kit in mapkit.js.
 import { CELL, T, FL } from './constants.js';
-import { castSight } from './physics.js';
+import { castSight, angDiff, los } from './physics.js';
 import { build as harbor } from './maps/harbor.js';
 import { build as villa } from './maps/villa.js';
 import { build as depot } from './maps/depot.js';
@@ -25,6 +25,7 @@ export function buildMap(id = 'harbor') {
   if (!MAPS[id]) id = 'harbor';
   const m = MAPS[id].build();
   addRopes(m);
+  addYardCover(m);
   return m;
 }
 
@@ -99,6 +100,74 @@ export const ropeS = (r, x, y) => (x - r.hang.x) * r.tx + (y - r.hang.y) * r.ty;
 export const ropeAtWindow = (r, x, y) => Math.abs(ropeS(r, x, y)) <= r.half - 4;
 // Is this rope's window open enough to climb in (not boarded, reinforced or blocked)?
 export function ropeWindowOpen(m, r) { return r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE); }
+
+// ---- Yard cover (he asked: an interesting outdoors with safer and riskier ways in, now that upper windows see the
+// ground) ----
+// Every way in from the ground (an outside door or window, or the ground under a rope) has an approach: the open
+// ground within APPROACH cells of it. Its exposure is the share of that ground an upper window could see once its
+// boards are off. About half the ways in end up safe (exposure under SAFE): the ones that already are, then the
+// cheapest to fix get containers / dumpsters (tall: they block sight and bullets) between them and the windows that
+// watch them; the rest stay exposed on purpose. Same pieces every round (no randomness). m.yard = the report.
+const APPROACH = 9, SAFE = 0.3;
+function addYardCover(m) {
+  const W = m.W, gi = m.groundFloor; if (gi === undefined) return;
+  const G = m.floors[gi], at = k => ({ x: (k % W + 0.5) * CELL, y: (Math.floor(k / W) + 0.5) * CELL });
+  const ground = k => k >= 0 && k < m.tiles.length && m.flAt[k] === gi && m.tiles[k] === T.GROUND && !m.shape[k];
+  // the views down from each upper window, from a spot just inside it, with its boards off
+  const views = [];
+  for (const r of m.ropes) {
+    const ft = windowFoot(m, r); if (!ft) continue;
+    const save = r.cells.map(k => m.tiles[k]); r.cells.forEach(k => { m.tiles[k] = T.OPEN; });
+    const vs = windowViews(m, ft.cx - Math.cos(r.out) * CELL * 1.6, ft.cy - Math.sin(r.out) * CELL * 1.6);
+    r.cells.forEach((k, i) => { m.tiles[k] = save[i]; });
+    if (vs.length) views.push({ v: vs[0], r });
+  }
+  // ways in from the ground: outside cells next to ground-floor doors and windows, and rope bases
+  const ways = [];
+  for (const o of m.openings) {
+    if (m.flAt[o.cells[0]] !== gi) continue;
+    const out = []; for (const c of o.cells) for (const d of [1, -1, W, -W]) if (ground(c + d) && !o.cells.includes(c + d)) out.push(c + d);
+    if (out.length) ways.push({ kind: o.kind, k: out[out.length >> 1] });
+  }
+  for (const r of m.ropes) if (r.down < 0) { const k = Math.floor(r.base.y / CELL) * W + Math.floor(r.base.x / CELL); if (ground(k)) ways.push({ kind: 'rope', k }); }
+  if (!ways.length || !views.length) { m.yard = { ways: [] }; return; }
+  const strip = k0 => { const x0 = k0 % W, y0 = Math.floor(k0 / W), out = []; for (let y = y0 - APPROACH; y <= y0 + APPROACH; y++) for (let x = x0 - APPROACH; x <= x0 + APPROACH; x++) { const k = y * W + x; if ((x - x0) ** 2 + (y - y0) ** 2 <= APPROACH * APPROACH && ground(k)) out.push(k); } return out; };
+  const watchers = k => { const p = at(k), w = []; for (const V of views) if (windowSees(m, V.v, p.x, p.y)) w.push(V); return w; };
+  const exposure = way => { let n = 0; for (const k of way.cells) if (watchers(k).length) n++; return way.cells.length ? n / way.cells.length : 0; };
+  for (const w of ways) { w.cells = strip(w.k); w.exp = exposure(w); w.exp0 = w.exp; }
+  // where a piece may stand: open ground with two clear cells all round, away from ways in, spawns and the building
+  const keepAway = [...ways.map(w => w.k), ...(m.atkSpawns || []).map(s => Math.floor(s.y / CELL) * W + Math.floor(s.x / CELL))];
+  const fits = (x0, y0, w, h) => {
+    for (let y = y0 - 2; y < y0 + h + 2; y++) for (let x = x0 - 2; x < x0 + w + 2; x++) if (!ground(y * W + x)) return false;
+    for (const k of keepAway) { const kx = k % W, ky = Math.floor(k / W); if (kx > x0 - 3 && kx < x0 + w + 2 && ky > y0 - 3 && ky < y0 + h + 2) return false; }
+    return true;
+  };
+  const place = (x0, y0, w, h, on) => { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) m.tiles[y * W + x] = on ? T.TALL : T.GROUND; };
+  const safeGoal = Math.ceil(ways.length / 2);
+  let safe = ways.filter(w => w.exp < SAFE).length, pieces = 0;
+  for (const way of ways.filter(w => w.exp >= SAFE).sort((a, b) => a.exp - b.exp)) {
+    if (safe >= safeGoal) break;
+    for (let tries = 0; tries < 3 && way.exp >= SAFE; tries++) {
+      // try a piece on every other watched cell of the approach, both ways round; keep the one that hides most of it
+      const seenBy = new Set(), watched = [];
+      for (const k of way.cells) { const ws = watchers(k); if (ws.length) { watched.push(k); ws.forEach(V => seenBy.add(V)); } }
+      const VS = [...seenBy], left = () => { let n = 0; for (const k of watched) { const p = at(k); if (VS.some(V => windowSees(m, V.v, p.x, p.y))) n++; } return n; };
+      let best = null;
+      for (let i = 0; i < watched.length; i += 2) for (const len of [6, 4]) for (const across of [false, true]) {
+        const k = watched[i], w = across ? 2 : len, h = across ? len : 2, x0 = k % W - (w >> 1), y0 = Math.floor(k / W) - (h >> 1);
+        if (!fits(x0, y0, w, h)) continue;
+        place(x0, y0, w, h, true); const e = left() / way.cells.length; place(x0, y0, w, h, false);
+        if (e < way.exp - 0.04 && (!best || e < best.e - 0.01 || (e < best.e + 0.01 && len < best.len))) best = { e, x0, y0, w, h, len };
+      }
+      if (!best) break;
+      place(best.x0, best.y0, best.w, best.h, true); pieces++;
+      m.props.push({ kind: best.len >= 6 ? 'container' : 'dumpster', x: best.x0, y: best.y0, w: best.w, h: best.h, rot: best.w > best.h ? 1 : 0, yard: 1 });
+      way.exp = best.e;
+    }
+    if (way.exp < SAFE) safe++;
+  }
+  m.yard = { pieces, safeGoal, ways: ways.map(w => ({ kind: w.kind, k: w.k, before: +w.exp0.toFixed(2), after: +w.exp.toFixed(2) })) };
+}
 
 // Which floor a world position is on (index into map.floors), or -1.
 export function floorAt(map, wx, wy) {
@@ -249,4 +318,100 @@ export function stairEnds(map, i, n = 1.5) {
   const ca = { x: (g.a.steps.x0 + g.a.steps.x1) / 2, y: (g.a.steps.y0 + g.a.steps.y1) / 2 }, cb = { x: (g.b.steps.x0 + g.b.steps.x1) / 2, y: (g.b.steps.y0 + g.b.steps.y1) / 2 };
   const len = (ux ? s.w : s.h) * CELL / 2; // half the stairs' length along the way up
   return { bottom: { x: ca.x - ux * (len + n * CELL), y: ca.y - uy * (len + n * CELL) }, top: { x: cb.x + ux * (len + n * CELL), y: cb.y + uy * (len + n * CELL) }, up: Math.atan2(uy, ux) };
+}
+
+// ---- Looking out of upper windows (he asked: from a window, even on the top floor, you see the ground below and
+// anyone climbing the wall; both ways, so a window peeker can be seen and shot from below) ----
+// Floors sit side by side in the map grid, lined up in the building frame, so "below" is the ground floor at the same
+// building-frame spot. Someone up to WIN_REACH inside an outside window looks out through it: the view is a cone on the
+// ground floor from just outside the wall under the window, as wide as the opening seen from where they stand (closer
+// = wider), WIN_RANGE long. As limited as the boards: nothing through an intact board, a narrow slit through each
+// bullet hole in it, the whole opening once it is broken. Through a hole the peeker is hard to make out from below
+// (small hole, dark room): only within WIN_HOLE_SEE. Shots go both ways through the same cone (server hitscan).
+export const WIN_RANGE = 15 * 36, WIN_HOLE_SEE = 6 * 36, WIN_REACH = 4.5 * CELL, WIN_SLIT = 0.11;
+// world offset from floor f to floor g (add it to a floor-f position to get the same spot on floor g)
+export function floorOff(m, f, g) {
+  const F = m.floors[f], G = m.floors[g];
+  return { x: ((F.x0 - F.gx) - (G.x0 - G.gx)) * CELL, y: (F.y0 - G.y0) * CELL };
+}
+const ledgeAt = (m, k) => m.tiles[k] === T.LOW && m.floor[k] === FL.VOID;
+// 'open' | 'holed' | 'boarded' | 'shut' for rope r's window (the state seen from below)
+export function windowState(m, r) {
+  if (r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE)) return 'open';
+  if (r.cells.some(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE || (m.tiles[k] === T.BARRI && m.holes[k] && m.holes[k].length))) return 'holed';
+  return r.cells.every(k => m.tiles[k] === T.BARRI) ? 'boarded' : 'shut';
+}
+// The ground-floor spot just outside the wall under rope r's window (where the view down starts).
+export function windowFoot(m, r) {
+  if (r._foot !== undefined) return r._foot;
+  const gi = m.groundFloor, ox = Math.cos(r.out), oy = Math.sin(r.out), o = floorOff(m, r.f, gi);
+  const cx = r.hang.x - ox * CELL, cy = r.hang.y - oy * CELL; // the window's middle
+  r._foot = null;
+  for (const n of [0.5, 1, 1.5]) {
+    const x = cx + ox * (CELL * n + 2) + o.x, y = cy + oy * (CELL * n + 2) + o.y, k = Math.floor(y / CELL) * m.W + Math.floor(x / CELL);
+    if (m.flAt[k] === gi && (m.tiles[k] === T.GROUND || m.tiles[k] === T.LOW) && !m.shape[k]) { r._foot = { x, y, cx, cy }; break; }
+  }
+  return r._foot;
+}
+// The views down from someone at (x, y): [{ x, y (on the ground floor), ang, fov, range, near, kind: 'window', hole, r }]
+export function windowViews(m, x, y) {
+  const out = [], f = floorAt(m, x, y), gi = m.groundFloor;
+  if (gi === undefined || f <= gi) return out;
+  for (const r of m.ropes || []) {
+    if (r.f !== f) continue;
+    const ft = windowFoot(m, r); if (!ft) continue;
+    const ox = Math.cos(r.out), oy = Math.sin(r.out), depth = (ft.cx - x) * ox + (ft.cy - y) * oy; // how far inside the window you stand
+    if (depth < 3 || depth > WIN_REACH) continue;
+    const side = Math.abs((ft.cx - x) * r.tx + (ft.cy - y) * r.ty);
+    if (side > r.half + depth * 1.6) continue;
+    const ix = ft.cx - ox * (CELL / 2 + 1), iy = ft.cy - oy * (CELL / 2 + 1), d = Math.hypot(ix - x, iy - y); // just inside the window
+    if (d > 3 && castSight(m, x, y, Math.atan2(iy - y, ix - x), d, null) < d - 3) continue;
+    const st = windowState(m, r); if (st === 'shut' || st === 'boarded') continue;
+    const view = (ang, fov, hole) => out.push({ x: ft.x, y: ft.y, ang, fov, range: WIN_RANGE, near: 0, kind: 'window', hole, r: r.i });
+    if (st === 'open') {
+      const e1x = ft.cx - r.tx * r.half, e1y = ft.cy - r.ty * r.half, e2x = ft.cx + r.tx * r.half, e2y = ft.cy + r.ty * r.half;
+      const a1 = Math.atan2(e1y - y, e1x - x), a2 = Math.atan2(e2y - y, e2x - x), da = Math.atan2(Math.sin(a2 - a1), Math.cos(a2 - a1));
+      view(a1 + da / 2, Math.abs(da), false);
+      continue;
+    }
+    // a board with holes (or partly broken): a slit through each hole and the whole of any broken cell
+    let n = 0;
+    for (const k of r.cells) {
+      const kx = (k % m.W + 0.5) * CELL, ky = (Math.floor(k / m.W) + 0.5) * CELL, t = m.tiles[k];
+      if (t !== T.BARRI) { const a = Math.atan2(ky - y, kx - x); view(a, Math.min(1.2, 2 * Math.atan2(CELL / 2, Math.hypot(kx - x, ky - y))), false); continue; }
+      const h = m.holes[k] || [];
+      for (let i = 0; i < h.length && n < 4; i += 2, n++) view(Math.atan2(h[i + 1] - y, h[i] - x), WIN_SLIT, true);
+    }
+  }
+  return out;
+}
+// Does a view down (from windowViews) take in the ground-floor point (px, py)?
+export function windowSees(m, v, px, py, smokes) {
+  const d = Math.hypot(px - v.x, py - v.y);
+  if (d > v.range) return false;
+  if (d > 6 && Math.abs(angDiff(Math.atan2(py - v.y, px - v.x), v.ang)) > v.fov / 2 + 0.03) return false;
+  return d <= 6 || los(m, v.x, v.y, px, py, smokes);
+}
+// Where someone up on the building also shows on the ground floor, or null: a window peeker (just outside the wall
+// under their window; views = their views down) or someone hanging on a rope (on the ground right under them).
+// Seen from (sx, sy) on the ground floor? peekSeen below.
+export function wallGhost(m, x, y) {
+  const f = floorAt(m, x, y), gi = m.groundFloor;
+  if (gi === undefined || f <= gi) return null;
+  const k = Math.floor(y / CELL) * m.W + Math.floor(x / CELL);
+  if (ledgeAt(m, k)) { const o = floorOff(m, f, gi); return { x: x + o.x, y: y + o.y, fl: gi, rope: true }; }
+  const views = windowViews(m, x, y); if (!views.length) return null;
+  const v = views.reduce((a, b) => (b.hole ? 0 : b.fov) > (a.hole ? 0 : a.fov) ? b : a);
+  return { x: v.x, y: v.y, fl: gi, views, hole: views.every(w => w.hole) };
+}
+// Can someone at (sx, sy) on the ground floor see this ghost? A rope climber: plain sight. A window peeker: only from
+// inside one of their views (what they can see can see them), and through a bullet hole only from close by.
+export function peekSeen(m, gh, sx, sy, smokes) {
+  if (!gh || floorAt(m, sx, sy) !== gh.fl) return false;
+  if (gh.rope) return los(m, sx, sy, gh.x, gh.y, smokes);
+  for (const v of gh.views) {
+    if (v.hole && Math.hypot(sx - v.x, sy - v.y) > WIN_HOLE_SEE) continue;
+    if (windowSees(m, v, sx, sy, smokes)) return true;
+  }
+  return false;
 }

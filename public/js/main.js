@@ -1,7 +1,7 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
-import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen } from '/shared/map.js';
+import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -212,16 +212,30 @@ function cursor() {
 function freeAimPoint() {
   let l = Math.min(Math.hypot(aimOff.x, aimOff.y) || 1, AIM_MAX());
   const a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), s = Math.sin(a);
-  if (st.map) { // never off the edge of the floor you are on (the camera can't follow it there)
+  const outWin = st.map && st.winViewsOn && winAimed(a); // aiming out of an upper window, down at the ground below
+  if (st.map && !outWin) { // never off the edge of the floor you are on (the camera can't follow it there)
     const F = st.map.floors[Math.max(0, floorAt(st.map, st.pred.x, st.pred.y))], m = 10, x0 = F.gx * CELL + m, x1 = (F.gx + F.w) * CELL - m, y1 = F.h * CELL - m;
     if (c > 1e-6) l = Math.min(l, (x1 - st.pred.x) / c); else if (c < -1e-6) l = Math.min(l, (x0 - st.pred.x) / c);
     if (s > 1e-6) l = Math.min(l, (y1 - st.pred.y) / s); else if (s < -1e-6) l = Math.min(l, (m - st.pred.y) / s);
     l = Math.max(1, l);
   }
-  const see = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null) + 2 : l;
-  const shot = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null, true) + 2 : l;
+  let see = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null) + 2 : l;
+  let shot = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null, true) + 2 : l;
+  if (outWin) { // out past the window the air ends at the floor's edge: the crosshair is on the ground below, not on a wall
+    const vx = st.pred.x + c * (see + 3), vy = st.pred.y + s * (see + 3), k = Math.floor(vy / CELL) * st.map.W + Math.floor(vx / CELL);
+    if (st.map.tiles[k] === T.VOID) { see = l; if (shot >= see - 40 || st.map.tiles[Math.floor((st.pred.y + s * (shot + 3)) / CELL) * st.map.W + Math.floor((st.pred.x + c * (shot + 3)) / CELL)] === T.VOID) shot = l; }
+  }
   const x = st.pred.x + c * l, y = st.pred.y + s * l;
   return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
+}
+// is this aim (from where you stand) out through one of the windows you are looking down from?
+function winAimed(a) {
+  for (const v of st.viewers || []) if (v.kind === 'window') {
+    const r = st.map.ropes[v.r], ft = r && windowFoot(st.map, r); if (!ft) continue;
+    const wa = Math.atan2(ft.cy - st.pred.y, ft.cx - st.pred.x), half = Math.atan2(r.half + 6, Math.max(8, Math.hypot(ft.cx - st.pred.x, ft.cy - st.pred.y)));
+    if (Math.abs(angDiff(a, wa)) < half) return true;
+  }
+  return false;
 }
 addEventListener('resize', resize); resize();
 fx.quality = gq.parts; setShading(gq.shade);
@@ -1455,6 +1469,7 @@ function frame(nowMs) {
     keep(st.pred.x, st.pred.y, 50 * DPR / st.zoom); keep(q.ax, q.ay, AHEAD() / st.zoom); // always some room past the crosshair (he asked)
   }
   if (view && view.kind === 'cam' && !view.dr) { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
+  const camPre = { x: st.cam.x, y: st.cam.y };
   { // never look past the edge of the floor you are on (other floors sit beside it in the map grid)
     const fi = view ? Math.max(0, floorAt(st.map, view.x, view.y)) : st.tv && st.tvOv ? st.tvOv.f : 0, F = st.map.floors[fi];
     if (st.camFloor !== fi) { // changed floor: jump straight there
@@ -1471,6 +1486,12 @@ function frame(nowMs) {
     if (!st.rot) st.cam.y = mh > hh * 2 ? Math.max(hh, Math.min(mh - hh, st.cam.y)) : mh / 2;
     }
     st.floorRect = [x0, 0, x0 + mw, mh];
+    const wb = st.winViewsOn && st.winBox; // looking down out of a window: the view may go out over the ground below
+    if (wb && !st.rot) {
+      const lo = Math.min(x0, wb[0]) + hw, hi = Math.max(x0 + mw, wb[2]) - hw, tp = Math.min(0, wb[1]) + hh, bt = Math.max(mh, wb[3]) - hh;
+      st.cam.x = lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, camPre.x));
+      st.cam.y = tp > bt ? (tp + bt) / 2 : Math.max(tp, Math.min(bt, camPre.y));
+    }
   }
   if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
 
@@ -1858,6 +1879,18 @@ function draw(s, view, now, dt) {
       ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x + u.x * 15, gh.y + u.y * 15);
       if (!ally && !p.dn) st.heads.push({ x: gh.x, y: gh.y });
     }
+    // at an upper window or on a rope (he asked): they also show on the ground just outside the wall, to anyone below
+    // they could see from there (what they can see can see them; through a bullet hole only from close by)
+    const wg = !isMe && !gh && wallGhost(st.map, p.x, p.y);
+    if (wg && (ally || (!p.sh && wallGhostSeen(wg)))) {
+      ctx.globalAlpha = 0.9;
+      drawOperator(ctx, { x: wg.x, y: wg.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: wg.rope ? 0 : Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil }, now);
+      ctx.globalAlpha = 1;
+      ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
+      const F = st.map.floors[Math.max(0, floorAt(st.map, p.x, p.y))];
+      ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(wg.rope ? '▲ ON THE WALL' : `▲ ${F.name} WINDOW`, wg.x + u.x * 15, wg.y + u.y * 15);
+      if (!ally && !p.dn) st.heads.push({ x: wg.x, y: wg.y });
+    }
     // Silent Shroud: drones and cameras can't see her, only eyes can
     const vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
     if (st.tv) (st.tvPos || (st.tvPos = new Map())).set(p.id, { x: p.x, y: p.y, p });
@@ -1964,7 +1997,7 @@ function draw(s, view, now, dt) {
     if (R > c) ctx.fillRect(c, Tp, R - c, B - Tp);
     if (B > d) ctx.fillRect(a, d, c - a, B - d);
   }
-  if (inGame && view) { drawStairView(s, st.me, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
+  if (inGame && view) { drawStairView(s, st.me, now); drawWindowView(s, st.me, now, view); drawWindowMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
   if (st.tv && inGame) { // each team's sight, faintly in its own colour (pro team colours, else blue / orange)
     const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
     for (const sq of [0, 1]) {
@@ -2514,6 +2547,10 @@ const tvCamCone = new Map(); // ESPORTS TV: each camera's sight polygon by camer
 function teamViewers(s, view, me, inGame) {
   const vs = [];
   if (view) vs.push(view);
+  // looking out of an upper window (he asked): the ground below, as far as the boards let you (windowViews)
+  if (view && view.kind === 'body' && me && inGame && me.a && !me.dn && st.map) {
+    for (const w of windowViews(st.map, view.x, view.y)) if (Math.abs(angDiff(w.ang, view.ang)) < view.fov / 2 + w.fov / 2) vs.push(w);
+  }
   if (st.tv && s && inGame) { // ESPORTS TV (he asked): viewers see what BOTH teams see, each team's sight tinted its colour
     if (view && me) view.tvSq = me.sq;
     for (const sp of s.players) {
@@ -2643,6 +2680,97 @@ function drawStairView(s, me, now) {
   const L = pv.up ? '▲ UPSTAIRS' : '▼ DOWNSTAIRS', ly = P.y - px * 0.36;
   octx.strokeText(L, P.x, ly); octx.fillText(L, P.x, ly);
   octx.restore();
+}
+function wallGhostSeen(gh) { // a window peeker / climber's copy on the ground: seen by something of ours down there
+  const sm = smokes(st.last);
+  for (const v of st.viewers || []) if (!v.off && v.kind !== 'hatch' && v.kind !== 'window' && floorAt(st.map, v.x, v.y) === gh.fl && canSee(st.map, v, gh.x, gh.y, sm) && peekSeen(st.map, gh, v.x, v.y, sm)) return true;
+  return false;
+}
+// The view down out of an upper window (he asked): the ground floor drawn into the dark outside the window, moved by
+// the floor offset so it lines up under the building, live colour only inside what the window lets you see (a slit
+// through a bullet hole, the whole opening once the boards are gone), a little darker (it is a floor or two down)
+// and fading out with distance. People and gadgets there: your team, and the other side where your team sees them.
+function drawWindowView(s, me, now, view) {
+  const ws = (st.viewers || []).filter(v => v.kind === 'window');
+  st.winBox = null; st.winViewsOn = ws.length > 0;
+  if (!ws.length || !me) return;
+  const m = st.map, gi = m.groundFloor, f = floorAt(m, view.x, view.y), o = floorOff(m, gi, f), sm = smokes(s);
+  const polys = ws.map(v => visionPolygon(v, sm, 120));
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const P of polys) for (let i = 0; i < P.length; i += 2) { x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]); y0 = Math.min(y0, P[i + 1]); y1 = Math.max(y1, P[i + 1]); }
+  const G = m.floors[gi]; x0 = Math.max(x0, G.gx * CELL); x1 = Math.min(x1, (G.gx + G.w) * CELL); y0 = Math.max(0, y0); y1 = Math.min(y1, G.h * CELL);
+  if (x1 <= x0 || y1 <= y0) return;
+  st.winBox = [x0 + o.x, y0 + o.y, x1 + o.x, y1 + o.y]; // the camera may show this past the floor's edge
+  const R = st.rend, k = R.c.width / R.Wp, c = octx;
+  c.save(); c.translate(o.x, o.y); // the top layer is in world units here (as for the stairs view)
+  c.beginPath(); for (const P of polys) { c.moveTo(P[0], P[1]); for (let i = 2; i < P.length; i += 2) c.lineTo(P[i], P[i + 1]); c.closePath(); }
+  c.clip('nonzero');
+  R.c.drawTo(c, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0);
+  const side = me.tm, inBox = (x, y) => x >= x0 - 20 && x < x1 + 20 && y >= y0 - 20 && y < y1 + 20;
+  for (const e0 of s.ents) {
+    const e = interp(e0.id, 'ents') || e0, ally = e.tm === side;
+    if (!inBox(e.x, e.y) || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud' || floorAt(m, e.x, e.y) !== gi) continue;
+    if (!ally && !teamSees(e.x, e.y)) continue;
+    if ((e.ty === 'clamp' || e.ty === 'prox' || e.ty === 'concuss' || e.ty === 'mine') && !ally) continue;
+    if (e.ty === 'drone') drawDrone(c, { ...e, ag: e.ag || 0, wheel: 0, spd: 0, mvAng: e.ag || 0, sway: 0 }, now, ally);
+    else if (e.ty === 'cam') drawCam(c, e, now, ally);
+    else drawGadget(c, e, now, ally);
+  }
+  for (const sp of s.players) {
+    if (!sp.a || sp.sg || sp.id === me.id) continue;
+    const p = interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
+    const pf = floorAt(m, p.x, p.y), wg = pf > gi ? wallGhost(m, p.x, p.y) : null, at = pf === gi ? p : wg && wg.rope ? wg : null; // climbers show on the wall below too
+    if (!at || !inBox(at.x, at.y)) continue;
+    const ally = p.tm === side;
+    if (!ally && (p.sh ? !teamSeesBody(at.x, at.y) : !teamSees(at.x, at.y))) continue;
+    const a = anim(p.id);
+    drawOperator(c, { x: at.x, y: at.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+    if (!ally && !p.dn) st.heads.push({ x: at.x + o.x, y: at.y + o.y });
+  }
+  // darker with distance from the wall: a floor or more down, and it fades out at the end of what you can see
+  for (const v of ws) {
+    const gr = c.createRadialGradient(v.x, v.y, 0, v.x, v.y, v.range);
+    gr.addColorStop(0, 'rgba(8,10,14,0.22)'); gr.addColorStop(0.75, 'rgba(8,10,14,0.4)'); gr.addColorStop(1, 'rgba(5,6,7,0.95)');
+    c.fillStyle = gr; c.fillRect(x0, y0, x1 - x0, y1 - y0); break;
+  }
+  c.restore();
+  const v0 = ws[0], P = w2s(v0.x + o.x + Math.cos(v0.ang) * 26, v0.y + o.y + Math.sin(v0.ang) * 26);
+  octx.save(); octx.setTransform(1, 0, 0, 1, 0, 0);
+  octx.font = `700 ${Math.round(11 * DPR)}px Barlow, sans-serif`; octx.textAlign = 'center';
+  octx.fillStyle = 'rgba(255,255,255,0.7)'; octx.strokeStyle = 'rgba(0,0,0,0.8)'; octx.lineWidth = 3 * DPR;
+  const L = ws.every(v => v.hole) ? '▼ GROUND · THROUGH A BULLET HOLE' : '▼ GROUND BELOW';
+  octx.strokeText(L, P.x, P.y); octx.fillText(L, P.x, P.y);
+  octx.restore();
+}
+// From the ground (he asked: attackers must be able to tell which upper windows may be watched): a small plate on the
+// ground under every upper outside window showing its state as your team last saw it from down there — boards intact,
+// boards with holes (someone may be looking through), broken open, or reinforced. All windows start boarded.
+const WIN_LOOK = { boarded: ['#8a5a2e', 'BOARDED'], holed: ['#d9a13a', 'HOLES'], open: ['#ff5a3c', 'OPEN'], shut: ['#8f969c', 'BLOCKED'] };
+function drawWindowMarks(s, view, now) {
+  const m = st.map, gi = m.groundFloor;
+  if (gi === undefined || floorAt(m, view.x, view.y) !== gi || !fxOn('winmarks')) return;
+  const K = st.winKnown || (st.winKnown = {}), sm = smokes(s), c = octx, u = UP();
+  const vx0 = st.cam.x - 1400, vx1 = st.cam.x + 1400, vy0 = st.cam.y - 1400, vy1 = st.cam.y + 1400;
+  const byFoot = new Map();
+  for (const r of m.ropes || []) {
+    const ft = windowFoot(m, r); if (!ft || ft.x < vx0 || ft.x > vx1 || ft.y < vy0 || ft.y > vy1) continue;
+    if (!K[r.i] || now - (K[r.i].t || 0) > 0.25) { // looked at again a few times a second while in sight
+      for (const v of st.viewers || []) if (!v.off && v.kind !== 'window' && v.kind !== 'hatch' && floorAt(m, v.x, v.y) === gi && canSee(m, v, ft.x, ft.y, sm)) { K[r.i] = { s: windowState(m, r), t: now }; break; }
+    }
+    const key = Math.round(ft.x / 8) + ',' + Math.round(ft.y / 8), n = byFoot.get(key) || 0; byFoot.set(key, n + 1);
+    const st0 = K[r.i] ? K[r.i].s : 'boarded', [col, word] = WIN_LOOK[st0];
+    const ox = Math.cos(r.out), oy = Math.sin(r.out), x = ft.x + ox * (6 + n * 13), y = ft.y + oy * (6 + n * 13), live = K[r.i] && now - K[r.i].t < 0.6;
+    c.save(); c.translate(x, y); c.rotate(r.out + Math.PI / 2);
+    c.globalAlpha = live ? 0.95 : 0.6;
+    c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillRect(-9, -4, 18, 8);
+    c.fillStyle = st0 === 'open' ? '#111' : col; c.fillRect(-8, -3, 16, 6);
+    if (st0 === 'boarded' || st0 === 'holed') { c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(-8, -0.5, 16, 1); }
+    if (st0 === 'holed') { c.fillStyle = '#000'; for (const hx of [-5, 1, 5]) c.fillRect(hx, -2, 1.4, 1.4); }
+    c.strokeStyle = col; c.lineWidth = 1; c.strokeRect(-8.5, -3.5, 17, 7);
+    c.restore();
+    c.save(); c.globalAlpha = live ? 0.9 : 0.55; c.font = '700 6px Barlow Condensed, sans-serif'; c.textAlign = 'center'; c.fillStyle = col;
+    c.fillText(`▲${m.floors[r.f].name} ${word}`, x + ox * 9 + u.x * 2, y + oy * 9 + u.y * 2); c.restore();
+  }
 }
 function ghostSeen(gh) {
   const sm = smokes(st.last);

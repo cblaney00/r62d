@@ -6,7 +6,7 @@
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
-import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt } from '../shared/map.js';
+import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel } from '../shared/pros.js';
 import { planWeight, opWeight } from './training.js';
@@ -303,7 +303,7 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside
   return path.reverse();
 }
 
-function visibleEnemy(game, p, see) {
+export function visibleEnemy(game, p, see) {
   const team = game.side(p);
   const smokes = game.smokeList();
   let best = null, bd = Infinity;
@@ -328,6 +328,33 @@ function visibleEnemy(game, p, see) {
     const seen = Object.create(q); seen.x = gh.x; seen.y = gh.y; // the person, where they show
     best = seen; bd = d;
   }
+  // upper windows (he asked): from up at a window, enemies on the ground below (or on a rope) through the view down,
+  // aimed at where they show from up here (the shot carries down: game.shotOutWindow); from the ground, someone at
+  // an upper window or on a rope, where they show just outside the wall
+  const m = game.map, gi = m.groundFloor, wide = p.pro ? 0.9 : 1.2;
+  const take = (q, x, y, win) => {
+    const d = Math.hypot(x - p.x, y - p.y);
+    if (d > see || d > bd || (d > 70 && Math.abs(angDiff(Math.atan2(y - p.y, x - p.x), p.aim)) > wide)) return;
+    const seen = Object.create(q); seen.x = x; seen.y = y; if (win) seen.win = 1;
+    best = seen; bd = d;
+  };
+  if (gi !== undefined && fl > gi) {
+    const vs = windowViews(m, p.x, p.y);
+    if (vs.length) {
+      const o = floorOff(m, gi, fl);
+      for (const q of game.players.values()) {
+        if (!q.alive || q.staged || game.side(q) === team || q.shrouded) continue;
+        const qf = floorAt(m, q.x, q.y), gh = qf > gi ? wallGhost(m, q.x, q.y) : null, at = qf === gi ? q : gh && gh.rope ? gh : null;
+        if (at && vs.some(v => windowSees(m, v, at.x, at.y, smokes))) take(q, at.x + o.x, at.y + o.y, true);
+      }
+    }
+  } else if (gi !== undefined && fl === gi) {
+    for (const q of game.players.values()) {
+      if (!q.alive || q.staged || game.side(q) === team || q.shrouded) continue;
+      const gh = wallGhost(m, q.x, q.y);
+      if (gh && peekSeen(m, gh, p.x, p.y, smokes)) take(q, gh.x, gh.y, false);
+    }
+  }
   return best;
 }
 
@@ -349,7 +376,8 @@ function shotClear(game, p, q) {
   let ok = true;
   walkRay(p.x, p.y, dx, dy, d, (cx, cy) => {
     if (cx === sx && cy === sy) return false;
-    const t = tileAt(m, cx, cy); if (!stopsBullet(t)) return false;
+    const t = tileAt(m, cx, cy); if (q.win && t === T.VOID) return true; // out of a window: it carries on down there
+    if (!stopsBullet(t)) return false;
     const sh = shapeAt(m, cx, cy); if (sh) { const h = rayShape(sh, p.x, p.y, dx, dy); if (h === null || h > d) return false; }
     ok = false; return true;
   });

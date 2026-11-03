@@ -1,6 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
-import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP } from '../shared/map.js';
+import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
@@ -576,14 +576,18 @@ export class Game {
   }
 
   tickPlayer(p, dt) {
+    const RUNOUT_SPOT = 3;
     this.tickPrep(p);
-    // a defender outside the building (preparation or action) is spotted by the attackers, and told so (he asked)
+    // a defender outside the building (preparation or action): the attackers are warned at once, and after RUNOUT_SPOT
+    // seconds outside in a row (R6's run-out rule, he chose it) the defender is spotted for them until back inside
     if (p.alive && this.side(p) === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION) && !this.tut) {
       const k = Math.floor(p.y / CELL) * this.map.W + Math.floor(p.x / CELL), out = this.map.tiles[k] === T.GROUND;
       p.outside = out; // the attackers get a warning at the top of the screen while any defender is outside (snapshot `ou`)
-      if (out) { this.spot(TEAM.ATK, p.id, 1); if (!(p.outWarnT > this.time)) { p.outWarnT = this.time + 6; this.events.push({ e: 'deny', id: p.id, why: 'You are outside: the attackers can see where you are' }); } }
+      p.outT = out ? (p.outT || 0) + dt : 0;
+      if (out && p.outT >= RUNOUT_SPOT) this.spot(TEAM.ATK, p.id, 1);
+      if (out && !(p.outWarnT > this.time)) { p.outWarnT = this.time + 6; this.events.push({ e: 'deny', id: p.id, why: p.outT >= RUNOUT_SPOT ? 'You are outside: the attackers can see where you are' : `You are outside: in ${Math.ceil(RUNOUT_SPOT - p.outT)} s the attackers will see where you are` }); }
     }
-    else p.outside = false;
+    else { p.outside = false; p.outT = 0; }
     if (!p.alive) { p.outside = false; return; }
     if (p.vault) { // carried over the obstacle along a fixed path
       const v = p.vault; v.t += dt;
@@ -806,8 +810,10 @@ export class Game {
       const a = base + shotOffset(w, cone, i);
       const into = this.aimedHatch(p, a); // aimed into a hatch: the bullet goes down (or up) there, not on across the room
       const eye = leanPoint(this.map, p.x, p.y, p.aim, p.lo || 0); // a lean shoots from the tipped upper body
-      const end = this.hitscan(p, eye.x, eye.y, a, into ? into.ad : w.range, w.dmg * m.dmg, w.name, w.cls);
+      let end = this.hitscan(p, eye.x, eye.y, a, into ? into.ad : w.range, w.dmg * m.dmg, w.name, w.cls);
       if (into && end.k === 'none') this.shotThroughHatch(p, a, into, w.dmg * m.dmg, w.name, w.cls);
+      else if (this.winCarry && end.k === 'none') end = this.shotOutWindow(p, eye, a, w.range, w.dmg * m.dmg, w.name, w.cls);
+      this.winCarry = null;
       if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });
@@ -952,6 +958,12 @@ export class Game {
         const tg = rayCircle(x0, y0, dx, dy, gh.x, gh.y, hitR(q.op));
         if (tg !== null && tg < bestT) { bestT = tg; best = { q, at: gh }; }
       }
+      // someone at an upper window (or on a rope) shows on the ground just outside the wall: hit there from below
+      const wg = fl === this.map.groundFloor && wallGhost(this.map, at.x, at.y);
+      if (wg && peekSeen(this.map, wg, x0, y0)) {
+        const tw = rayCircle(x0, y0, dx, dy, wg.x, wg.y, hitR(q.op));
+        if (tw !== null && tw < bestT) { bestT = tw; best = { q, at: wg }; }
+      }
     }
     for (const e of this.ents) {
       if (!e.hp || e.team === team) continue;
@@ -964,9 +976,16 @@ export class Game {
     const cov = rayCovers(this.map, x0, y0, dx, dy, bestT); if (cov) { bestT = cov.t; best = null; } // a cover plate in the way
     let mult = 1, stopT = bestT, kind = best ? 'flesh' : cov ? 'cover' : 'none', pens = 0, wallT = 0, tracerWall = src && src.tracerUntil > this.time && this.shotW ? 2 : 0; // MARK: two cells of solid wall
     const pen = penOf(this.shotW && this.shotW.cls === cls ? this.shotW : { cls });
-    const sx = Math.floor(x0 / CELL), sy = Math.floor(y0 / CELL);
+    const sx = Math.floor(x0 / CELL), sy = Math.floor(y0 / CELL), up = fl > (this.map.groundFloor ?? 99);
+    let winK = -1; this.winCarry = null;
     walkRay(x0, y0, dx, dy, bestT, (cx, cy, t) => {
-      const k = cy * this.map.W + cx, tile = tileAt(this.map, cx, cy), sh = (stopsBullet(tile) || penBullet(tile)) && shapeAt(this.map, cx, cy);
+      const k = cy * this.map.W + cx, tile = tileAt(this.map, cx, cy);
+      if (up) { // out of an upper window: the rest of the shot carries on down on the ground floor (shotOutWindow)
+        if (this.map.win[k]) winK = k;
+        else if (winK >= 0 && !this.winCarry && (tile === T.VOID || (tile === T.LOW && this.map.floor[k] === FL.VOID))) this.winCarry = { t, mult, k: winK };
+        if (tile === T.VOID && this.winCarry) { stopT = t; kind = 'none'; best = null; return true; }
+      }
+      const sh = (stopsBullet(tile) || penBullet(tile)) && shapeAt(this.map, cx, cy);
       if (sh) { const h = rayShape(sh, x0, y0, dx, dy); if (h === null || h > bestT) return false; t = h; } // angled/curved wall: only its solid part
       else if (cx === sx && cy === sy) return false;
       if (stopsBullet(tile) && tracerWall > 0 && tile !== T.VOID) { tracerWall--; mult *= 0.75; pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) }); return false; }
@@ -1069,6 +1088,25 @@ export class Game {
     const ax = p.x + Math.cos(ang) * ad, ay = p.y + Math.sin(ang) * ad, at = hatchAtPoint(this.map, ax, ay);
     if (!at || (!at.up && this.map.tiles[at.h.cells[0]] !== T.HOLE)) return null;
     return { ...at, ad, ax, ay };
+  }
+  // A shot out of an upper window (hitscan left this.winCarry where it left the window) carries on down on the ground
+  // floor with what the boards left of it, from where the view down starts (windowFoot), towards the same aim point
+  // (keeping the shot's spread), so bullets go where the view shows. The tracer ends where it lands as seen from up
+  // here (the view down is drawn moved by the same offset).
+  shotOutWindow(p, eye, ang, range, dmg, wname, cls) {
+    const c = this.winCarry; this.winCarry = null;
+    const f = floorAt(this.map, eye.x, eye.y), o = floorOff(this.map, f, this.map.groundFloor), sa = this.shotAim;
+    const r = this.map.ropes.find(q => q.cells.includes(c.k)), ft = r && windowFoot(this.map, r);
+    let x = eye.x + Math.cos(ang) * c.t + o.x, y = eye.y + Math.sin(ang) * c.t + o.y, a2 = ang;
+    if (ft) {
+      const tx = (sa && sa.x !== undefined && sa.x !== null ? sa.x : eye.x + Math.cos(ang) * 200) + o.x, ty = (sa && sa.y !== undefined && sa.y !== null ? sa.y : eye.y + Math.sin(ang) * 200) + o.y;
+      const aimA = Math.atan2(ty - o.y - eye.y, tx - o.x - eye.x);
+      x = ft.x; y = ft.y; a2 = Math.atan2(ty - y, tx - x) + angDiff(ang, aimA);
+    }
+    if (sa && sa.x !== undefined && sa.x !== null) this.shotAim = { x: sa.x + o.x, y: sa.y + o.y };
+    const e = this.hitscan(p, x - Math.cos(a2) * 2, y - Math.sin(a2) * 2, a2, Math.min(WIN_RANGE + 40, range - c.t), dmg * c.mult, wname, cls);
+    this.shotAim = sa;
+    return { x: e.x - o.x, y: e.y - o.y, k: e.k };
   }
   shotThroughHatch(p, ang, at, dmg, wname, cls) {
     const { ax, ay } = at, h = at.h, t = this.map.tiles[h.cells[0]];
@@ -2057,6 +2095,10 @@ export class Game {
     if (m.a === 'tp' && process.env.R62D_FAST) {
       const q = m.id ? this.players.get(m.id) : p;
       if (q && isFinite(m.x) && isFinite(m.y)) { q.x = m.x; q.y = m.y; if (isFinite(m.aim)) q.aim = m.aim; if (q.bot) q.hold = !!m.hold; }
+      return;
+    }
+    if (m.a === 'tile' && process.env.R62D_FAST && Array.isArray(m.ks)) { // screenshot tests only: set map cells (open a window)
+      for (const k of m.ks) if (this.map.tiles[k] !== undefined) { this.map.tiles[k] = m.v | 0; this.map.hp[k] = m.v === T.BARRI ? CELL_HP[T.BARRI] : 0; delete this.map.holes[k]; if (m.holes) { this.map.holes[k] = m.holes.slice(0, 2); this.newHoles.push(k, m.holes[0], m.holes[1]); } this.changed.add(k); }
       return;
     }
     if (m.a === 'start') {
