@@ -212,8 +212,7 @@ export function build() {
     sites: [
       { name: 'A: Spice Bazaar / Granary', bombs: [{ id: 'A', ...g(14, 10), room: 'Spice Bazaar' }, { id: 'B', ...g(28, 11), room: 'Granary' }], rooms: ['Spice Bazaar', 'Granary'] },
       { name: 'B: Water Works / Pump House', bombs: [{ id: 'A', ...g(74, 10), room: 'Water Works' }, { id: 'B', ...g(90, 11), room: 'Pump House' }], rooms: ['Water Works', 'Pump House'] },
-      { name: 'Hotel Lobby / Hotel Bar', bombs: [{ id: 'A', ...g(47, 10), room: 'Hotel Lobby' }, { id: 'B', ...g(57, 12), room: 'Hotel Bar' }], rooms: ['Hotel Lobby', 'Hotel Bar'] },
-    ],
+    ], // (the middle site in the hotel was removed, he asked: just A and B, like a classic desert town)
     cams: [g(20, 25), g(50, 23), g(80, 25), g(7, 50), g(52, 48), g(88, 50), g(46, 6), g(12, -5), g(90, -7), g(46, -8), g(50, -14)],
     atkSpawns: [
       { name: 'Long Road', ...g(6, 74) }, { name: 'Market Street', ...g(28, 74) },

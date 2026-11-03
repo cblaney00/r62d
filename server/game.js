@@ -35,6 +35,7 @@ const THROWN_AB = new Set(['emp', 'sonar', 'stickycam', 'gas', 'flare', 'medkit'
 const PLACED_AB = new Set(['prox', 'concuss', 'clamp', 'sensor', 'plates', 'turret', 'spike', 'alarm', 'pace', 'radar', 'station', 'catcher', 'jammer', 'mine', 'grid', 'cover', 'cutter', 'periscope', 'scope']);
 const LUNGE_M = 4; // CROW: how far the marked lunge reaches (m)
 const SHIELD_ASIDE = 0.45; // BULWARK: seconds to swing the shield out of the way when aiming in // FERRO: seconds between hammer swings // TALON's EMP: a circle about a door wide (he asked), centred inside the wall it stuck to
+const MAX_BANS = 8; // he asked: at most 8 banned operators in a match
 const BAN_GAP = 2.6; // seconds between Esports TV bans, long enough to read each one
 
 export class Game {
@@ -248,16 +249,17 @@ export class Game {
   }
 
   isBanned(op) { return !!this.bans && this.bans.some(b => b.op === op); }
-  // ESPORTS TV bans (he asked, R6 rules): before the first round each team bans 2 attackers and 2 defenders, taking turns
-  // (4 banned on each side); every round after that each team bans 1 more, from the side the other team plays that round.
-  // Banned operators stay banned for the whole match. Returns true while the ban phase is still running.
+  // ESPORTS TV bans (he asked: there were too many): before the first round each team bans 1 attacker and 1 defender
+  // (4 in all); every round after that 1 more (the teams take turns, from the side the other team plays that round), never
+  // more than MAX_BANS in a match. Banned operators stay banned for the whole match. True while the ban phase is running.
   tvBanStep() {
     if (!this.bans) this.bans = [];
     let B = this.banRun;
     if (!B || B.round !== this.round) {
       const atkSq = [0, 1].find(sq => [...this.players.values()].some(p => p.squad === sq && this.side(p) === TEAM.ATK)) ?? 0;
-      const order = this.round === 1 ? [[0, 'atk'], [1, 'atk'], [0, 'def'], [1, 'def'], [1, 'atk'], [0, 'atk'], [1, 'def'], [0, 'def']]
-        : [[atkSq, 'def'], [1 - atkSq, 'atk']];
+      const by = this.round % 2; // whose turn this round
+      const order = this.round === 1 ? [[0, 'atk'], [1, 'atk'], [1, 'def'], [0, 'def']]
+        : this.bans.length >= MAX_BANS ? [] : [[by, by === atkSq ? 'def' : 'atk']];
       B = this.banRun = { round: this.round, order, i: 0, t: this.time + 2.5 };
     }
     if (B.i < B.order.length) {
