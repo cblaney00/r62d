@@ -8,10 +8,9 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
 
-- [ ] One-file installer: anyone who can browse the internet and follow basic instructions should be set up with no hitches in under a minute after the file is on their computer (he asked). Still needs: a single setup file instead of a zip.
-
 ## Done
 
+- [x] One-file installer: not needed, he decided the zip is fine (unzip, double-click R62D.exe).
 - [x] Main menu: the buttons on the left are smaller and grouped under PLAY, WATCH, LEARN and YOU, with QUIT at the bottom.
 - [x] The R62D program has PLAY / HOST / JOIN: PLAY is a game just for you (nobody can join, the lobby doesn't offer an address), HOST opens your game to your home network and, on the VPN, to everyone on Lando's homelab, JOIN looks for games itself: Lando's homelab first, then anyone hosting on your network or the homelab VPN; one game = straight in, more = a short list to pick from, none = it says to switch on the VPN or ask a friend to HOST (an address can still be typed). Never open to the internet.
 - [x] The R62D program updates itself: each time it opens it looks at your GitHub page for a newer release and fetches just the game part (about half a megabyte), checks it arrived whole, and plays it. No internet, or anything goes wrong: it plays the version it has.

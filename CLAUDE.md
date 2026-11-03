@@ -245,6 +245,6 @@ His wishes so far:
   - `desktop/preload.cjs` (`window.r62dApp`), `desktop/start.html`. `quitGame` in main.js calls `r62dApp.quit()`.
 - Build: `bash desktop/build.sh` (node on PATH) → `build/R62D/R62D.exe`, `build/R62D-windows.zip` (full, 147 MB), `build/R62D-update.zip` (game only, ~0.5 MB). Electron `EV` for Windows from GitHub, checksum checked, cached in `build/cache`. The .exe icon is put in by our own `desktop/seticon.mjs` (rcedit was refused by the safety check). Release: commit + push, then `sudo -u insideabush -H bash desktop/release.sh` (gh release `b<n>`, --latest).
 - Tested under wine (he allowed it): `R62D_PORT=6271` + `--remote-debugging-port=9333 --no-sandbox --disable-gpu` on an Xvfb screen as insideabush, prefix `~/.local/share/r62d/wine-test` (`WINEDLLOVERRIDES=mscoree,mshtml=` skips the mono prompt); driven over the DevTools port. Not yet run on real Windows.
-- Not done: a one-file installer (he wants anyone set up in under a minute; needs NSIS, not in the dev shell).
+- No installer: he decided the zip is fine (2026-11-03).
 - `tools/progress/` is a TEMPORARY build-progress window he asked for (`open.sh` opens it on his desktop, `node tools/progress/step.js start|done|fail N "detail"`, port 6263). Delete it when the program project is finished.
 - Main menu: left nav buttons smaller, grouped PLAY / WATCH / LEARN / YOU (`.ngrp`), he asked.
