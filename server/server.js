@@ -9,6 +9,7 @@ import { attachWebSocket } from './ws.js';
 import { Worker } from 'node:worker_threads';
 import { training, addResults, saveTraining, needsTraining, newVersion, roundsLeft } from './training.js';
 import { Game } from './game.js';
+const perfLog = [];
 import { store, publicProfile } from './store.js';
 import { TICK_RATE, SNAP_RATE } from '../shared/constants.js';
 
@@ -63,6 +64,11 @@ function api(req, res) {
     const rank = u => (u.vpn ? 2 : u.net === 'Wi-Fi' ? 1 : 0);
     urls.sort((a, b) => rank(a) - rank(b));
     return json(200, { urls, host: os.hostname(), version: VERSION, port: PORT });
+  }
+  if (u.pathname === '/api/perf') { // browsers report how smoothly they run (see perfRep in main.js)
+    if (req.method !== 'POST') return json(200, perfLog);
+    let b = ''; req.on('data', d => { if (b.length < 8000) b += d; }); req.on('end', () => { try { perfLog.push({ ip: req.socket.remoteAddress, ...JSON.parse(b) }); if (perfLog.length > 200) perfLog.shift(); } catch {} json(200, { ok: true }); });
+    return;
   }
   if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, running: !!trainer, session: trainer ? trainer.rounds : 0, current: VERSION.id });
   if (u.pathname === '/api/train' && req.method === 'POST') { const r = trainCheck(true); return json(200, { running: !!trainer, why: r || '' }); } // TRAIN THE PROS button

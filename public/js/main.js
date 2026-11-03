@@ -421,6 +421,7 @@ function portraitCached(c, k) { // operator portraits are drawn once and copied 
 }
 
 function onSnap(s) {
+  { const t = performance.now(); if (perfRep.lastSnap) perfRep.snaps.push(t - perfRep.lastSnap); perfRep.lastSnap = t; }
   if (st.mapLoading) return; // a new map is being got ready behind the loading screen
   if (s.mp && s.mp !== st.mapId) { // a different map: build it behind a loading screen
     st.mapLoading = true;
@@ -1431,7 +1432,19 @@ function frame(nowMs) {
   drawOutWarn(st.last, st.me); drawCompass(st.last, st.me, now); drawAllies(st.last, st.me, now);
   pfa('total', T0);
   watchPerf(rawGap, performance.now() - T0);
+  perfRep.gaps.push(rawGap); perfRep.work.push(performance.now() - T0);
 }
+// How smoothly this browser runs, sent to the server every 3 s during a match (read at /api/perf) so slowness on
+// a real screen can be looked at; headless test browsers don't use the graphics card, so they can't show it.
+const perfRep = { gaps: [], work: [], snaps: [], lastSnap: 0, pf: {} };
+setInterval(() => {
+  const P = perfRep; if (!P.gaps.length || !playing() && !st.tv) { P.gaps = []; P.work = []; P.snaps = []; return; }
+  const q = (a, f) => { const b = a.slice().sort((x, y) => x - y); return +(b[Math.min(b.length - 1, Math.floor(b.length * f))] || 0).toFixed(1); };
+  const sec = {}; for (const k in PF) if (k !== 'frames') sec[k] = +(((PF[k] - (P.pf[k] || 0)) / Math.max(1, PF.frames - (P.pf.frames || 0)))).toFixed(2);
+  const rep = { t: Date.now(), name: st.profile && st.profile.name, tv: !!st.tv, gfx: gfxLevel(), VW, VH, DPR, fps: +(P.gaps.length / 3).toFixed(1), gapMed: q(P.gaps, 0.5), gap95: q(P.gaps, 0.95), gapMax: q(P.gaps, 1), workMed: q(P.work, 0.5), work95: q(P.work, 0.95), snapMed: q(P.snaps, 0.5), snap95: q(P.snaps, 0.95), snapMax: q(P.snaps, 1), sec, viewers: (st.viewers || []).length, hidden: document.hidden };
+  P.pf = { ...PF }; P.gaps = []; P.work = []; P.snaps = [];
+  fetch('/api/perf', { method: 'POST', body: JSON.stringify(rep) }).catch(() => {});
+}, 3000);
 let overDirty = false, fogShown = false;
 function showFog(on) { if (on !== fogShown) { fogShown = on; fog.style.visibility = on ? 'visible' : 'hidden'; } }
 const PF = { frames: 0 }; function pfa(k, t) { const n = performance.now(); PF[k] = (PF[k] || 0) + n - t; return n; }
