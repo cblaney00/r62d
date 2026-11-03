@@ -25,7 +25,7 @@ while (Date.now() < until && left > 0) {
     }
     g.events = [];
     if (g.phase !== last) {
-      if (g.phase === PHASE.PREP) { rs = {}; for (const p of g.players.values()) if (p.op) rs[p.id] = { op: p.op, sq: p.squad, ab: p.abilityCount, k: 0, d: 0, sk: 0, hs: 0, fk: 0 }; }
+      if (g.phase === PHASE.PREP) { rs = {}; for (const p of g.players.values()) if (p.op) rs[p.id] = { op: p.op, sq: p.squad, ab: OPERATORS[p.op].ability.count, k: 0, d: 0, sk: 0, hs: 0, fk: 0 }; }
       if (g.phase === PHASE.ROUND_END && g.winner !== null && g.winner !== undefined) {
         const res = { plans: {}, ops: {}, rounds: 1 };
         for (const sq of [0, 1]) {
@@ -35,7 +35,7 @@ while (Date.now() < until && left > 0) {
           for (const p of g.players.values()) if (p.squad === sq && p.op) { const k = opKey(id, side, p.op), o = res.ops[k] || (res.ops[k] = [0, 0]); o[0]++; o[1] += win; }
         }
         if (rs) { res.opx = {}; for (const [id, r] of Object.entries(rs)) { if (id === 'first') continue; const p = g.players.get(id), u = p && OPERATORS[r.op].ability.count ? Math.max(0, r.ab - p.abilityCount) : 0;
-          const x = res.opx[r.op] || (res.opx[r.op] = [0, 0, 0, 0, 0, 0, 0, 0]); x[0]++; x[1] += g.winner === r.sq ? 1 : 0; x[2] += r.k; x[3] += r.d; x[4] += r.sk; x[5] += u; x[6] += r.hs; x[7] += r.fk; } } // rounds, wins, kills, deaths, skill kills, skill uses, headshots, opening kills
+          const x = res.opx[r.op] || (res.opx[r.op] = [0, 0, 0, 0, 0, 0, 0, 0, 0]); x[0]++; x[8]++; x[1] += g.winner === r.sq ? 1 : 0; x[2] += r.k; x[3] += r.d; x[4] += r.sk; x[5] += u; x[6] += r.hs; x[7] += r.fk; } } // rounds, wins, kills, deaths, skill kills, skill uses, headshots, opening kills, rounds the uses were counted in
         rs = null;
         parentPort.postMessage(res); left--;
       }

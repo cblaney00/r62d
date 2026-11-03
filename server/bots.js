@@ -691,6 +691,11 @@ export function botThink(game, p, dt) {
     return moveTo(game, p, inp, mate, dt);
   }
   if (abId === 'stim' && p.abilityCount > 1 && p.hp < 45 && action) { useAbility(); return; } // patch yourself up (the dart lands on you when no teammate is in line)
+  if (abId === 'stim' && p.abilityCount > 1 && action) { // a hurt teammate in sight (between fights): heal them from range, keeping one dart for a revive
+    const hurt = [...game.players.values()].find(q => q !== p && q.alive && !q.downed && game.side(q) === team && q.hp < q.maxHp * 0.6
+      && Math.hypot(q.x - p.x, q.y - p.y) < 380 && floorAt(map, q.x, q.y) === floorAt(map, p.x, p.y) && los(map, p.x, p.y, q.x, q.y));
+    if (hurt) { const a = Math.atan2(hurt.y - p.y, hurt.x - p.x); turnTo(p, a, S.turn, dt); if (Math.abs(angDiff(a, p.aim)) < 0.04) useAbility(); return; }
+  }
 
   // --- cameras (he asked): a defender looks through the team's cameras when it is safe, or for a quick look when
   // enemies are heard coming and nobody knows where; never with an enemy close by ---
@@ -1478,6 +1483,10 @@ function proAct(game, p, inp, dt, team) {
       if ((ai.waitT = (ai.waitT ?? 9 + Math.random() * 6) - dt) <= 0) {
         ai.waitT = 10 + Math.random() * 8; ai.spreadOff = { x: Math.round((Math.random() - 0.5) * 6), y: Math.round((Math.random() - 0.5) * 6) }; ai.spread = null;
         if (!game.spots[team].size && Math.random() < 0.35) proSay(game, p, `${place(game, p.x, p.y)} is quiet, holding for the go (${Math.max(0, Math.round(go - el))} s)`, 'wait' + place(game, p.x, p.y));
+      }
+      if (j.clear != null && el > go - 9 && game.map.tiles[j.clear] === T.BARRI) { // a boarded window: shoot the boards off from the stack (as R6 teams do) instead of hitting them three times in the open
+        const W = game.map.W, cx = (j.clear % W + 0.5) * CELL, cy = (Math.floor(j.clear / W) + 0.5) * CELL; aimAt(p, cx, cy); inp.ads = 1;
+        const gun = p.guns[p.slot]; if (gun && gun.ammo === 0) game.startReload(p); else shootInput(inp, ai, gun); return true;
       }
       watch(eff(st, j, 'target'), true); return true;
     }

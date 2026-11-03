@@ -10,6 +10,9 @@ const FILE = path.join(DIR, 'pro-training.json');
 export const training = { version: null, at: 0, rounds: 0, verRounds: 0, plans: {}, ops: {}, opx: {} }; // opx: per operator, all maps (BALL KNOWLEDGE)
 export const ROUNDS_PER_VERSION = 200; // he asked: 200 practice rounds per update is enough
 try { Object.assign(training, JSON.parse(fs.readFileSync(FILE, 'utf8'))); } catch {}
+// skill uses were counted wrong before (defender bots set their traps before the count started, and bots never
+// headshot): those two numbers start again from zero; x[8] = rounds the uses were counted in
+for (const x of Object.values(training.opx || {})) if (x.length < 9) { x[5] = 0; x[6] = 0; x[8] = 0; }
 export function saveTraining() { try { fs.mkdirSync(DIR, { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(training)); } catch {} }
 
 const rate = r => (r ? (r.w + 1) / (r.n + 2) : 0.5); // wins out of rounds, nudged towards 50% while there are few
@@ -23,7 +26,7 @@ export function addResults(res) {
   for (const [kind, tbl] of [['plans', res.plans || {}], ['ops', res.ops || {}]]) for (const [k, [n, w]] of Object.entries(tbl)) {
     const r = training[kind][k] || (training[kind][k] = { n: 0, w: 0 }); r.n += n; r.w += w;
   }
-  for (const [op, a] of Object.entries(res.opx || {})) { const x = training.opx[op] || (training.opx[op] = a.map(() => 0)); a.forEach((v, i) => { x[i] += v; }); }
+  for (const [op, a] of Object.entries(res.opx || {})) { const x = training.opx[op] || (training.opx[op] = a.map(() => 0)); a.forEach((v, i) => { x[i] = (x[i] || 0) + v; }); }
   training.rounds += res.rounds || 0; training.verRounds = (training.verRounds || 0) + (res.rounds || 0);
 }
 // a new version of the game makes the old lessons less sure: keep them, but at half weight

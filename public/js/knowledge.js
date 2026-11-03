@@ -25,15 +25,15 @@ function statsOf(op) {
   let an = 0, aw = 0; // all maps, for before the detailed numbers exist
   for (const [k, r] of Object.entries(d.ops || {})) { const [m, s, o] = k.split('|'); if (o !== op || s !== side) continue; an += r.n; aw += r.w; if (r.n >= 4) maps.push({ m, n: r.n, w: r.w, rate: r.w / r.n }); }
   maps.sort((a, b) => b.rate - a.rate);
-  const [r, w, k, de, sk, u, hs, fk] = x;
-  return { r: r || an, w: r ? w : aw, k, de, sk, u, hs, fk, maps, detail: r >= 5 };
+  const [r, w, k, de, sk, u, hs, fk, ur] = x;
+  return { r: r || an, w: r ? w : aw, k, de, sk, u, hs, fk, ur: ur || 0, maps, detail: r >= 5 };
 }
 function tipsFor(op, s) {
   const o = OPERATORS[op], ab = o.ability, t = [];
   if (s.maps.length) t.push(`Strongest on <b>${esc(mapName(s.maps[0].m))}</b>: ${pct(s.maps[0].w, s.maps[0].n)} of rounds won there.`);
   if (s.maps.length > 2) { const lo = s.maps[s.maps.length - 1]; if (lo.rate < 0.45) t.push(`Weakest on <b>${esc(mapName(lo.m))}</b> (${pct(lo.w, lo.n)}): pick someone else there.`); }
   if (s.detail) {
-    if (ab.count) { const per = s.u / s.r; t.push(per < 0.4 ? `Top players often keep the <b>${esc(ab.name)}</b> in their pocket (${per.toFixed(1)} a round): wait for the moment it decides the fight.` : `Top players use the <b>${esc(ab.name)}</b> about ${per.toFixed(1)} times a round, out of ${ab.count}.`); }
+    if (ab.count && s.ur >= 5) { const per = s.u / s.ur; t.push(per < 0.4 ? `Top players often keep the <b>${esc(ab.name)}</b> in their pocket (${per.toFixed(1)} a round): wait for the moment it decides the fight.` : `Top players use the <b>${esc(ab.name)}</b> about ${per.toFixed(1)} times a round, out of ${ab.count}.`); }
     if (s.k >= 5 && s.sk / s.k > 0.15) t.push(`${pct(s.sk, s.k)} of their kills come from the skill or gadget, not the gun.`);
     if (s.k >= 8 && s.hs / s.k > 0.35) t.push(`${pct(s.hs, s.k)} of their kills are headshots: aim at head height before the corner.`);
     if (s.fk / s.r > 0.15) t.push(`Gets the first kill in ${pct(s.fk, s.r)} of rounds: an early-fight operator, take the first duel.`);

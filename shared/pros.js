@@ -218,6 +218,17 @@ export function playbook(m, si, side, team) {
         support: { task: 'Covers the breacher at the wall, then plants from that side.', stack: I.wall.stack, target: I.wall.inside, util: 'smoke', plant: bombNear(I.wall) },
         flank: { task: `Comes through ${doorName(I.side)} at the same moment.`, stack: I.side.stack, target: I.side.inside },
       } });
+    // practice showed attacks coming in three ways at once win far more often: like the pinch, but through a window or the stairs instead of a wall
+    const apart = (a, b) => Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y) > 5 * CELL;
+    const third = I.side && I.ways.find(w => ['window', 'stairs'].includes(w.kind) && apart(w, I.main) && apart(w, I.side));
+    if (third) plans.push({ id: 'collapse', name: 'Three-way collapse', tempo: 'medium', go: 42, idea: `${(s => s[0].toUpperCase() + s.slice(1))(doorName(I.main))}, ${doorName(I.side)} and ${doorName(third)} all at once: one defender can't watch three ways.`,
+      jobs: {
+        intel: { task: `Drones the site, then comes through ${doorName(third)} with the support.`, drone: I.siteCentre, keepDrone: 30, stack: third.stack, target: third.inside },
+        breach: { task: `Barricade and utility at ${doorName(I.main)}, then pushes it with the entry.`, stack: I.main.stack, target: I.main.inside },
+        entry: { task: `First through ${doorName(I.main)}.`, stack: I.main.stack, target: I.main.inside, util: 'stun' },
+        support: { task: `Comes through ${doorName(third)} and plants from there.`, stack: third.stack, target: third.inside, util: 'smoke', plant: bombNear(third), clear: third.kind === 'window' ? third.k : undefined },
+        flank: { task: `Comes through ${doorName(I.side)} at the same moment.`, stack: I.side.stack, target: I.side.inside },
+      } });
     plans.push({ id: 'late', name: 'Late hit', tempo: 'slow', go: 95, idea: `Hunt the roamers and drone everything first; the defenders get restless, then the team hits ${doorName(I.main)} with about 1:20 left.`,
       jobs: {
         intel: { task: 'Keeps a drone on the site for most of the round and calls every move.', drone: I.siteCentre, keepDrone: 80, stack: I.main.stack, target: I.main.inside },
@@ -231,7 +242,7 @@ export function playbook(m, si, side, team) {
       jobs: {
         intel: { task: 'Drones the window side and calls who is watching it.', drone: win.inside, keepDrone: 30, stack: win.stack, target: win.inside },
         breach: { task: `Makes noise at ${doorName(I.main)} (barricade, utility), then pushes it.`, fake: I.main.stack, stack: I.main.stack, target: I.main.inside },
-        entry: { task: `First through ${doorName(win)}.`, stack: win.stack, target: win.inside, util: 'stun' },
+        entry: { task: `Shoots the boards off ${doorName(win)} just before the go, then is first through.`, stack: win.stack, target: win.inside, util: 'stun', clear: win.k },
         support: { task: 'Follows the entry through the window and plants.', stack: win.stack, target: win.inside, util: 'smoke', plant: bombNear(win) },
         flank: { task: `Pushes ${doorName(I.main)} with the breacher once the window is in.`, stack: I.main.stack, target: I.main.inside, delay: 4 },
       } });
