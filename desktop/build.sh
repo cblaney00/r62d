@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Builds the Windows program: build/R62D/R62D.exe (+ the files it needs) and build/R62D-windows.zip.
-# Needs internet the first time (Electron for Windows from GitHub, kept in build/cache) and 7z.
-# The window and taskbar use desktop/icon.png; the .exe file itself still shows Electron's icon in Explorer.
+# Needs internet the first time (Electron for Windows from GitHub, kept in build/cache), 7z, node and magick.
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")/.."
 EV=v45.2.2                 # Electron version
@@ -17,11 +16,12 @@ have=$(sha256sum "$C/electron-$EV-win32-x64.zip" | cut -d' ' -f1)
 rm -rf "$OUT" build/R62D-windows.zip; mkdir -p "$OUT"
 7z x -y -bso0 -bsp0 -o"$OUT" "$C/electron-$EV-win32-x64.zip"
 mv "$OUT/electron.exe" "$OUT/R62D.exe"
+node desktop/seticon.mjs "$OUT/R62D.exe" desktop/icon.png > /dev/null   # our icon on the .exe
 rm -f "$OUT/resources/default_app.asar"
 
 APP="$OUT/resources/app"; mkdir -p "$APP"
 cp -r server shared public desktop "$APP/"
-rm -f "$APP/desktop/build.sh"
+rm -f "$APP/desktop/build.sh" "$APP/desktop/seticon.mjs"
 cat > "$APP/package.json" <<'EOF'
 { "name": "r62d", "productName": "R62D", "type": "module", "main": "desktop/main.js" }
 EOF

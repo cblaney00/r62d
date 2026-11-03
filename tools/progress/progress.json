@@ -1,7 +1,7 @@
 {
  "title": "Making R62D its own program",
  "started": 1793734907703,
- "updated": 1793735207891,
+ "updated": 1793735911863,
  "steps": [
   {
    "name": "Plan and token estimate",
@@ -65,10 +65,10 @@
   {
    "name": "Test it like a Windows PC would",
    "about": "Run the .exe under Wine (Windows emulation) and check host, join and a match.",
-   "state": "fail",
-   "began": 1793735174329,
-   "detail": "Start screen and built-in server checked; running R62D.exe itself in Wine needs your OK",
-   "ended": 1793735194749
+   "state": "done",
+   "began": 1793735239872,
+   "detail": "In Wine: start screen, HOST, the game menus and a free-play match all work; Quit closes it",
+   "ended": 1793735578340
   },
   {
    "name": "Browser version still works",
@@ -81,7 +81,9 @@
   {
    "name": "Download link on GitHub",
    "about": "Upload R62D.zip to your GitHub Releases page for your friends.",
-   "state": "todo"
+   "state": "doing",
+   "began": 1793735911863,
+   "detail": "Uploading R62D-windows.zip to GitHub"
   }
  ],
  "log": [
@@ -144,6 +146,22 @@
   {
    "at": 1793735207891,
    "text": "Finished: Browser version still works — Bot match on Harbor Office and free play test both PASS"
+  },
+  {
+   "at": 1793735239872,
+   "text": "Started: Test it like a Windows PC would — Starting R62D.exe in Wine on a hidden screen"
+  },
+  {
+   "at": 1793735578340,
+   "text": "Finished: Test it like a Windows PC would — In Wine: start screen, HOST, the game menus and a free-play match all work; Quit closes it"
+  },
+  {
+   "at": 1793735911836,
+   "text": "R62D.exe now has the R62D icon"
+  },
+  {
+   "at": 1793735911863,
+   "text": "Started: Download link on GitHub — Uploading R62D-windows.zip to GitHub"
   }
  ]
 }

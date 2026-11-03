@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const PORT = 6262;
+const PORT = Number(process.env.R62D_PORT) || 6262; // R62D_PORT: only for testing beside a running server
 let win = null, hosting = false;
 
 // what build.sh wrote down: which version of the game this program is
