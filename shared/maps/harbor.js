@@ -1,18 +1,21 @@
 // "Harbor Office" — a two-storey office block with a garage, surrounded by a garden, a parking lot
 // and a road. Stairs: one in the lobby, one in the meeting room, and an outside fire escape (east).
+// The North Wing (he asked for bigger maps that are not rectangles) runs north from the east half and turns west,
+// so the building hooks round a loading yard; it has its own stairs in the security office.
 import { T, FL, MAT } from '../constants.js';
 import { makeMap } from '../mapkit.js';
 
 export function build() {
   const { kits: [G, U], stair, finish } = makeMap({ id: 'harbor', name: 'Harbor Office', floors: [
-    { name: '1F', x0: 0, y0: 0, w: 84, h: 60, ground: true },
-    { name: '2F', x0: 9, y0: 7, w: 66, h: 46 },
+    { name: '1F', x0: 0, y0: -40, w: 84, h: 100, ground: true },
+    { name: '2F', x0: 9, y0: -33, w: 66, h: 86 },
   ] });
 
   // ================= 1F =================
   G.ground(0, 52, 84, 6, FL.ASPHALT);      // road
   G.ground(74, 8, 10, 44, FL.ASPHALT);     // east parking
-  G.ground(36, 0, 14, 10, FL.ASPHALT);     // north loading lot
+  G.ground(15, -13, 29, 22, FL.ASPHALT);   // loading yard between the wings
+  G.ground(0, -40, 84, 6, FL.ASPHALT);     // service road along the north
   G.ground(24, 49, 3, 3, FL.CONCRETE);     // path to main entrance
   G.ground(52, 49, 7, 3, FL.CONCRETE);     // garage driveway
 
@@ -41,7 +44,7 @@ export function build() {
 
   G.door(24, 49, 26, 49, true);    // main entrance
   G.door(52, 49, 58, 49, true);    // garage shutter
-  G.window(18, 10, 19, 10); G.window(48, 10, 49, 10); G.window(63, 10, 64, 10);
+  G.window(18, 10, 19, 10);
   G.window(71, 32, 71, 33); G.window(12, 15, 12, 16);
   G.door(12, 31, 12, 32, true);    // kitchen back door
   G.door(12, 24, 12, 26, true);    // west hall door
@@ -74,11 +77,11 @@ export function build() {
   G.prop('workbench', 49, 42, 5, 1, T.LOW);
   G.prop('car', 6, 53, 6, 3, T.TALL, 1); G.prop('car', 60, 54, 6, 3, T.TALL, 1); G.prop('van', 30, 53, 8, 3, T.TALL, 1);
   G.prop('car', 76, 20, 3, 6, T.TALL); G.prop('car', 76, 34, 3, 6, T.TALL); G.prop('car', 80, 12, 3, 6, T.TALL);
-  G.prop('tree', 5, 5, 2, 2, T.TALL); G.prop('tree', 28, 3, 2, 2, T.TALL); G.prop('tree', 56, 4, 2, 2, T.TALL);
+  G.prop('tree', 5, 5, 2, 2, T.TALL); G.prop('tree', 28, 3, 2, 2, T.TALL); G.prop('tree', 70, -8, 2, 2, T.TALL);
   G.prop('tree', 4, 44, 2, 2, T.TALL); G.prop('tree', 3, 18, 2, 2, T.TALL);
   G.prop('bush', 7, 26, 2, 2, T.LOW); G.prop('bush', 7, 37, 2, 2, T.LOW); G.prop('bush', 20, 6, 3, 2, T.LOW);
-  G.prop('bush', 64, 5, 3, 2, T.LOW);
-  G.prop('dumpster', 2, 30, 2, 3, T.TALL); G.prop('container', 40, 2, 6, 3, T.TALL, 1);
+  G.prop('bush', 68, 3, 3, 2, T.LOW); G.prop('tree', 6, -20, 2, 2, T.TALL); G.prop('bush', 76, -24, 3, 2, T.LOW);
+  G.prop('dumpster', 2, 30, 2, 3, T.TALL); G.prop('container', 30, -6, 6, 3, T.TALL, 1); G.prop('van', 22, -2, 8, 3, T.TALL, 1);
   G.prop('barrier', 14, 51, 6, 1, T.LOW, 1);
 
   // shapes: the building's north-east and south-west corners are cut off at an angle, and a few rooms get
@@ -97,7 +100,8 @@ export function build() {
     x.fillStyle = 'rgba(235,235,230,0.7)';
     x.fillRect(X(0), Y(52) + 3, X(84) - X(0), 1.2); x.fillRect(X(0), Y(58) - 4, X(84) - X(0), 1.2);
     for (let py = 9; py < 51; py += 3) x.fillRect(X(75), Y(py), X(83) - X(75), 1.2);
-    for (let px = 37; px < 49; px += 2.5) x.fillRect(X(px), Y(0), 1.2, Y(6) - Y(0));
+    for (let px = 17; px < 42; px += 2.5) x.fillRect(X(px), Y(-12), 1.2, Y(-6) - Y(-12));
+    for (let px = 0; px < 84; px += 2.5) x.fillRect(X(px), Y(-37) - 1, 22, 2);
     for (const [sx, sy] of [[48, 45], [58, 44], [66, 46]]) {
       const g = x.createRadialGradient(X(sx), Y(sy), 0, X(sx), Y(sy), 22);
       g.addColorStop(0, 'rgba(20,20,25,0.45)'); g.addColorStop(1, 'rgba(20,20,25,0)');
@@ -107,6 +111,38 @@ export function build() {
     x.fillStyle = 'rgba(230,190,50,0.55)';
     for (const bx of [43, 63]) { x.fillRect(X(bx) - 4, Y(41.5), 1.5, Y(48.5) - Y(41.5)); x.fillRect(X(bx + 4) + 2, Y(41.5), 1.5, Y(48.5) - Y(41.5)); }
   });
+
+  // ---- North Wing (1F): a north arm (x 45-63) and a west arm along the top (y -29..-15)
+  G.room('Loading Bay', 45, -6, 19, 16, FL.CONCRETE);
+  G.room('Mail Room', 45, -18, 9, 11, FL.TILE);
+  G.room('Security Office', 55, -18, 9, 11, FL.WOOD);
+  G.room('Canteen', 45, -29, 19, 10, FL.TILE);
+  G.room('Gym', 15, -29, 14, 15, FL.WOOD);
+  G.room('Showers', 30, -29, 6, 15, FL.TILE);
+  G.room('Print Shop', 37, -29, 7, 15, FL.CONCRETE);
+  G.box(44, -30, 64, 10, T.SOFT, MAT.BRICK); G.box(14, -30, 44, -14, T.SOFT, MAT.BRICK);
+  G.wall(45, -7, 63, -7); G.wall(45, -19, 63, -19); G.wall(54, -18, 54, -8);
+  G.wall(29, -29, 29, -15); G.wall(36, -29, 36, -15, T.HARD, MAT.CONCRETE);
+  G.pillar([[44, -30], [64, -30], [14, -30], [14, -14], [44, -14], [44, 10], [64, 10], [44, -7], [64, -7], [44, -19], [64, -19], [54, -7], [54, -19], [29, -30], [29, -14], [36, -30], [36, -14]]);
+  G.door(44, 0, 44, 5, true);          // loading bay shutter onto the yard
+  G.door(62, 10, 63, 10);              // loading bay -> East Office
+  G.door(64, -3, 64, -2, true);        // loading bay side door (east)
+  G.door(49, -7, 50, -7); G.door(59, -7, 60, -7); G.door(54, -14, 54, -13);
+  G.door(49, -19, 50, -19); G.door(58, -19, 59, -19);
+  G.door(44, -25, 44, -24); G.door(32, -19, 33, -19, false);
+  G.door(29, -24, 29, -23); G.door(39, -14, 40, -14, true); G.door(20, -14, 21, -14, true);
+  G.door(52, -30, 54, -30, true);      // canteen north doors onto the service road
+  G.window(14, -24, 14, -23); G.window(24, -30, 25, -30); G.window(64, -24, 64, -23); G.window(64, -14, 64, -13); G.window(58, -30, 59, -30);
+  G.prop('crates', 47, -4, 2, 2, T.TALL); G.prop('crates', 47, 4, 3, 2, T.TALL); G.prop('shelf', 61, -5, 1, 7, T.TALL);
+  G.prop('workbench', 52, 7, 5, 1, T.LOW); G.prop('crates', 56, -1, 2, 2, T.TALL);
+  G.prop('shelf', 46, -17, 1, 6, T.TALL); G.prop('counter', 48, -10, 5, 1, T.LOW);
+  G.prop('desk', 56, -17, 3, 2, T.LOW); G.prop('console', 62, -12, 1, 3, T.LOW);
+  G.prop('counter', 46, -28, 9, 1, T.LOW); G.prop('island', 48, -24, 5, 2, T.LOW); G.prop('chairs', 57, -26, 1, 3, T.LOW); G.prop('chairs', 60, -26, 1, 3, T.LOW);
+  G.prop('bench', 17, -27, 4, 1, T.LOW); G.prop('bench', 17, -18, 4, 1, T.LOW); G.prop('rack', 26, -28, 2, 1, T.TALL);
+  G.prop('locker', 31, -28, 4, 1, T.TALL); G.prop('stall', 34, -22, 1, 3, T.TALL);
+  G.prop('workbench', 38, -28, 5, 1, T.LOW); G.prop('shelf', 42, -24, 1, 6, T.TALL);
+  G.chamfer(15, -29, 3, 'se', T.HARD, MAT.DRYWALL); G.round(63, -29, 3, 'sw', T.HARD, MAT.DRYWALL);
+  G.outside([[14, -18.6], [14, -13], [19.6, -13]]); G.walls([[14.5, -18.5], [19.5, -13.5]], 1, T.SOFT, MAT.BRICK); // angled corner on the yard
 
   // ================= 2F =================
   U.slab(72, 33, 2, 14, FL.CONCRETE);                 // fire-escape landing outside the east wall
@@ -129,7 +165,7 @@ export function build() {
   U.door(56, 33, 56, 34); U.door(43, 33, 43, 34); U.door(43, 44, 43, 45);
   U.door(50, 38, 51, 38); U.door(65, 38, 66, 38);
   U.door(71, 35, 71, 36, true);                        // fire-escape door into Records
-  U.window(18, 10, 19, 10); U.window(34, 10, 35, 10); /* moved off the bookcases so it can be used */ U.window(60, 10, 61, 10);
+  U.window(18, 10, 19, 10); U.window(34, 10, 35, 10); /* moved off the bookcases so it can be used */
   U.window(12, 15, 12, 16); U.window(12, 36, 12, 37); U.window(71, 31, 71, 32);
   U.window(25, 49, 26, 49); U.window(58, 49, 59, 49);
 
@@ -149,7 +185,33 @@ export function build() {
   U.arc(24, 46.5, 5, 180, 360, 0.7, T.SOFT);                                        // curved glass-walled booth in the open office
   U.chamfer(29, 11, 2, 'se', T.HARD, MAT.DRYWALL); U.chamfer(49, 11, 2, 'sw', T.HARD, MAT.DRYWALL); // Boardroom
 
+  // ---- North Wing (2F)
+  U.room('2F Drafting Hall', 45, -6, 19, 16, FL.WOOD);
+  U.room('2F Lab', 45, -18, 9, 11, FL.TILE);
+  U.room('2F Landing', 55, -18, 9, 11, FL.CARPET);
+  U.room('2F Roof Lounge', 45, -29, 19, 10, FL.CARPET);
+  U.room('2F Studio', 15, -29, 14, 15, FL.WOOD);
+  U.room('2F Copy Room', 30, -29, 14, 15, FL.CARPET);
+  U.box(44, -30, 64, 10, T.SOFT, MAT.BRICK); U.box(14, -30, 44, -14, T.SOFT, MAT.BRICK);
+  U.wall(45, -7, 63, -7); U.wall(45, -19, 63, -19); U.wall(54, -18, 54, -8); U.wall(29, -29, 29, -15);
+  U.pillar([[44, -30], [64, -30], [14, -30], [14, -14], [44, -14], [44, 10], [64, 10], [44, -7], [64, -7], [44, -19], [64, -19], [54, -7], [54, -19], [29, -30], [29, -14]]);
+  U.door(59, 10, 60, 10); // the North Wing's door into the IT room
+  U.door(49, -7, 50, -7); U.door(60, -7, 61, -7); U.door(54, -12, 54, -11);
+  U.door(48, -19, 49, -19); U.door(58, -19, 59, -19); U.door(44, -24, 44, -23); U.door(29, -22, 29, -21);
+  U.window(44, 2, 44, 3); U.window(64, -2, 64, -1); U.window(64, -25, 64, -24); U.window(20, -14, 21, -14); U.window(36, -14, 37, -14);
+  U.window(14, -23, 14, -22); U.window(50, -30, 51, -30); U.window(22, -30, 23, -30);
+  for (const [dx, dy] of [[47, -4], [53, -4], [47, 2], [53, 2]]) U.prop('desk', dx, dy, 4, 2, T.LOW);
+  U.prop('shelf', 62, -5, 1, 6, T.TALL); U.prop('console', 46, -17, 1, 4, T.LOW); U.prop('shelf', 50, -9, 3, 1, T.TALL);
+  U.prop('couch', 47, -27, 5, 1, T.LOW); U.prop('coffeetable', 48, -25, 3, 2, T.LOW); U.prop('plant', 59, -28, 1, 1, T.TALL);
+  U.prop('desk', 17, -27, 4, 2, T.LOW); U.prop('desk', 22, -22, 4, 2, T.LOW); U.prop('cabinet', 27, -28, 1, 3, T.TALL);
+  U.prop('console', 32, -27, 4, 1, T.LOW); U.prop('shelf', 39, -20, 4, 1, T.TALL);
+  U.chamfer(15, -29, 3, 'se', T.HARD, MAT.DRYWALL); U.round(63, -29, 3, 'sw', T.HARD, MAT.DRYWALL);
+  U.outside([[14, -18.6], [14, -13], [19.6, -13]]); U.walls([[14.5, -18.5], [19.5, -13.5]], 1, T.SOFT, MAT.BRICK);
+
   // ================= stairs =================
+  stair(0, 1, 58, -16, 3, 6, 'n', FL.WOOD);          // North Wing: security office -> 2F landing
+  G.prop('railing', 57, -17, 1, 6, T.LOW); G.prop('railing', 61, -17, 1, 6, T.LOW); G.prop('railing', 58, -17, 3, 1, T.LOW);
+  U.prop('railing', 57, -15, 1, 6, T.LOW); U.prop('railing', 61, -15, 1, 6, T.LOW); U.prop('railing', 58, -10, 3, 1, T.LOW);
   stair(0, 1, 36, 42, 3, 6, 'n', FL.MARBLE);          // lobby -> open office
   G.prop('railing', 35, 41, 1, 6, T.LOW); G.prop('railing', 39, 41, 1, 6, T.LOW); G.prop('railing', 36, 41, 3, 1, T.LOW);
   U.prop('railing', 35, 43, 1, 6, T.LOW); U.prop('railing', 39, 43, 1, 6, T.LOW); U.prop('railing', 36, 48, 3, 1, T.LOW);
@@ -167,9 +229,9 @@ export function build() {
       { name: 'Kitchen / Lounge', bombs: [{ id: 'A', ...g(15, 37), room: 'Kitchen' }, { id: 'B', ...g(38, 35), room: 'Lounge' }], rooms: ['Kitchen', 'Lounge'] },
       { name: '2F Boardroom / IT Room', bombs: [{ id: 'A', ...u(31, 19), room: '2F Boardroom' }, { id: 'B', ...u(66, 15), room: '2F IT Room' }], rooms: ['2F Boardroom', '2F IT Room'] },
     ],
-    cams: [g(20, 24), g(52, 24), g(30, 47), g(60, 46), g(72, 8), u(40, 24), u(16, 47)],
+    cams: [g(20, 24), g(52, 24), g(30, 47), g(60, 46), g(72, 8), u(40, 24), u(16, 47), g(52, 2), g(20, -20), u(56, -26)],
     atkSpawns: [
-      { name: 'Loading Lot', ...g(43, 7) }, { name: 'West Garden', ...g(4, 26) },
+      { name: 'Loading Yard', ...g(26, -9) }, { name: 'West Garden', ...g(4, 26) }, { name: 'Service Road', ...g(54, -37) },
       { name: 'Front Road', ...g(22, 56) }, { name: 'East Parking', ...g(79, 30) },
     ],
   });
