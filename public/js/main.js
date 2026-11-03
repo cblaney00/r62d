@@ -593,6 +593,15 @@ function anim(id) { let a = st.anim.get(id); if (!a) st.anim.set(id, a = { walk:
 
 // ---------------- input ----------------
 // `keys` holds the names of actions currently held down (see keys.js for the bindings).
+// In the desktop app no browser shortcut may close or reload the game, whatever screen you are on or what has the focus
+// (he said it "crashed" while crouching (Ctrl) and lying down: the window closed cleanly, so most likely Ctrl+W / Ctrl+Q
+// etc. got through on a screen where the old rule (only while playing) did not apply). Typing boxes keep copy/paste.
+const COPY_KEYS = new Set(['KeyA', 'KeyC', 'KeyV', 'KeyX', 'KeyZ', 'KeyY']);
+addEventListener('keydown', e => {
+  if (!new URLSearchParams(location.search).has('app') || !(e.ctrlKey || e.metaKey)) return;
+  const typing = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+  if (!(typing && COPY_KEYS.has(e.code))) e.preventDefault();
+}, { capture: true });
 let rebinding = null;
 addEventListener('keydown', e => {
   if (rebinding) { e.preventDefault(); if (e.code !== 'Escape') setBind(rebinding.id, rebinding.slot, e.code); rebinding = null; renderSettings(); return; }
