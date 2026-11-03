@@ -48,5 +48,15 @@ if (other.x !== ox || other.y !== oy) fail('drove a teammate\'s drone');
 g.event(a1, { k: 'spot', id: d1.id }); if (!g.spots.atk.has(d1.id)) fail('could not mark from a teammate\'s drone');
 g.event(a1, { k: 'camSet', id: own.id }); if (a1.ctrl !== 'drone') fail('own drone not driven');
 g.hitEnt(other, a1); g.tickPlayer(a2, 1 / 30); if (a2.ctrl !== 'body') fail('pilot not back in body');
+// keys 5 / 6 (he asked): 5 only looks through the team's feeds, 6 puts out and drives your own drone
+const a3 = ps.filter(p => g.side(p) === TEAM.ATK && p.alive)[2]; a3.bot = false; a3.ctrl = 'body'; a3.busy = null; a3.drones = 2; a3.droneId = null;
+const nDr = () => g.ents.filter(e => e.type === 'drone' && e.owner === a3.id).length;
+g.event(a3, { k: 'feeds' }); if (nDr() || a3.ctrl !== 'cam') fail('5 put out a drone or did not open team feeds', nDr(), a3.ctrl);
+g.event(a3, { k: 'drone' }); if (nDr() !== 1 || a3.ctrl !== 'drone') fail('6 did not put out and drive a drone', nDr(), a3.ctrl);
+g.event(a3, { k: 'drone' }); if (a3.ctrl !== 'body') fail('6 again did not go back to the body');
+g.event(a3, { k: 'drone' }); if (nDr() !== 1 || a3.ctrl !== 'drone') fail('6 put out a second drone instead of taking the first');
+g.event(a3, { k: 'feeds' }); if (a3.ctrl !== 'body') fail('5 on a drone did not go back to the body');
+d1.ctrl = 'body'; g.event(d1, { k: 'drone' }); if (d1.ctrl !== 'body') fail('6 did something for a defender');
+d1.ctrl = 'body'; g.event(d1, { k: 'feeds' }); if (d1.ctrl !== 'cam') fail('5 did not open defender cameras');
 console.log(fails ? `FAIL (${fails})` : 'PASS');
 process.exit(fails ? 1 : 0);

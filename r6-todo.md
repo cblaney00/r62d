@@ -7,15 +7,15 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
-- [ ] make 6 deploy your inventory bot and 5 is just to switch to bots and cameras, also you should be able to switch between the bots and cameras on your team with q and e though you cant control others bots
-- [ ] make the settings screen less cluttered and more intuitive
-- [ ] if a defender goes outside there is a warning at the top of the screen that alerts the attackers of this
-- [ ] make sure leaning is toggle by default
 - [ ] the pros should play a wider variety of operators and also have more plays to learn from
 - [ ] give the maps a big rework to make them larger (not more floors but more floorspace) and make the buildings not rectangles, L shaped buildings could be good for 1 or 2 of them but lets get creative
 
 ## Done
 
+- [x] Leaning is a toggle by default: Q or E once to lean, again (or the other side) to stand straight; dying or going down straightens you. Settings → Mouse & Aim → Leaning switches back to Hold.
+- [x] 6 puts out your drone and drives it (6 again: back to your body; if it's already out, 6 takes it back). 5 only opens your team's drones and cameras, never puts a drone out. On a drone or camera, Q / E flip to the previous / next feed; teammates' drones are watch-only. A controller or phone keeps its one DRONE / CAMS button.
+- [x] Settings rebuilt: sections down the left (Sound, Mouse & Aim, Keys, Screen, Crosshair) and only the chosen one shows, each setting on its own row with a plain line saying what it does. Keys are grouped (Moving, Fighting, Drones/Cameras & Team, Menus & Free Play). It remembers the last section you looked at.
+- [x] When a defender steps outside, every attacker gets a pulsing red DEFENDER OUTSIDE banner at the top of the screen with who it is and where ("ARGUS · NEAR WEST GARDEN"), and a short two-tone alert. Two or more show as "2 DEFENDERS OUTSIDE".
 - [x] Lie down with C (Ctrl is crouch only now): a quick drop (0.3 s), crawl as fast as a crouch, silent, aim like a crouch; Ctrl, Space or C again gets you up. Lying down you see (and shoot) under desks, tables, benches, market stalls, chairs, cars, vans and trains, but your body never fits under, so nobody can hide there. Drones (yours, teammates' and the bots') drive and see under the same things.
 - [x] Bots stand around less. A bot that stays in one small area with no enemy in sight gets impatient and makes a play: attackers stop waiting and push to a fresh spot, often going round to come in from an unexpected side; defenders take a new angle, and bolder ones step out into a room beside the site. The more experienced (higher rank) a bot is, the longer it waits first. Paranoia: a bot that is alone and hears something keeps sweeping every way in, not just the one the sound came from. Also fixed bots (roamers especially) that walked into a wall and stood there all round when they had no route to their spot. Measured: idle time without a fight went from about half the round to 40%, and the longest attacker standstill from 96 to 17 seconds.
 - [x] Esports TV: the auto director keeps count of how long each team has been on screen and leans toward the team that has had less, while a really exciting moment still wins. Viewers now see what both teams see, each team's sight faintly tinted in its own colour.

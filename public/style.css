@@ -208,14 +208,33 @@ tr.me { color: var(--gold); } tr.dead { opacity: 0.5; }
 #conn { position: absolute; inset: 0; display: grid; place-items: center; font: 700 28px var(--head); letter-spacing: 0.2em; background: rgba(0,0,0,0.85); pointer-events: auto; }
 
 /* ---------- settings ---------- */
-#settings { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(760px, 94vw); max-height: 90vh; display: flex; flex-direction: column; gap: 10px;
-  background: rgba(10,13,18,0.96); border: 1px solid var(--line); padding: 18px 22px; pointer-events: auto; z-index: 5; }
-#settings h2 { margin: 0; font: 800 30px var(--head); letter-spacing: 0.2em; }
-#settings .vols { display: flex; gap: 30px; font: 600 15px var(--head); letter-spacing: 0.08em; }
-#settings .vols input { width: 180px; vertical-align: middle; padding: 0; }
-#settings .tablewrap { overflow: auto; }
-#settings .gfx { align-items: center; }
-#settings .gfx button { padding: 4px 12px; font-size: 14px; }
+#settings { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(1000px, 96vw); height: min(660px, 92vh); display: grid; grid-template-columns: 210px 1fr;
+  background: rgba(10,13,18,0.97); border: 1px solid var(--line); pointer-events: auto; z-index: 5; }
+#settings.hidden { display: none; }
+#settings .setSide { display: flex; flex-direction: column; gap: 4px; padding: 20px 0; border-right: 1px solid var(--line); background: rgba(255,255,255,0.025); min-height: 0; }
+#settings h2 { margin: 0 22px 16px; font: 800 26px var(--head); letter-spacing: 0.2em; }
+#settings .setSide > button { text-align: left; background: none; border: 0; border-left: 3px solid transparent; border-radius: 0; padding: 12px 22px; font: 700 15px var(--head); letter-spacing: 0.12em; color: #9aa4ae; }
+#settings .setSide > button:hover { color: #fff; background: rgba(255,255,255,0.04); }
+#settings .setSide > button.on { color: #fff; border-left-color: var(--gold); background: rgba(240,190,70,0.08); }
+#settings .setFoot { margin-top: auto; padding: 0 18px; display: flex; flex-direction: column; gap: 8px; }
+#settings .setFoot button { width: 100%; }
+#settings .setBody { overflow: auto; padding: 22px 28px; min-height: 0; }
+#settings .setPage { display: none; flex-direction: column; gap: 4px; }
+#settings .setPage.on { display: flex; }
+#settings h3 { margin: 0 0 10px; font: 800 20px var(--head); letter-spacing: 0.16em; color: var(--gold); }
+#settings h4 { margin: 18px 0 8px; font: 700 14px var(--head); letter-spacing: 0.12em; } #settings h4 small { font-weight: 400; opacity: 0.6; letter-spacing: 0.04em; margin-left: 8px; }
+#settings .srow { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+#settings .srow.wide { flex-wrap: wrap; }
+#settings .sl { display: flex; flex-direction: column; gap: 3px; min-width: 200px; flex: 1; }
+#settings .sl b { font: 600 16px var(--head); letter-spacing: 0.05em; }
+#settings .sl small { font-size: 13px; color: #8d97a1; line-height: 1.35; }
+#settings .sctl { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+#settings .sctl input[type=range] { width: 220px; vertical-align: middle; padding: 0; }
+#settings .sctl b { min-width: 46px; text-align: right; font: 600 14px var(--head); }
+#settings .sctl button { padding: 6px 14px; font-size: 14px; }
+#settings #fxList { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
+#settings #fxList button { text-align: left; font-size: 14px; padding: 8px 12px; }
+#settings .keyGroup th { text-align: left; padding: 14px 8px 4px; color: var(--gold); font: 700 13px var(--head); letter-spacing: 0.14em; }
 #settings .tog { min-width: 64px; }
 #settings .tog.on, #settings .seg button.on { background: var(--gold); color: #000; border-color: var(--gold); }
 #settings .seg { display: inline-flex; gap: 0; margin-left: 8px; }
@@ -589,6 +608,12 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 #siteFound canvas { display: block; margin: 0 auto; width: 300px; height: 180px; opacity: 0.85; border: 1px solid rgba(255,255,255,0.12); }
 @keyframes sfIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 /* compass to the bomb site (he asked): under the score bar */
+/* attackers: a defender is outside (he asked) */
+#outWarn { position: absolute; top: 86px; left: 50%; transform: translateX(-50%); padding: 6px 18px; background: rgba(150,20,20,0.88); border: 1px solid #ff6a5a;
+  font: 800 16px var(--head); letter-spacing: 0.14em; color: #fff; white-space: nowrap; pointer-events: none; box-shadow: 0 0 22px rgba(255,60,40,0.45); animation: outPulse 1.1s ease-in-out infinite; }
+#outWarn small { font: 600 13px var(--head); letter-spacing: 0.08em; opacity: 0.9; margin-left: 8px; }
+@keyframes outPulse { 50% { box-shadow: 0 0 6px rgba(255,60,40,0.2); background: rgba(120,15,15,0.85); } }
+#outWarn:not(.hidden) ~ #compass { top: 128px; }
 #compass { position: absolute; top: 92px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
 #compass canvas { width: 64px; height: 64px; }
 #compass b { margin-top: 2px; font: 700 14px var(--head); letter-spacing: 0.1em; color: #f2c14e; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; }
@@ -633,7 +658,7 @@ html.touch #pause .menu, html.touch #quitDlg .menu { zoom: 1.15; }
 /* make room for the thumbs: health and ammo move up out of the corners */
 html.fitui #lobby, html.fitui #splash > *, html.fitui #select, html.fitui #endscreen, html.fitui .overlay > *, html.fitui #settings, html.fitui #pause,
 html.fitui #quitDlg, html.fitui #loading > *, html.fitui #corner, html.fitui #help, html.fitui #conn, html.fitui #countdown, html.fitui #freeOps { zoom: var(--uiz, 1); }
-html.fitui #hud, html.fitui #coach, html.fitui #chat, html.fitui #siteFound, html.fitui #compass { zoom: var(--hudz, 1); }
+html.fitui #hud, html.fitui #coach, html.fitui #chat, html.fitui #siteFound, html.fitui #outWarn, html.fitui #compass { zoom: var(--hudz, 1); }
 html.touch #bl { bottom: auto; top: 70px; }
 html.touch #br { bottom: auto; top: 172px; right: auto; left: 18px; text-align: left; }
 html.touch #hud #feed, html.touch #hud #killfeed { margin-top: 56px; }
@@ -690,7 +715,7 @@ html.touch * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) tr
 .armTouch button.on { background: rgba(242,193,78,0.7); color: #000; }
 html.touch #armCanvas { touch-action: none; }
 #touchUI .tbtn.t6 { right: auto; left: max(20px, env(safe-area-inset-left)); top: auto; bottom: 168px; width: 84px; } /* ⟲ TILT, above the move stick */
-#settings .phoneOnly { display: none; } html.touch #settings .phoneOnly { display: flex; }
+#settings .phoneOnly { display: none; } html.touch #settings .srow.phoneOnly { display: flex; }
 /* OPEN TO LAN */
 .roomBtns { display: flex; gap: 10px; }
 html.fitui #lanDlg > * { zoom: var(--uiz, 1); }
@@ -748,7 +773,7 @@ html.tv #hud #bl, html.tv #hud #br, html.tv #coach { display: none; }
 #tvHelp { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); font: 600 13px var(--head); letter-spacing: 0.12em; color: #cfd6dd; background: rgba(0,0,0,0.55); padding: 4px 12px; white-space: nowrap; }
 html.tv #chat { left: 220px; }
 /* ESPORTS TV is sacred (he asked: nothing clunky in the way of the competition): no player HUD clutter, small corner overlays */
-html.tv #objective, html.tv #compass, html.tv #prompt, html.tv #siteFound, html.tv #corner, html.tv #feed, html.tv #stairPip, html.tv #viewlabel, html.tv #freeHint, html.tv #clickIn { display: none !important; }
+html.tv #objective, html.tv #outWarn, html.tv #compass, html.tv #prompt, html.tv #siteFound, html.tv #corner, html.tv #feed, html.tv #stairPip, html.tv #viewlabel, html.tv #freeHint, html.tv #clickIn { display: none !important; }
 html.tv #chat { left: 14px; bottom: 40px; width: 380px; font-size: 13px; }
 html.tv #chatLog div:not(:nth-last-child(-n+3)) { display: none; }
 html.tv #chatLog div { background: rgba(0,0,0,0.42); padding: 2px 7px; }
@@ -829,8 +854,5 @@ html.touch .mnav button.on { box-shadow: inset 0 -3px 0 var(--gold); }
 html.touch .mnav .ind { display: none; }
 html.touch .mnav .quitNav { margin-top: 0; }
 html.touch .mbody { padding: 12px 18px; }
-#settings .pageOff { display: none !important; }
 html.touch #settings { width: 96vw; }
-html.touch #settings .setPages { margin: 0 0 6px; flex-wrap: wrap; } html.touch #settings .setPages button { font-size: 17px; padding: 8px 16px; }
-html.touch #settings .vols { flex-wrap: wrap; gap: 14px 30px; font-size: 17px; } html.touch #settings .vols input { width: 220px; }
-html.touch #settings .seg { flex-wrap: wrap; } html.touch #settings .gfx button { font-size: 16px; padding: 7px 14px; }
+html.touch #settings .seg { flex-wrap: wrap; } html.touch #settings { grid-template-columns: 150px 1fr; } html.touch #settings .setSide > button { padding: 12px 14px; font-size: 16px; }

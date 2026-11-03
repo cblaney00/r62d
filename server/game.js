@@ -512,9 +512,11 @@ export class Game {
     // a defender outside the building (preparation or action) is spotted by the attackers, and told so (he asked)
     if (p.alive && this.side(p) === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION) && !this.tut) {
       const k = Math.floor(p.y / CELL) * this.map.W + Math.floor(p.x / CELL), out = this.map.tiles[k] === T.GROUND;
+      p.outside = out; // the attackers get a warning at the top of the screen while any defender is outside (snapshot `ou`)
       if (out) { this.spot(TEAM.ATK, p.id, 1); if (!(p.outWarnT > this.time)) { p.outWarnT = this.time + 6; this.events.push({ e: 'deny', id: p.id, why: 'You are outside: the attackers can see where you are' }); } }
     }
-    if (!p.alive) return;
+    else p.outside = false;
+    if (!p.alive) { p.outside = false; return; }
     if (p.vault) { // carried over the obstacle along a fixed path
       const v = p.vault; v.t += dt;
       const f = Math.min(1, v.t / v.dur), e = f * f * (3 - 2 * f);
@@ -1283,7 +1285,9 @@ export class Game {
       case 'melee': this.melee(p); break;
       case 'ability': if (!p.downed && p.ctrl === 'body' && !p.busy && !p.rope && !(this.time < (p.empUntil || 0))) this.startUse(p, 'ability'); break;
       case 'gadget': if (!p.downed && p.ctrl === 'body' && !p.busy && !p.rope && !(this.time < (p.empUntil || 0))) this.startUse(p, 'gadget'); break;
-      case 'view': this.toggleView(p); break;
+      case 'view': this.toggleView(p); break; // controller / touch: drone or cameras, one button
+      case 'feeds': this.openFeeds(p); break; // 5
+      case 'drone': this.droneKey(p); break; // 6
       case 'camNext': case 'camPrev': if (p.ctrl === 'cam' || p.ctrl === 'drone') this.cycleCam(p, e.k === 'camNext' ? 1 : -1); break;
       case 'camSet': if (p.ctrl === 'cam' || p.ctrl === 'drone') { const f = this.feeds(team).find(f => f.id === e.id); if (f) this.watch(p, f); } break;
       case 'spot': {
@@ -1332,6 +1336,30 @@ export class Game {
       const list = this.feeds(team);
       if (list.length) this.watch(p, list.find(f => f.id === p.feedId) || list[0]);
     }
+  }
+
+  // 5 (he asked): just look through the team's drones and cameras; your own drone you drive, others' you only watch.
+  // Never puts a drone out (that is 6). Again: back to your body.
+  openFeeds(p) {
+    if (p.downed) return;
+    const team = this.side(p), own = this.ent(p.droneId), list = this.feeds(team);
+    if (team === TEAM.ATK && this.phase === PHASE.PREP) { // attackers are on their drones all preparation: flip between own and team feeds
+      if (p.ctrl === 'cam' && own) this.watch(p, own); else if (p.ctrl === 'drone') this.cycleCam(p, 1);
+      return;
+    }
+    if (p.ctrl === 'drone' || p.ctrl === 'cam') { p.ctrl = 'body'; return; }
+    if (p.ctrl !== 'body' || p.busy || !list.length) return;
+    this.watch(p, list.find(f => f.id === p.feedId) || (own && list.includes(own) ? own : list[0]));
+  }
+  // 6 (he asked): put out your own drone and drive it (or take it back if it is already out); again: back to your body
+  droneKey(p) {
+    if (p.downed || this.side(p) !== TEAM.ATK) return;
+    const own = this.ent(p.droneId);
+    if (this.phase === PHASE.PREP) { if (p.ctrl === 'cam' && own) this.watch(p, own); return; }
+    if (p.ctrl === 'drone') { p.ctrl = 'body'; return; }
+    if (p.ctrl === 'cam') { if (own) { this.watch(p, own); return; } p.ctrl = 'body'; }
+    if (p.ctrl !== 'body' || p.busy) return;
+    if (!own && p.drones > 0) this.toggleView(p); else if (own) this.watch(p, own);
   }
 
   // Everything a team can look through, flipped through with left/right or the mouse wheel:
@@ -2498,6 +2526,7 @@ export class Game {
     });
     const spots = { atk: [...this.spots.atk.keys()], def: [...this.spots.def.keys()] };
     const common = JSON.stringify({
+      ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId,
       site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       tvl: this.tv ? this.botLevel : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,

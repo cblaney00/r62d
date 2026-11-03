@@ -23,7 +23,7 @@ const STEPS = [
   { part: 0, ph: PHASE.SELECT, cont: true, t: 'How R62D works', b: () => `
     Two teams of five. A match is <b>first to 3 rounds</b> and the sides swap every round. Each round has three phases:
     <ol><li><b>Operator select</b> — pick who you play.</li>
-    <li><b>Preparation</b> (40 s) — attackers scout with drones, defenders fortify.</li>
+    <li><b>Preparation</b> (30 s) — attackers scout with drones, defenders fortify.</li>
     <li><b>Action</b> (3 min) — attackers break in and plant the <b>defuser</b> at bomb A or B; defenders stop them.</li></ol>
     This run takes about 4 minutes: you attack one round, then defend one. The enemy bots here never shoot.` },
   { part: 0, ph: PHASE.SELECT, t: 'Pick an attacker', b: () => `Each round you choose a <b>role</b>, then an operator from it:
@@ -66,7 +66,7 @@ const STEPS = [
     Face an <b>open doorway</b> and <b>hold ${K('interact')}</b> (you have 3 a round). Barricades block walking and sight,
     but break easily — the noise warns you someone is coming.`, done: c => c.tu.barri > c.base.barri },
   { part: 1, ph: PHASE.PREP, t: 'Watch the cameras', b: () => `
-    Press ${K('view')} for the cameras; ${isTouch ? '<kbd>◀</kbd> / <kbd>▶</kbd>' : `${K('left')} / ${K('right')} or the wheel`} flip through them. <b>${isTouch ? `Point at something and press ${K('spot')}` : 'Click something'} to ping it</b>
+    Press ${K('view')} for the cameras; ${isTouch ? '<kbd>◀</kbd> / <kbd>▶</kbd>' : `${K('leanL')} / ${K('leanR')} or the wheel`} flip through them. <b>${isTouch ? `Point at something and press ${K('spot')}` : 'Click something'} to ping it</b>
     for your team (an attacker's drone is a good find — shoot drones you see). ${K('view')} again to leave.`,
     done: c => c.tu.feedPings > c.base.feedPings },
   { part: 1, ph: PHASE.PREP, go: true, t: 'Ready', b: () => `Well fortified. The action phase is starting: the attackers are on their way.`, done: c => c.ph === PHASE.ACTION },

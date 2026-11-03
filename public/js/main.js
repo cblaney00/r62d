@@ -592,7 +592,13 @@ function pressAction(a, e) {
     case 'melee': ev.push({ k: 'melee' }); break;
     case 'gadget': ev.push({ k: 'gadget' }); audio.foley('gadget'); break;
     case 'ability': ev.push({ k: 'ability' }); audio.foley('gadget'); break;
-    case 'view': ev.push({ k: 'view' }); break;
+    case 'view': ev.push({ k: 'feeds' }); break; // 5: your team's drones and cameras (he asked)
+    case 'drone': ev.push({ k: 'drone' }); break; // 6: put out your own drone / drive it (he asked)
+    case 'droneOrCams': ev.push({ k: 'view' }); break; // controller / touch: one button for both, as before
+    case 'leanL': case 'leanR': {
+      const d = a === 'leanR' ? 1 : -1;
+      if (st.me && (st.me.ct === 'cam' || st.me.ct === 'drone')) { ev.push({ k: d > 0 ? 'camNext' : 'camPrev' }); break; } // Q / E flip through the team's feeds
+      st.leanT = st.leanT === d ? 0 : d; break; }
     case 'settings': toggleSettings(); break;
     case 'pause': escape(); break;
     case 'spot': st.spotReq = true; break;
@@ -696,6 +702,27 @@ cv.addEventListener('mousedown', e => { if (e.button === 1) { e.preventDefault()
 
 // ---------------- settings ----------------
 function toggleSettings() { $('settings').classList.toggle('hidden'); renderSettings(); }
+// Settings is a list of sections down the left; only the chosen one shows (he asked: less cluttered, more intuitive)
+let setPage = (() => { try { return localStorage.getItem('r62d-setpage') || 'sound'; } catch { return 'sound'; } })();
+function showSetPage(n) {
+  setPage = n; try { localStorage.setItem('r62d-setpage', n); } catch {}
+  for (const b of $('settings').querySelectorAll('.setSide > button[data-p]')) b.classList.toggle('on', b.dataset.p === n);
+  for (const c of $('settings').querySelectorAll('.setPage')) c.classList.toggle('on', c.dataset.p === n);
+}
+for (const b of $('settings').querySelectorAll('.setSide > button[data-p]')) b.onclick = () => { audio.ui(); showSetPage(b.dataset.p); };
+showSetPage(setPage);
+// Leaning: toggle by default (he asked); Hold keeps it only while the key is down
+let leanMode = (() => { try { return localStorage.getItem('r62d-lean') === 'hold' ? 'hold' : 'toggle'; } catch { return 'toggle'; } })();
+function setLean(m, save = true) {
+  leanMode = m === 'hold' ? 'hold' : 'toggle'; st.leanT = 0;
+  try { localStorage.setItem('r62d-lean', leanMode); } catch {}
+  for (const b of $('leanSeg').children) b.classList.toggle('on', b.dataset.l === leanMode);
+  $('leanHint').textContent = leanMode === 'toggle' ? 'Press lean once to lean, again (or the other side) to stand straight' : 'Lean only while you hold the key';
+  if (save) saveSettings();
+}
+for (const b of $('leanSeg').children) b.onclick = () => { audio.ui(); setLean(b.dataset.l); };
+setLean(leanMode, false);
+const leanNow = () => leanMode === 'toggle' ? st.leanT || 0 : (keys.has('leanR') ? 1 : 0) - (keys.has('leanL') ? 1 : 0);
 // screen effects anyone can switch off (he asked), remembered on this computer
 const FX_OPTS = [['shake', 'Screen shake'], ['hurt', 'Red edges when hurt'], ['hit', 'Hit markers'], ['pts', 'Points pop-ups'], ['sight', 'Sight glow when aiming in'],
   ['compass', 'Bomb-site compass'], ['pip', 'Stairs preview window'], ['site', 'Bomb-site found card'], ['vignette', 'Dark screen corners']];
@@ -712,19 +739,26 @@ applyFx();
 function renderSettings() {
   renderFxList();
   const el = $('settings'); if (el.classList.contains('hidden')) return;
-  const rows = ACTIONS.map(([id, name]) => {
-    const b = bindsFor(id);
+  const named = new Map(ACTIONS.map(a => [a[0], a[1]])), grouped = new Set(KEY_GROUPS.flatMap(g => g[1]));
+  const groups = [...KEY_GROUPS, ['OTHER', ACTIONS.map(a => a[0]).filter(id => !grouped.has(id))]];
+  const rows = groups.filter(g => g[1].length).map(([gName, ids]) => `<tr class="keyGroup"><th colspan="3">${gName}</th></tr>` + ids.filter(id => named.has(id)).map(id => {
+    let name = named.get(id); const b = bindsFor(id);
+    if (id === 'leanL' || id === 'leanR') name = name.replace('(hold)', leanMode === 'toggle' ? '(press)' : '(hold)');
     const btn = slot => `<button data-id="${id}" data-slot="${slot}" class="${rebinding && rebinding.id === id && rebinding.slot === slot ? 'wait' : ''}">${rebinding && rebinding.id === id && rebinding.slot === slot ? 'PRESS A KEY…' : keyName(b[slot])}</button>`;
     return `<tr><td>${name}</td><td>${btn(0)}</td><td>${btn(1)}</td></tr>`;
-  }).join('');
-  $('bindTable').innerHTML = `<tr><th>ACTION</th><th>KEY</th><th>ALTERNATE</th></tr>${rows}
-    <tr><td>Shoot / Aim down sights</td><td>Left mouse</td><td>Right mouse</td></tr>
-    <tr><td>Ping</td><td>Middle mouse</td><td></td></tr>
-    <tr><th>XBOX CONTROLLER</th><th colspan="2">${gpName ? 'CONNECTED' : 'NOT CONNECTED (plug it in and press a button)'}</th></tr>
+  }).join('')).join('');
+  $('bindTable').innerHTML = `<tr><th></th><th>KEY</th><th>SECOND KEY</th></tr>${rows}
+    <tr class="keyGroup"><th colspan="3">MOUSE</th></tr><tr><td>Shoot / Aim in</td><td>Left button</td><td>Right button</td></tr>
+    <tr><td>Ping</td><td>Middle button</td><td></td></tr>
+    <tr class="keyGroup"><th>XBOX CONTROLLER</th><th colspan="2">${gpName ? 'CONNECTED' : 'NOT CONNECTED (plug it in and press a button)'}</th></tr>
     ${PAD_HELP.map(([n, b]) => `<tr><td>${n}</td><td colspan="2">${b}</td></tr>`).join('')}`;
   for (const b of $('bindTable').querySelectorAll('button')) b.onclick = () => { rebinding = { id: b.dataset.id, slot: +b.dataset.slot }; renderSettings(); };
 }
 $('setReset').onclick = () => { resetBinds(); renderSettings(); };
+const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'walk', 'crouch', 'prone', 'vault', 'leanL', 'leanR']],
+  ['FIGHTING', ['primary', 'secondary', 'melee', 'reload', 'ability', 'gadget', 'interact']],
+  ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'chat', 'scoreboard']],
+  ['MENUS & FREE PLAY', ['settings', 'pause', 'opNext', 'opPrev', 'opGrid']]];
 // crosshair: chosen in Settings, saved in your profile
 let xh = (() => { try { return cleanXhair(JSON.parse(localStorage.getItem('r62d-xh') || 'null')); } catch { return cleanXhair(); } })();
 function setXhair(o, save = true) {
@@ -802,7 +836,7 @@ function renderControls() {
   const rows = [[`${L('up')}${L('left')}${L('down')}${L('right')}`, 'Move'], ['Mouse', 'Aim'], ['Left click', 'Shoot'], ['Right click', 'Aim down sights'],
     [L('walk'), 'Walk (silent)'], [L('crouch'), 'Crouch (hold, silent)'], [L('reload'), 'Reload'],
     [L('interact') + ' (hold)', 'Reinforce, barricade, plant, defuse, revive'], [L('ability'), 'Operator skill'],
-    [L('gadget'), 'Secondary gadget'], [L('melee'), 'Melee'], [L('view'), 'Drone / Cameras'], [L('spot') + ' · Middle click', 'Ping (enemies, gadgets, walls, doors, places)'],
+    [L('gadget'), 'Secondary gadget'], [L('melee'), 'Melee'], [L('drone'), 'Put out / drive your drone'], [L('view'), 'Team drones & cameras (' + L('leanL') + ' / ' + L('leanR') + ' switch)'], [L('spot') + ' · Middle click', 'Ping (enemies, gadgets, walls, doors, places)'],
     [`${L('primary')} / ${L('secondary')} · Wheel`, 'Switch weapon'], [L('scoreboard'), 'Scoreboard']];
   const html = rows.map(([k, d]) => `<span>${k}</span>${d}`).join('');
   if ($('ctlGrid').innerHTML !== html) $('ctlGrid').innerHTML = html;
@@ -1065,6 +1099,20 @@ function drawAllies(s, me, now) {
     if (p.ct === 'drone') where += ' (on drone)'; else if (p.ct === 'cam') where += ' (on cams)';
     return `<div class="${p.a ? (p.dn ? 'dn' : '') : 'dead'}"><b>${esc(p.n.replace(/^\[\w+\] /, ''))}</b> <i>${o ? esc(o.name) : ''}</i> <span>${esc(where)}</span></div>`; }).join('');
   if (box.innerHTML !== h) box.innerHTML = h;
+}
+// Attackers (he asked): a warning at the top of the screen while any defender is outside, with who and where
+// (the nearest named outside area: the attack spawns are named after them).
+function drawOutWarn(s, me) {
+  const el = $('outWarn'), ids = s && me && me.tm === 'atk' && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION) ? s.ou || [] : [];
+  if (!ids.length) { if (!el.classList.contains('hidden')) el.classList.add('hidden'); st.outN = 0; return; }
+  const ps = ids.map(id => s.players.find(p => p.id === id)).filter(p => p && p.x !== undefined);
+  const near = p => { let b = null, bd = 1e9; for (const a of st.map.atkSpawns || []) { const d = Math.hypot(a.x - p.x, a.y - p.y); if (d < bd) { bd = d; b = a.name; } } return b; };
+  const who = ps.length === 1 ? `${(OPERATORS[ps[0].op] || {}).name || 'DEFENDER'} · NEAR ${(near(ps[0]) || 'THE BUILDING').toUpperCase()}` : ps.map(p => (OPERATORS[p.op] || {}).name || '?').join(', ');
+  const html = `⚠ ${ids.length > 1 ? ids.length + ' DEFENDERS' : 'DEFENDER'} OUTSIDE<small>${esc(who)}</small>`;
+  if (el.innerHTML !== html) el.innerHTML = html;
+  el.classList.remove('hidden');
+  if (ids.length > (st.outN || 0)) audio.ui('alert');
+  st.outN = ids.length;
 }
 function drawCompass(s, me, now) {
   const box = $('compass');
@@ -1380,7 +1428,7 @@ function frame(nowMs) {
   revealSeen(); t1 = pfa('viewers', t1);
   bodySounds(me, dt);
   draw(s, view, now, dt); ctx = ctx0;
-  drawCompass(st.last, st.me, now); drawAllies(st.last, st.me, now);
+  drawOutWarn(st.last, st.me); drawCompass(st.last, st.me, now); drawAllies(st.last, st.me, now);
   pfa('total', T0);
   watchPerf(rawGap, performance.now() - T0);
 }
@@ -1397,8 +1445,9 @@ function sendInput(dt, me, ctrl, view, s, now) {
     up: keys.has('up') || gpk.up ? 1 : 0, down: keys.has('down') || gpk.down ? 1 : 0, left: keys.has('left') || gpk.left ? 1 : 0, right: keys.has('right') || gpk.right ? 1 : 0,
     walk: keys.has('walk') || gpk.walk ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch ? 1 : 0, prone: st.prone && me && me.a && !me.dn ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
-    lean: (keys.has('leanR') ? 1 : 0) - (keys.has('leanL') ? 1 : 0), jump: performance.now() - (st.jumpReq || -1e9) < 120 ? 1 : 0,
+    lean: me && me.ct === 'body' ? leanNow() : 0, jump: performance.now() - (st.jumpReq || -1e9) < 120 ? 1 : 0,
   };
+  if (me && (!me.a || me.dn)) st.leanT = 0; // dead or downed: stand straight again
   if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
   if (st.rot) k.rot = Math.round(-st.rot * 1000) / 1000; // Rotate aiming: W walks up the screen
@@ -2249,12 +2298,12 @@ function hud(s) {
   // view label
   let vl = '';
   if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); const sp = me.dsl > 0 ? `SPRINTING ${me.dsl.toFixed(1)}s` : !me.ds ? 'NO SPRINTS LEFT' : me.dsc > 0 ? `SPRINT IN ${Math.ceil(me.dsc)}s (${me.ds} LEFT)` : `${gpRecent() ? (isTouch ? 'SPRINT' : 'B') : label('walk')}: SPRINT (${me.ds} LEFT)`.replace('SPRINT: SPRINT', 'HOLD SPRINT');
-    vl = d && d.j ? 'DRONE JAMMED' : isTouch ? `YOUR DRONE · ${sp} · PING TO MARK · ◀ ▶ TEAM DRONES` : `YOUR DRONE · ${sp} · CLICK OR ${label('spot')} TO PING · WHEEL: TEAM DRONES · ${label('view')} TO EXIT`; }
+    vl = d && d.j ? 'DRONE JAMMED' : isTouch ? `YOUR DRONE · ${sp} · PING TO MARK · ◀ ▶ TEAM DRONES` : `YOUR DRONE · ${sp} · CLICK OR ${label('spot')} TO PING · ${label('leanL')} ${label('leanR')}: TEAM FEEDS · ${label('drone')} TO EXIT`; }
   else if (me.ct === 'cam') {
     const list = feedList(s, me), c = list.find(e => e.id === me.fi);
     if (c) {
       const ro = c.ow && c.ow !== me.id, who = ro ? `${ownerName(s, c.ow).toUpperCase()}'S ` : c.ow ? 'YOUR ' : '';
-      vl = `${who}${feedKind(c)} ${list.indexOf(c) + 1}/${list.length} · ${(roomAt(st.map, c.x, c.y) || 'outside').toUpperCase()} · ${ro || c.ty !== 'cam' ? 'WATCH ONLY' : 'MOUSE LOOK'} · ${label('left')} ${label('right')} SWITCH · CLICK PING${c.off || c.j ? ' · DISRUPTED' : ''}`;
+      vl = `${who}${feedKind(c)} ${list.indexOf(c) + 1}/${list.length} · ${(roomAt(st.map, c.x, c.y) || 'outside').toUpperCase()} · ${ro || c.ty !== 'cam' ? 'WATCH ONLY' : 'MOUSE LOOK'} · ${label('leanL')} ${label('leanR')} SWITCH · CLICK PING${c.off || c.j ? ' · DISRUPTED' : ''}`;
     }
   }
   $('viewlabel').textContent = vl;
@@ -2688,7 +2737,7 @@ const TIPS = [
   'A downed teammate can be revived — hold interact next to them.',
   'Press T (or middle click) to ping anything for your team: enemies, cameras, traps, doors, walls, or a place to go.',
   'New to R62D? The TUTORIAL tab teaches the phases, the roles and pinging in two short playable lessons.',
-  'Cameras see a cone: aim them with the mouse and switch with A and D.',
+  'Cameras see a cone: aim them with the mouse and switch with Q and E.',
   'Change your loadout for every operator on the Operators page.',
   'Smashed barricades leave splinters that crack underfoot.',
 ];
@@ -2732,7 +2781,7 @@ window.__r62d = { PF, st, showEnd, playXp, siteFound, pad: () => ({ padAng, padR
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
   try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, aimV: 2, xh };
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode };
 }
 let saveTimer = 0;
 function saveSettings() {
@@ -2744,6 +2793,7 @@ function applySettings(s) {
   for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.xh) setXhair(s.xh, false);
+  if (s.lean) setLean(s.lean, false);
   if (AIM_MODES.includes(s.aim)) setAim(s.aimV === 2 ? s.aim : s.aim === 'pad' ? 'free' : s.aim, s.aimV !== 2); // the old default pad becomes the new Crosshair once
   showSens();
   applyVol(); setMusicVolume(musicVol());
@@ -2946,15 +2996,4 @@ function toggleFullscreen() {
 }
 if (inApp()) for (const id of ['fsBtn', 'pFs']) $(id).style.display = 'none'; // nothing to switch in the desktop app
 $('kcBtn').onclick = () => { audio.ui(); watchKillcam(); };
-// Phones (he asked: the same menus, re-proportioned, with more pages so everything fits): Settings is split into pages
-// with a bar of buttons at the top instead of one long crowded window.
-if (isTouch) {
-  const S = $('settings'), pages = [['SOUND', 'volMaster'], ['AIMING', 'sens'], ['CONTROLS', 'inputSeg'], ['SCREEN', 'fsToggle'], ['CROSSHAIR', 'xhPreview'], ['KEYS', 'bindTable']];
-  const kids = [...S.children].filter(c => c.tagName !== 'H2' && !c.classList.contains('center'));
-  let last = 'SOUND';
-  for (const c of kids) { const p = pages.find(([, id]) => c.querySelector('#' + id)); if (p) last = p[0]; else if (c.classList.contains('fxToggles')) last = 'SCREEN'; else if (/Click a key/.test(c.textContent)) last = 'KEYS'; c.dataset.page = last; }
-  const bar = document.createElement('div'); bar.className = 'seg setPages'; S.querySelector('h2').after(bar);
-  const show = n => { for (const c of kids) c.classList.toggle('pageOff', c.dataset.page !== n); for (const b of bar.children) b.classList.toggle('on', b.textContent === n); };
-  for (const [n] of pages) if (kids.some(c => c.dataset.page === n)) { const b = document.createElement('button'); b.textContent = n; b.onclick = () => { audio.ui(); show(n); }; bar.appendChild(b); }
-  show('SOUND');
-}
+

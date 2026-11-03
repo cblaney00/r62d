@@ -9,14 +9,15 @@ export const ACTIONS = [
   ['crouch', 'Crouch — silent, most accurate (hold)', 'ControlLeft', ''],
   ['prone', 'Lie down / get up — sees under tables and cars', 'KeyC', ''],
   ['interact', 'Use — reinforce, barricade, plant, defuse, revive (hold)', 'KeyF', ''],
-  ['leanL', 'Lean left (hold)', 'KeyQ', ''],
-  ['leanR', 'Lean right (hold)', 'KeyE', ''],
+  ['leanL', 'Lean left (hold) — on drones / cameras: previous feed', 'KeyQ', ''],
+  ['leanR', 'Lean right (hold) — on drones / cameras: next feed', 'KeyE', ''],
   ['reload', 'Reload', 'KeyR', ''],
   ['primary', 'Primary weapon', 'Digit1', ''],
   ['secondary', 'Secondary weapon', 'Digit2', ''],
   ['gadget', 'Gadget / grenade', 'KeyG', ''],
   ['ability', 'Operator skill', 'Digit4', 'KeyZ'],
-  ['view', 'Drone / Cameras', 'Digit5', ''],
+  ['view', 'Team drones & cameras (look only at teammates\' drones)', 'Digit5', ''],
+  ['drone', 'Put out your drone / drive it (attack)', 'Digit6', ''],
   ['melee', 'Melee (knife)', 'Digit3', 'KeyV'],
   ['vault', 'Jump (onto furniture) — vaults windows and wall stubs', 'Space', ''],
   ['spot', 'Ping what is under your aim (enemy, gadget, wall, door, place)', 'KeyT', ''],
@@ -66,7 +67,7 @@ export function keyName(code) {
     .replace('Arrow', '').replace('Control', 'Ctrl').replace('Bracket', ' Bracket');
 }
 // on a phone the prompts name the touch button instead of a key (touch.js buttons)
-const TOUCH_NAMES = { interact: 'USE', vault: 'VAULT', melee: 'MELEE', ability: 'SKILL', gadget: 'GADGET', reload: 'RELOAD', spot: 'PING', crouch: 'CROUCH', ads: 'AIM', walk: 'a light push', view: 'DRONE / CAMS', scoreboard: 'SCORES' };
+const TOUCH_NAMES = { interact: 'USE', vault: 'VAULT', melee: 'MELEE', ability: 'SKILL', gadget: 'GADGET', reload: 'RELOAD', spot: 'PING', crouch: 'CROUCH', ads: 'AIM', walk: 'a light push', view: 'DRONE / CAMS', drone: 'DRONE / CAMS', scoreboard: 'SCORES' };
 export const label = id => (isTouch && TOUCH_NAMES[id]) || keyName((binds[id] || [])[0]);
 loadBinds();
 // Capture the mouse for aiming, asking for raw movement where the browser allows it (no system mouse acceleration,
