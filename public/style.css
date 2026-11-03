@@ -902,12 +902,12 @@ html.touch #settings .seg { flex-wrap: wrap; } html.touch #settings { grid-templ
 #bkPage .pagehead { display: flex; align-items: center; gap: 14px; } #bkPage .bkInfo { margin-right: auto; }
 #bkPage .bkSide { display: flex; gap: 4px; } #bkPage .bkSide button.on { background: var(--gold, #f2c14e); color: #000; }
 #bkPage .bkBody { display: grid; grid-template-columns: 1fr 340px; gap: 16px; min-height: 0; overflow: hidden; height: calc(100% - 64px); }
-#bkPage .bkGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; overflow-y: auto; align-content: start; padding-right: 6px; }
+#bkPage .bkGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; overflow-y: auto; align-content: start; padding-right: 6px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
 #bkPage .bkCard { background: rgba(10,13,18,0.82); border: 1px solid rgba(255,255,255,0.1); border-left: 4px solid var(--oc); padding: 10px 12px; }
 #bkPage .bkHead { display: flex; flex-direction: column; gap: 1px; margin-bottom: 6px; }
 #bkPage .bkHead b { font: 800 19px var(--head); letter-spacing: 0.06em; } #bkPage .bkHead span { font-size: 12px; color: var(--dim); } #bkPage .bkHead em { font-style: normal; font: 700 13px var(--head); color: #f2c14e; letter-spacing: 0.05em; }
 #bkPage .bkCard ul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.4; } #bkPage .bkCard li { margin: 3px 0; } #bkPage .bkCard li b { color: #fff; }
-#bkPage .bkPatch { overflow-y: auto; background: rgba(10,13,18,0.82); border: 1px solid rgba(255,255,255,0.1); padding: 10px 12px; }
+#bkPage .bkPatch { overflow-y: auto; background: rgba(10,13,18,0.82); border: 1px solid rgba(255,255,255,0.1); padding: 10px 12px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
 #bkPage .bkPatch h4 { margin: 0 0 8px; font: 800 15px var(--head); letter-spacing: 0.2em; color: #ff8a5a; }
 #bkPage .bkPatch div { font-size: 14px; line-height: 1.35; padding: 6px 8px; margin-bottom: 6px; border-left: 3px solid; background: rgba(255,255,255,0.03); }
 #bkPage .bkPatch .hot { border-color: #ff5a4a; } #bkPage .bkPatch .cold { border-color: #5ec8ff; }
