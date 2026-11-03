@@ -181,10 +181,7 @@
       <div class="srow"><div class="sl"><b>Master volume</b><small>Everything in the game, all at once</small></div><div class="sctl"><input type="range" id="volMaster" min="0" max="100" value="70"></div></div>
       <div class="srow"><div class="sl"><b>Effects volume</b><small>Guns, footsteps, gadgets and explosions</small></div><div class="sctl"><input type="range" id="volSfx" min="0" max="100" value="100"></div></div>
       <div class="srow"><div class="sl"><b>Music volume</b><small>The music in the menus</small></div><div class="sctl"><input type="range" id="volMusic" min="0" max="100" value="88"></div></div>
-      <div class="srow"><div class="sl"><b>Teammate voices</b><small>Bots on your team talking in a match (Esc in a match sets each one)</small></div><div class="sctl"><input type="range" id="volVoice" min="0" max="100" value="88"></div></div>
-      <div class="srow"><div class="sl"><b>Casters</b><small>The two commentators in Esports TV</small></div><div class="sctl"><input type="range" id="volCaster" min="0" max="100" value="88"></div></div>
-      <div class="srow"><div class="sl"><b>TV: left team voices</b><small>Northwind in Esports TV</small></div><div class="sctl"><input type="range" id="volTeamL" min="0" max="100" value="88"></div></div>
-      <div class="srow"><div class="sl"><b>TV: right team voices</b><small>Ironclad in Esports TV</small></div><div class="sctl"><input type="range" id="volTeamR" min="0" max="100" value="88"></div></div>
+      <div class="srow"><div class="sl"><b>Microphone boost</b><small>Raise this if the bots miss what you say when you talk to them</small></div><div class="sctl"><input type="range" id="micBoost" min="50" max="400" step="10" value="100"></div></div>
     </section>
     <section class="setPage" data-p="aim"><h3>MOUSE &amp; AIM</h3>
       <div class="srow"><div class="sl"><b>Playing with</b><small>Phone / tablet shows buttons on the screen</small></div><div class="sctl"><span class="seg" id="inputSeg"><button data-c="desk">Keyboard &amp; mouse</button><button data-c="touch">Phone / tablet</button></span></div></div>
@@ -224,7 +221,7 @@
   </div>
   <div id="clickIn" class="hidden">CLICK TO TAKE CONTROL</div>
   <div id="pause" class="overlay hidden"><div class="menu"><h2>PAUSED</h2><p class="hint">The match keeps running for everyone else.</p>
-    <div id="pVoices" class="hidden"></div><button id="pResume" class="primary">Resume</button><button id="pOps">Operators &amp; loadouts</button><button id="pProf">Profile &amp; match history</button>
+    <button id="pResume" class="primary">Resume</button><button id="pOps">Operators &amp; loadouts</button><button id="pProf">Profile &amp; match history</button>
     <button id="pSet">Settings &amp; keys</button><button id="pFs">Fullscreen</button><button id="pLan">Open to LAN</button><button id="pEnd">End match for everyone</button><button id="pQuit">Quit to desktop</button></div></div>
   <div id="lanDlg" class="overlay hidden"><div class="menu lanMenu"><h2>OPEN TO LAN</h2>
     <p class="hint">Your game is open to every phone and computer on your home network. On a phone, scan this with the camera, or type the address into the browser.</p>
@@ -245,7 +242,7 @@
   <div id="tvDraft" class="hidden"></div>
   <div id="tvCast" class="hidden"></div>
   <div id="pttInd" class="hidden"></div>
-  <div id="tvHud"><div id="tvL" class="tvSide"></div><div id="tvR" class="tvSide"></div><div id="tvCommsL" class="tvComms"></div><div id="tvCommsR" class="tvComms"></div><div id="tvHelp"></div><div id="tvVoice"><label><span>CASTERS</span><input type="range" id="tvvolCaster" min="0" max="100"></label><label><span>LEFT TEAM</span><input type="range" id="tvvolTeamL" min="0" max="100"></label><label><span>RIGHT TEAM</span><input type="range" id="tvvolTeamR" min="0" max="100"></label></div></div>
+  <div id="tvHud"><div id="tvL" class="tvSide"></div><div id="tvR" class="tvSide"></div><div id="tvCommsL" class="tvComms"></div><div id="tvCommsR" class="tvComms"></div><div id="tvHelp"></div></div>
   <div id="corner"><button id="fsBtn" title="Fullscreen">⛶ Fullscreen</button><button id="setBtn">⚙ Settings</button><button id="muteBtn">🔊</button><button id="leaveBtn" class="hidden">End match</button></div>
   <div id="conn" class="hidden">Connecting…</div>
 </div>

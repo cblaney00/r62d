@@ -1,14 +1,13 @@
-// ESPORTS TV casters (he asked: announcers you hear and read while the pros play; Pro matches only). Two of our own:
+// ESPORTS TV casters (he asked: announcers you read while the pros play; Pro matches only). Two of our own:
 // MAX REYES calls the action, IRIS KANE explains why it happened. Lines (shared/comms.js, CAST) come from what happens in
 // the match. They leave gaps, and once someone is clutching they stop chatting and let you listen (he asked).
-import { CAST, CASTER_VOICE, compose } from '/shared/comms.js';
-import { sayVoice, clearVoice, speaking } from './voice.js';
+import { CAST, compose } from '/shared/comms.js';
 const WHO = [{ name: 'MAX REYES', role: 'PLAY-BY-PLAY', col: '#ffd166' }, { name: 'IRIS KANE', role: 'ANALYST', col: '#8fd3ff' }];
 let el = null, queue = [], lastKey = {}, recent = [[], []], clutch = false, gapT = 0;
 const nm = n => (n || '').replace(/^\[\w+\] /, '');
 const BIG = new Set(['hs', 'kill', 'plant', 'end', 'act', 'clutch']); // still called while someone is clutching
 
-export function castReset() { queue = []; lastKey = {}; clutch = false; clearVoice('caster'); if (el) el.innerHTML = ''; }
+export function castReset() { queue = []; lastKey = {}; clutch = false; if (el) el.innerHTML = ''; }
 function say(cat, slots = {}, key = null) {
   const def = CAST[cat]; if (!def) return;
   if (clutch && !BIG.has(cat)) return;
@@ -33,12 +32,11 @@ export function castTick(on) {
   el.classList.toggle('hidden', !on);
   if (!on) return;
   const now = performance.now() / 1000;
-  if (!queue.length || speaking('caster') || now < gapT) return;
+  if (!queue.length || now < gapT) return;
   const l = queue.shift();
   if (now - l.t > 8) return; // stale news
-  const c = compose(CASTER_VOICE[l.who], l.cat, l.slots, recent[l.who]); if (!c) return;
-  gapT = now + 1.2 + Math.random() * 1.6;
-  sayVoice('caster', 'caster', CASTER_VOICE[l.who], c.parts);
+  const c = compose(WHO[l.who].name, l.cat, l.slots, recent[l.who]); if (!c) return;
+  gapT = now + 1.2 + c.text.length * 0.04 + Math.random() * 1.6; // time to read it
   show(l.who, c.text);
 }
 // match moments from the snapshot events (main.js passes them on in Esports TV)

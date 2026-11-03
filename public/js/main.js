@@ -1,8 +1,7 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
-import * as voice from './voice.js';
-import { pttDown, pttUp, pttSetState, pttTest } from './ptt.js';
+import { pttDown, pttUp, pttSetState, pttVocab, pttTest } from './ptt.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
@@ -657,7 +656,11 @@ function pressAction(a, e) {
     case 'settings': toggleSettings(); break;
     case 'pause': escape(); break;
     case 'spot': st.spotReq = true; break;
-    case 'ptt': if (st.id && !st.tv && !st.tut) pttDown(); break;
+    case 'ptt': if (st.id && !st.tv && !st.tut) {
+      const sn = st.snaps.length ? st.snaps[st.snaps.length - 1] : null;
+      if (st.map) pttVocab([...(st.map.rooms || []).map(r => r.name.replace(/^\dF /, '')), ...Object.values(OPERATORS).map(o => o.name), ...(sn ? [...sn.players.values()].map(p => String(p.n || '').replace(/^\[\w+\] /, '')) : [])]);
+      pttDown();
+    } break;
     case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
     case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
@@ -718,14 +721,14 @@ function pollPad(dt, view) {
 addEventListener('keyup', e => {
   if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault(); // stop Firefox's menu bar popping up
   const a = actionFor(e.code); if (a) keys.delete(a);
-  if (a === 'ptt') pttUp((text, intent) => { // what it heard shows to the team, then a bot answers
-    if (text) { send({ t: 'chat', text, team: true }); if (intent) send({ t: 'ptt', intent }); }
-    if (!intent) addFeed("Didn't catch that: try \"where are they\", \"follow me\" or \"push\"");
-    else pttMsg('DIDN\'T CATCH THAT', 1500);
+  if (a === 'ptt') pttUp((text, loudest) => { // what it heard goes to the team as chat, and the bots read that like anything typed
+    if (text) send({ t: 'chat', text, team: true, mic: 1 });
+    else addFeed(loudest < 0.004 ? 'The microphone heard almost nothing: check it, or raise Microphone boost in Settings → Sound' : "Didn't catch any words: try \"where are they\" or \"go to\" and a room");
   });
 });
 function pttMsg(text, ms) { const el = $('pttInd'); el.textContent = text; el.classList.remove('hidden'); clearTimeout(el._t); if (ms) el._t = setTimeout(() => el.classList.add('hidden'), ms); }
-pttSetState(k => { if (k === 'on') pttMsg('🎤 LISTENING'); else if (k === 'loading') pttMsg('🎤 STARTING MICROPHONE…'); else if (k === 'nomic') pttMsg('NO MICROPHONE HERE (OR THE BROWSER REFUSED IT)', 4000); else $('pttInd').classList.add('hidden'); });
+pttSetState(k => { if (k === 'on') { pttMsg('🎤 LISTENING'); $('pttInd').style.setProperty('--lv', 0); } else if (k === 'loading') pttMsg('🎤 STARTING MICROPHONE…'); else if (k === 'nomic') pttMsg('NO MICROPHONE HERE (OR THE BROWSER REFUSED IT)', 4000); else $('pttInd').classList.add('hidden'); },
+  (text, lv) => { const el = $('pttInd'); if (text) el.textContent = '🎤 ' + text.toUpperCase(); if (lv) el.style.setProperty('--lv', lv.toFixed(2)); });
 addEventListener('blur', () => { keys.clear(); mouse.l = mouse.r = false; });
 cv.addEventListener('mousemove', e => {
   mouseT = performance.now();
@@ -889,7 +892,7 @@ function tvShotBox(fi, s, site) {
 }
 // Volume sliders follow loudness, not raw gain: each step is 0.5 dB, so the whole slider spans 50 dB (audio.sliderGain).
 // He asked for a quieter start: the default master (70) is about a third as loud as full.
-const VOL_DEF = { volMaster: 70, volSfx: 100, volMusic: 88, volVoice: 88, volCaster: 88, volTeamL: 88, volTeamR: 88 };
+const VOL_DEF = { volMaster: 70, volSfx: 100, volMusic: 88 };
 // a slider saved before the curve was straight gain: convert it, and never come back louder than the new default
 const fromOld = (k, v) => Math.min(VOL_DEF[k], v <= 0 ? 0 : Math.max(0, Math.round(100 + 40 * Math.log10(v / 100))));
 const saveVol = () => { try { localStorage.setItem('r62d-vol2', JSON.stringify([+$('volMaster').value, +$('volSfx').value])); } catch {} };
@@ -3048,7 +3051,7 @@ window.__r62d = { pttTest, PF, st, switchMatch, showEnd, playXp, siteFound, pad:
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
   try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, volVoice: +$('volVoice').value, volCaster: +$('volCaster').value, volTeamL: +$('volTeamL').value, volTeamR: +$('volTeamR').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode };
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode };
 }
 let saveTimer = 0;
 function saveSettings() {
@@ -3057,7 +3060,7 @@ function saveSettings() {
 }
 function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
-  for (const k of ['volMaster', 'volSfx', 'volMusic', 'volVoice', 'volCaster', 'volTeamL', 'volTeamR', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
+  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.xh) setXhair(s.xh, false);
   if (s.lean) setLean(s.lean, false);
@@ -3068,8 +3071,7 @@ function applySettings(s) {
   renderSettings(); renderControls();
 }
 onBindsChange(() => saveSettings());
-for (const id of ['volMaster', 'volSfx', 'volMusic', 'volVoice', 'volCaster', 'volTeamL', 'volTeamR']) $(id).addEventListener('change', saveSettings);
-setInterval(() => { if (st.tv) syncTvVols(); }, 1000);
+for (const id of ['volMaster', 'volSfx', 'volMusic']) $(id).addEventListener('change', saveSettings);
 
 // ---------------- captured mouse & sensitivity ----------------
 function playing() { const p = st.last && st.last.ph; return !!st.id && (p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END); }
@@ -3155,42 +3157,7 @@ function chatKey(e) {
     closeChat();
   }
 }
-// who is talking out loud: on TV only the team the camera is on (he chose); in a match your bot teammates
-function hearChat(m) {
-  if (st.tv) { if (st.me && m.squad === st.me.sq) voice.sayVoice('team', 'team' + m.squad, m.vo.v, m.vo.parts); return; }
-  if (m.from === st.id) return;
-  const ch = 'bot:' + m.name; voice.setVoiceGain(ch, voice.sliderGain(+$('volVoice').value) * voice.sliderGain(botVol(m.name)));
-  voice.sayVoice('team', ch, m.vo.v, m.vo.parts);
-}
-function botVol(name) { try { const v = JSON.parse(localStorage.getItem('r62d-botvol') || '{}')[name]; return typeof v === 'number' ? v : 100; } catch { return 100; } }
-function setBotVol(name, v) { try { const a = JSON.parse(localStorage.getItem('r62d-botvol') || '{}'); a[name] = v; localStorage.setItem('r62d-botvol', JSON.stringify(a)); } catch {} }
-// Esc in a match: a slider for each bot on your team, so one who annoys you can be turned down (he asked). Kept per name.
-function fillPauseVoices() {
-  const el = $('pVoices'); if (!el) return;
-  const snap = st.snaps.length ? st.snaps[st.snaps.length - 1] : null, me = st.me;
-  const bots = !st.tv && snap && me ? [...snap.players.values()].filter(p => p.sq === me.sq && p.id !== st.id && p.bt) : [];
-  el.classList.toggle('hidden', !bots.length);
-  el.innerHTML = bots.length ? '<h3>TEAMMATE VOICES</h3>' : '';
-  for (const p of bots) {
-    const d = document.createElement('label'); d.className = 'pVoice'; d.innerHTML = '<span></span><input type="range" min="0" max="100">';
-    d.firstChild.textContent = p.n.replace(/^\[\w+\] /, ''); const r = d.lastChild; r.value = botVol(p.n);
-    r.oninput = () => setBotVol(p.n, +r.value);
-    el.appendChild(d);
-  }
-}
-new MutationObserver(() => { if (!$('pause').classList.contains('hidden')) fillPauseVoices(); }).observe($('pause'), { attributes: true, attributeFilter: ['class'] });
-// the voice sliders: Settings → Sound, and the same three on the TV screen (he asked: usable with your cursor)
-const VOICE_VOLS = [['volCaster', 'caster'], ['volTeamL', 'team0'], ['volTeamR', 'team1']];
-function applyVoiceVols() { for (const [id, ch] of VOICE_VOLS) voice.setVoiceGain(ch, voice.sliderGain(+$(id).value)); }
-for (const [id] of VOICE_VOLS) {
-  const tv = $('tv' + id); $(id).addEventListener('input', () => { tv.value = $(id).value; applyVoiceVols(); });
-  tv.oninput = () => { $(id).value = tv.value; applyVoiceVols(); }; tv.onchange = () => saveSettings();
-  tv.addEventListener('mousedown', e => e.stopPropagation());
-}
-addEventListener('mousemove', () => { if (!st.tv) return; const el = $('tvVoice'); el.classList.add('on'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('on'), 4000); });
-function syncTvVols() { for (const [id] of VOICE_VOLS) $('tv' + id).value = $(id).value; applyVoiceVols(); }
 function addChat(m) {
-  if (m.vo) hearChat(m);
   if (st.tv && m.from) (st.tvSay || (st.tvSay = new Map())).set(m.from, { text: m.text, t: performance.now() / 1000 }); // spoken from the character (he asked)
   if (st.tv && m.squad !== undefined) { // ESPORTS TV: the team's comms, live, under that team's player cards
     const el = $(m.squad ? 'tvCommsR' : 'tvCommsL'); if (!el) return;
@@ -3220,3 +3187,6 @@ function toggleFullscreen() {
 if (inApp()) for (const id of ['fsBtn', 'pFs']) $(id).style.display = 'none'; // nothing to switch in the desktop app
 $('kcBtn').onclick = () => { audio.ui(); watchKillcam(); };
 
+
+try { $('micBoost').value = localStorage.getItem('r62d-micboost') || 100; } catch {}
+$('micBoost').addEventListener('input', () => { try { localStorage.setItem('r62d-micboost', $('micBoost').value); } catch {} });
