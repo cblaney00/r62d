@@ -8,8 +8,13 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
 
+- [ ] One-file installer: anyone who can browse the internet and follow basic instructions should be set up with no hitches in under a minute after the file is on their computer (he asked). Still needs: a single setup file instead of a zip.
+
 ## Done
 
+- [x] Main menu: the buttons on the left are smaller and grouped under PLAY, WATCH, LEARN and YOU, with QUIT at the bottom.
+- [x] The R62D program has PLAY / HOST / JOIN: PLAY is a game just for you (nobody can join, the lobby doesn't offer an address), HOST opens your game to your home network and, on the VPN, to everyone on Lando's homelab, JOIN looks for games itself: Lando's homelab first, then anyone hosting on your network or the homelab VPN; one game = straight in, more = a short list to pick from, none = it says to switch on the VPN or ask a friend to HOST (an address can still be typed). Never open to the internet.
+- [x] The R62D program updates itself: each time it opens it looks at your GitHub page for a newer release and fetches just the game part (about half a megabyte), checks it arrived whole, and plays it. No internet, or anything goes wrong: it plays the version it has.
 - [x] R62D is its own program now (the browser version still works the same): R62D.exe for Windows with its own R62D icon, download: https://github.com/cblaney00/r62d/releases/tag/v1.0-test It opens full screen (F11 for a window) on a HOST / JOIN screen: HOST starts the game on that computer so friends can play any time without yours being on, JOIN takes a friend's address (the last five are remembered). Each friend's profiles stay on their own computer, and Quit to desktop closes the program. Tested under Wine (start screen, hosting, menus, a free-play match, Quit); not yet on a real Windows PC.
 - [x] Token estimate for turning R62D into an .exe: about 3–5 million tokens in all (nearly all of it re-reading the project), with roughly 100–150 thousand tokens of new writing. The real number for this job is in VibeNote.
 - [x] Slightly shorter rounds: the action phase is now 2:40 instead of 3:00 (R6 uses 3:00, but on smaller maps), and the wait between rounds 5 s instead of 7. Preparation stays 30 s and the defuser timer 45 s, so there is still time to drone, plan and try something creative before going for the objective. Bots and the pro teams' timings follow the new clock.

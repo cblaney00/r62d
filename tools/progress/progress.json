@@ -1,7 +1,7 @@
 {
- "title": "Making R62D its own program (+ updates)",
+ "title": "Making R62D its own program (+ updates, Play/Host/Join)",
  "started": 1793734907703,
- "updated": 1793736673327,
+ "updated": 1793737532862,
  "steps": [
   {
    "name": "Plan and token estimate",
@@ -117,8 +117,38 @@
    "ended": 1793736673327
   },
   {
+   "name": "PLAY: a game just for you",
+   "about": "Starts the game on your own computer only, with bots.",
+   "state": "done",
+   "began": 1793736924058,
+   "detail": "PLAY runs the game for this computer only",
+   "ended": 1793737081111
+  },
+  {
+   "name": "HOST: open to home network and homelab",
+   "about": "Lets people on your home network or Lando's homelab VPN join.",
+   "state": "done",
+   "ended": 1793737081142,
+   "detail": "HOST opens it to the network; other copies can find it"
+  },
+  {
+   "name": "JOIN: find games by itself",
+   "about": "Lando's homelab first, then games on your network; a short list if there are several.",
+   "state": "done",
+   "ended": 1793737081168,
+   "detail": "JOIN checks Lando's homelab first, then asks the network; list if more than one"
+  },
+  {
+   "name": "Test it all in Wine",
+   "about": "Play, host, and join from a second copy.",
+   "state": "done",
+   "began": 1793737081226,
+   "detail": "Wine: PLAY stays on this computer, HOST opens it, JOIN finds the homelab and joins, 'no games' after 1.5 s",
+   "ended": 1793737532862
+  },
+  {
    "name": "New download link",
-   "about": "Replace the first test download with one that can update itself.",
+   "about": "Publish the new version to GitHub.",
    "state": "todo"
   }
  ],
@@ -226,6 +256,34 @@
   {
    "at": 1793736673327,
    "text": "Finished: Test an update in Wine — In Wine: build 1 updated itself to build 237, hosted on it, and started fine with no internet"
+  },
+  {
+   "at": 1793736924058,
+   "text": "Started: PLAY: a game just for you — Letting the game server start for this computer only"
+  },
+  {
+   "at": 1793737081111,
+   "text": "Finished: PLAY: a game just for you — PLAY runs the game for this computer only"
+  },
+  {
+   "at": 1793737081142,
+   "text": "Finished: HOST: open to home network and homelab — HOST opens it to the network; other copies can find it"
+  },
+  {
+   "at": 1793737081168,
+   "text": "Finished: JOIN: find games by itself — JOIN checks Lando's homelab first, then asks the network; list if more than one"
+  },
+  {
+   "at": 1793737081196,
+   "text": "Left-hand menu: smaller buttons in groups PLAY / WATCH / LEARN / YOU"
+  },
+  {
+   "at": 1793737081226,
+   "text": "Started: Test it all in Wine — Building and testing in Wine"
+  },
+  {
+   "at": 1793737532862,
+   "text": "Finished: Test it all in Wine — Wine: PLAY stays on this computer, HOST opens it, JOIN finds the homelab and joins, 'no games' after 1.5 s"
   }
  ]
 }

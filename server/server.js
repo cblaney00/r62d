@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { attachWebSocket } from './ws.js';
 import { Worker } from 'node:worker_threads';
+import dgram from 'node:dgram';
 import { training, addResults, saveTraining, needsTraining, newVersion, roundsLeft } from './training.js';
 import { Game } from './game.js';
 const perfLog = [];
@@ -15,6 +16,9 @@ import { TICK_RATE, SNAP_RATE } from '../shared/constants.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || 6262;
+// R62D_BIND 127.0.0.1 = this computer only (the program's PLAY); openTo('0.0.0.0') opens it to the network (HOST)
+let BIND = process.env.R62D_BIND || '0.0.0.0';
+const FIND_PORT = 6264; // JOIN in the program asks the network "R62D?" on this UDP port; servers open to the network answer
 // Which build this server is (OPEN TO LAN shows it, so a phone can tell his own PC's game from someone else's server):
 // the git commit when run from his project folder, otherwise R62D_VERSION if the packaged app sets it.
 let VERSION = { id: process.env.R62D_VERSION || 'packaged', date: '' };
@@ -63,7 +67,7 @@ function api(req, res) {
     }
     const rank = u => (u.vpn ? 2 : u.net === 'Wi-Fi' ? 1 : 0);
     urls.sort((a, b) => rank(a) - rank(b));
-    return json(200, { urls, host: os.hostname(), version: VERSION, port: PORT });
+    return json(200, { urls, host: os.hostname(), version: VERSION, port: PORT, players: humans(), local: BIND === '127.0.0.1' });
   }
   if (u.pathname === '/api/perf') { // browsers report how smoothly they run (see perfRep in main.js)
     if (req.method !== 'POST') return json(200, perfLog);
@@ -128,7 +132,29 @@ function trainCheck(force = false) {
 }
 setInterval(trainCheck, 5 * 60 * 1000); setTimeout(trainCheck, 60 * 1000);
 
-server.listen(PORT, '0.0.0.0', () => {
+const humans = () => [...game.players.values()].filter(p => !p.bot).length;
+
+// answers "R62D?" from programs looking for games (not while this computer only)
+let finder = null;
+function answerFinders() {
+  if (finder || BIND === '127.0.0.1') return;
+  finder = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  finder.on('error', () => { try { finder.close(); } catch {} finder = null; });
+  finder.on('message', (m, from) => {
+    if (m.toString() !== 'R62D?') return;
+    finder.send(JSON.stringify({ r62d: 1, port: PORT, host: os.hostname(), version: VERSION.id, players: humans() }), from.port, from.address);
+  });
+  finder.bind(FIND_PORT);
+}
+export function openTo(bind) {
+  if (bind === BIND) return Promise.resolve();
+  BIND = bind;
+  server.close(); // stops listening now; games already connected carry on
+  return new Promise((ok, no) => server.listen(PORT, BIND, () => { answerFinders(); ok(); }).once('error', no));
+}
+answerFinders();
+
+server.listen(PORT, BIND, () => {
   console.log(`R62D is running.  On this computer open:  http://localhost:${PORT}`);
   for (const list of Object.values(os.networkInterfaces()))
     for (const a of list || []) if (a.family === 'IPv4' && !a.internal) console.log(`  Friends on the same network open:  http://${a.address}:${PORT}`);

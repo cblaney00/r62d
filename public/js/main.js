@@ -932,8 +932,9 @@ function renderLobby(s) {
   { const t = s.rk ? 'RANKED: ON' : 'RANKED: OFF'; if ($('rankedBtn').textContent !== t) { $('rankedBtn').textContent = t; $('rankedBtn').classList.toggle('primary', !!s.rk); } st.rk = !!s.rk; }
   // the address friends type to join (the first network card is the wired one)
   if (st.addr === undefined || (st.addrT && performance.now() - st.addrT > 15000)) { st.addr = st.addr || null; st.addrT = performance.now(); fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
-  const u = st.addr && st.addr.urls[0], jt = !u ? '' : `Friends at home join at ${u.url} · OPEN TO LAN shows a code to scan with a phone`;
+  const u = st.addr && !st.addr.local && st.addr.urls[0], jt = !u ? '' : `Friends at home join at ${u.url} · OPEN TO LAN shows a code to scan with a phone`;
   if ($('joinAddr').textContent !== jt) $('joinAddr').textContent = jt;
+  for (const b of ['lanBtn', 'pLan']) $(b).classList.toggle('hidden', !!(st.addr && st.addr.local)); // the program's PLAY: this computer only, nobody to invite
   for (const sq of [0, 1]) {
     const ul = document.querySelector(`#sq${sq} ul`);
     const list = s.players.filter(p => p.sq === sq);

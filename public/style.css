@@ -417,8 +417,11 @@ button.big { font-size: 22px; padding: 14px 34px; }
 .xpbar { width: 180px; height: 5px; background: rgba(255,255,255,0.12); margin-top: 4px; } .xpbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #e2a531, #ffd56b); transition: width 0.6s; }
 .xpbar.big { width: 100%; height: 10px; flex: 1; }
 .pxp { font: 600 11px var(--head); color: var(--dim); letter-spacing: 0.15em; margin-top: 3px; }
-.mnav { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 28px 0 28px 24px; border-right: 1px solid var(--line); }
-.mnav button { background: none; border: none; text-align: left; font: 700 24px var(--head); letter-spacing: 0.14em; color: var(--dim); padding: 12px 18px; }
+.mnav { position: relative; display: flex; flex-direction: column; gap: 1px; padding: 18px 0 22px 24px; border-right: 1px solid var(--line); }
+.mnav button { background: none; border: none; text-align: left; font: 700 18px var(--head); letter-spacing: 0.12em; color: var(--dim); padding: 6px 18px; }
+/* menu groups (he asked: smaller buttons, grouped) */
+.mnav .ngrp { font: 600 11px var(--head); letter-spacing: 0.3em; color: rgba(147,160,173,0.55); padding: 16px 18px 4px; border-top: 1px solid var(--line); margin-right: 18px; }
+.mnav .ngrp:first-child { border-top: none; padding-top: 4px; }
 .mnav button:hover { color: #fff; background: rgba(255,255,255,0.04); }
 .mnav button.on { color: #fff; }
 .mnav .ind { position: absolute; left: 24px; width: 4px; background: var(--gold); transition: top 0.25s cubic-bezier(.2,.8,.2,1), height 0.25s; box-shadow: 0 0 12px var(--gold); }
@@ -876,6 +879,7 @@ html.touch .mnav { flex-direction: row; overflow-x: auto; overflow-y: hidden; pa
 html.touch .mnav button { flex: none; font-size: 19px; padding: 9px 14px; letter-spacing: 0.1em; }
 html.touch .mnav button.on { box-shadow: inset 0 -3px 0 var(--gold); }
 html.touch .mnav .ind { display: none; }
+html.touch .mnav .ngrp { display: none; }
 html.touch .mnav .quitNav { margin-top: 0; }
 html.touch .mbody { padding: 12px 18px; }
 html.touch #settings { width: 96vw; }
