@@ -1909,7 +1909,7 @@ export class Game {
     this.ents.push(b);
     this.events.push({ e: 'snd', s: 'birdForm', x: r1(b.x), y: r1(b.y) }); this.events.push({ e: 'hit', k: 'spark', x: r1(b.x), y: r1(b.y) });
     if (m) { this.pts(m, 30, 'DRONE CAPTURED'); this.events.push({ e: 'deny', id: m.id, why: 'Drone captured: it is your bird now (look through your feeds to fly it)' }); }
-    if (m && m.bot) this.birdPerch(m, b, 3 * CELL); // a bot's bird lands on the nearest wall and watches on AUTO
+    if (m && m.bot) b.botFly = true; // a bot's bird flies to the nearest wall, lands and watches on AUTO (tickBird)
   }
   // E on your bird: land on the wall next to it (looking out from it, AUTO on), or take off again
   birdPerch(p, b, reach = 14) {
@@ -1931,6 +1931,18 @@ export class Game {
   tickBird(b, dt) {
     const o = this.players.get(b.owner);
     if (o && !o.alive && o.ctrl === 'drone') o.ctrl = 'body';
+    if (b.botFly && !b.perch && !(o && o.ctrl === 'drone' && o.droneId === b.id)) { // (found at playtest: hovering in the open, they were shot)
+      if (!b.goal) { // the nearest wall in reach, a bird-length off it
+        let ba = null, bd = Infinity;
+        for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, d = castSight(this.map, b.x, b.y, a, 10 * CELL, null); if (d < bd) { bd = d; ba = a; } }
+        b.goal = ba === null ? { x: b.x, y: b.y } : { x: b.x + Math.cos(ba) * Math.max(0, bd - 8), y: b.y + Math.sin(ba) * Math.max(0, bd - 8) };
+        b.flyT = 0;
+      }
+      const dx = b.goal.x - b.x, dy = b.goal.y - b.y, l = Math.hypot(dx, dy); b.flyT += dt;
+      if (l > 3 && b.flyT < 4) { const s = Math.min(l, SWARM.bird * PX_PER_M * dt); b.ang = Math.atan2(dy, dx); moveCircle(this.map, b, dx / l * s, dy / l * s, 2.5, 'bird'); }
+      else { b.botFly = false; if (o) this.birdPerch(o, b, 3 * CELL); }
+      return;
+    }
     if (!b.perch || !b.auto || this.phase !== PHASE.ACTION && this.phase !== PHASE.PREP) return;
     if ((b.lookT = (b.lookT || 0) - dt) > 0) return; b.lookT = 0.15;
     const sm = this.smokeList(), fl = floorAt(this.map, b.x, b.y);

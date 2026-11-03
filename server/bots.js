@@ -411,7 +411,9 @@ function leaveForMagpie(game, p, e) {
   if (game.ents.some(s => s.type === 'swarm' && s.target === e.id)) return true;
   const mags = magpieOf(game, game.side(p)); if (!mags.length) return false;
   const near = mags.find(q => Math.hypot(q.x - e.x, q.y - e.y) < SWARM.keep * PX_PER_M), where = place(game, e.x, e.y) || 'here';
-  if (near) { teamSay(game, p, `Drone ${where}: not shooting it, leaving it for ${near.name.replace(/^\[\w+\] /, '')}`, 'mgL' + e.id); return true; }
+  const lt = game.leaveT || (game.leaveT = {}); lt[e.id] ??= game.time; // (found at playtest: drones she never got to were left alone all round)
+  if (near && game.time - lt[e.id] < 5) { teamSay(game, p, `Drone ${where}: not shooting it, leaving it for ${near.name.replace(/^\[\w+\] /, '')}`, 'mgL' + e.id); return true; }
+  if (near) { teamSay(game, p, `${near.name.replace(/^\[\w+\] /, '')} didn't take the drone ${where}, shooting it`, 'mgS' + e.id); return false; }
   teamSay(game, p, `Drone ${where} is too far for MAGPIE, shooting it`, 'mgS' + e.id);
   return false;
 }
@@ -1184,7 +1186,8 @@ function botDrone(game, p, dt) {
   const mg = game.magpieSeen;
   if ((p.pro || lvlOf(game, p) >= 4) && mg && game.time - mg.t < 45 && Math.hypot(mg.x - d.x, mg.y - d.y) < (SWARM.reach + 2) * PX_PER_M && !(ai.mgBackT > game.time) && ai.dTrail && ai.dTrail.length) {
     ai.mgBackT = game.time + 6; ai.droneGoal = ai.dTrail[0]; ai.droneGoalT = 6; ai.dPath = null;
-    teamSay(game, p, 'MAGPIE on defence: keep the drones away from her, sprint from the swarm', 'mgW');
+    const said = game.mgWarned || (game.mgWarned = {}); // once a round per team
+    if (said[p.squad] !== game.round) { said[p.squad] = game.round; teamSay(game, p, 'MAGPIE on defence: keep the drones away from her, sprint from the swarm', 'mgW'); }
   }
   // he asked: higher ranks keep their drone alive. From Gold up (not the risk-takers), once a defender is close to the
   // drone or preparation is nearly over, it backs off to where it was a few seconds ago, out of the way, and stays parked.

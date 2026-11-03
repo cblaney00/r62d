@@ -94,25 +94,26 @@ const UNIFORM = {
 };
 // Every operator's own uniform (he asked: recognisable at a glance by uniform, helmet and accents; own colours, with the
 // team colour kept as a trim: the ring and the armbands). [cloth, vest, pattern, pattern colour]; patterns in drawPattern.
+// No uniform is team blue or enemy orange (found at playtest: an enemy BRISK in blue looked like a teammate).
 const UNI = {
   ember: ['#5a3a2a', '#3a2a22', 'char', '#d8602a'], kestrel: ['#d6dad6', '#8a9298', 'digital', '#9aa4aa'], hammer: ['#c89a3a', '#4a3e26', 'hazard', '#1e1e1e'],
-  talon: ['#2a2e3a', '#1a1d24', 'circuit', '#3ae0a0'], bulwark: ['#26304a', '#161c2a', 'hex', '#3a4a6a'], rivet: ['#22282e', '#3a4048', 'stripe', '#e0a030'],
-  haze: ['#7a7a6e', '#55554a', 'camo', '#9c9c8c'], glint: ['#7a6842', '#4a4030', 'camo', '#a08c5c'], brisk: ['#2f5a9a', '#1e3460', 'stripe', '#e8e8e8'],
+  talon: ['#2a2e3a', '#1a1d24', 'circuit', '#3ae0a0'], bulwark: ['#33363a', '#1e2023', 'hex', '#55595f'], rivet: ['#22282e', '#3a4048', 'stripe', '#e0a030'],
+  haze: ['#7a7a6e', '#55554a', 'camo', '#9c9c8c'], glint: ['#7a6842', '#4a4030', 'camo', '#a08c5c'], brisk: ['#2a8a7a', '#1a4a42', 'stripe', '#e8e8e8'],
   onyx: ['#18181a', '#2a2a2e', 'hex', '#3c3c44'], prism: ['#5a3a7a', '#36264e', 'check', '#c080ff'], volt: ['#26384a', '#18222e', 'zig', '#ffe030'],
   tether: ['#4a5a3a', '#343e2c', 'camo', '#6e7e4c'], strider: ['#3c4c38', '#262e24', 'tiger', '#141a12'], ferro: ['#7a3a2a', '#4a2a22', 'plain', null],
   salvo: ['#5a6a4a', '#3a4a32', 'digital', '#7c8c5c'], torque: ['#2e221c', '#201814', 'stripe', '#c04020'], rush: ['#c03030', '#1a1a1a', 'stripe', '#ffffff'],
-  blaze: ['#d86a2a', '#4a2a1a', 'splatter', '#ffd040'], echo: ['#6a7a5a', '#4a5a42', 'digital', '#8ea474'], mark: ['#4a4a5a', '#2a2a36', 'tiger', '#7a7a92'],
+  blaze: ['#d8c040', '#4a2a1a', 'splatter', '#c02a2a'], echo: ['#6a7a5a', '#4a5a42', 'digital', '#8ea474'], mark: ['#4a4a5a', '#2a2a36', 'tiger', '#7a7a92'],
   patch: ['#e8eaea', '#b8c0c0', 'plain', null], trench: ['#6a5a42', '#4a4030', 'check', '#8a7a5a'], wren: ['#2a2a2a', '#5a4a3a', 'plain', null],
   vapor: ['#8a8aa0', '#4a4a60', 'splatter', '#c4c4e4'], crow: ['#101012', '#1a1a1e', 'plain', null],
   mason: ['#8a8a82', '#4a4a48', 'digital', '#aaaaa2'], veil: ['#3a3a52', '#24243a', 'zig', '#8080ff'], lynx: ['#a07a4a', '#5a442a', 'spots', '#3a2a1a'],
-  solace: ['#e0e4e8', '#3a8ab0', 'plain', null], wraith: ['#2a2a30', '#1a1a20', 'splatter', '#5a5a72'], bramble: ['#4a6a2a', '#2a3a1a', 'camo', '#7a9a3a'],
-  kite: ['#8a2a2a', '#3a1a1a', 'check', '#e05252'], gravel: ['#7a6a52', '#3a3a3a', 'digital', '#9c8c6c'], shunt: ['#2a4a8a', '#1a2a52', 'zig', '#ffffff'],
+  solace: ['#e0e4e8', '#5a6470', 'plain', null], wraith: ['#2a2a30', '#1a1a20', 'splatter', '#5a5a72'], bramble: ['#4a6a2a', '#2a3a1a', 'camo', '#7a9a3a'],
+  kite: ['#8a2a2a', '#3a1a1a', 'check', '#e05252'], gravel: ['#7a6a52', '#3a3a3a', 'digital', '#9c8c6c'], shunt: ['#3a3a3a', '#222222', 'zig', '#f0d030'],
   hush: ['#3a3e48', '#24262c', 'plain', null], shade: ['#4a3a6a', '#2a2242', 'hex', '#9b6be0'], rampart: ['#5a6068', '#3c4249', 'hex', '#8f9aa6'],
   miasma: ['#c8d34a', '#6a7a2a', 'plain', null], snare: ['#7a5a3a', '#4a3422', 'tiger', '#33251a'], argus: ['#2a2a32', '#1a1a22', 'stripe', '#3ac4b0'],
   solder: ['#5a4a3a', '#3a3028', 'splatter', '#ff9a3a'], latch: ['#d8e030', '#3a3a2a', 'stripe', '#e8e8e8'], hound: ['#8a5a3a', '#5a3a22', 'check', '#c26a3a'],
   ruse: ['#3a3048', '#24202e', 'spots', '#8a6ad6'], rally: ['#e05a7a', '#46384a', 'stripe', '#ffffff'], lens: ['#4f6a32', '#3a4a22', 'camo', '#6a8a42'],
-  audit: ['#4a5a6a', '#2a343e', 'stripe', '#5ad0c0'], tonic: ['#5a9ab8', '#3a6a80', 'plain', null], ward: ['#3a4252', '#2a303c', 'hex', '#7aa0e8'],
-  girder: ['#e08a2a', '#4a4a4a', 'hazard', '#1e1e1e'], magpie: ['#1a1c1e', '#e6e6e0', 'split', '#f2f2ec'],
+  audit: ['#4a5a6a', '#2a343e', 'stripe', '#5ad0c0'], tonic: ['#4aa08a', '#2a6a5a', 'plain', null], ward: ['#3a4252', '#2a303c', 'hex', '#7aa0e8'],
+  girder: ['#5e6064', '#3a3c40', 'hazard', '#e0c030'], magpie: ['#1a1c1e', '#e6e6e0', 'split', '#f2f2ec'],
 };
 const uniCache = {};
 export function uniformOf(op, team) {
