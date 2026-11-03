@@ -9,6 +9,10 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
 - [ ] make 6 deploy your inventory bot and 5 is just to switch to bots and cameras, also you should be able to switch between the bots and cameras on your team with q and e though you cant control others bots
 - [ ] make the settings screen less cluttered and more intuitive
+- [ ] if a defender goes outside there is a warning at the top of the screen that alerts the attackers of this
+- [ ] make sure leaning is toggle by default
+- [ ] the pros should play a wider variety of operators and also have more plays to learn from
+- [ ] give the maps a big rework to make them larger (not more floors but more floorspace) and make the buildings not rectangles, L shaped buildings could be good for 1 or 2 of them but lets get creative
 
 ## Done
 
