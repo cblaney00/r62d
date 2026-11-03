@@ -52,5 +52,26 @@ for (const id of MAP_LIST) {
   for (const q of g.players.values()) if (g.side(q) === 'atk' && (q.x < 0 || q.y < 0 || q.x > g.map.W * CELL)) fail(id, q.name, 'still off the map in the action phase');
   console.log(`${id}: ${spawns.length} spawns, ${atk.name} started at ${s.name}`);
 }
+// he asked: RANDOM is the default spawn, and a team on RANDOM usually plays as two groups and one player off alone
+{
+  const shapes = {};
+  for (let r = 0; r < 300; r++) {
+    const g = new Game();
+    for (let i = 0; i < 10; i++) g.addBot();
+    g.mapId = MAP_LIST[r % MAP_LIST.length]; g.map = buildMap(g.mapId); g.startMatch();
+    const atk = [...g.players.values()].filter(q => g.side(q) === 'atk');
+    if (atk.some(q => q.spawn)) fail('someone starts the round with a chosen spawn instead of RANDOM');
+    const count = {}; for (const q of atk) { const n = g.spawnOf(q).name; count[n] = (count[n] || 0) + 1; }
+    const shape = Object.values(count).sort((a, b) => b - a).join('+'); shapes[shape] = (shapes[shape] || 0) + 1;
+    if (r === 0) { // choosing a spawn then RANDOM again
+      const q = atk[0]; g.handle(q, { t: 'spawn', n: 0 }); if (q.spawn !== g.map.atkSpawns[0].name) fail('spawn choice ignored');
+      g.handle(q, { t: 'spawn', n: -1 }); if (q.spawn !== null) fail('RANDOM button ignored');
+    }
+  }
+  const pct = k => Math.round((shapes[k] || 0) / 3);
+  console.log('RANDOM spawn shapes for 5 attackers (% of rounds):', Object.entries(shapes).map(([k, v]) => k + ' ' + Math.round(v / 3) + '%').join(', '));
+  if (pct('2+2+1') < 40) fail('two groups and one loner should be the usual shape');
+  if (pct('5') < 5 || pct('5') > 30) fail('the whole team at one spawn should happen sometimes');
+}
 console.log(fails ? `${fails} failure(s)` : 'PASS spawns');
 process.exit(fails ? 1 : 0);

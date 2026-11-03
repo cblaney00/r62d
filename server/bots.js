@@ -122,9 +122,8 @@ function planTalk(game) {
       if (o && !(game.tv && game.tv.req && game.tv.req.some(r => OPERATORS[r].team === sd && jobOf(r) === jobOf(o)))) { p.job = jobOf(o); game.pickOp(p, o); }
       if (!p.op) botPickOp(game, p); else if (p.pro) (p.pro.lastOps || (p.pro.lastOps = {}))[sd] = p.op;
       if (!p.op) return;
-      if (atk && !p.pro && Math.random() < 0.3) p.spawn = pickOne(m.atkSpawns).name;
       const line = Math.random() < 0.5 ? `${talkOp(p.op)} for me.` : pickOne([`I'll go ${talkOp(p.op)}.`, `Locking ${talkOp(p.op)}.`, `${talkOp(p.op)}.`]);
-      say(game, p, atk && p.spawn && Math.random() < 0.45 ? `${line} Spawning ${p.spawn}.` : line);
+      say(game, p, atk && Math.random() < 0.45 ? `${line} Spawning ${game.spawnOf(p).name}.` : line);
     }));
   }
   T.ev.sort((a, b) => a.at - b.at);

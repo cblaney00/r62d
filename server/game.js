@@ -193,8 +193,9 @@ export class Game {
       else if (m.a === 'end' && this.phase !== PHASE.LOBBY) { this.msg(`${p.name} ended the match`); this.resetToLobby(); }
     } else if (m.t === 'pick') this.pickOp(p, m.op);
     else if (m.t === 'spawn') { // attackers choose where they start (operator select or preparation)
-      const sp = this.map && this.map.atkSpawns[m.n];
-      if (sp && Number.isInteger(m.n) && this.side(p) === TEAM.ATK && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP)) p.spawn = sp.name;
+      const sp = this.map && this.map.atkSpawns[m.n], ok = this.side(p) === TEAM.ATK && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP);
+      if (ok && m.n === -1) p.spawn = null; // RANDOM: the team's spawn plan places them (the default)
+      else if (ok && sp && Number.isInteger(m.n)) p.spawn = sp.name;
     }
     else if (m.t === 'role') { // choosing a role limits you to its operators
       const team = this.side(p), job = JOBS[team] && JOBS[team].find(j => j.id === m.r);
@@ -300,6 +301,7 @@ export class Game {
     this.spots = { atk: new Map(), def: new Map() };
     this.reinforce = 10;
     this.spawnName = this.map.atkSpawns[Math.floor(Math.random() * this.map.atkSpawns.length)].name;
+    this.spawnPlan = this.makeSpawnPlan();
     for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; p.locked = false; p.spawn = null; p.staged = false; p.job = null; }
     this.phase = PHASE.SELECT; this.timer = DUR.select;
     this.events.push({ e: 'newmap', v: this.mapVersion });
@@ -352,8 +354,38 @@ export class Game {
     this.events.push({ e: 'banner', text: 'PREPARATION PHASE', sub: '' });
   }
 
-  // the spawn an attacker chose (or the team's default for this round)
-  spawnOf(p) { const S = this.map.atkSpawns; return S.find(s => s.name === p.spawn) || S.find(s => s.name === this.spawnName) || S[0]; }
+  // the spawn an attacker chose, or (RANDOM, the default) where the team's spawn plan puts them
+  spawnOf(p) { const S = this.map.atkSpawns; return S.find(s => s.name === p.spawn) || S.find(s => s.name === this.autoSpawn(p)) || S[0]; }
+
+  // he asked: random spawn by default, but teams mostly play together: usually two groups and one player off on
+  // their own, sometimes the whole team at one spawn, sometimes two even groups. One plan per round (the round's
+  // strategy); the attackers on RANDOM are dealt into it in a shuffled order, so who goes where changes every round.
+  makeSpawnPlan() {
+    const S = this.map.atkSpawns.map(s => s.name), r = Math.random();
+    const main = this.spawnName, others = S.filter(n => n !== main).sort(() => Math.random() - 0.5);
+    const kind = S.length < 2 || this.tut ? 'stack' : r < 0.55 ? 'split' : r < 0.8 ? 'two' : r < 0.95 ? 'stack' : 'wide';
+    return { kind, main, second: others[0] || main, off: others[1] || others[0] || main, wide: others[2] || others[1] || others[0] || main, salt: Math.random(), key: '', at: new Map() };
+  }
+  autoSpawn(p) {
+    const P = this.spawnPlan || (this.spawnPlan = this.makeSpawnPlan());
+    const auto = [...this.players.values()].filter(q => this.side(q) === TEAM.ATK && !q.spawn);
+    const key = auto.map(q => q.id).join(',');
+    if (P.key !== key) { // someone joined, left or chose their own spawn: deal again
+      P.key = key; P.at.clear();
+      const n = auto.length, h = q => Math.abs(Math.sin(String(q.id).length * 7.1 + [...String(q.id)].reduce((a, c) => a + c.charCodeAt(0), 0) * 12.9898 + P.salt * 78.233) * 43758.5453) % 1;
+      const order = auto.slice().sort((a, b) => h(a) - h(b)), slots = [];
+      if (P.kind === 'stack' || n < 2) for (let i = 0; i < n; i++) slots.push(P.main);
+      else if (P.kind === 'two') for (let i = 0; i < n; i++) slots.push(i < Math.ceil(n / 2) ? P.main : P.second);
+      else { // split: one off on their own (from 3 players), the rest in two groups; 'wide' (rare) has two loners
+        const lone = n >= 3 ? (P.kind === 'wide' && n >= 5 ? 2 : 1) : 0, rest = n - lone;
+        for (let i = 0; i < rest; i++) slots.push(i < Math.ceil(rest / 2) ? P.main : P.second);
+        if (lone) slots.push(P.off);
+        if (lone > 1) slots.push(P.wide);
+      }
+      order.forEach((q, i) => P.at.set(q.id, slots[i]));
+    }
+    return P.at.get(p.id) || P.main;
+  }
 
   beginAction() {
     for (const p of this.players.values()) {
@@ -426,7 +458,6 @@ export class Game {
       for (const p of this.players.values()) if (p.bot && !p.op && (this.tut || this.humansLocked(p.squad)) && Math.random() < dt * 2.5) botPickOp(this, p);
       for (const p of this.players.values()) if (p.bot && p.op && !p.locked) {
         p.locked = true;
-        if (this.side(p) === TEAM.ATK && Math.random() < 0.3) p.spawn = this.map.atkSpawns[Math.floor(Math.random() * this.map.atkSpawns.length)].name; // most stay with the team
       }
       // he asked: no clock. The round starts when everyone has locked in (anyone who has left counts as ready)
       if (this.tut ? this.timer <= 0 : this.allLocked()) this.beginPrep();
@@ -2672,7 +2703,7 @@ export class Game {
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,
       });
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
-      if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); }
+      if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; } }
       if (p.alive && (p.sock || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
