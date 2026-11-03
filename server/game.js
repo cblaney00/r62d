@@ -106,7 +106,11 @@ export class Game {
         sock.send(JSON.stringify({ t: 'welcome', id: null, tv: 1, mapVersion: this.mapVersion, mapId: this.mapId, token: login.token, profile: publicProfile(login.profile),
           tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp), holes: this.map.holes }));
       } else if (m.t === 'tv' && joined) {
-        if (m.a === 'start' && this.phase === PHASE.LOBBY) this.tvStart(m.map, m.level);
+        if (m.a === 'start' && this.phase === PHASE.LOBBY) {
+          // viewer requests (he asked): up to 3 operators, one per role on each side, that the bots must play
+          const seen = new Set(); this.tv.req = (Array.isArray(m.req) ? m.req : []).filter(o => OPERATORS[o] && !seen.has(OPERATORS[o].team + jobOf(o)) && seen.add(OPERATORS[o].team + jobOf(o))).slice(0, 3);
+          this.tvStart(m.map, m.level);
+        }
         else if (m.a === 'follow') this.tv.follow = this.players.has(m.id) ? m.id : null;
       }
     });

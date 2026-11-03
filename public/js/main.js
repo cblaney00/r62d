@@ -23,7 +23,7 @@ import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
 const rankTag = i => i == null ? '' : `<span class="rankTag" style="color:${RANK_COL[i]};border-color:${RANK_COL[i]}">${RANKS[i].toUpperCase()}</span>`;
-import { ACTIONS, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION, lockMouse } from './keys.js';
+import { ACTIONS, PRESETS, applyPreset, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION, lockMouse } from './keys.js';
 import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
 import { drawQr } from './qr.js';
@@ -237,7 +237,7 @@ function connect(mode = '') { // '' = the shared match, 'tut' / 'free' = a priva
     if (m.t === 'welcome') {
       if (st.tutorial) send({ t: 'tut', a: 'start', lesson: st.tutorial });
       if (st.free) send({ t: 'free', a: 'start', map: st.free.map, bots: st.free.bots, level: st.free.level });
-      if (st.tv) send({ t: 'tv', a: 'start', map: st.tv.map, level: st.tv.level });
+      if (st.tv) send({ t: 'tv', a: 'start', map: st.tv.map, level: st.tv.level, req: st.tv.req });
       st.id = m.id;
       if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
         resetMap(m.mapVersion);
@@ -274,7 +274,7 @@ $('coach').addEventListener('click', e => { if ((coach.blocking && !e.target.clo
 // free = { map, bots } for a free-play match (see the FREE PLAY page below)
 function switchMatch(lesson, free = null, tv = null) {
   if (!st.token) { setTab('play'); $('name').focus(); return; }
-  st.tutorial = lesson; st.free = free; st.tv = tv ? { map: tv.map, level: tv.level, auto: true, follow: null, overview: false, cutT: 0, shot: {} } : null; st.rejoin = true; st.marks = [];
+  st.tutorial = lesson; st.free = free; st.tv = tv ? { map: tv.map, level: tv.level, req: tv.req || [], auto: true, follow: null, overview: false, cutT: 0, shot: {} } : null; st.rejoin = true; st.marks = [];
   document.documentElement.classList.toggle('tv', !!tv);
   if (lesson) coach.start(lesson); else coach.stop();
   const leave = lesson ? 'Leave tutorial' : free ? 'Leave free play' : tv ? 'Leave Esports TV' : '';
@@ -285,8 +285,21 @@ function switchMatch(lesson, free = null, tv = null) {
 for (const b of document.querySelectorAll('[data-lesson]')) b.onclick = () => switchMatch(b.dataset.lesson);
 
 // ---------------- ESPORTS TV page: pick a map (or random), then watch ----------------
-const tvPick = { map: 'random', level: 7 };
+const tvPick = { map: 'random', level: 7, req: [] };
 function renderTv() {
+  // viewer requests (he asked): up to 3 operators the pros must play; one per role on each side
+  const rq = $('tvReq'), jobKey = o => OPERATORS[o].team + jobOf(o);
+  if (!rq.children.length) for (const team of ['atk', 'def']) {
+    const row = document.createElement('div'); row.className = 'rq'; row.innerHTML = `<b>${team === 'atk' ? 'ATTACK' : 'DEFENCE'}</b>`;
+    for (const o of Object.keys(OPERATORS).filter(o => OPERATORS[o].team === team)) {
+      const b = document.createElement('button'); b.dataset.op = o; b.textContent = OPERATORS[o].name; b.style.setProperty('--oc', OPERATORS[o].color); b.title = OPERATORS[o].role;
+      b.onclick = () => { audio.ui(); const i = tvPick.req.indexOf(o); if (i >= 0) tvPick.req.splice(i, 1); else if (tvPick.req.length < 3 && !tvPick.req.some(q => jobKey(q) === jobKey(o))) tvPick.req.push(o); renderTv(); };
+      row.appendChild(b);
+    }
+    rq.appendChild(row);
+  }
+  for (const b of rq.querySelectorAll('button')) { const o = b.dataset.op, on = tvPick.req.includes(o); b.classList.toggle('on', on); b.classList.toggle('off', !on && (tvPick.req.length >= 3 || tvPick.req.some(q => jobKey(q) === jobKey(o)))); }
+  $('tvReqN').textContent = tvPick.req.length ? tvPick.req.map(o => OPERATORS[o].name).join(' · ') : '(none)';
   for (const b of $('tvLeague').querySelectorAll('button')) { b.classList.toggle('on', +b.dataset.l === tvPick.level); b.onclick = () => { audio.ui(); tvPick.level = +b.dataset.l; renderTv(); }; }
   const el = $('tvMaps');
   if (!el.children.length) for (const id of ['random', ...MAP_LIST]) {
@@ -310,7 +323,7 @@ function trainInfo() {
 }
 for (const b of document.querySelectorAll('.trainBtn')) b.onclick = () => { audio.ui(); fetch('/api/train', { method: 'POST' }).then(r => r.json()).then(r => { if (!r.running && r.why) for (const el of document.querySelectorAll('.trainInfo')) el.textContent = 'Can\'t train right now: ' + r.why + '.'; else trainInfo(); }); };
 setInterval(() => { if (!$('tab-tv').classList.contains('on') && $('playbookPage').classList.contains('hidden')) return; trainInfo(); }, 4000);
-$('tvGo').onclick = () => switchMatch(null, null, { map: tvPick.map === 'random' ? null : tvPick.map, level: tvPick.level });
+$('tvGo').onclick = () => switchMatch(null, null, { map: tvPick.map === 'random' ? null : tvPick.map, level: tvPick.level, req: tvPick.req.slice() });
 // ---------------- free play page ----------------
 // Pick a map and how many enemy bots, then play alone with no clock, switching operator with N / B.
 const freePick = { map: 'harbor', bots: 0, level: 2 };
@@ -756,6 +769,7 @@ function renderSettings() {
   for (const b of $('bindTable').querySelectorAll('button')) b.onclick = () => { rebinding = { id: b.dataset.id, slot: +b.dataset.slot }; renderSettings(); };
 }
 $('setReset').onclick = () => { resetBinds(); renderSettings(); };
+for (const [id, name] of PRESETS) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => { audio.ui(); applyPreset(id); renderSettings(); }; $('keyPresets').appendChild(b); }
 const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'walk', 'crouch', 'prone', 'vault', 'leanL', 'leanR']],
   ['FIGHTING', ['primary', 'secondary', 'melee', 'reload', 'ability', 'gadget', 'interact']],
   ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'chat', 'scoreboard']],
@@ -2999,7 +3013,7 @@ function tvHud(s) {
       const said = st.tvSay && st.tvSay.get(p.id), cv = b.querySelector('canvas');
       if (now - (cv._t || 0) > 0.07) { cv._t = now; drawWebcam(cv, { name: p.n, pro, colour, talking: !!said && now - said.t < 2.5, dead: !p.a, down: p.dn }, now); }
     } }
-  setHTML('tvHelp', `${st.tv.overview ? 'MAP OVERVIEW' : st.tv.auto ? 'AUTO DIRECTOR' : 'FOLLOWING'} · 1-5 / 6-0 follow a player · A director ${st.tv.auto ? 'off' : 'on'} · M map · Esc menu`);
+  setHTML('tvHelp', `${st.tv.req && st.tv.req.length ? 'REQUESTED: ' + st.tv.req.map(o => OPERATORS[o]?.name).join(', ') + ' · ' : ''}${st.tv.overview ? 'MAP OVERVIEW' : st.tv.auto ? 'AUTO DIRECTOR' : 'FOLLOWING'} · 1-5 / 6-0 follow a player · A director ${st.tv.auto ? 'off' : 'on'} · M map · Esc menu`);
 }
 function addChat(m) {
   if (st.tv && m.from) (st.tvSay || (st.tvSay = new Map())).set(m.from, { text: m.text, t: performance.now() / 1000 }); // spoken from the character (he asked)

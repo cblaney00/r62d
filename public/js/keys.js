@@ -54,6 +54,24 @@ export function applyBinds(saved) {
   try { localStorage.setItem(KEY, JSON.stringify(binds)); } catch {}
 }
 export function resetBinds() { try { localStorage.removeItem(KEY); } catch {} loadBinds(); if (onChange) onChange(binds); }
+// Layouts from other games (he asked, and chose the games): only what differs from ours. Running is always the default
+// here, so a game's sprint key becomes our walk key where it has none; actions a game lacks (leaning) go on free keys.
+export const PRESETS = [
+  ['cs2', 'Counter-Strike 2', { interact: ['KeyE', ''], ability: ['KeyQ', 'KeyZ'], gadget: ['Digit4', 'KeyG'], leanL: ['KeyX', ''], leanR: ['KeyC', ''], prone: ['KeyB', ''], opPrev: ['', ''], spot: ['KeyT', ''], melee: ['Digit3', ''] }],
+  ['r6', 'Rainbow Six Siege', { crouch: ['KeyC', 'ControlLeft'], prone: ['KeyZ', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], ability: ['Digit3', 'KeyX'], gadget: ['Digit4', 'KeyG'], view: ['Digit5', ''], drone: ['Digit6', ''], melee: ['KeyV', ''] }],
+  ['cod', 'Call of Duty (modern)', { crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyX', 'Digit4'], leanL: ['KeyQ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
+  ['mw2', 'Modern Warfare 2 (2009)', { crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyQ', 'Digit4'], leanL: ['KeyZ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
+  ['halo', 'Halo', { crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyE', ''], melee: ['KeyQ', 'KeyV'], gadget: ['KeyG', ''], ability: ['ShiftLeft', 'KeyF'], leanL: ['KeyZ', ''], leanR: ['KeyX', ''] }],
+  ['swbf2', 'Star Wars Battlefront II (2017)', { crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], ability: ['KeyQ', ''], gadget: ['KeyE', 'KeyG'], leanL: ['KeyZ', ''], leanR: ['KeyX', ''], melee: ['KeyV', ''] }],
+];
+export function applyPreset(name) {
+  const pr = PRESETS.find(p => p[0] === name); if (!pr) return;
+  loadBinds(); for (const id in binds) binds[id] = ACTIONS.find(a => a[0] === id).slice(2, 4); // start from ours
+  const over = pr[2], taken = new Set(Object.values(over).flat().filter(Boolean));
+  for (const id in binds) if (!over[id]) binds[id] = binds[id].map(c => (taken.has(c) ? '' : c)); // a key the layout uses elsewhere
+  for (const id in over) if (binds[id]) binds[id] = over[id].slice();
+  saveBinds();
+}
 export function setBind(id, slot, code) {
   for (const k in binds) binds[k] = binds[k].map(c => (c === code ? '' : c)); // one key, one action
   binds[id][slot] = code; saveBinds();

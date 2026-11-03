@@ -11,6 +11,9 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] lets see if we can get faster than 6.7ms a frame on high, if there are any optimization possible we can look at that help this run light as possible without sacrificing gameplay or UI (tried 2026-11-02: faster in the test browser but laggy in his real Firefox, undone)
 - [ ] play and watch rounds and fix what is found in gameplay, balance, ability and equipment use, pro operator picks, bot behaviour and the esports TV director (his answers: attackers play for the plant much more; make Hammer, Salvo, Torque and Ferro stronger until pros pick them; TV gets short instant replays of big moments the camera missed)
 - [ ] in esports TV the webcams and team cards should be along the bottom of the screen, not on the left and right
+- [ ] the esports tv should have viewer requests where a few operators can be selected before the pro match so you can see how specific operators are being used
+- [ ] add a few keybind defaults for players from different games that might feel natural for some people
+- [ ] some of these on the list have either been done or cant be worked on now, consider that for this batch
 
 ## Done
 

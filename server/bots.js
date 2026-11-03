@@ -40,7 +40,20 @@ function roleFor(game, p, team) {
   return list[(Math.max(0, mates.indexOf(p)) + (game.round || 0)) % list.length];
 }
 
+// ESPORTS TV viewer requests (he asked): a requested operator of this side is played every round by the bot with its role
+// (a pro's own job; among amateurs, the first bot to pick takes it)
+function requestPick(game, p) {
+  const req = game.tv && game.tv.req; if (!req || !req.length || p.pro) return false; // (pros: first in their pool, proPickOp)
+  const team = game.side(p), side = team === TEAM.ATK ? 'atk' : 'def';
+  const taken = new Set([...game.players.values()].filter(q => q.squad === p.squad && q.op).map(q => q.op));
+  const o = req.find(o => OPERATORS[o].team === side && !taken.has(o));
+  if (!o) return false;
+  p.job = jobOf(o); game.pickOp(p, o);
+  if (p.op !== o) { p.job = null; return false; }
+  return true;
+}
 export function botPickOp(game, p) {
+  if (requestPick(game, p)) return;
   if (p.pro && proPickOp(game, p)) return;
   const team = game.side(p);
   const taken = new Set([...game.players.values()].filter(q => q.squad === p.squad && q.op).map(q => q.op));
@@ -1215,6 +1228,7 @@ export function proPickOp(game, p) {
   let pool = game.proExplore || game.proAnyOp ? all.sort(() => Math.random() - 0.5) : draw(all); // practice / balance tests: any operator of their job
   if (side === 'atk' && job === 'breach' && j && j.breach != null && !(game.proExplore && Math.random() < 0.5)) pool = draw(pool.filter(o => HARD_BREACH.includes(o))).concat(pool.filter(o => !HARD_BREACH.includes(o))); // the plan opens a wall: a hard breacher, in case it is reinforced
   else if (side === 'atk' && job === 'breach' && j && j.hatch && !game.proExplore) pool.sort((a, b) => HARD_BREACH.includes(a) - HARD_BREACH.includes(b)); // a hatch: a soft one
+  const rq = game.tv && game.tv.req && game.tv.req.find(o => all.includes(o)); if (rq) pool = [rq, ...pool.filter(o => o !== rq)]; // ESPORTS TV viewer request: this player plays it
   for (const op of pool) { game.pickOp(p, op); if (p.op === op) break; }
   if (!p.op) return false;
   p.pro.lastOps[side] = p.op;
