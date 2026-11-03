@@ -431,7 +431,9 @@ function checkAngles(game, p, dt, rate = 0.7) {
   const ai = p.ai;
   if (!ai.lookUntil || game.time > ai.lookUntil) {
     ai.lookPt = threatPoint(game, p, p.aim + (Math.random() - 0.5) * 4) || (Math.random() < 0.5 ? watchPoint(game, p) : null);
-    ai.lookA = p.aim + (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 1.2);
+    let la = p.aim, ld = -1; // nothing to check: the longest view of a few glances to either side, not a wall
+    for (let i = 0; i < 6; i++) { const a = p.aim + (i & 1 ? -1 : 1) * (0.6 + Math.random() * 1.2), d = castSight(game.map, p.x, p.y, a, 500, null); if (d > ld) { ld = d; la = a; } }
+    ai.lookA = la;
     ai.lookUntil = game.time + 1.4 + Math.random() * 2.4;
   }
   turnTo(p, ai.lookPt ? Math.atan2(ai.lookPt.y - p.y, ai.lookPt.x - p.x) : ai.lookA, skill(game, p).turn * rate, dt);
@@ -506,6 +508,38 @@ function downedMate(game, p, team) {
 function turnTo(p, a, rate, dt) {
   if (p.pro) return mouseTurn(p, a, rate, dt);
   p.aim += Math.max(-dt * rate, Math.min(dt * rate, angDiff(a, p.aim)));
+}
+// He asked (Esports TV): bots stared at walls while holding, then snapped round at contact. The angle worth holding
+// toward pt: pt itself when it can be seen, else the corner it would come round (the furthest point of the way there
+// still in sight), else the nearest way in roughly that way. Worked out at most every 1.2 s per bot.
+function angleOn(game, p, pt) {
+  if (!pt) return null;
+  const ai = p.ai, m = game.map;
+  if (los(m, p.x, p.y, pt.x, pt.y)) return pt;
+  const key = Math.floor(pt.y / CELL) * m.W + Math.floor(pt.x / CELL), me = Math.floor(p.y / CELL) * m.W + Math.floor(p.x / CELL);
+  if (ai.aoKey === key && ai.aoAt === me && game.time < ai.aoT) return ai.ao;
+  const path = findPath(m, Math.floor(p.x / CELL), Math.floor(p.y / CELL), Math.floor(pt.x / CELL), Math.floor(pt.y / CELL), ai.noVault, false, game.side(p) === TEAM.DEF) || [];
+  let best = null;
+  for (let i = 0; i < path.length && i < 80; i++) {
+    const x = (path[i] % m.W + 0.5) * CELL, y = (Math.floor(path[i] / m.W) + 0.5) * CELL;
+    if (floorAt(m, x, y) !== floorAt(m, p.x, p.y)) break;
+    if (los(m, p.x, p.y, x, y)) { if (Math.hypot(x - p.x, y - p.y) > 1.5 * CELL) best = { x, y }; } else if (best || i > 3) break;
+  }
+  ai.aoKey = key; ai.aoAt = me; ai.aoT = game.time + 1.2;
+  return (ai.ao = best || threatPoint(game, p, Math.atan2(pt.y - p.y, pt.x - p.x)) || pt);
+}
+// Where a bot walking along its path looks: the furthest bit of the path ahead it can see (round the next corner as it
+// comes), not the very next cell (often a wall beside a doorway).
+function pathLook(game, p) {
+  const ai = p.ai, m = game.map;
+  if (game.time < (ai.plT || 0) && ai.pl) return ai.pl;
+  let best = null;
+  for (let i = 0; i < ai.path.length && i < 14; i++) {
+    const x = (ai.path[i] % m.W + 0.5) * CELL, y = (Math.floor(ai.path[i] / m.W) + 0.5) * CELL;
+    if (floorAt(m, x, y) !== floorAt(m, p.x, p.y) || !los(m, p.x, p.y, x, y)) break;
+    best = { x, y };
+  }
+  ai.plT = game.time + 0.3; return (ai.pl = best);
 }
 // Aim along an angle and set the throw point (grenades land where you aim, up to 300 px away).
 function aimAt(p, x, y) {
@@ -852,7 +886,8 @@ export function botThink(game, p, dt) {
   const paranoid = alone && heardRecently && game.time - ai.heard.t > 0.7;
   // heard something and can't see it: stop, turn to face it and listen for a moment (pushy bots don't stop as long)
   if (heardRecently && game.time - ai.heard.t < 1.6 - me.aggr * 0.6 && !p.hasDefuser && !(team === TEAM.DEF && game.planted)) {
-    turnTo(p, Math.atan2(ai.heard.y - p.y, ai.heard.x - p.x), skill(game, p).turn * 0.6, dt);
+    const hp = angleOn(game, p, ai.heard); // the corner it would come round, not the wall in front of it
+    turnTo(p, Math.atan2(hp.y - p.y, hp.x - p.x), skill(game, p).turn * 0.6, dt);
     inp.crouch = atk ? 0 : 1;
     const hd = Math.hypot(ai.heard.x - p.x, ai.heard.y - p.y);
     // a smoke barrage between us and a noise close by
@@ -1153,7 +1188,8 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   }
   const nx = (next % map.W + 0.5) * CELL, ny = (Math.floor(next / map.W) + 0.5) * CELL;
   const dirA = Math.atan2(ny - p.y, nx - p.x);
-  let lookA = dirA; // where they walk, or (better bots) where an enemy would come from
+  const ahead = pathLook(game, p);
+  let lookA = ahead ? Math.atan2(ahead.y - p.y, ahead.x - p.x) : dirA; // where they walk, or (better bots) where an enemy would come from
   if (preAims(game, p)) {
     if ((ai.threatT = (ai.threatT || 0) - dt) <= 0) { ai.threatT = 0.7; ai.threat = threatPoint(game, p, dirA); }
     if (ai.threat) lookA = Math.atan2(ai.threat.y - p.y, ai.threat.x - p.x);
@@ -1583,7 +1619,7 @@ function proAct(game, p, inp, dt, team) {
     if (ai.heard && game.time - ai.heard.t < 2.5) pt = ai.heard;
     else { if ((ai.chkT = (ai.chkT ?? 3 + Math.random() * 3) - dt) <= 0) { ai.chkT = 3 + Math.random() * 4; ai.chk = Math.random() < 0.4 ? threatPoint(game, p, p.aim + (Math.random() - 0.5) * 3) : null; ai.chkUntil = game.time + 1.2; }
       if (ai.chk && game.time < ai.chkUntil) pt = ai.chk; }
-    if (pt) turnTo(p, Math.atan2(pt.y - p.y, pt.x - p.x), S.turn * 0.6, dt); inp.crouch = crouch ? 1 : 0; // he asked: crosshair placement matters most — held still on the spot, no drifting
+    pt = angleOn(game, p, pt); if (pt) turnTo(p, Math.atan2(pt.y - p.y, pt.x - p.x), S.turn * 0.6, dt); inp.crouch = crouch ? 1 : 0; // he asked: crosshair placement matters most — held still on the spot, no drifting
   };
   const trade = game.proTrade && game.proTrade[p.squad]; // a teammate just died close by: swing onto where it came from
   const objectiveFirst = (team === TEAM.ATK && game.planted) || (team === TEAM.DEF && !game.planted && p.pro.pl.jobs.def === 'anchor'); // he asked: everything in service of the objective
