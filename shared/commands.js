@@ -6,6 +6,28 @@ const CONTRACT = [[/\bwhat s\b/g, 'what is'], [/\bwhere s\b/g, 'where is'], [/\b
 const SOUNDS = { defuser: 'diffuser', chonk: 'chunk' }, HEARD = Object.entries(SOUNDS).map(([a, b]) => [b, a]);
 const NUM = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 export const micFix = t => { for (const [a, b] of HEARD) t = t.replace(new RegExp(`\\b${a}\\b`, 'g'), b); return t; };
+// Do the sentence recogniser's answer and a free listener's answer say the same thing? Words are compared by their consonants,
+// because the free listener spells what it hears ("hallway" / "hall way", "killed" / "kill"). (he said: it still reads him badly in a match)
+const SMALL = new Set('a an the to in on at of is are am be it its i im me my you your we us our they them he she his her this that these those and or go going lets let s can could please just now there here one two'.split(' '));
+const sound = w => (w[0] + w.slice(1).replace(/[aeiouyh]/g, '')).replace(/[bp]/g, 'p').replace(/[dt]/g, 't').replace(/[gkcqj]/g, 'k').replace(/[sz]/g, 's').replace(/[fv]/g, 'f').replace(/(.)\1+/g, '$1');
+function nearWords(a, b) {
+  a = sound(a); b = sound(b); if (a === b) return true;
+  const n = Math.max(a.length, b.length); if (n < 2) return false;
+  let p = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) { const q = [i]; for (let j = 1; j <= b.length; j++) q[j] = Math.min(p[j] + 1, q[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); p = q; }
+  return p[b.length] <= (n >= 6 ? 2 : 1);
+}
+export function heardAgree(sentence, free) {
+  const big = t => normalize(t).trim().split(' ').filter(w => w && !SMALL.has(w));
+  const g = big(sentence), f = big(free), all = f.join('');
+  if (!g.length || !f.length) return true;
+  return g.filter(w => f.some(x => nearWords(w, x)) || all.includes(w)).length * 2 >= g.length;
+}
+// Which answer to believe: the sentence if the free listener heard nothing or roughly the same, otherwise what was really said.
+export function pickHeard(sentence, free) {
+  if (!sentence || !free || heardAgree(sentence, free)) return sentence || free;
+  return free;
+}
 export function normalize(text) {
   let s = ' ' + String(text || '').toLowerCase().replace(/\[unk\]/g, ' ').replace(/[^a-z0-9' ]+/g, ' ').replace(/'/g, ' ').replace(/ +/g, ' ').trim() + ' ';
   for (const [a, b] of CONTRACT) s = s.replace(a, b);

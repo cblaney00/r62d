@@ -1,7 +1,7 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
-import { pttDown, pttUp, pttSetState, pttVocab, pttTest, pttPreload, pttReady, setOpenMic, setMicClip, takeClip } from './ptt.js';
+import { pttDown, pttUp, pttSetState, pttVocab, pttTest, pttPreload, pttReady, setOpenMic, setMicClip, takeClip, lastHeard } from './ptt.js';
 import { parseCommand } from '/shared/commands.js';
 import { openVoiceTest } from './voicetest.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
@@ -764,7 +764,7 @@ addEventListener('keyup', e => {
   const a = actionFor(e.code); if (a) keys.delete(a);
   if (a === 'ptt') pttUp((text, loudest) => { // what it heard goes to the team as chat, and the bots read that like anything typed
     saveClip(text);
-    try { fetch('/api/miclog', { method: 'POST', body: `level ${loudest.toFixed(4)} heard: ${text || '(nothing)'}` }).catch(() => {}); } catch {}
+    try { fetch('/api/miclog', { method: 'POST', body: `level ${loudest.toFixed(4)} heard: ${text || '(nothing)'} [sentence: ${lastHeard().sentence} / free: ${lastHeard().free}]` }).catch(() => {}); } catch {}
     if (text) send({ t: 'chat', text, team: true, mic: 1 });
     else addFeed(loudest < 0.004 ? 'The microphone heard almost nothing: check it, or raise Microphone boost in Settings → Sound' : "Didn't catch any words: try \"where are they\" or \"go to\" and a room");
   });
@@ -790,7 +790,7 @@ async function syncOpenMic() {
   try { localStorage.setItem('r62d-ptt-used', '1'); } catch {}
   if (micLive) setOpenMic(true, (text, loudest) => {
     saveClip(text);
-    try { fetch('/api/miclog', { method: 'POST', body: `open level ${loudest.toFixed(4)} heard: ${text || '(nothing)'}` }).catch(() => {}); } catch {}
+    try { fetch('/api/miclog', { method: 'POST', body: `open level ${loudest.toFixed(4)} heard: ${text || '(nothing)'} [sentence: ${lastHeard().sentence} / free: ${lastHeard().free}]` }).catch(() => {}); } catch {}
     const rooms = st.map ? (st.map.rooms || []).map(r => r.name) : [], c = text ? parseCommand(text, { rooms }) : null;
     if (c && (c.intent || c.room)) send({ t: 'chat', text, team: true, mic: 1 });
   });

@@ -6,7 +6,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] the mix input needs more work, its not understand me enough (2026-11-03: read 18 orders in his room at his normal distance: 16/18 meant the right thing, now 18/18 with noise between words turned down and more sentences known; those clips were used to tune it, so he still has to try it in a match. He then said blended words get missed, rural accent, north-western Maryland: every sentence is now also listened for without its small words; try it in a match. 2026-11-04: in a real match it still reads him badly, volume is not the cause. Stronger recogniser test paused, he said not now)
+- [ ] the mix input needs more work, its not understand me enough (2026-11-03: read 18 orders in his room at his normal distance: 16/18 meant the right thing, now 18/18 with noise between words turned down and more sentences known; those clips were used to tune it, so he still has to try it in a match. He then said blended words get missed, rural accent, north-western Maryland: every sentence is now also listened for without its small words; try it in a match. 2026-11-04: in a real match it still reads him badly, volume is not the cause. Stronger recogniser test paused, he said not now. 2026-11-04 later: tried the 130 MB recogniser on his 9 saved clips, he allowed it: no clearly better and far slower than he talks, so it is not in. New: a second listener hears any word, and the sentence only stands if the two roughly agree, so "one just killed me" no longer becomes the order "one to scout me". Checked on his clips, he still has to try it in a match)
 
 ## Done
 

@@ -242,7 +242,7 @@ His wishes so far:
 - Round length (he asked: a bit shorter, still room for intel and creativity): action 2:40 (`DUR.action` 160, was 3:00), 5 s between rounds (`roundEnd`), prep stays 30 s, defuser 45 s. Bot timings that meant "a minute in" use `DUR.action - 60`; the pro roamer is back on site at 1:30 left (`until: 70`). Measured: bots finish rounds in ~1 min median (pros 90% under 1:47), so 2:40 still leaves people time to drone.
 
 ## Talking to the bots (2026-11-03, see docs/voice.md)
-- He scrapped recorded voices for the whole game: bots and casters write in chat, nothing plays. What matters is bots understanding him: `shared/commands.js` (`parseCommand`), `botHear`/`botCmd` in server/bots.js, typed or by microphone (`public/js/ptt.js`, key X, he asked). Lines: `shared/comms.js`. `node tests/comms.js`.
+- He scrapped recorded voices for the whole game: bots and casters write in chat, nothing plays. What matters is bots understanding him: `shared/commands.js` (`parseCommand`, `pickHeard`: a free-listening second recogniser checks the sentence one), `botHear`/`botCmd` in server/bots.js, typed or by microphone (`public/js/ptt.js`, key X, he asked). Lines: `shared/comms.js`. `node tests/comms.js`.
 
 ## Server only while open (2026-11-03)
 - He asked: the server is only up while the game is open. `stop_server` in play.sh stops it after the window closes and nobody has been connected for 20 s. So don't leave a server running after testing or restarting. Daily pro practice (`trainCheck`) now only runs while the game is open and no match is on; POST /api/train likewise.
