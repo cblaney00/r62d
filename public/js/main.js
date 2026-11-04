@@ -1648,6 +1648,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
   if (st.rot) k.rot = Math.round(-st.rot * 1000) / 1000; // Rotate aiming: W walks up the screen
+  if (k.up && keys.has('sprint') && me && me.ct === 'body') k.rot = Math.round((st.aim + Math.PI / 2) * 1000) / 1000; // sprint + forward (he asked): the keys turn so W goes where you aim, as in R6
   // ping whatever is under your aim: an enemy you can see, else a gadget, camera or the objective, else the wall, door or floor you point at
   const trySpot = () => {
     if (!view || !me) return;
@@ -3076,7 +3077,7 @@ function updateCard() {
 const TIPS = [
   'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',
   'Walk ({walk}) or crouch ({crouch}) to move without footsteps — just like CS2.',
-  'Sprinting only goes the way you aim. It is very loud, and your gun takes a moment to come up.',
+  'Hold sprint and forward to run where you aim, whichever way the screen faces. It is very loud, and your gun takes a moment to come up.',
   'Stop before you shoot: running ruins your accuracy. Crouching still is the most accurate.',
   'Broken glass under windows crunches loudly — listen for it.',
   'Defenders: reinforce the walls of the objective room before the action phase starts.',

@@ -5,7 +5,7 @@ export const ACTIONS = [
   ['down', 'Move back', 'KeyS', 'ArrowDown'],
   ['left', 'Move left', 'KeyA', 'ArrowLeft'],
   ['right', 'Move right', 'KeyD', 'ArrowRight'],
-  ['sprint', 'Sprint — very loud, only the way you aim, gun down (hold)', 'AltLeft', ''],
+  ['sprint', 'Sprint — with Move forward: runs where you aim. Very loud, gun down (hold)', 'AltLeft', ''],
   ['walk', 'Walk — silent (hold)', 'ShiftLeft', ''],
   ['crouch', 'Crouch — silent, most accurate (hold)', 'ControlLeft', ''],
   ['crouchTap', 'Crouch on / off (one tap)', '', ''],

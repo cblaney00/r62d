@@ -20,6 +20,17 @@ if (fast / run < M_S.sprint / M_S.run * 0.9) fail('sprint not faster', run, fast
 console.log(`run ${run.toFixed(0)} px/s, sprint ${fast.toFixed(0)} px/s`);
 const back = speed({ sprint: 1 }, Math.PI); if (back > run * 1.05) fail('sprinting backwards', back);
 for (const k of ['ads', 'walk', 'crouch', 'prone', 'lean', 'fire']) { const v = speed({ sprint: 1, [k]: 1 }); if (v > run * 1.05 || p.spr) fail('sprint should stop for', k, v); }
+// sprint + W: the client turns the keys to the aim (k.rot), so W runs where you aim, in any direction
+let open = null;
+for (let y = 12; y < g.map.H - 12 && !open; y++) for (let x = 12; x < g.map.W - 12 && !open; x++) { let ok = true; for (let j = -10; j <= 10 && ok; j++) for (let i = -10; i <= 10 && ok; i++) ok = g.map.tiles[(y + j) * g.map.W + x + i] === 0; if (ok) open = { x: x * 16 + 8, y: y * 16 + 8 }; }
+if (!open) fail('no open ground for the test');
+for (const a of [0.7, 2.5, -1.2, -2.8]) {
+  Object.assign(p, open, { vx: 0, vy: 0, aim: a, pr: 0, spr: false }); const x0 = open.x, y0 = open.y;
+  for (let i = 0; i < 20; i++) { p.input = { up: 1, sprint: 1, sa: a, rot: a + Math.PI / 2 }; g.applyMove(p, 1 / 30); g.time += 1 / 30; }
+  const dx = p.x - x0, dy = p.y - y0;
+  if (Math.hypot(dx, dy) < 30 || Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - a), Math.cos(Math.atan2(dy, dx) - a))) > 0.6) fail('sprint + W went the wrong way', a, dx, dy);
+  if (a === 0.7 && !p.spr) fail('sprint + W should sprint');
+}
 // loud
 speed({}); g.noises = []; speed({}, 0, 0.6); const jog = Math.max(...g.noises.map(n => n.r));
 g.noises = []; speed({ sprint: 1 }, 0, 0.6); const spr = Math.max(...g.noises.map(n => n.r));
