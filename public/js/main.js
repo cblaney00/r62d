@@ -1719,21 +1719,11 @@ function pingTarget(view, me, s, mw) {
   if (be) return { x: be.x, y: be.y, w: entName(be), id: be.id };
   const site = m.sites[s.site];
   if (site && (me.tm === 'def' || s.rev)) for (const b of site.bombs) if (Math.hypot(b.x - mw.x, b.y - mw.y) < 22) return { x: b.x, y: b.y, w: 'OBJECTIVE ' + b.id };
-  // follow the aim line out from where you look: the first thing that stops your sight, or the floor where you point
-  const dx = mw.x - view.x, dy = mw.y - view.y, L = Math.hypot(dx, dy) || 1;
-  if (L > view.range || (L > view.near && Math.abs(angDiff(Math.atan2(dy, dx), view.ang)) > view.fov / 2 + 0.1)) return null;
-  for (let d = 3; ; d += 2) {
-    const end = d >= L, x = view.x + dx / L * Math.min(d, L), y = view.y + dy / L * Math.min(d, L);
-    const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), k = cy * m.W + cx, t = tileAt(m, cx, cy);
-    if (t === T.VOID) return null;
-    if (blocksSight(t) || end) {
-      if (!blocksSight(t) && !seeIt(x, y)) return null;
-      const name = cellName(k, t);
-      if (name) return { x: blocksSight(t) ? (cx + 0.5) * CELL : x, y: blocksSight(t) ? (cy + 0.5) * CELL : y, w: name };
-      for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k2 = (cy + oy) * m.W + cx + ox; if (m.dhole[k2]) return { x, y, w: 'DRONE HOLE' }; }
-      return { x, y, w: view.kind === 'body' ? 'GO HERE' : 'LOOK HERE' };
-    }
-  }
+  // otherwise right where the crosshair is (he asked: not on the wall the aim line hits first), named after what is there
+  const cx = Math.floor(mw.x / CELL), cy = Math.floor(mw.y / CELL), k = cy * m.W + cx, t = tileAt(m, cx, cy);
+  const name = cellName(k, t); if (name) return { x: mw.x, y: mw.y, w: name };
+  for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (m.dhole[(cy + oy) * m.W + cx + ox]) return { x: mw.x, y: mw.y, w: 'DRONE HOLE' };
+  return { x: mw.x, y: mw.y, w: view.kind === 'body' ? 'GO HERE' : 'LOOK HERE' };
 }
 // Pings on screen: a badge with what it is, who pinged it and how far; kept at the screen edge when off screen.
 // A ping on another floor shows over the same spot of your floor, tagged with its floor.
