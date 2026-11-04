@@ -853,8 +853,9 @@ html.tv #tvHelp { bottom: 6px; }
 .pbPlayer .pbCam { float: left; width: 96px; height: 72px; margin: 2px 10px 4px 0; border-radius: 4px; }
 .pbPlayer { overflow: hidden; }
 /* killcam (he asked): watch your death again, then the BS rating */
-#kcBtn { position: absolute; top: 116px; left: 50%; transform: translateX(-50%); font: 700 15px var(--head); letter-spacing: 0.2em; color: #fff; background: #b8342a; animation: none; transition: none; border: 1px solid rgba(255,255,255,0.35); padding: 6px 16px; cursor: pointer; z-index: 6; pointer-events: auto; }
-#kcBtn b { background: rgba(0,0,0,0.5); padding: 0 6px; margin-right: 8px; }
+#kcBtn { position: absolute; top: 116px; left: 50%; transform: translateX(-50%); font: 600 14px var(--head); letter-spacing: 0.18em; color: #efe6e2; background: rgba(38, 26, 28, 0.82); border: 1px solid rgba(214, 138, 124, 0.35); border-radius: 3px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); animation: none; transition: background 0.15s, border-color 0.15s; padding: 7px 16px 7px 8px; cursor: pointer; z-index: 6; pointer-events: auto; }
+#kcBtn:hover { background: rgba(58, 36, 36, 0.92); border-color: rgba(226, 158, 142, 0.6); }
+#kcBtn b { background: rgba(214, 138, 124, 0.2); color: #f0c4b8; border-radius: 2px; padding: 1px 7px; margin-right: 10px; letter-spacing: 0; }
 #killcam { position: fixed; inset: 0; z-index: 60; background: rgba(3,5,8,0.82); display: flex; align-items: center; justify-content: center; }
 #killcam .kcBox { position: relative; width: min(96vw, 1100px); }
 #killcam canvas { width: 100%; aspect-ratio: 16 / 9; display: block; border: 1px solid rgba(255,255,255,0.15); background: #07090c; }

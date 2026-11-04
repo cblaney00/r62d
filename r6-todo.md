@@ -7,12 +7,12 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked again: this computer lets port 6262 in and the game listens on every network. Two things left, neither in the game: Lando's homelab firewall has to pass port 6262 to 10.10.0.5, and this computer's VPN setup only accepts traffic from the NAS and Lando's two gaming-pc VPN addresses, so another machine on his LAN is also dropped unless his firewall makes it look like one of those or the list grows)
-- [ ] try push to talk on screen with a real microphone (needs him at the computer: hold H in a match and talk)
+- [ ] try push to talk on screen with a real microphone (needs him at the computer: hold X in a match and talk)
 - [ ] the mix input needs more work, its not understand me enough (recorded test voices now understood 93% of the time; still needs trying with his real voice. What it hears is saved as words only in mic-log.txt in the game's data, so a session can tune it to him)
 
 ## Done
 
-- [x] the killcam suggestions cannot just flash, it should be red but not flashing (found it: the button was being switched on and off ten times a second; watched in a real match, now solid red the whole time)
+- [x] the killcam suggestions cannot just flash, it should be red but not flashing (found it: the button was being switched on and off ten times a second; watched in a real match, now steady the whole time; he then asked for a less aggressive colour, so it is a dark panel with a soft red edge)
 - [x] push to talk: talk to the bots with your microphone (where to go, where the enemies are) and they answer (tests/botorders.js now passes on every map; bots had been freezing in doorways near a teammate, hitting people standing by a wall instead of the wall, and SOLDER welding instead of obeying)
 - [x] clean things up its getting a little laggy (server does about a third of the work in a bot match, 5.5% down to 1.9% of a core on Harbor; the on-screen info no longer rewrites itself ten times a second when nothing changed)
 - [x] lets make sure that wooden planks have 3 stages of being broken, 1 is a small hole, 2 is a bit larger, and 3 breaks it completely

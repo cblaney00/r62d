@@ -22,7 +22,7 @@ export const ACTIONS = [
   ['vault', 'Jump (onto furniture) — vaults windows and wall stubs', 'Space', ''],
   ['spot', 'Ping what is under your aim (enemy, gadget, wall, door, place)', 'KeyT', ''],
   ['chat', 'Chat (opens team chat; / switches team ⇄ all)', 'KeyY', 'Enter'],
-  ['ptt', 'Push to talk to the bots (hold)', 'KeyH', ''],
+  ['ptt', 'Push to talk to the bots (hold)', 'KeyX', ''],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['opNext', 'Free play: next operator', 'KeyN', ''],
   ['opPrev', 'Free play: previous operator', 'KeyB', ''],
@@ -31,8 +31,8 @@ export const ACTIONS = [
   ['pause', 'Pause menu', 'Escape', 'KeyP'],
 ];
 
-const KEY = 'r62d-keys-v4'; // v4 = lean on Q/E, use on F, skill on 4, gadget on G, Space jumps (he asked)
-export const BINDS_VERSION = 4;
+const KEY = 'r62d-keys-v5'; // v4 = lean on Q/E, use on F, skill on 4, gadget on G, Space jumps; v5 = push to talk on X (he asked)
+export const BINDS_VERSION = 5;
 let binds = {};
 // C used to be a second crouch key; it is now lie down (he asked), so older saved keys give it up
 function freeC() { if (binds.crouch[1] === 'KeyC' && binds.prone[0] === 'KeyC') binds.crouch[1] = ''; }
@@ -48,10 +48,13 @@ export function onBindsChange(fn) { onChange = fn; }
 export function saveBinds() { try { localStorage.setItem(KEY, JSON.stringify(binds)); } catch {} if (onChange) onChange(binds); }
 export const getBinds = () => JSON.parse(JSON.stringify(binds));
 // load a profile's saved keys (unknown actions ignored, missing ones keep defaults)
-export function applyBinds(saved) {
+// Saved keys from v4 keep everything except push to talk, which moves from H to X. If something else has X, or a layout took it, talk stays on H.
+function pttFree() { if (binds.ptt[0] === 'KeyX' && Object.keys(binds).some(k => k !== 'ptt' && binds[k].includes('KeyX'))) binds.ptt[0] = Object.keys(binds).some(k => binds[k].includes('KeyH')) ? '' : 'KeyH'; }
+export function applyBinds(saved, from = BINDS_VERSION) {
+  if (from < 5 && saved && Array.isArray(saved.ptt) && saved.ptt[0] === 'KeyH') saved = { ...saved, ptt: ['KeyX', saved.ptt[1] || ''] };
   loadBinds();
   if (saved && typeof saved === 'object') for (const id in saved) if (binds[id] && Array.isArray(saved[id])) binds[id] = saved[id].slice(0, 2).map(c => (typeof c === 'string' ? c.slice(0, 24) : ''));
-  freeC();
+  freeC(); pttFree();
   try { localStorage.setItem(KEY, JSON.stringify(binds)); } catch {}
 }
 export function resetBinds() { try { localStorage.removeItem(KEY); } catch {} loadBinds(); if (onChange) onChange(binds); }
@@ -71,6 +74,7 @@ export function applyPreset(name) {
   const over = pr[2], taken = new Set(Object.values(over).flat().filter(Boolean));
   for (const id in binds) if (!over[id]) binds[id] = binds[id].map(c => (taken.has(c) ? '' : c)); // a key the layout uses elsewhere
   for (const id in over) if (binds[id]) binds[id] = over[id].slice();
+  if (!binds.ptt[0]) binds.ptt[0] = 'KeyX'; pttFree();
   saveBinds();
 }
 export function setBind(id, slot, code) {
