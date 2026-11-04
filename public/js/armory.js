@@ -157,7 +157,7 @@ function tick(el, dt) {
 // most) and growing / sliding to keep you and the crosshair on screen (main.js camera, FIT_H, keep).
 const ROOM_W = 330; // the range is this wide either side of you
 const farEnd = () => S.dist * M + 60; // the backstop
-const scoped = () => String(attOf(S.w).sight || '').includes('scope');
+const scoped = () => /scope|sniper/.test(String(attOf(S.w).sight || ''));
 const fitCap = () => S.mouse.r ? (scoped() ? 1000 : 820) : 700;
 const aimMin = () => 46 * O.dpr() / (S.z || 1), aimMax = () => S.reachW || 400;
 function adsAim() { const l = Math.hypot(S.aim.x, S.aim.y) || 1, d = adsStart(attOf(S.w).sight) * M; S.aim = { x: S.aim.x / l * d, y: S.aim.y / l * d }; } // per sight, as in a match

@@ -147,7 +147,11 @@ let aimOff = { x: 150, y: 0 };
 const AHEAD = () => Math.max(36 * DPR, VH * 0.13); // screen room always left beyond the crosshair
 const AIM_MIN = () => 46 * DPR / (st.zoom || 1), AIM_MAX = () => st.reachW || 400;
 // how far a view can grow to fit you and your crosshair: further when aiming in, furthest with a 2x scope
-const FIT_H = me => me && me.ad ? (String(me.aa).includes('scope') ? 1000 : 820) : 700;
+const scopeOn = me => !!me && /scope|sniper/.test(String(me.aa || '')), sniperOn = me => !!me && String(me.aa || '').includes('sniper');
+const FIT_H = me => me && me.ad ? (sniperOn(me) ? LONG_H : scopeOn(me) ? 1000 : 820) : 700;
+// Long sightlines (he asked): looking down a line more than 1.5x the normal range, the view opens right out the way you
+// face, up to LONG_H world px tall, and you see out to LONG_R. The sniper scope always gets that view while aimed in.
+const LONG_H = 1500, LONG_R = 2400;
 // Turning (he asked: hard to pull the mouse round, flicks must be possible): moving the mouse sideways turns you as if
 // the crosshair were never further than TURN_R from you, so a far-out crosshair turns as quickly as a near one; moving
 // it towards / away from you changes the distance 1:1. Close in it is exactly 1:1 like a pointer.
@@ -165,9 +169,28 @@ function freeMove(dx, dy) {
 // aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked), else to its sight's distance
 function adsReset() {
   const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l, d = st.me && st.me.aa ? adsStart(attFromCode(st.me.aa).sight) * PX_PER_M : ADS_DIST;
+  if (sniperOn(st.me)) { // sniper scope (he asked): the reticle snaps out to the mark at the end of your sightline
+    const keep = st.reachW; st.reachW = Math.max(keep || 0, LONG_R); aimOff = { x: ux * LONG_R, y: uy * LONG_R };
+    const q = freeAimPoint(); st.reachW = keep;
+    const to = Math.max(AIM_MIN(), q.see - 2); aimOff = { x: ux * to, y: uy * to }; return;
+  }
   const far = Math.max(l, d); aimOff = { x: ux * far, y: uy * far };
   const q = freeAimPoint(), to = q.stopped ? Math.max(AIM_MIN(), q.see) : d;
   aimOff = { x: ux * to, y: uy * to };
+}
+// Sniper scope sway (he asked): scoped in, the reticle drifts in a slow figure of eight; holding Shift (walk or sprint
+// key) steadies it within about a tenth of a second, for as long as you hold it (like the AWP), and slows the mouse by
+// Settings → Steady aim sensitivity. The sway turns your real aim, so a shot goes where the reticle is.
+const steadying = () => !!(st.me && st.me.ct === 'body' && st.me.a && sniperOn(st.me) && (mouse.r || gpk.ads) && (keys.has('walk') || keys.has('sprint') || gpk.walk));
+function scopeSway(dt, me, now) {
+  const on = me && me.ct === 'body' && me.a && !me.dn && sniperOn(me) && !st.tv ? Math.min(1, me.at || 0) : 0;
+  const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
+  const want = on * (steadying() ? 0.0008 : 0.011 * (1 + run * 1.5));
+  st.swayA = (st.swayA || 0) + (want - (st.swayA || 0)) * (1 - Math.exp(-dt * (want < (st.swayA || 0) ? 22 : 4)));
+  const v = st.swayA * (Math.sin(now * 1.3) + 0.5 * Math.sin(now * 2.9 + 1)), d = v - (st.swayV || 0);
+  st.swayV = v; if (!d) return;
+  if (padOn && aimMode === 'free' && !gpRecent()) { const c = Math.cos(d), s = Math.sin(d); aimOff = { x: aimOff.x * c - aimOff.y * s, y: aimOff.x * s + aimOff.y * c }; }
+  else padAng = wrapAng(padAng + d);
 }
 const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
 let padOn = false, padAng = 0, padReach = 0.6;
@@ -214,7 +237,7 @@ function cursor() {
   const z = st.zoom || 1, P0 = w2s(st.pred.x, st.pred.y), px = P0.x, py = P0.y;
   if (aimMode === 'free' && !gpRecent()) { const q = freeAimPoint(); return w2s(q.x, q.y); }
   const cx = Math.cos(padAng + (st.rot || 0)), cy = Math.sin(padAng + (st.rot || 0)), m = 30 * DPR;
-  const scoped = st.me && String(st.me.aa || '').includes('scope');
+  const scoped = scopeOn(st.me);
   let d = VH * 0.07 + padReach * (VH * 0.36 + (scoped ? 0 : 4 * PX_PER_M * z)); // +4 m without a scope (he asked); shortened if it would leave the screen
   if (cx > 0.01) d = Math.min(d, (VW - m - px) / cx); else if (cx < -0.01) d = Math.min(d, (m - px) / cx);
   if (cy > 0.01) d = Math.min(d, (VH - m - py) / cy); else if (cy < -0.01) d = Math.min(d, (m - py) / cy);
@@ -702,7 +725,7 @@ function trySlide() { if (!st.pred || !st.pred.spr || st.pred.scd > 0 || !st.me 
 // How much the movement keys are turned: Rotate view, Face aiming (W goes the way you face), sprint + W (he asked: where you aim).
 function moveTurn() {
   const body = st.me && st.me.ct === 'body';
-  if (body && !gpRecent() && (aimMode === 'face' || (keys.has('sprint') && keys.has('up')))) return st.aim + Math.PI / 2;
+  if (body && !gpRecent() && (aimMode === 'face' || (keys.has('sprint') && keys.has('up') && !steadying()))) return st.aim + Math.PI / 2;
   return -(st.rot || 0);
 }
 // Vaulting goes the way you're moving, or where you look when standing still.
@@ -759,7 +782,7 @@ cv.addEventListener('mousemove', e => {
   if (st.mapV) { const V = st.mapV, c = 1.15 * DPR; V.cx = Math.max(0, Math.min(VW, V.cx + e.movementX * c)); V.cy = Math.max(0, Math.min(VH, V.cy + e.movementY * c)); return; }
   if (document.pointerLockElement === cv) {
     const ads = mouse.r && st.me && st.me.a && st.me.ct === 'body';
-    const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * DPR;
+    const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * (steadying() ? ($('steadySens') ? $('steadySens').value / 100 : 0.5) : 1) * DPR;
     if (padOn && aimMode === 'free') { freeMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'pad') { padMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'face') { faceMove(e.movementX * k, e.movementY * k, ads); return; }
@@ -1420,7 +1443,7 @@ function frame(nowMs) {
       view = b && b.pe ? { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: 1.9, range: 520, near: 6, kind: 'drone', bird: 1 } : { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: b ? 260 : 230, near: 0, kind: 'drone', low: !b, bird: b ? 1 : 0 };
     }
     else if (ctrl === 'cam') { const c = s.ents.find(e => e.id === me.fi); if (c) view = feedView(c, me); }
-    else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: 1100, near: 26, kind: 'body', low: (st.pred.pr || 0) >= 1 }; } // you see from your (leaning) head
+    else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: st.longV ? LONG_R : 1100, near: 26, kind: 'body', low: (st.pred.pr || 0) >= 1 }; } // you see from your (leaning) head
   } else if (inGame && me) {
     const mates = s.players.filter(p => p.a && p.sq === me.sq && p.id !== me.id);
     if (mouse.wl > 0) { st.spect++; mouse.wl = 0; }
@@ -1461,7 +1484,7 @@ function frame(nowMs) {
     view.ang = st.aim;
   }
   if (!view || view.kind !== 'cam') st.lastCam = null;
-  if (!st.tv) sendInput(dt, me, ctrl, view, s, now);
+  if (!st.tv) { scopeSway(dt, me, now); sendInput(dt, me, ctrl, view, s, now); }
 
   // --- camera ---
   let cx, cy;
@@ -1473,7 +1496,7 @@ function frame(nowMs) {
       const fa = !st.tv && padOn && aimMode === 'free' && !gpRecent() ? freeAimPoint() : null;
       const c = cursor(), mw = st.tv ? { x: st.pred.x + Math.cos(st.aim) * 160, y: st.pred.y + Math.sin(st.aim) * 160 } : fa ? { x: fa.ax, y: fa.ay } : screenToWorld(c.x, c.y); // TV: lead the way they look
       const vh = st.viewH || 400;
-      const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? (String(me.aa).includes('scope') ? 0.46 : 0.32) : 0.2); // a scope looks further ahead
+      const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? (sniperOn(me) ? 0.5 : scopeOn(me) ? 0.46 : 0.32) : 0.2); // a scope looks further ahead
       let ax = l > mx ? lx / l * mx : lx, ay = l > mx ? ly / l * mx : ly;
       // he asked to always see about as far as someone could shoot you from: down a long sightline the view slides
       // ahead far enough that its far end is on screen (st.sightLead, worked out with the zoom below)
@@ -1518,14 +1541,18 @@ function frame(nowMs) {
       // how far you can be seen (and so shot) from in the way you face: the 80th-percentile sightline across your
       // view cone, so one sliver through a doorway doesn't count. It grows quickly and shrinks slowly (no jumpy camera).
       const n = 15, fov = Math.min(view.fov || 1.8, 1.9), ds = [];
-      for (let i = 0; i < n; i++) ds.push(castSight(st.map, view.x, view.y, view.ang - fov / 2 + fov * i / (n - 1), 1100, null));
+      for (let i = 0; i < n; i++) ds.push(castSight(st.map, view.x, view.y, view.ang - fov / 2 + fov * i / (n - 1), LONG_R, null));
       ds.sort((a, b) => a - b);
       const far = ds[Math.floor(n * 0.8)];
       st.farS = st.farS === undefined ? far : st.farS + (far - st.farS) * (1 - Math.exp(-dt * (far > st.farS ? 1.2 : 0.6))); // calm outdoors, where sightlines change a lot as you turn
       // the screen must hold you and that far point: its reach along your aim is viewH * e (e from the screen's shape)
       const cA = Math.abs(Math.cos(view.ang)), sA = Math.abs(Math.sin(view.ang));
       const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), m1 = 70, m2 = 40;
-      want = Math.max(want, Math.min(st.tv ? 520 : 680, (st.farS + m1 + m2) / (2 * e))); // (TV: staring out over a yard shouldn't make a wide, empty shot)
+      // long view (he asked): further than 1.5x what the normal view reaches that way (the biggest room view, 470 tall)
+      // opens the view right out; it closes again below 1.3x so it doesn't flicker at the edge
+      const norm = Math.max(560, 470 * 2 * e - m1 - m2), sniper = me && me.ad && sniperOn(me);
+      st.longV = !st.tv && view.kind === 'body' && (sniper || st.farS > norm * (st.longV ? 1.3 : 1.5));
+      want = Math.max(want, Math.min(st.tv ? 520 : st.longV ? LONG_H : 680, (st.farS + m1 + m2) / (2 * e))); // (TV: staring out over a yard shouldn't make a wide, empty shot)
       const reach = (st.viewH || want) * e; // how far the screen reaches from its middle along your aim, right now
       st.sightLead = Math.max(0, Math.min(reach - m1, st.farS - (reach - m2)));
     } else st.sightLead = 0;
@@ -1536,7 +1563,7 @@ function frame(nowMs) {
   st.envH = st.envH || st.envWant;
   st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * (view && view.kind === 'body' ? 3 : 6))); // a gentle glide, not a pump
   // aiming down sights widens the view, fast (he asked: it used to zoom in, the opposite of what you want); a 2x scope widest
-  const adsZ = view && view.kind === 'body' && me && me.ad ? (String(me.aa).includes('scope') ? 1.3 : 1.12) : 1;
+  const adsZ = view && view.kind === 'body' && me && me.ad ? (sniperOn(me) ? 1.5 : scopeOn(me) ? 1.3 : 1.12) : 1;
   st.adsZ = st.adsZ || 1;
   st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18));
   st.viewH = st.envH * st.adsZ;
@@ -1546,7 +1573,7 @@ function frame(nowMs) {
   if (freeAim) {
     const q = freeAimPoint(), cA = Math.abs(Math.cos(st.aim)), sA = Math.abs(Math.sin(st.aim));
     const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), mg = (50 * DPR + AHEAD()) / (st.zoom || 1);
-    const capH = FIT_H(me), need = Math.min(capH, (q.ad + mg) / (2 * e));
+    const capH = Math.max(FIT_H(me), st.longV ? LONG_H : 0), need = Math.min(capH, (q.ad + mg) / (2 * e));
     st.reachW = Math.max(160, capH * 2 * e - mg);
     st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need;
     st.viewH = Math.max(st.viewH, st.fitH);
@@ -1625,6 +1652,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (me && (!me.a || me.dn)) st.leanT = 0; // dead or downed: stand straight again
   if (!me || !me.a || me.dn || !s || (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION)) st.crouchT = false;
   if (mouse.l || gpk.fire) st.sprintHold = performance.now() + 500; // shooting stops a sprint for a moment, so the shot gets out
+  if (steadying()) k.sprint = 0; // scoped in, the sprint key only steadies the scope
   if (k.sprint) k.sa = Math.round(st.aim * 1000) / 1000; // what the server will go by for which way you sprint
   if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }

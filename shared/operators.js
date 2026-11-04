@@ -404,6 +404,9 @@ export const ATTACH = {
     holo: { name: 'Holo Sight', short: 'Holo', desc: '+ A little quicker to aim than a red dot. − Aimed shots a little looser than a red dot.', adsSpread: 0.94, ads: 0.96 },
     prism: { name: '1.5× Prism', short: '1.5× prism', desc: '+ Accurate aimed shots for mid range. − Slower to aim in.', adsSpread: 0.8, ads: 1.1 },
     scope: { name: '2.0× Scope', short: '2× scope', desc: '+ Very accurate aimed shots, and you see further ahead. − Slowest to aim in, looser hip fire.', adsSpread: 0.7, ads: 1.2, hip: 1.08, zoom: 1 },
+    // he asked: a sniper scope for the slow marksman rifles. Aiming in snaps the reticle out to the mark at the end of
+    // your sightline, everything round the lens blurs, and holding Shift steadies it (main.js scopeSway)
+    sniper: { name: 'Sniper Scope', short: 'Sniper', desc: '+ Pin-point aimed shots, the view opens right out and the reticle jumps to the end of your sightline; hold Shift to steady it. − Slowest to aim in, wild hip fire, everything round the lens is a blur.', adsSpread: 0.45, ads: 1.35, hip: 1.35, zoom: 1 },
   },
 };
 export const ATTACH_SLOTS = [['barrel', 'Barrel'], ['grip', 'Grip'], ['sight', 'Sight']];
@@ -427,7 +430,8 @@ export function attachFor(w) {
     grip = grip.filter(g => g !== 'vertical' && g !== 'handstop').concat('trigger', 'pad');
   }
   if (W && SIDEARMS.has(w) && W.cls !== 'MP' && W.cls !== 'Pistol') { grip = grip.filter(g => g !== 'vertical' && g !== 'handstop'); } // sidearms: nothing bulky underneath
-  return { barrel, grip, sight: f.sight }; // at least 3 in every slot (he asked)
+  const sight = W && W.cls === 'DMR' && W.rpm <= 300 ? f.sight.concat('sniper') : f.sight; // the sniper scope: slow-firing marksman rifles only
+  return { barrel, grip, sight }; // at least 3 in every slot (he asked)
 }
 // Starter attachments (he asked: for players who don't care, a sensible set per operator; the moment they change one,
 // their choice is saved and replaces it). The gun type sets the base, the operator's role tweaks it: quiet jobs
@@ -466,7 +470,7 @@ export function gunMods(w, a) {
 }
 // three short letters for the snapshot: barrel / grip / sight
 // how far out (metres) aiming in puts the crosshair, per sight (he asked: a red dot should feel different from a 2x)
-export const ADS_START = { iron: 2.5, reddot: 3.5, holo: 3, prism: 5, scope: 6.5 };
+export const ADS_START = { iron: 2.5, reddot: 3.5, holo: 3, prism: 5, scope: 6.5, sniper: 10 };
 export const adsStart = sight => ADS_START[sight] || 2.5;
 export const attCode = a => [a.barrel, a.grip, a.sight].join(',');
 export const attFromCode = s => { const [barrel, grip, sight] = String(s || '').split(','); return { barrel, grip, sight }; };

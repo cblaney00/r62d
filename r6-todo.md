@@ -6,6 +6,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] we need to make it so that if youre looking down an area thats further than 1.5x normal range then it should just zoom out massively in the direction your character is facing. also please add a sniper scope for slow firing markman type weapons and for that scope i want a sniper reticle to snap to the orange mark, shift will slow your sensitivity (adjustable in settings) and steady your aim quickly so that quickscopes are possible
 
 ## Done
 

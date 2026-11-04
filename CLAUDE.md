@@ -276,3 +276,6 @@ His wishes so far:
 ## Outdoor scenes and random map (2026-11-03)
 - Outdoors (he asked; he chose solid cover): `shared/outdoors.js` `OUTDOORS[map]` = per spawn name a scene in that spawn's own frame (u sideways, v toward the building): `cover` (the two kinds `coverSpawn` uses, must fill an 8×3 slab), `ground`/`road`/`path`/`marks` (painted), `pieces` ([kind, u, v, lu, lv, block]: 1 solid, 2 low, 0 scenery; shifted or mirrored if they don't fit). `dressOutdoors` runs in `finish` after `coverSpawn`, then scatters per map and rings the floor with `edge`; report in `map.outdoors`. New drawings are `public/js/outprops.js` (`drawOutProp`, the `default` of `drawProp`). `FL.SNOW` (lodge: all grass becomes snow). Spawn names are the keys, so renaming a spawn needs the scene renamed. `node tests/outdoors.js`.
 - RANDOM map (he asked; he chose: a surprise until the match starts): lobby `map` message with id `random` sets `game.randomMap` (snapshot `rm`), `startMatch` rolls a map other than the current one; picking a map switches it off. Free Play's card rolls on the client at `freeGo`. `RANDOM_CARD` in main.js. `node tests/randommap.js`.
+
+## PAUSED WORK (2026-11-04): long view + sniper scope
+Half done, he paused it. **Read `docs/sniper-wip.md` first** — what is in, his answers, and what is left.

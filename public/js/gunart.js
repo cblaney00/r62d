@@ -146,6 +146,7 @@ export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   if (a.sight === 'holo') { box(ctx, sx, top - 3, 13, 1.4, '#22252a'); part(ctx, [sx + 1, top - 3, sx + 3, top - 9, sx + 12, top - 9, sx + 12.5, top - 3], '#2a2d32'); ctx.fillStyle = 'rgba(140,220,255,0.4)'; ctx.fillRect(sx + 4, top - 8, 7, 4.2); }
   if (a.sight === 'prism') { box(ctx, sx, top - 2.2, 15, 2.2, '#1b1d20'); box(ctx, sx + 1, top - 9, 14, 7, '#24272b', 1.4); box(ctx, sx + 3, top - 10, 9, 1.4, '#2c2f33'); ctx.fillStyle = 'rgba(255,170,60,0.55)'; ctx.fillRect(sx + 14.2, top - 8, 0.9, 5); }
   if (a.sight === 'scope') { box(ctx, sx + 4, top - 4, 3, 2.5, '#1b1d20'); box(ctx, sx + 16, top - 4, 3, 2.5, '#1b1d20'); box(ctx, sx - 1, top - 9, 26, 5.5, '#1e2024', 1.7); box(ctx, sx - 3, top - 10, 4, 7.5, '#25282c'); box(ctx, sx + 23, top - 10.5, 5, 8.5, '#25282c'); ctx.fillStyle = 'rgba(110,180,255,0.6)'; ctx.fillRect(sx + 27.5, top - 9.5, 0.8, 6.5); box(ctx, sx + 9, top - 11, 3, 2, '#2c2f33'); }
+  if (a.sight === 'sniper') { box(ctx, sx + 6, top - 4, 3, 2.5, '#1b1d20'); box(ctx, sx + 22, top - 4, 3, 2.5, '#1b1d20'); box(ctx, sx - 3, top - 10, 36, 6.5, '#1a1c20', 2); box(ctx, sx - 7, top - 11.5, 6, 9.5, '#23262a'); box(ctx, sx + 31, top - 12.5, 7, 11.5, '#23262a'); box(ctx, sx + 12, top - 13, 4, 3, '#2c2f33'); box(ctx, sx + 14, top - 8, 3, 2, '#2c2f33'); ctx.fillStyle = 'rgba(110,180,255,0.65)'; ctx.fillRect(sx + 37.5, top - 11.5, 0.9, 9.5); }
   ctx.restore();
 }
 
