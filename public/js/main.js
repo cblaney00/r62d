@@ -1,7 +1,8 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
-import { pttDown, pttUp, pttSetState, pttVocab, pttTest } from './ptt.js';
+import { pttDown, pttUp, pttSetState, pttVocab, pttTest, pttPreload } from './ptt.js';
+import { openVoiceTest } from './voicetest.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
@@ -251,6 +252,11 @@ fx.quality = gq.parts; setShading(gq.shade);
 function connect(mode = '', tvKey = null) { // '' = the shared match, 'tut' / 'free' = a private one
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws${mode ? `?${mode}=1` : ''}${tvKey ? `&key=${tvKey}` : ''}`);
   st.ws = ws;
+  // first time in: the voice setup (he asked). Phones and addresses where a browser allows no microphone don't get it.
+  ws.addEventListener('message', function first(ev) { if (!String(ev.data).includes('"welcome"')) return; ws.removeEventListener('message', first); setTimeout(() => {
+    let done = true; try { done = !!localStorage.getItem('r62d-voicetest'); } catch {}
+    if (!done && !isTouch && navigator.mediaDevices && !st.tv && !st.tutorial && !st.free && st.last && st.last.ph === PHASE.LOBBY) openVoiceTest();
+  }, 900); });
   ws.onopen = () => { if (st.rejoin) { st.rejoin = false; $('joinBtn').click(); } };
   ws.onmessage = ev => {
     const m = JSON.parse(ev.data);
@@ -481,6 +487,10 @@ function onSnap(s) {
     return;
   }
   if (s.mv !== st.mv) { if (st.rend) resetMap(s.mv); else loadMap(s.mv, null, null, s.mp); } // same map, new round
+  if (st.pttRd !== s.rd && s.rd && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION) && !st.tv && !st.tutorial) { // the microphone's words for this round, loaded ahead (once you have used it)
+    st.pttRd = s.rd; let used = false; try { used = !!localStorage.getItem('r62d-ptt-used'); } catch {}
+    if (used) setTimeout(() => { if (!st.tv && !st.tutorial) { pttVocabNow(); pttPreload(); } }, 1500);
+  }
   const m = st.map, now = performance.now() / 1000;
   const changed = [];
   for (let i = 0; i < s.cells.length; i += 3) {
@@ -666,8 +676,7 @@ function pressAction(a, e) {
     case 'pause': escape(); break;
     case 'spot': st.spotReq = true; break;
     case 'ptt': if (st.id && !st.tv && !st.tut) {
-      const sn = st.snaps.length ? st.snaps[st.snaps.length - 1] : null;
-      if (st.map) pttVocab((st.map.rooms || []).map(r => r.name), sn ? [...sn.players.values()].filter(p => p.bt).map(p => String(p.n || '').replace(/^\[\w+\] /, '')) : [], sn ? [...new Set([...sn.players.values()].map(p => p.op).filter(Boolean))].map(o => OPERATORS[o].name) : []);
+      pttVocabNow(); try { localStorage.setItem('r62d-ptt-used', '1'); } catch {}
       pttDown();
     } break;
     case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;
@@ -736,6 +745,10 @@ addEventListener('keyup', e => {
     else addFeed(loudest < 0.004 ? 'The microphone heard almost nothing: check it, or raise Microphone boost in Settings → Sound' : "Didn't catch any words: try \"where are they\" or \"go to\" and a room");
   });
 });
+function pttVocabNow() {
+  const sn = st.snaps.length ? st.snaps[st.snaps.length - 1] : null;
+  if (st.map) pttVocab((st.map.rooms || []).map(r => r.name), sn ? [...sn.players.values()].filter(p => p.bt).map(p => String(p.n || '').replace(/^\[\w+\] /, '')) : [], sn ? [...new Set([...sn.players.values()].map(p => p.op).filter(Boolean))].map(o => OPERATORS[o].name) : []);
+}
 function pttMsg(text, ms) { const el = $('pttInd'); el.textContent = text; el.classList.remove('hidden'); clearTimeout(el._t); if (ms) el._t = setTimeout(() => el.classList.add('hidden'), ms); }
 pttSetState(k => { if (k === 'on') { pttMsg('🎤 LISTENING'); $('pttInd').style.setProperty('--lv', 0); } else if (k === 'loading') pttMsg('🎤 STARTING MICROPHONE…'); else if (k === 'nomic') pttMsg('NO MICROPHONE HERE (OR THE BROWSER REFUSED IT)', 4000); else $('pttInd').classList.add('hidden'); },
   (text, lv) => { const el = $('pttInd'); if (text) el.textContent = '🎤 ' + text.toUpperCase(); if (lv) el.style.setProperty('--lv', lv.toFixed(2)); });
@@ -3207,4 +3220,5 @@ $('kcBtn').onclick = () => { audio.ui(); watchKillcam(); };
 
 
 try { $('micBoost').value = localStorage.getItem('r62d-micboost') || 100; } catch {}
+$('voiceTestBtn').onclick = () => { audio.ui(); openVoiceTest(); };
 $('micBoost').addEventListener('input', () => { try { localStorage.setItem('r62d-micboost', $('micBoost').value); } catch {} });

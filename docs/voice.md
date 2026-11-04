@@ -21,3 +21,12 @@ Whole sentences (`micPhrases`, the default, about 2000 on Harbor) with synthetic
 - Words the model lacks: `SOUNDS` in shared/commands.js listens for a sound-alike and reads it back (defuser/diffuser, chonk/chunk); digits in room names are read as words.
 - `/api/miclog` keeps the last 300 things heard (words and level, no sound) in `mic-log.txt` in the data folder: read it first when tuning to him.
 Test clips: `/var/tmp/r62d-tts/mic` + `phrases.txt` (may be gone). To rerun, link the clips under `public/` for the test only and fetch them in hidden Firefox.
+
+## His own voice (2026-11-03)
+He read 18 orders at his normal distance (about 45 cm) into a temporary test page; the recordings were kept only for this and deleted. By meaning to `parseCommand`: 16/18 before, 18/18 after (same clips, so tuned on them; other sentences may do worse). What helped:
+- `gateNext` in ptt.js: levelling lifted room noise between words until the recogniser heard words in it ("in someone in"). Sound not above `GATE` (3) × the room's noise (`noiseAt`, tracked while idle too) is turned down to 5%. 2 and 4.5 measured worse.
+- More sentences in `SAY`/`AT` (it can only choose what it knows), "watch the stairs" means hold, "where are the" means enemies, "someone see" counts, "plant it" no longer matches the IT Room.
+- First press lost words while the model loaded: `pttPreload` loads model and sentences at round start once `r62d-ptt-used` is set (no microphone opened).
+To repeat: record raw Float32 clips, serve them with CORS, and in hidden Firefox `import('/js/ptt.js')`, `pttVocab(rooms, [], [])`, `pttTest(samples, rate, { fresh: true })`, score with `parseCommand`.
+## Voice setup
+`public/js/voicetest.js`, `openVoiceTest`: shown once (`r62d-voicetest`) ~0.9 s after the welcome in the lobby, not on touch, not without `navigator.mediaDevices`, not in TV/tutorial/free; again from Settings → Sound (`#voiceTestBtn`). Sets Microphone boost to 200 if the mic is very quiet.
