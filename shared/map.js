@@ -341,6 +341,31 @@ export function hatchAtPoint(map, x, y) {
   return null;
 }
 
+// ---- Looking through an open hatch (he asked: like the stairs, a limited view, and you only shoot down where you
+// could really see; lying down shows more of the room sideways, like a 3D game) ----
+// Floor to floor HATCH_H m. A straight line from your eye through the opening reaches the other floor's people (at
+// BODY_Z m off their floor) only in one patch: the opening grown about the spot under your eye by 1 / f, with f how far
+// along that line the opening is. Standing at the edge you see down to ~2 m past it; lying at the edge, a long thin
+// strip 1-10 m out; a step back and you see nothing (the floor is in the way). From below it works the same upward.
+// The view: { x, y (the middle of the opening on the other floor: walls there block from that point), range, ang: 0,
+// fov: 2pi, near: 0, kind: 'hatch', mask: { ex, ey, f, x0, y0, x1, y1 } (other floor coords), h, up, o (offset to the
+// other floor) }. maskSees(mask, x, y) tests the patch.
+export const HATCH_H = 3.2, EYE_H = { stand: 1.6, crouch: 1.05, prone: 0.3 }, BODY_Z = 1.0, HATCH_LOOK = 7 * CELL;
+export const maskSees = (k, x, y) => { const X = k.ex + k.f * (x - k.ex), Y = k.ey + k.f * (y - k.ey); return X >= k.x0 && X <= k.x1 && Y >= k.y0 && Y <= k.y1; };
+export function hatchSight(m, h, x, y, stance = 'stand') {
+  if (!m.tiles || m.tiles[h.cells[0]] !== T.HOLE) return null;
+  const f0 = floorAt(m, x, y), up = f0 === h.fl, fb = floorAt(m, h.bx, h.by); // up: you are above it, looking down
+  if (!up && f0 !== fb) return null;
+  const cx = up ? h.x : h.bx, cy = up ? h.y : h.by, d = Math.hypot(cx - x, cy - y);
+  if (d > HATCH_LOOK || d < 1) return null;
+  if (castSight(m, x, y, Math.atan2(cy - y, cx - x), d, null) < d - CELL * 1.2) return null; // something in the way of the opening itself
+  const e = EYE_H[stance] || EYE_H.stand, f = up ? e / (HATCH_H + e - BODY_Z) : (HATCH_H - e) / (HATCH_H + BODY_Z - e);
+  const o = up ? { x: h.bx - h.x, y: h.by - h.y } : { x: h.x - h.bx, y: h.y - h.by }, ox = up ? h.bx : h.x, oy = up ? h.by : h.y;
+  const mask = { ex: x + o.x, ey: y + o.y, f, x0: ox - CELL, y0: oy - CELL, x1: ox + CELL, y1: oy + CELL };
+  let far = 0; for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) far = Math.max(far, Math.hypot(ox + sx * CELL - mask.ex, oy + sy * CELL - mask.ey));
+  return { x: ox, y: oy, ang: 0, fov: Math.PI * 2, range: Math.min(16 * 36, far / f + 4), near: 0, kind: 'hatch', mask, h, up, o };
+}
+
 // ---- Stairwells (he asked: fights between the top and the bottom of a staircase should work) ----
 // A staircase is drawn on both floors at the same spot. Anyone on its steps, or on the landing at its open end
 // (STAIR_LAND cells: the bottom landing downstairs, the top landing upstairs), also shows up on the steps of the other

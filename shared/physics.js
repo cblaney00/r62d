@@ -316,6 +316,7 @@ export function canSee(map, v, px, py, smokes) {
   const d = Math.hypot(px - v.x, py - v.y);
   if (d > v.range) return false;
   if (d > v.near && Math.abs(angDiff(Math.atan2(py - v.y, px - v.x), v.ang)) > v.fov / 2 + 0.05) return false;
+  if (v.mask) { const k = v.mask, X = k.ex + k.f * (px - k.ex), Y = k.ey + k.f * (py - k.ey); if (X < k.x0 || X > k.x1 || Y < k.y0 || Y > k.y1) return false; } // through a hatch: only the patch the opening lets you see (map.js hatchSight)
   return los(map, v.x, v.y, px, py, smokes);
 }
 

@@ -5,8 +5,8 @@
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
-import { tileAt, los, angDiff, vaultable, castSight, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
-import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF } from '../shared/map.js';
+import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
+import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel } from '../shared/pros.js';
 import { planWeight, opWeight } from './training.js';
@@ -384,6 +384,17 @@ export function visibleEnemy(game, p, see) {
       const pv = gh && peekSeen(m, gh, p.x, p.y, smokes); if (pv) take(q, pv === true ? gh.x : pv.x, pv === true ? gh.y : pv.y, false); // (where they show from here)
     }
   }
+  // through an open hatch: whoever is in the patch the opening shows (hatchSight, at this bot's stance), aimed at where
+  // they show from here (the shot goes through: game.holeAim)
+  const stance = p.pr >= 1 ? 'prone' : p.input && p.input.crouch ? 'crouch' : 'stand';
+  for (const h of m.hatches || []) {
+    const v = m.tiles[h.cells[0]] === T.HOLE && hatchSight(m, h, p.x, p.y, stance); if (!v) continue;
+    const vf = floorAt(m, v.x, v.y);
+    for (const q of game.players.values()) {
+      if (!q.alive || q.staged || game.side(q) === team || q.shrouded || floorAt(m, q.x, q.y) !== vf) continue;
+      if (canSee(m, v, q.x, q.y, smokes)) take(q, q.x - v.o.x, q.y - v.o.y, 'hatch');
+    }
+  }
   return best;
 }
 
@@ -401,6 +412,7 @@ function behindDrone(game, p, e, d) {
 // stops bullets (he saw a pro empty three magazines into one), and a teammate in the way would be shot (friendly fire).
 function shotClear(game, p, q) {
   const m = game.map, d = Math.hypot(q.x - p.x, q.y - p.y); if (d < 1) return true;
+  if (q.win === 'hatch') return true; // down (or up) through a hatch: the opening is the way
   const dx = (q.x - p.x) / d, dy = (q.y - p.y) / d, sx = Math.floor(p.x / CELL), sy = Math.floor(p.y / CELL);
   let ok = true;
   walkRay(p.x, p.y, dx, dy, d, (cx, cy) => {
@@ -667,6 +679,7 @@ export function botThink(game, p, dt) {
   if (!ai.role) ai.role = roleFor(game, p, team);
   const abId = OPERATORS[p.op].ability.id;
   const useAbility = () => game.event(p, { k: 'ability' });
+  if (action && team === TEAM.ATK && !p.downed && roofPlay(game, p, inp, dt)) return; // (he asked) up on the roof, in through a hatch
 
   // --- hearing: the most recent enemy noise this bot could hear ---
   for (const n of game.noises || []) {
@@ -1066,6 +1079,86 @@ function botCams(game, p, dt) {
       if (!p.pro && ([...game.players.values()].some(o => !o.bot && o.squad === p.squad) || game.tv) && game.markOk(p)) game.mark(p, q.x, q.y, 'ENEMY ' + OPERATORS[q.op].name, q.id); }
   }
 }
+// ---- The roof (he asked: when the objective is on the floor under the roof, bots go up there: another way in, and a
+// hatch to throw utility through) ----
+// Once a round per attacking team: is there a roof hatch over (or close to) the site, on the floor right under it?
+// Then one attacker (two from Diamond up, more often the higher the rank; pros: the flank / intel / support player,
+// usually) climbs a rope to the roof, opens the hatch, throws a grenade down, lies by it watching below (shooting
+// whoever shows in it) and drops in when the team pushes. A reinforced hatch or the clock: back down the rope.
+const ROOF_CHANCE = [0.15, 0.25, 0.35, 0.45, 0.55, 0.6, 0.65, 0.7]; // by rank (lvlOf), the last for pros
+const ROOF_JOBS = ['flank', 'intel', 'support'];
+function roofPick(game, p) {
+  const m = game.map, R = game._roof && game._roof.round === game.round ? game._roof : (game._roof = { round: game.round, sq: {} });
+  if (R.sq[p.squad] === undefined) {
+    let plan = null;
+    const site = m.sites[game.site], bf = floorAt(m, site.bombs[0].x, site.bombs[0].y);
+    if (m.roofFloor !== undefined && bf === m.roofFloor - 1 || (m.hatches || []).some(h => h.roof && floorAt(m, h.bx, h.by) === bf)) {
+      let best = null, bd = 14 * PX_PER_M;
+      for (const h of m.hatches || []) {
+        if (!h.roof || floorAt(m, h.bx, h.by) !== bf || m.tiles[h.cells[0]] === T.HATCHR) continue;
+        const d = Math.min(...site.bombs.map(b => Math.hypot(b.x - h.bx, b.y - h.by)));
+        if (d < bd) { bd = d; best = h; }
+      }
+      const top = r => { while (r.up >= 0) r = m.ropes[r.up]; return r.roof ? r : null; };
+      const rope = best && m.ropes.filter(r => r.down < 0 && top(r)).sort((a, b) => Math.hypot(top(a).roof.x - best.x, top(a).roof.y - best.y) - Math.hypot(top(b).roof.x - best.x, top(b).roof.y - best.y))[0];
+      const team = [...game.players.values()].filter(q => q.bot && q.alive && q.squad === p.squad);
+      const lvl = team.some(q => q.pro) ? 7 : lvlOf(game, p);
+      if (rope && team.length >= 2 && Math.random() < ROOF_CHANCE[lvl]) {
+        const pref = q => (q.pro ? ROOF_JOBS.includes(q.pro.pl.jobs.atk) : ['flank', 'intel'].includes(q.ai && q.ai.role)) ? 0 : 1;
+        const ids = team.filter(q => !q.hasDefuser).sort((a, b) => pref(a) - pref(b) || Math.random() - 0.5).slice(0, lvl >= 5 && team.length >= 4 ? 2 : 1).map(q => q.id);
+        plan = { h: best, rope, top: top(rope), ids, dropAt: 40 + Math.random() * 25 };
+      }
+    }
+    R.sq[p.squad] = plan;
+  }
+  const plan = R.sq[p.squad];
+  return plan && plan.ids.includes(p.id) ? plan : null;
+}
+function roofPlay(game, p, inp, dt) {
+  const ai = p.ai, m = game.map, R = roofPick(game, p); if (!R) return false;
+  const st = ai.roofSt && ai.roofSt.round === game.round ? ai.roofSt : (ai.roofSt = { round: game.round, s: 'go', t: game.time });
+  if (st.s === 'done') return false;
+  const fl = floorAt(m, p.x, p.y), prev = p.prevInput || {}, press = k => { inp[k] = prev[k] ? 0 : 1; }, h = R.h;
+  if (p.rope) { if (p.rope.st === 'hang') press(st.s === 'leave' ? 'interact' : 'sprint'); return true; } // up (or down) the rope a stop at a time
+  if (st.s !== 'leave' && st.s !== 'go' && (game.planted || game.timer < 30 || game.time - st.t > 70)) st.s = 'leave';
+  if (st.s === 'go') {
+    if (fl === m.roofFloor) { st.s = 'open'; st.t = game.time; if (!ai.roofSaid) { ai.roofSaid = true; teamSay(game, p, 'On the roof.', 'roof'); } }
+    else if (fl !== m.groundFloor || game.time - st.t > 45 || p.hasDefuser) { st.s = 'done'; return false; }
+    else { const b = R.rope.base; if (Math.hypot(b.x - p.x, b.y - p.y) > 9) { moveTo(game, p, inp, b, dt); return true; } press('interact'); return true; }
+  }
+  if (fl !== m.roofFloor) { st.s = 'done'; return false; } // dropped in through the hatch (or came down the rope)
+  if (st.s === 'leave') { const t = R.top.roof; if (Math.hypot(t.x - p.x, t.y - p.y) > 10) { moveTo(game, p, inp, t, dt); return true; } press('interact'); return true; }
+  if (visibleEnemy(game, p, skill(game, p).see)) return false; // someone in sight (below through the hatch, too): fight
+  const tile = m.tiles[h.cells[0]], dEdge = Math.hypot(h.x - p.x, h.y - p.y);
+  const edge = st.edge || (st.edge = (() => { // a spot just off the hatch, on the side facing the site
+    const site = m.sites[game.site], b = site.bombs[0], a = Math.atan2(h.y - (b.y - h.by + h.y), h.x - (b.x - h.bx + h.x)); // from the site's side, so the view goes towards it
+    for (const da of [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, Math.PI]) { const x = h.x + Math.cos(a + da) * 26, y = h.y + Math.sin(a + da) * 26; if (floorAt(m, x, y) === m.roofFloor && m.hatchAt[Math.floor(y / CELL) * m.W + Math.floor(x / CELL)] < 0 && m.tiles[Math.floor(y / CELL) * m.W + Math.floor(x / CELL)] === T.FLOOR) return { x, y }; }
+    return { x: h.x + 26, y: h.y };
+  })());
+  if (st.s === 'open') {
+    if (tile === T.HATCHR) { st.s = 'leave'; teamSay(game, p, 'Roof hatch is reinforced, coming down.', 'roofR'); return true; }
+    if (tile === T.HATCH) { if (Math.hypot(edge.x - p.x, edge.y - p.y) > 8) { moveTo(game, p, inp, edge, dt); return true; } aimAt(p, h.x, h.y); inp.crouch = 1; if (p.meleeCd <= 0) game.event(p, { k: 'melee' }); return true; }
+    st.s = 'util';
+  }
+  if (st.s === 'util') { // a grenade down the hole first
+    if (p.gadgetCount > 0 && ['frag', 'stun', 'smoke', 'impact'].includes(p.gadget) && !st.thrown) {
+      if (Math.hypot(edge.x - p.x, edge.y - p.y) > 8) { moveTo(game, p, inp, edge, dt); return true; }
+      aimAt(p, h.x, h.y); game.event(p, { k: 'gadget' }); st.thrown = true; teamSay(game, p, 'Utility down the roof hatch.', 'roofU'); return true;
+    }
+    st.s = 'hold';
+  }
+  if (st.s === 'hold') { // lie at the edge looking down until the team goes in
+    const goAt = p.pro ? (() => { const ps = proPlan(game, p.squad, 'atk'); return ps && ps.go ? ps.go : R.dropAt; })() : R.dropAt;
+    if (elapsedAction(game) < goAt) {
+      if (Math.hypot(edge.x - p.x, edge.y - p.y) > 8) { moveTo(game, p, inp, edge, dt); return true; }
+      inp.prone = 1; turnTo(p, Math.atan2(h.y - p.y, h.x - p.x), skill(game, p).turn, dt); return true;
+    }
+    st.s = 'drop'; teamSay(game, p, 'Dropping in.', 'roofD');
+  }
+  if (st.s === 'drop') { setDir(inp, h.x - p.x, h.y - p.y); p.aim = Math.atan2(h.y - p.y, h.x - p.x); if (game.time - st.t > 80) st.s = 'leave'; return true; }
+  return true;
+}
+
 // the site's ways in, rooms beside it and the attackers' route (shared/pros.js), worked out once a round
 function intelOf(game) {
   const key = game.map.id + '|' + game.site;

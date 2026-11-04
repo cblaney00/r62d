@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -2175,7 +2175,7 @@ function draw(s, view, now, dt) {
     if (R > c) ctx.fillRect(c, Tp, R - c, B - Tp);
     if (B > d) ctx.fillRect(a, d, c - a, B - d);
   }
-  if (inGame && view) { drawStairView(s, st.me, now); drawWindowView(s, st.me, now, view); drawWindowMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
+  if (inGame && view) { drawStairView(s, st.me, now); drawHatchView(s, st.me, now); drawWindowView(s, st.me, now, view); drawWindowMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
   if (st.tv && inGame) { // each team's sight, faintly in its own colour (pro team colours, else blue / orange)
     const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
     for (const sq of [0, 1]) {
@@ -2766,10 +2766,13 @@ function teamViewers(s, view, me, inGame) {
   if (!s || !me || !inGame) return vs;
   // an open hatch someone can see into shows a little of the room on the other side of it
   const m = st.map, sm = smokes(s), n = vs.length;
+  const body = view && view.kind === 'body' && me.a && !me.dn, sp = body && s.players.find(q => q.id === me.id);
+  const stance = sp && sp.pn ? 'prone' : sp && sp.cr ? 'crouch' : 'stand';
   for (const h of m.hatches || []) {
     if (m.tiles[h.cells[0]] !== T.HOLE) continue;
+    if (body) { const hv = hatchSight(m, h, view.x, view.y, stance); if (hv) vs.push(hv); } // your own eyes: only what the opening shows from where you are (drawHatchView)
     let up = false, down = false;
-    for (let i = 0; i < n; i++) { const v = vs[i]; if (!up && canSee(m, v, h.x, h.y, sm)) up = true; if (!down && canSee(m, v, h.bx, h.by, sm)) down = true; }
+    for (let i = body ? 1 : 0; i < n; i++) { const v = vs[i]; if (!up && canSee(m, v, h.x, h.y, sm)) up = true; if (!down && canSee(m, v, h.bx, h.by, sm)) down = true; }
     if (up) vs.push({ x: h.bx, y: h.by, ang: 0, fov: Math.PI * 2, range: 72, near: 72, kind: 'hatch' });
     if (down) vs.push({ x: h.x, y: h.y, ang: 0, fov: Math.PI * 2, range: 40, near: 40, kind: 'hatch' });
   }
@@ -2947,6 +2950,52 @@ function drawWindowView(s, me, now, view) {
   const L = ws.every(v => v.hole) ? '▼ GROUND · THROUGH A BULLET HOLE' : '▼ GROUND BELOW';
   octx.strokeText(L, P.x, P.y); octx.fillText(L, P.x, P.y);
   octx.restore();
+}
+// Through an open hatch (he asked: like the stairs, limited, and lying down shows more sideways): the other floor's
+// patch the opening lets you see (hatchSight), drawn where it really is under (or over) this floor, darker, with the
+// people and gadgets there your team sees. Your crosshair on it shoots through the hatch (server holeAim).
+function drawHatchView(s, me, now) {
+  const hs = (st.viewers || []).filter(v => v.mask);
+  if (!hs.length || !me) return;
+  const m = st.map, sm = smokes(s), R = st.rend, k = R.c.width / R.Wp, c = octx, side = me.tm;
+  for (const v of hs) {
+    const K = v.mask, o = v.o, fb = floorAt(m, v.x, v.y), P = visionPolygon(v, sm, 120);
+    const Q = [[K.x0, K.y0], [K.x1, K.y0], [K.x1, K.y1], [K.x0, K.y1]].map(([x, y]) => [K.ex + (x - K.ex) / K.f, K.ey + (y - K.ey) / K.f]);
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const [x, y] of Q) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W * CELL, x1); y1 = Math.min(m.H * CELL, y1);
+    if (x1 <= x0 || y1 <= y0) continue;
+    c.save(); c.translate(-o.x, -o.y);
+    c.beginPath(); c.moveTo(P[0], P[1]); for (let i = 2; i < P.length; i += 2) c.lineTo(P[i], P[i + 1]); c.closePath(); c.clip();
+    c.beginPath(); c.moveTo(Q[0][0], Q[0][1]); for (const [x, y] of Q.slice(1)) c.lineTo(x, y); c.closePath(); c.clip();
+    R.c.drawTo(c, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0);
+    const inBox = (x, y) => x >= x0 - 20 && x < x1 + 20 && y >= y0 - 20 && y < y1 + 20;
+    for (const e0 of s.ents) {
+      const e = interp(e0.id, 'ents') || e0, ally = e.tm === side;
+      if (!inBox(e.x, e.y) || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud' || floorAt(m, e.x, e.y) !== fb) continue;
+      if (!ally && (!teamSees(e.x, e.y) || TRAPS.has(e.ty))) continue;
+      if (e.ty === 'drone') drawDrone(c, { ...e, ag: e.ag || 0, wheel: 0, spd: 0, mvAng: e.ag || 0, sway: 0 }, now, ally);
+      else if (e.ty === 'cam') drawCam(c, e, now, ally);
+      else drawGadget(c, e, now, ally);
+    }
+    for (const sp of s.players) {
+      if (!sp.a || sp.sg || sp.id === me.id) continue;
+      const p = interp(sp.id, 'players'); if (!p || p.x === undefined || !inBox(p.x, p.y) || floorAt(m, p.x, p.y) !== fb) continue;
+      const ally = p.tm === side;
+      if (!ally && (p.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue;
+      const a = anim(p.id);
+      drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+      if (!ally && !p.dn) st.heads.push({ x: p.x - o.x, y: p.y - o.y });
+    }
+    c.fillStyle = 'rgba(8,10,14,0.32)'; c.fillRect(x0, y0, x1 - x0, y1 - y0); // a floor away: a little darker
+    c.restore();
+    const L = v.up ? '▼ BELOW' : '▲ ABOVE', T0 = w2s(v.up ? v.h.x : v.h.bx, v.up ? v.h.y : v.h.by);
+    octx.save(); octx.setTransform(1, 0, 0, 1, 0, 0);
+    octx.font = `700 ${Math.round(11 * DPR)}px Barlow, sans-serif`; octx.textAlign = 'center';
+    octx.fillStyle = 'rgba(255,255,255,0.7)'; octx.strokeStyle = 'rgba(0,0,0,0.8)'; octx.lineWidth = 3 * DPR;
+    const lx = T0.x, ly = T0.y - 22 * DPR; octx.strokeText(L, lx, ly); octx.fillText(L, lx, ly);
+    octx.restore();
+  }
 }
 // From the ground (he asked: attackers must be able to tell which upper windows may be watched): a small plate on the
 // ground under every upper outside window showing its state as your team last saw it from down there — boards intact,

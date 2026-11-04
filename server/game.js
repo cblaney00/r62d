@@ -1,8 +1,8 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
-import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN } from '../shared/map.js';
+import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
-import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
+import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
@@ -834,9 +834,10 @@ export class Game {
     const mx = p.x + Math.cos(aim) * (w.len + 6), my = p.y + Math.sin(aim) * (w.len + 6);
     for (let i = 0; i < w.pellets; i++) {
       const a = base + shotOffset(w, cone, i);
-      const into = this.aimedHatch(p, a); // aimed into a hatch: the bullet goes down (or up) there, not on across the room
+      const hole = this.holeAim(p); // aimed at a spot seen through an open hatch: the bullet goes down (or up) there
+      const into = !hole && this.aimedHatch(p, a); // aimed at a closed hatch from on top: shotguns and DMRs chew it
       const eye = leanPoint(this.map, p.x, p.y, p.aim, p.lo || 0); // a lean shoots from the tipped upper body
-      let end = this.hitscan(p, eye.x, eye.y, a, into ? into.ad : w.range, w.dmg * m.dmg, w.name, w.cls);
+      let end = hole ? this.shotThroughHole(p, eye, a, hole, w.range, w.dmg * m.dmg, w.name, w.cls) : this.hitscan(p, eye.x, eye.y, a, into ? into.ad : w.range, w.dmg * m.dmg, w.name, w.cls);
       if (into && end.k === 'none') this.shotThroughHatch(p, a, into, w.dmg * m.dmg, w.name, w.cls);
       else if (this.winCarry && end.k === 'none') end = this.shotOutWindow(p, eye, a, w.range, w.dmg * m.dmg, w.name, w.cls);
       this.winCarry = null;
@@ -1117,8 +1118,30 @@ export class Game {
     const ad = Math.hypot(p.aimX - p.x, p.aimY - p.y);
     if (ad > 260 || ad < 4) return null;
     const ax = p.x + Math.cos(ang) * ad, ay = p.y + Math.sin(ang) * ad, at = hatchAtPoint(this.map, ax, ay);
-    if (!at || (!at.up && this.map.tiles[at.h.cells[0]] !== T.HOLE)) return null;
+    if (!at || !at.up || this.map.tiles[at.h.cells[0]] === T.HOLE) return null;
     return { ...at, ad, ax, ay };
+  }
+  // Is the shooter's crosshair on a spot they see through an open hatch (hatchSight: the patch the opening shows, at
+  // their stance)? { v (the view), x, y (that spot on the other floor) } or null.
+  holeAim(p) {
+    const sa = this.shotAim; if (!sa || sa.x === undefined || sa.x === null) return null;
+    const stance = p.pr >= 1 ? 'prone' : p.input && p.input.crouch ? 'crouch' : 'stand';
+    for (const h of this.map.hatches || []) {
+      const v = hatchSight(this.map, h, p.x, p.y, stance); if (!v) continue;
+      const x = sa.x + v.o.x, y = sa.y + v.o.y;
+      if (canSee(this.map, v, x, y, this.smokeList())) return { v, x, y };
+    }
+    return null;
+  }
+  // The shot carries on from the opening on the other floor towards that spot, keeping its spread; it ends (for the
+  // tracer) where it lands as seen from here.
+  shotThroughHole(p, eye, ang, hole, range, dmg, wname, cls) {
+    const { v, x, y } = hole, sa = this.shotAim, aimA = Math.atan2(sa.y - eye.y, sa.x - eye.x);
+    const a2 = Math.atan2(y - v.y, x - v.x) + angDiff(ang, aimA);
+    this.shotAim = { x, y }; this.fromAbove = true;
+    const e = this.hitscan(p, v.x, v.y, a2, Math.min(range, Math.hypot(x - v.x, y - v.y) + 200), dmg, wname, cls);
+    this.fromAbove = false; this.shotAim = sa;
+    return { x: e.x - v.o.x, y: e.y - v.o.y, k: e.k };
   }
   // A shot out of an upper window (hitscan left this.winCarry where it left the window) carries on down on the ground
   // floor with what the boards left of it, from where the view down starts (windowFoot), towards the same aim point
@@ -2522,6 +2545,8 @@ export class Game {
     }
     if (blocked(nx, e.y)) { e.vx = -e.vx * 0.45; bounced = true; } else e.x = nx;
     if (blocked(e.x, ny)) { e.vy = -e.vy * 0.45; bounced = true; } else e.y = ny;
+    const hk = Math.floor(e.y / CELL) * this.map.W + Math.floor(e.x / CELL);
+    if (this.map.tiles[hk] === T.HOLE && this.map.hatchAt[hk] >= 0 && takeStairs(this.map, e)) { e.vx *= 0.35; e.vy *= 0.35; this.events.push({ e: 'snd', s: 'bounce', x: r1(e.x), y: r1(e.y) }); } // (he asked) it falls through an open hatch
     const f = Math.exp(-THROW_K * dt); e.vx *= f; e.vy *= f;
     e.flight += dt; if (!e.landed && (Math.hypot(e.vx, e.vy) < 20 || e.flight > 1.4)) e.landed = true;
     if (bounced && sp > 60) this.events.push({ e: 'snd', s: 'bounce', x: r1(e.x), y: r1(e.y) });

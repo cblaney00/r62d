@@ -3,11 +3,12 @@
 // at that spot on the other floor. Run: node tests/hatches.js
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
-import { MAP_LIST, buildMap, floorAt, roomAt } from '../shared/map.js';
+import { MAP_LIST, buildMap, floorAt, roomAt, hatchSight, stairGhost } from '../shared/map.js';
+import { los, canSee } from '../shared/physics.js';
 import { PHASE, T, CELL, TEAM, CELL_HP } from '../shared/constants.js';
 import { WEAPONS } from '../shared/operators.js';
 
-let fails = 0, total = 0;
+let fails = 0, total = 0, checked5 = 0;
 const fail = (...a) => { fails++; console.log('FAIL', ...a); };
 for (const id of MAP_LIST) {
   const m0 = buildMap(id);
@@ -57,6 +58,21 @@ for (const id of MAP_LIST) {
     gun.w = wk; atk.rc = 0; atk.adsT = 1; atk.bloom = 0; atk.vx = atk.vy = 0;
     for (let i = 0; i < 3 && def.hp === hp0; i++) g.fire(atk, gun, WEAPONS[wk]);
     if (def.hp === hp0) fail(tag, 'a shot into the hole did not hit the defender below');
+    // (he asked) only where the opening really shows: standing at the edge, someone 5 m out beyond it can't be seen or
+    // shot; lying at the edge shows them (a long thin strip)
+    const tx = h.bx + 5 * 36, tk = Math.floor(h.by / CELL) * g.map.W + Math.floor(tx / CELL);
+    if (g.map.tiles[tk] === T.FLOOR && los(g.map, h.bx, h.by, tx, h.by) && !stairGhost(g.map, tx, h.by)) { // (not by a staircase: they'd show up here too)
+      ready(def); def.x = tx; def.y = h.by; const hp2 = def.hp;
+      ready(atk); atk.x = h.x - 22; atk.y = h.y; atk.aim = 0; atk.aimX = h.x + 5 * 36; atk.aimY = h.y; atk.pr = 0; atk.input = { ...atk.input, crouch: 0 };
+      const vs = hatchSight(g.map, h, atk.x, atk.y, 'stand');
+      if (vs && canSee(g.map, vs, tx, h.by)) fail(tag, 'standing at the edge sees 5 m out below');
+      g.shotAim = { x: atk.aimX, y: atk.aimY }; const hs = g.holeAim(atk); g.shotAim = null;
+      if (hs) { g.shotAim = { x: atk.aimX, y: atk.aimY }; const ha = g.holeAim(atk); g.shotAim = null; fail(tag, 'standing at the edge can shoot 5 m out below', JSON.stringify({ ha: ha && [ha.v.h.id, h.id], hp: [hp2, def.hp], op: def.op, atkop: atk.op })); }
+      atk.pr = 1; atk.rc = 0; atk.shots = 0; atk.lastShot = -99; const vp = hatchSight(g.map, h, atk.x, atk.y, 'prone'); // (no recoil left from the shots above)
+      if (!vp || !canSee(g.map, vp, tx, h.by)) fail(tag, 'lying at the edge does not see 5 m out below');
+      else { for (let i = 0; i < 3 && def.hp === hp2; i++) g.fire(atk, gun, WEAPONS[wk]); if (def.hp === hp2) { g.shotAim = { x: atk.aimX, y: atk.aimY }; const ha = g.holeAim(atk); g.shotAim = null; const sh = ha && (g.shotAim = { x: atk.aimX, y: atk.aimY }, g.shotThroughHole(atk, atk, 0, ha, 2000, 30, 'T', 'AR')); g.shotAim = null; fail(tag, 'lying at the edge could not shoot someone 5 m out below', JSON.stringify({ sh, def: [def.x, def.y, def.hp, def.op, def.riot, def.prone, def.pr], ha: ha && [ha.v.h.id, ha.x | 0, ha.y | 0], t: [tx, h.by], fl: [floorAt(g.map, tx, h.by), floorAt(g.map, h.bx, h.by)], alive: def.alive })); } }
+      atk.pr = 0; checked5++;
+    }
     // and back up: from underneath, aiming at the hole hits someone at its edge upstairs
     ready(atk); atk.x = h.bx - 30; atk.y = h.by; atk.aimX = h.bx; atk.aimY = h.by;
     ready(def); def.x = h.x; def.y = h.y - 2; // standing right over the hole (would fall, but not moved here)
@@ -71,6 +87,6 @@ for (const id of MAP_LIST) {
   g2.explode({ x: h.x, y: h.y, team: TEAM.ATK, owner: p.id }, { r: 40, dmg: 0, cellR: 21, cells: [T.SOFT, T.BARRI, T.HATCH], kind: 'breach', at: h.cells[0] });
   if (g2.map.tiles[h.cells[0]] !== T.HOLE) fail(id, 'a breaching charge did not open a hatch');
 }
-console.log(`${total} hatches on ${MAP_LIST.length} maps`);
+console.log(`${total} hatches on ${MAP_LIST.length} maps, ${checked5} checked for the view through the opening`);
 console.log(fails ? `${fails} failure(s)` : 'PASS hatches');
 process.exit(fails ? 1 : 0);
