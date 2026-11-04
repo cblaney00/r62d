@@ -2,7 +2,7 @@
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
-import { stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
+import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, roundChat, tvTalk, tvBanPick } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
@@ -169,6 +169,7 @@ export class Game {
     if (m.t === 'input') {
       p.input = { ...EMPTY_INPUT, ...m.k };
       if (typeof m.a === 'number' && isFinite(m.a)) p.aim = m.a;
+      if ((p.slT > 0 || p.slR > 0) && p.ctrl === 'body') p.aim = p.slA + Math.max(-SLIDE.lock, Math.min(SLIDE.lock, angDiff(p.aim, p.slA))); // power slide: you can only aim forward until you are back up
       p.input.sa = p.aim; // sprinting goes by the aim the server knows
       if (p.ctrl === 'cam') { const c = this.feed(p); if (c && this.operates(p, c)) c.ang = c.wn === null || c.wn === undefined ? p.aim : c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(p.aim, c.wn))); } // a wall camera can't look into its wall
       if (typeof m.ax === 'number') { p.aimX = m.ax; p.aimY = m.ay; }
@@ -588,6 +589,7 @@ export class Game {
     const loud = p.spr && moved > BASE_SPEED ? SPRINT_LOUD : p.input.crouch || p.pr ? 0 : 320 * Math.max(0, Math.min(1, (moved / PX_PER_M - 1.45) / (M_S.run - 1.45)));
     p.moving = moved < 5 ? 0 : loud === SPRINT_LOUD ? 3 : loud < 60 ? 1 : 2;
     if (p.spr) p.gunUp = this.time + SPRINT_RAISE;
+    if (p.slT > 0) { p.gunUp = 0; if (!p.sliding) { p.sliding = true; this.noise(p.x, p.y, this.side(p), 420); this.events.push({ e: 'snd', s: 'slide', x: r1(p.x), y: r1(p.y), id: p.id }); } } else p.sliding = false; // you can shoot from the hip during a slide
     if (p.landed) { p.landed = false; if (!p.shrouded) this.noise(p.x, p.y, this.side(p), 220); this.events.push({ e: 'snd', s: 'land', x: r1(p.x), y: r1(p.y), id: p.id }); } // a landing thump
     if (loud >= 30 && !this.ghost(p) && !p.shrouded && this.time - (p.noiseT || 0) > 0.3) { p.noiseT = this.time; this.noise(p.x, p.y, this.side(p), loud); } // running footsteps (none from HUSH's shroud)
   }
@@ -629,7 +631,7 @@ export class Game {
     if (this.free && this.free.god !== false && !p.bot && p.sock && p.alive) this.godMode(p); // (only a real connected player, not the test harness)
     p.fireCd -= dt; p.meleeCd -= dt; p.turretCd = Math.max(0, (p.turretCd || 0) - dt);
     { const g = p.guns[p.slot], rate = (1 / (g ? adsTime(WEAPONS[g.w]) : 0.3)) * (this.time < (p.boostUntil || 0) ? 2 : 1) / (g ? g.m.ads : 1);
-      const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time) && !p.vault && !(p.recoverUntil > this.time);
+      const canAds = p.input.ads && p.ctrl === 'body' && !p.downed && !(p.slT > 0) && !(p.slR > 0) && p.reloadT <= 0 && !p.bracing && !(p.switchUntil > this.time) && !p.vault && !(p.recoverUntil > this.time);
       p.adsT = Math.max(0, Math.min(1, (p.adsT || 0) + (canAds ? dt * rate : -dt * rate * 1.6)));
       const idle = this.time - p.lastShot; // the crosshair drifts back after a burst; once the gun has settled the next shot is exact
       if (idle > 0.1) p.rc = (p.rc || 0) * Math.exp(-dt * 12);
@@ -2779,7 +2781,7 @@ export class Game {
         el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
         ct: p.ctrl, cf: this.tv && p.ctrl === 'cam' ? p.feedId : undefined, // ESPORTS TV: which camera they are looking through
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
-        gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch || p.pr ? 1 : 0, pn: p.pr >= 1 ? 1 : undefined, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
+        gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch || p.pr || p.slR > 0 ? 1 : 0, sd: p.slT > 0 ? 1 : undefined, pn: p.pr >= 1 ? 1 : undefined, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
         aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,
@@ -2791,7 +2793,7 @@ export class Game {
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur)] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
-        pp: p.prep ? [p.prep.mode === 'throw' ? 1 : 2, r2(Math.max(0, p.prep.until - this.time)), p.prep.dur] : undefined, m: this.mods(p), jp: [r2(p.air || 0), p.up ? 1 : 0, r2(p.jcd || 0), r1(p.lo || 0), r2(p.pr || 0)], vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined, df: p.deafUntil > this.time ? 1 : undefined, su: p.downed && SELF_UP.has(p.op) ? r2(p.selfUp / SELF_UP_TIME) : undefined, scd: p.shroudCd > this.time ? r1(p.shroudCd - this.time) : undefined,
+        pp: p.prep ? [p.prep.mode === 'throw' ? 1 : 2, r2(Math.max(0, p.prep.until - this.time)), p.prep.dur] : undefined, m: this.mods(p), jp: [r2(p.air || 0), p.up ? 1 : 0, r2(p.jcd || 0), r1(p.lo || 0), r2(p.pr || 0), r2(p.slT || 0), r2(p.slR || 0), r2(p.slA || 0), r2(p.scd || 0)], vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined, df: p.deafUntil > this.time ? 1 : undefined, su: p.downed && SELF_UP.has(p.op) ? r2(p.selfUp / SELF_UP_TIME) : undefined, scd: p.shroudCd > this.time ? r1(p.shroudCd - this.time) : undefined,
       }));
       return o;
     });

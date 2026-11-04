@@ -483,6 +483,7 @@ export function play(name, x, y) {
     case 'unsheathe': { const g = out(x, y, 0.55, 700, 0.15); if (!g) return; const t = ac.currentTime; noise(g, t, 0.35, 'highpass', 4200, 2, 0.7, 0.01, 7000); ring(g, t + 0.3, 3100, 0.25, 0.4); return; } // CROW's blade coming out
     case 'pin': { const g = out(x, y, 0.3, 380, 0.05); if (!g) return; const t = ac.currentTime; ring(g, t, 4200, 0.15, 0.12); noise(g, t + 0.05, 0.05, 'highpass', 5000, 1, 0.4); return; } // a pin pulled
     case 'setup': { const g = out(x, y, 0.25, 320, 0.05); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 3; i++) noise(g, t + i * 0.3, 0.08, 'bandpass', 1800, 2, 0.5); return; } // clicks of something being set down
+    case 'slide': { const g = out(x, y, 0.5, 520, 0.14); if (!g) return; const t = ac.currentTime; noise(g, t, 0.09, 'lowpass', 300, 1, 0.8); noise(g, t + 0.03, 0.55, 'bandpass', 1100, 0.7, 0.55, 0.05); return; } // a slide: a knee down, then the scrape
     case 'land': { const g = out(x, y, 0.45, 520, 0.15); if (!g) return; noise(g, ac.currentTime, 0.14, 'lowpass', 260, 1, 0.9); return; } // a jump's landing thump
     case 'vault': { foley('cloth', x, y); const g = out(x, y, 0.35, 380, 0.12); if (!g) return; const t = ac.currentTime; noise(g, t + 0.05, 0.14, 'lowpass', 600, 0.9, 0.6); noise(g, t + 0.45, 0.12, 'lowpass', 500, 1, 0.5); return; } // a hand on the ledge, then the landing
     case 'clamp': impact('metal', x, y); return foley('hurt', x, y);

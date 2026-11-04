@@ -5,7 +5,7 @@ import { pttDown, pttUp, pttSetState, pttVocab, pttTest, pttPreload, pttReady, s
 import { parseCommand } from '/shared/commands.js';
 import { openVoiceTest } from './voicetest.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
-import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
+import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
@@ -542,7 +542,7 @@ function reconcile() {
   if (st.predCtrl !== me.ct || st.predDid !== me.did) { st.predCtrl = me.ct; st.predDid = me.did; st.pending = []; }
   st.pending = st.pending.filter(i => i.s > me.ls);
   st.pred.x = pos.x; st.pred.y = pos.y; st.pred.vx = pos.vx || 0; st.pred.vy = pos.vy || 0; st.pred.gait = pos.gait || 0;
-  if (me.jp && me.ct !== 'drone') { st.pred.air = me.jp[0]; st.pred.up = !!me.jp[1]; st.pred.jcd = me.jp[2]; st.pred.lo = me.jp[3]; st.pred.pr = me.jp[4] || 0; }
+  if (me.jp && me.ct !== 'drone') { st.pred.air = me.jp[0]; st.pred.up = !!me.jp[1]; st.pred.jcd = me.jp[2]; st.pred.lo = me.jp[3]; st.pred.pr = me.jp[4] || 0; st.pred.slT = me.jp[5] || 0; st.pred.slR = me.jp[6] || 0; st.pred.slA = me.jp[7] || 0; st.pred.scd = me.jp[8] || 0; }
   const mods = me.m || {};
   for (const i of st.pending) stepMove(st.map, st.pred, i.k, i.dt, mods);
 }
@@ -669,8 +669,8 @@ function pressAction(a, e) {
   switch (a) {
     case 'reload': ev.push({ k: 'reload' }); break;
     case 'prone': st.prone = !st.prone; st.crouchT = false; break; // C lies down / gets up (he asked); Ctrl crouch or Space also gets up
-    case 'crouch': st.prone = false; break;
-    case 'crouchTap': st.crouchT = st.prone || !st.crouchT; st.prone = false; break; // one tap crouches, the next stands (he asked)
+    case 'crouch': if (trySlide()) break; st.prone = false; break;
+    case 'crouchTap': if (trySlide()) break; st.crouchT = st.prone || !st.crouchT; st.prone = false; break; // one tap crouches, the next stands (he asked)
     case 'sprint': if (st.me && st.me.ct === 'body') { st.prone = false; st.crouchT = false; st.leanT = 0; } break; // sprinting gets you up, like R6
     case 'primary': ev.push({ k: 'slot', n: 0 }); break;
     case 'secondary': ev.push({ k: 'slot', n: 1 }); break;
@@ -705,6 +705,10 @@ function pressAction(a, e) {
     case 'camPrev': case 'camNext': if (st.me && (st.me.ct === 'cam' || st.me.ct === 'drone')) ev.push({ k: a }); break;
   }
 }
+// Power slide: crouching while sprinting; until you are back up you can only aim within SLIDE.lock of the way you slide
+const sliding = () => st.pred && (st.pred.slT > 0 || st.pred.slR > 0) && st.me && st.me.ct === 'body' && !st.tv;
+const slideAim = a => st.pred.slA + Math.max(-SLIDE.lock, Math.min(SLIDE.lock, angDiff(a, st.pred.slA)));
+function trySlide() { if (!st.pred || !st.pred.spr || st.pred.scd > 0 || !st.me || st.me.ct !== 'body') return false; st.slideReq = performance.now(); return true; }
 // How much the movement keys are turned: Rotate view, Face aiming (W goes the way you face), sprint + W (he asked: where you aim).
 function moveTurn() {
   const body = st.me && st.me.ct === 'body';
@@ -1470,6 +1474,7 @@ function frame(nowMs) {
   // --- input & prediction ---
   pollPad(dt, view);
   setTouchVisible(playing() && !st.tv && !menuOpen() && !!st.me && $('pause').classList.contains('hidden')); // phone controls only while playing
+  if (sliding()) { padAng = wrapAng(slideAim(padAng)); const l = Math.hypot(aimOff.x, aimOff.y), a = slideAim(Math.atan2(aimOff.y, aimOff.x)); aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l }; }
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
   st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
   audio.setListenerRot(st.rot);
@@ -1484,6 +1489,7 @@ function frame(nowMs) {
   if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone')) {
     const c = cursor(), mw = screenToWorld(c.x, c.y);
     st.aim = Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x);
+    if (sliding()) st.aim = slideAim(st.aim);
     if (now < (st.dazeUntil || 0)) st.aim += Math.sin(now * 6.3) * 0.05 + Math.sin(now * 2.1) * 0.04; // dazed: the aim sways
   } else if (view && view.kind === 'cam') {
     if (st.lastCam !== view.cam.id) { // switching cameras: start from that camera's current direction
@@ -1652,7 +1658,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
   const k = {
     up: keys.has('up') || gpk.up ? 1 : 0, down: keys.has('down') || gpk.down ? 1 : 0, left: keys.has('left') || gpk.left ? 1 : 0, right: keys.has('right') || gpk.right ? 1 : 0,
-    walk: keys.has('walk') || gpk.walk ? 1 : 0, sprint: keys.has('sprint') && performance.now() >= (st.sprintHold || 0) ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch || st.crouchT ? 1 : 0, prone: st.prone && me && me.a && !me.dn ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
+    walk: keys.has('walk') || gpk.walk ? 1 : 0, sprint: keys.has('sprint') && performance.now() >= (st.sprintHold || 0) ? 1 : 0, slide: performance.now() - (st.slideReq ?? -1e9) < 120 ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch || st.crouchT ? 1 : 0, prone: st.prone && me && me.a && !me.dn ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
     lean: me && me.ct === 'body' ? leanNow() : 0, jump: performance.now() - (st.jumpReq || -1e9) < 120 ? 1 : 0,
   };
@@ -2042,7 +2048,7 @@ function draw(s, view, now, dt) {
       ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.arc(p.x, p.y, 15.5, 0, 7); ctx.stroke(); ctx.restore();
       ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     drawOperator(ctx, {
-      x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn,
+      x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn || p.sd, downed: p.dn,
       sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
     if (elv) ctx.restore();
@@ -2379,8 +2385,8 @@ function crosshair(me, now) {
     if (on) { ctx.fillStyle = 'rgba(255,59,59,0.22)'; ctx.fill(); }
   }
   const fq = aimMode === 'free' && padOn && !gpRecent() ? freeAimPoint() : null;
-  if (aimMode === 'face' && padOn && !gpRecent() && mouse.r && me.ct === 'body') { // aimed in: the narrow area you are locked to
-    const ca = st.faceC ?? padAng, R = Math.hypot(m.x - px, m.y - py);
+  if (sliding() || (aimMode === 'face' && padOn && !gpRecent() && mouse.r && me.ct === 'body')) { // aimed in (Face) or sliding: the narrow area you are locked to
+    const ca = sliding() ? st.pred.slA : st.faceC ?? padAng, R = Math.hypot(m.x - px, m.y - py);
     ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1 * DPR;
     ctx.beginPath(); ctx.arc(px, py, R, ca - FACE_ADS, ca + FACE_ADS); ctx.stroke();
     for (const e of [ca - FACE_ADS, ca + FACE_ADS]) { const q = 7 * DPR; ctx.beginPath(); ctx.moveTo(px + Math.cos(e) * (R - q), py + Math.sin(e) * (R - q)); ctx.lineTo(px + Math.cos(e) * (R + q), py + Math.sin(e) * (R + q)); ctx.stroke(); }
@@ -3097,6 +3103,7 @@ function updateCard() {
 const TIPS = [
   'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',
   'Walk ({walk}) or crouch ({crouch}) to move without footsteps — just like CS2.',
+  'Crouch while sprinting to power slide. You can only shoot forward from the hip until you are back up.',
   'Hold sprint and forward to run where you aim, whichever way the screen faces. It is very loud, and your gun takes a moment to come up.',
   'Stop before you shoot: running ruins your accuracy. Crouching still is the most accurate.',
   'Broken glass under windows crunches loudly — listen for it.',

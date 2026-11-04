@@ -113,6 +113,8 @@ export const M_S = { sprint: 4.2, run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, pr
 export const PRONE_T = 0.3;
 export const isProne = o => (o.pr || 0) >= 1;
 export const JUMP_T = 0.42, LEAN_PX = 6, LEAN_SPEED = 40; // a hop's airtime (s); how far and fast a lean moves you (px, px/s)
+// Power slide (he asked, like CoD but less drastic): crouch while sprinting. t = sliding, up = getting back up (aim stays locked till then), lock = aim either side of the slide, cd = from start to the next slide, speeds in m/s
+export const SLIDE = { t: 0.65, up: 0.35, lock: 15 * Math.PI / 180, cd: 2.5, start: 4.6, end: 1.4 };
 export const BASE_SPEED = M_S.run * PX_PER_M;   // ~94 px/s (was 118)
 export const DRONE_SPEED = M_S.drone * PX_PER_M; // ~115 px/s (was 200)
 export const ARMOR_SPEED = { 1: 0.88, 2: 1.0, 3: 1.14 };
@@ -137,6 +139,11 @@ export function stepMove(map, o, input, dt, mods) {
   else if (mods.drone) spd = DRONE_SPEED * (mods.sprint ? DRONE_SPRINT.mul : 1);
   else {
     spd = BASE_SPEED * (ARMOR_SPEED[mods.armor] || 1) * (mods.mul || 1);
+    o.scd = Math.max(0, (o.scd || 0) - dt);
+    if (mods.downed || mods.rope) o.slT = o.slR = 0;
+    if (input.slide && o.spr && !o.scd && !mods.downed && !mods.frozen && !mods.rope && !(o.air > 0) && !o.up) { o.slT = SLIDE.t; o.slR = 0; o.slA = Math.atan2(o.vy || 0, o.vx || 0); o.scd = SLIDE.cd; }
+    else if (o.slT > 0) { o.slT -= dt; if (o.slT <= 0) { o.slT = 0; o.slR = SLIDE.up; } }
+    else if (o.slR > 0) o.slR = Math.max(0, o.slR - dt);
     if (mods.downed) spd = M_S.downed * PX_PER_M;
     else if (input.prone || o.pr > 0) spd *= M_S.prone / M_S.run; // lying down (or getting down / up): a crawl
     else if (input.crouch) spd *= M_S.crouch / M_S.run; // crouch: slowest, silent, most accurate
@@ -145,8 +152,10 @@ export function stepMove(map, o, input, dt, mods) {
     else if (input.ads) spd *= M_S.ads * (mods.ga || 1) / M_S.run; // aiming in: the gun's own pace; holding Shift too adds nothing (he asked)
     else if (input.walk) spd *= M_S.walk * (mods.gw || 1) / M_S.run; // walk (Shift): silent, the gun's own pace
     // sprint (he asked, like R6): only the way you aim, only on your feet with nothing else going on; the server keeps your gun down meanwhile
-    o.spr = !!input.sprint && len > 0 && !mods.ns && !mods.downed && !mods.rope && !input.prone && !(o.pr > 0) && !input.crouch && !input.lean && !o.up && !input.ads && !input.walk && !input.fire && mx * Math.cos(input.sa || 0) + my * Math.sin(input.sa || 0) > 0.5;
+    o.spr = !!input.sprint && len > 0 && !mods.ns && !mods.downed && !mods.rope && !(o.slT > 0) && !(o.slR > 0) && !input.prone && !(o.pr > 0) && !input.crouch && !input.lean && !o.up && !input.ads && !input.walk && !input.fire && mx * Math.cos(input.sa || 0) + my * Math.sin(input.sa || 0) > 0.5;
     if (o.spr) spd *= M_S.sprint / M_S.run;
+    if (o.slR > 0) spd = Math.min(spd, M_S.crouch * PX_PER_M); // getting back up
+    if (o.slT > 0 && !mods.frozen) { mx = Math.cos(o.slA); my = Math.sin(o.slA); spd = (SLIDE.end + (SLIDE.start - SLIDE.end) * (o.slT / SLIDE.t)) * PX_PER_M * (ARMOR_SPEED[mods.armor] || 1); } // carried along, the keys do nothing
   }
   // Weight: velocity eases toward where you want to go instead of jumping there.
   o.vx = o.vx || 0; o.vy = o.vy || 0;
@@ -156,7 +165,7 @@ export function stepMove(map, o, input, dt, mods) {
     s = Math.max(R.a, Math.min(R.b, s + (mx * R.tx + my * R.ty) * M_S.rope * PX_PER_M * dt));
     o.x = R.x + R.tx * s; o.y = R.y + R.ty * s; o.vx = 0; o.vy = 0; return false;
   }
-  const accel = mods.drone ? (mods.sprint ? 1100 : 800) : len > 0 ? 500 : 760; // eased down with the slower speeds: same sense of weight
+  const accel = o.slT > 0 ? 3000 : mods.drone ? (mods.sprint ? 1100 : 800) : len > 0 ? 500 : 760; // eased down with the slower speeds: same sense of weight
   let dvx = mx * spd - o.vx, dvy = my * spd - o.vy;
   const dl = Math.hypot(dvx, dvy), maxd = accel * dt;
   if (dl > maxd) { dvx *= maxd / dl; dvy *= maxd / dl; }
@@ -175,7 +184,7 @@ export function stepMove(map, o, input, dt, mods) {
     o.jcd = Math.max(0, (o.jcd || 0) - dt);
     const down = !!input.prone && !mods.downed && !o.up && !(o.air > 0); // no lying down while downed, in the air or up on furniture
     o.pr = Math.max(0, Math.min(1, (o.pr || 0) + (down ? dt : -dt) / PRONE_T)); if (!o.pr) delete o.pr;
-    if (input.jump && !(o.air > 0) && !o.jcd && !mods.downed && !input.crouch && !o.pr) { o.air = JUMP_T; o.jcd = JUMP_T + 0.35; }
+    if (input.jump && !(o.air > 0) && !o.jcd && !mods.downed && !input.crouch && !o.pr && !(o.slT > 0)) { o.air = JUMP_T; o.jcd = JUMP_T + 0.35; }
   }
   const wasAir = o.air > 0;
   moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? DRONE_R : PLAYER_R, mods.bird ? 'bird' : !!mods.drone, !mods.drone && (wasAir || !!o.up));
@@ -194,7 +203,7 @@ export function stepMove(map, o, input, dt, mods) {
     if (Math.abs(ax) < Math.abs(o.vx) - 1) o.vx = ax;
     if (Math.abs(ay) < Math.abs(o.vy) - 1) o.vy = ay;
   }
-  return len > 0;
+  return len > 0 || o.slT > 0;
 }
 
 // Walking off the end of a staircase puts you on the same spot of the other floor.
