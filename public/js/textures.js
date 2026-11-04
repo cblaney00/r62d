@@ -185,6 +185,21 @@ function grass(P) {
 }
 
 // packed desert sand: warm ochre with soft drifts, ripples and grit
+function snow(P) {
+  const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(131);
+  x.scale(TEX, TEX);
+  x.fillStyle = '#dde5ea'; x.fillRect(0, 0, P, P);
+  for (let i = 0; i < 18; i++) {
+    const bx = r() * P, by = r() * P, br = 12 + r() * 30, blue = r() < 0.6;
+    wrap(P, (ox, oy) => {
+      const g = x.createRadialGradient(bx + ox, by + oy, 0, bx + ox, by + oy, br);
+      g.addColorStop(0, blue ? 'rgba(150,175,200,0.2)' : 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = g; x.fillRect(bx + ox - br, by + oy - br, br * 2, br * 2);
+    });
+  }
+  x.fillStyle = 'rgba(255,255,255,0.6)'; for (let i = 0; i < 90; i++) x.fillRect(r() * P, r() * P, 0.6, 0.6);
+  return c;
+}
 function sand(P) {
   const c = canvas(P * TEX, P * TEX), x = c.getContext('2d'), r = rng(97);
   x.scale(TEX, TEX);
@@ -231,7 +246,7 @@ export function floorPatterns(ctx) {
   if (!cache) cache = {
     [FL.WOOD]: wood(128), [FL.TILE]: tile(64, '#c4cbcf', 16, '#7d8589'), [FL.SERVER]: serverFloor(64),
     [FL.MARBLE]: marble(128), [FL.CARPET]: carpet(64), [FL.CONCRETE]: concrete(128),
-    [FL.GRASS]: grass(128), [FL.ASPHALT]: asphalt(128), [FL.SAND]: sand(128),
+    [FL.GRASS]: grass(128), [FL.ASPHALT]: asphalt(128), [FL.SAND]: sand(128), [FL.SNOW]: snow(128),
   };
   const out = {};
   for (const [k, c] of Object.entries(cache)) {

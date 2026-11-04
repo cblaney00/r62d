@@ -6,6 +6,7 @@
 // Maps are written in one shared "building frame": cell (x, y) means the same spot on every floor,
 // so a stairwell or a room stacked above another uses the same numbers on both floors.
 import { T, FL, MAT, CELL, CELL_HP, UNDER_KINDS } from './constants.js';
+import { coverKinds, dressOutdoors } from './outdoors.js';
 import { polyIn } from './physics.js';
 
 // Clip a convex polygon [[x, y], ...] to a box; returns the part inside (wound so physics' outward normals work), or null.
@@ -435,7 +436,7 @@ export function makeMap({ id, name, floors }) {
       for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) tiles[y * W + x] = T.TALL;
       return true;
     };
-    const kinds = ['van', 'container'], s0 = src[best];
+    const kinds = coverKinds(id, s.name), s0 = src[best];
     if (s0 >= 0) {
       const tx = s0 % W - bx, ty = ((s0 / W) | 0) - by; slab(tx, ty, kinds[i % 2]);
       const ax = spawnGeo.mx - bx, ay = spawnGeo.my - by, ang = Math.abs(Math.atan2(tx * ay - ty * ax, tx * ax + ty * ay));
@@ -488,11 +489,13 @@ export function makeMap({ id, name, floors }) {
     placeHatches(extra && extra.sites);
     padGround();
     if (extra && extra.atkSpawns) extra.atkSpawns = extra.atkSpawns.map((s, i) => coverSpawn(s, i));
+    const gf = fl.find(f => f.ground);
+    const outdoors = extra && extra.atkSpawns && spawnGeo ? dressOutdoors({ id, W, tiles, floor, props, decor, spawns: extra.atkSpawns, gf, dist: spawnGeo.dist, src: spawnGeo.src, open: k => flAt[k] === gf.i && tiles[k] === T.GROUND && !propAt(k) }) : null;
     const under = new Uint8Array(N); // cells of furniture with a gap underneath (UNDER_KINDS)
     for (const p of props) if (UNDER_KINDS.has(p.kind)) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) under[y * W + x] = 1;
     return {
       id, name, W, H, tiles, floor, mat, hp, holes: {}, openId, dhole, props, openings, rooms, portal, flAt, stairs, decor, shape, shapeSide, shapeFill,
-      hatches, hatchAt, hatchBelow, win, hardened, under,
+      hatches, hatchAt, hatchBelow, win, hardened, under, outdoors,
       floors: fl.map(f => ({ name: f.name, i: f.i, gx: f.gx, w: f.w, h: f.h, x0: f.x0, y0: f.y0 })),
       ...extra,
     };

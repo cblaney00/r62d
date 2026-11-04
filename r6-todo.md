@@ -6,13 +6,16 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked again: this computer lets port 6262 in and the game listens on every network. Two things left, neither in the game: Lando's homelab firewall has to pass port 6262 to 10.10.0.5, and this computer's VPN setup only accepts traffic from the NAS and Lando's two gaming-pc VPN addresses, so another machine on his LAN is also dropped unless his firewall makes it look like one of those or the list grows) (2026-11-03: nothing left to do in the game; written up for Lando in docs/for-lando-lan-hosting.md, stays open until he has done it and it is tried)
 - [ ] try push to talk on screen with a real microphone (needs him at the computer: hold X in a match and talk)
 - [ ] the mix input needs more work, its not understand me enough (recorded test voices now understood 93% of the time; still needs trying with his real voice. What it hears is saved as words only in mic-log.txt in the game's data, so a session can tune it to him)
-- [ ] put this on the lando to do list (note is ready in docs/for-lando-lan-hosting.md; his list is in the computer setup, so it goes on through `vibe`, "Change or fix something on your computer")
+- [ ] some of these might already have been done or worked on so check them as done if that seems to be the case or if another list is handling it already
 
 ## Done
 
+- [x] complete the outdoor sections for the maps based on the theme you wrote for each spawn point (he chose: solid cover. All 33 spawns have their own scene: ski lift with hut and snowcat, school buses at the bus stop, wagons on rails in the rail yard, market tents, a tunnel mouth and so on; Alpine Lodge now stands in snow; each map also has its own edge of the world and scattered trees, rocks or barrels on the added ground)
+- [x] add a random map choice function in the play menu (RANDOM card in the lobby: the map is a surprise until the match starts and differs from the last one; Free Play has the card too)
+- [x] get hosting when connecting to lando's vpn working so that lando can join from his LAN (on Lando's list now, so ticked here: he opened the firewall for his two gaming-pc addresses and wrote runbook 15, a task for this computer's VPN, which he reaches at http://10.10.0.5:6262. Not yet tried end to end)
+- [x] put this on the lando to do list (done: pull request 281 on his repo adds it to his TASKS.md, waiting for him to merge)
 - [x] fix play.sh so lando can play it on his computer from this repo (a fresh copy now runs with `./play.sh` on any Linux computer: it uses Node if the computer has it, else fetches it with Nix, and opens Firefox, or your usual browser if there is no Firefox. Tested on this computer from clean copies set up like another computer; not yet tried on his)
 - [x] make the aim reticle reset to the orange contact point when ADSing (if a wall stops your bullets before the crosshair, aiming in now puts the crosshair right on that spot; with nothing in the way it still goes to the usual distance for your sight)
 - [x] the killcam suggestions cannot just flash, it should be red but not flashing (found it: the button was being switched on and off ten times a second; watched in a real match, now steady the whole time; he then asked for a less aggressive colour, so it is a dark panel with a soft red edge)

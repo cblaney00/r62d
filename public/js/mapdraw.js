@@ -3,6 +3,7 @@
 import { CELL, T, FL, MAT, CELL_HP } from '/shared/constants.js';
 import { S, floorPatterns, hash, shade, canvas } from './textures.js';
 import { polyIn } from '/shared/physics.js';
+import { drawOutProp } from './outprops.js';
 
 const SOLID = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL]);
 const WALLISH = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.BARRI]);
@@ -907,5 +908,6 @@ export function drawProp(ctx, p, m) {
       ctx.fillStyle = '#c33'; for (let i = 0; i < W; i += 16) ctx.fillRect(X + i, Y + 4, 6, 2);
       break;
     }
+    default: drawOutProp(ctx, p, X, Y, W, H, h);
   }
 }

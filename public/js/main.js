@@ -361,17 +361,20 @@ setInterval(() => { if (!$('tab-tv').classList.contains('on') && $('playbookPage
 $('tvGo').onclick = () => switchMatch(null, null, { map: tvPick.map === 'random' ? null : tvPick.map, level: tvPick.level, req: tvPick.req.slice() });
 // ---------------- free play page ----------------
 // Pick a map and how many enemy bots, then play alone with no clock, switching operator with N / B.
+const RANDOM_CARD = '<div class="tvRandom">?</div><b>RANDOM</b><span>a surprise</span>';
 const freePick = { map: 'harbor', bots: 0, level: 2 };
 try { Object.assign(freePick, JSON.parse(localStorage.getItem('r62d-free') || '{}')); } catch {}
-if (!MAPS[freePick.map]) freePick.map = 'harbor';
+if (!MAPS[freePick.map] && freePick.map !== 'random') freePick.map = 'harbor';
 function renderFree() {
   const el = $('freeMaps');
-  if (!el.children.length) for (const id of MAP_LIST) {
+  if (!el.children.length) for (const id of ['random', ...MAP_LIST]) {
     const M = MAPS[id], b = document.createElement('button');
-    b.dataset.id = id; b.title = M.desc;
+    b.dataset.id = id;
+    b.onclick = () => { audio.ui(); freePick.map = id; renderFree(); };
+    if (id === 'random') { b.innerHTML = RANDOM_CARD; el.appendChild(b); continue; }
+    b.title = M.desc;
     b.appendChild(mapThumb(id).cloneNode()); b.querySelector('canvas').getContext('2d').drawImage(mapThumb(id), 0, 0);
     b.insertAdjacentHTML('beforeend', `<b>${esc(M.name)}</b><span>${esc(M.floors)}</span>`);
-    b.onclick = () => { audio.ui(); freePick.map = id; renderFree(); };
     el.appendChild(b);
   }
   for (const b of el.children) b.classList.toggle('on', b.dataset.id === freePick.map);
@@ -382,7 +385,7 @@ for (const b of $('freeBots').children) b.onclick = () => { audio.ui(); freePick
 for (const b of $('freeLevel').children) b.onclick = () => { audio.ui(); freePick.level = +b.dataset.lv; renderFree(); };
 $('freeGo').onclick = () => {
   try { localStorage.setItem('r62d-free', JSON.stringify(freePick)); } catch {}
-  switchMatch(null, { ...freePick });
+  switchMatch(null, { ...freePick, map: freePick.map === 'random' ? MAP_LIST[Math.floor(Math.random() * MAP_LIST.length)] : freePick.map });
 };
 
 function loadMap(mv, tiles, hp, id, holes) {
@@ -949,7 +952,7 @@ function mapThumb(id) {
   if (mapThumbs.has(id)) return mapThumbs.get(id);
   const m = buildMap(id), F = m.floors.find(f => f.name === '1F') || m.floors[0];
   const c = document.createElement('canvas'); c.width = F.w * 3; c.height = F.h * 3; const x = c.getContext('2d');
-  const FC = { [FL.GRASS]: '#33502c', [FL.ASPHALT]: '#2c2e31', [FL.WOOD]: '#7a5534', [FL.TILE]: '#9aa2a6', [FL.CARPET]: '#4a5a78', [FL.CONCRETE]: '#6d6d68', [FL.MARBLE]: '#c7c2b8', [FL.SERVER]: '#3d4650', [FL.SAND]: '#c9a66b' };
+  const FC = { [FL.SNOW]: '#c9d4da', [FL.SAND]: '#a98c5c', [FL.GRASS]: '#33502c', [FL.ASPHALT]: '#2c2e31', [FL.WOOD]: '#7a5534', [FL.TILE]: '#9aa2a6', [FL.CARPET]: '#4a5a78', [FL.CONCRETE]: '#6d6d68', [FL.MARBLE]: '#c7c2b8', [FL.SERVER]: '#3d4650', [FL.SAND]: '#c9a66b' };
   for (let y = 0; y < F.h; y++) for (let gx = F.gx; gx < F.gx + F.w; gx++) {
     const k = y * m.W + gx, t = m.tiles[k];
     x.fillStyle = t === T.HARD || t === T.SOFT ? '#d8d2c4' : t === T.TALL ? '#22262a' : t === T.OPEN ? '#e0b54a' : t === T.STAIR ? '#f2c14e' : FC[m.floor[k]] || '#111';
@@ -958,18 +961,22 @@ function mapThumb(id) {
   mapThumbs.set(id, c); return c;
 }
 function renderMapPick(s) {
-  const el = $('mapPick'), key = s.mp + ':' + (s.ph === PHASE.LOBBY);
+  const el = $('mapPick'), key = s.mp + ':' + (s.ph === PHASE.LOBBY) + ':' + s.rm;
   if (el.dataset.k === key) return;
   el.dataset.k = key; el.innerHTML = '';
+  const rnd = document.createElement('button');
+  rnd.className = s.rm ? 'on' : ''; rnd.innerHTML = RANDOM_CARD;
+  rnd.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'map', id: 'random' }); };
+  el.appendChild(rnd);
   for (const id of MAP_LIST) {
     const M = MAPS[id], b = document.createElement('button');
-    b.className = id === s.mp ? 'on' : ''; b.title = M.desc;
+    b.className = id === s.mp && !s.rm ? 'on' : ''; b.title = M.desc;
     b.appendChild(mapThumb(id).cloneNode()); b.querySelector('canvas').getContext('2d').drawImage(mapThumb(id), 0, 0);
     b.insertAdjacentHTML('beforeend', `<b>${esc(M.name)}</b><span>${esc(M.floors)}</span>`);
     b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'map', id }); };
     el.appendChild(b);
   }
-  $('lobbyHint').textContent = `${MAPS[s.mp] ? MAPS[s.mp].name + ' · ' + MAPS[s.mp].desc + ' · ' : ''}First to 3 rounds · Sides swap every round`;
+  $('lobbyHint').textContent = `${s.rm ? 'Random map: a surprise until the match starts · ' : MAPS[s.mp] ? MAPS[s.mp].name + ' · ' + MAPS[s.mp].desc + ' · ' : ''}First to 3 rounds · Sides swap every round`;
 }
 function renderLobby(s) {
   renderControls(); renderMapPick(s);
@@ -1715,7 +1722,7 @@ const smokeMemo = new WeakMap();
 const smokes = s => { if (!s) return []; let v = smokeMemo.get(s); if (!v) smokeMemo.set(s, v = s.ents.filter(e => e.ty === 'smoke').flatMap(e => e.pf ? Array.from({ length: e.pf.length / 2 }, (_, i) => ({ x: e.pf[i * 2], y: e.pf[i * 2 + 1], r: e.r })) : [{ x: e.x, y: e.y, r: e.r }])); return v; };
 
 // ---------------- what things are made of (for sound) ----------------
-const FLOOR_SURF = { [FL.WOOD]: 'wood', [FL.TILE]: 'tile', [FL.SERVER]: 'metal', [FL.MARBLE]: 'marble', [FL.CARPET]: 'carpet', [FL.CONCRETE]: 'concrete', [FL.GRASS]: 'grass', [FL.ASPHALT]: 'asphalt', [FL.SAND]: 'grass' };
+const FLOOR_SURF = { [FL.SNOW]: 'grass', [FL.WOOD]: 'wood', [FL.TILE]: 'tile', [FL.SERVER]: 'metal', [FL.MARBLE]: 'marble', [FL.CARPET]: 'carpet', [FL.CONCRETE]: 'concrete', [FL.GRASS]: 'grass', [FL.ASPHALT]: 'asphalt', [FL.SAND]: 'grass' };
 function cellAt(x, y) { const m = st.map, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return cx < 0 || cy < 0 || cx >= m.W || cy >= m.H ? -1 : cy * m.W + cx; }
 function surfaceAt(x, y) {
   const k = cellAt(x, y); if (k < 0) return 'concrete';
@@ -1755,7 +1762,7 @@ audio.setWorld(
     });
     return Math.min(3, Math.ceil(n / 1.5));
   },
-  (x, y) => { const k = cellAt(x, y); return k >= 0 && st.map && st.map.floor[k] !== FL.GRASS && st.map.floor[k] !== FL.ASPHALT && st.map.floor[k] !== FL.SAND; },
+  (x, y) => { const k = cellAt(x, y); return k >= 0 && st.map && st.map.floor[k] !== FL.GRASS && st.map.floor[k] !== FL.ASPHALT && st.map.floor[k] !== FL.SAND && st.map.floor[k] !== FL.SNOW; },
   (x, y) => (st.map ? localPos(st.map, x, y) : { x, y }),
 );
 

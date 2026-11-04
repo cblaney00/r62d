@@ -56,7 +56,7 @@ export const T = {
 
 // Floor looks
 export const FL = {
-  GRASS: 0, ASPHALT: 1, WOOD: 2, TILE: 3, CARPET: 4, CONCRETE: 5, MARBLE: 6, SERVER: 7, VOID: 8, SAND: 9, // SAND: the desert town (Dust Town)
+  GRASS: 0, ASPHALT: 1, WOOD: 2, TILE: 3, CARPET: 4, CONCRETE: 5, MARBLE: 6, SERVER: 7, VOID: 8, SAND: 9, SNOW: 10, // SAND: the desert town (Dust Town); SNOW: round the Alpine Lodge
 };
 
 // Wall materials (for drawing)

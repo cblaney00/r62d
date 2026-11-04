@@ -59,6 +59,7 @@ export class Game {
     this.timer = 0; this.round = 0; this.score = [0, 0]; this.time = 0;
     this.mapId = 'harbor';
     this.map = buildMap(this.mapId);
+    this.randomMap = false; // RANDOM in the lobby (he asked): a surprise map rolled when the match starts
     this.mapVersion = 0;
     this.site = 0; this.siteRevealed = false; this.planted = null;
     this.spots = { atk: new Map(), def: new Map() };
@@ -186,7 +187,16 @@ export class Game {
       else if (m.a === 'switch') this.switchSquad(p);
       else if (m.a === 'ranked' && this.phase === PHASE.LOBBY) { this.ranked = !!m.on; if (this.ranked) this.rankedLevel(); this.msg(this.ranked ? `${p.name} switched on RANKED: bots play at the lobby's rank (${BOT_LEVELS[this.botLevel]})` : `${p.name} switched ranked off`); }
       else if (m.a === 'botLevel' && !this.ranked && BOT_LEVELS[m.lv] && m.lv !== this.botLevel) { this.botLevel = m.lv; assignPros(this); this.msg(m.lv === PRO_LEVEL ? `${p.name} brought in the pro teams: Northwind and Ironclad Collective` : `${p.name} set the bot skill to ${BOT_LEVELS[m.lv]}`); }
-      else if (m.a === 'map' && this.phase === PHASE.LOBBY && MAPS[m.id] && m.id !== this.mapId) {
+      else if (m.a === 'map' && this.phase === PHASE.LOBBY && m.id === 'random') {
+        if (!this.randomMap) this.msg(`${p.name} chose a random map: it stays a surprise until the match starts`);
+        this.randomMap = true;
+      }
+      else if (m.a === 'map' && this.phase === PHASE.LOBBY && MAPS[m.id] && m.id === this.mapId) {
+        if (this.randomMap) this.msg(`${p.name} chose the map ${MAPS[m.id].name}`);
+        this.randomMap = false;
+      }
+      else if (m.a === 'map' && this.phase === PHASE.LOBBY && MAPS[m.id]) {
+        this.randomMap = false;
         this.mapId = m.id; this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
         this.msg(`${p.name} chose the map ${MAPS[m.id].name}`);
       }
@@ -284,6 +294,7 @@ export class Game {
   }
   startMatch() {
     if (this.players.size === 0) return;
+    if (this.randomMap) { const list = MAP_LIST.filter(k => k !== this.mapId); this.mapId = list[Math.floor(Math.random() * list.length)]; this.map = buildMap(this.mapId); }
     if (this.ranked) { this.rankedLevel(); for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); } // empty slots on both teams: bots at that rank
     assignPros(this); this.proState = {}; this.proLast = {}; this.proLog = [];
     this.score = [0, 0]; this.round = 0; // round 1: squad 0 attacks (the tutorial: you attack, then defend)
@@ -2803,7 +2814,7 @@ export class Game {
     const spots = { atk: [...this.spots.atk.keys()], def: [...this.spots.def.keys()] };
     const common = JSON.stringify({
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
-      ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId,
+      ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId, rm: this.randomMap ? 1 : 0,
       site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       tvl: this.tv ? this.botLevel : undefined, bn: this.tv && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
       bq: this.tv && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, this.banRun.t - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,

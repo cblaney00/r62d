@@ -1,5 +1,7 @@
 # For Lando's list: joining Blaney's R62D from Lando's LAN
 
+**Update 2026-11-03:** Lando has since opened TCP 6262 on optiplex-fw for his two gaming-pc addresses and wants it kept to those, so the steps below are out of date. The live task is runbook 15 in the config repo (`docs/runbooks/blaney/15-r62d-host-for-lando.md`): he joins at `http://10.10.0.5:6262`.
+
 Blaney hosts R62D on blaney-pc over the homelab VPN. Lando wants to join from a machine on his LAN.
 Nothing in the game is in the way. Checked 2026-11-03:
 
