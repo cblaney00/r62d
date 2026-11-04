@@ -137,7 +137,8 @@ const mouse = { x: 0, y: 0, l: false, r: false, wl: 0, wr: 0 };
 // A controller's right stick always aims like the pad (see gamepad.js).
 // "Rotate" (spin): like an FPS — the view turns with you so you always face up the screen; mouse left/right turns,
 // up/down sets how far ahead the crosshair sits, and W always walks up the screen (k.rot turns the keys).
-const AIM_MODES = ['free', 'spin', 'pad', 'turn', 'cursor'];
+const AIM_MODES = ['free', 'face', 'spin', 'pad', 'turn', 'cursor'];
+const FACE_ADS = 15 * Math.PI / 180; // Face aiming (he asked): aiming in keeps you within 15° either side of where you faced
 let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return localStorage.getItem('r62d-aim2') && AIM_MODES.includes(m) ? m : 'free'; } catch { return 'free'; } })();
 // Crosshair mode: where the crosshair sits from your character, in WORLD pixels. It can go anywhere you can see
 // (he asked: a marksman must be able to headshot down a long sightline, not only inside the room): pushing it past
@@ -187,6 +188,13 @@ function padMove(dx, dy) { // a captured-mouse move, in screen pixels, applied t
 function turnMove(dx, dy) {
   padAng = wrapAng(padAng + dx * 0.004);
   padReach = Math.max(0, Math.min(1, padReach - dy / (VH * 0.45)));
+}
+function faceMove(dx, dy, ads) { // Face aiming: the mouse turns your character; aiming in locks you to a narrow area until you let go
+  if (!ads) { st.faceC = null; turnMove(dx, dy); return; }
+  if (st.faceC === null || st.faceC === undefined) st.faceC = padAng;
+  turnMove(Math.max(-300, Math.min(300, dx)), dy); // one move can't wrap past the far side of the lock
+  const off = wrapAng(padAng - st.faceC);
+  if (Math.abs(off) > FACE_ADS) padAng = wrapAng(st.faceC + Math.sign(off) * FACE_ADS);
 }
 // controller state (merged with the keyboard and mouse in sendInput)
 const gpk = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0 };
@@ -697,10 +705,16 @@ function pressAction(a, e) {
     case 'camPrev': case 'camNext': if (st.me && (st.me.ct === 'cam' || st.me.ct === 'drone')) ev.push({ k: a }); break;
   }
 }
+// How much the movement keys are turned: Rotate view, Face aiming (W goes the way you face), sprint + W (he asked: where you aim).
+function moveTurn() {
+  const body = st.me && st.me.ct === 'body';
+  if (body && !gpRecent() && (aimMode === 'face' || (keys.has('sprint') && keys.has('up')))) return st.aim + Math.PI / 2;
+  return -(st.rot || 0);
+}
 // Vaulting goes the way you're moving, or where you look when standing still.
 function vaultDir() {
   const mx = (keys.has('right') || gpk.right ? 1 : 0) - (keys.has('left') || gpk.left ? 1 : 0), my = (keys.has('down') || gpk.down ? 1 : 0) - (keys.has('up') || gpk.up ? 1 : 0);
-  return mx || my ? Math.atan2(my, mx) - (st.rot || 0) : st.aim;
+  return mx || my ? Math.atan2(my, mx) + moveTurn() : st.aim;
 }
 // Read the controller once a frame and turn it into the same actions as the keyboard and mouse.
 function pollPad(dt, view) {
@@ -801,6 +815,7 @@ cv.addEventListener('mousemove', e => {
     const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * DPR;
     if (padOn && aimMode === 'free') { freeMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'pad') { padMove(e.movementX * k, e.movementY * k); return; }
+    if (padOn && aimMode === 'face') { faceMove(e.movementX * k, e.movementY * k, ads); return; }
     if (padOn && (aimMode === 'turn' || aimMode === 'spin')) { turnMove(e.movementX * k, e.movementY * k); return; }
     mouse.x = Math.max(0, Math.min(VW, mouse.x + e.movementX * k));
     mouse.y = Math.max(0, Math.min(VH, mouse.y + e.movementY * k));
@@ -821,7 +836,7 @@ cv.addEventListener('mousedown', e => {
   if (e.button === 0) { mouse.l = true; mouse.wl++; }
   if (e.button === 2) { mouse.r = true; mouse.wr++; if (aimMode === 'free' && padOn && st.me && st.me.ct === 'body') adsReset(); }
 });
-addEventListener('mouseup', e => { if (e.button === 0) mouse.l = false; if (e.button === 2) mouse.r = false; });
+addEventListener('mouseup', e => { if (e.button === 0) mouse.l = false; if (e.button === 2) { mouse.r = false; st.faceC = null; } });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => {
   if (!st.me || !st.me.a) return;
@@ -1647,8 +1662,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (k.sprint) k.sa = Math.round(st.aim * 1000) / 1000; // what the server will go by for which way you sprint
   if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
-  if (st.rot) k.rot = Math.round(-st.rot * 1000) / 1000; // Rotate aiming: W walks up the screen
-  if (k.up && keys.has('sprint') && me && me.ct === 'body') k.rot = Math.round((st.aim + Math.PI / 2) * 1000) / 1000; // sprint + forward (he asked): the keys turn so W goes where you aim, as in R6
+  { const r = moveTurn(); if (r) k.rot = Math.round(r * 1000) / 1000; } // Rotate view, Face aiming, sprint + W: the keys turn with you
   // ping whatever is under your aim: an enemy you can see, else a gadget, camera or the objective, else the wall, door or floor you point at
   const trySpot = () => {
     if (!view || !me) return;
@@ -2365,6 +2379,12 @@ function crosshair(me, now) {
     if (on) { ctx.fillStyle = 'rgba(255,59,59,0.22)'; ctx.fill(); }
   }
   const fq = aimMode === 'free' && padOn && !gpRecent() ? freeAimPoint() : null;
+  if (aimMode === 'face' && padOn && !gpRecent() && mouse.r && me.ct === 'body') { // aimed in: the narrow area you are locked to
+    const ca = st.faceC ?? padAng, R = Math.hypot(m.x - px, m.y - py);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1 * DPR;
+    ctx.beginPath(); ctx.arc(px, py, R, ca - FACE_ADS, ca + FACE_ADS); ctx.stroke();
+    for (const e of [ca - FACE_ADS, ca + FACE_ADS]) { const q = 7 * DPR; ctx.beginPath(); ctx.moveTo(px + Math.cos(e) * (R - q), py + Math.sin(e) * (R - q)); ctx.lineTo(px + Math.cos(e) * (R + q), py + Math.sin(e) * (R + q)); ctx.stroke(); }
+  }
   if (me.mv === 3) ctx.globalAlpha = 0.3; // sprinting: gun down
   else if (fq && fq.stopped) ctx.globalAlpha = 0.45; // bullets stop at a wall before it: faded
   drawXhair(ctx, x, y, xh, spread, DPR);
@@ -3125,7 +3145,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { pttTest, PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { pttTest, PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
@@ -3195,7 +3215,7 @@ function setAim(m, save = true) {
   for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
   if (m !== 'cursor') { padAng = st.aim || 0; padReach = 0.6; }
   if (m === 'free') aimOff = { x: Math.cos(st.aim || 0) * 150, y: Math.sin(st.aim || 0) * 150 };
-  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Push it past the edge of the screen to look further: it goes anywhere you can see. Pull it through your character to turn round.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
+  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', face: 'Face: the map stays still and the mouse turns your character. W walks the way you face, A and D step sideways, S steps back. Aiming in locks you to a narrow 30° area until you let go. Mouse up / down moves the crosshair further / nearer.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Hold sprint and W to sprint toward the crosshair. Push it past the edge of the screen to look further: it goes anywhere you can see. Pull it through your character to turn round.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
     turn: 'Turn: like an FPS. Mouse left / right turns you, mouse up / down moves the crosshair further / nearer.',
     cursor: 'Cursor: you aim at wherever the mouse pointer is.' }[m];
   if (save) saveSettings();

@@ -3,6 +3,7 @@ import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { buildMap } from '../shared/map.js';
 import { M_S } from '../shared/physics.js';
+import { T } from '../shared/constants.js';
 let fails = 0; const fail = (...a) => { fails++; console.log('FAIL', ...a); };
 const g = new Game({ free: true }), p = g.addPlayer('Runner', false);
 g.mapId = 'harbor'; g.map = buildMap('harbor'); g.handle(p, { t: 'free', a: 'start', map: 'harbor', bots: 0 });
@@ -22,8 +23,8 @@ const back = speed({ sprint: 1 }, Math.PI); if (back > run * 1.05) fail('sprinti
 for (const k of ['ads', 'walk', 'crouch', 'prone', 'lean', 'fire']) { const v = speed({ sprint: 1, [k]: 1 }); if (v > run * 1.05 || p.spr) fail('sprint should stop for', k, v); }
 // sprint + W: the client turns the keys to the aim (k.rot), so W runs where you aim, in any direction
 let open = null;
-for (let y = 12; y < g.map.H - 12 && !open; y++) for (let x = 12; x < g.map.W - 12 && !open; x++) { let ok = true; for (let j = -10; j <= 10 && ok; j++) for (let i = -10; i <= 10 && ok; i++) ok = g.map.tiles[(y + j) * g.map.W + x + i] === 0; if (ok) open = { x: x * 16 + 8, y: y * 16 + 8 }; }
-if (!open) fail('no open ground for the test');
+for (let y = 12; y < g.map.H - 12 && !open; y++) for (let x = 12; x < g.map.W - 12 && !open; x++) { let ok = true; for (let j = -7; j <= 7 && ok; j++) for (let i = -7; i <= 7 && ok; i++) { const t = g.map.tiles[(y + j) * g.map.W + x + i]; ok = t === 0 || t === T.GROUND; } if (ok) open = { x: x * 16 + 8, y: y * 16 + 8 }; }
+if (!open) { console.log('FAIL no open ground for the test'); process.exit(1); }
 for (const a of [0.7, 2.5, -1.2, -2.8]) {
   Object.assign(p, open, { vx: 0, vy: 0, aim: a, pr: 0, spr: false }); const x0 = open.x, y0 = open.y;
   for (let i = 0; i < 20; i++) { p.input = { up: 1, sprint: 1, sa: a, rot: a + Math.PI / 2 }; g.applyMove(p, 1 / 30); g.time += 1 / 30; }
