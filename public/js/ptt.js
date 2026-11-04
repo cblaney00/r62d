@@ -33,7 +33,7 @@ let free = null, freeRate = 0, lastFree = '', freeAsked = false, freeDone = fals
 export const lastHeard = () => heardBoth;
 const freshHeard = () => { last = ''; lastFree = ''; freeAsked = false; freeDone = false; };
 function finish() {
-  if (free && freeUse && freeAsked && !freeDone && performance.now() - lastEv < 1500) { setTimeout(finish, 30); return; } // (its answer may still be on its way)
+  if (free && freeUse && freeAsked && !freeDone && performance.now() - lastEv < 4500) { setTimeout(finish, 30); return; } // (its answer may still be on its way)
   if (!onDone) return;
   const g = micFix(last.replace(/\[unk\]/g, ' ').replace(/\s+/g, ' ').trim()), f = micFix(lastFree.replace(/\[unk\]/g, ' ').replace(/\s+/g, ' ').trim());
   const t = free && freeUse ? pickHeard(g, f, { rooms: vocab.rooms || [] }) : g, cb = onDone;
@@ -63,20 +63,24 @@ let noiseAt = 0, gateHang = 0, gatePrev = null, GATE = 3;
 const rmsOf = d => { let s = 0; for (let i = 0; i < d.length; i++) s += d[i] * d[i]; return Math.sqrt(s / d.length); };
 export const noiseTrack = d => { const r = rmsOf(d); noiseAt = !noiseAt ? Math.max(r, 1e-5) : Math.min(noiseAt * 1.01, Math.max(r, 1e-5)); return r; };
 function gateNext(d) {
-  const r = noiseTrack(d), open = r > Math.max(noiseAt * GATE, 0.0012), was = gateHang > 0;
-  gateHang = open ? 4 : gateHang - 1;
+  const r = noiseTrack(d), open = r > Math.max(noiseAt * GATE, 0.0012), was = gateHang > 0, softWas = softHang > 0, soft = r > Math.max(noiseAt * FREE_GATE, 0.0008);
+  gateHang = open ? 4 : gateHang - 1; softHang = soft ? 4 : softHang - 1;
   const out = gatePrev; gatePrev = Float32Array.from(d); if (!out) return null;
-  if (open || was) return out;
-  const q = new Float32Array(out.length); for (let i = 0; i < q.length; i++) q[i] = out[i] * 0.05; return q;
+  gateOpen = open || was; softOpen = soft || softWas; return out;
 }
+// One piece of sound to both listeners. The sentence list makes words out of noise, so quiet goes right down for it; the free
+// listener copes with noise far better and needs the soft ends of words, which a voice further from the mic loses (he noticed).
+let gateOpen = true, softOpen = true, softHang = 0, FREE_FLOOR = 0.3, FREE_GATE = 1.6; // (measured with his room's noise and a far, echoing voice: gate 3 cut most of it; the free listener's order count rose by half)
+const scaled = (d, k) => { if (k === 1) return d; const q = new Float32Array(d.length); for (let i = 0; i < q.length; i++) q[i] = d[i] * k; return q; };
+function hearBlock(b, boost, rate) { const g = gateNext(b); if (!g) return; const L = levelUp(g, boost, rate); feed(scaled(L, gateOpen ? 1 : 0.05), rate, scaled(L, softOpen ? 1 : FREE_FLOOR)); }
 // Open mic (he asked, as a choice next to push to talk): listening all the time, a sentence starts when sound rises above the
 // room's noise and ends after a short pause. Only the words of a sentence that means something go to the team (main.js).
 let openOn = false, openCb = null, talking = false, quietN = 0, longN = 0, loudN = 0;
 export function setOpenMic(on, cb) { openOn = on; openCb = on ? cb : null; if (!on && talking) { talking = false; held = false; last = ''; if (onState) onState('off'); } }
 const micBoost = () => { try { return (+localStorage.getItem('r62d-micboost') || 100) / 100; } catch { return 1; } };
-function feed(samples, rate) {
+function feed(samples, rate, forFree = samples) {
   const b = new AudioBuffer({ length: samples.length, sampleRate: rate, numberOfChannels: 1 }); b.copyToChannel(samples, 0); pending++; rec.acceptWaveform(b);
-  if (free && freeUse && free !== rec) { const c = new AudioBuffer({ length: samples.length, sampleRate: rate, numberOfChannels: 1 }); c.copyToChannel(samples, 0); free.acceptWaveform(c); }
+  if (free && freeUse && free !== rec) { const c = new AudioBuffer({ length: samples.length, sampleRate: rate, numberOfChannels: 1 }); c.copyToChannel(forFree, 0); free.acceptWaveform(c); }
 }
 // the last answer only counts once it has worked through everything it was sent, or words land in your next sentence
 function askFinal(wait = 0) { if (!onDone) return; if (pending > 0 && wait < 6000) { setTimeout(() => askFinal(wait + 30), 30); return; } pending = 0; finalAsked = true; gotFinal = false; retried = false; lastEv = performance.now(); rec.retrieveFinalResult(); if (free && freeUse) { freeAsked = true; free.retrieveFinalResult(); } settle(lastEv); }
@@ -101,12 +105,12 @@ export function micBlock(d) {
   if (clipOn && talking) clip.push(Float32Array.from(d));
   if (held || tail) {
     const boost = micBoost();
-    const hear = b => { const g = gateNext(b); if (g) feed(levelUp(g, boost, ac.sampleRate), ac.sampleRate); };
+    const hear = b => hearBlock(b, boost, ac.sampleRate);
     while (ring.length) hear(ring.shift());
     hear(d);
     if (onHear) onHear(null, Math.min(1, Math.sqrt(loudest) * 4));
   } else if (openOn && openCb && !onDone) {
-    const boost = micBoost(), hear = b => { const g = gateNext(b); if (g) feed(levelUp(g, boost, ac.sampleRate), ac.sampleRate); }, block = Float32Array.from(d);
+    const boost = micBoost(), hear = b => hearBlock(b, boost, ac.sampleRate), block = Float32Array.from(d);
     if (!talking) {
       const r = noiseTrack(block); loudN = r > Math.max(noiseAt * GATE, 0.0012) ? loudN + 1 : 0;
       ring.push(block); if (ring.length > 6) ring.shift();
@@ -165,13 +169,13 @@ export async function pttTest(samples, rate, opts = {}) {
   if (opts.fresh) rec = null; // (the old one stays: see pttDown)
   if (opts.vocab) pttVocab(...opts.vocab);
   if (!rec || recRate !== rate) rec = await makeRec(rate, opts.mode || 'phrases');
-  freeUse = opts.mode !== 'free' && opts.check !== false; freshHeard(); levelReset(true); pending = 0; GATE = opts.gate || 3;
+  freeUse = opts.mode !== 'free' && opts.check !== false; freshHeard(); levelReset(true); pending = 0; GATE = opts.gate || 3; if (opts.floor) FREE_FLOOR = opts.floor; if (opts.fgate) FREE_GATE = opts.fgate;
   return new Promise(res => {
     // done only once the recogniser has gone quiet, so nothing lands on the next clip
     finalAsked = false; onDone = t => { const wait = () => { if (performance.now() - lastEv < (opts.quiet || 300)) return setTimeout(wait, 50); const late = last; last = ''; res((t + ' ' + late).trim()); }; wait(); };
     const f = new Float32Array(samples.length + Math.round(rate * 0.7)); f.set(samples); // (a moment of quiet after it, as a person's key-up gives)
     const size = Math.round(rate * 0.085); // like the real microphone's pieces
-    const piece = i => { const c = f.subarray(i, i + size); const g = opts.gate === 0 ? Float32Array.from(c) : gateNext(c); if (g) feed(opts.raw ? g : levelUp(g, 1, rate), rate); };
+    const piece = i => { hearBlock(f.subarray(i, i + size), 1, rate); };
     if (opts.paced) { let i = 0; const next = () => { if (i + size > f.length) return askFinal(); piece(i); i += size; setTimeout(next, size / rate * 1000); }; next(); } // (as fast as a real microphone)
     else { for (let i = 0; i + size <= f.length; i += size) piece(i); askFinal(); }
     setTimeout(() => { if (onDone) finish(); }, opts.quiet ? 60000 : opts.paced ? 15000 + samples.length / rate * 1000 : 15000);

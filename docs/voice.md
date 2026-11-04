@@ -47,3 +47,7 @@ He offered his graphics card (a stronger recogniser such as Whisper could run on
 
 ## His match, 2026-11-04 (the second listener's first real test)
 He talked in a match and read the screen: the free listener's words were right almost word for word ("is this better can you understand this"), the sentence list's were nonsense ("is this bathroom can you ember stay this"), and the bottom-middle text was still the sentence list's. So `pickHeard` now believes the free listener unless the two agree both ways and the sentence is an order, the bottom-middle text is the free listener's, and the sentence list alone only counts if it means an order. He has not yet given orders this way: `parseCommand` on natural speech is the next thing to watch in `/api/miclog`.
+
+## Further from the mic (2026-11-04)
+He said it hears him better a bit closer, with boost at 300%. Boost does nothing here unless the mic is very quiet: `levelUp` levels the sound afterwards anyway. The cause was the noise gate: his room's noise is about 0.0048, so `GATE` 3 cut anything under 0.0144 and a far voice lost its soft word ends. The free listener now has its own softer gate (`FREE_GATE` 1.6, quiet at `FREE_FLOOR` 0.3, in `hearBlock`); the sentence list keeps gate 3. Simulated far voice (test voices, echo, his real room noise, about 1.8× the noise): 9/16 orders kept before, 11/16 after. His real voice at a distance has not been measured.
+`finish` now waits up to 4.5 s for the free listener's answer (it was 1.5 s), because a late one landed on the next sentence.
