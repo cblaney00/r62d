@@ -454,7 +454,7 @@ function runLoading(title, steps, mapId = null) {
     $('loadSub').textContent = M ? `${M.floors}  ·  ${M.desc}` : title === 'LOADING' ? 'TACTICAL BREACH  ·  5 VS 5' : '';
     $('loadKicker').textContent = M ? 'DEPLOYING TO' : '';
     if (M) { const bg = $('loadBg'); bg.innerHTML = ''; const c = mapThumb(mapId), cc = document.createElement('canvas'); cc.width = c.width; cc.height = c.height; cc.getContext('2d').drawImage(c, 0, 0); bg.appendChild(cc); }
-    if (fresh || !$('loadTip').textContent) $('loadTip').textContent = 'TIP  ' + TIPS[Math.floor(Math.random() * TIPS.length)];
+    if (fresh || !$('loadTip').textContent) $('loadTip').textContent = 'TIP  ' + tipText(TIPS[Math.floor(Math.random() * TIPS.length)]);
     el.classList.remove('hidden');
     for (let i = 0; i < steps.length; i++) {
       loadSpan = [i / steps.length, (i + 1) / steps.length];
@@ -2482,7 +2482,7 @@ function hud(s) {
   const where = me.a && me.x !== undefined ? roomAt(st.map, st.pred.x, st.pred.y) : '';
   if (side === 'def') {
     obj = s.pl ? 'DISABLE THE DEFUSER!' : s.ph === PHASE.PREP ? `FORTIFY: ${site.name}` : `DEFEND: ${site.name}`;
-    sub = s.ph === PHASE.PREP ? `Reinforcements left: ${s.rf} · hold E on walls to reinforce, E on doors/windows to barricade (as many as you like), melee soft walls for rotation holes` : `Reinforcements left: ${s.rf}`;
+    sub = s.ph === PHASE.PREP ? `Reinforcements left: ${s.rf} · hold ${label('interact')} on walls to reinforce, ${label('interact')} on doors/windows to barricade (as many as you like), melee soft walls for rotation holes` : `Reinforcements left: ${s.rf}`;
   } else {
     obj = s.pl ? 'PROTECT THE DEFUSER' : s.ph === PHASE.PREP ? 'LOCATE THE OBJECTIVE WITH YOUR DRONE' : s.rev ? `PLANT THE DEFUSER: ${site.name}` : 'FIND THE OBJECTIVE';
     if (me.df) sub = 'You are carrying the defuser';
@@ -3067,21 +3067,22 @@ function updateCard() {
 }
 const TIPS = [
   'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',
-  'Walk (Shift) or crouch (Ctrl) to move without footsteps — just like CS2.',
+  'Walk ({walk}) or crouch ({crouch}) to move without footsteps — just like CS2.',
   'Stop before you shoot: running ruins your accuracy. Crouching still is the most accurate.',
   'Broken glass under windows crunches loudly — listen for it.',
   'Defenders: reinforce the walls of the objective room before the action phase starts.',
   'Attackers: use your drone in preparation to find the objective before you go in.',
   'Bullets go through soft walls. If you can hear them, you can shoot them.',
   'A downed teammate can be revived — hold interact next to them.',
-  'Press T (or middle click) to ping anything for your team: enemies, cameras, traps, doors, walls, or a place to go.',
+  'Press {spot} (or middle click) to ping anything for your team: enemies, cameras, traps, doors, walls, or a place to go.',
   'New to R62D? The TUTORIAL tab teaches the phases, the roles and pinging in two short playable lessons.',
-  'Cameras see a cone: aim them with the mouse and switch with Q and E.',
+  'Cameras see a cone: aim them with the mouse and switch with {leanL} and {leanR}.',
   'Change your loadout for every operator on the Operators page.',
   'Smashed barricades leave splinters that crack underfoot.',
 ];
+const tipText = t => t.replace(/\{(\w+)\}/g, (_, id) => label(id)); // tips name your own keys
 let tipI = Math.floor(Math.random() * TIPS.length);
-const nextTip = () => { const el = $('tip'); el.textContent = TIPS[tipI++ % TIPS.length]; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; };
+const nextTip = () => { const el = $('tip'); el.textContent = tipText(TIPS[tipI++ % TIPS.length]); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; };
 nextTip(); setInterval(nextTip, 8000);
 // every button: soft hover tick, click sound and a ripple from where you clicked
 let lastHover = 0;

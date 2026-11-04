@@ -62,7 +62,7 @@ export function resetBinds() { try { localStorage.removeItem(KEY); } catch {} lo
 // here, so a game's sprint key becomes our walk key where it has none; actions a game lacks (leaning) go on free keys.
 export const PRESETS = [
   ['cs2', 'Counter-Strike 2', { interact: ['KeyE', ''], ability: ['KeyQ', 'KeyZ'], gadget: ['Digit4', 'KeyG'], leanL: ['KeyX', ''], leanR: ['KeyC', ''], prone: ['KeyB', ''], opPrev: ['', ''], spot: ['KeyT', ''], melee: ['Digit3', ''] }],
-  ['r6', 'Rainbow Six Siege', { crouch: ['KeyC', 'ControlLeft'], prone: ['KeyZ', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], ability: ['Digit3', 'KeyX'], gadget: ['Digit4', 'KeyG'], view: ['Digit5', ''], drone: ['Digit6', ''], melee: ['KeyV', ''] }],
+  ['r6', 'Rainbow Six Siege', { crouch: ['KeyC', 'ControlLeft'], prone: ['KeyZ', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['Digit3', 'KeyG'], ability: ['Digit4', ''], view: ['Digit5', ''], drone: ['Digit6', ''], melee: ['KeyV', ''] }],
   ['cod', 'Call of Duty (modern)', { crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyX', 'Digit4'], leanL: ['KeyQ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
   ['mw2', 'Modern Warfare 2 (2009)', { crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyQ', 'Digit4'], leanL: ['KeyZ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
   ['halo', 'Halo', { crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyE', ''], melee: ['KeyQ', 'KeyV'], gadget: ['KeyG', ''], ability: ['ShiftLeft', 'KeyF'], leanL: ['KeyZ', ''], leanR: ['KeyX', ''] }],
