@@ -755,9 +755,10 @@ function setMicMode(m) {
   micMode = m === 'open' ? 'open' : 'ptt';
   try { localStorage.setItem('r62d-micmode', micMode); } catch {}
   for (const b of $('micSeg').children) b.classList.toggle('on', b.dataset.m === micMode);
-  $('micHint').textContent = micMode === 'open' ? 'Always listening during a match: just talk' : `Hold ${keyName(bindsFor('ptt')[0] || 'KeyX')} while you talk to the bots`;
+  showMicHint();
   syncOpenMic();
 }
+function showMicHint() { $('micHint').textContent = micMode === 'open' ? 'Always listening during a match: just talk' : `Hold ${keyName(bindsFor('ptt')[0] || 'KeyX')} while you talk to the bots`; }
 async function syncOpenMic() {
   const want = micMode === 'open' && playing() && !st.tv && !st.tutorial && !!navigator.mediaDevices && !isTouch;
   if (want === micLive) return;
@@ -866,6 +867,7 @@ applyFx();
 function renderSettings() {
   renderFxList();
   const el = $('settings'); if (el.classList.contains('hidden')) return;
+  showMicHint();
   const named = new Map(ACTIONS.map(a => [a[0], a[1]])), grouped = new Set(KEY_GROUPS.flatMap(g => g[1]));
   const groups = [...KEY_GROUPS, ['OTHER', ACTIONS.map(a => a[0]).filter(id => !grouped.has(id))]];
   const rows = groups.filter(g => g[1].length).map(([gName, ids]) => `<tr class="keyGroup"><th colspan="3">${gName}</th></tr>` + ids.filter(id => named.has(id)).map(id => {

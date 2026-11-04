@@ -193,7 +193,7 @@ His wishes so far:
 
 ## Batch 23 (done; notes in docs/batch-23.md)
 - Weak breachers: Hammer 4 slugs, Ferro `HAMMER_CD` 2.5 s and one swing clears T.BARRI/T.BEAM/T.DSHIELD or an unreinforced hatch (still no walls), Salvo 5, Torque 4 discs at 60. Bots: `BREACH_TOOLS` has sticky (`blow`: set off from the wait spot) and saw, no hammer (Ferro swings in `botAbility`); `proPickOp` puts `HARD_BREACH` first only when the plan opens a wall, and a soft breacher whose plan wall is reinforced uses `planBreach` instead.
-- Key layouts (he chose the games): `PRESETS`/`applyPreset` in keys.js, buttons `#keyPresets` in Settings → Keys.
+- Key layouts (he chose the games): `PRESETS`/`applyPreset` in keys.js, buttons `#keyPresets` in Settings → Keys. `node tests/keypresets.js` checks no key does two jobs. Game text names keys with `label(id)` (tips: `{id}`, `tipText`), never fixed letters.
 - TV viewer requests (he asked: up to 3, must play, one per role per side): `tvPick.req`/`#tvReq` in main.js, server `this.tv.req`, `requestPick` (amateurs) and the front of the pool in `proPickOp`. `node tests/tvrequests.js`.
 - TV instant replays (he asked: full screen ~6 s, fade-in/fade-out times, smooth): server `tvKill` (why it's big) → `tvClips` sends `tvclip` 1.2 s later; client `T.seen` (did the camera catch it), `T.calm` (nobody mid-fight), `public/js/tvreplay.js` (`offerReplay`/`tickReplay`; slow motion round the kill, eased camera, gold wipe, ≥18 s apart) drawing with `drawClip`/`poses` from killcam.js. `st.tvAllReplays` forces them for screenshot tests.
 - Camera bounce (he said: "super bouncy when you look around"): Crosshair mode leads from `freeAimPoint()` (world), not the screen cursor (feedback loop); no aim-distance zoom for bodies; slower lead/zoom glides.

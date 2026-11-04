@@ -7,10 +7,10 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 ## To do
 
 - [ ] the mix input needs more work, its not understand me enough (2026-11-03: read 18 orders in his room at his normal distance: 16/18 meant the right thing, now 18/18 with noise between words turned down and more sentences known; those clips were used to tune it, so he still has to try it in a match. He then said blended words get missed, rural accent, north-western Maryland: every sentence is now also listened for without its small words; try it in a match. 2026-11-04: in a real match it still reads him badly, volume is not the cause. Stronger recogniser test paused, he said not now)
-- [ ] for the rainbow 6 keybind settings it has 3 and 4 reversed, see if there are any other issues with that
 
 ## Done
 
+- [x] for the rainbow 6 keybind settings it has 3 and 4 reversed, see if there are any other issues with that (3 is now gadget and 4 is operator skill. Also found: that layout took X from push to talk, so talk stays on X now and the skill keeps only 4; game text named fixed keys, such as "hold E to reinforce" when Use is on F, and now names your own keys; the microphone hint could show an old key. Every layout is checked so no key does two jobs. Click the layout's button again to get the fix)
 - [x] open mic should also be a toggle option (Settings → Sound → Microphone: Push to talk or Open mic. Open mic listens only during a match you are playing, sends a sentence after a short pause, and drops anything that means nothing to the bots. Push to talk stays the default. Tested with recorded test voices, not yet with a real microphone and game sound)
 - [x] try push to talk on screen with a real microphone (he tried it: it runs, but understood him poorly, which is the item above)
 - [x] put an audio voice test in the game when you load in for the first time as part of the setup so that new players can talk to the bots easier (VOICE SETUP appears once after entering: 4 orders to read, shows what it heard, says how many it understood; can be skipped; Settings → Sound → RUN VOICE TEST runs it again; phones and addresses where the browser allows no microphone do not get it)
