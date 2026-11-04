@@ -250,9 +250,13 @@ export function drawOperator(ctx, p, t) {
   if (p.prone) { // lying down (he asked): legs stretched out behind, kicking a little as you crawl
     for (const s of [1, -1]) { const k = s * st * 1.6 * (p.legs ?? 1); limb(ctx, [-3, s * 3, -10 + k, s * 4, -17 + k, s * 4.6], 3.6, u.clothD); ell(ctx, -18 + k, s * 4.6, 2.3, 2.2, '#1c1b1a'); }
   }
+  if (p.slide) { // power slide (he asked, like modern CoD): feet first, one leg out straight, the other bent over on its side
+    limb(ctx, [0, 4, 8, 7, 15.5, 7.4], 3.6, u.clothD); ell(ctx, 16.7, 7.5, 3.4, 2.3, '#1c1b1a');
+    limb(ctx, [0, -3, 7, -9.5, 11.5, -2.2], 3.6, u.clothD); ell(ctx, 7, -9.5, 1.6, 1.7, '#1d1f22'); ell(ctx, 12.3, -1.6, 3.2, 2.2, '#1c1b1a');
+  }
   const stride = st * (cr ? 2.2 : 4.6) * (p.legs ?? 1); // feet come back together when standing still
   const feet = cr ? [[5.5 + stride * 0.3, 4.2], [4 - stride * 0.3, -4.6]] : [[stride, 4.8], [-stride, -4.8]];
-  for (const [fx, fy] of p.prone ? [] : feet) {
+  for (const [fx, fy] of p.prone || p.slide ? [] : feet) {
     const hip = [-1, fy > 0 ? 3.2 : -3.2];
     const knee = cr ? [fx + 2.5, fy * 1.15] : [(hip[0] + fx) / 2 + 0.8, (hip[1] + fy) / 2 + (fy > 0 ? 0.3 : -0.3)];
     limb(ctx, [hip[0], hip[1], knee[0], knee[1], fx, fy], 3.6, u.clothD);
@@ -261,6 +265,7 @@ export function drawOperator(ctx, p, t) {
     ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(fx + 2.6, fy - 1.4, 1.2, 2.8);
   }
 
+  if (p.slide) ctx.translate(-3, 0); // sliding: the body leans back behind the legs
   // ---- leaning (he asked): the legs stay planted, everything from the hips up tips to the side ----
   if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean));
     ctx.fillStyle = u.cloth || '#333'; ctx.beginPath(); ctx.ellipse(0, L * 2.2, 3.2, 4 + Math.abs(L) * 2, 0, 0, 7); ctx.fill(); // the hips bend toward the lean
@@ -285,6 +290,7 @@ export function drawOperator(ctx, p, t) {
   if (id === 'panel') { for (const yy of [-1, 1]) { ctx.save(); ctx.scale(1, yy); box(ctx, -4.5, 6.5, 6, 3.4, 1.5, '#5d666f'); ctx.restore(); } }
 
   ctx.restore();
+  if (p.slide) ctx.translate(-3, 0);
   if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean)); ctx.translate(0, L * 5.5); ctx.rotate(L * 0.14); } // arms, gun and head lean with the torso
 
   // ---- weapon & arms ----
