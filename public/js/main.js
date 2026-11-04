@@ -722,6 +722,7 @@ addEventListener('keyup', e => {
   if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault(); // stop Firefox's menu bar popping up
   const a = actionFor(e.code); if (a) keys.delete(a);
   if (a === 'ptt') pttUp((text, loudest) => { // what it heard goes to the team as chat, and the bots read that like anything typed
+    try { fetch('/api/miclog', { method: 'POST', body: `level ${loudest.toFixed(4)} heard: ${text || '(nothing)'}` }).catch(() => {}); } catch {}
     if (text) send({ t: 'chat', text, team: true, mic: 1 });
     else addFeed(loudest < 0.004 ? 'The microphone heard almost nothing: check it, or raise Microphone boost in Settings → Sound' : "Didn't catch any words: try \"where are they\" or \"go to\" and a room");
   });

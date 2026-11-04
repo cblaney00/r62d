@@ -6,15 +6,15 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked: the game already listens on every network; what is left is on Lando's side — his homelab firewall has to let port 6262 through from his LAN to the VPN)
-- [ ] push to talk: talk to the bots with your microphone (where to go, where the enemies are) and they answer (bots answer and take orders; tests/botorders.js, watching each order on every map, is written but not working yet)
-- [ ] try push to talk on screen with a real microphone (the voices and their sliders are gone)
-- [ ] the mix input needs more work, its not understand me enough (microphone: now hears words in any order, picks the closest phrase, keeps the moment before and after the key; not yet tried with a real voice)
-- [ ] the killcam suggestions cannot just flash, it should be red but not flashing (button is now solid red; what made it flash was not found, so check it)
-- [ ] clean things up its getting a little laggy
+- [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked again: this computer lets port 6262 in and the game listens on every network. Two things left, neither in the game: Lando's homelab firewall has to pass port 6262 to 10.10.0.5, and this computer's VPN setup only accepts traffic from the NAS and Lando's two gaming-pc VPN addresses, so another machine on his LAN is also dropped unless his firewall makes it look like one of those or the list grows)
+- [ ] try push to talk on screen with a real microphone (needs him at the computer: hold H in a match and talk)
+- [ ] the mix input needs more work, its not understand me enough (recorded test voices now understood 93% of the time; still needs trying with his real voice. What it hears is saved as words only in mic-log.txt in the game's data, so a session can tune it to him)
 
 ## Done
 
+- [x] the killcam suggestions cannot just flash, it should be red but not flashing (found it: the button was being switched on and off ten times a second; watched in a real match, now solid red the whole time)
+- [x] push to talk: talk to the bots with your microphone (where to go, where the enemies are) and they answer (tests/botorders.js now passes on every map; bots had been freezing in doorways near a teammate, hitting people standing by a wall instead of the wall, and SOLDER welding instead of obeying)
+- [x] clean things up its getting a little laggy (server does about a third of the work in a bot match, 5.5% down to 1.9% of a core on Harbor; the on-screen info no longer rewrites itself ten times a second when nothing changed)
 - [x] lets make sure that wooden planks have 3 stages of being broken, 1 is a small hole, 2 is a bit larger, and 3 breaks it completely
 - [x] add more volume options, it generally works but i also want realistic voices for people aged 16-32 and a variety of accents to say things. the voice chats should not be as repetitive, there should be lots of different ways the announcers and pros say things, your cursor should also be usable during tv esports to adjust sliders for the different voice volumes, i think this will be a decent sized job but it will make this more interesting to watch as i can gain information from how the pros communicate. this will probably take a bit of rework of how the bots communicate to eachother because i will be able to hear the voice and sounds they make. it shouldnt sounds like robot, it should sound pretty realistic as if people are talking over a game chat so not perfect audio quality but definitely understable - see how it sounds when the players talk in r6 esports to study this (dropped: he scrapped voice lines for the whole game, bots write in chat instead; chat lines got far more variety)
 - [x] finish recording the voice lines (about 5268 of 7915 clips made; a line with no clip only shows as writing): see docs/voice.md (dropped: he scrapped voice lines for the whole game, bots write in chat instead)

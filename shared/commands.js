@@ -2,9 +2,15 @@
 // directions and questions easily). parseCommand turns a sentence into an intent, who it is for and which room or enemy it
 // names. The rules are loose on purpose: the recogniser drops words and people don't talk in set phrases.
 const CONTRACT = [[/\bwhat s\b/g, 'what is'], [/\bwhere s\b/g, 'where is'], [/\bwhos\b|\bwho s\b/g, 'who is'], [/\bwheres\b/g, 'where is'], [/\bwhats\b/g, 'what is'], [/\bi m\b|\bim\b/g, 'i am'], [/\blet s\b/g, 'lets'], [/\bthey re\b|\btheyre\b/g, 'they are'], [/\bdon t\b|\bdont\b/g, 'do not'], [/\byou re\b|\byoure\b/g, 'you are'], [/\bu\b/g, 'you'], [/\bur\b/g, 'your'], [/\bthx\b|\bty\b/g, 'thanks'], [/\bplz\b|\bpls\b/g, 'please'], [/\benemys\b/g, 'enemies']];
+// Words the recogniser doesn't know: it listens for one that sounds the same, and it's read back as what was meant.
+const SOUNDS = { defuser: 'diffuser', chonk: 'chunk' }, HEARD = Object.entries(SOUNDS).map(([a, b]) => [b, a]);
+const NUM = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+export const micFix = t => { for (const [a, b] of HEARD) t = t.replace(new RegExp(`\\b${a}\\b`, 'g'), b); return t; };
 export function normalize(text) {
   let s = ' ' + String(text || '').toLowerCase().replace(/\[unk\]/g, ' ').replace(/[^a-z0-9' ]+/g, ' ').replace(/'/g, ' ').replace(/ +/g, ' ').trim() + ' ';
   for (const [a, b] of CONTRACT) s = s.replace(a, b);
+  for (const [a, b] of HEARD) s = s.replace(new RegExp(` ${a} `, 'g'), ` ${b} `);
+  s = s.replace(/ ([1-9])(?= )/g, (m, d) => ' ' + NUM[d]); // "Suite 1" and "suite one" are the same room
   // the filler people start with
   return s.replace(/ +/g, ' ').replace(/^ ((uh+|um+|er+|so|okay|ok|yeah|yo|hey|like|right|please|guys|team|well|and|but) )+(?=\w)/, m => (/\b(team|guys|yo|hey)\b/.test(m) ? m : ' '));
 }
@@ -96,8 +102,8 @@ const TO_NAME = ['follow me', 'come with me', 'cover me', 'hold here', 'wait her
 export function micPhrases(rooms = [], names = [], ops = []) {
   const low = s => normalize(s).trim().replace(/\bi am\b/g, 'i am');
   const R = [...new Set(rooms.map(r => low(r.replace(/^\dF /, ''))))], N = [...new Set(names.map(low))], O = [...new Set(ops.map(low))], out = new Set(SAY);
-  for (const r of R) for (const a of AT) out.add(a + r);
+  for (const r of R) { out.add(r); for (const a of AT) out.add(a + r); } // (a room on its own means go there)
   for (const n of N) { for (const t of TO_NAME) out.add(n + ' ' + t); for (const r of R) { out.add(n + ' go to the ' + r); out.add(n + ' go to ' + r); out.add(n + ' watch the ' + r); } out.add(n + ' go to site'); }
   for (const o of O) { out.add('where is ' + o); out.add(o); for (const r of R) { out.add(o + ' in the ' + r); out.add(o + ' in ' + r); out.add(o + ' ' + r); } }
-  return [...out].filter(Boolean);
+  return [...out].filter(Boolean).map(x => x.split(' ').map(w => SOUNDS[w] || w).join(' '));
 }

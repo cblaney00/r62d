@@ -13,5 +13,11 @@ Offline recogniser vosk-browser with the small English model, listening for sing
 
 Testing without a person: synthetic speech was run through `pttTest(samples, rate, { raw, grammar })` in hidden Firefox at chosen volumes (the clips were not kept in the repo). Synthetic speech shows the effect of volume, not how well it knows his own voice, so he has the last word.
 
-## Mic test results (2026-11-03, unfinished)
-The recogniser now chooses between whole sentences (`micPhrases` in shared/commands.js); `'words'` is the older loose-word mode. Synthetic speech, 92 clips: sentences 27 right at normal volume and 41 at very low volume (-34 dB) with `levelUp`; loose words 32 at normal volume. So levelling works, but accuracy is still poor and these runs are unreliable: some answers landed on the following clip (`pending`/`askFinal` in `pttTest` still lets results slip). Fix that first, then compare the modes. Also check that a second recogniser works: after `rec.remove()` the next one heard nothing; `remove` is no longer called, but a new match's rebuild (`stale`) has not been retested. Test speech clips: `/var/tmp/r62d-tts/mic` (may be gone; they were made with Chatterbox, which was removed). `tests/botorders.js`: one Harbor run had a bot reach 0 of 6 rooms; not reproduced in 40 more trials.
+## Mic test results (2026-11-03)
+Whole sentences (`micPhrases`, the default, about 2000 on Harbor) with synthetic speech, 4 voices, 46 sentences, scored by whether the sentence means the same to `parseCommand`: 172/184 (93%). Before the last fixes: very low volume (-34 dB) 151/184, added noise 161/184. Loose words and free dictation were clearly worse. His real voice is still untested.
+- The old low figures were mostly the test: answers slipped onto the next clip. `pttTest` now waits until the recogniser goes quiet.
+- A pause gives an answer of its own, so the first result after the key is not the last: `settle` waits for quiet. The recogniser sometimes answers empty and keeps the words for next time: `settle` feeds a little quiet and asks once more. It still happens now and then (about 3%), and those words land in front of the next sentence.
+- A second recogniser (`stale`, new match) hears fine.
+- Words the model lacks: `SOUNDS` in shared/commands.js listens for a sound-alike and reads it back (defuser/diffuser, chonk/chunk); digits in room names are read as words.
+- `/api/miclog` keeps the last 300 things heard (words and level, no sound) in `mic-log.txt` in the data folder: read it first when tuning to him.
+Test clips: `/var/tmp/r62d-tts/mic` + `phrases.txt` (may be gone). To rerun, link the clips under `public/` for the test only and fetch them in hidden Firefox.

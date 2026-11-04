@@ -26,7 +26,7 @@ ws.onopen = async () => {
       if (s.url) await call('browsingContext.navigate', { context: ctx, url: s.url, wait: 'complete' });
       if (s.js) {
         const r = await call('script.evaluate', { expression: s.js, target: { context: ctx }, awaitPromise: true });
-        if (r.result && r.result.value !== undefined) console.log('js ->', String(r.result.value).slice(0, 4000));
+        if (r.result && r.result.value !== undefined) console.log('js ->', String(r.result.value).slice(0, 200000));
         if (r.exceptionDetails) console.log('js error', r.exceptionDetails.text);
       }
       if (s.wait) await sleep(s.wait);
@@ -37,6 +37,6 @@ ws.onopen = async () => {
       }
     }
   } catch (e) { console.log('ERROR', e.message); }
-  console.log('--- browser log ---\n' + logs.slice(0, 80).join('\n'));
+  console.log('--- browser log ---\n' + logs.slice(0, 20000).join('\n'));
   process.exit(0);
 };

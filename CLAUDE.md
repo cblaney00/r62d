@@ -256,3 +256,9 @@ His wishes so far:
 - Tested under wine (he allowed it): `R62D_PORT=6271` + `--remote-debugging-port=9333 --no-sandbox --disable-gpu` on an Xvfb screen as insideabush, prefix `~/.local/share/r62d/wine-test` (`WINEDLLOVERRIDES=mscoree,mshtml=` skips the mono prompt); driven over the DevTools port. Not yet run on real Windows.
 - No installer: he decided the zip is fine (2026-11-03).
 - Main menu: left nav buttons smaller, grouped PLAY / WATCH / LEARN / YOU (`.ngrp`), he asked.
+
+## Batch of 2026-11-03 (bot orders, lag)
+- Bots obey (`node tests/botorders.js` passes on every map): in `moveTo` the "other half of the doorway" only applies before entering it, no wall swing with anyone within 30 px (`inWay`; the swing lands on them), SOLDER doesn't weld under an order, walking on the spot for 4 s tries another route (`ai.anT`).
+- Lag (he said it got a little laggy): `findPath` prices each cell once per search (`CC`/`CS`), `moveTo` keeps its path when the goal shifts ≤3 cells and looks again every 2–3 s, at most `PATHS_A_TICK` 3 searches a tick. HUD writes go through `setText`/`setCls`/`setHTML` (no write when unchanged). `node tests/perfmatch.js`: Harbor 5.5% → 1.9% of a core.
+- `classList.toggle(x, a || b)` with b undefined flips instead of setting: that was the flashing killcam button. Use a real true/false.
+- `node tests/feeds.js` fails now and then (random operators), the same before these changes; `tests/stuckbots.js` too. Not looked into.
