@@ -2433,7 +2433,7 @@ function hud(s) {
     $('prompt').innerHTML = ''; $('progress').style.display = 'none';
     const mates = s.players.filter(p => p.a && p.sq === me.sq);
     $('viewlabel').textContent = mates.length ? `SPECTATING ${mates[st.spect % mates.length].n.toUpperCase()} · CLICK TO SWITCH` : '';
-    $('kcBtn').classList.toggle('hidden', !st.killcam || st.tv); setHTML('kcBtn', `<b>${label('interact')}</b> WATCH KILLCAM`);
+    $('kcBtn').classList.toggle('hidden', !st.killcam || !!st.tv); setHTML('kcBtn', `<b>${label('interact')}</b> WATCH KILLCAM`);
     return;
   }
   $('br').style.visibility = ''; $('kcBtn').classList.add('hidden'); if (st.killcam && performance.now() - st.killcam.got > 3000) st.killcam = null; // alive again: the old killcam is gone
