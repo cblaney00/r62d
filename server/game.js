@@ -1,6 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
-import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE } from '../shared/map.js';
+import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
@@ -1263,7 +1263,7 @@ export class Game {
       const f = this.facingCell(p, 28); // the same reach as the on-screen prompt
       if (f && f.t === T.SOFT && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (p.op === 'girder' ? 0.5 : 1), cell: f.k };
       if (f && f.t === T.OPEN && this.map.openId[f.k] >= 0 && p.barri > 0 && this.canBarricade(this.map.openId[f.k])) return { k: 'barricade', t: 0, dur: DUR.barricade, cell: f.k };
-      const h = hatchNear(this.map, p.x, p.y, p.aim, 14);
+      const under = hatchAtPoint(this.map, p.x, p.y), h = under && !under.up && under.h.roof ? under.h : hatchNear(this.map, p.x, p.y, p.aim, 14); // (a roof hatch from the room below: defenders can't get up there)
       if (h && this.map.tiles[h.cells[0]] === T.HATCH && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (p.op === 'girder' ? 0.5 : 1), hatch: h.id };
     }
     return null;
@@ -1311,6 +1311,8 @@ export class Game {
     if (!p.rope) {
       if (!edge('interact') || this.phase !== PHASE.ACTION || this.side(p) !== TEAM.ATK || p.ctrl !== 'body' || p.downed || p.busy || p.vault || !p.alive) return;
       if ([...this.players.values()].some(q => q !== p && q.alive && q.downed && this.side(q) === TEAM.ATK && Math.hypot(q.x - p.x, q.y - p.y) < 26)) return; // E next to a downed teammate revives, never climbs
+      const top = roofRopeAt(this.map, p.x, p.y);
+      if (top) { p.rope = { st: 'move', r: -1, from: -2, to: top.i, s: 0, t: 0, dur: ROPE_DROP, top: { x: p.x, y: p.y } }; p.ropeHeld = true; p.reloadT = 0; p.adsT = 0; p.burst = 0; this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id }); return; }
       const hit = ropeAt(this.map, p.x, p.y); if (!hit) return;
       const [r, s] = hit;
       p.rope = { st: 'move', r: -1, from: -1, to: r.i, s, t: 0, dur: ROPE_CLIMB * r.lvl, base: ropeGround(this.map, r, s) }; p.ropeHeld = true;
@@ -1322,6 +1324,8 @@ export class Game {
     const o = p.rope, at = i => i === -2 ? o.top : i < 0 ? o.base : { x: R[i].hang.x + R[i].tx * (o.s || 0), y: R[i].hang.y + R[i].ty * (o.s || 0) };
     if (o.st === 'hang') {
       const r = R[o.r];
+      if (edge('sprint')) { this.ropeUp(p, r); return; }
+      if (edge('interact') && r.down >= 0) { this.ropeHop(p, r, R[r.down], ROPE_DROP); p.ropeHeld = true; return; } // down to the window below
       if (edge('interact')) { // let go: slide back down to the ground below you
         p.rope = { st: 'move', r: -1, from: -2, to: -1, t: 0, dur: ROPE_DROP * r.lvl, base: ropeGround(this.map, r, ropeS(r, p.x, p.y)), top: { x: p.x, y: p.y } };
         p.ropeHeld = true; p.adsT = 0; p.burst = 0; this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id });
@@ -1335,6 +1339,20 @@ export class Game {
       else { o.st = 'hang'; o.r = o.to; }
     }
   }
+  // from one window to the next on the same wall, keeping your place along it
+  ropeHop(p, r, q, dur) {
+    const s = Math.max(q.a, Math.min(q.b, r.ax * CELL + ropeS(r, p.x, p.y) - q.ax * CELL));
+    p.rope = { st: 'move', r: -1, from: -2, to: q.i, s, t: 0, dur, top: { x: p.x, y: p.y } }; p.adsT = 0; p.burst = 0;
+    this.noise(p.x, p.y, this.side(p), 260); this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id });
+  }
+  // up one stop: the next window, or over the edge onto the roof
+  ropeUp(p, r) {
+    if (r.up >= 0) { const q = this.map.ropes[r.up]; this.ropeHop(p, r, q, ROPE_CLIMB * (q.lvl - r.lvl)); return true; }
+    if (!r.roof) return false;
+    p.rope = { st: 'move', r: -1, from: -2, to: -1, t: 0, dur: ROPE_CLIMB * 0.6, base: r.roof, top: { x: p.x, y: p.y }, climb: 1 }; p.adsT = 0; p.burst = 0;
+    this.noise(p.x, p.y, this.side(p), 260); this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id });
+    return true;
+  }
   // shot off the rope: down on the ground below it
   ropeFall(p) {
     if (!p.rope) return;
@@ -1346,7 +1364,8 @@ export class Game {
   startVault(p, ang) {
     if (p.rope) { // hanging outside a window: climb in once it is open
       const r = p.rope.st === 'hang' && this.map.ropes[p.rope.r];
-      if (!r || !ropeWindowOpen(this.map, r) || !ropeAtWindow(r, p.x, p.y) || p.downed) return false;
+      if (!r || p.downed) return false;
+      if (!ropeWindowOpen(this.map, r) || !ropeAtWindow(r, p.x, p.y)) return this.ropeUp(p, r); // no way in here: Space goes on up
       p.rope = null;
       p.vault = { x0: p.x, y0: p.y, x1: r.inside.x, y1: r.inside.y, t: 0, dur: VAULT_TIME * 1.3 };
       this.noise(p.x, p.y, this.side(p), 320);
@@ -2794,7 +2813,7 @@ export class Game {
       if (p.alive && (p.sock || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
-        bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur)] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
+        bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur), p.rope.climb ? 1 : 0] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
         pp: p.prep ? [p.prep.mode === 'throw' ? 1 : 2, r2(Math.max(0, p.prep.until - this.time)), p.prep.dur] : undefined, m: this.mods(p), jp: [r2(p.air || 0), p.up ? 1 : 0, r2(p.jcd || 0), r1(p.lo || 0), r2(p.pr || 0), r2(p.slT || 0), r2(p.slR || 0), r2(p.slA || 0), r2(p.scd || 0)], vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined, df: p.deafUntil > this.time ? 1 : undefined, su: p.downed && SELF_UP.has(p.op) ? r2(p.selfUp / SELF_UP_TIME) : undefined, scd: p.shroudCd > this.time ? r1(p.shroudCd - this.time) : undefined,
       }));

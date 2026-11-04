@@ -17,6 +17,7 @@ for (const id of MAP_LIST) {
   if (!m.ropes.length) { fail(id, 'no ropes'); continue; }
   const tick = (s, inp = {}) => { for (let i = 0; i < s * 30; i++) { a.prevInput = a.input; a.input = { ...inp }; g.applyMove(a, 1 / 30); g.tickPlayer(a, 1 / 30); g.time += 1 / 30; } };
   for (const r of m.ropes) {
+    if (r.down >= 0) continue; // (reached from the stop below it: tests/roof.js)
     n++;
     Object.assign(a, { alive: true, downed: false, ctrl: 'body', rope: null, vault: null, busy: null, hp: 100, x: r.base.x, y: r.base.y });
     if (g.side(a) !== TEAM.ATK) { a.squad = 1 - a.squad; if (g.side(a) !== TEAM.ATK) { fail(id, 'climber is not attacking'); break; } }
@@ -33,7 +34,7 @@ for (const id of MAP_LIST) {
     // back to the window, boarded: no way in
     for (const k of r.cells) m.tiles[k] = T.BARRI;
     a.x = r.hang.x; a.y = r.hang.y; tick(0.1);
-    if (g.startVault(a, 0)) fail(id, 'rope', r.i, 'climbed in through boards');
+    { const u = [r.up, r.roof]; r.up = -1; r.roof = null; if (g.startVault(a, 0)) fail(id, 'rope', r.i, 'climbed in through boards'); r.up = u[0]; r.roof = u[1]; } // (with a stop above, Space goes on up instead)
     // three melee hits from the rope break the boards
     g.barricade(m.openId[r.cells[0]], T.BARRI, true); a.aim = r.out + Math.PI;
     for (let i = 0; i < 3; i++) { a.meleeCd = 0; g.melee(a); }

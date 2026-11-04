@@ -15,7 +15,7 @@ for (const id of MAP_LIST) {
   for (const h of m0.hatches) {
     if (!h.cells.every(k => m0.tiles[k] === T.HATCH)) fail(id, 'hatch', h.id, 'cells are not hatch tiles');
     if (!h.below.every(k => m0.tiles[k] === T.FLOOR)) fail(id, 'hatch', h.id, 'has no clear floor below');
-    if (floorAt(m0, h.bx, h.by) !== h.fl - 1) fail(id, 'hatch', h.id, 'is not over the floor below');
+    if (!h.roof && floorAt(m0, h.bx, h.by) !== h.fl - 1) fail(id, 'hatch', h.id, 'is not over the floor below');
   }
   if (!m0.hatches.length) continue;
   const g = new Game();
@@ -48,7 +48,7 @@ for (const id of MAP_LIST) {
     atk.input = { ...atk.input, right: 1 };
     for (let i = 0; i < 30 && floorAt(g.map, atk.x, atk.y) === f0; i++) g.applyMove(atk, 1 / 30);
     atk.input = { ...atk.input, right: 0 };
-    if (floorAt(g.map, atk.x, atk.y) !== h.fl - 1) fail(tag, 'walking onto the hole did not drop to the floor below');
+    if (floorAt(g.map, atk.x, atk.y) !== (h.roof ? floorAt(g.map, h.bx, h.by) : h.fl - 1)) fail(tag, 'walking onto the hole did not drop to the floor below');
     // a shot aimed into the hole hits someone standing under it
     ready(atk); atk.x = h.x - 22; atk.y = h.y; atk.aim = 0; atk.aimX = h.x; atk.aimY = h.y; atk.viewTime = null;
     ready(def); def.x = h.bx; def.y = h.by;

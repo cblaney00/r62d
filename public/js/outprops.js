@@ -41,6 +41,7 @@ function star(c, cx, cy, r, n, col, inner = 0.55, rot = 0) {
 export function drawOutProp(c, p, X, Y, W, H, h) {
   const cx = X + W / 2, cy = Y + H / 2, R = Math.min(W, H) / 2;
   switch (p.kind) {
+    case 'aircon': shadow(c, X, Y, W, H, 3); c.fillStyle = '#8a9096'; c.fillRect(X, Y, W, H); c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 1; c.strokeRect(X + 0.5, Y + 0.5, W - 1, H - 1); c.fillStyle = '#4b5056'; c.beginPath(); c.arc(cx, cy, R * 0.72, 0, 7); c.fill(); c.strokeStyle = '#b5bbc1'; for (let i = 0; i < 3; i++) { const a = i * 2.09; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * R * 0.66, cy + Math.sin(a) * R * 0.66); c.stroke(); } break;
     case 'truck': shadow(c, X, Y, W, H, 3); long(c, X, Y, W, H, h, (L, B) => {
       c.fillStyle = '#111'; for (const s of [-1, 1]) for (const t of [-0.36, 0.18, 0.36]) c.fillRect(s * B / 2 - 2, t * L - 4, 4, 8);
       c.fillStyle = '#d4d6d8'; c.fillRect(-B / 2 + 1, -L / 2 + L * 0.27, B - 2, L * 0.72); c.fillStyle = 'rgba(0,0,0,0.12)'; for (let i = 0; i < 6; i++) c.fillRect(-B / 2 + 1, -L / 2 + L * 0.3 + i * L * 0.11, B - 2, 1);

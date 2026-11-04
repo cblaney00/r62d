@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -1823,7 +1823,7 @@ const smokeMemo = new WeakMap();
 const smokes = s => { if (!s) return []; let v = smokeMemo.get(s); if (!v) smokeMemo.set(s, v = s.ents.filter(e => e.ty === 'smoke').flatMap(e => e.pf ? Array.from({ length: e.pf.length / 2 }, (_, i) => ({ x: e.pf[i * 2], y: e.pf[i * 2 + 1], r: e.r })) : [{ x: e.x, y: e.y, r: e.r }])); return v; };
 
 // ---------------- what things are made of (for sound) ----------------
-const FLOOR_SURF = { [FL.SNOW]: 'grass', [FL.WOOD]: 'wood', [FL.TILE]: 'tile', [FL.SERVER]: 'metal', [FL.MARBLE]: 'marble', [FL.CARPET]: 'carpet', [FL.CONCRETE]: 'concrete', [FL.GRASS]: 'grass', [FL.ASPHALT]: 'asphalt', [FL.SAND]: 'grass' };
+const FLOOR_SURF = { [FL.ROOF]: 'concrete', [FL.SNOW]: 'grass', [FL.WOOD]: 'wood', [FL.TILE]: 'tile', [FL.SERVER]: 'metal', [FL.MARBLE]: 'marble', [FL.CARPET]: 'carpet', [FL.CONCRETE]: 'concrete', [FL.GRASS]: 'grass', [FL.ASPHALT]: 'asphalt', [FL.SAND]: 'grass' };
 function cellAt(x, y) { const m = st.map, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); return cx < 0 || cy < 0 || cx >= m.W || cy >= m.H ? -1 : cy * m.W + cx; }
 function surfaceAt(x, y) {
   const k = cellAt(x, y); if (k < 0) return 'concrete';
@@ -2625,10 +2625,11 @@ function setCls(el, c, on) { if (el.classList.contains(c) !== on) el.classList.t
 function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;
   if (me.ro) { // on a rope
-    if (!me.ro[0]) return me.ro[2] < 0 ? 'LETTING GO…' : `CLIMBING ${Math.round(me.ro[3] * 100)}%`;
-    const r = m.ropes[me.ro[1]], atW = r && ropeAtWindow(r, x, y);
+    if (!me.ro[0]) return me.ro[2] < 0 && !me.ro[4] ? 'LETTING GO…' : `CLIMBING ${Math.round(me.ro[3] * 100)}%`;
+    const r = m.ropes[me.ro[1]], atW = r && ropeAtWindow(r, x, y), hop = (i, n) => n >= 0 ? m.floors[m.ropes[n].f].name : i;
     const what = !atW ? 'MOVE TO SLIDE ALONG THE WALL' : ropeWindowOpen(m, r) ? `<b>${label('vault')}</b>CLIMB IN` : `<b>${label('melee')}</b>BREAK THE BOARDS (OR SHOOT A WAY IN)`;
-    return `${what}  ·  <b>${label('interact')}</b>LET GO`;
+    const up = r.up >= 0 ? hop('', r.up) : r.roof ? 'ROOF' : '', upKey = atW && ropeWindowOpen(m, r) ? label('sprint') : label('vault') + (bindsFor('sprint')[0] ? ' / ' + label('sprint') : '');
+    return `${what}${up ? `  ·  <b>${upKey}</b>UP TO ${up}` : ''}  ·  <b>${label('interact')}</b>${r.down >= 0 ? 'DOWN TO ' + hop('', r.down) : 'LET GO'}`;
   }
   const down = s.players.find(p => p.a && p.dn && p.tm === side && p.id !== me.id && Math.hypot(p.x - x, p.y - y) < 26);
   if (down && !me.dn && me.ct === 'body') return `<b>${label('interact')}</b>HOLD TO REVIVE ${esc(down.n.toUpperCase())}`; // before ropes (the server puts reviving first too)
@@ -2636,6 +2637,8 @@ function promptText(s, me) {
     const h = ropeAt(m, x, y);
     if (h) return `<b>${label('interact')}</b>RAPPEL UP TO ${m.floors[h[0].f].name}`;
   }
+  if (side === 'atk' && s.ph === PHASE.ACTION && me.ct === 'body' && !me.dn && roofRopeAt(m, x, y)) return `<b>${label('interact')}</b>RAPPEL DOWN`;
+  if (side === 'def' && s.rf > 0) { const at = hatchAtPoint(m, x, y); if (at && !at.up && at.h.roof && m.tiles[at.h.cells[0]] === T.HATCH) return `<b>${label('interact')}</b>HOLD TO REINFORCE ROOF HATCH (${s.rf} LEFT)`; }
   if (side === 'atk' && me.df && s.ph === PHASE.ACTION && !s.pl) {
     const b = m.sites[s.site].bombs.find(b => Math.hypot(b.x - x, b.y - y) < 30);
     if (b) return `<b>${label('interact')}</b>HOLD TO PLANT DEFUSER (BOMB ${b.id})`;

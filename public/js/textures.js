@@ -246,7 +246,7 @@ export function floorPatterns(ctx) {
   if (!cache) cache = {
     [FL.WOOD]: wood(128), [FL.TILE]: tile(64, '#c4cbcf', 16, '#7d8589'), [FL.SERVER]: serverFloor(64),
     [FL.MARBLE]: marble(128), [FL.CARPET]: carpet(64), [FL.CONCRETE]: concrete(128),
-    [FL.GRASS]: grass(128), [FL.ASPHALT]: asphalt(128), [FL.SAND]: sand(128), [FL.SNOW]: snow(128),
+    [FL.GRASS]: grass(128), [FL.ASPHALT]: asphalt(128), [FL.SAND]: sand(128), [FL.SNOW]: snow(128), [FL.ROOF]: asphalt(128),
   };
   const out = {};
   for (const [k, c] of Object.entries(cache)) {

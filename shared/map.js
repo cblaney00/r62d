@@ -71,11 +71,18 @@ function addRopes(m) {
     const sa = -(half - CELL / 2) - nA * CELL, sb = (half - CELL / 2) + nB * CELL;
     ropes.push({ i: ropes.length, f, lvl: f - gi, cells: o.cells, ledge: [...ledge, ...ext], hang, base, inside, out: Math.atan2(out[1], out[0]), tx, ty, a: sa, b: sb, half, up: -1, down: -1 });
   }
-  for (const r of ropes) { // the windows above and below on the same rope
-    for (const q of ropes) if (q !== r && Math.hypot(q.base.x - r.base.x, q.base.y - r.base.y) < 12) {
-      if (q.lvl === r.lvl + 1) r.up = q.i;
-      if (q.lvl === r.lvl - 1) r.down = q.i;
-    }
+  // Each window is a stop (he asked): from one you go up or down to the next window on the same wall, or from the top one onto
+  // the roof. pos = where along the wall (ax) and which wall line (ay), the same numbers on every floor.
+  const pos = r => { const F = m.floors[r.f], x = r.hang.x / CELL - F.gx + F.x0, y = r.hang.y / CELL + F.y0; return { ax: x * r.tx + y * r.ty, ay: x * r.ty + y * r.tx }; };
+  for (const r of ropes) Object.assign(r, pos(r));
+  const lineUp = (r, q) => q.out === r.out && Math.abs(q.ay - r.ay) < 0.75 && r.ax * CELL + r.b >= q.ax * CELL + q.a && q.ax * CELL + q.b >= r.ax * CELL + r.a;
+  for (const r of ropes) {
+    const near = list => list.sort((p, q) => Math.abs(p.lvl - r.lvl) - Math.abs(q.lvl - r.lvl) || Math.abs(p.ax - r.ax) - Math.abs(q.ax - r.ax))[0];
+    const u = near(ropes.filter(q => q.lvl > r.lvl && lineUp(r, q))), d = near(ropes.filter(q => q.lvl < r.lvl && lineUp(r, q)));
+    if (u) r.up = u.i; if (d) r.down = d.i;
+    if (u || m.roofFloor === undefined) continue;
+    const R = m.floors[m.roofFloor], F = m.floors[r.f], o = [Math.cos(r.out), Math.sin(r.out)]; // over the edge of the roof, a little way in
+    for (const n of [2, 3, 4]) { const x = r.hang.x + ((R.gx - R.x0) - (F.gx - F.x0)) * CELL - o[0] * CELL * n, y = r.hang.y + (F.y0 - R.y0) * CELL - o[1] * CELL * n; if (walk(x, y, m.roofFloor)) { r.roof = { x, y }; break; } }
   }
   m.groundFloor = gi;
 }
@@ -88,6 +95,13 @@ export function ropeAt(m, x, y) {
     const s = Math.max(r.a, Math.min(r.b, (x - r.base.x) * r.tx + (y - r.base.y) * r.ty)), d = Math.hypot(r.base.x + r.tx * s - x, r.base.y + r.ty * s - y);
     if (d < bd) { bd = d; best = [r, s]; }
   }
+  return best;
+}
+// A rope you can go back down from the roof (x, y): the nearest place one comes over the edge, within reach.
+export function roofRopeAt(m, x, y) {
+  if (m.flAt && floorAt(m, x, y) !== m.roofFloor) return null;
+  let best = null, bd = ROPE_REACH * 1.6;
+  for (const r of m.ropes || []) if (r.roof) { const d = Math.hypot(r.roof.x - x, r.roof.y - y); if (d < bd) { bd = d; best = r; } }
   return best;
 }
 // Where you land on the ground when you let go (or are shot off) at s along the wall: below you if there is ground there

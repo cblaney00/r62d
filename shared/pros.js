@@ -137,8 +137,8 @@ export function siteIntel(m, si) {
   const side = main ? far(doors.filter(w => w !== main && w.d < main.d + 90), main) || far(doors.filter(w => w !== main), main) : null;
   // a wall to breach: close to the attackers, away from the main door (a second angle on the defenders)
   const wall = main ? walls.slice().sort((a, b) => (a.d - Math.hypot(a.pos.x - main.pos.x, a.pos.y - main.pos.y) / CELL * 0.6) - (b.d - Math.hypot(b.pos.x - main.pos.x, b.pos.y - main.pos.y) / CELL * 0.6))[0] : walls[0];
-  const hatch = (m.hatches || []).find(h => inSite(Math.floor(h.bx / CELL), Math.floor(h.by / CELL))) || null; // a hatch in the ceiling of the site
-  const hatchBelow = (m.hatches || []).find(h => inSite(Math.floor(h.x / CELL), Math.floor(h.y / CELL))) || null; // one in the site's floor
+  const hatch = (m.hatches || []).filter(h => !h.roof).find(h => inSite(Math.floor(h.bx / CELL), Math.floor(h.by / CELL))) || null; // a hatch in the ceiling of the site
+  const hatchBelow = (m.hatches || []).filter(h => !h.roof).find(h => inSite(Math.floor(h.x / CELL), Math.floor(h.y / CELL))) || null; // one in the site's floor
   const nearSpawn = main ? spawns.slice().sort((a, b) => Math.hypot(a.x - main.stack.x, a.y - main.stack.y) - Math.hypot(b.x - main.stack.x, b.y - main.stack.y))[0] : spawns[0];
   // rooms next to the site (sharing a door) for crossfires and roaming
   const siteRooms = m.rooms.filter(r => site.rooms.includes(r.name));

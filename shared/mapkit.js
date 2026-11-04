@@ -41,6 +41,10 @@ export const PAD = 20, SPAWN_BACK = 30;
 export function makeMap({ id, name, floors }) {
   let gx = 0;
   floors = floors.map(f => f.ground ? { ...f, x0: f.x0 - PAD, y0: f.y0 - PAD, w: f.w + 2 * PAD, h: f.h + 2 * PAD, pad: PAD } : f);
+  { // he asked: every map has a roof (buildRoof). One flat floor over everything above the ground (School: over the 2F and its 3F tower)
+    const up = floors.slice(floors.findIndex(f => f.ground) + 1), x0 = Math.min(...up.map(f => f.x0)), y0 = Math.min(...up.map(f => f.y0));
+    floors = [...floors, { name: 'RF', x0, y0, w: Math.max(...up.map(f => f.x0 + f.w)) - x0, h: Math.max(...up.map(f => f.y0 + f.h)) - y0, roof: true }];
+  }
   const fl = floors.map((f, i) => { const o = { ...f, i, gx, gy: 0 }; gx += f.w + GAP; return o; });
   const W = gx - GAP, H = Math.max(...floors.map(f => f.h)), N = W * H;
   const tiles = new Uint8Array(N).fill(T.VOID), floor = new Uint8Array(N).fill(FL.VOID);
@@ -354,36 +358,54 @@ export function makeMap({ id, name, floors }) {
     for (const p of props) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) propAt[y * W + x] = 1;
     for (const f of fl) {
       if (f.i === 0) continue;
-      const b = fl[f.i - 1];
-      const down = k => { // the same building-frame spot one floor down, or -1
-        const lx = (k % W) - f.gx + f.x0 - b.x0, ly = Math.floor(k / W) + f.y0 - b.y0;
-        return lx < 0 || ly < 0 || lx >= b.w || ly >= b.h ? -1 : ly * W + b.gx + lx;
-      };
-      const clear = k => k >= 0 && tiles[k] === T.FLOOR && !shape[k] && !propAt[k] && portal[k] < 0 && hatchAt[k] < 0 && hatchBelow[k] < 0;
-      const list = rooms.filter(r => r.fl === f.i && r.w >= 5 && r.h >= 5).sort((p, q) => q.w * q.h - p.w * p.h);
+      // a roof's hatches open into whichever floor is the highest at that spot, over its rooms (it has no rooms of its own), at least 2 even if that means smaller rooms
+      const gi = fl.findIndex(q => q.ground), max = f.roof ? MAX_HATCHES + 1 : MAX_HATCHES;
       let n = 0;
-      for (const r of list) {
-        if (n >= MAX_HATCHES) break;
-        const spots = [];
-        for (let y = r.y + 1; y <= r.y + r.h - 3; y++) for (let x = r.x + 1; x <= r.x + r.w - 3; x++)
-          spots.push([x, y, Math.hypot(x + 1 - (r.x + r.w / 2), y + 1 - (r.y + r.h / 2))]);
-        spots.sort((p, q) => p[2] - q[2]);
-        for (const [x, y] of spots) {
-          let ok = true;
-          for (let j = -1; j <= 2 && ok; j++) for (let i = -1; i <= 2 && ok; i++) { const k = (y + j) * W + x + i; if (!clear(k) || !clear(down(k))) ok = false; }
-          const cx = (x + 1) * CELL, cy = (y + 1) * CELL;
-          if (!ok || bombs.some(bb => Math.hypot(bb.x - cx, bb.y - cy) < CELL * 4)) continue;
-          const id = hatches.length, cells = [y * W + x, y * W + x + 1, (y + 1) * W + x, (y + 1) * W + x + 1], below = cells.map(down);
-          for (const k of cells) { tiles[k] = T.HATCH; hp[k] = CELL_HP[T.HATCH]; hatchAt[k] = id; }
-          for (const k of below) hatchBelow[k] = id;
-          const bk = below[0];
-          hatches.push({ id, fl: f.i, cells, below, x: cx, y: cy, bx: (bk % W + 1) * CELL, by: (Math.floor(bk / W) + 1) * CELL });
-          n++; break;
+      for (const b of f.roof ? fl.filter(q => q.i > gi && !q.roof).reverse() : [fl[f.i - 1]]) {
+        const dx = (f.gx - f.x0) - (b.gx - b.x0), dy = f.y0 - b.y0; // grid x on f = grid x on b + dx; y on b = y on f + dy
+        const down = k => { // the same building-frame spot on b, or -1
+          const lx = (k % W) - f.gx + f.x0 - b.x0, ly = Math.floor(k / W) + f.y0 - b.y0;
+          return lx < 0 || ly < 0 || lx >= b.w || ly >= b.h ? -1 : ly * W + b.gx + lx;
+        };
+        const covered = k => fl.some(q => q.i > b.i && !q.roof && (() => { const lx = (k % W) - f.gx + f.x0 - q.x0, ly = Math.floor(k / W) + f.y0 - q.y0; return lx >= 0 && ly >= 0 && lx < q.w && ly < q.h && tiles[ly * W + q.gx + lx] !== T.VOID; })());
+        const clear = k => k >= 0 && tiles[k] === T.FLOOR && !shape[k] && !propAt[k] && portal[k] < 0 && hatchAt[k] < 0 && hatchBelow[k] < 0;
+        const fit = min => (f.roof ? rooms.filter(r => r.fl === b.i).map(r => ({ ...r, x: r.x + dx, y: r.y - dy })) : rooms.filter(r => r.fl === f.i)).filter(r => r.w >= min && r.h >= min).sort((p, q) => q.w * q.h - p.w * p.h);
+        for (const r of f.roof ? [...fit(5), ...fit(4).filter(q => q.w < 5 || q.h < 5)] : fit(5)) {
+          if (n >= max) break;
+          const spots = [];
+          for (let y = r.y + 1; y <= r.y + r.h - 3; y++) for (let x = r.x + 1; x <= r.x + r.w - 3; x++)
+            spots.push([x, y, Math.hypot(x + 1 - (r.x + r.w / 2), y + 1 - (r.y + r.h / 2))]);
+          spots.sort((p, q) => p[2] - q[2]);
+          for (const [x, y] of spots) {
+            let ok = true;
+            for (let j = -1; j <= 2 && ok; j++) for (let i = -1; i <= 2 && ok; i++) { const k = (y + j) * W + x + i; if (!clear(k) || !clear(down(k)) || (f.roof && covered(k))) ok = false; }
+            const cx = (x + 1) * CELL, cy = (y + 1) * CELL;
+            if (!ok || bombs.some(bb => Math.hypot(bb.x + (f.roof ? dx * CELL : 0) - cx, bb.y - (f.roof ? dy * CELL : 0) - cy) < CELL * 4)) continue;
+            const id = hatches.length, cells = [y * W + x, y * W + x + 1, (y + 1) * W + x, (y + 1) * W + x + 1], below = cells.map(down);
+            for (const k of cells) { tiles[k] = T.HATCH; hp[k] = CELL_HP[T.HATCH]; hatchAt[k] = id; }
+            for (const k of below) hatchBelow[k] = id;
+            const bk = below[0];
+            hatches.push({ id, fl: f.i, cells, below, x: cx, y: cy, bx: (bk % W + 1) * CELL, by: (Math.floor(bk / W) + 1) * CELL, roof: !!f.roof });
+            n++; break;
+          }
         }
       }
     }
   };
 
+  // The roof (he asked): flat over the top floor's whole footprint, reached by rope. It can't be broken by anything: only its
+  // hatches open (it is plain floor, nothing damages floor), and they only drop you down.
+  const buildRoof = () => {
+    const R = fl[fl.length - 1], gi = fl.findIndex(q => q.ground);
+    for (const U of fl) if (U.i > gi && !U.roof) for (let y = 0; y < U.h; y++) for (let x = 0; x < U.w; x++) if (tiles[y * W + U.gx + x] !== T.VOID) { const k = (y + U.y0 - R.y0) * W + R.gx + x + U.x0 - R.x0; tiles[k] = T.FLOOR; floor[k] = FL.ROOF; }
+  };
+  // Air conditioning boxes to hide behind (low: you can see and jump over them), a row of them clear of the hatches
+  const roofProps = () => {
+    const R = fl[fl.length - 1], K = kits[R.i], free = (x, y) => { for (let j = -1; j <= 3; j++) for (let i = -1; i <= 3; i++) { const k = (y + j) * W + R.gx + x + i; if (x + i < 0 || x + i >= R.w || y + j < 0 || y + j >= R.h || tiles[k] !== T.FLOOR) return false; } return true; };
+    let n = 0;
+    for (let y = 3; y < R.h - 4; y += 11) for (let x = 3 + (y % 2) * 5; x < R.w - 4; x += 13) if (free(x, y) && !hatches.some(h => h.fl === R.i && Math.hypot(h.x - (R.gx + x + 1.5) * CELL, h.y - (y + 1.5) * CELL) < CELL * 6)) { K.prop('aircon', x + R.x0, y + R.y0, 3, 2, T.LOW); n++; }
+    return n;
+  };
   // the added ground round the edge carries on the ground at the old edge (a road stays a road, sand stays sand)
   // (only the map's usual ground goes all the way out; a road or yard at the edge widens by 3 cells, then the usual ground)
   const padGround = () => {
@@ -486,7 +508,9 @@ export function makeMap({ id, name, floors }) {
     siteWindows(extra && extra.sites);
     hardenWalls(extra && extra.sites);
     droneHoles();
+    buildRoof();
     placeHatches(extra && extra.sites);
+    roofProps();
     padGround();
     if (extra && extra.atkSpawns) extra.atkSpawns = extra.atkSpawns.map((s, i) => coverSpawn(s, i));
     const gf = fl.find(f => f.ground);
@@ -496,7 +520,8 @@ export function makeMap({ id, name, floors }) {
     return {
       id, name, W, H, tiles, floor, mat, hp, holes: {}, openId, dhole, props, openings, rooms, portal, flAt, stairs, decor, shape, shapeSide, shapeFill,
       hatches, hatchAt, hatchBelow, win, hardened, under, outdoors,
-      floors: fl.map(f => ({ name: f.name, i: f.i, gx: f.gx, w: f.w, h: f.h, x0: f.x0, y0: f.y0 })),
+      floors: fl.map(f => ({ name: f.name, i: f.i, gx: f.gx, w: f.w, h: f.h, x0: f.x0, y0: f.y0, roof: !!f.roof })),
+      roofFloor: fl[fl.length - 1].i,
       ...extra,
     };
   };
