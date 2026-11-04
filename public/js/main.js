@@ -1205,7 +1205,7 @@ function drawOutWarn(s, me) {
   const who = ps.length === 1 ? `${(OPERATORS[ps[0].op] || {}).name || 'DEFENDER'} · NEAR ${(near(ps[0]) || 'THE BUILDING').toUpperCase()}` : ps.map(p => (OPERATORS[p.op] || {}).name || '?').join(', ');
   const html = `⚠ ${ids.length > 1 ? ids.length + ' DEFENDERS' : 'DEFENDER'} OUTSIDE<small>${esc(who)}</small>`;
   if (el.innerHTML !== html) el.innerHTML = html;
-  el.classList.remove('hidden');
+  setCls(el, 'hidden', false);
   if (ids.length > (st.outN || 0)) audio.ui('alert');
   st.outN = ids.length;
 }
@@ -2396,13 +2396,13 @@ function hud(s) {
   }).join('');
   const hs = st.tv ? 0 : me.sq, mine = s.players.filter(p => p.sq === hs), theirs = s.players.filter(p => p.sq !== hs);
   setHTML('tiL', icons(mine, true)); setHTML('tiR', icons(theirs, !!st.tv));
-  $('scL').textContent = s.sc[hs]; $('scR').textContent = s.sc[1 - hs];
+  setText('scL', s.sc[hs]); setText('scR', s.sc[1 - hs]);
   if (st.tv) TV.tvHud(s);
   const t = s.pl ? s.pl.t : s.tm;
-  $('time').textContent = s.fp && !s.pl ? '∞' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
-  $('time').classList.toggle('planted', !!s.pl);
-  $('phase').textContent = s.pl ? 'DEFUSER' : s.fp ? 'FREE PLAY' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER';
-  $('roundNo').textContent = s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`;
+  setText('time', s.fp && !s.pl ? '∞' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`);
+  setCls($('time'), 'planted', !!s.pl);
+  setText('phase', s.pl ? 'DEFUSER' : s.fp ? 'FREE PLAY' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER');
+  setText('roundNo', s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`);
   // free play: which keys switch operator, and who you'd get
   $('freeHint').classList.toggle('hidden', !s.fp);
   if (s.fp && me.op) {
@@ -2427,29 +2427,30 @@ function hud(s) {
   const flName = fi >= 0 && st.map.floors.length > 1 ? st.map.floors[fi].name : '';
   setHTML('objective', `${esc(obj)}<small>${flName ? '<b class="flr">' + esc(flName) + '</b> ' : ''}${esc(sub)}${where ? ' · ' + esc(where) : ''}</small>`);
   if (!me.a) {
-    $('opname').innerHTML = me.op ? `${OPERATORS[me.op].name}` : '';
-    $('hpnum').textContent = '—'; $('hpbar').firstElementChild.style.width = '0%';
-    $('status').textContent = 'ELIMINATED'; $('br').style.visibility = 'hidden';
-    $('prompt').innerHTML = ''; $('progress').style.display = 'none';
+    setHTML('opname', me.op ? `${OPERATORS[me.op].name}` : '');
+    setText('hpnum', '—'); $('hpbar').firstElementChild.style.width = '0%';
+    setText('status', 'ELIMINATED'); $('br').style.visibility = 'hidden';
+    setHTML('prompt', ''); $('progress').style.display = 'none';
     const mates = s.players.filter(p => p.a && p.sq === me.sq);
-    $('viewlabel').textContent = mates.length ? `SPECTATING ${mates[st.spect % mates.length].n.toUpperCase()} · CLICK TO SWITCH` : '';
-    $('kcBtn').classList.toggle('hidden', !st.killcam || !!st.tv); setHTML('kcBtn', `<b>${label('interact')}</b> WATCH KILLCAM`);
+    setText('viewlabel', mates.length ? `SPECTATING ${mates[st.spect % mates.length].n.toUpperCase()} · CLICK TO SWITCH` : '');
+    setCls($('kcBtn'), 'hidden', !st.killcam || !!st.tv); setHTML('kcBtn', `<b>${label('interact')}</b> WATCH KILLCAM`);
     return;
   }
-  $('br').style.visibility = ''; $('kcBtn').classList.add('hidden'); if (st.killcam && performance.now() - st.killcam.got > 3000) st.killcam = null; // alive again: the old killcam is gone
+  $('br').style.visibility = ''; setCls($('kcBtn'), 'hidden', true); if (st.killcam && performance.now() - st.killcam.got > 3000) st.killcam = null; // alive again: the old killcam is gone
   const o = OPERATORS[me.op];
-  $('opname').innerHTML = `${o.name}<small>${o.role.toUpperCase()}</small>`;
-  $('hpnum').textContent = me.hp;
+  setHTML('opname', `${o.name}<small>${o.role.toUpperCase()}</small>`);
+  setText('hpnum', me.hp);
   const bar = $('hpbar').firstElementChild;
-  bar.style.width = Math.min(100, me.hp / me.mhp * 100) + '%';
-  bar.className = me.hp > me.mhp ? 'over' : me.hp < 35 || me.dn ? 'low' : '';
-  $('status').textContent = me.dn ? `DOWNED — BLEEDING OUT · ${Math.ceil(me.hp)}s` : me.df ? 'DEFUSER CARRIER' : '';
+  const barW = Math.min(100, me.hp / me.mhp * 100) + '%', barC = me.hp > me.mhp ? 'over' : me.hp < 35 || me.dn ? 'low' : '';
+  if (bar.style.width !== barW) bar.style.width = barW;
+  if (bar.className !== barC) bar.className = barC;
+  setText('status', me.dn ? `DOWNED — BLEEDING OUT · ${Math.ceil(me.hp)}s` : me.df ? 'DEFUSER CARRIER' : '');
   const w = WEAPONS[me.w];
-  $('wname').textContent = w ? `${w.name.toUpperCase()} · ${CLASS_NAME[w.cls].toUpperCase()}` : '';
+  setText('wname', w ? `${w.name.toUpperCase()} · ${CLASS_NAME[w.cls].toUpperCase()}` : '');
   const pk = me.w + '|' + me.aa;
   if ($('wpic').dataset.k !== pk) { $('wpic').dataset.k = pk; $('wpic').innerHTML = ''; if (me.w) $('wpic').appendChild(gunPicture(me.w, attFromCode(me.aa), 150, 49)); }
-  $('mag').textContent = me.rl > 0 ? '··' : me.am; $('mag').className = w && me.am <= w.mag * 0.25 ? 'low' : '';
-  $('res').textContent = '/ ' + me.rs;
+  setText('mag', me.rl > 0 ? '··' : me.am); { const mc = w && me.am <= w.mag * 0.25 ? 'low' : ''; if ($('mag').className !== mc) $('mag').className = mc; }
+  setText('res', '/ ' + me.rs);
   const ab = o.ability, g = GADGETS[me.gd || o.gadget];
   const abCount = ab.battery ? `${Math.round(me.bat / ab.battery * 100)}%` : ab.count ? me.ac : '';
   const viewName = side === 'atk' ? `Drone${s.ph === PHASE.ACTION ? ' ×' + me.dr : ''}` : 'Cameras';
@@ -2473,23 +2474,26 @@ function hud(s) {
       vl = `${who}${feedKind(c)} ${list.indexOf(c) + 1}/${list.length} · ${(roomAt(st.map, c.x, c.y) || 'outside').toUpperCase()} · ${ro || c.ty !== 'cam' ? 'WATCH ONLY' : 'MOUSE LOOK'} · ${label('leanL')} ${label('leanR')} SWITCH · CLICK PING${c.off || c.j ? ' · DISRUPTED' : ''}`;
     }
   }
-  $('viewlabel').textContent = vl;
+  setText('viewlabel', vl);
   camBar(s, me);
   // interaction
   if (me.bu) {
     $('progress').style.display = 'block';
     $('progress').querySelector('.label').textContent = { plant: 'PLANTING DEFUSER', defuse: 'DISABLING DEFUSER', revive: 'REVIVING', reinforce: 'REINFORCING', barricade: 'BARRICADING' }[me.bu.k] || '';
     $('progress').querySelector('i').style.width = me.bu.p * 100 + '%';
-    $('prompt').innerHTML = '';
+    setHTML('prompt', '');
   } else {
     $('progress').style.display = 'none';
     const pt = me.ct === 'body' && !me.dn ? promptText(s, me) : '';
     if (me.dn && me.su !== undefined) { setHTML('prompt', `GETTING BACK UP… ${Math.round(me.su * 100)}%`); } else // the health operators get up by themselves
-    $('prompt').innerHTML = isTouch ? pt.replace(/<b>([A-Z ]+)<\/b>\1(?![A-Z])/g, '<b>$1</b>') : pt; // phone: no "VAULT VAULT"
+    setHTML('prompt', isTouch ? pt.replace(/<b>([A-Z ]+)<\/b>\1(?![A-Z])/g, '<b>$1</b>') : pt); // phone: no "VAULT VAULT"
   }
   if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone', badge: st.tBadge || {} }); }
 }
 function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!el) return; if (el.innerHTML !== h) el.innerHTML = h; }
+// (he said it got laggy: the HUD rewrote about a dozen elements ten times a second even when nothing had changed)
+function setText(id, v) { const el = $(id), t = String(v); if (el && el.textContent !== t) el.textContent = t; }
+function setCls(el, c, on) { if (el.classList.contains(c) !== on) el.classList.toggle(c, on); }
 
 function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;

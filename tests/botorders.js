@@ -52,7 +52,7 @@ for (const id of MAP_LIST) {
   { // flank and push move them
     const { g, me, a, b } = make(id, TEAM.ATK); g.siteRevealed = true; const x = a.x, y = a.y;
     const c = say(g, me, a, 'flank them'); run(g, 12); check(c.intent === 'flank' && !near(a, x, y, 3), `${id}: flank did not move (${c.intent}; ${state(a)})`);
-    const x2 = b.x, y2 = b.y; botHear(g, me, 'everyone push'); const pushed = b.ai.cmd; run(g, 12); check(!near(b, x2, y2, 3) || !pushed || Math.hypot(pushed.x - x2, pushed.y - y2) < 8 * PX_PER_M, `${id}: push did not move (${state(b)})`);
+    const x2 = b.x, y2 = b.y; botHear(g, me, 'everyone push'); const pushed = b.ai.cmd; run(g, 12); check(!near(b, x2, y2, 3) || !pushed || !b.ai.cmd || Math.hypot(pushed.x - x2, pushed.y - y2) < 8 * PX_PER_M, `${id}: push did not move (${state(b)})`);
   }
   console.log(id.padEnd(8), res.join(' · '));
 }

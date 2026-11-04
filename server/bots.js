@@ -247,10 +247,11 @@ export function botPrep(game, p) {
 // fresh grid-sized arrays and a heap of little arrays every time (he asked: Lando's server must stay quiet).
 let PF = null;
 function pfBuf(N) {
-  if (!PF || PF.N < N) PF = { N, g: new Float32Array(N), from: new Int32Array(N), seen: new Uint32Array(N), shut: new Uint32Array(N), stamp: 0, hf: new Float64Array(4096), hk: new Int32Array(4096) };
-  if (++PF.stamp > 4e9) { PF.seen.fill(0); PF.shut.fill(0); PF.stamp = 1; }
+  if (!PF || PF.N < N) PF = { N, g: new Float32Array(N), from: new Int32Array(N), seen: new Uint32Array(N), shut: new Uint32Array(N), cc: new Float32Array(N), cs: new Uint32Array(N), stamp: 0, hf: new Float64Array(4096), hk: new Int32Array(4096) };
+  if (++PF.stamp > 4e9) { PF.seen.fill(0); PF.shut.fill(0); PF.cs.fill(0); PF.stamp = 1; }
   return PF;
 }
+const DIR8X = [1, -1, 0, 0, 1, 1, -1, -1], DIR8Y = [0, 0, 1, -1, 1, -1, 1, -1];
 function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside = false) {
   const W = map.W, H = map.H, N = W * H;
   const start = sy * W + sx, goal = gy * W + gx;
@@ -264,7 +265,7 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside
     if (blocksDrone(t) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) && !underAt(map, k, t)) return Infinity;
     return 1;
   };
-  const cost = drone ? droneCost : k => {
+  const cellCost = drone ? droneCost : k => {
     const t = map.tiles[k];
     if (avoid && avoid.has(k)) return Infinity; // tried and failed (a vault with nowhere to land, a wall the swing can't reach)
     if (map.shape && map.shape[k] && map.shapeFill[k] < 10 && t !== T.VOID) return 2.5; // the open side of a sloped wall: a body slides along it
@@ -284,6 +285,9 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (blocksMove(tileAt(map, x + dx, y + dy)) && tileAt(map, x + dx, y + dy) !== T.BARRI) near++;
     return 1 + near * 0.6;
   };
+  // a cell is looked at from up to 8 sides: its price is worked out once per search (this was a quarter of the server's work)
+  const CC = B.cc, CS = B.cs;
+  const cost = k => { if (CS[k] === st) return CC[k]; CS[k] = st; return (CC[k] = cellCost(k)); };
   // the same binary heap as before (same order on ties), kept in two flat arrays
   const push = (f, k) => {
     if (hn === hf.length) { const nf = new Float64Array(hn * 2), nk = new Int32Array(hn * 2); nf.set(hf); nk.set(hk); hf = B.hf = nf; hk = B.hk = nk; }
@@ -312,8 +316,8 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside
     const x = k % W, y = (k / W) | 0;
     const pk = map.portal ? map.portal[k] : -1; // the end of a staircase leads to the other floor
     if (pk >= 0) { const ng = G[k] + 1; if (ng < gOf(pk)) { setG(pk, ng, k); push(ng + h(pk), pk); } continue; }
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-      const nx = x + dx, ny = y + dy;
+    for (let di = 0; di < 8; di++) {
+      const dx = DIR8X[di], dy = DIR8Y[di], nx = x + dx, ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
       const nk = ny * W + nx;
       if (dx && dy && (drone ? droneCost(y * W + nx) === Infinity || droneCost(ny * W + x) === Infinity : blocksMove(map.tiles[y * W + nx]) || blocksMove(map.tiles[ny * W + x]))) continue;
@@ -519,8 +523,8 @@ function angleOn(game, p, pt) {
   if (!pt) return null;
   const ai = p.ai, m = game.map;
   if (los(m, p.x, p.y, pt.x, pt.y)) return pt;
-  const key = Math.floor(pt.y / CELL) * m.W + Math.floor(pt.x / CELL), me = Math.floor(p.y / CELL) * m.W + Math.floor(p.x / CELL);
-  if (ai.aoKey === key && ai.aoAt === me && game.time < ai.aoT) return ai.ao;
+  const key = Math.floor(pt.y / CELL) * m.W + Math.floor(pt.x / CELL);
+  if (ai.aoKey === key && game.time < ai.aoT) return ai.ao;
   const path = findPath(m, Math.floor(p.x / CELL), Math.floor(p.y / CELL), Math.floor(pt.x / CELL), Math.floor(pt.y / CELL), ai.noVault, false, game.side(p) === TEAM.DEF) || [];
   let best = null;
   for (let i = 0; i < path.length && i < 80; i++) {
@@ -528,7 +532,7 @@ function angleOn(game, p, pt) {
     if (floorAt(m, x, y) !== floorAt(m, p.x, p.y)) break;
     if (los(m, p.x, p.y, x, y)) { if (Math.hypot(x - p.x, y - p.y) > 1.5 * CELL) best = { x, y }; } else if (best || i > 3) break;
   }
-  ai.aoKey = key; ai.aoAt = me; ai.aoT = game.time + 1.2;
+  ai.aoKey = key; ai.aoT = game.time + 1.2;
   return (ai.ao = best || threatPoint(game, p, Math.atan2(pt.y - p.y, pt.x - p.x)) || pt);
 }
 // Where a bot walking along its path looks: the furthest bit of the path ahead it can see (round the next corner as it
@@ -1152,6 +1156,7 @@ function keepInside(game, goal) {
   const r = hit === null ? null : { x: (hit % W + 0.5) * CELL, y: (Math.floor(hit / W) + 0.5) * CELL };
   c.set(k0, r); return r || goal;
 }
+const PATHS_A_TICK = 3;
 function moveTo(game, p, inp, goal, dt, hold = false) {
   const ai = p.ai, map = game.map, team = game.side(p);
   const early = team === TEAM.DEF && (game.phase === PHASE.PREP || (game.phase === PHASE.ACTION && game.timer > DUR.action - 15)) && !game.free && !game.planted;
@@ -1159,8 +1164,15 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   const gx = Math.floor(goal.x / CELL), gy = Math.floor(goal.y / CELL);
   const sx = Math.floor(p.x / CELL), sy = Math.floor(p.y / CELL);
   ai.pathT = (ai.pathT || 0) - dt;
-  if (!ai.path || ai.pathT <= 0 || ai.goalK !== gy * map.W + gx) {
-    ai.path = findPath(map, sx, sy, gx, gy, ai.noVault, false, team === TEAM.DEF, early) || []; ai.pathT = 1.2; ai.goalK = gy * map.W + gx;
+  // A search can take many ms on these big maps, so (he said it got laggy): a goal that only shifted a little keeps its path until
+  // the next look, and at most PATHS_A_TICK bots search in one tick; the others keep walking and search on the next.
+  const gk = gy * map.W + gx, shifted = ai.goalK !== gk, far = shifted && (!ai.path || !ai.path.length || ai.goalK === undefined || Math.hypot(ai.goalK % map.W - gx, Math.floor(ai.goalK / map.W) - gy) > 3);
+  if (!ai.path || ai.pathT <= 0 || far) {
+    if (game.pathTick !== game.time) { game.pathTick = game.time; game.pathsNow = 0; }
+    if (game.pathsNow < PATHS_A_TICK || !ai.path) {
+      game.pathsNow++;
+      ai.path = findPath(map, sx, sy, gx, gy, ai.noVault, false, team === TEAM.DEF, early) || []; ai.pathT = 2 + Math.random(); ai.goalK = gk;
+    }
   }
   { const i = ai.path.indexOf(sy * map.W + sx); if (i >= 0 && i < 6) ai.path.splice(0, i + 1); } // also skips the stair end after being carried to the other floor
   ai.noPathT = !ai.path.length && Math.hypot(goal.x - p.x, goal.y - p.y) > 2 * CELL ? (ai.noPathT || 0) + dt : 0; // no way there: see impatience
