@@ -301,7 +301,7 @@ export function drawOperator(ctx, p, t) {
   if (mel > 0) ctx.rotate(-Math.sin(mel * Math.PI) * 0.9);
   if (p.reload) ctx.rotate(0.38 + Math.sin(t * 9) * 0.05);
   if (p.sprint) ctx.rotate(p.sprint * 0.85); // sprinting: gun down across the body
-  ctx.translate(p.ads ? 2 : 0, p.ads ? 0 : 1.4);
+  ctx.translate(p.ads || p.slide ? 2 : 0, p.ads || p.slide ? 0 : 1.4); // sliding: the gun is up as if aiming in, the only way you can hold it
   const glove = (x, y) => { ell(ctx, x, y, 1.7, 1.6, '#1f1f20'); };
   if (shield) { // the shield hand holds the grip on the inside of the shield, wherever it has swung to (he asked)
     const sp = p.shieldPose || { rot: 0 }, ga = sp.rot - 0.45, hx = -2 + 10.6 * Math.cos(ga), hy = 10.6 * Math.sin(ga);
@@ -346,6 +346,7 @@ export function drawOperator(ctx, p, t) {
     ctx.restore();
   }
 
+  if (p.slide) { ctx.translate(3.4, 0.5); ctx.rotate(0.14); } // sliding (he asked): the head leans down onto the gun, as when aiming in
   // ---- head & headgear ----
   ell(ctx, 0.8, 0, 4.3, 4.3, skin);
   const earCups = () => { ell(ctx, 0, -4.7, 1.8, 1.3, '#151618'); ell(ctx, 0, 4.7, 1.8, 1.3, '#151618'); };
