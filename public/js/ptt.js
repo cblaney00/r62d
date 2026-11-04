@@ -32,11 +32,11 @@ export const levelReset = (full = false) => { env *= 0.3; loudest = 0; gateHang 
 export function levelUp(src, boost = 1, rate = 48000) {
   const N = src.length, out = new Float32Array(N); let sum = 0;
   for (let i = 0; i < N; i++) sum += src[i] * src[i];
-  const rms = Math.sqrt(sum / N); loudest = Math.max(loudest, rms);
+  const raw = Math.sqrt(sum / N), rms = raw * boost; loudest = Math.max(loudest, raw); // (boost counts before the levelling: it helps a very quiet mic and can't distort a normal voice)
   env = Math.max(rms, env * Math.exp(-(N / rate) / 1.5));
-  const want = env > FLOOR ? Math.min(MAX_GAIN, TARGET / env) : Math.min(gain, 8);
+  const want = env > FLOOR ? Math.min(MAX_GAIN, TARGET / env) : Math.min(gain, 8); // (env follows the boosted level)
   const dt = N / rate, g0 = gain, g1 = gain + (want - gain) * (1 - Math.exp(-dt / (want < gain ? 0.03 : 0.08))); gain = g1;
-  for (let i = 0; i < N; i++) { const v = src[i] * (g0 + (g1 - g0) * i / N) * boost; out[i] = v > 0.98 ? 0.98 : v < -0.98 ? -0.98 : v; }
+  for (let i = 0; i < N; i++) { const v = src[i] * boost * (g0 + (g1 - g0) * i / N); out[i] = v > 0.98 ? 0.98 : v < -0.98 ? -0.98 : v; }
   return out;
 }
 // Between words the levelling would lift room noise until the recogniser hears words in it ("in someone in", he read a test

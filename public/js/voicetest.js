@@ -55,7 +55,8 @@ export function openVoiceTest(onClose) {
     if (mid < 0.012) { try { localStorage.setItem('r62d-micboost', '200'); const s = document.getElementById('micBoost'); if (s) { s.value = 200; s.dispatchEvent(new Event('change')); } } catch {} }
     const say = mid < 0.004 ? 'The microphone is hearing almost nothing. Check that the right one is plugged in and not muted.'
       : right === LINES.length ? 'All set.' : right >= LINES.length - 1 ? 'That will work well.' : 'Try speaking a little slower or moving closer. You can run this again in Settings → Sound.';
-    body.innerHTML = `<p class="vtLine">${right} of ${LINES.length} understood</p><p>${say}</p><p>In a match, hold <b>${key}</b> to give orders like "go to the kitchen" or ask "where are they". Your team's bots answer in chat. Your voice stays on this computer: only the words go to your team.</p>`;
+    const vol = mid < 0.004 ? 'too quiet' : mid > 0.35 ? 'too loud' : 'good';
+    body.innerHTML = `<p class="vtLine">${right} of ${LINES.length} understood</p><p>Microphone volume: <b>${vol}</b>. The game evens out your voice by itself, so anything marked good is fine.</p><p>${say}</p><p>In a match, hold <b>${key}</b> to give orders like "go to the kitchen" or ask "where are they". Your team's bots answer in chat. Your voice stays on this computer: only the words go to your team.</p>`;
     btns.innerHTML = ''; btn('DONE', close, true);
   };
   const start = async () => {
