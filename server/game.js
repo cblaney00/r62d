@@ -3,7 +3,7 @@ import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOL
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
-import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
@@ -2228,6 +2228,11 @@ export class Game {
       for (const q of [...this.players.values()]) if (q.bot) { if (q.hasDefuser) this.dropDefuser(q); this.players.delete(q.id); }
     } else if (m.a === 'pick' && this.phase === PHASE.ACTION && OPERATORS[m.op]) { // the operator grid
       this.freeSwitch(p, m.op);
+    } else if (m.a === 'gun' && this.phase === PHASE.ACTION && WEAPONS[m.w] && p.alive) { // he asked: any gun, any time
+      const side = SIDEARMS.has(m.w) ? 's' : 'p';
+      p.freeGuns = { ...(p.freeGuns || {}), [side]: m.w };
+      this.freeGunsOn(p); p.slot = side === 'p' ? 0 : p.guns.length - 1;
+      this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id });
     } else if (m.a === 'op' && this.phase === PHASE.ACTION) {
       const i = Math.max(0, FREE_OPS.indexOf(p.op)), n = FREE_OPS.length;
       this.freeSwitch(p, FREE_OPS[(i + (m.dir < 0 ? -1 : 1) + n) % n]);
@@ -2258,10 +2263,19 @@ export class Game {
         q.squad = 1 - squad; q.op = null; this.freeSpawn(q, true);
       }
     }
-    p.op = op;
+    p.op = op; p.freeGuns = null; // a new operator comes with their own guns
     this.freeSpawn(p, !wasAlive);
     if (wasAlive) { p.x = x; p.y = y; p.aim = aim; }
     this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id });
+  }
+  // free play: the guns picked from the menu (p.freeGuns: p = main gun, s = sidearm) replace the operator's, kept on respawn
+  freeGunsOn(p) {
+    const F = p.freeGuns; if (!F) return;
+    const L = p.loadout || {}, mk = w => { const att = cleanAtt(w, L.att && L.att[w], p.op); return { w, ammo: WEAPONS[w].mag, reserve: WEAPONS[w].reserve, att, m: gunMods(w, att) }; };
+    if (F.p) p.riot = null; // a main gun in place of a riot shield
+    const prim = F.p || (p.riot ? null : p.guns[0] && p.guns[0].w), sec = F.s || (p.guns[p.guns.length - 1] || {}).w;
+    p.guns = [prim, sec].filter(Boolean).map(w => (p.guns.find(g => g.w === w) || mk(w)));
+    p.slot = Math.min(p.slot || 0, p.guns.length - 1); p.reloadT = 0; p.fireCd = 0; p.adsT = 0; p.rc = 0; p.shots = 0;
   }
   // (re)equips a player; atSpawn also puts them at their side's starting spot
   freeSpawn(p, atSpawn) {
@@ -2270,7 +2284,7 @@ export class Game {
       const taken = new Set([...this.players.values()].filter(q => q.squad === p.squad && q.op).map(q => q.op)), list = opsForTeam(this.side(p)).filter(o => !taken.has(o));
       p.op = list[Math.floor(Math.random() * list.length)] || opsForTeam(this.side(p))[0];
     }
-    this.equip(p);
+    this.equip(p); this.freeGunsOn(p);
     const map = this.map, atk = this.side(p) === TEAM.ATK;
     if (atSpawn) {
       if (!atk) {

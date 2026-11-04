@@ -990,3 +990,12 @@ html.tv canvas#game { cursor: default; }
 html.tv canvas#game { cursor: default; }
 
 /* first-time voice setup */
+/* free play: any gun (he asked) */
+#freeOps .foGuns { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 18px; border-bottom: 1px solid var(--line); align-items: flex-start; }
+#freeOps .foGuns .foCls { flex: none; }
+#freeOps .foGuns h4 { margin: 0 0 4px; white-space: nowrap; }
+#freeOps .foGuns .foCls > div { display: flex; gap: 4px; }
+#freeOps .foGuns button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 6px; min-width: 88px; }
+#freeOps .foGuns button canvas { width: 80px; height: 28px; }
+#freeOps .foGuns button b { font-size: 12px; white-space: nowrap; }
+#freeOps .foGuns button.on { border-color: #f2c14e; color: #f2c14e; }
