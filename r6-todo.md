@@ -13,6 +13,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] fix play.sh so lando can play it on his computer from this repo (a fresh copy now runs with `./play.sh` on any Linux computer: it uses Node if the computer has it, else fetches it with Nix, and opens Firefox, or your usual browser if there is no Firefox. Tested on this computer from clean copies set up like another computer; not yet tried on his)
 - [x] make the aim reticle reset to the orange contact point when ADSing (if a wall stops your bullets before the crosshair, aiming in now puts the crosshair right on that spot; with nothing in the way it still goes to the usual distance for your sight)
 - [x] the killcam suggestions cannot just flash, it should be red but not flashing (found it: the button was being switched on and off ten times a second; watched in a real match, now steady the whole time; he then asked for a less aggressive colour, so it is a dark panel with a soft red edge)
 - [x] push to talk: talk to the bots with your microphone (where to go, where the enemies are) and they answer (tests/botorders.js now passes on every map; bots had been freezing in doorways near a teammate, hitting people standing by a wall instead of the wall, and SOLDER welding instead of obeying)

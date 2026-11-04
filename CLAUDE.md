@@ -110,7 +110,7 @@ His wishes so far:
 - **Language:** JavaScript. Node 22 server (no npm packages at all — a tiny hand-written
   WebSocket server in `server/ws.js`) + plain browser JavaScript with Canvas 2D.
   Dev shell: `vibe-web` (see `.vibe-project`, `.envrc`).
-- **Run:** his desktop shortcut runs `play.sh` (starts the server if not running, opens Firefox in kiosk mode with its own profile at ~/.local/share/r62d/firefox-kiosk, URL `?app=1`; "Quit to desktop" calls `/api/quit`, localhost only, which pkills that window). Manually: `nix develop /home/insideabush/nixos-config#vibe-web --command node server/server.js`
+- **Run:** his desktop shortcut runs `play.sh` (he asked that it work from any clone so Lando can play: Node 22+ on PATH, else `~/nixos-config#vibe-web`, else `nix shell nixpkgs#nodejs_22`; `PORT=` honoured; only stops a server it started itself; no Firefox = `xdg-open`; starts the server if not running, opens Firefox in kiosk mode with its own profile at ~/.local/share/r62d/firefox-kiosk, URL `?app=1`; "Quit to desktop" calls `/api/quit`, localhost only, which pkills that window). Manually: `nix develop /home/insideabush/nixos-config#vibe-web --command node server/server.js`
   then open `http://localhost:6262`. Friends use `http://<this machine's VPN IP>:6262`.
   `R62D_FAST=1` shortens operator-select and prep to a few seconds for testing. `PORT=` changes port.
 - **Layout:**

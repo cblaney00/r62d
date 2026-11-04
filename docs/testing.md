@@ -14,6 +14,7 @@ Plays 10 bots through a full match (25 sim-minutes max). Prints each round's win
    `{"url":..}`, `{"js": "...", "wait": ms, "shot": "name"}`. Keys/mouse are simulated by
    dispatching `KeyboardEvent` on `window` and `MouseEvent` on `#game`. A Firefox instance only
    allows one BiDi session, so restart Firefox for each run.
+- `play.sh` on another computer: clone it with a throwaway `HOME` and `PORT`, `MOZ_HEADLESS=1`, run as insideabush with `env -i` and a chosen `PATH`.
 - Shortcut for this app lives in ~/.local/share/applications/r62d.desktop and ~/Desktop/R62D.desktop, both running play.sh (starts server if needed, opens Firefox).
 - Placing people for a screenshot: with the server in quick mode (`R62D_FAST=1`), in Free Play send
   `__r62d.st.ws.send(JSON.stringify({t:'free', a:'tp', x, y, id?, aim?, hold?}))` — moves you (or a bot by `id`;
