@@ -10,6 +10,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] make the free play gun page include attachment options (press O in free play: under the guns there is now an ATTACHMENTS strip for each gun in your hands, barrel, grip and sight, only the ones that fit; click one and it is on the gun at once. The menu stays open after picking a gun so you can fit it out. Your picks stay through respawns and gun swaps for the rest of the session)
 - [x] we need to be able to change weapons in freeplay freely (press O in free play: the menu is now OPERATORS & GUNS with every gun in the game sorted by type, either side. Click one and it is in your hands at once: pistols replace your sidearm, everything else your main gun, with your saved attachments for it. It stays through respawns and goes back to the operator's own guns when you switch operator)
 
 - [x] bots try roof things when the bomb is on the floor under the roof: another angle to come in from and to send utility through (attackers climb a rope, break the roof hatch over the site, throw a grenade down, lie at the edge watching below and drop in when the team pushes; a reinforced hatch or the clock sends them back down. Beginner bots try it now and then, higher ranks more often, pros about half the time with two players)

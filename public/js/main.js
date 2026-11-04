@@ -5,7 +5,7 @@ import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './ping
 import { parseCommand } from '/shared/commands.js';
 import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
@@ -530,6 +530,7 @@ function onSnap(s) {
   if (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION && s.ph !== PHASE.ROUND_END) revealAll();
   const players = new Map(s.players.map(p => [p.id, p]));
   if (s.mine && players.has(s.you)) { Object.assign(players.get(s.you), s.mine); st.mineAt = now; } // your own private details
+  if (s.fp && s.mine && s.mine.ga) queueMicrotask(freeAttDraw);
   const ents = new Map(s.ents.map(e => [e.id, e]));
   st.snaps.push({ t: now, st: s.time, players, ents }); if (st.snaps.length > 12) st.snaps.shift();
   const prevMe = st.me;
@@ -1309,6 +1310,21 @@ function drawCompass(s, me, now) {
   if (label.textContent !== text) label.textContent = text;
 }
 
+// Free play's attachments (he asked): a row per gun in your hands, every attachment that fits it; redrawn when the
+// snapshot's `ga` (gun:barrel,grip,sight for each held gun) changes
+function freeAttDraw() {
+  const el = $('freeOps'), A = el && el.querySelector('.foAtt'), ga = (st.me && st.me.ga) || [], k = ga.join('|');
+  if (!A || el.classList.contains('hidden') || st.foAttK === k) return; st.foAttK = k;
+  A.innerHTML = '<h3>ATTACHMENTS</h3>' + ga.map(x => { const [w, c] = x.split(':'), a = attFromCode(c), ok = attachFor(w);
+    return `<div class="foAttGun" data-w="${w}"><div class="foAttPic"><b>${esc(WEAPONS[w].name)}</b></div>` + ATTACH_SLOTS.map(([sl, label]) => `<div class="foSlot"><h4>${label.toUpperCase()}</h4><div>` +
+      ok[sl].map(v => `<button data-s="${sl}" data-v="${v}" class="${a[sl] === v ? 'on' : ''}" title="${esc(ATTACH[sl][v].desc)}">${esc(ATTACH[sl][v].short)}</button>`).join('') + `</div><em>${esc(ATTACH[sl][a[sl]].desc)}</em></div>`).join('') + '</div>'; }).join('');
+  for (const row of A.querySelectorAll('.foAttGun')) {
+    const w = row.dataset.w, a = attFromCode((ga.find(x => x.startsWith(w + ':')) || '').split(':')[1]);
+    row.querySelector('.foAttPic').prepend(gunPicture(w, a, 120, 42));
+    for (const b of row.querySelectorAll('button')) b.onclick = () => { audio.ui(); send({ t: 'free', a: 'att', w, s: b.dataset.s, v: b.dataset.v }); };
+  }
+}
+
 // Free play's operator grid (he asked): every operator, attack and defence, by role; click one to switch to it on the spot
 function toggleFreeOps(force) {
   const el = $('freeOps'), open = force ?? el.classList.contains('hidden');
@@ -1322,14 +1338,15 @@ function toggleFreeOps(force) {
     b.onclick = () => { audio.ui(); send({ t: 'free', a: 'pick', op: b.dataset.op }); el.classList.add('hidden'); };
   }
   { // he asked: change guns freely in free play. Every gun in the game, by type; a pistol goes in the sidearm slot
-    const G = el.querySelector('.foGuns'), held = new Set(((st.me && st.me.gl) || []).concat(st.me && st.me.w ? [st.me.w] : []));
+    const G = el.querySelector('.foGuns'), held = new Set(((st.me && st.me.ga) || []).map(x => x.split(':')[0]).concat(st.me && st.me.w ? [st.me.w] : []));
     const by = {}; for (const [k, w] of Object.entries(WEAPONS)) (by[SIDEARMS.has(k) ? 'Sidearm' : CLASS_NAME[w.cls] || w.cls] ||= []).push(k);
     G.innerHTML = '<h3>GUNS</h3>' + Object.entries(by).map(([c, ks]) => `<div class="foCls"><h4>${esc(c.toUpperCase())}</h4><div>` +
       ks.map(k => `<button data-gun="${k}" class="${held.has(k) ? 'on' : ''}"><b>${esc(WEAPONS[k].name)}</b></button>`).join('') + '</div></div>').join('');
     for (const b of G.querySelectorAll('button[data-gun]')) {
       b.prepend(gunPicture(b.dataset.gun, {}, 80, 28));
-      b.onclick = () => { audio.ui(); send({ t: 'free', a: 'gun', w: b.dataset.gun }); el.classList.add('hidden'); };
+      b.onclick = () => { audio.ui(); send({ t: 'free', a: 'gun', w: b.dataset.gun }); for (const o of G.querySelectorAll('button.on')) if (SIDEARMS.has(o.dataset.gun) === SIDEARMS.has(b.dataset.gun)) o.classList.remove('on'); b.classList.add('on'); };
     }
+    st.foAttK = null; freeAttDraw(); // the menu stays open so attachments can follow (he asked)
   }
   el.querySelector('.close').onclick = () => { audio.ui('back'); el.classList.add('hidden'); };
   for (const b of el.querySelectorAll('[data-fb]')) b.onclick = () => { // he asked: bots and dummies while in free play

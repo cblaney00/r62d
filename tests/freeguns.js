@@ -3,7 +3,7 @@
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { buildMap } from '../shared/map.js';
-import { WEAPONS, SIDEARMS } from '../shared/operators.js';
+import { WEAPONS, SIDEARMS, attachFor } from '../shared/operators.js';
 let fails = 0; const ok = (c, ...a) => { if (!c) { fails++; console.log('FAIL', ...a); } };
 const g = new Game({ free: true }), p = g.addPlayer('Me', false); p.sock = { open: true, send() {} };
 g.mapId = 'harbor'; g.map = buildMap('harbor'); g.handle(p, { t: 'free', a: 'start', map: 'harbor', bots: 0 });
@@ -17,4 +17,14 @@ g.handle(p, { t: 'free', a: 'gun', w: 'pike' }); g.handle(p, { t: 'free', a: 'gu
 g.freeSpawn(p, true); ok(p.guns[0].w === 'pike' && p.guns[1].w === 'sparrow', 'pick lost on respawn', p.guns.map(q => q.w));
 g.handle(p, { t: 'free', a: 'pick', op: 'rampart' }); ok(!p.guns.some(q => q.w === 'pike'), 'pick kept after switching operator');
 g.handle(p, { t: 'free', a: 'gun', w: 'longbow' }); ok(p.guns[0].w === 'longbow' && !p.riot, 'riot shield not replaced', p.riot);
+// attachments from the same menu (he asked): every one that fits is taken, a misfit is refused, they stay through a respawn and a gun swap
+for (const w of p.guns.map(x => x.w)) for (const [sl, vs] of Object.entries(attachFor(w))) for (const v of vs) {
+  g.handle(p, { t: 'free', a: 'att', w, s: sl, v }); const q = p.guns.find(x => x.w === w);
+  ok(q && q.att[sl] === v && q.m, 'attachment not fitted', w, sl, v, q && q.att);
+}
+g.handle(p, { t: 'free', a: 'att', w: 'longbow', s: 'barrel', v: 'suppressor' }); g.handle(p, { t: 'free', a: 'att', w: 'longbow', s: 'grip', v: 'vertical' });
+ok(p.guns[0].att.grip !== 'vertical' || attachFor('longbow').grip.includes('vertical'), 'misfit attachment taken');
+g.freeSpawn(p, true); ok(p.guns[0].att.barrel === 'suppressor' && p.guns[0].m.quiet, 'attachment lost on respawn', p.guns[0].att);
+g.handle(p, { t: 'free', a: 'gun', w: 'pike' }); g.handle(p, { t: 'free', a: 'gun', w: 'longbow' }); ok(p.guns[0].att.barrel === 'suppressor', 'attachment lost on gun swap');
+g.handle(p, { t: 'free', a: 'att', w: 'pike', s: 'sight', v: 'holo' }); g.handle(p, { t: 'free', a: 'gun', w: 'pike' }); ok(p.guns[0].att.sight === 'holo', 'attachment for a gun not in hand ignored');
 console.log(fails ? `${fails} failure(s)` : 'PASS freeguns'); process.exit(fails ? 1 : 0);

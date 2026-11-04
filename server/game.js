@@ -2233,6 +2233,11 @@ export class Game {
       p.freeGuns = { ...(p.freeGuns || {}), [side]: m.w };
       this.freeGunsOn(p); p.slot = side === 'p' ? 0 : p.guns.length - 1;
       this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id });
+    } else if (m.a === 'att' && WEAPONS[m.w] && attachFor(m.w)[m.s]?.includes(m.v)) { // he asked: attachments in the free play gun menu
+      const g = p.guns.find(q => q.w === m.w), cur = (p.freeAtt && p.freeAtt[m.w]) || (g && g.att) || cleanAtt(m.w, p.loadout && p.loadout.att && p.loadout.att[m.w], p.op);
+      (p.freeAtt ||= {})[m.w] = { ...cur, [m.s]: m.v };
+      this.freeGunsOn(p);
+      if (g) this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id });
     } else if (m.a === 'op' && this.phase === PHASE.ACTION) {
       const i = Math.max(0, FREE_OPS.indexOf(p.op)), n = FREE_OPS.length;
       this.freeSwitch(p, FREE_OPS[(i + (m.dir < 0 ? -1 : 1) + n) % n]);
@@ -2269,9 +2274,12 @@ export class Game {
     this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id });
   }
   // free play: the guns picked from the menu (p.freeGuns: p = main gun, s = sidearm) replace the operator's, kept on respawn
+  // and p.freeAtt[w] = attachments picked there for that gun, kept for the whole free play session
   freeGunsOn(p) {
+    const A = p.freeAtt || {};
+    for (const g of p.guns) if (A[g.w]) { g.att = cleanAtt(g.w, A[g.w], p.op); g.m = gunMods(g.w, g.att); }
     const F = p.freeGuns; if (!F) return;
-    const L = p.loadout || {}, mk = w => { const att = cleanAtt(w, L.att && L.att[w], p.op); return { w, ammo: WEAPONS[w].mag, reserve: WEAPONS[w].reserve, att, m: gunMods(w, att) }; };
+    const L = p.loadout || {}, mk = w => { const att = cleanAtt(w, A[w] || (L.att && L.att[w]), p.op); return { w, ammo: WEAPONS[w].mag, reserve: WEAPONS[w].reserve, att, m: gunMods(w, att) }; };
     if (F.p) p.riot = null; // a main gun in place of a riot shield
     const prim = F.p || (p.riot ? null : p.guns[0] && p.guns[0].w), sec = F.s || (p.guns[p.guns.length - 1] || {}).w;
     p.guns = [prim, sec].filter(Boolean).map(w => (p.guns.find(g => g.w === w) || mk(w)));
@@ -2861,6 +2869,7 @@ export class Game {
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
       if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; } }
       if (p.alive && (p.sock || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
+        ga: this.free ? p.guns.map(q => q.w + ':' + attCode(q.att)) : undefined, // free play's gun menu shows what each held gun carries
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur), p.rope.climb ? 1 : 0] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,

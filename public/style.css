@@ -999,3 +999,14 @@ html.tv canvas#game { cursor: default; }
 #freeOps .foGuns button canvas { width: 80px; height: 28px; }
 #freeOps .foGuns button b { font-size: 12px; white-space: nowrap; }
 #freeOps .foGuns button.on { border-color: #f2c14e; color: #f2c14e; }
+
+/* free play attachments (he asked) */
+#freeOps .foAtt { padding: 8px 18px; border-bottom: 1px solid var(--line); }
+#freeOps .foAttGun { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 6px; }
+#freeOps .foAttPic { flex: none; width: 124px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+#freeOps .foAttPic canvas { width: 120px; height: 42px; } #freeOps .foAttPic b { font-size: 12px; }
+#freeOps .foSlot { flex: 1; min-width: 0; } #freeOps .foSlot h4 { margin: 0 0 4px; }
+#freeOps .foSlot > div { display: flex; flex-wrap: wrap; gap: 4px; }
+#freeOps .foSlot button { font-size: 12px; padding: 4px 8px; }
+#freeOps .foSlot button.on { border-color: #f2c14e; color: #f2c14e; }
+#freeOps .foSlot em { display: block; font-size: 11px; color: var(--dim); margin-top: 3px; font-style: normal; }
