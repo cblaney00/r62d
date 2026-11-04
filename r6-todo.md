@@ -6,9 +6,10 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked again: this computer lets port 6262 in and the game listens on every network. Two things left, neither in the game: Lando's homelab firewall has to pass port 6262 to 10.10.0.5, and this computer's VPN setup only accepts traffic from the NAS and Lando's two gaming-pc VPN addresses, so another machine on his LAN is also dropped unless his firewall makes it look like one of those or the list grows)
+- [ ] get hosting when connecting to lando's vpn working so that lando can join from his LAN. Lando thinks this could be a firewall problem in his homelab. (checked again: this computer lets port 6262 in and the game listens on every network. Two things left, neither in the game: Lando's homelab firewall has to pass port 6262 to 10.10.0.5, and this computer's VPN setup only accepts traffic from the NAS and Lando's two gaming-pc VPN addresses, so another machine on his LAN is also dropped unless his firewall makes it look like one of those or the list grows) (2026-11-03: nothing left to do in the game; written up for Lando in docs/for-lando-lan-hosting.md, stays open until he has done it and it is tried)
 - [ ] try push to talk on screen with a real microphone (needs him at the computer: hold X in a match and talk)
 - [ ] the mix input needs more work, its not understand me enough (recorded test voices now understood 93% of the time; still needs trying with his real voice. What it hears is saved as words only in mic-log.txt in the game's data, so a session can tune it to him)
+- [ ] put this on the lando to do list (note is ready in docs/for-lando-lan-hosting.md; his list is in the computer setup, so it goes on through `vibe`, "Change or fix something on your computer")
 
 ## Done
 
