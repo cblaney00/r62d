@@ -1230,6 +1230,7 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   }
   setDir(inp, nx - p.x, ny - p.y);
   if (teamHushed(game, p)) inp.walk = 1; // someone asked for quiet: don't stomp about either
+  else if (!game.tut && game.time - (ai.seenT ?? -99) > 6 && Math.hypot(goal.x - p.x, goal.y - p.y) > 430) { inp.sprint = 1; inp.sa = p.aim; } // a long way to go and no fight on: sprint (loud). Physics only allows it when they look where they go
   // stuck? nudge
   if (Math.hypot(p.x - (ai.lx || 0), p.y - (ai.ly || 0)) < 0.5) { ai.stuck = (ai.stuck || 0) + dt; if (ai.stuck > 1) { ai.path = null; ai.stuck = 0; } }
   else ai.stuck = 0;

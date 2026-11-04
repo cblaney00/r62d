@@ -108,7 +108,7 @@ export function moveCircle(map, o, dx, dy, r, drone = false, up = false) {
 //   running (the default, like CS2 — no sprint) is a tactical jog with a gun up, 2.6 m/s for a 2-speed
 //   operator (2.3 heavy, 3.0 light); walking (Shift) 1.4 m/s, a normal walk; aiming down sights 1.5 m/s;
 //   crouch-walking 0.9 m/s; crawling while downed 0.5 m/s; a drone 3.2 m/s, a little quicker than a jog.
-export const M_S = { run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, prone: 0.9, downed: 0.5, drone: 3.2, rope: 1.0 };
+export const M_S = { sprint: 4.2, run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, prone: 0.9, downed: 0.5, drone: 3.2, rope: 1.0 };
 // lying down (C, he asked: a quick drop, crawl as fast as a crouch, aim like a crouch): o.pr goes 0 → 1 in PRONE_T seconds
 export const PRONE_T = 0.3;
 export const isProne = o => (o.pr || 0) >= 1;
@@ -144,6 +144,9 @@ export function stepMove(map, o, input, dt, mods) {
     if (o.up && !(o.air > 0)) spd *= 0.75; // up on furniture
     else if (input.ads) spd *= M_S.ads * (mods.ga || 1) / M_S.run; // aiming in: the gun's own pace; holding Shift too adds nothing (he asked)
     else if (input.walk) spd *= M_S.walk * (mods.gw || 1) / M_S.run; // walk (Shift): silent, the gun's own pace
+    // sprint (he asked, like R6): only the way you aim, only on your feet with nothing else going on; the server keeps your gun down meanwhile
+    o.spr = !!input.sprint && len > 0 && !mods.ns && !mods.downed && !mods.rope && !input.prone && !(o.pr > 0) && !input.crouch && !input.lean && !o.up && !input.ads && !input.walk && !input.fire && mx * Math.cos(input.sa || 0) + my * Math.sin(input.sa || 0) > 0.5;
+    if (o.spr) spd *= M_S.sprint / M_S.run;
   }
   // Weight: velocity eases toward where you want to go instead of jumping there.
   o.vx = o.vx || 0; o.vy = o.vy || 0;
@@ -163,7 +166,7 @@ export function stepMove(map, o, input, dt, mods) {
   if (!mods.drone) {
     const v = Math.hypot(o.vx, o.vy);
     // real step lengths: ~0.95 m jogging, ~0.7 m walking, ~0.45 m crouched, ~0.35 m crawling
-    const stride = mods.downed || o.pr > 0 ? 13 : v > BASE_SPEED * 0.78 ? 34 : v > BASE_SPEED * 0.42 ? 25 : 16;
+    const stride = mods.downed || o.pr > 0 ? 13 : v > BASE_SPEED * 1.15 ? 46 : v > BASE_SPEED * 0.78 ? 34 : v > BASE_SPEED * 0.42 ? 25 : 16;
     o.gait = (o.gait || 0) + v * dt / stride * Math.PI;
   }
   const bx = o.x, by = o.y;

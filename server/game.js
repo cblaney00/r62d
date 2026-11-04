@@ -17,7 +17,8 @@ const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
 // everyday bots: their own names, never a pro's (he asked) or a gun's
 const BOT_NAMES = ['Dusty', 'Pickles', 'Gerald', 'Noodle', 'Biscuit', 'Lenny', 'Toast', 'Wobbles', 'Mittens', 'Chonk', 'Sprout', 'Tumbleweed'];
-const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, prone: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0 };
+const SPRINT_RAISE = 0.3, SPRINT_LOUD = 520; // seconds to get the gun back up after a sprint; how far sprinting steps carry (a jog is 320)
+const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, sprint: 0, sa: 0, crouch: 0, prone: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0 };
 const JAM_R = 90;
 const VAULT_TIME = 0.6, VAULT_RECOVER = 0.35; // climbing over (no shooting, gun down), then a moment before you can aim again
 const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free play's switching order
@@ -168,6 +169,7 @@ export class Game {
     if (m.t === 'input') {
       p.input = { ...EMPTY_INPUT, ...m.k };
       if (typeof m.a === 'number' && isFinite(m.a)) p.aim = m.a;
+      p.input.sa = p.aim; // sprinting goes by the aim the server knows
       if (p.ctrl === 'cam') { const c = this.feed(p); if (c && this.operates(p, c)) c.ang = c.wn === null || c.wn === undefined ? p.aim : c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(p.aim, c.wn))); } // a wall camera can't look into its wall
       if (typeof m.ax === 'number') { p.aimX = m.ax; p.aimY = m.ay; }
       if (typeof m.vt === 'number' && isFinite(m.vt)) p.viewTime = m.vt; // server time of the world this player is looking at
@@ -564,12 +566,13 @@ export class Game {
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
       (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK);
     const gw = p.guns && p.guns[p.slot] ? moveOf(WEAPONS[p.guns[p.slot].w]) : [1, 1];
-    return { armor: o.armor, mul, downed: p.downed, frozen, gw: gw[0], ga: gw[1] };
+    return { armor: o.armor, mul, downed: p.downed, frozen, gw: gw[0], ga: gw[1], ns: mul < 1 ? 1 : undefined }; // ns: anything slowing you stops a sprint
   }
 
   applyMove(p, dt) {
     if (dt <= 0 || (this.phase !== PHASE.PREP && this.phase !== PHASE.ACTION) || !p.alive) return;
     const m = this.mods(p);
+    if (p.ctrl !== 'body') p.spr = false;
     if (p.ctrl === 'drone') {
       const d = this.ent(p.droneId); if (!d) return;
       stepMove(this.map, d, p.input, dt, m); d.ang = p.aim;
@@ -582,8 +585,9 @@ export class Game {
     stepMove(this.map, p, p.input, dt, m);
     const moved = Math.hypot(p.x - before.x, p.y - before.y) / dt;
     // how loud your steps are follows how fast you move (he asked): walking/crouching is silent, aiming in is faint, a jog is loud
-    const loud = p.input.crouch || p.pr ? 0 : 320 * Math.max(0, Math.min(1, (moved / PX_PER_M - 1.45) / (M_S.run - 1.45)));
-    p.moving = moved < 5 ? 0 : loud < 60 ? 1 : 2;
+    const loud = p.spr && moved > BASE_SPEED ? SPRINT_LOUD : p.input.crouch || p.pr ? 0 : 320 * Math.max(0, Math.min(1, (moved / PX_PER_M - 1.45) / (M_S.run - 1.45)));
+    p.moving = moved < 5 ? 0 : loud === SPRINT_LOUD ? 3 : loud < 60 ? 1 : 2;
+    if (p.spr) p.gunUp = this.time + SPRINT_RAISE;
     if (p.landed) { p.landed = false; if (!p.shrouded) this.noise(p.x, p.y, this.side(p), 220); this.events.push({ e: 'snd', s: 'land', x: r1(p.x), y: r1(p.y), id: p.id }); } // a landing thump
     if (loud >= 30 && !this.ghost(p) && !p.shrouded && this.time - (p.noiseT || 0) > 0.3) { p.noiseT = this.time; this.noise(p.x, p.y, this.side(p), loud); } // running footsteps (none from HUSH's shroud)
   }
@@ -613,7 +617,7 @@ export class Game {
     const myBird = p.ctrl === 'drone' ? this.ent(p.droneId) : null;
     if (myBird && myBird.type === 'bird') { if (inp && inp.interact && !(prev && prev.interact)) this.birdPerch(p, myBird); } // E: land on a wall / take off
     else if (p.ctrl === 'drone') { // drone sprint (he asked): Shift, 1.6x for up to 3 s, 3 a round, 6 s between; the motor whine carries
-      const on = this.time < (p.sprintUntil || 0), held = inp && inp.walk, was = prev && prev.walk;
+      const on = this.time < (p.sprintUntil || 0), held = inp && (inp.walk || inp.sprint), was = prev && (prev.walk || prev.sprint);
       if (on && !held) { p.sprintUntil = this.time; p.sprintCd = this.time + DRONE_SPRINT.wait; }
       else if (!on && held && !was && (p.sprints || 0) > 0 && this.time >= (p.sprintCd || 0)) {
         p.sprints--; p.sprintUntil = this.time + DRONE_SPRINT.time; p.sprintCd = p.sprintUntil + DRONE_SPRINT.wait;
@@ -774,10 +778,11 @@ export class Game {
     // BULWARK (he asked): holding aim-in glides the shield aside over SHIELD_ASIDE s; he can only shoot once it is fully out of the way
     const asT = p.riot ? RIOT[p.riot].aside : SHIELD_ASIDE;
     if (p.bracing) p.aside = Math.max(0, Math.min(1, (p.aside || 0) + (p.input.ads ? dt / asT : -dt / (asT * 0.75)))); else p.aside = 0;
-    const canShoot = p.ctrl === "body" && !p.staged && !p.prep && !(p.bracing && p.aside < 1 && !(p.riot && RIOT[p.riot].hip)) && !p.busy && !p.vault && !(p.rope && p.rope.st !== 'hang') && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && gun &&
+    const canShoot = p.ctrl === "body" && !p.staged && !p.prep && !(p.bracing && p.aside < 1 && !(p.riot && RIOT[p.riot].hip)) && !p.busy && !p.vault && !(p.rope && p.rope.st !== 'hang') && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && gun && !p.spr && !(p.gunUp > this.time) &&
       !(p.switchUntil > this.time) && !(p.staggerUntil > this.time);
     // a click made a hair before the gun is ready is kept until it is (up to 0.15 s), so fast tapping never loses a shot
-    const click = p.click && !(this.time - (p.click.t ?? this.time) > 0.15) ? p.click : null; p.click = null;
+    const gunComing = p.spr || p.gunUp > this.time; // a click at the end of a sprint fires as soon as the gun is up
+    const click = p.click && !(this.time - (p.click.t ?? this.time) > (gunComing ? 0.5 : 0.15)) ? p.click : null; p.click = null;
     if (click && click.t === undefined) click.t = this.time;
     if (p.burst && !(canShoot && gun.w === p.burstW && gun.ammo > 0)) p.burst = 0; // a burst stops if you can't shoot
     if (p.burst) { // the rest of a burst fires by itself
@@ -792,7 +797,7 @@ export class Game {
         else if (gun.reserve > 0) this.startReload(p);
         else if (edge) this.events.push({ e: 'snd', s: 'empty', x: r1(p.x), y: r1(p.y) });
       } else if (click && !w.auto && p.fireCd > 0) p.click = click;
-    }
+    } else if (click && gunComing) p.click = click;
   }
 
   startReload(p) {
@@ -2288,7 +2293,7 @@ export class Game {
           if (e.t > 0) break;
           if (e.type === 'spike') { // ECHO: defenders running near it show up
             e.t = 0.5; let any = false;
-            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving === 2 && Math.hypot(q.x - e.x, q.y - e.y) < 10 * PX_PER_M) { this.spot(e.team, q.id, 1.5); any = true; }
+            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving >= 2 && Math.hypot(q.x - e.x, q.y - e.y) < 10 * PX_PER_M) { this.spot(e.team, q.id, 1.5); any = true; }
             e.pingT -= 0.5; if (any && e.pingT <= 0) { e.pingT = 1.5; this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); }
           } else { // AUDIT: every attacker drone nearby is marked for the defenders, again and again
             e.t = 1.5; const o = this.players.get(e.owner), seen = e.seen || (e.seen = {});
@@ -2427,7 +2432,7 @@ export class Game {
           e.t -= dt; e.pingT -= dt; if (e.t > 0) break; e.t = 0.5;
           let any = false;
           for (const q of this.players.values())
-            if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving === 2 && Math.hypot(q.x - e.x, q.y - e.y) < 190) { this.spot(e.team, q.id, 1.5); any = true; }
+            if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving >= 2 && Math.hypot(q.x - e.x, q.y - e.y) < 190) { this.spot(e.team, q.id, 1.5); any = true; }
           if (any && e.pingT <= 0) { e.pingT = 1.5; this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); }
           break;
         }

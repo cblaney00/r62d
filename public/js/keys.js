@@ -5,8 +5,10 @@ export const ACTIONS = [
   ['down', 'Move back', 'KeyS', 'ArrowDown'],
   ['left', 'Move left', 'KeyA', 'ArrowLeft'],
   ['right', 'Move right', 'KeyD', 'ArrowRight'],
+  ['sprint', 'Sprint — very loud, only the way you aim, gun down (hold)', 'AltLeft', ''],
   ['walk', 'Walk — silent (hold)', 'ShiftLeft', ''],
   ['crouch', 'Crouch — silent, most accurate (hold)', 'ControlLeft', ''],
+  ['crouchTap', 'Crouch on / off (one tap)', '', ''],
   ['prone', 'Lie down / get up — sees under tables and cars', 'KeyC', ''],
   ['interact', 'Use — reinforce, barricade, plant, defuse, revive (hold)', 'KeyF', ''],
   ['leanL', 'Lean left (hold) — on drones / cameras: previous feed', 'KeyQ', ''],
@@ -36,11 +38,13 @@ export const BINDS_VERSION = 5;
 let binds = {};
 // C used to be a second crouch key; it is now lie down (he asked), so older saved keys give it up
 function freeC() { if (binds.crouch[1] === 'KeyC' && binds.prone[0] === 'KeyC') binds.crouch[1] = ''; }
+// Sprint is new: saved keys that already use Alt (walk, on most layouts) get it on Shift if that is free, else no key until one is chosen
+function sprintFree() { const used = c => Object.keys(binds).some(k => k !== 'sprint' && binds[k].includes(c)); if (binds.sprint[0] === 'AltLeft' && used('AltLeft')) binds.sprint[0] = used('ShiftLeft') ? '' : 'ShiftLeft'; }
 export function loadBinds() {
   binds = {};
   for (const [id, , a, b] of ACTIONS) binds[id] = [a, b];
   try { const saved = JSON.parse(localStorage.getItem(KEY) || '{}'); for (const id in saved) if (binds[id]) binds[id] = saved[id]; } catch {}
-  freeC();
+  freeC(); sprintFree();
   return binds;
 }
 let onChange = null;
@@ -54,19 +58,18 @@ export function applyBinds(saved, from = BINDS_VERSION) {
   if (from < 5 && saved && Array.isArray(saved.ptt) && saved.ptt[0] === 'KeyH') saved = { ...saved, ptt: ['KeyX', saved.ptt[1] || ''] };
   loadBinds();
   if (saved && typeof saved === 'object') for (const id in saved) if (binds[id] && Array.isArray(saved[id])) binds[id] = saved[id].slice(0, 2).map(c => (typeof c === 'string' ? c.slice(0, 24) : ''));
-  freeC(); pttFree();
+  freeC(); pttFree(); sprintFree();
   try { localStorage.setItem(KEY, JSON.stringify(binds)); } catch {}
 }
 export function resetBinds() { try { localStorage.removeItem(KEY); } catch {} loadBinds(); if (onChange) onChange(binds); }
-// Layouts from other games (he asked, and chose the games): only what differs from ours. Running is always the default
-// here, so a game's sprint key becomes our walk key where it has none; actions a game lacks (leaning) go on free keys.
+// Layouts from other games (he asked, and chose the games): only what differs from ours. Actions a game lacks (leaning, walking) go on free keys.
 export const PRESETS = [
   ['cs2', 'Counter-Strike 2', { interact: ['KeyE', ''], ability: ['KeyQ', 'KeyZ'], gadget: ['Digit4', 'KeyG'], leanL: ['KeyX', ''], leanR: ['KeyC', ''], prone: ['KeyB', ''], opPrev: ['', ''], spot: ['KeyT', ''], melee: ['Digit3', ''] }],
-  ['r6', 'Rainbow Six Siege', { crouch: ['KeyC', 'ControlLeft'], prone: ['KeyZ', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['Digit3', 'KeyG'], ability: ['Digit4', ''], view: ['Digit5', ''], drone: ['Digit6', ''], melee: ['KeyV', ''] }],
-  ['cod', 'Call of Duty (modern)', { crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyX', 'Digit4'], leanL: ['KeyQ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
-  ['mw2', 'Modern Warfare 2 (2009)', { crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyQ', 'Digit4'], leanL: ['KeyZ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
-  ['halo', 'Halo', { crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyE', ''], melee: ['KeyQ', 'KeyV'], gadget: ['KeyG', ''], ability: ['ShiftLeft', 'KeyF'], leanL: ['KeyZ', ''], leanR: ['KeyX', ''] }],
-  ['swbf2', 'Star Wars Battlefront II (2017)', { crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], ability: ['KeyQ', ''], gadget: ['KeyE', 'KeyG'], leanL: ['KeyZ', ''], leanR: ['KeyX', ''], melee: ['KeyV', ''] }],
+  ['r6', 'Rainbow Six Siege', { crouch: ['', ''], crouchTap: ['KeyC', ''], prone: ['ControlLeft', ''], sprint: ['ShiftLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['Digit3', 'KeyG'], ability: ['Digit4', ''], view: ['Digit5', ''], drone: ['Digit6', ''], melee: ['KeyV', ''] }],
+  ['cod', 'Call of Duty (modern)', { sprint: ['ShiftLeft', ''], crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyX', 'Digit4'], leanL: ['KeyQ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
+  ['mw2', 'Modern Warfare 2 (2009)', { sprint: ['ShiftLeft', ''], crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyQ', 'Digit4'], leanL: ['KeyZ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
+  ['halo', 'Halo', { sprint: ['ShiftLeft', ''], crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyE', ''], melee: ['KeyQ', 'KeyV'], gadget: ['KeyG', ''], ability: ['KeyF', ''], leanL: ['KeyZ', ''], leanR: ['KeyX', ''] }],
+  ['swbf2', 'Star Wars Battlefront II (2017)', { sprint: ['ShiftLeft', ''], crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], ability: ['KeyQ', ''], gadget: ['KeyE', 'KeyG'], leanL: ['KeyZ', ''], leanR: ['KeyX', ''], melee: ['KeyV', ''] }],
 ];
 export function applyPreset(name) {
   const pr = PRESETS.find(p => p[0] === name); if (!pr) return;

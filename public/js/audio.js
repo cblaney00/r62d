@@ -162,7 +162,7 @@ const SURF = {
   glass:    { modes: [[160, 0.018, 0.5], [2400, 0.01, 0.3]], pulse: 1, slap: 6000, slapG: 0.6, scuff: 0.3, gravel: 0.5, glass: 1, v: 1.01 },
   splinters:{ modes: [[95, 0.07, 0.9], [400, 0.03, 0.45], [880, 0.018, 0.3]], pulse: 2.2, slap: 2600, slapG: 0.45, scuff: 0.3, crack: 1, v: 0.72 },
 };
-// paces: 0 walk (Shift), 1 crouch, 2 run, 3 run (heavy)
+// paces: 0 walk (Shift), 1 crouch, 2 run, 3 sprint
 const GAIT = [
   { heel: 0.55, toe: 0.45, gap: [0.1, 0.14], soft: 1.6, scuff: 0.6 },
   { heel: 0.38, toe: 0.4, gap: [0.13, 0.18], soft: 2.0, scuff: 0.9 },
@@ -253,8 +253,8 @@ export function step(x, y, surf, pace, own) {
   C = 'steps';
   if (pace <= 1 && !own) return; // silent movement, like CS2
   const s = SURF[surf] || SURF.concrete; if (!SURF[surf]) surf = 'concrete';
-  const loud = [0.16, 0.22, 0.92, 1][pace] * s.v;
-  const range = [160, 220, 580, 620][pace];
+  const loud = [0.16, 0.22, 0.92, 1.25][pace] * s.v;
+  const range = [160, 220, 580, 900][pace];
   const g = out(own ? undefined : x, own ? undefined : y, loud * (own ? 0.42 : 1), range, 0.12); if (!g) return;
   playBuf(g, stepBuf(surf, pace), 0.96 + Math.random() * 0.08);
   if (pace >= 2 && Math.random() < 0.45) gear(g, ac.currentTime + 0.02, 0.28);

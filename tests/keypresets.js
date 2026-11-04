@@ -10,11 +10,12 @@ for (const [id, name] of PRESETS) {
   applyPreset(id);
   const b = getBinds(), seen = {};
   for (const k in b) for (const c of b[k]) { if (!c) continue; if (seen[c]) fail(`${name}: ${c} is both ${seen[c]} and ${k}`); seen[c] = k; }
-  for (const [a] of ACTIONS) if (a !== 'opPrev' && !b[a].some(Boolean)) fail(`${name}: nothing on ${a}`);
-  console.log(name.padEnd(32), ['crouch', 'prone', 'walk', 'interact', 'gadget', 'ability', 'melee', 'leanL', 'leanR', 'ptt', 'view', 'drone'].map(a => a + '=' + b[a].filter(Boolean).join('/').replace(/Key|Digit/g, '')).join(' '));
+  for (const [a] of ACTIONS) if (a !== 'opPrev' && a !== 'crouchTap' && !(a === 'crouch' && b.crouchTap.some(Boolean)) && !b[a].some(Boolean)) fail(`${name}: nothing on ${a}`);
+  console.log(name.padEnd(32), ['sprint', 'crouch', 'crouchTap', 'prone', 'walk', 'interact', 'gadget', 'ability', 'melee', 'leanL', 'leanR', 'ptt', 'view', 'drone'].map(a => a + '=' + b[a].filter(Boolean).join('/').replace(/Key|Digit/g, '')).join(' '));
 }
 applyPreset('r6');
 const r = getBinds();
+if (r.crouchTap[0] !== 'KeyC' || r.prone[0] !== 'ControlLeft' || r.sprint[0] !== 'ShiftLeft') fail('Siege: C taps crouch, Ctrl lies down, Shift sprints');
 if (r.gadget[0] !== 'Digit3') fail('Siege: 3 should be the gadget');
 if (r.ability[0] !== 'Digit4') fail('Siege: 4 should be the operator skill');
 console.log(bad ? `${bad} problems` : 'PASS');

@@ -294,6 +294,7 @@ export function drawOperator(ctx, p, t) {
   ctx.save();
   if (mel > 0) ctx.rotate(-Math.sin(mel * Math.PI) * 0.9);
   if (p.reload) ctx.rotate(0.38 + Math.sin(t * 9) * 0.05);
+  if (p.sprint) ctx.rotate(p.sprint * 0.85); // sprinting: gun down across the body
   ctx.translate(p.ads ? 2 : 0, p.ads ? 0 : 1.4);
   const glove = (x, y) => { ell(ctx, x, y, 1.7, 1.6, '#1f1f20'); };
   if (shield) { // the shield hand holds the grip on the inside of the shield, wherever it has swung to (he asked)

@@ -10,6 +10,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] one tap of C crouches, Ctrl lies down, Shift sprints on the Rainbow Six layout; add sprinting to the game, quite loud, similar to R6 (sprint goes about 60% faster, only the way you aim, gun down and 0.3 s to come back up, footsteps much louder and carrying further, bots sprint too. Key: Shift on the game layouts, Alt on the normal layout. Not on controller or phone yet)
 - [x] for the rainbow 6 keybind settings it has 3 and 4 reversed, see if there are any other issues with that (3 is now gadget and 4 is operator skill. Also found: that layout took X from push to talk, so talk stays on X now and the skill keeps only 4; game text named fixed keys, such as "hold E to reinforce" when Use is on F, and now names your own keys; the microphone hint could show an old key. Every layout is checked so no key does two jobs. Click the layout's button again to get the fix)
 - [x] open mic should also be a toggle option (Settings → Sound → Microphone: Push to talk or Open mic. Open mic listens only during a match you are playing, sends a sentence after a short pause, and drops anything that means nothing to the bots. Push to talk stays the default. Tested with recorded test voices, not yet with a real microphone and game sound)
 - [x] try push to talk on screen with a real microphone (he tried it: it runs, but understood him poorly, which is the item above)

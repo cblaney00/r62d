@@ -660,8 +660,10 @@ function pressAction(a, e) {
   const ev = st.evq;
   switch (a) {
     case 'reload': ev.push({ k: 'reload' }); break;
-    case 'prone': st.prone = !st.prone; break; // C lies down / gets up (he asked); Ctrl crouch or Space also gets up
+    case 'prone': st.prone = !st.prone; st.crouchT = false; break; // C lies down / gets up (he asked); Ctrl crouch or Space also gets up
     case 'crouch': st.prone = false; break;
+    case 'crouchTap': st.crouchT = st.prone || !st.crouchT; st.prone = false; break; // one tap crouches, the next stands (he asked)
+    case 'sprint': if (st.me && st.me.ct === 'body') { st.prone = false; st.crouchT = false; st.leanT = 0; } break; // sprinting gets you up, like R6
     case 'primary': ev.push({ k: 'slot', n: 0 }); break;
     case 'secondary': ev.push({ k: 'slot', n: 1 }); break;
     case 'melee': ev.push({ k: 'melee' }); break;
@@ -885,7 +887,7 @@ function renderSettings() {
 }
 $('setReset').onclick = () => { resetBinds(); renderSettings(); };
 for (const [id, name] of PRESETS) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => { audio.ui(); applyPreset(id); renderSettings(); }; $('keyPresets').appendChild(b); }
-const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'walk', 'crouch', 'prone', 'vault', 'leanL', 'leanR']],
+const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'sprint', 'walk', 'crouch', 'crouchTap', 'prone', 'vault', 'leanL', 'leanR']],
   ['FIGHTING', ['primary', 'secondary', 'melee', 'reload', 'ability', 'gadget', 'interact']],
   ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'chat', 'ptt', 'scoreboard']],
   ['MENUS & FREE PLAY', ['settings', 'pause', 'opNext', 'opPrev', 'opGrid']]];
@@ -990,7 +992,7 @@ $('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(
 function renderControls() {
   const L = id => keyName(bindsFor(id)[0]);
   const rows = [[`${L('up')}${L('left')}${L('down')}${L('right')}`, 'Move'], ['Mouse', 'Aim'], ['Left click', 'Shoot'], ['Right click', 'Aim down sights'],
-    [L('walk'), 'Walk (silent)'], [L('crouch'), 'Crouch (hold, silent)'], [L('reload'), 'Reload'],
+    [L('sprint'), 'Sprint (loud)'], [L('walk'), 'Walk (silent)'], [bindsFor('crouch')[0] ? L('crouch') : L('crouchTap'), bindsFor('crouch')[0] ? 'Crouch (hold, silent)' : 'Crouch (tap, silent)'], [L('reload'), 'Reload'],
     [L('interact') + ' (hold)', 'Reinforce, barricade, plant, defuse, revive'], [L('ability'), 'Operator skill'],
     [L('gadget'), 'Secondary gadget'], [L('melee'), 'Melee'], [L('drone'), 'Put out / drive your drone'], [L('view'), 'Team drones & cameras (' + L('leanL') + ' / ' + L('leanR') + ' switch)'], [L('spot') + ' · Middle click', 'Ping (enemies, gadgets, walls, doors, places)'],
     [`${L('primary')} / ${L('secondary')} · Wheel`, 'Switch weapon'], [L('scoreboard'), 'Scoreboard']];
@@ -1635,11 +1637,14 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
   const k = {
     up: keys.has('up') || gpk.up ? 1 : 0, down: keys.has('down') || gpk.down ? 1 : 0, left: keys.has('left') || gpk.left ? 1 : 0, right: keys.has('right') || gpk.right ? 1 : 0,
-    walk: keys.has('walk') || gpk.walk ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch ? 1 : 0, prone: st.prone && me && me.a && !me.dn ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
+    walk: keys.has('walk') || gpk.walk ? 1 : 0, sprint: keys.has('sprint') && performance.now() >= (st.sprintHold || 0) ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch || st.crouchT ? 1 : 0, prone: st.prone && me && me.a && !me.dn ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
     lean: me && me.ct === 'body' ? leanNow() : 0, jump: performance.now() - (st.jumpReq || -1e9) < 120 ? 1 : 0,
   };
   if (me && (!me.a || me.dn)) st.leanT = 0; // dead or downed: stand straight again
+  if (!me || !me.a || me.dn || !s || (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION)) st.crouchT = false;
+  if (mouse.l || gpk.fire) st.sprintHold = performance.now() + 500; // shooting stops a sprint for a moment, so the shot gets out
+  if (k.sprint) k.sa = Math.round(st.aim * 1000) / 1000; // what the server will go by for which way you sprint
   if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
   if (st.rot) k.rot = Math.round(-st.rot * 1000) / 1000; // Rotate aiming: W walks up the screen
@@ -2023,7 +2028,7 @@ function draw(s, view, now, dt) {
       ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     drawOperator(ctx, {
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn,
-      lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
+      sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
     if (elv) ctx.restore();
     drawn.push(p);
@@ -2359,7 +2364,8 @@ function crosshair(me, now) {
     if (on) { ctx.fillStyle = 'rgba(255,59,59,0.22)'; ctx.fill(); }
   }
   const fq = aimMode === 'free' && padOn && !gpRecent() ? freeAimPoint() : null;
-  if (fq && fq.stopped) ctx.globalAlpha = 0.45; // bullets stop at a wall before it: faded
+  if (me.mv === 3) ctx.globalAlpha = 0.3; // sprinting: gun down
+  else if (fq && fq.stopped) ctx.globalAlpha = 0.45; // bullets stop at a wall before it: faded
   drawXhair(ctx, x, y, xh, spread, DPR);
   ctx.globalAlpha = 1;
   // points popups under the crosshair (he asked, R6-style): newest at the top, each fades after a couple of seconds
@@ -3070,6 +3076,7 @@ function updateCard() {
 const TIPS = [
   'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',
   'Walk ({walk}) or crouch ({crouch}) to move without footsteps — just like CS2.',
+  'Sprinting only goes the way you aim. It is very loud, and your gun takes a moment to come up.',
   'Stop before you shoot: running ruins your accuracy. Crouching still is the most accurate.',
   'Broken glass under windows crunches loudly — listen for it.',
   'Defenders: reinforce the walls of the objective room before the action phase starts.',
