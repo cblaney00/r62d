@@ -44,7 +44,7 @@ export function levelUp(src, boost = 1, rate = 48000) {
 // sound lately, the mic idling between presses included; a piece of sound just before speech starts is kept (gateNext).
 let noiseAt = 0, gateHang = 0, gatePrev = null, GATE = 3;
 const rmsOf = d => { let s = 0; for (let i = 0; i < d.length; i++) s += d[i] * d[i]; return Math.sqrt(s / d.length); };
-export const noiseTrack = d => { const r = rmsOf(d); noiseAt = !noiseAt ? r : Math.min(noiseAt * 1.01, Math.max(r, 1e-5)); return r; };
+export const noiseTrack = d => { const r = rmsOf(d); noiseAt = !noiseAt ? Math.max(r, 1e-5) : Math.min(noiseAt * 1.01, Math.max(r, 1e-5)); return r; };
 function gateNext(d) {
   const r = noiseTrack(d), open = r > Math.max(noiseAt * GATE, 0.0012), was = gateHang > 0;
   gateHang = open ? 4 : gateHang - 1;
@@ -52,6 +52,10 @@ function gateNext(d) {
   if (open || was) return out;
   const q = new Float32Array(out.length); for (let i = 0; i < q.length; i++) q[i] = out[i] * 0.05; return q;
 }
+// Open mic (he asked, as a choice next to push to talk): listening all the time, a sentence starts when sound rises above the
+// room's noise and ends after a short pause. Only the words of a sentence that means something go to the team (main.js).
+let openOn = false, openCb = null, talking = false, quietN = 0, longN = 0, loudN = 0;
+export function setOpenMic(on, cb) { openOn = on; openCb = on ? cb : null; if (!on && talking) { talking = false; held = false; last = ''; if (onState) onState('off'); } }
 const micBoost = () => { try { return (+localStorage.getItem('r62d-micboost') || 100) / 100; } catch { return 1; } };
 function feed(samples, rate) {
   const b = new AudioBuffer({ length: samples.length, sampleRate: rate, numberOfChannels: 1 }); b.copyToChannel(samples, 0); pending++; rec.acceptWaveform(b);
@@ -68,6 +72,27 @@ function settle(t0) {
     finish();
   } else setTimeout(() => settle(t0), 40);
 }
+// one piece of sound from the microphone
+export function micBlock(d) {
+  if (held || tail) {
+    const boost = micBoost();
+    const hear = b => { const g = gateNext(b); if (g) feed(levelUp(g, boost, ac.sampleRate), ac.sampleRate); };
+    while (ring.length) hear(ring.shift());
+    hear(d);
+    if (onHear) onHear(null, Math.min(1, Math.sqrt(loudest) * 4));
+  } else if (openOn && openCb && !onDone) {
+    const boost = micBoost(), hear = b => { const g = gateNext(b); if (g) feed(levelUp(g, boost, ac.sampleRate), ac.sampleRate); }, block = Float32Array.from(d);
+    if (!talking) {
+      const r = noiseTrack(block); loudN = r > Math.max(noiseAt * GATE, 0.0012) ? loudN + 1 : 0;
+      ring.push(block); if (ring.length > 6) ring.shift();
+      if (loudN >= 2) { talking = true; quietN = 0; longN = 0; last = ''; levelReset(); if (onState) onState('on'); while (ring.length) hear(ring.shift()); }
+    } else {
+      const loud = rmsOf(block) > Math.max(noiseAt * GATE, 0.0012); quietN = loud ? 0 : quietN + 1; longN++; hear(block);
+      if (onHear) onHear(null, Math.min(1, Math.sqrt(loudest) * 4));
+      if (quietN > 8 || longN > 94) { talking = false; loudN = 0; if (onState) onState('off'); onDone = t => openCb && openCb(t, loudest); askFinal(); setTimeout(() => { if (onDone) finish(); }, 9000); } // (about 0.7 s of quiet, or 8 s of talking)
+    }
+  } else { noiseTrack(d); ring.push(Float32Array.from(d)); if (ring.length > 6) ring.shift(); }
+}
 async function setup() {
   if (!navigator.mediaDevices) throw new Error('nomic'); // only on this computer: a browser refuses the microphone on a plain http address
   // the browser's own noise filter treats a voice far from the mic as noise, so it stays off; echo cancelling keeps the game's sound out
@@ -77,16 +102,7 @@ async function setup() {
   if (!rec || stale || recRate !== ac.sampleRate) rec = await makeRec(ac.sampleRate);
   const src = ac.createMediaStreamSource(stream), hp = ac.createBiquadFilter(), node = ac.createScriptProcessor(4096, 1, 1), mute = ac.createGain();
   hp.type = 'highpass'; hp.frequency.value = 90; mute.gain.value = 0; // (rumble and desk thumps only confuse it)
-  node.onaudioprocess = e => {
-    const d = e.inputBuffer.getChannelData(0);
-    if (held || tail) {
-      const boost = micBoost();
-      const hear = b => { const g = gateNext(b); if (g) feed(levelUp(g, boost, ac.sampleRate), ac.sampleRate); };
-      while (ring.length) hear(ring.shift());
-      hear(d);
-      if (onHear) onHear(null, Math.min(1, Math.sqrt(loudest) * 4));
-    } else { noiseTrack(d); ring.push(Float32Array.from(d)); if (ring.length > 6) ring.shift(); }
-  };
+  node.onaudioprocess = e => micBlock(e.inputBuffer.getChannelData(0));
   src.connect(hp); hp.connect(node); node.connect(mute); mute.connect(ac.destination);
 }
 // state: 'loading' | 'on' | 'off' | 'nomic'. hear(text, level): what it has understood so far, how loud the mic is

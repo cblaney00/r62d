@@ -1,7 +1,8 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
-import { pttDown, pttUp, pttSetState, pttVocab, pttTest, pttPreload } from './ptt.js';
+import { pttDown, pttUp, pttSetState, pttVocab, pttTest, pttPreload, pttReady, setOpenMic } from './ptt.js';
+import { parseCommand } from '/shared/commands.js';
 import { openVoiceTest } from './voicetest.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
 import { stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
@@ -487,6 +488,7 @@ function onSnap(s) {
     return;
   }
   if (s.mv !== st.mv) { if (st.rend) resetMap(s.mv); else loadMap(s.mv, null, null, s.mp); } // same map, new round
+  syncOpenMic();
   if (st.pttRd !== s.rd && s.rd && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION) && !st.tv && !st.tutorial) { // the microphone's words for this round, loaded ahead (once you have used it)
     st.pttRd = s.rd; let used = false; try { used = !!localStorage.getItem('r62d-ptt-used'); } catch {}
     if (used) setTimeout(() => { if (!st.tv && !st.tutorial) { pttVocabNow(); pttPreload(); } }, 1500);
@@ -745,6 +747,30 @@ addEventListener('keyup', e => {
     else addFeed(loudest < 0.004 ? 'The microphone heard almost nothing: check it, or raise Microphone boost in Settings → Sound' : "Didn't catch any words: try \"where are they\" or \"go to\" and a room");
   });
 });
+// Settings → Sound → Microphone: push to talk or open mic. Open mic only listens in a match you are playing, and a sentence that
+// means nothing to the bots is dropped so the game's own sound doesn't end up in team chat.
+let micMode = (() => { try { return localStorage.getItem('r62d-micmode') === 'open' ? 'open' : 'ptt'; } catch { return 'ptt'; } })(), micLive = false;
+function setMicMode(m) {
+  micMode = m === 'open' ? 'open' : 'ptt';
+  try { localStorage.setItem('r62d-micmode', micMode); } catch {}
+  for (const b of $('micSeg').children) b.classList.toggle('on', b.dataset.m === micMode);
+  $('micHint').textContent = micMode === 'open' ? 'Always listening during a match: just talk' : `Hold ${keyName(bindsFor('ptt')[0] || 'KeyX')} while you talk to the bots`;
+  syncOpenMic();
+}
+async function syncOpenMic() {
+  const want = micMode === 'open' && playing() && !st.tv && !st.tutorial && !!navigator.mediaDevices && !isTouch;
+  if (want === micLive) return;
+  micLive = want;
+  if (!want) { setOpenMic(false); return; }
+  pttVocabNow();
+  if (!await pttReady()) { micLive = false; pttMsg('NO MICROPHONE HERE (OR THE BROWSER REFUSED IT)', 4000); return; }
+  try { localStorage.setItem('r62d-ptt-used', '1'); } catch {}
+  if (micLive) setOpenMic(true, (text, loudest) => {
+    try { fetch('/api/miclog', { method: 'POST', body: `open level ${loudest.toFixed(4)} heard: ${text || '(nothing)'}` }).catch(() => {}); } catch {}
+    const rooms = st.map ? (st.map.rooms || []).map(r => r.name) : [], c = text ? parseCommand(text, { rooms }) : null;
+    if (c && (c.intent || c.room)) send({ t: 'chat', text, team: true, mic: 1 });
+  });
+}
 function pttVocabNow() {
   const sn = st.snaps.length ? st.snaps[st.snaps.length - 1] : null;
   if (st.map) pttVocab((st.map.rooms || []).map(r => r.name), sn ? [...sn.players.values()].filter(p => p.bt).map(p => String(p.n || '').replace(/^\[\w+\] /, '')) : [], sn ? [...new Set([...sn.players.values()].map(p => p.op).filter(Boolean))].map(o => OPERATORS[o].name) : []);
@@ -3220,5 +3246,7 @@ $('kcBtn').onclick = () => { audio.ui(); watchKillcam(); };
 
 
 try { $('micBoost').value = localStorage.getItem('r62d-micboost') || 100; } catch {}
+for (const b of $('micSeg').children) b.onclick = () => { audio.ui(); setMicMode(b.dataset.m); };
+setMicMode(micMode);
 $('voiceTestBtn').onclick = () => { audio.ui(); openVoiceTest(); };
 $('micBoost').addEventListener('input', () => { try { localStorage.setItem('r62d-micboost', $('micBoost').value); } catch {} });

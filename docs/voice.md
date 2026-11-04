@@ -30,3 +30,7 @@ He read 18 orders at his normal distance (about 45 cm) into a temporary test pag
 To repeat: record raw Float32 clips, serve them with CORS, and in hidden Firefox `import('/js/ptt.js')`, `pttVocab(rooms, [], [])`, `pttTest(samples, rate, { fresh: true })`, score with `parseCommand`.
 ## Voice setup
 `public/js/voicetest.js`, `openVoiceTest`: shown once (`r62d-voicetest`) ~0.9 s after the welcome in the lobby, not on touch, not without `navigator.mediaDevices`, not in TV/tutorial/free; again from Settings → Sound (`#voiceTestBtn`). Sets Microphone boost to 200 if the mic is very quiet.
+
+## Blended speech and open mic (2026-11-03)
+He speaks fast with a rural accent (north-western Maryland) and blends words. `micPhrases` also listens for each sentence without "the", with "go" for "go to the" and "they"/"you" for "are they"/"are you"; `parseCommand` reads those. Test voices sped up 1.4× barely suffer (89/92 before, 91/92 after), so they don't show blending: only his voice can.
+Open mic: `setOpenMic(on, cb)` in ptt.js, handled in `micBlock` (one piece of mic sound; a test can call it directly because a hidden browser's AudioContext never runs). A sentence starts after 2 pieces above the gate, ends after ~0.7 s of quiet or 8 s. `syncOpenMic` in main.js turns it on only while `playing()`, not TV/tutorial/touch; sentences with no intent or room are dropped. Choice: `r62d-micmode`, Settings `#micSeg`.
