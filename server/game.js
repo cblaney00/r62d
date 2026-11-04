@@ -4,10 +4,11 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatch
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
-import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, roundChat, tvTalk, tvBanPick } from './bots.js';
+import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
+const PING_KINDS = new Set(['go', 'omw', 'watch', 'hold', 'danger', 'help', 'enemy', 'open']); // the ping wheel (public/js/pingwheel.js)
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 const BARRI_BULLET_HP = 320; // bullet damage that breaks a whole wooden barricade (he asked)
 
@@ -222,7 +223,7 @@ export class Game {
       }
     }
     else if (m.t === 'settings') store.setSettings(p.token, m.s);
-    else if (m.t === 'chat') { this.chat(p, { text: m.text, team: m.team }); if (m.team) botHear(this, p, String(m.text || '').slice(0, 140), !!m.mic); } // bots take directions and questions, typed or spoken
+    else if (m.t === 'chat') { this.chat(p, { text: m.text, team: m.team }); if (m.team) botHear(this, p, String(m.text || '').slice(0, 140)); } // bots take directions and questions, typed or spoken
     else if (m.t === 'loadout') {
       const l = store.setLoadout(p.token, m.op, m.l);
       const prof = store.byToken(p.token);
@@ -1483,9 +1484,11 @@ export class Game {
         const x = Number(e.x), y = Number(e.y);
         if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > this.map.W * CELL || y > this.map.H * CELL || !this.markOk(p)) break;
         const w = String(e.w || '').toUpperCase().replace(/[^A-Z0-9 .'-]/g, '').trim().slice(0, 28) || 'HERE';
-        this.mark(p, x, y, w, typeof e.id === 'string' || typeof e.id === 'number' ? e.id : null);
+        const pk = PING_KINDS.has(e.pk) ? e.pk : undefined;
+        this.mark(p, x, y, w, typeof e.id === 'string' || typeof e.id === 'number' ? e.id : null, pk);
+        if (pk) botPing(this, p, pk, x, y);
         { // points for pinging something worth knowing (a gadget, camera, drone, the objective...), once per thing a round
-          const key = e.id != null ? 'e' + e.id : w + '@' + (roomAt(this.map, x, y) || Math.round(x / 80) + ',' + Math.round(y / 80)), worth = !/^(GO|LOOK) HERE/.test(w);
+          const key = e.id != null ? 'e' + e.id : w + '@' + (roomAt(this.map, x, y) || Math.round(x / 80) + ',' + Math.round(y / 80)), worth = !pk && !/^(GO|LOOK) HERE/.test(w);
           if (worth && !(p.pinged || (p.pinged = new Set())).has(key)) { p.pinged.add(key); this.pts(p, 10, w.split(' ').slice(0, 2).join(' ') + ' PINGED'); }
         }
         break;
@@ -2098,9 +2101,9 @@ export class Game {
     return true;
   }
   // A labelled marker for the pinger's team, plus a line in their team chat saying what and where.
-  mark(p, x, y, w, id) {
+  mark(p, x, y, w, id, pk) {
     const team = this.side(p), room = roomAt(this.map, x, y);
-    this.events.push({ e: 'mark', team, x: r1(x), y: r1(y), w, by: p.name, from: p.id, id });
+    this.events.push({ e: 'mark', team, x: r1(x), y: r1(y), w, by: p.name, from: p.id, id, pk });
     const msg = JSON.stringify({ t: 'chat', from: p.id, name: p.name, text: w + (room ? ' · ' + room : ''), team: true, squad: p.squad, ping: 1 });
     for (const q of this.players.values()) if (q.sock && q.sock.open && q.squad === p.squad) q.sock.send(msg);
     if (this.tut && !p.bot) { const i = this.tut.info; if (!i.pings.includes(w)) i.pings.push(w); i.n++; if (p.ctrl !== 'body') i.feedPings++; }

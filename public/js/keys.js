@@ -24,7 +24,8 @@ export const ACTIONS = [
   ['vault', 'Jump (onto furniture) — vaults windows and wall stubs', 'Space', ''],
   ['spot', 'Ping what is under your aim (enemy, gadget, wall, door, place)', 'KeyT', ''],
   ['chat', 'Chat (opens team chat; / switches team ⇄ all)', 'KeyY', 'Enter'],
-  ['ptt', 'Push to talk to the bots (hold)', 'KeyX', ''],
+  ['wheel', 'Ping wheel: hold, drag toward a ping, let go', 'KeyX', ''],
+  ['map', 'Map: open or close, click it to ping', 'CapsLock', ''],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['opNext', 'Free play: next operator', 'KeyN', ''],
   ['opPrev', 'Free play: previous operator', 'KeyB', ''],
@@ -43,8 +44,8 @@ function sprintFree() { const used = c => Object.keys(binds).some(k => k !== 'sp
 export function loadBinds() {
   binds = {};
   for (const [id, , a, b] of ACTIONS) binds[id] = [a, b];
-  try { const saved = JSON.parse(localStorage.getItem(KEY) || '{}'); for (const id in saved) if (binds[id]) binds[id] = saved[id]; } catch {}
-  freeC(); sprintFree();
+  try { const saved = fromTalk(JSON.parse(localStorage.getItem(KEY) || '{}')); for (const id in saved) if (binds[id]) binds[id] = saved[id]; } catch {}
+  freeC(); sprintFree(); mapFree();
   return binds;
 }
 let onChange = null;
@@ -53,12 +54,16 @@ export function saveBinds() { try { localStorage.setItem(KEY, JSON.stringify(bin
 export const getBinds = () => JSON.parse(JSON.stringify(binds));
 // load a profile's saved keys (unknown actions ignored, missing ones keep defaults)
 // Saved keys from v4 keep everything except push to talk, which moves from H to X. If something else has X, or a layout took it, talk stays on H.
-function pttFree() { if (binds.ptt[0] === 'KeyX' && Object.keys(binds).some(k => k !== 'ptt' && binds[k].includes('KeyX'))) binds.ptt[0] = Object.keys(binds).some(k => binds[k].includes('KeyH')) ? '' : 'KeyH'; }
+function wheelFree() { if (binds.wheel[0] === 'KeyX' && Object.keys(binds).some(k => k !== 'wheel' && binds[k].includes('KeyX'))) binds.wheel[0] = Object.keys(binds).some(k => binds[k].includes('KeyH')) ? '' : 'KeyH'; }
+// Talking is gone (he scrapped it): the ping wheel takes over its key. The map is on Caps Lock on every layout unless Caps Lock was chosen for something else.
+function fromTalk(saved) { if (saved && saved.ptt && !saved.wheel) saved = { ...saved, wheel: saved.ptt }; return saved; }
+function mapFree() { if (binds.map[0] === 'CapsLock' && Object.keys(binds).some(k => k !== 'map' && binds[k].includes('CapsLock'))) binds.map[0] = ''; }
 export function applyBinds(saved, from = BINDS_VERSION) {
   if (from < 5 && saved && Array.isArray(saved.ptt) && saved.ptt[0] === 'KeyH') saved = { ...saved, ptt: ['KeyX', saved.ptt[1] || ''] };
+  saved = fromTalk(saved);
   loadBinds();
   if (saved && typeof saved === 'object') for (const id in saved) if (binds[id] && Array.isArray(saved[id])) binds[id] = saved[id].slice(0, 2).map(c => (typeof c === 'string' ? c.slice(0, 24) : ''));
-  freeC(); pttFree(); sprintFree();
+  freeC(); wheelFree(); sprintFree(); mapFree();
   try { localStorage.setItem(KEY, JSON.stringify(binds)); } catch {}
 }
 export function resetBinds() { try { localStorage.removeItem(KEY); } catch {} loadBinds(); if (onChange) onChange(binds); }
@@ -77,7 +82,7 @@ export function applyPreset(name) {
   const over = pr[2], taken = new Set(Object.values(over).flat().filter(Boolean));
   for (const id in binds) if (!over[id]) binds[id] = binds[id].map(c => (taken.has(c) ? '' : c)); // a key the layout uses elsewhere
   for (const id in over) if (binds[id]) binds[id] = over[id].slice();
-  if (!binds.ptt[0]) binds.ptt[0] = 'KeyX'; pttFree();
+  if (!binds.wheel[0]) binds.wheel[0] = 'KeyX'; wheelFree(); mapFree();
   saveBinds();
 }
 export function setBind(id, slot, code) {

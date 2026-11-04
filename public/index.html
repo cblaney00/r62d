@@ -181,10 +181,6 @@
       <div class="srow"><div class="sl"><b>Master volume</b><small>Everything in the game, all at once</small></div><div class="sctl"><input type="range" id="volMaster" min="0" max="100" value="70"></div></div>
       <div class="srow"><div class="sl"><b>Effects volume</b><small>Guns, footsteps, gadgets and explosions</small></div><div class="sctl"><input type="range" id="volSfx" min="0" max="100" value="100"></div></div>
       <div class="srow"><div class="sl"><b>Music volume</b><small>The music in the menus</small></div><div class="sctl"><input type="range" id="volMusic" min="0" max="100" value="88"></div></div>
-      <div class="srow"><div class="sl"><b>Microphone</b><small><span id="micHint"></span></small></div><div class="sctl"><span class="seg" id="micSeg"><button data-m="ptt">Push to talk</button><button data-m="open">Open mic</button></span></div></div>
-      <div class="srow"><div class="sl"><b>Save my voice</b><small>Keeps the sound of what you say on this computer, to help tune the microphone. Goes back to Off when you close the game</small></div><div class="sctl"><span class="seg" id="micSaveSeg"><button data-m="off">Off</button><button data-m="on">On</button></span></div></div>
-      <div class="srow"><div class="sl"><b>Voice setup</b><small>Check the bots can understand your microphone</small></div><div class="sctl"><button id="voiceTestBtn">RUN VOICE TEST</button></div></div>
-      <div class="srow"><div class="sl"><b>Microphone boost</b><small>The game evens out your voice by itself. Leave this at 100 unless the voice test says your volume is too quiet</small></div><div class="sctl"><input type="range" id="micBoost" min="50" max="400" step="10" value="100"></div></div>
     </section>
     <section class="setPage" data-p="aim"><h3>MOUSE &amp; AIM</h3>
       <div class="srow"><div class="sl"><b>Playing with</b><small>Phone / tablet shows buttons on the screen</small></div><div class="sctl"><span class="seg" id="inputSeg"><button data-c="desk">Keyboard &amp; mouse</button><button data-c="touch">Phone / tablet</button></span></div></div>
@@ -244,7 +240,6 @@
   <div id="profilePage" class="overlay hidden"><div class="page"><div class="pagehead"><h2>PROFILE</h2><button class="close">Close</button></div><div id="profBody"></div></div></div>
   <div id="tvDraft" class="hidden"></div>
   <div id="tvCast" class="hidden"></div>
-  <div id="pttInd" class="hidden"></div>
   <div id="tvHud"><div id="tvL" class="tvSide"></div><div id="tvR" class="tvSide"></div><div id="tvCommsL" class="tvComms"></div><div id="tvCommsR" class="tvComms"></div><div id="tvHelp"></div></div>
   <div id="corner"><button id="fsBtn" title="Fullscreen">⛶ Fullscreen</button><button id="setBtn">⚙ Settings</button><button id="muteBtn">🔊</button><button id="leaveBtn" class="hidden">End match</button></div>
   <div id="conn" class="hidden">Connecting…</div>

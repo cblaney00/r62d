@@ -1486,7 +1486,7 @@ function listenUp(game, p) {
   if (ts.hushUntil > t || t - (ts.hushSaid ?? -99) < 45 || t - ts.last > 4 || Math.random() > 0.25) return; // only worth saying when people are talking
   if (talk(game, p, 'hush')) { ts.hushSaid = t; ts.hushUntil = t + 5 + Math.random() * 3; }
 }
-// A person told the team something, typed or into the microphone (public/js/ptt.js): the right bots answer and really do it.
+// A person told the team something in team chat: the right bots answer and really do it.
 const OP_NAMES = Object.values(OPERATORS).map(o => o.name);
 const clean = n => String(n || '').replace(/^\[\w+\] /, '');
 const NUM_WORD = n => String(n);
@@ -1524,7 +1524,18 @@ function sayTo(game, who, cat, slots = {}) {
   if (who.pro) (game.proLog || (game.proLog = [])).push({ round: game.round, squad: who.squad, team: who.pro.tag, text: c.text, who: who.pro.pl.name });
   game.chat(who, { text: c.text, team: true });
 }
-export function botHear(game, p, text, mic = false) {
+// The ping wheel: go and help send the two nearest bots to the spot, hold sends the nearest and it stays; danger calls off orders to go near it.
+export function botPing(game, p, pk, x, y) {
+  if (game.tut || p.bot || game.tv) return;
+  const t = game.time, bots = [...game.players.values()].filter(q => q !== p && q.squad === p.squad && q.bot && q.alive && !q.downed).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
+  if (!bots.length) return;
+  const later = game.phase === PHASE.PREP ? game.timer : 0, reply = (q, cat) => (game.replyQ || (game.replyQ = [])).push({ t: t + 0.35 + Math.random() * 0.7, id: q.id, cat, slots: { place: place(game, x, y) } });
+  const send = (q, secs, extra) => { q.ai = q.ai || {}; q.ai.cmd = { k: 'goto', id: p.id, until: t + secs + later, x, y, ...extra }; };
+  if (pk === 'go' || pk === 'help' || pk === 'open') { const n = bots.slice(0, 2); n.forEach(q => send(q, 120, { stay: pk === 'open' ? 10 : 25 })); reply(n[0], 'ansGoto'); }
+  else if (pk === 'hold') { send(bots[0], 120, { stay: 45 }); reply(bots[0], 'ansWatch'); }
+  else if (pk === 'danger') { let n = null; for (const q of bots) if (q.ai && q.ai.cmd && q.ai.cmd.k === 'goto' && Math.hypot(q.ai.cmd.x - x, q.ai.cmd.y - y) < 6 * PX_PER_M) { q.ai.cmd = null; n = n || q; } if (n) reply(n, 'ansDrop'); }
+}
+export function botHear(game, p, text) {
   if (game.tut || p.bot || game.tv) return null;
   const t = game.time, ts = talkTeam(game, p.squad), team = game.side(p), players = [...game.players.values()];
   const others = players.filter(q => q !== p && q.squad === p.squad && q.bot);
@@ -1536,7 +1547,7 @@ export function botHear(game, p, text, mic = false) {
   const asked = bots.filter(q => c.who.includes(q.id));
   const say = (who, cat, slots = {}, slow = 0) => { (game.replyQ || (game.replyQ = [])).push({ t: t + 0.35 + slow + Math.random() * 0.7, id: who.id, cat, slots }); };
   const first = asked[0] || bots[0];
-  if (!c.intent) { if (mic || asked.length || c.question) say(first, 'huh'); return c; }
+  if (!c.intent) { if (asked.length || c.question) say(first, 'huh'); return c; }
   // who it is for: names first, then "everyone", then the team-wide orders, otherwise whoever is nearest
   const wide = c.all || ['push', 'regroup', 'fallback', 'quiet', 'talk', 'cancel'].includes(c.intent);
   const targets = asked.length ? asked : wide ? bots : [bots[0]];

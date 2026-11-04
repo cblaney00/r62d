@@ -516,6 +516,13 @@ export function play(name, x, y) {
 export function getAudio() { return ac && ac.state !== 'closed' && !ac.offline ? { ac, master } : null; }
 
 // Menu and HUD sounds: low, soft and warm — no shrill beeps.
+// Each ping has its own short call (he asked for a ping wheel): rising for go, falling for danger, and so on.
+const PING_NOTES = { go: [520, 700], omw: [600, 760, 900], watch: [760, 760], hold: [440, 440], danger: [720, 430], help: [640, 860, 640], enemy: [880, 620], open: [360, 480], auto: [660, 660] };
+export function pingSound(kind) {
+  if (!ac) return; C = 'ui';
+  const g = out(undefined, undefined, 0.22, 0, 0.12); if (!g) return;
+  (PING_NOTES[kind] || PING_NOTES.auto).forEach((f, i) => tone(g, ac.currentTime + i * 0.085, 0.13, f, f, 'triangle', 0.09, 0.006));
+}
 export function ui(kind = 'click') {
   C = 'ui';
   const g = out(undefined, undefined, 0.22, 0, 0.12); if (!g) return;

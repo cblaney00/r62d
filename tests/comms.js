@@ -3,13 +3,11 @@
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { botHear, flushReplies, talk, teamHushed } from '../server/bots.js';
-import { parseCommand, pickHeard } from '../shared/commands.js';
+import { parseCommand } from '../shared/commands.js';
 import { LINES, CAST, compose } from '../shared/comms.js';
 import { PHASE, TEAM, CELL, PX_PER_M, DUR } from '../shared/constants.js';
 import { floorAt, roomAt } from '../shared/map.js';
 let bad = 0; const check = (ok, what) => { console.log(ok ? 'ok  ' : 'FAIL', what); if (!ok) bad++; };
-for (const [g, f, want] of [['toast where hall', 'this is a test for wind', f => f], ['me studio the stairs shade drafting', 'this is me sitting at a distance share the exactly', f => f], ['see to lobby office', 'its easy to libya listen', f => f], ['noodle thank it lobby i pickles my bad', 'i dont think its lobby actually my that', f => f], ['is this bathroom can you ember stay this', 'is this better can you understand this', f => f], ['the stairs studio', 'is there any of the about two year', f => f], ['again has defuser lab pickles lab garage thanks', 'the game is definitely picking up the wrong things', f => f], ['one to scout me', 'one just kill me', f => f], ['lets go to the bomb site', "let's go to the bomb site", g => g], ['stay there', 'say there', g => g], ['regroup on me', 'the group on me', g => g], ['my bad hall', 'i died from hallway', f => f], ['', 'where are they', f => f], ['hold here', '', g => g]])
-  check(pickHeard(g, f) === want(want === undefined ? g : (want.toString().startsWith('f') ? f : g)), 'mic: "' + g + '" against "' + f + '"');
 const ctx = { rooms: ['1F Kitchen', '2F Main Office', 'Lobby', 'Server Room', 'Stairs'], ops: ['EMBER', 'ONYX'], enemyOps: ['EMBER'], mates: [{ id: 'p2', name: 'Kaze', op: 'ONYX' }, { id: 'p3', name: 'Moth', op: 'RUSH' }] };
 const T = {
   enemies: ['where are they', 'where are the enemies', 'any info', 'what do you see', 'uh where are they at', 'anyone see them?', 'anything on cams', 'where is everyone', 'who do you see'],
@@ -54,7 +52,6 @@ for (const [w, t] of [[A, 'where are they'], [A, 'how many are left'], [A, 'how 
   const c = answer(w.g, w.said, w.me, t); const talks = t.startsWith('blah') ? w.said.length === 0 : w.said.length >= 1;
   check(talks, `"${t}" → ${c.intent}: ${w.said[0] || '(silence)'}`);
 }
-{ const c = botHear(A.g, A.me, 'asdf qwer', true); A.g.time += 2; A.said.length = 0; flushReplies(A.g); check(A.said.length === 1, 'not understood on the mic: a bot says so: ' + A.said[0]); }
 check(A.team.filter(q => q !== A.me).some(q => q.ai && q.ai.cmd), 'orders stick to a bot');
 { // a bot told to go to a room gets there
   const { g, me } = make(TEAM.DEF), b = [...g.players.values()].find(q => q.bot && q.alive && q.squad === me.squad);

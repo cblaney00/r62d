@@ -1,9 +1,8 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
-import { pttDown, pttUp, pttSetState, pttVocab, pttTest, pttPreload, pttReady, setOpenMic, setMicClip, takeClip, lastHeard } from './ptt.js';
+import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { openVoiceTest } from './voicetest.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
@@ -261,11 +260,6 @@ fx.quality = gq.parts; setShading(gq.shade);
 function connect(mode = '', tvKey = null) { // '' = the shared match, 'tut' / 'free' = a private one
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws${mode ? `?${mode}=1` : ''}${tvKey ? `&key=${tvKey}` : ''}`);
   st.ws = ws;
-  // first time in: the voice setup (he asked). Phones and addresses where a browser allows no microphone don't get it.
-  ws.addEventListener('message', function first(ev) { if (!String(ev.data).includes('"welcome"')) return; ws.removeEventListener('message', first); setTimeout(() => {
-    let done = true; try { done = !!localStorage.getItem('r62d-voicetest'); } catch {}
-    if (!done && !isTouch && navigator.mediaDevices && !st.tv && !st.tutorial && !st.free && st.last && st.last.ph === PHASE.LOBBY) openVoiceTest();
-  }, 900); });
   ws.onopen = () => { if (st.rejoin) { st.rejoin = false; $('joinBtn').click(); } };
   ws.onmessage = ev => {
     const m = JSON.parse(ev.data);
@@ -496,11 +490,6 @@ function onSnap(s) {
     return;
   }
   if (s.mv !== st.mv) { if (st.rend) resetMap(s.mv); else loadMap(s.mv, null, null, s.mp); } // same map, new round
-  syncOpenMic();
-  if (st.pttRd !== s.rd && s.rd && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION) && !st.tv && !st.tutorial) { // the microphone's words for this round, loaded ahead (once you have used it)
-    st.pttRd = s.rd; let used = false; try { used = !!localStorage.getItem('r62d-ptt-used'); } catch {}
-    if (used) setTimeout(() => { if (!st.tv && !st.tutorial) { pttVocabNow(); pttPreload(); } }, 1500);
-  }
   const m = st.map, now = performance.now() / 1000;
   const changed = [];
   for (let i = 0; i < s.cells.length; i += 3) {
@@ -618,8 +607,9 @@ function onEvent(e, s, players) {
     case 'daze': if (st.me && e.id === st.me.id) { st.dazeUntil = now + e.dur; audio.tinnitus(1); } break;
     case 'mark': if (e.team === mySide()) {
       st.marks = (st.marks || []).filter(k => !(k.from === e.from && (k.id === e.id && e.id != null || st.marks.filter(q => q.from === e.from).length >= 3)));
-      st.marks.push({ ...e, t: now }); fx.ping(e.x, e.y, e.w.startsWith('ENEMY') ? '255,70,70' : '255,210,74');
-      if (e.from !== st.id) audio.foley('spot');
+      const pk = e.pk || (e.w.startsWith('ENEMY') ? 'enemy' : 'auto');
+      st.marks.push({ ...e, pk, t: now }); fx.ping(e.x, e.y, pingOf(pk).col);
+      audio.pingSound(pk);
     } break;
     case 'lungeWarn': if (e.id === st.id) { addFeed('CROW drew a blade on you: a lunge is coming in 1.5 s'); audio.play('unsheathe', st.pred.x, st.pred.y); st.lungeWarnT = now; } break;
     case 'deny': if (e.id === st.id) addFeed(e.why); break;
@@ -662,6 +652,7 @@ addEventListener('keydown', e => {
 });
 function watchKillcam() { if (!st.killcam || !st.rend || killcamOpen()) return; if (document.pointerLockElement) document.exitPointerLock(); openKillcam(st.killcam, st.rend, st.map); }
 function pressAction(a, e) {
+  if (a === 'pause' && (st.wheel || st.mapV)) { closeWheel(true); st.mapV = null; return; }
   if (a === 'interact' && st.killcam && st.me && !st.me.a && playing()) { watchKillcam(); return; } // dead: F replays how you died
   keys.add(a);
   audio.initAudio();
@@ -687,10 +678,8 @@ function pressAction(a, e) {
     case 'settings': toggleSettings(); break;
     case 'pause': escape(); break;
     case 'spot': st.spotReq = true; break;
-    case 'ptt': if (st.id && !st.tv && !st.tut) {
-      pttVocabNow(); try { localStorage.setItem('r62d-ptt-used', '1'); } catch {}
-      pttDown();
-    } break;
+    case 'wheel': openWheel(); break;
+    case 'map': toggleMapV(); break;
     case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
     case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
@@ -762,59 +751,12 @@ function pollPad(dt, view) {
 addEventListener('keyup', e => {
   if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault(); // stop Firefox's menu bar popping up
   const a = actionFor(e.code); if (a) keys.delete(a);
-  if (a === 'ptt') pttUp((text, loudest) => { // what it heard goes to the team as chat, and the bots read that like anything typed
-    saveClip(text);
-    try { fetch('/api/miclog', { method: 'POST', body: `level ${loudest.toFixed(4)} heard: ${text || '(nothing)'} [sentence: ${lastHeard().sentence} / free: ${lastHeard().free}]` }).catch(() => {}); } catch {}
-    if (text) send({ t: 'chat', text, team: true, mic: 1 });
-    else addFeed(loudest < 0.004 ? 'The microphone heard almost nothing: check it, or raise Microphone boost in Settings → Sound' : "Didn't catch any words: try \"where are they\" or \"go to\" and a room");
-  });
+  if (a === 'wheel' && !st.wheelMouse) closeWheel();
 });
-// Settings → Sound → Microphone: push to talk or open mic. Open mic only listens in a match you are playing, and a sentence that
-// means nothing to the bots is dropped so the game's own sound doesn't end up in team chat.
-let micMode = (() => { try { return localStorage.getItem('r62d-micmode') === 'open' ? 'open' : 'ptt'; } catch { return 'ptt'; } })(), micLive = false;
-function setMicMode(m) {
-  micMode = m === 'open' ? 'open' : 'ptt';
-  try { localStorage.setItem('r62d-micmode', micMode); } catch {}
-  for (const b of $('micSeg').children) b.classList.toggle('on', b.dataset.m === micMode);
-  showMicHint();
-  syncOpenMic();
-}
-function showMicHint() { $('micHint').textContent = micMode === 'open' ? 'Always listening during a match: just talk' : `Hold ${keyName(bindsFor('ptt')[0] || 'KeyX')} while you talk to the bots`; }
-async function syncOpenMic() {
-  const want = micMode === 'open' && playing() && !st.tv && !st.tutorial && !!navigator.mediaDevices && !isTouch;
-  if (want === micLive) return;
-  micLive = want;
-  if (!want) { setOpenMic(false); return; }
-  pttVocabNow();
-  if (!await pttReady()) { micLive = false; pttMsg('NO MICROPHONE HERE (OR THE BROWSER REFUSED IT)', 4000); return; }
-  try { localStorage.setItem('r62d-ptt-used', '1'); } catch {}
-  if (micLive) setOpenMic(true, (text, loudest) => {
-    saveClip(text);
-    try { fetch('/api/miclog', { method: 'POST', body: `open level ${loudest.toFixed(4)} heard: ${text || '(nothing)'} [sentence: ${lastHeard().sentence} / free: ${lastHeard().free}]` }).catch(() => {}); } catch {}
-    const rooms = st.map ? (st.map.rooms || []).map(r => r.name) : [], c = text ? parseCommand(text, { rooms }) : null;
-    if (c && (c.intent || c.room)) send({ t: 'chat', text, team: true, mic: 1 });
-  });
-}
-function saveClip(text) {
-  if (!micSave) return;
-  const { samples, rate } = takeClip(); if (!samples.length) return;
-  fetch(`/api/micclip?rate=${rate}&heard=${encodeURIComponent(text || '')}`, { method: 'POST', body: samples }).catch(() => {});
-}
-let micSave = false;
-function setMicSave(on) {
-  micSave = !!on; setMicClip(micSave);
-  for (const b of $('micSaveSeg').children) b.classList.toggle('on', (b.dataset.m === 'on') === micSave);
-}
-function pttVocabNow() {
-  const sn = st.snaps.length ? st.snaps[st.snaps.length - 1] : null;
-  if (st.map) pttVocab((st.map.rooms || []).map(r => r.name), sn ? [...sn.players.values()].filter(p => p.bt).map(p => String(p.n || '').replace(/^\[\w+\] /, '')) : [], sn ? [...new Set([...sn.players.values()].map(p => p.op).filter(Boolean))].map(o => OPERATORS[o].name) : []);
-}
-function pttMsg(text, ms) { const el = $('pttInd'); el.textContent = text; el.classList.remove('hidden'); clearTimeout(el._t); if (ms) el._t = setTimeout(() => el.classList.add('hidden'), ms); }
-pttSetState(k => { if (k === 'on') { pttMsg('🎤 LISTENING'); $('pttInd').style.setProperty('--lv', 0); } else if (k === 'loading') pttMsg('🎤 STARTING MICROPHONE…'); else if (k === 'nomic') pttMsg('NO MICROPHONE HERE (OR THE BROWSER REFUSED IT)', 4000); else $('pttInd').classList.add('hidden'); },
-  (text, lv) => { const el = $('pttInd'); if (text) el.textContent = '🎤 ' + text.toUpperCase(); if (lv) el.style.setProperty('--lv', lv.toFixed(2)); });
-addEventListener('blur', () => { keys.clear(); mouse.l = mouse.r = false; });
 cv.addEventListener('mousemove', e => {
   mouseT = performance.now();
+  if (st.wheel) { const W = st.wheel, c = 1.15 * DPR, R = WHEEL_CLAMP * DPR; W.dx += e.movementX * c; W.dy += e.movementY * c; const L = Math.hypot(W.dx, W.dy); if (L > R) { W.dx *= R / L; W.dy *= R / L; } return; } // the wheel holds your aim still
+  if (st.mapV) { const V = st.mapV, c = 1.15 * DPR; V.cx = Math.max(0, Math.min(VW, V.cx + e.movementX * c)); V.cy = Math.max(0, Math.min(VH, V.cy + e.movementY * c)); return; }
   if (document.pointerLockElement === cv) {
     const ads = mouse.r && st.me && st.me.a && st.me.ct === 'body';
     const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * DPR;
@@ -838,12 +780,16 @@ cv.addEventListener('mousedown', e => {
   if (playing() && !menuOpen() && document.pointerLockElement !== cv && !st.lockAsked) { // the first click just takes control, it doesn't shoot
     st.lockAsked = true; lockMouse(cv); return;
   }
+  if (st.wheel) { if (e.button === 2) closeWheel(true); return; }
+  if (st.mapV) { if (e.button === 2) st.mapV = null; else if (e.button === 0) mapClick(); return; }
   if (e.button === 0) { mouse.l = true; mouse.wl++; }
   if (e.button === 2) { mouse.r = true; mouse.wr++; if (aimMode === 'free' && padOn && st.me && st.me.ct === 'body') adsReset(); }
 });
-addEventListener('mouseup', e => { if (e.button === 0) mouse.l = false; if (e.button === 2) { mouse.r = false; st.faceC = null; } });
+addEventListener('mouseup', e => { if (e.button === 0 && st.wheelMouse) closeWheel(); if (e.button === 0) mouse.l = false; if (e.button === 2) { mouse.r = false; st.faceC = null; } });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => {
+  if (st.mapV) { mapFloorStep(e.deltaY > 0 ? 1 : -1); return; }
+  if (st.wheel) return;
   if (!st.me || !st.me.a) return;
   if (st.me.ct === 'cam' || st.me.ct === 'drone') st.evq.push({ k: e.deltaY > 0 ? 'camNext' : 'camPrev' }); // flip through the team's cameras / drones
   else st.evq.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 });
@@ -889,7 +835,6 @@ applyFx();
 function renderSettings() {
   renderFxList();
   const el = $('settings'); if (el.classList.contains('hidden')) return;
-  showMicHint();
   const named = new Map(ACTIONS.map(a => [a[0], a[1]])), grouped = new Set(KEY_GROUPS.flatMap(g => g[1]));
   const groups = [...KEY_GROUPS, ['OTHER', ACTIONS.map(a => a[0]).filter(id => !grouped.has(id))]];
   const rows = groups.filter(g => g[1].length).map(([gName, ids]) => `<tr class="keyGroup"><th colspan="3">${gName}</th></tr>` + ids.filter(id => named.has(id)).map(id => {
@@ -909,7 +854,7 @@ $('setReset').onclick = () => { resetBinds(); renderSettings(); };
 for (const [id, name] of PRESETS) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => { audio.ui(); applyPreset(id); renderSettings(); }; $('keyPresets').appendChild(b); }
 const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'sprint', 'walk', 'crouch', 'crouchTap', 'prone', 'vault', 'leanL', 'leanR']],
   ['FIGHTING', ['primary', 'secondary', 'melee', 'reload', 'ability', 'gadget', 'interact']],
-  ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'chat', 'ptt', 'scoreboard']],
+  ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'wheel', 'map', 'chat', 'scoreboard']],
   ['MENUS & FREE PLAY', ['settings', 'pause', 'opNext', 'opPrev', 'opGrid']]];
 // crosshair: chosen in Settings, saved in your profile
 let xh = (() => { try { return cleanXhair(JSON.parse(localStorage.getItem('r62d-xh') || 'null')); } catch { return cleanXhair(); } })();
@@ -1018,7 +963,7 @@ function renderControls() {
     [L('sprint'), 'Sprint (loud)'], [L('walk'), 'Walk (silent)'], [bindsFor('crouch')[0] ? L('crouch') : L('crouchTap'), bindsFor('crouch')[0] ? 'Crouch (hold, silent)' : 'Crouch (tap, silent)'], [L('reload'), 'Reload'],
     [L('interact') + ' (hold)', 'Reinforce, barricade, plant, defuse, revive'], [L('ability'), 'Operator skill'],
     [L('gadget'), 'Secondary gadget'], [L('melee'), 'Melee'], [L('drone'), 'Put out / drive your drone'], [L('view'), 'Team drones & cameras (' + L('leanL') + ' / ' + L('leanR') + ' switch)'], [L('spot') + ' · Middle click', 'Ping (enemies, gadgets, walls, doors, places)'],
-    [`${L('primary')} / ${L('secondary')} · Wheel`, 'Switch weapon'], [L('scoreboard'), 'Scoreboard']];
+    [L('wheel') + ' (hold, drag)', 'Ping wheel'], [L('map'), 'Map: click it to ping'], [`${L('primary')} / ${L('secondary')} · Wheel`, 'Switch weapon'], [L('scoreboard'), 'Scoreboard']];
   const html = rows.map(([k, d]) => `<span>${k}</span>${d}`).join('');
   if ($('ctlGrid').innerHTML !== html) $('ctlGrid').innerHTML = html;
 }
@@ -1692,6 +1637,8 @@ function sendInput(dt, me, ctrl, view, s, now) {
     ev.push(t.spot ? { k: 'spot', id: t.spot } : { k: 'mark', x: Math.round(t.x), y: Math.round(t.y), w: t.w, id: t.id });
     audio.foley('spot');
   };
+  if (st.pingOut) { firePing(st.pingOut, view, me, s, ev); st.pingOut = null; }
+  if (st.wheel || st.mapV) { k.fire = 0; k.ads = 0; mouse.wl = 0; mouse.wr = 0; }
   if (ctrl === 'cam' || ctrl === 'drone') {
     if (mouse.wl) trySpot();
     if (ctrl === 'cam') { k.up = k.down = k.left = k.right = 0; }
@@ -1788,27 +1735,97 @@ function pingTarget(view, me, s, mw) {
     }
   }
 }
-// Pings on screen: a diamond with what it is, who pinged it and how far; kept at the screen edge when off screen.
+// Pings on screen: a badge with what it is, who pinged it and how far; kept at the screen edge when off screen.
+// A ping on another floor shows over the same spot of your floor, tagged with its floor.
 function drawMarks(view, now) {
   if (!st.marks || !st.marks.length) return;
   st.marks = st.marks.filter(k => now - k.t < 6);
-  const z = st.zoom, pad = 40 * DPR;
+  const pad = 46 * DPR, m = st.map, vf = view ? floorAt(m, view.x, view.y) : -1;
   for (const k of st.marks) {
-    const age = now - k.t, al = age > 5 ? 6 - age : 1, pop = Math.min(1, age / 0.15), col = k.w.startsWith('ENEMY') ? '255,70,70' : '255,210,74';
-    const S0 = w2s(k.x, k.y), sx = S0.x, sy = S0.y;
-    const cx = Math.max(pad, Math.min(VW - pad, sx)), cy = Math.max(pad + 60 * DPR, Math.min(VH - pad - 60 * DPR, sy));
-    const W0 = screenToWorld(cx, cy), wx = W0.x, wy = W0.y, r = 5 * (2 - pop);
-    ctx.save(); ctx.translate(wx, wy); ctx.rotate(-(st.rot || 0)); ctx.globalAlpha = al; // upright on a turned view
-    ctx.fillStyle = `rgba(${col},0.25)`; ctx.strokeStyle = `rgb(${col})`; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(0, 0, 1.2, 0, 7); ctx.fill();
-    ctx.textAlign = 'center'; ctx.font = '700 6.5px Barlow Condensed, sans-serif';
-    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(k.w, 0, -r - 3); ctx.fillText(k.w, 0, -r - 3);
-    const d = view ? ` · ${Math.round(Math.hypot(k.x - view.x, k.y - view.y) / CELL * 0.8)}m` : '';
-    ctx.font = '600 5px Barlow Condensed, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.strokeText(k.by + d, 0, r + 7); ctx.fillText(k.by + d, 0, r + 7);
-    ctx.restore();
+    const f = floorAt(m, k.x, k.y); let x = k.x, y = k.y, tag = '';
+    if (vf >= 0 && f >= 0 && f !== vf) { const o = floorOff(m, f, vf); x += o.x; y += o.y; tag = (f > vf ? '▲ ' : '▼ ') + m.floors[f].name + ' · '; }
+    const P = w2s(x, y), sx = Math.max(pad, Math.min(VW - pad, P.x)), sy = Math.max(pad + 60 * DPR, Math.min(VH - pad - 60 * DPR, P.y));
+    const d = view && !tag ? ` · ${Math.round(Math.hypot(k.x - view.x, k.y - view.y) / PX_PER_M)} m` : '';
+    drawPing(ctx, k, sx, sy, now - k.t, DPR, tag + k.by + d);
   }
+}
+
+// ---------------- ping wheel and map (he asked, instead of talking to the bots) ----------------
+// Hold the wheel key at a spot, drag toward a ping, let go. The map key opens a map of the floors; click it to ping, or hold
+// the click (or the wheel key) and drag for the wheel. You keep moving meanwhile; only your aim and gun wait.
+const WHEEL_CLAMP = 110;
+function openWheel(mouseHeld = false) {
+  if (!st.id || st.tv || !playing() || menuOpen() || st.wheel) return;
+  if (st.mapV) { const p = mapPoint(); if (!p) return; st.wheel = { sx: st.mapV.cx, sy: st.mapV.cy, x: p.x, y: p.y, map: true, dx: 0, dy: 0, t0: performance.now() }; }
+  else { if (!st.pred) return; const c = cursor(), w = screenToWorld(c.x, c.y); st.wheel = { sx: c.x, sy: c.y, x: w.x, y: w.y, dx: 0, dy: 0, t0: performance.now() }; }
+  st.wheelMouse = mouseHeld; audio.ui('hover');
+}
+function closeWheel(cancel) {
+  const W = st.wheel; st.wheel = null; st.wheelMouse = false; if (!W || cancel) return;
+  const P = wheelPick(W.dx, W.dy, DPR);
+  st.pingOut = { x: W.x, y: W.y, pk: P ? P.id : null, map: W.map };
+}
+// what actually goes to the server: a thing under the spot lends its name ("DANGER - CAMERA"), an enemy you can see gets spotted
+function firePing(o, view, me, s, ev) {
+  if (!me) return;
+  const t = view && !o.map ? pingTarget(view, me, s, { x: o.x, y: o.y }) : null, thing = t && t.w && !/HERE$/.test(t.w);
+  if (t && t.spot && (!o.pk || o.pk === 'enemy')) ev.push({ k: 'spot', id: t.spot });
+  else if (!o.pk) { if (t) ev.push({ k: 'mark', x: Math.round(t.x), y: Math.round(t.y), w: t.w, id: t.id }); else if (o.map) ev.push({ k: 'mark', x: Math.round(o.x), y: Math.round(o.y), w: 'GO HERE', pk: 'go' }); else return; }
+  else ev.push({ k: 'mark', x: Math.round(thing ? t.x : o.x), y: Math.round(thing ? t.y : o.y), w: pingOf(o.pk).w + (thing ? ' - ' + t.w : ''), pk: o.pk, id: thing ? t.id : undefined });
+  audio.foley('spot');
+}
+function toggleMapV() {
+  if (st.mapV) { st.mapV = null; return; }
+  if (!st.id || st.tv || !playing() || menuOpen() || !st.map || !st.rend) return;
+  const v = st.lastViewPos || st.pred, f = v ? Math.max(0, floorAt(st.map, v.x, v.y)) : 0;
+  st.mapV = { f, cx: VW * 0.72, cy: VH * 0.5, t: 0, pic: null }; audio.ui('open');
+}
+function mapFloorStep(d) { const V = st.mapV, n = st.map.floors.length; V.f = Math.max(0, Math.min(n - 1, V.f + d)); V.t = 0; V.pic = null; }
+// where this floor sits on the screen: close on its rooms, a little ground round them
+function mapBox(V) {
+  const m = st.map, F = m.floors[V.f]; if (V.box && V.box.f === V.f && V.box.VW === VW && V.box.VH === VH) return V.box;
+  let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; for (const r of m.rooms || []) if (r.fl === V.f) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
+  if (x1 < 0) { x0 = F.gx; y0 = 0; x1 = F.gx + F.w; y1 = F.h; }
+  x0 = Math.max(F.gx, x0 - 6); y0 = Math.max(0, y0 - 6); x1 = Math.min(F.gx + F.w, x1 + 6); y1 = Math.min(F.h, y1 + 6);
+  const w = x1 - x0, h = y1 - y0, k = Math.min(VW * 0.42 / w, VH * 0.66 / h), pw = Math.round(w * k), ph = Math.round(h * k);
+  return V.box = { f: V.f, VW, VH, x0, y0, w, h, k, pw, ph, px: Math.round(VW - pw - 125 * DPR), py: Math.round((VH - ph) / 2 - 8 * DPR) }; // (clear of the buttons and gadget list at the edges)
+}
+function mapPoint() { const V = st.mapV, B = mapBox(V); if (V.cx < B.px || V.cy < B.py || V.cx > B.px + B.pw || V.cy > B.py + B.ph) return null; return { x: (B.x0 + (V.cx - B.px) / B.k) * CELL, y: (B.y0 + (V.cy - B.py) / B.k) * CELL }; }
+function mapTabAt(V, B) { const n = st.map.floors.length, w = 54 * DPR, h = 26 * DPR; if (V.cy < B.py - h - 4 * DPR || V.cy > B.py - 4 * DPR) return -1; const i = Math.floor((V.cx - B.px) / w); return i >= 0 && i < n ? i : -1; }
+function mapClick() { const V = st.mapV, i = mapTabAt(V, mapBox(V)); if (i >= 0) { V.f = i; V.t = 0; V.pic = null; audio.ui(); return; } openWheel(true); }
+function drawMapV(s, me, now) {
+  const V = st.mapV, m = st.map, B = mapBox(V), D = DPR, R = st.rend;
+  if (!V.pic || now > V.t) { // the picture is what you know of the floor, refreshed now and then; people are drawn on top each frame
+    const c = V.pic || (V.pic = document.createElement('canvas')); c.width = B.pw; c.height = B.ph; const x = c.getContext('2d'), P = CELL * R.S;
+    R.c.drawTo(x, B.x0 * P, B.y0 * P, B.w * P, B.h * P, 0, 0, B.pw, B.ph);
+    x.fillStyle = 'rgba(5,8,12,0.28)'; x.fillRect(0, 0, B.pw, B.ph);
+    const site = m.sites[s.site], side = me && me.tm, known = side === 'def' || s.rev;
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3 * D; x.strokeStyle = 'rgba(0,0,0,0.85)';
+    for (const r of m.rooms || []) if (r.fl === V.f) {
+      const rx = (r.x - B.x0) * B.k, ry = (r.y - B.y0) * B.k, rw = r.w * B.k, rh = r.h * B.k;
+      if (known && site && (site.rooms || []).includes(r.name)) { x.fillStyle = 'rgba(242,193,78,0.22)'; x.fillRect(rx, ry, rw, rh); x.save(); x.lineWidth = 2 * D; x.strokeStyle = '#f2c14e'; x.strokeRect(rx, ry, rw, rh); x.restore(); }
+      const name = r.name.replace(/^\dF /, '').toUpperCase(); x.font = `700 ${10.5 * D}px Barlow Condensed, sans-serif`;
+      if (x.measureText(name).width < rw - 4 * D && rh > 14 * D) { x.fillStyle = 'rgba(255,255,255,0.82)'; x.strokeText(name, rx + rw / 2, ry + rh / 2); x.fillText(name, rx + rw / 2, ry + rh / 2); }
+    }
+    V.t = now + 1;
+  }
+  const c = ctx, P = (x, y) => ({ x: B.px + (x / CELL - B.x0) * B.k, y: B.py + (y / CELL - B.y0) * B.k }), on = (x, y) => floorAt(m, x, y) === V.f;
+  c.save();
+  c.fillStyle = 'rgba(6,9,14,0.86)'; c.fillRect(B.px - 3 * D, B.py - 3 * D, B.pw + 6 * D, B.ph + 6 * D);
+  c.drawImage(V.pic, B.px, B.py);
+  c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = D; c.strokeRect(B.px - 0.5, B.py - 0.5, B.pw + 1, B.ph + 1);
+  m.floors.forEach((F, i) => { const w = 54 * D, h = 26 * D, x = B.px + i * w, y = B.py - h - 4 * D, cur = i === V.f; c.fillStyle = cur ? '#f2c14e' : 'rgba(6,9,14,0.86)'; c.fillRect(x, y, w - 3 * D, h); c.fillStyle = cur ? '#10131a' : '#d8dde4'; c.font = `800 ${14 * D}px Barlow Condensed, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(F.name, x + (w - 3 * D) / 2, y + h / 2 + D); });
+  c.save(); c.beginPath(); c.rect(B.px, B.py, B.pw, B.ph); c.clip();
+  const site = m.sites[s.site]; if (site && me && (me.tm === 'def' || s.rev)) for (const b of site.bombs) if (on(b.x, b.y)) { const q = P(b.x, b.y); c.fillStyle = '#f2c14e'; c.beginPath(); c.arc(q.x, q.y, 8 * D, 0, 7); c.fill(); c.fillStyle = '#000'; c.font = `800 ${11 * D}px Barlow Condensed, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(b.id, q.x, q.y + D * 0.5); }
+  for (const p of s.players) if (me && p.tm === me.tm && p.a && p.id !== st.id && p.x !== undefined && !p.sg && on(p.x, p.y)) { const q = P(p.x, p.y); c.fillStyle = '#4fb3ff'; c.strokeStyle = '#000'; c.lineWidth = 1.5 * D; c.beginPath(); c.arc(q.x, q.y, 5 * D, 0, 7); c.fill(); c.stroke(); }
+  for (const p of st.foesSeen || []) if (on(p.x, p.y)) { const q = P(p.x, p.y); c.fillStyle = '#ff4646'; c.strokeStyle = '#000'; c.lineWidth = 1.5 * D; c.beginPath(); c.arc(q.x, q.y, 5.5 * D, 0, 7); c.fill(); c.stroke(); }
+  if (me && me.a && st.pred && on(st.pred.x, st.pred.y)) { const q = P(st.pred.x, st.pred.y); c.save(); c.translate(q.x, q.y); c.rotate(st.aim + Math.PI / 2); c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 1.5 * D; c.beginPath(); c.moveTo(0, -9 * D); c.lineTo(6 * D, 7 * D); c.lineTo(0, 3.5 * D); c.lineTo(-6 * D, 7 * D); c.closePath(); c.fill(); c.stroke(); c.restore(); }
+  for (const k of st.marks || []) if (on(k.x, k.y)) { const q = P(k.x, k.y), age = now - k.t, al = age > 5 ? 6 - age : 1, rp = (age % 1.4) / 1.4, col = pingOf(k.pk).col; c.strokeStyle = `rgba(${col},${0.8 * (1 - rp) * al})`; c.lineWidth = 2 * D; c.beginPath(); c.arc(q.x, q.y, (10 + rp * 18) * D, 0, 7); c.stroke(); drawBadge(c, k.pk, q.x, q.y, 10 * D, al); }
+  c.restore();
+  c.font = `600 ${12.5 * D}px Barlow Condensed, sans-serif`; c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 3 * D; c.strokeStyle = 'rgba(0,0,0,0.8)';
+  const tip = 'CLICK TO PING · HOLD AND DRAG FOR THE WHEEL'; c.strokeText(tip, B.px + B.pw, B.py - 17 * D); c.fillText(tip, B.px + B.pw, B.py - 17 * D);
+  if (!st.wheel) { c.translate(V.cx, V.cy); c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 1.5 * D; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 16 * D); c.lineTo(4.5 * D, 12 * D); c.lineTo(11 * D, 11 * D); c.closePath(); c.fill(); c.stroke(); }
+  c.restore();
 }
 
 // smoke clouds of a snapshot, worked out once per snapshot (it was being rebuilt many times a frame)
@@ -2205,9 +2222,9 @@ function draw(s, view, now, dt) {
     if (s.pl) marker(s.pl.x, s.pl.y, '!', '#ff4040', view);
     if (side === 'atk') for (const e of ents) if (e.ty === 'defuser') marker(e.x, e.y, 'D', '#f2c14e', view);
     drawScanBlips(now);
-    drawMarks(view, now);
     if (!st.tv) deathMarks(view, now); // TV: the cards and kill feed already say who is down; no big marks over the action
     // an enemy your team can see who is off the edge of your screen: a mark at the edge, so nobody shoots you unseen
+    st.foesSeen = drawn.filter(p => p.tm !== side);
     for (const p of drawn) if (p.tm !== side) {
       const { x: sx, y: sy } = w2s(p.x, p.y);
       if ((sx < 0 || sy < 0 || sx > VW || sy > VH) && (!view || floorAt(st.map, p.x, p.y) === floorAt(st.map, view.x, view.y))) marker(p.x, p.y, '!', '#ff5040', view); // another floor (seen in the stairs window): no edge mark
@@ -2268,8 +2285,11 @@ function draw(s, view, now, dt) {
   const fl = st.flashUntil - now;
   if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(1, fl / 1.2)})`; ctx.fillRect(0, 0, VW, VH); }
   if (st.tv && inGame) TV.tvBubbles(now);
-  if (inGame && me && me.a && me.ct === 'body' && (!me.br || me.ri)) crosshair(me, now); // a riot shield's holder aims round it
-  else if (inGame) { // drone / camera / spectating: a clear reticle (he asked: the old dot was too hard to see)
+  if (inGame) drawMarks(view, now);
+  if (inGame && me && !menuOpen() && !st.tv) { if (st.mapV) drawMapV(s, me, now); } else if (st.mapV || st.wheel) { st.mapV = null; closeWheel(true); }
+  if (st.wheel && (!playing() || menuOpen())) closeWheel(true);
+  if (inGame && me && me.a && me.ct === 'body' && !st.mapV && !st.wheel && (!me.br || me.ri)) crosshair(me, now); // a riot shield's holder aims round it
+  else if (inGame && !st.mapV && !st.wheel) { // drone / camera / spectating: a clear reticle (he asked: the old dot was too hard to see)
     const c = cursor(), r = 10 * DPR, t = 6 * DPR;
     for (const [col, w] of [['rgba(0,0,0,0.85)', 3.4 * DPR], ['#7dffb0', 1.6 * DPR]]) {
       ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, 7);
@@ -2279,6 +2299,7 @@ function draw(s, view, now, dt) {
     ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(c.x, c.y, 2.6 * DPR, 0, 7); ctx.fill(); ctx.fillStyle = '#7dffb0'; ctx.beginPath(); ctx.arc(c.x, c.y, 1.6 * DPR, 0, 7); ctx.fill();
   }
   if (inGame && padOn && aimMode === 'pad' && !gpRecent() && !menuOpen()) aimPad();
+  drawWheelNow();
 }
 
 // ESPORTS TV: what a player says floats above them for a few seconds, on a solid dark card in their own colour (he asked)
@@ -2364,6 +2385,7 @@ function sightLook(sight, x, y, k) {
   }
   ctx.restore();
 }
+function drawWheelNow() { if (st.wheel) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); drawWheel(ctx, st.wheel, DPR); ctx.restore(); } }
 function crosshair(me, now) {
   if (st.tv) return; // watching: no crosshair of your own on the broadcast
   const w = WEAPONS[me.w];
@@ -3168,7 +3190,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { pttTest, PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
@@ -3319,10 +3341,3 @@ if (inApp() && !window.r62dApp) fetch('/api/window').then(r => r.json()).then(a 
 $('kcBtn').onclick = () => { audio.ui(); watchKillcam(); };
 
 
-try { $('micBoost').value = localStorage.getItem('r62d-micboost') || 100; } catch {}
-for (const b of $('micSeg').children) b.onclick = () => { audio.ui(); setMicMode(b.dataset.m); };
-setMicMode(micMode);
-for (const b of $('micSaveSeg').children) b.onclick = () => { audio.ui(); setMicSave(b.dataset.m === 'on'); };
-setMicSave(false);
-$('voiceTestBtn').onclick = () => { audio.ui(); openVoiceTest(); };
-$('micBoost').addEventListener('input', () => { try { localStorage.setItem('r62d-micboost', $('micBoost').value); } catch {} });

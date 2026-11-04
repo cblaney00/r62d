@@ -986,19 +986,7 @@ html.tv.tvsel .tvComms { top: auto; bottom: 3vh; width: 30vw; } html.tv.tvsel #t
 html.tv.tvsel #tvCast { top: auto; bottom: 3vh; left: 50%; transform: translateX(-50%); width: min(520px, 30vw); }
 
 html.tv canvas#game { cursor: default; }
-#pttInd { position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); padding: 5px 14px; background: rgba(8,10,14,0.75); color: #9dffb0; font: 700 13px var(--head); letter-spacing: 0.12em; z-index: 4; pointer-events: none; }
 
 html.tv canvas#game { cursor: default; }
-#pttInd::after { content: ''; display: block; height: 3px; margin-top: 3px; background: #9dffb0; width: calc(var(--lv, 0) * 100%); }
 
 /* first-time voice setup */
-#voiceDlg { z-index: 900; display: grid; place-items: center; background: rgba(4,6,9,0.82); }
-#voiceDlg .menu { width: min(620px, 92vw); display: flex; flex-direction: column; gap: 12px; background: var(--panel); border: 1px solid var(--line); padding: 26px 30px; }
-html.fitui #voiceDlg > * { zoom: var(--uiz, 1); }
-#voiceDlg h2 { margin: 0; font: 800 38px var(--head); letter-spacing: 0.2em; }
-#voiceDlg p { margin: 0; line-height: 1.45; color: var(--dim); } #voiceDlg p b { color: #fff; }
-#voiceDlg .vtStep { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; }
-#voiceDlg .vtLine { font: 700 40px var(--head); color: var(--gold); letter-spacing: 0.04em; text-transform: uppercase; }
-#vtBar { height: 8px; background: rgba(255,255,255,0.08); } #vtBar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width 0.08s linear; }
-#vtHeard { min-height: 24px; font-size: 18px; } #vtHeard.on { color: #fff; } #vtHeard.good { color: #6fdc8c; } #vtHeard.bad { color: #ff9a7a; }
-#vtBtns { display: flex; gap: 10px; justify-content: flex-end; }

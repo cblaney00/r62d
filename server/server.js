@@ -83,22 +83,6 @@ function api(req, res) {
     urls.sort((a, b) => rank(a) - rank(b));
     return json(200, { urls, host: os.hostname(), version: VERSION, port: PORT, players: humans(), local: BIND === '127.0.0.1' });
   }
-  if (u.pathname === '/api/micclip' && req.method === 'POST') { // Save my voice: only from this computer, kept in the data folder, the last 60
-    const a = req.socket.remoteAddress || ''; if (!/^(::1|127\.|::ffff:127\.)/.test(a)) { res.writeHead(403); res.end(); return; }
-    const parts = []; let n = 0; req.on('data', d => { n += d.length; if (n <= 8e6) parts.push(d); });
-    req.on('end', () => { try {
-      const dir = path.join(process.env.R62D_DATA || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data'), 'mic-clips'); fs.mkdirSync(dir, { recursive: true });
-      const name = Date.now() + '-' + (+u.searchParams.get('rate') || 0);
-      fs.writeFileSync(path.join(dir, name + '.f32'), Buffer.concat(parts));
-      fs.appendFileSync(path.join(dir, 'heard.txt'), name + ' ' + String(u.searchParams.get('heard') || '').replace(/[\r\n]+/g, ' ').slice(0, 300) + '\n');
-      const all = fs.readdirSync(dir).filter(f => f.endsWith('.f32')).sort(); for (const f of all.slice(0, -60)) fs.unlinkSync(path.join(dir, f));
-    } catch {} res.writeHead(204); res.end(); });
-    return;
-  }
-  if (u.pathname === '/api/miclog' && req.method === 'POST') { // what the microphone heard (words only, no sound), so it can be tuned to a real voice; the last 300 lines, on this computer
-    let b = ''; req.on('data', d => { if (b.length < 600) b += d; }); req.on('end', () => { try { const f = path.join(process.env.R62D_DATA || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data'), 'mic-log.txt'); const lines = fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).slice(-299) : []; lines.push(new Date().toISOString() + ' ' + String(b).replace(/\s+/g, ' ').slice(0, 500)); fs.writeFile(f, lines.join('\n') + '\n', () => {}); } catch {} res.writeHead(204); res.end(); });
-    return;
-  }
   if (u.pathname === '/api/perf') { // browsers report how smoothly they run (see perfRep in main.js)
     if (req.method !== 'POST') return json(200, perfLog);
     let b = ''; req.on('data', d => { if (b.length < 8000) b += d; }); req.on('end', () => { try { perfLog.push({ ip: req.socket.remoteAddress, ...JSON.parse(b) }); if (perfLog.length > 200) perfLog.shift(); } catch {} json(200, { ok: true }); });
