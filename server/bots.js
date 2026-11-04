@@ -1026,7 +1026,7 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
     if (!game.periscopeSpot(p)) {} // no floor above or below here
     else if (!enemy && ok() && el > 5 && el < 40 && Math.abs(siteF - myF) === 1 && Math.random() < dt * 0.5) { p.periDir = siteF > myF ? 'up' : 'down'; useAbility(); done(25); } // early: eyes on the site's floor
     else if (!enemy && ok() && (heard || Math.random() < dt * 0.06)) { useAbility(); done(20); }
-  } else if (abId === 'weld') { // SOLDER: weld a broken wall back when one is close and nobody is shooting
+  } else if (abId === 'weld' && !ai.cmd) { // SOLDER: weld a broken wall back when one is close and nobody is shooting (an order from a person comes first)
     if (!enemy && p.battery > 0.5 && game.baseTiles) {
       const m = game.map, cx = Math.floor(p.x / CELL), cy = Math.floor(p.y / CELL);
       for (let y = cy - 2; y <= cy + 2; y++) for (let x = cx - 2; x <= cx + 2; x++) {
@@ -1190,7 +1190,7 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   if (!mate) ai.yieldUntil = undefined;
   else if (game.time > ai.yieldUntil + 1.5) ai.yieldUntil = undefined; // waited long enough: go anyway, then wait again later
   const oi = map.openId ? map.openId[next] : -1;
-  if (oi >= 0 && map.openings[oi] && map.openings[oi].cells.length > 1) { // a doorway: take the half a teammate isn't using
+  if (oi >= 0 && map.openId[sy * map.W + sx] !== oi && map.openings[oi] && map.openings[oi].cells.length > 1) { // a doorway, not yet in it: take the half a teammate isn't using (once in it, walk on, or a mate nearby holds you there for good)
     const o = map.openings[oi], used = [...game.players.values()].filter(q => q !== p && q.alive && q.squad === p.squad && Math.hypot(q.x - p.x, q.y - p.y) < 120);
     if (used.length) { const far = o.cells.slice().sort((a, b) => Math.min(...used.map(q => Math.hypot((b % map.W + 0.5) * CELL - q.x, (Math.floor(b / map.W) + 0.5) * CELL - q.y))) - Math.min(...used.map(q => Math.hypot((a % map.W + 0.5) * CELL - q.x, (Math.floor(a / map.W) + 0.5) * CELL - q.y))))[0]; next = far; }
   }
@@ -1210,7 +1210,8 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   if (map.tiles[next] === T.BARRI || map.tiles[next] === T.SOFT || map.tiles[next] === T.PANEL) {
     if (Math.hypot(nx - p.x, ny - p.y) < 26) {
       p.aim = dirA; const f = game.facingCell(p, 20);
-      if (f && f.k === next) { ai.hitT = 0; game.event(p, { k: 'melee' }); return; }
+      const inWay = [...game.players.values()].some(q => q !== p && q.alive && q.ctrl === 'body' && Math.hypot(q.x - p.x, q.y - p.y) < 30); // a swing would land on them, not the wall (and hurt a teammate)
+      if (f && f.k === next && !inWay) { ai.hitT = 0; game.event(p, { k: 'melee' }); return; }
       ai.hitT = (ai.hitT || 0) + dt; // the swing wouldn't reach it from here: step in, and after a while go another way
       if (ai.hitT > 2.5) { ai.hitT = 0; (ai.noVault || (ai.noVault = new Set())).add(next); ai.path = null; return; }
     }
@@ -1221,6 +1222,9 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   if (Math.hypot(p.x - (ai.lx || 0), p.y - (ai.ly || 0)) < 0.5) { ai.stuck = (ai.stuck || 0) + dt; if (ai.stuck > 1) { ai.path = null; ai.stuck = 0; } }
   else ai.stuck = 0;
   ai.lx = p.x; ai.ly = p.y;
+  // walking on the spot (wobbling against something the path can't see): after 4 s, another way
+  if (Math.hypot(p.x - (ai.anX ?? -1e9), p.y - (ai.anY ?? -1e9)) > 12 || !(game.time - ai.anT < 8)) { ai.anX = p.x; ai.anY = p.y; ai.anT = game.time; }
+  else if (game.time - ai.anT > 4) { ai.anT = game.time; const nv = ai.noVault && ai.noVault.size > 12 ? (ai.noVault.clear(), ai.noVault) : ai.noVault || (ai.noVault = new Set()); nv.add(next); ai.path = null; }
 }
 
 // A teammate just ahead on the way this bot is going (closer than the spacing we keep), or, entering a doorway, one

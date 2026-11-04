@@ -11,6 +11,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] try push to talk on screen with a real microphone (the voices and their sliders are gone)
 - [ ] the mix input needs more work, its not understand me enough (microphone: now hears words in any order, picks the closest phrase, keeps the moment before and after the key; not yet tried with a real voice)
 - [ ] the killcam suggestions cannot just flash, it should be red but not flashing (button is now solid red; what made it flash was not found, so check it)
+- [ ] clean things up its getting a little laggy
 
 ## Done
 
