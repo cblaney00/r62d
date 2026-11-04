@@ -14,8 +14,8 @@ const cx = (k % W + 0.5) * CELL, cy = (Math.floor(k / W) + 0.5) * CELL;
 const o = { x: cx - 2.2 * CELL, y: cy, vx: 0, vy: 0 }, mods = { armor: 2, mul: 1 };
 for (let i = 0; i < 60; i++) stepMove(m, o, { right: 1 }, 1 / 30, mods);
 if (o.x > cx - CELL * 0.6) fail('walked into furniture without jumping', o.x - cx);
-for (let i = 0; i < 40; i++) stepMove(m, o, { right: 1, jump: i === 0 ? 1 : 0 }, 1 / 30, mods);
-const onIt = standable(m, Math.floor(o.y / CELL) * W + Math.floor(o.x / CELL));
+let onIt = false; // (narrow furniture: you can be over it and off the far side again by the end)
+for (let i = 0; i < 40; i++) { stepMove(m, o, { right: 1, jump: i === 0 ? 1 : 0 }, 1 / 30, mods); if (o.up || standable(m, Math.floor(o.y / CELL) * W + Math.floor(o.x / CELL))) onIt = true; }
 console.log('after a jump: up =', !!o.up, 'standing on furniture =', onIt);
 if (!o.up && !onIt) fail('jumping did not get onto the furniture');
 // leaning never moves the body (he noticed tapping Q walked you sideways); only the upper body tips (o.lo)

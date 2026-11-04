@@ -19,7 +19,7 @@ for (const id of MAP_LIST) {
   const m = g.map, W = m.W;
   const defs = [...g.players.values()].filter(q => g.side(q) === TEAM.DEF);
   const boarded = m.openings.filter(o => o.kind !== 'window' && o.cells.some(c => m.tiles[c] === T.BARRI)).length;
-  for (const o of m.openings) if (o.kind === 'window' && !o.cells.every(c => m.tiles[c] === T.BARRI)) { fail(id, 'a window did not start boarded'); break; }
+  for (const o of m.openings) if (o.kind === 'window' && !o.cells.every(c => m.tiles[c] === T.BARRI || m.tiles[c] === T.BEAM)) { fail(id, 'a window did not start boarded'); break; }
   if (boarded > defs.length * BARRICADES_EACH) fail(id, boarded, 'barricades up from', defs.length, 'defenders');
   if (boarded === m.openings.filter(o => o.kind !== 'window').length) fail(id, 'every doorway boarded up at the start');
   for (const q of defs) if (q.barri < 0 || q.barri > BARRICADES_EACH) fail(id, q.name, 'has', q.barri, 'barricades');

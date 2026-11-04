@@ -36,7 +36,7 @@ for (const id of maps) {
   const { g, reacts, rounds } = play(id);
   allReacts.push(...reacts);
   const log = g.proLog || [];
-  calls += log.length; switches += log.filter(l => /switch|now|Retake|Rotate/i.test(l.text)).length; gos += log.filter(l => /go go go/i.test(l.text)).length;
+  calls += log.length; switches += log.filter(l => /switch|now|Retake|Rotate/i.test(l.text)).length; gos += log.filter(l => /^go!|\bgo now\b|\bwe go\b/i.test(l.text)).length;
   if (rounds.length < 3) bad(id, 'match did not finish');
   for (const r of rounds) if (r.plans.filter(Boolean).length < 2) bad(id, 'round', r.round, 'a team had no plan');
   const plansUsed = new Set(rounds.flatMap(r => r.plans));
