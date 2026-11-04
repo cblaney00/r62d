@@ -25,6 +25,8 @@ export function buildMap(id = 'harbor') {
   if (!MAPS[id]) id = 'harbor';
   const m = MAPS[id].build();
   addRopes(m);
+  addRoofEdges(m);
+  addOutCams(m);
   addYardCover(m);
   return m;
 }
@@ -114,6 +116,72 @@ export const ropeS = (r, x, y) => (x - r.hang.x) * r.tx + (y - r.hang.y) * r.ty;
 export const ropeAtWindow = (r, x, y) => Math.abs(ropeS(r, x, y)) <= r.half - 4;
 // Is this rope's window open enough to climb in (not boarded, reinforced or blocked)?
 export function ropeWindowOpen(m, r) { return r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE); }
+
+// ---- Looking over the roof's edge, and outside cameras (he asked) ----
+// The roof's edge is cut into short straight stretches (up to EDGE_LEN cells) that work like open upper windows:
+// within ROOF_REACH of one you see the ground below that side (windowViews), and people down there can see and shoot
+// you (wallGhost). m.roofEdges[i] = { i, edge: 1, f (the roof), cells, hang (the air cell outside its middle), out,
+// tx, ty, half }; m.roofEdgeAt: roof cell -> its edges.
+export const ROOF_REACH = 2.6 * CELL, EDGE_LEN = 4;
+function addRoofEdges(m) {
+  const W = m.W, rf = m.roofFloor, edges = []; m.roofEdges = edges; m.roofEdgeAt = new Map();
+  if (rf === undefined || m.groundFloor === undefined) return;
+  const top = k => m.flAt[k] === rf && (m.tiles[k] === T.FLOOR || m.tiles[k] === T.GROUND) && !m.shape[k];
+  const air = k => m.flAt[k] === rf && m.tiles[k] === T.VOID;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const step = dx ? W : 1, on = new Set(); // along the edge
+    for (let k = 0; k < m.tiles.length; k++) if (top(k) && air(k + dy * W + dx)) on.add(k);
+    for (const k of on) {
+      if (on.has(k - step)) continue; // start of a straight run
+      const run = []; for (let q = k; on.has(q); q += step) run.push(q);
+      for (let i = 0; i < run.length; i += EDGE_LEN) {
+        const cells = run.slice(i, i + EDGE_LEN);
+        if (cells.length < 2 && i) { edges[edges.length - 1].cells.push(...cells); continue; } // a lone cell joins the stretch before it
+        edges.push({ i: edges.length, edge: 1, f: rf, cells, out: Math.atan2(dy, dx), tx: dx ? 0 : 1, ty: dx ? 1 : 0, dx, dy });
+      }
+    }
+  }
+  for (const e of edges) {
+    const a = e.cells[0], b = e.cells[e.cells.length - 1];
+    e.half = e.cells.length * CELL / 2;
+    e.hang = { x: ((a % W + b % W) / 2 + 0.5 + e.dx) * CELL, y: ((Math.floor(a / W) + Math.floor(b / W)) / 2 + 0.5 + e.dy) * CELL };
+    for (const k of e.cells) (m.roofEdgeAt.get(k) || m.roofEdgeAt.set(k, []).get(k)).push(e.i); // (a corner cell is on two)
+  }
+}
+// OUTCAM_N cameras on the outside of the building just under the roof's edge (the top floor: 2F or 3F), spread round
+// it: defenders see the yard below that side, anyone climbing the ropes there and the strip of roof above. Attackers
+// can shoot one from the roof (it hangs in the air cell just past the edge, made a "drop" ledge so sight and bullets
+// reach it) or from the ground (it shows on the wall above gx/gy). m.outCams[i] = { x, y (on the roof grid), gx, gy
+// (the ground under it), n (straight out), e (its edge) }. Same spots every round.
+export const OUTCAM_N = 4, OUTCAM_TURN = 1.2, OUTCAM_ROOF = 3 * 36, OUTCAM_RANGE = 650;
+function yardAhead(m, e) { // how much open ground a camera over edge e looks out on (of 15 spots 3-11 m out)
+  const ft = windowFoot(m, e), gi = m.groundFloor; let n = 0;
+  for (const d of [3, 5, 7, 9, 11]) for (const a of [-0.5, 0, 0.5]) {
+    const x = ft.x + Math.cos(e.out + a) * d * 36, y = ft.y + Math.sin(e.out + a) * d * 36, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), k = cy * m.W + cx;
+    if (cx >= 0 && cy >= 0 && cx < m.W && cy < m.H && m.flAt[k] === gi && m.tiles[k] === T.GROUND && los(m, ft.x, ft.y, x, y)) n++;
+  }
+  return n;
+}
+function addOutCams(m) {
+  const W = m.W, out = []; m.outCams = out;
+  const cand = (m.roofEdges || []).filter(e => e.cells.length >= 2 && windowFoot(m, e)).map(e => {
+    const mid = e.cells[e.cells.length >> 1], k = mid + e.dy * W + e.dx;
+    return { e, k, x: (mid % W + 0.5) * CELL + e.dx * (CELL / 2 + 3), y: (Math.floor(mid / W) + 0.5) * CELL + e.dy * (CELL / 2 + 3) };
+  }).filter(c => m.tiles[c.k] === T.VOID && yardAhead(m, c.e) >= 6); // only where there is yard to watch (not a cliff or the next wall)
+  if (!cand.length) return;
+  const cx = cand.reduce((a, c) => a + c.x, 0) / cand.length, cy = cand.reduce((a, c) => a + c.y, 0) / cand.length;
+  const pick = [cand.reduce((a, c) => Math.hypot(c.x - cx, c.y - cy) > Math.hypot(a.x - cx, a.y - cy) ? c : a)];
+  while (pick.length < Math.min(OUTCAM_N, cand.length)) { // then each time the spot furthest from those already chosen
+    let best = null, bd = -1;
+    for (const c of cand) { if (pick.includes(c)) continue; const d = Math.min(...pick.map(p => Math.hypot(p.x - c.x, p.y - c.y))); if (d > bd) { bd = d; best = c; } }
+    pick.push(best);
+  }
+  for (const c of pick) {
+    m.tiles[c.k] = T.LOW; m.floor[c.k] = FL.VOID;
+    const ft = windowFoot(m, c.e);
+    out.push({ i: out.length, x: c.x, y: c.y, gx: ft.x, gy: ft.y, n: c.e.out, e: c.e.i, k: c.k });
+  }
+}
 
 // ---- Yard cover (he asked: an interesting outdoors with safer and riskier ways in, now that upper windows see the
 // ground) ----
@@ -351,6 +419,7 @@ export function floorOff(m, f, g) {
 const ledgeAt = (m, k) => m.tiles[k] === T.LOW && m.floor[k] === FL.VOID;
 // 'open' | 'holed' | 'boarded' | 'shut' for rope r's window (the state seen from below)
 export function windowState(m, r) {
+  if (r.edge) return 'open';
   if (r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE)) return 'open';
   if (r.cells.some(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE || (m.tiles[k] === T.BARRI && m.holes[k] && m.holes[k].length))) return 'holed';
   return r.cells.every(k => m.tiles[k] === T.BARRI) ? 'boarded' : 'shut';
@@ -371,19 +440,20 @@ export function windowFoot(m, r) {
 export function windowViews(m, x, y) {
   const out = [], f = floorAt(m, x, y), gi = m.groundFloor;
   if (gi === undefined || f <= gi) return out;
-  for (const r of m.ropes || []) {
-    if (r.f !== f) continue;
+  const srcs = f === m.roofFloor ? m.roofEdges || [] : (m.ropes || []).filter(r => r.f === f);
+  for (const r of srcs) {
     const ft = windowFoot(m, r); if (!ft) continue;
-    const ox = Math.cos(r.out), oy = Math.sin(r.out), depth = (ft.cx - x) * ox + (ft.cy - y) * oy; // how far inside the window you stand
-    if (depth < 3 || depth > WIN_REACH) continue;
+    const ox = Math.cos(r.out), oy = Math.sin(r.out), depth = (ft.cx - x) * ox + (ft.cy - y) * oy + (r.edge ? CELL / 2 : 0); // how far inside the window (or back from the roof's edge) you stand
+    if (r.edge ? depth < 1 || depth > ROOF_REACH : depth < 3 || depth > WIN_REACH) continue;
     const side = Math.abs((ft.cx - x) * r.tx + (ft.cy - y) * r.ty);
     if (side > r.half + depth * 1.6) continue;
     const ix = ft.cx - ox * (CELL / 2 + 1), iy = ft.cy - oy * (CELL / 2 + 1), d = Math.hypot(ix - x, iy - y); // just inside the window
     if (d > 3 && castSight(m, x, y, Math.atan2(iy - y, ix - x), d, null) < d - 3) continue;
     const st = windowState(m, r); if (st === 'shut' || st === 'boarded') continue;
-    const view = (ang, fov, hole) => out.push({ x: ft.x, y: ft.y, ang, fov, range: WIN_RANGE, near: 0, kind: 'window', hole, r: r.i });
+    const view = (ang, fov, hole) => out.push(r.edge ? { x: ft.x, y: ft.y, ang, fov, range: WIN_RANGE, near: 0, kind: 'window', hole, r: -1, e: r.i } : { x: ft.x, y: ft.y, ang, fov, range: WIN_RANGE, near: 0, kind: 'window', hole, r: r.i });
     if (st === 'open') {
-      const e1x = ft.cx - r.tx * r.half, e1y = ft.cy - r.ty * r.half, e2x = ft.cx + r.tx * r.half, e2y = ft.cy + r.ty * r.half;
+      const fx = ft.cx + (r.edge ? ox * CELL / 2 : 0), fy = ft.cy + (r.edge ? oy * CELL / 2 : 0); // the opening's (or the edge's) outside line
+      const e1x = fx - r.tx * r.half, e1y = fy - r.ty * r.half, e2x = fx + r.tx * r.half, e2y = fy + r.ty * r.half;
       const a1 = Math.atan2(e1y - y, e1x - x), a2 = Math.atan2(e2y - y, e2x - x), da = Math.atan2(Math.sin(a2 - a1), Math.cos(a2 - a1));
       view(a1 + da / 2, Math.abs(da), false);
       continue;
@@ -399,6 +469,8 @@ export function windowViews(m, x, y) {
   }
   return out;
 }
+// The rope (its window) or roof edge a view down (from windowViews) looks out of
+export const viewSrc = (m, v) => v.e !== undefined ? m.roofEdges[v.e] : m.ropes[v.r];
 // Does a view down (from windowViews) take in the ground-floor point (px, py)?
 export function windowSees(m, v, px, py, smokes) {
   const d = Math.hypot(px - v.x, py - v.y);
@@ -425,7 +497,7 @@ export function peekSeen(m, gh, sx, sy, smokes) {
   if (gh.rope) return los(m, sx, sy, gh.x, gh.y, smokes);
   for (const v of gh.views) {
     if (v.hole && Math.hypot(sx - v.x, sy - v.y) > WIN_HOLE_SEE) continue;
-    if (windowSees(m, v, sx, sy, smokes)) return true;
+    if (windowSees(m, v, sx, sy, smokes)) return v; // (truthy: the view they are seen through; they show at its foot from there)
   }
   return false;
 }

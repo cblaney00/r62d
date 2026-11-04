@@ -49,7 +49,7 @@ function pickMap(el, id) {
     setTimeout(() => { // let the "drawing" note show first: building the picture takes a moment
       if (S.id !== id) return;
       S.map = buildMap(id); S.rend = new MapRenderer(S.map, S.map.tiles.slice(), 1); S.loadedId = id; // 1 picture px per world px: sharp at this page's zoom, ~3x quicker than match detail
-      S.cams = (S.map.cams || []).map(c => wallMount(S.map, c.x, c.y));
+      S.cams = [...(S.map.cams || []).map(c => wallMount(S.map, c.x, c.y)), ...(S.map.outCams || []).map(c => ({ x: c.x, y: c.y, n: c.n }))]; // + the outside cameras, on the roof's edge
       S.fl = S.map.groundFloor ?? 0; S.site = -1;
       side(el); floors(el); draw(el);
     }, 30);

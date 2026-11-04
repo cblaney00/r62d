@@ -6,7 +6,7 @@
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
-import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff } from '../shared/map.js';
+import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel } from '../shared/pros.js';
 import { planWeight, opWeight } from './training.js';
@@ -381,7 +381,7 @@ export function visibleEnemy(game, p, see) {
     for (const q of game.players.values()) {
       if (!q.alive || q.staged || game.side(q) === team || q.shrouded) continue;
       const gh = wallGhost(m, q.x, q.y);
-      if (gh && peekSeen(m, gh, p.x, p.y, smokes)) take(q, gh.x, gh.y, false);
+      const pv = gh && peekSeen(m, gh, p.x, p.y, smokes); if (pv) take(q, pv === true ? gh.x : pv.x, pv === true ? gh.y : pv.y, false); // (where they show from here)
     }
   }
   return best;
@@ -1050,8 +1050,16 @@ function botCams(game, p, dt) {
   p.aim = c.ang || 0;
   const smokes = game.smokeList();
   for (const q of game.players.values()) {
-    if (!q.alive || game.side(q) === team || q.shrouded || Math.hypot(q.x - c.x, q.y - c.y) > 420 || floorAt(game.map, q.x, q.y) !== floorAt(game.map, c.x, c.y)) continue;
-    if (Math.abs(angDiff(Math.atan2(q.y - c.y, q.x - c.x), c.ang || 0)) > 0.85 || !los(game.map, c.x, c.y, q.x, q.y, smokes)) continue;
+    if (!q.alive || game.side(q) === team || q.shrouded) continue;
+    if (c.oc !== undefined) { // an outside camera: the ground below (climbers show there too) and the roof just above
+      const m = game.map, qf = floorAt(m, q.x, q.y), gh = qf === m.groundFloor ? q : wallGhost(m, q.x, q.y), at = gh && (qf === m.groundFloor || gh.rope) ? gh : null;
+      const onRoof = qf === m.roofFloor && Math.hypot(q.x - c.x, q.y - c.y) < OUTCAM_ROOF && los(m, c.x, c.y, q.x, q.y, smokes);
+      const below = at && Math.hypot(at.x - c.gx, at.y - c.gy) < 420 && Math.abs(angDiff(Math.atan2(at.y - c.gy, at.x - c.gx), c.ang || 0)) < 0.85 && los(m, c.gx, c.gy, at.x, at.y, smokes);
+      if (!onRoof && !below) continue;
+    } else {
+      if (Math.hypot(q.x - c.x, q.y - c.y) > 420 || floorAt(game.map, q.x, q.y) !== floorAt(game.map, c.x, c.y)) continue;
+      if (Math.abs(angDiff(Math.atan2(q.y - c.y, q.x - c.x), c.ang || 0)) > 0.85 || !los(game.map, c.x, c.y, q.x, q.y, smokes)) continue;
+    }
     game.spot(team, q.id, 3);
     if (!(ai.camSaid || (ai.camSaid = new Set())).has(q.id + ':' + game.round)) { ai.camSaid.add(q.id + ':' + game.round);
       talk(game, p, 'cam', { op: opName(q), place: place(game, q.x, q.y) }, 'see' + q.id);

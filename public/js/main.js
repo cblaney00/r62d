@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, gunMods, attFromCode, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -246,8 +246,8 @@ function freeAimPoint() {
 }
 // is this aim (from where you stand) out through one of the windows you are looking down from?
 function winAimed(a) {
-  for (const v of st.viewers || []) if (v.kind === 'window') {
-    const r = st.map.ropes[v.r], ft = r && windowFoot(st.map, r); if (!ft) continue;
+  for (const v of st.viewers || []) if (v.kind === 'window' && !v.oc) {
+    const r = viewSrc(st.map, v), ft = r && windowFoot(st.map, r); if (!ft) continue;
     const wa = Math.atan2(ft.cy - st.pred.y, ft.cx - st.pred.x), half = Math.atan2(r.half + 6, Math.max(8, Math.hypot(ft.cx - st.pred.x, ft.cy - st.pred.y)));
     if (Math.abs(angDiff(a, wa)) < half) return true;
   }
@@ -2016,6 +2016,13 @@ function draw(s, view, now, dt) {
     drawGadget(ctx, e, now, ally);
   }
   for (const e of ents) if (e.ty === 'cam' && (e.tm === side || seen(e.x, e.y))) drawCam(ctx, e, now, e.tm === side);
+  for (const e of ents) { // an outside camera also shows on the wall above the ground under it (he asked: it can be shot from down there)
+    const oc = e.ty === 'cam' && e.oc !== undefined && st.map.outCams && st.map.outCams[e.oc];
+    if (!oc || !(e.tm === side || seen(oc.gx, oc.gy))) continue;
+    drawCam(ctx, { ...e, x: oc.gx, y: oc.gy }, now, e.tm === side);
+    ctx.font = '700 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = e.tm === side ? '#8fc8ff' : '#ff8a3d';
+    ctx.fillText('▲ CAMERA', oc.gx + Math.cos(oc.n) * 10, oc.gy + Math.sin(oc.n) * 10 + 2); // (out in the yard, not on the wall)
+  }
 
   // players
   const drawn = []; st.heads = []; // enemies you can see: their head zones show while you aim in
@@ -2045,14 +2052,16 @@ function draw(s, view, now, dt) {
     }
     // at an upper window or on a rope (he asked): they also show on the ground just outside the wall, to anyone below
     // they could see from there (what they can see can see them; through a bullet hole only from close by)
-    const wg = !isMe && !gh && wallGhost(st.map, p.x, p.y);
-    if (wg && (ally || (!p.sh && wallGhostSeen(wg)))) {
+    let wg = !isMe && !gh && wallGhost(st.map, p.x, p.y);
+    const wgAt = wg && (ally ? wg : !p.sh && wallGhostSeen(wg));
+    if (wgAt) {
+      wg = { ...wg, x: wgAt.x, y: wgAt.y };
       ctx.globalAlpha = 0.9;
       drawOperator(ctx, { x: wg.x, y: wg.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: wg.rope ? 0 : Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil }, now);
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
       const F = st.map.floors[Math.max(0, floorAt(st.map, p.x, p.y))];
-      ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(wg.rope ? '▲ ON THE WALL' : `▲ ${F.name} WINDOW`, wg.x + u.x * 15, wg.y + u.y * 15);
+      ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(wg.rope ? '▲ ON THE WALL' : wg.views[0].e !== undefined ? '▲ ON THE ROOF' : `▲ ${F.name} WINDOW`, wg.x + u.x * 15, wg.y + u.y * 15);
       if (!ally && !p.dn) st.heads.push({ x: wg.x, y: wg.y });
     }
     // Silent Shroud: drones and cameras can't see her, only eyes can
@@ -2708,6 +2717,7 @@ function feedView(c, me) {
   if (c.ty === 'bird') { const ic = interp(c.id, 'ents') || c; return c.pe ? { x: ic.x, y: ic.y, ang: ic.ag || c.ag || 0, fov: 1.9, range: 520, near: 6, kind: 'cam', cam: c, ro: 1 } : { x: ic.x, y: ic.y, ang: ic.ag || c.ag || 0, fov: Math.PI * 2, range: 260, near: 0, kind: 'cam', cam: c, dr: 1, ro: 1 }; }
   if (c.ty === 'scope' && c.fl) return { x: c.x, y: c.y, ang: c.ag || 0, fov: 6.28, range: 230, near: 6, kind: 'cam', cam: c, ro: 1 }; // LENS: looking all round the room above / below
   if (c.ty === 'scope') return { x: c.x, y: c.y, ang: c.ag || 0, fov: 1.3, range: 420, near: 6, kind: 'cam', cam: c, ro: 1 };
+  if (c.oc !== undefined) return { x: c.x, y: c.y, ang: c.ag || 0, fov: 6.28, range: OUTCAM_ROOF, near: 0, kind: 'cam', off: c.off, cam: c, ro, oc: 1 }; // outside camera: the roof just above it here, the ground below in teamViewers
   return { x: c.x, y: c.y, ang: ro ? c.ag || 0 : st.aim, fov: 1.9, range: 650, near: 14, kind: 'cam', off: c.off, cam: c, ro };
 }
 
@@ -2721,7 +2731,7 @@ function camBar(s, me) {
   const html = list.map(c => {
     const live = !def || c.hp > 0 || c.ty === 'bird', mine = c.ow === me.id;
     const name = c.ow ? (mine ? 'MY ' : `${ownerName(s, c.ow).toUpperCase()}'S `) + (c.ty === 'cam' ? (c.tu ? 'TURRET' : 'STICKY') : c.ty === 'scope' ? 'SCOPE' : c.ty === 'bird' ? 'BIRD' : 'DRONE') : `CAM ${++n}`;
-    return `<button data-id="${live ? c.id : ''}" class="${c.id === cur ? 'on' : ''} ${live ? '' : 'dead'}">${esc(name)}<small>${esc((roomAt(st.map, c.x, c.y) || 'outside').toUpperCase())}${c.off || c.j ? ' · DISRUPTED' : ''}</small></button>`;
+    return `<button data-id="${live ? c.id : ''}" class="${c.id === cur ? 'on' : ''} ${live ? '' : 'dead'}">${esc(name)}<small>${esc(c.oc !== undefined ? 'OUTSIDE · ' + ['EAST', 'SOUTH', 'WEST', 'NORTH'][((Math.round((c.wn || 0) / (Math.PI / 2)) % 4) + 4) % 4] + ' WALL' : (roomAt(st.map, c.x, c.y) || 'outside').toUpperCase())}${c.off || c.j ? ' · DISRUPTED' : ''}</small></button>`;
   }).join('');
   if (bar.innerHTML !== html) {
     bar.innerHTML = html;
@@ -2737,6 +2747,8 @@ const tvCamCone = new Map(); // ESPORTS TV: each camera's sight polygon by camer
 function teamViewers(s, view, me, inGame) {
   const vs = [];
   if (view) vs.push(view);
+  const oc = view && view.oc && !view.off && st.map && st.map.outCams && st.map.outCams[view.cam.oc]; // an outside camera's view down onto the ground (drawn like a window's)
+  if (oc) vs.push({ x: oc.gx, y: oc.gy, ang: view.ang, fov: 1.9, range: OUTCAM_RANGE, near: 0, kind: 'window', r: -1, oc: 1 });
   // looking out of an upper window (he asked): the ground below, as far as the boards let you (windowViews)
   if (view && view.kind === 'body' && me && inGame && me.a && !me.dn && st.map) {
     for (const w of windowViews(st.map, view.x, view.y)) if (Math.abs(angDiff(w.ang, view.ang)) < view.fov / 2 + w.fov / 2) vs.push(w);
@@ -2871,10 +2883,14 @@ function drawStairView(s, me, now) {
   octx.strokeText(L, P.x, ly); octx.fillText(L, P.x, ly);
   octx.restore();
 }
-function wallGhostSeen(gh) { // a window peeker / climber's copy on the ground: seen by something of ours down there
+function wallGhostSeen(gh) { // a window peeker / climber's copy on the ground: seen by something of ours down there? Where it shows, or null
   const sm = smokes(st.last);
-  for (const v of st.viewers || []) if (!v.off && v.kind !== 'hatch' && v.kind !== 'window' && floorAt(st.map, v.x, v.y) === gh.fl && canSee(st.map, v, gh.x, gh.y, sm) && peekSeen(st.map, gh, v.x, v.y, sm)) return true;
-  return false;
+  for (const v of st.viewers || []) {
+    if (v.off || v.kind === 'hatch' || v.kind === 'window' || floorAt(st.map, v.x, v.y) !== gh.fl) continue;
+    const pv = peekSeen(st.map, gh, v.x, v.y, sm), at = pv === true ? gh : pv; // (at the foot of the view it is seen through)
+    if (at && canSee(st.map, v, at.x, at.y, sm)) return at;
+  }
+  return null;
 }
 // The view down out of an upper window (he asked): the ground floor drawn into the dark outside the window, moved by
 // the floor offset so it lines up under the building, live colour only inside what the window lets you see (a slit

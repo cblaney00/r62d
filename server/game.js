@@ -1,6 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
-import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE } from '../shared/map.js';
+import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM } from '../shared/operators.js';
@@ -343,6 +343,8 @@ export class Game {
       for (let i = 0; i <= 16; i++) { const a = c.n === null ? i / 16 * Math.PI * 2 : c.n - c.sp + c.sp * 2 * i / 16, d = castSight(map, c.x, c.y, a, 600, null); if (d > bestD) { bestD = d; best = a; } }
       this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, team: TEAM.DEF, hp: 1, offUntil: 0, ang: best, wn: c.n, ws: c.sp, wall: c.wall });
     }
+    for (const c of map.outCams || []) // outside cameras under the roof's edge (he asked): watch the yard, the ropes and the roof edge
+      this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, gx: c.gx, gy: c.gy, oc: c.i, team: TEAM.DEF, hp: 1, offUntil: 0, ang: c.n, wn: c.n, ws: OUTCAM_TURN, wall: [] });
     this.boardWindows();
     // defenders start on site, attackers at one spawn (their bodies wait while they drone)
     const site = map.sites[this.site];
@@ -984,9 +986,11 @@ export class Game {
       }
       // someone at an upper window (or on a rope) shows on the ground just outside the wall: hit there from below
       const wg = fl === this.map.groundFloor && wallGhost(this.map, at.x, at.y);
-      if (wg && peekSeen(this.map, wg, x0, y0)) {
-        const tw = rayCircle(x0, y0, dx, dy, wg.x, wg.y, hitR(q.op));
-        if (tw !== null && tw < bestT) { bestT = tw; best = { q, at: wg }; }
+      const pv = wg && peekSeen(this.map, wg, x0, y0);
+      if (pv) {
+        const gp = pv === true ? wg : { ...wg, x: pv.x, y: pv.y }; // at the foot of the view the shooter sees them through
+        const tw = rayCircle(x0, y0, dx, dy, gp.x, gp.y, hitR(q.op));
+        if (tw !== null && tw < bestT) { bestT = tw; best = { q, at: gp }; }
       }
     }
     for (const e of this.ents) {
@@ -997,6 +1001,7 @@ export class Game {
       const at = small && src.viewTime !== null && src.viewTime !== undefined ? this.posAt(e, src.viewTime) : e;
       const t = rayCircle(x0, y0, dx, dy, at.x, at.y, e.type === 'decoy' ? hitR(e.op) : small ? 4.5 : 6); // drones are small
       if (t !== null && t < bestT) { bestT = t; best = { e }; }
+      if (e.oc !== undefined && fl === this.map.groundFloor && !this.fromAbove) { const tg = rayCircle(x0, y0, dx, dy, e.gx, e.gy, 6); if (tg !== null && tg < bestT) { bestT = tg; best = { e }; } } // an outside camera, from the ground below it
     }
     const cov = rayCovers(this.map, x0, y0, dx, dy, bestT); if (cov) { bestT = cov.t; best = null; } // a cover plate in the way
     let mult = 1, stopT = bestT, kind = best ? 'flesh' : cov ? 'cover' : 'none', pens = 0, wallT = 0, tracerWall = src && src.tracerUntil > this.time && this.shotW ? 2 : 0; // MARK: two cells of solid wall
@@ -1006,7 +1011,7 @@ export class Game {
     walkRay(x0, y0, dx, dy, bestT, (cx, cy, t) => {
       const k = cy * this.map.W + cx, tile = tileAt(this.map, cx, cy);
       if (up) { // out of an upper window: the rest of the shot carries on down on the ground floor (shotOutWindow)
-        if (this.map.win[k]) winK = k;
+        if (this.map.win[k] || (this.map.roofEdgeAt && this.map.roofEdgeAt.has(k))) winK = k; // (or over the roof's edge)
         else if (winK >= 0 && !this.winCarry && (tile === T.VOID || (tile === T.LOW && this.map.floor[k] === FL.VOID))) this.winCarry = { t, mult, k: winK };
         if (tile === T.VOID && this.winCarry) { stopT = t; kind = 'none'; best = null; return true; }
       }
@@ -1122,7 +1127,11 @@ export class Game {
   shotOutWindow(p, eye, ang, range, dmg, wname, cls) {
     const c = this.winCarry; this.winCarry = null;
     const f = floorAt(this.map, eye.x, eye.y), o = floorOff(this.map, f, this.map.groundFloor), sa = this.shotAim;
-    const r = this.map.ropes.find(q => q.cells.includes(c.k)), ft = r && windowFoot(this.map, r);
+    const eis = this.map.roofEdgeAt && this.map.roofEdgeAt.get(c.k);
+    let ei; // over the roof's edge: the edge (of the one or two this cell is on) the shot goes out over, if you can look down over it
+    if (eis) { const vs = windowViews(this.map, eye.x, eye.y); ei = eis.filter(i => vs.some(v => v.e === i)).sort((a, b) => Math.abs(angDiff(ang, this.map.roofEdges[a].out)) - Math.abs(angDiff(ang, this.map.roofEdges[b].out)))[0]; }
+    if (eis && ei === undefined) return { x: eye.x + Math.cos(ang) * c.t, y: eye.y + Math.sin(ang) * c.t, k: 'none' }; // off the roof from too far back: you can't see down, nor shoot down
+    const r = ei !== undefined ? this.map.roofEdges[ei] : this.map.ropes.find(q => q.cells.includes(c.k)), ft = r && windowFoot(this.map, r);
     let x = eye.x + Math.cos(ang) * c.t + o.x, y = eye.y + Math.sin(ang) * c.t + o.y, a2 = ang;
     if (ft) {
       const tx = (sa && sa.x !== undefined && sa.x !== null ? sa.x : eye.x + Math.cos(ang) * 200) + o.x, ty = (sa && sa.y !== undefined && sa.y !== null ? sa.y : eye.y + Math.sin(ang) * 200) + o.y;
@@ -1130,7 +1139,9 @@ export class Game {
       x = ft.x; y = ft.y; a2 = Math.atan2(ty - y, tx - x) + angDiff(ang, aimA);
     }
     if (sa && sa.x !== undefined && sa.x !== null) this.shotAim = { x: sa.x + o.x, y: sa.y + o.y };
+    this.fromAbove = true; // (a shot coming down from up there doesn't hit the outside camera's copy on the wall)
     const e = this.hitscan(p, x - Math.cos(a2) * 2, y - Math.sin(a2) * 2, a2, Math.min(WIN_RANGE + 40, range - c.t), dmg * c.mult, wname, cls);
+    this.fromAbove = false;
     this.shotAim = sa;
     return { x: e.x - o.x, y: e.y - o.y, k: e.k };
   }
@@ -2824,7 +2835,7 @@ export class Game {
       if (e.owner) o.ow = e.owner;
       if (e.kind) o.kd = e.kind;
       if (e.ang !== undefined) o.ag = r2(e.ang);
-      if (e.type === 'cam') { o.hp = e.hp; o.off = e.offUntil > this.time ? 1 : 0; if (e.tu) { o.tu = 1; if (e.coolUntil > this.time) o.hot = 1; } if (e.wn !== null && e.wn !== undefined) { o.wn = r2(e.wn); o.ws = r2(e.ws); } }
+      if (e.type === 'cam') { o.hp = e.hp; o.off = e.offUntil > this.time ? 1 : 0; if (e.tu) { o.tu = 1; if (e.coolUntil > this.time) o.hot = 1; } if (e.wn !== null && e.wn !== undefined) { o.wn = r2(e.wn); o.ws = r2(e.ws); } if (e.oc !== undefined) o.oc = e.oc; }
       if (e.type === 'decoy') { o.op = e.op; o.w = e.w; }
       if (e.type === 'cover') o.hl = e.hl;
       if (e.type === 'plates') o.c = e.c;
