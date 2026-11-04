@@ -73,7 +73,14 @@ function settle(t0) {
   } else setTimeout(() => settle(t0), 40);
 }
 // one piece of sound from the microphone
+// Settings → Sound → Save my voice (he asked, to test stronger recognisers on how he really talks; off unless switched on, for this
+// session only): the sound of each sentence, kept for main.js to send to the data folder on this computer.
+let clipOn = false, clip = [];
+export const setMicClip = on => { clipOn = on; clip = []; };
+export function takeClip() { const n = clip.reduce((a, b) => a + b.length, 0), o = new Float32Array(n); let k = 0; for (const b of clip) { o.set(b, k); k += b.length; } clip = []; return { samples: o, rate: ac ? ac.sampleRate : 0 }; }
 export function micBlock(d) {
+  if (clipOn && (held || tail)) { if (!clip.length) clip = ring.map(b => Float32Array.from(b)); clip.push(Float32Array.from(d)); }
+  if (clipOn && talking) clip.push(Float32Array.from(d));
   if (held || tail) {
     const boost = micBoost();
     const hear = b => { const g = gateNext(b); if (g) feed(levelUp(g, boost, ac.sampleRate), ac.sampleRate); };
@@ -85,7 +92,7 @@ export function micBlock(d) {
     if (!talking) {
       const r = noiseTrack(block); loudN = r > Math.max(noiseAt * GATE, 0.0012) ? loudN + 1 : 0;
       ring.push(block); if (ring.length > 6) ring.shift();
-      if (loudN >= 2) { talking = true; quietN = 0; longN = 0; last = ''; levelReset(); if (onState) onState('on'); while (ring.length) hear(ring.shift()); }
+      if (loudN >= 2) { talking = true; quietN = 0; longN = 0; last = ''; levelReset(); if (onState) onState('on'); if (clipOn) clip = ring.map(b => Float32Array.from(b)); while (ring.length) hear(ring.shift()); }
     } else {
       const loud = rmsOf(block) > Math.max(noiseAt * GATE, 0.0012); quietN = loud ? 0 : quietN + 1; longN++; hear(block);
       if (onHear) onHear(null, Math.min(1, Math.sqrt(loudest) * 4));

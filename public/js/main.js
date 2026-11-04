@@ -1,7 +1,7 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
-import { pttDown, pttUp, pttSetState, pttVocab, pttTest, pttPreload, pttReady, setOpenMic } from './ptt.js';
+import { pttDown, pttUp, pttSetState, pttVocab, pttTest, pttPreload, pttReady, setOpenMic, setMicClip, takeClip } from './ptt.js';
 import { parseCommand } from '/shared/commands.js';
 import { openVoiceTest } from './voicetest.js';
 import { buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff } from '/shared/map.js';
@@ -742,6 +742,7 @@ addEventListener('keyup', e => {
   if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault(); // stop Firefox's menu bar popping up
   const a = actionFor(e.code); if (a) keys.delete(a);
   if (a === 'ptt') pttUp((text, loudest) => { // what it heard goes to the team as chat, and the bots read that like anything typed
+    saveClip(text);
     try { fetch('/api/miclog', { method: 'POST', body: `level ${loudest.toFixed(4)} heard: ${text || '(nothing)'}` }).catch(() => {}); } catch {}
     if (text) send({ t: 'chat', text, team: true, mic: 1 });
     else addFeed(loudest < 0.004 ? 'The microphone heard almost nothing: check it, or raise Microphone boost in Settings → Sound' : "Didn't catch any words: try \"where are they\" or \"go to\" and a room");
@@ -766,10 +767,21 @@ async function syncOpenMic() {
   if (!await pttReady()) { micLive = false; pttMsg('NO MICROPHONE HERE (OR THE BROWSER REFUSED IT)', 4000); return; }
   try { localStorage.setItem('r62d-ptt-used', '1'); } catch {}
   if (micLive) setOpenMic(true, (text, loudest) => {
+    saveClip(text);
     try { fetch('/api/miclog', { method: 'POST', body: `open level ${loudest.toFixed(4)} heard: ${text || '(nothing)'}` }).catch(() => {}); } catch {}
     const rooms = st.map ? (st.map.rooms || []).map(r => r.name) : [], c = text ? parseCommand(text, { rooms }) : null;
     if (c && (c.intent || c.room)) send({ t: 'chat', text, team: true, mic: 1 });
   });
+}
+function saveClip(text) {
+  if (!micSave) return;
+  const { samples, rate } = takeClip(); if (!samples.length) return;
+  fetch(`/api/micclip?rate=${rate}&heard=${encodeURIComponent(text || '')}`, { method: 'POST', body: samples }).catch(() => {});
+}
+let micSave = false;
+function setMicSave(on) {
+  micSave = !!on; setMicClip(micSave);
+  for (const b of $('micSaveSeg').children) b.classList.toggle('on', (b.dataset.m === 'on') === micSave);
 }
 function pttVocabNow() {
   const sn = st.snaps.length ? st.snaps[st.snaps.length - 1] : null;
@@ -3248,5 +3260,7 @@ $('kcBtn').onclick = () => { audio.ui(); watchKillcam(); };
 try { $('micBoost').value = localStorage.getItem('r62d-micboost') || 100; } catch {}
 for (const b of $('micSeg').children) b.onclick = () => { audio.ui(); setMicMode(b.dataset.m); };
 setMicMode(micMode);
+for (const b of $('micSaveSeg').children) b.onclick = () => { audio.ui(); setMicSave(b.dataset.m === 'on'); };
+setMicSave(false);
 $('voiceTestBtn').onclick = () => { audio.ui(); openVoiceTest(); };
 $('micBoost').addEventListener('input', () => { try { localStorage.setItem('r62d-micboost', $('micBoost').value); } catch {} });
