@@ -160,7 +160,13 @@ function freeMove(dx, dy) {
   else if (l < lo) l = lo;
   aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l };
 }
-function adsReset() { const l = Math.hypot(aimOff.x, aimOff.y) || 1, d = st.me && st.me.aa ? adsStart(attFromCode(st.me.aa).sight) * PX_PER_M : ADS_DIST; aimOff = { x: aimOff.x / l * d, y: aimOff.y / l * d }; }
+// aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked), else to its sight's distance
+function adsReset() {
+  const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l, d = st.me && st.me.aa ? adsStart(attFromCode(st.me.aa).sight) * PX_PER_M : ADS_DIST;
+  const far = Math.max(l, d); aimOff = { x: ux * far, y: uy * far };
+  const q = freeAimPoint(), to = q.stopped ? Math.max(AIM_MIN(), q.see) : d;
+  aimOff = { x: ux * to, y: uy * to };
+}
 const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
 let padOn = false, padAng = 0, padReach = 0.6;
 const wrapAng = a => Math.atan2(Math.sin(a), Math.cos(a));
