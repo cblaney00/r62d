@@ -8,7 +8,7 @@ import { LINES, CAST, compose } from '../shared/comms.js';
 import { PHASE, TEAM, CELL, PX_PER_M, DUR } from '../shared/constants.js';
 import { floorAt, roomAt } from '../shared/map.js';
 let bad = 0; const check = (ok, what) => { console.log(ok ? 'ok  ' : 'FAIL', what); if (!ok) bad++; };
-for (const [g, f, want] of [['one to scout me', 'one just kill me', f => f], ['lets go to the bomb site', "let's go to the bomb site", g => g], ['stay there', 'say there', g => g], ['regroup on me', 'the group on me', g => g], ['my bad hall', 'i died from hallway', g => g], ['', 'where are they', f => f], ['hold here', '', g => g]])
+for (const [g, f, want] of [['is this bathroom can you ember stay this', 'is this better can you understand this', f => f], ['the stairs studio', 'is there any of the about two year', f => f], ['again has defuser lab pickles lab garage thanks', 'the game is definitely picking up the wrong things', f => f], ['one to scout me', 'one just kill me', f => f], ['lets go to the bomb site', "let's go to the bomb site", g => g], ['stay there', 'say there', g => g], ['regroup on me', 'the group on me', g => g], ['my bad hall', 'i died from hallway', g => g], ['', 'where are they', f => f], ['hold here', '', g => g]])
   check(pickHeard(g, f) === want(want === undefined ? g : (want.toString().startsWith('f') ? f : g)), 'mic: "' + g + '" against "' + f + '"');
 const ctx = { rooms: ['1F Kitchen', '2F Main Office', 'Lobby', 'Server Room', 'Stairs'], ops: ['EMBER', 'ONYX'], enemyOps: ['EMBER'], mates: [{ id: 'p2', name: 'Kaze', op: 'ONYX' }, { id: 'p3', name: 'Moth', op: 'RUSH' }] };
 const T = {

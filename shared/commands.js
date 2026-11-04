@@ -19,14 +19,16 @@ function nearWords(a, b) {
 }
 export function heardAgree(sentence, free) {
   const big = t => normalize(t).trim().split(' ').filter(w => w && !SMALL.has(w));
-  const g = big(sentence), f = big(free), all = f.join('');
-  if (!g.length || !f.length) return true;
-  return g.filter(w => f.some(x => nearWords(w, x)) || all.includes(w)).length * 2 >= g.length;
+  const g = big(sentence), f = big(free), share = (x, y) => x.filter(w => y.some(v => nearWords(w, v)) || y.join('').includes(w)).length * 2 >= x.length;
+  return !g.length || !f.length || (share(g, f) && share(f, g)); // both ways: a long string of list words can touch half of anything
 }
-// Which answer to believe: the sentence if the free listener heard nothing or roughly the same, otherwise what was really said.
-export function pickHeard(sentence, free) {
-  if (!sentence || !free || heardAgree(sentence, free)) return sentence || free;
-  return free;
+// Which answer to believe (his match, 2026-11-04: the free listener wrote what he said, word for word; the sentence list wrote
+// nonsense unless he said one of its sentences). What was really said, unless the sentence list heard the same order and spells
+// it better ("say there" / "stay there", a room's name). Heard by the sentence list alone: only if it means an order.
+export function pickHeard(sentence, free, ctx = {}) {
+  if (!sentence) return free;
+  if (!free) return parseCommand(sentence, ctx).intent ? sentence : '';
+  return heardAgree(sentence, free) && parseCommand(sentence, ctx).intent ? sentence : free;
 }
 export function normalize(text) {
   let s = ' ' + String(text || '').toLowerCase().replace(/\[unk\]/g, ' ').replace(/[^a-z0-9' ]+/g, ' ').replace(/'/g, ' ').replace(/ +/g, ' ').trim() + ' ';

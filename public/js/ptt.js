@@ -12,11 +12,12 @@ async function makeRec(rate, mode = 'phrases') {
   if (!window.Vosk) await script('/vendor/vosk/vosk.js');
   if (!model) { model = await window.Vosk.createModel('/vendor/vosk/model.tar.gz'); try { model.setLogLevel(-1); } catch {} }
   const r = mode !== 'free' ? new model.KaldiRecognizer(rate, grammar(mode)) : new model.KaldiRecognizer(rate);
-  r.on('result', m => { lastEv = performance.now(); const t = m.result && m.result.text; pending = Math.max(0, pending - 1); if (t) { last = (last + ' ' + t).trim(); if (onHear) onHear(last, 0); } if (finalAsked) gotFinal = true; });
-  r.on('partialresult', m => { lastEv = performance.now(); pending = Math.max(0, pending - 1); const t = m.result && m.result.partial; if (t && onHear) onHear((last + ' ' + t).trim(), 0); });
+  r.on('result', m => { lastEv = performance.now(); const t = m.result && m.result.text; pending = Math.max(0, pending - 1); if (t) { last = (last + ' ' + t).trim(); if (onHear && !(free && freeUse)) onHear(last, 0); } if (finalAsked) gotFinal = true; });
+  r.on('partialresult', m => { lastEv = performance.now(); pending = Math.max(0, pending - 1); const t = m.result && m.result.partial; if (t && onHear && !(free && freeUse)) onHear((last + ' ' + t).trim(), 0); });
   if (mode === 'phrases' && (!free || freeRate !== rate)) { // the second opinion (finish): the same sound, free to hear any word
     free = new model.KaldiRecognizer(rate); freeRate = rate;
-    free.on('result', m => { const t = m.result && m.result.text; if (t) lastFree = (lastFree + ' ' + t).trim(); if (freeAsked) freeDone = true; });
+    free.on('result', m => { const t = m.result && m.result.text; if (t) { lastFree = (lastFree + ' ' + t).trim(); if (onHear) onHear(lastFree, 0); } if (freeAsked) freeDone = true; });
+    free.on('partialresult', m => { const t = m.result && m.result.partial; if (t && onHear) onHear((lastFree + ' ' + t).trim(), 0); }); // (what you see while you talk)
   }
   recRate = rate; recKey = vocabKey; stale = false;
   return r;
@@ -35,7 +36,7 @@ function finish() {
   if (free && freeUse && freeAsked && !freeDone && performance.now() - lastEv < 1500) { setTimeout(finish, 30); return; } // (its answer may still be on its way)
   if (!onDone) return;
   const g = micFix(last.replace(/\[unk\]/g, ' ').replace(/\s+/g, ' ').trim()), f = micFix(lastFree.replace(/\[unk\]/g, ' ').replace(/\s+/g, ' ').trim());
-  const t = free && freeUse ? pickHeard(g, f) : g, cb = onDone;
+  const t = free && freeUse ? pickHeard(g, f, { rooms: vocab.rooms || [] }) : g, cb = onDone;
   heardBoth = { sentence: g, free: f };
   onDone = null; freshHeard(); finalAsked = false; if (cb) cb(t);
 }
