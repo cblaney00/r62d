@@ -13,13 +13,14 @@ const sound = w => (w[0] + w.slice(1).replace(/[aeiouyh]/g, '')).replace(/[bp]/g
 function nearWords(a, b) {
   a = sound(a); b = sound(b); if (a === b) return true;
   const n = Math.max(a.length, b.length); if (n < 2) return false;
+  if (n < 3 && a[0] !== b[0]) return false; // (two consonants: too easy to match by chance, so they must start alike)
   let p = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i++) { const q = [i]; for (let j = 1; j <= b.length; j++) q[j] = Math.min(p[j] + 1, q[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); p = q; }
   return p[b.length] <= (n >= 6 ? 2 : 1);
 }
 export function heardAgree(sentence, free) {
   const big = t => normalize(t).trim().split(' ').filter(w => w && !SMALL.has(w));
-  const g = big(sentence), f = big(free), share = (x, y) => x.filter(w => y.some(v => nearWords(w, v)) || y.join('').includes(w)).length * 2 >= x.length;
+  const g = big(sentence), f = big(free), share = (x, y) => x.filter(w => y.some(v => nearWords(w, v)) || (w.length > 3 && y.join('').includes(w))).length * 3 >= x.length * 2; // (two thirds: half let nonsense through when he sat further back)
   return !g.length || !f.length || (share(g, f) && share(f, g)); // both ways: a long string of list words can touch half of anything
 }
 // Which answer to believe (his match, 2026-11-04: the free listener wrote what he said, word for word; the sentence list wrote
