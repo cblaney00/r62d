@@ -8,10 +8,10 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 - [ ] try push to talk on screen with a real microphone (needs him at the computer: hold X in a match and talk)
 - [ ] the mix input needs more work, its not understand me enough (recorded test voices now understood 93% of the time; still needs trying with his real voice. What it hears is saved as words only in mic-log.txt in the game's data, so a session can tune it to him)
-- [ ] some of these might already have been done or worked on so check them as done if that seems to be the case or if another list is handling it already
 
 ## Done
 
+- [x] some of these might already have been done or worked on so check them as done if that seems to be the case or if another list is handling it already (checked: Lando's two items were already on his side; the two microphone items are not done, the game has no record yet of hearing his voice)
 - [x] complete the outdoor sections for the maps based on the theme you wrote for each spawn point (he chose: solid cover. All 33 spawns have their own scene: ski lift with hut and snowcat, school buses at the bus stop, wagons on rails in the rail yard, market tents, a tunnel mouth and so on; Alpine Lodge now stands in snow; each map also has its own edge of the world and scattered trees, rocks or barrels on the added ground)
 - [x] add a random map choice function in the play menu (RANDOM card in the lobby: the map is a surprise until the match starts and differs from the last one; Free Play has the card too)
 - [x] get hosting when connecting to lando's vpn working so that lando can join from his LAN (on Lando's list now, so ticked here: he opened the firewall for his two gaming-pc addresses and wrote runbook 15, a task for this computer's VPN, which he reaches at http://10.10.0.5:6262. Not yet tried end to end)
