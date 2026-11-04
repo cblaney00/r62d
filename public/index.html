@@ -202,7 +202,7 @@
       <div class="row"><button id="setReset">Put all keys back to normal</button></div>
     </section>
     <section class="setPage" data-p="screen"><h3>SCREEN</h3>
-      <div class="srow"><div class="sl"><b>Fullscreen</b><small>Fill the whole monitor</small></div><div class="sctl"><button id="fsToggle" class="tog">ON</button></div></div>
+      <div class="srow"><div class="sl"><b>Fullscreen</b><small>Fill the whole monitor, or off for a window (F11 too)</small></div><div class="sctl"><button id="fsToggle" class="tog">ON</button></div></div>
       <div class="srow wide"><div class="sl"><b>Graphics quality</b><small><span id="gfxHint"></span></small></div><div class="sctl"><span class="seg" id="gfxSeg"><button data-q="auto">Auto</button><button data-q="low">Low</button><button data-q="medium">Medium</button><button data-q="high">High</button><button data-q="ultra">Ultra</button></span></div></div>
       <div class="srow"><div class="sl"><b>Text size</b><small>How big the menus and match text are (menus stop growing when they fill your screen)</small></div><div class="sctl"><input type="range" id="uiScale" min="70" max="160" value="100"> <b id="uiScaleVal"></b></div></div>
       <div class="srow"><div class="sl"><b>How much of the map you see</b><small>Higher shows more around you, smaller</small></div><div class="sctl"><input type="range" id="viewMul" min="80" max="200" value="100"> <b id="viewMulVal"></b></div></div>
@@ -225,7 +225,7 @@
   <div id="clickIn" class="hidden">CLICK TO TAKE CONTROL</div>
   <div id="pause" class="overlay hidden"><div class="menu"><h2>PAUSED</h2><p class="hint">The match keeps running for everyone else.</p>
     <button id="pResume" class="primary">Resume</button><button id="pOps">Operators &amp; loadouts</button><button id="pProf">Profile &amp; match history</button>
-    <button id="pSet">Settings &amp; keys</button><button id="pFs">Fullscreen</button><button id="pLan">Open to LAN</button><button id="pEnd">End match for everyone</button><button id="pQuit">Quit to desktop</button></div></div>
+    <button id="pSet">Settings &amp; keys</button><button id="pFs">Fullscreen / window</button><button id="pLan">Open to LAN</button><button id="pEnd">End match for everyone</button><button id="pQuit">Quit to desktop</button></div></div>
   <div id="lanDlg" class="overlay hidden"><div class="menu lanMenu"><h2>OPEN TO LAN</h2>
     <p class="hint">Your game is open to every phone and computer on your home network. On a phone, scan this with the camera, or type the address into the browser.</p>
     <div class="lanBody"><canvas id="lanQr"></canvas><div><div id="lanUrl"></div><div id="lanOther"></div><div id="lanServer"></div></div></div>

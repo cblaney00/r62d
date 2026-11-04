@@ -10,6 +10,10 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] make it so you can take it off fullscreen and go windowed (Settings → Screen → Fullscreen, Fullscreen / window in the pause menu, the Fullscreen button, or F11. It opens as a 1280×720 window you can move, and starts the same way next time. Also in the Windows program, for new downloads. On a computer without Hyprland the desktop shortcut stays full screen)
+- [x] i cant swing into the windows in the top floor with space (Space did nothing on a rope at any window, on any floor. It now climbs in at an open window; he chose that boarded windows still need the boards broken first with melee or shots)
+- [x] the menu thumbnails arent all updated, check esports tv (he chose: all menus now show the real map picture close up on the building, no black speckles, no stretching in Esports TV and Free Play)
+- [x] the open to lan button is offcenter (its words ran off to the right; the three lobby buttons now match, words centred)
 - [x] a powerslide like Call of Duty, less drastic but good situationally: you can't aim side to side until you are all the way back up, but you can hip fire forward in a 30 degree area (feet first, he asked: one leg out straight, the other bent on its side, head leaning onto the gun; crouch while sprinting: about 2 m in about 0.65 s, then 0.35 s getting up, 2.5 s before the next one; a thin arc shows the 30°; no aiming in; a scrape others can hear. Bots, controller and phone don't slide yet)
 - [x] when you aim in it locks your rotation to a small area to aim, and when you are not aimed in it rotates you (new aiming style Face in Settings → Mouse & Aim, he chose: only the character turns, the map stays still, W walks the way you face, aiming in locks you to 30°; a thin arc shows the area. Not for controller)
 - [x] an option where Shift+W sprints you toward your cursor and the rest of the game is like before (that is the Crosshair aiming style, the normal one)

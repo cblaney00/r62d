@@ -696,6 +696,7 @@ function pressAction(a, e) {
     case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
     case 'vault': { // Space: vault a window or wall stub in front of you, otherwise jump (he asked)
       const p = st.pred, m = st.map, me = st.me;
+      if (me && me.ro) { if (me.ro[0]) ev.push({ k: 'vault', a: st.aim }); break; } // on a rope: climb in at the window (the server checks it is open)
       const v = p && m && me && !(me.jp && me.jp[1]) ? findVault(m, p.x, p.y, vaultDir()) : null;
       if (v && !standable(m, v.k)) ev.push({ k: 'vault', a: Math.round(vaultDir() * 1000) / 1000 });
       else if (st.prone) st.prone = false; else st.jumpReq = performance.now();
@@ -934,9 +935,12 @@ $('xhReset').onclick = () => { audio.ui(); setXhair(XH_DEFAULT); };
 renderXhair();
 // graphics: fullscreen switch + quality presets
 const GFX_HINT = { auto: 'Auto — picks the quality for this computer and lowers it by itself if the game can\'t keep up.', low: 'Low — for weak computers: fewer pixels, fewer particles, flat lighting.', medium: 'Medium — a little softer picture, runs well on most computers.', high: 'High — full sharpness. Recommended.', ultra: 'Ultra — extra-sharp, smoothest edges and most effects. Needs a strong computer.' };
+let appWin = false; // play.sh's window on this desktop answers /api/window
+const winSwitch = () => appWin || !!(window.r62dApp && window.r62dApp.toggleFull);
+const appFull = () => innerWidth >= screen.width - 1 && innerHeight >= screen.height - 1;
 function renderGfx() {
   for (const b of $('gfxSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.q === gfxName);
-  const app = new URLSearchParams(location.search).has('app'), on = app || !!document.fullscreenElement;
+  const app = inApp() && !winSwitch(), on = app || (inApp() ? appFull() : !!document.fullscreenElement);
   const t = $('fsToggle'); t.textContent = on ? 'ON' : 'OFF'; t.classList.toggle('on', on); t.disabled = app;
   t.title = app ? 'The desktop app always runs full screen' : '';
   $('gfxHint').textContent = GFX_HINT[gfxName] + (gfxName === 'auto' ? ` Now: ${autoLevel[0].toUpperCase() + autoLevel.slice(1)}.` : '') + (app ? '  (The desktop app is always full screen.)' : '');
@@ -1021,18 +1025,29 @@ function renderControls() {
 
 
 // Little top-down pictures of each map's ground floor for the lobby's map picker.
-const mapThumbs = new Map();
+// The map cards in every menu (he chose): the real map picture, close up on the ground floor of the building.
+const mapThumbs = new Map(), THUMB_W = 360, THUMB_H = 214, THUMB_INSIDE = new Set([FL.WOOD, FL.TILE, FL.CARPET, FL.MARBLE, FL.SERVER]);
 function mapThumb(id) {
   if (mapThumbs.has(id)) return mapThumbs.get(id);
-  const m = buildMap(id), F = m.floors.find(f => f.name === '1F') || m.floors[0];
-  const c = document.createElement('canvas'); c.width = F.w * 3; c.height = F.h * 3; const x = c.getContext('2d');
-  const FC = { [FL.SNOW]: '#c9d4da', [FL.SAND]: '#a98c5c', [FL.GRASS]: '#33502c', [FL.ASPHALT]: '#2c2e31', [FL.WOOD]: '#7a5534', [FL.TILE]: '#9aa2a6', [FL.CARPET]: '#4a5a78', [FL.CONCRETE]: '#6d6d68', [FL.MARBLE]: '#c7c2b8', [FL.SERVER]: '#3d4650', [FL.SAND]: '#c9a66b' };
-  for (let y = 0; y < F.h; y++) for (let gx = F.gx; gx < F.gx + F.w; gx++) {
-    const k = y * m.W + gx, t = m.tiles[k];
-    x.fillStyle = t === T.HARD || t === T.SOFT ? '#d8d2c4' : t === T.TALL ? '#22262a' : t === T.OPEN ? '#e0b54a' : t === T.STAIR ? '#f2c14e' : FC[m.floor[k]] || '#111';
-    x.fillRect((gx - F.gx) * 3, y * 3, 3, 3);
+  const m = buildMap(id), fi = Math.max(0, m.floors.findIndex(f => f.name === '1F')), F = m.floors[fi];
+  let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1, fx0 = Infinity, fy0 = Infinity, fx1 = -1, fy1 = -1;
+  for (let k = 0; k < m.tiles.length; k++) if (m.flAt[k] === fi) {
+    const cx = k % m.W, cy = Math.floor(k / m.W);
+    fx0 = Math.min(fx0, cx); fx1 = Math.max(fx1, cx); fy0 = Math.min(fy0, cy); fy1 = Math.max(fy1, cy);
+    if (THUMB_INSIDE.has(m.floor[k])) { x0 = Math.min(x0, cx); x1 = Math.max(x1, cx); y0 = Math.min(y0, cy); y1 = Math.max(y1, cy); }
   }
-  mapThumbs.set(id, c); return c;
+  if (x1 < 0) { x0 = fx0; x1 = fx1; y0 = fy0; y1 = fy1; }
+  let w = x1 - x0 + 7, h = y1 - y0 + 7; // (a little ground round the building)
+  if (w / h < THUMB_W / THUMB_H) w = h * THUMB_W / THUMB_H; else h = w * THUMB_H / THUMB_W;
+  const mid = (a, b, n, lo, hi) => n > hi + 1 - lo ? (a + b + 1 - n) / 2 : Math.max(lo, Math.min(hi + 1 - n, (a + b + 1 - n) / 2));
+  const sx = mid(x0, x1, w, fx0, fx1), sy = mid(y0, y1, h, fy0, fy1);
+  const R = new MapRenderer(m, m.tiles.slice(), Math.min(0.5, THUMB_W * 1.5 / (w * CELL)));
+  const c = document.createElement('canvas'); c.width = THUMB_W; c.height = THUMB_H;
+  const x = c.getContext('2d'), P = CELL * R.S, k = THUMB_W / w;
+  R.c.drawTo(x, fx0 * P, Math.floor((fy0 + fy1) / 2) * P, P, P, 0, 0, THUMB_W, THUMB_H); // a card wider than the floor: its ground carries on, not the next floor beside it
+  x.beginPath(); x.rect((fx0 - sx) * k, (fy0 - sy) * k, (fx1 + 1 - fx0) * k, (fy1 + 1 - fy0) * k); x.clip();
+  R.c.drawTo(x, sx * P, sy * P, w * P, h * P, 0, 0, THUMB_W, THUMB_H);
+mapThumbs.set(id, c); return c;
 }
 function renderMapPick(s) {
   const el = $('mapPick'), key = s.mp + ':' + (s.ph === PHASE.LOBBY) + ':' + s.rm;
@@ -2639,6 +2654,7 @@ $('conn').classList.add('hidden');
 runLoading('LOADING', [
   ['Loading fonts', () => document.fonts.ready],
   ['Building the map', () => loadMap(-1)], // the map drifts behind the title screen and menus
+  ['Drawing the maps', jobsStep(MAP_LIST.map(id => () => mapThumb(id)), 1)],
   ['Drawing the guns', jobsStep(Object.keys(WEAPONS).flatMap(w => [[270, 84], [210, 74], [150, 49], [160, 50], [300, 100]].map(([a, b]) => () => gunPicture(w, {}, a, b))), 8)],
   ['Drawing the operators', jobsStep(Object.keys(OPERATORS).map(k => () => portraitCached(document.createElement('canvas'), k)), 6)],
   ['Getting the graphics card ready', () => frames(6)],
@@ -3286,12 +3302,20 @@ setInterval(() => { const now = performance.now(); for (const d of $('chatLog').
 
 // The desktop app's window is already full screen (Firefox kiosk). Asking the browser for full
 // screen again there shrinks the picture into a corner, so the switch only acts in a normal browser.
-function inApp() { return new URLSearchParams(location.search).has('app'); }
+function inApp() { return !!window.r62dApp || new URLSearchParams(location.search).has('app'); }
 function toggleFullscreen() {
+  if (window.r62dApp && window.r62dApp.toggleFull) return window.r62dApp.toggleFull();
+  if (appWin) { fetch('/api/window', { method: 'POST' }).catch(() => {}); return; }
   if (inApp()) return;
   if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {});
 }
-if (inApp()) for (const id of ['fsBtn', 'pFs']) $(id).style.display = 'none'; // nothing to switch in the desktop app
+// The desktop window can go full screen or windowed (he asked), when it knows how; the choice is kept for next time.
+function showFsBtns() { for (const id of ['fsBtn', 'pFs']) $(id).style.display = inApp() && !winSwitch() ? 'none' : ''; renderGfx(); }
+showFsBtns();
+if (inApp() && !window.r62dApp) fetch('/api/window').then(r => r.json()).then(a => { appWin = !!a.can; showFsBtns(); }).catch(() => {});
+{ let t = 0, was = null; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => {
+  renderGfx(); const full = appFull(); if (appWin && full !== was) { was = full; fetch('/api/window?save=' + (full ? 'full' : 'windowed'), { method: 'POST' }).catch(() => {}); }
+}, 400); }); }
 $('kcBtn').onclick = () => { audio.ui(); watchKillcam(); };
 
 

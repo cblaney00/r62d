@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Starts the R62D game server (if it isn't running yet) and opens the game full screen,
-# in its own Firefox window with no browser bars (kiosk mode, separate profile).
+# Starts the R62D game server (if it isn't running yet) and opens the game full screen (or windowed, if that was
+# chosen last time), in its own Firefox window with no browser bars (separate profile).
 cd "$(dirname "$(readlink -f "$0")")"
 # Works from any copy of this repo on any Linux computer: needs a browser, and Node 22+ or Nix (he asked, so Lando can play).
 PORT="${PORT:-6262}"; export PORT
 URL="http://localhost:$PORT/?app=1"
 up() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }
 SHARE="${XDG_DATA_HOME:-$HOME/.local/share}/r62d"
+HC=$(command -v hyprctl)
+[ -n "$HYPRLAND_INSTANCE_SIGNATURE" ] || HC=
+if [ -n "$HC" ]; then export R62D_HYPRCTL="$HC" R62D_WINFILE="$SHARE/windowed"; fi # the game's full screen / window switch
 # one way of getting Node, tried in order until the server answers
 node_ok() { [ "$(node -p 'parseInt(process.versions.node)' 2>/dev/null || echo 0)" -ge 22 ]; }
 try_server() {
@@ -72,12 +75,25 @@ PREFS
 # Slow mouse moves (he noticed the crosshair not moving at all): with the desktop's mouse acceleration on, a slow move
 # becomes steps of less than a pixel and Firefox on Wayland throws those away before the game sees them. While the game
 # window is open the mouse is set to flat (every step 1:1, nothing lost); the old setting comes back when it closes.
-HC=$(command -v hyprctl)
-if [ -n "$HC" ] && [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+if [ -n "$HC" ]; then
   old=$("$HC" getoption input:accel_profile | sed -n "s/^str: //p")
   case "$old" in ""|"[[EMPTY]]") old=adaptive ;; esac
   "$HC" keyword input:accel_profile flat > /dev/null
-  firefox --kiosk --no-remote --profile "$PROFILE" "$URL"
+  # Firefox's kiosk mode can't leave full screen (he asked for a window), so here it is a normal Firefox with its bars
+  # hidden, and the desktop makes it full screen or a window.
+  mkdir -p "$PROFILE/chrome"
+  echo 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);' >> "$PROFILE/user.js"
+  cat > "$PROFILE/chrome/userChrome.css" <<'CSS'
+#TabsToolbar, #nav-bar, #PersonalToolbar, #toolbar-menubar, #sidebar-box, #sidebar-main { visibility: collapse !important; }
+#navigator-toolbox { border: none !important; min-height: 0 !important; height: 0 !important; }
+CSS
+  firefox --no-remote --profile "$PROFILE" "$URL" &
+  FF=$!
+  for i in $(seq 1 150); do "$HC" clients | grep -q "pid: $FF\$" && break; sleep 0.1; done
+  "$HC" dispatch focuswindow "pid:$FF" > /dev/null
+  if [ -s "$R62D_WINFILE" ]; then "$HC" --batch 'dispatch setfloating active; dispatch resizeactive exact 1280 720; dispatch centerwindow' > /dev/null
+  else "$HC" dispatch fullscreen 0 > /dev/null; fi
+  wait "$FF"
   "$HC" keyword input:accel_profile "$old" > /dev/null
   stop_server
   exit 0

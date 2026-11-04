@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld('r62dApp', {
   info: () => ipcRenderer.invoke('info'),
   quit: () => ipcRenderer.invoke('quit'),
   menu: () => ipcRenderer.invoke('menu'),
+  toggleFull: () => ipcRenderer.invoke('toggleFull'),
 });

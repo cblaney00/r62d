@@ -57,6 +57,20 @@ function api(req, res) {
     setTimeout(() => execFile('pkill', ['-f', 'r62d/firefox-kiosk'], () => {}), 300);
     return;
   }
+  // Full screen / windowed for the game window on this computer (he asked). play.sh tells the server how: R62D_HYPRCTL (the
+  // desktop) and R62D_WINFILE (where the choice is kept for next time; it holds "windowed" or nothing).
+  if (u.pathname === '/api/window') {
+    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress), hc = process.env.R62D_HYPRCTL;
+    if (!local || !hc) return json(200, { can: false });
+    if (req.method !== 'POST') return json(200, { can: true });
+    if (u.searchParams.has('save')) { try { fs.writeFileSync(process.env.R62D_WINFILE, u.searchParams.get('save') === 'windowed' ? 'windowed' : ''); } catch {} return json(200, { ok: true }); }
+    execFile(hc, ['activewindow', '-j'], (err, out) => {
+      let w = null; try { w = JSON.parse(out); } catch {}
+      if (err || !w || w.class !== 'firefox') return json(200, { ok: false }); // only ever the game window, which the click came from
+      execFile(hc, ['--batch', w.fullscreen ? 'dispatch fullscreen 0; dispatch setfloating active; dispatch resizeactive exact 1280 720; dispatch centerwindow' : 'dispatch fullscreen 0'], () => json(200, { ok: true }));
+    });
+    return;
+  }
   // the addresses friends type to join this server (shown in the lobby)
   if (u.pathname === '/api/addr') {
     const urls = [];

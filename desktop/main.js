@@ -1,7 +1,7 @@
 // R62D as its own program (Electron). This file is the starter: it opens the window, looks on GitHub for a newer
 // release of the game and fetches it (updates.js), then runs the game part (app.js) from the newest copy it has.
 // The starter itself only changes with a new download; everything else (game, server, start screen) updates itself.
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -19,15 +19,19 @@ const LOADING = `<!doctype html><meta charset="utf-8"><body style="margin:0;heig
 background:#05070a;color:#93a0ad;font:600 18px 'Segoe UI',sans-serif;letter-spacing:.12em"><div style="font:800 64px 'Segoe UI',sans-serif;color:#eef2f5;letter-spacing:.14em">R62D</div>
 <div id="s">STARTING…</div><div style="width:320px;height:4px;background:#1a2028"><div id="b" style="height:100%;width:0;background:#f2c14e;transition:width .2s"></div></div></body>`;
 
+const WINDOWED = path.join(app.getPath('userData'), 'windowed');
 app.whenReady().then(async () => {
   const win = new BrowserWindow({
-    fullscreen: true, width: 1600, height: 900, backgroundColor: '#05070a', title: 'R62D',
+    fullscreen: !fs.existsSync(WINDOWED), width: 1600, height: 900, backgroundColor: '#05070a', title: 'R62D',
     icon: path.join(HERE, 'icon.png'), autoHideMenuBar: true,
     webPreferences: { preload: path.join(HERE, 'preload.cjs'), contextIsolation: true, sandbox: true, backgroundThrottling: false },
   });
   win.webContents.on('before-input-event', (e, k) => {
     if (k.type === 'keyDown' && k.key === 'F11') { win.setFullScreen(!win.isFullScreen()); e.preventDefault(); }
   });
+  ipcMain.handle('toggleFull', () => win.setFullScreen(!win.isFullScreen()));
+  win.on('leave-full-screen', () => { try { fs.writeFileSync(WINDOWED, ''); } catch {} }); // he asked: windowed stays windowed next time
+  win.on('enter-full-screen', () => { try { fs.rmSync(WINDOWED, { force: true }); } catch {} });
   win.webContents.on('page-title-updated', e => e.preventDefault());
   await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(LOADING));
   const say = (text, frac) => win.webContents.executeJavaScript(`s.textContent=${JSON.stringify(text)};${frac != null ? `b.style.width='${Math.round(frac * 100)}%'` : ''}`).catch(() => {});

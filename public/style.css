@@ -50,7 +50,7 @@ input { font: 600 20px var(--head); padding: 10px 14px; background: rgba(0,0,0,0
 .squads { display: flex; gap: 24px; }
 #mapPick { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; margin: 4px 0 14px; } /* every map fits (Dust Town, the 7th, was off the edge) */
 #mapPick button { min-width: 0; padding: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; }
-#mapPick canvas { width: 100%; height: 70px; object-fit: contain; display: block; background: #0a0c0f; image-rendering: auto; }
+#mapPick canvas { width: 100%; height: 76px; object-fit: cover; display: block; background: #0a0c0f; image-rendering: auto; }
 #mapPick b { font: 700 13px var(--head); letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #mapPick span { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
 #mapPick button.on { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
@@ -515,7 +515,7 @@ button.big { font-size: 22px; padding: 14px 34px; }
 .freeH { font: 800 15px var(--head); letter-spacing: 0.18em; color: #f2c14e; margin: 18px 0 8px; }
 #freeMaps { display: flex; gap: 10px; flex-wrap: wrap; }
 #freeMaps button { width: 150px; padding: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; }
-#freeMaps canvas { width: 100%; height: 84px; display: block; background: #0a0c0f; }
+#freeMaps canvas { width: 100%; height: 84px; object-fit: cover; display: block; background: #0a0c0f; }
 #freeMaps b { font: 700 14px var(--head); letter-spacing: 0.08em; }
 #freeMaps span { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
 #freeMaps button.on { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
@@ -725,7 +725,7 @@ html.touch #armCanvas { touch-action: none; }
 #touchUI .tbtn.t6 { right: auto; left: max(20px, env(safe-area-inset-left)); top: auto; bottom: 168px; width: 84px; } /* ⟲ TILT, above the move stick */
 #settings .phoneOnly { display: none; } html.touch #settings .srow.phoneOnly { display: flex; }
 /* OPEN TO LAN */
-.roomBtns { display: flex; gap: 10px; }
+.roomBtns { display: flex; gap: 10px; } .roomBtns button { flex: 1 1 0; padding: 14px 18px; text-align: center; }
 html.fitui #lanDlg > * { zoom: var(--uiz, 1); }
 #lanDlg .lanMenu { width: min(760px, 92vw); }
 #lanDlg .lanBody { display: flex; gap: 24px; align-items: center; margin: 10px 0 16px; }
@@ -739,7 +739,6 @@ html.touch #lanDlg .lanBody { gap: 14px; } html.touch #lanQr { width: 170px; hei
 #lanDlg .menu { display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); padding: 22px 26px; }
 #lanDlg h2 { margin: 0; font: 800 44px var(--head); letter-spacing: 0.2em; }
 #lanDlg .hint { text-align: left; }
-#lanBtn { white-space: nowrap; }
 /* PLAYBOOK: the pro teams' plans */
 .pbWrap { flex: 1; display: flex; gap: 14px; padding: 14px 18px 18px; min-height: 0; }
 #pbTeams { width: 280px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
@@ -766,8 +765,8 @@ html.touch #lanDlg .lanBody { gap: 14px; } html.touch #lanQr { width: 170px; hei
 #tvReq button { font: 700 12px var(--head); letter-spacing: 0.06em; padding: 4px 8px; border-left: 3px solid var(--oc); }
 #tvReq button.on { background: #f2c14e; color: #000; } #tvReq button.off { opacity: 0.35; }
 #tvMaps button { width: 150px; padding: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; }
-#tvMaps canvas, #tvMaps .tvRandom { width: 100%; height: 84px; display: block; background: #0a0c0f; }
-#mapPick .tvRandom { height: 70px; background: #0a0c0f; }
+#tvMaps canvas, #tvMaps .tvRandom { width: 100%; height: 84px; object-fit: cover; display: block; background: #0a0c0f; }
+#mapPick .tvRandom { height: 76px; background: #0a0c0f; }
 #freeMaps .tvRandom { background: #0a0c0f; }
 #tvMaps .tvRandom, #mapPick .tvRandom, #freeMaps .tvRandom { display: grid; place-items: center; font: 800 46px var(--head); color: #f2c14e; }
 #tvMaps b { font: 700 14px var(--head); letter-spacing: 0.08em; } #tvMaps span { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
