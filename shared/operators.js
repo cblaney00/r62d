@@ -331,7 +331,7 @@ export function defaultLoadout(op) {
 // Keep only choices that operator actually has.
 export function cleanLoadout(op, l) {
   const L = LOADOUTS[op], d = defaultLoadout(op);
-  if (!L || !l || typeof l !== 'object') return { ...d, att: {} };
+  if (!L || !l || typeof l !== 'object') return { ...d, att: {}, own: {} };
   const att = {}, own = {};
   for (const w of [...L.primaries, ...L.secondaries]) if (WEAPONS[w]) {
     if (l.att && l.att[w]) att[w] = cleanAtt(w, l.att[w]);

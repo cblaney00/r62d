@@ -27,4 +27,6 @@ ok(p.guns[0].att.grip !== 'vertical' || attachFor('longbow').grip.includes('vert
 g.freeSpawn(p, true); ok(p.guns[0].att.barrel === 'suppressor' && p.guns[0].m.quiet, 'attachment lost on respawn', p.guns[0].att);
 g.handle(p, { t: 'free', a: 'gun', w: 'pike' }); g.handle(p, { t: 'free', a: 'gun', w: 'longbow' }); ok(p.guns[0].att.barrel === 'suppressor', 'attachment lost on gun swap');
 g.handle(p, { t: 'free', a: 'att', w: 'pike', s: 'sight', v: 'holo' }); g.handle(p, { t: 'free', a: 'gun', w: 'pike' }); ok(p.guns[0].att.sight === 'holo', 'attachment for a gun not in hand ignored');
+// he said it disconnected him on switching operator: an operator never set up crashed resolveLoadout
+for (const op of ['onyx', 'magpie', 'girder', 'salvo']) { try { g.handle(p, { t: 'free', a: 'pick', op }); g.tick(1 / 30); ok(p.op === op, 'switch failed', op); } catch (e) { ok(false, 'switch crashed', op, e.message); } }
 console.log(fails ? `${fails} failure(s)` : 'PASS freeguns'); process.exit(fails ? 1 : 0);
