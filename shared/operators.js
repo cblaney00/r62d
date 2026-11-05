@@ -38,7 +38,11 @@ export const WEAPONS = {
   drummer: { name: 'Drummer LMG', cls: 'LMG', dmg: 22, rpm: 860, mag: 60, reserve: 180, reload: 3.6, spread: 0.085, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 1050, len: 16,
              adsMul: 0.8, kickMul: 0.8, swayMul: 1.5, trait: 'A light, fast-firing LMG that hoses a doorway: quick to aim and reload for its kind, but its soft bullets wander side to side.' },
   pike:    { name: 'Pike Bolt-Action', cls: 'DMR', mode: 'bolt-action', dmg: 112, rpm: 50, mag: 5, reserve: 30, reload: 3.2, spread: 0.09, ads: 0.002, bloom: 0.05, auto: false, pellets: 1, range: 1600, len: 20,
-             pen: 0.8, adsMul: 1.3, kickMul: 1.5, settle: 0.9, trait: 'One body shot drops any light or medium operator. A slow bolt between shots, slow to aim, hopeless from the hip.' },
+             pen: 0.8, adsMul: 1.3, kickMul: 1.5, settle: 0.9, oneShot: true, trait: 'One clean body shot drops anyone. A slow bolt between shots, slow to aim, hopeless from the hip; its scope glints at whoever it points at.' },
+  // he asked: a sniper that feels more modern, tan, like a British L115 (our own design and name): a straight-pull bolt
+  // that cycles fast, quicker to aim, a big muzzle brake that tames the kick but is loud. Still one shot to the body.
+  saker:   { name: 'Saker LR', cls: 'DMR', mode: 'straight-pull', dmg: 120, rpm: 72, mag: 5, reserve: 30, reload: 2.9, spread: 0.09, ads: 0.0018, bloom: 0.05, auto: false, pellets: 1, range: 1700, len: 21,
+             pen: 0.7, adsMul: 1.15, kickMul: 1.15, settle: 0.75, oneShot: true, trait: 'Modern long-range rifle: one clean body shot drops anyone, and the straight-pull bolt is back on target faster than the Pike. Thinner walls stop more of it; loud, and its scope glints.' },
   heron:   { name: 'Heron Marksman', cls: 'DMR', dmg: 44, rpm: 480, mag: 20, reserve: 100, reload: 2.4, spread: 0.055, ads: 0.007, bloom: 0.014, auto: false, pellets: 1, range: 1200, len: 16,
              adsMul: 0.85, kickMul: 0.7, settle: 0.4, trait: 'A quick-firing marksman rifle with light recoil: three fast hits drop anyone.' },
   gnat:    { name: 'Gnat Machine Pistol', cls: 'MP', dmg: 17, rpm: 1050, mag: 20, reserve: 100, reload: 1.7, spread: 0.09, ads: 0.035, bloom: 0.011, auto: true, pellets: 1, range: 700, len: 7,
@@ -57,7 +61,7 @@ export const WEAPONS = {
 export const SIDEARMS = new Set(['p10', 'vex50', 'bison', 'gnat', 'stub', 'sparrow']);
 
 // armor: 1 = heavy/slow, 2 = medium, 3 = light/fast. HP follows armor.
-export const ARMOR_HP = { 1: 125, 2: 110, 3: 100 };
+export const ARMOR_HP = { 1: 150, 2: 132, 3: 120 }; // he asked: everyone a bit tougher (+20%); the Pike still kills with one body shot
 // build follows armor too: heavies stay broad, mediums and lights are skinnier (drawn narrower AND harder to hit).
 // HIT_R is how close (px) a bullet must pass to a body's centre to hit it; walls still use PLAYER_R for bumping.
 export const BODY_W = { 1: 0.95, 2: 0.84, 3: 0.76 };
@@ -249,7 +253,7 @@ export const GADGET_COUNT = { smoke: 2, frag: 2, claymore: 1, breach: 2, stun: 2
 // or sniper rifles (the Anvil slug does that job). tests/weapons.js checks it.
 export const LOADOUTS = {
   ember:   { primaries: ['k4', 'tusk', 'rook'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'breach'] },
-  kestrel: { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'claymore'] },
+  kestrel: { primaries: ['longbow', 'k4', 'pike', 'saker'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'claymore'] },
   hammer:  { primaries: ['tusk', 'javelin', 'ram'], secondaries: ['p10', 'stub'], gadgets: ['claymore', 'frag'] },
   talon:   { primaries: ['sabre', 'k4', 'trident'], secondaries: ['p10', 'stub'], gadgets: ['breach', 'stun'] },
   bulwark: { primaries: ['p10', 'bison'], secondaries: [], gadgets: ['stun', 'smoke'] }, // one hand on the shield: pistols only
@@ -260,7 +264,7 @@ export const LOADOUTS = {
   onyx:    { primaries: ['mule', 'ox', 'aegis'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'breach'] },
   prism:   { primaries: ['javelin', 'k4', 'heron'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'stun'] },
   volt:    { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['breach', 'claymore'] },
-  tether:  { primaries: ['longbow', 'k4', 'pike'], secondaries: ['p10', 'bison'], gadgets: ['claymore', 'smoke'] },
+  tether:  { primaries: ['longbow', 'k4', 'pike', 'saker'], secondaries: ['p10', 'bison'], gadgets: ['claymore', 'smoke'] },
   strider: { primaries: ['javelin', 'sabre', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'stun'] },
   ferro:   { primaries: ['tusk', 'mule', 'k4'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'claymore'] },
   mason:   { primaries: ['drummer', 'breaker', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
@@ -562,8 +566,9 @@ export const FALLOFF = {
 };
 export const HEAD_R = 2.3; // a bullet passing this close to the centre of a body is a headshot: instant kill
 // ...and only if your crosshair was on their head when you fired (he asked: no headshots from a crosshair in front of
-// or behind someone that just happens to line up). 4.5 px is the head as drawn.
-export const HEAD_AIM = 4.5;
+// or behind someone that just happens to line up). The head as drawn is 4.5 px; he asked for harder headshots, so only
+// its middle two-thirds counts (the ring shown while aiming in is this zone).
+export const HEAD_AIM = 3;
 // The ballistic shield's pose, shared by the server (what stops bullets) and the drawing (what you see), so they always
 // match (he asked). rot: how far the shield is turned from where its holder aims; arc: how far it reaches either side.
 // Standing, walking (Shift) or crouching: square in front, the full arc: truly safe from the front. Jogging: it swings
@@ -651,6 +656,7 @@ export const SPRAY = {
   ox:      { pull: 0.15, zig: 0.15, per: 6, flip: 0, k: 1.4, mx: 1.8 },  // heavy, straight up: pull down
   drummer: { pull: -0.6, zig: 1.3, per: 4, flip: 12, k: 0.9, mx: 1.3 },  // wanders left then right
   pike:    { pull: 1,    zig: 0,   per: 2, flip: 0,  k: 1.3, mx: 1.5 },
+  saker:   { pull: 0.4,  zig: 0,   per: 2, flip: 0,  k: 1.0, mx: 1.1 },  // the brake keeps it straighter than the Pike
   heron:   { pull: -0.6, zig: 0.5, per: 3, flip: 0,  k: 1,   mx: 1 },
   gnat:    { pull: 0.6,  zig: 1.8, per: 2, flip: 0,  k: 1.5, mx: 1.8 },  // very hard to control
   bison:   { pull: -1,   zig: 0.3, per: 2, flip: 0,  k: 2,   mx: 1.6 },  // a big kick left every shot

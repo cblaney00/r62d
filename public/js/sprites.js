@@ -199,7 +199,8 @@ function box(ctx, x, y, w, h, r, col, outline = true) {
 function drawGun(ctx, wkey, recoil) {
   const w = WEAPONS[wkey]; if (!w) return;
   const L = w.len, x0 = 4 - recoil;
-  const metal = '#1d1f23', poly = w.cls === 'Shotgun' ? '#5b3c22' : '#2b2e33';
+  const g = G[wkey] || {};
+  const metal = g.tan ? '#9c855a' : '#1d1f23', poly = g.tan ? '#a38a5b' : w.cls === 'Shotgun' ? '#5b3c22' : '#2b2e33'; // (a tan rifle stays tan in your hands)
   ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(x0 + 1.2, 1.9, L, 2.6);
   // stock
   if (w.cls !== 'Pistol' && w.cls !== 'MP') { box(ctx, x0 - 4, 0.1, 5, 2.8, 0.8, poly); ctx.fillStyle = '#111'; ctx.fillRect(x0 - 4, 0.3, 0.8, 2.4); }
@@ -209,7 +210,7 @@ function drawGun(ctx, wkey, recoil) {
   // barrel + muzzle
   ctx.fillStyle = '#121316'; ctx.fillRect(x0 + L * 0.6, 0.55, L * 0.4, 1.6);
   ctx.fillStyle = '#0a0a0c'; ctx.fillRect(x0 + L - 1.6, 0.25, 1.9, 2.2);
-  const g = G[wkey] || {};
+  if (g.brake) { box(ctx, x0 + L - 1.2, 0, 3.4, 2.7, 0.6, '#17181a'); ctx.fillStyle = '#050506'; ctx.fillRect(x0 + L, 0, 0.5, 2.7); ctx.fillRect(x0 + L + 1.2, 0, 0.5, 2.7); } // muzzle brake
   if (g.double) { ctx.fillStyle = '#121316'; ctx.fillRect(x0 + L * 0.5, -0.2, L * 0.5, 1.4); ctx.fillRect(x0 + L * 0.5, 1.5, L * 0.5, 1.4); } // side-by-side barrels
   if (g.revolver) { box(ctx, x0 + L * 0.22, -0.9, 3.4, 4.6, 1.4, '#55595e'); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x0 + L * 0.22 + 0.6, 0.7, 2.2, 0.5); } // cylinder
   if (g.can) box(ctx, x0 + L - 1.5, -0.1, 4.6, 3, 0.9, '#16181b'); // built-in suppressor

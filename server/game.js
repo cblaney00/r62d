@@ -1070,6 +1070,7 @@ export class Game {
       this.shotPens = pens; // the death card says "through a wall"
       if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
       else if (head && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
+      else if (W && W.oneShot && !pens && !q.downed && mult >= 1) this.damage(q, 9999, src, wname, ang); // he asked: the big sniper rifles still drop anyone with one clean body shot
       else this.damage(q, dmg * mult * fall, src, wname, ang);
       this.shotPens = 0;
     } else if (best && best.e && best.e.tu) { best.e.offUntil = Math.max(best.e.offUntil || 0, this.time + 8); this.events.push({ e: 'hit', k: 'spark', x: r1(ex), y: r1(ey) }); }

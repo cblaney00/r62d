@@ -2303,6 +2303,7 @@ function draw(s, view, now, dt) {
     if (side === 'atk') for (const e of ents) if (e.ty === 'defuser') marker(e.x, e.y, 'D', '#f2c14e', view);
     drawScanBlips(now);
     if (!st.tv) deathMarks(view, now); // TV: the cards and kill feed already say who is down; no big marks over the action
+    if (!st.tv) scopeGlare(s, side, now);
     st.foesSeen = drawn.filter(p => p.tm !== side); // (the red ! at the screen edge for off-screen enemies is gone: he asked for fewer alert marks)
     // Sounds you can't see (he asked: hearing someone must not tell you exactly where to shoot blindly): no arrows
     // towards footsteps or gunfire any more. Only which floor: footsteps running on the floor just above or below
@@ -2381,6 +2382,30 @@ function draw(s, view, now, dt) {
 // where a teammate died: a red cross with their name, shown through walls and kept at the screen edge (he asked for
 // these to be obvious now that you no longer see through teammates' eyes); pulses for the first few seconds.
 // Someone who died on another floor shows at the same spot of the building on yours, with ▲ / ▼.
+// Scope glare (he asked: snipers one-shot, so you must be able to spot one): an enemy aimed in with a sniper scope that
+// points roughly at you (within ~8°) glints at their spot when nothing solid or smoke is between you, even beyond what you
+// can otherwise see. Off screen, the glint sits small at the screen edge in their direction.
+const GLARE_ANG = 0.14, GLARE_MAX = aimReach('sniper', true) * PX_PER_M;
+function scopeGlare(s, side, now) {
+  const me = st.me, v = st.pred; if (!me || !me.a || me.dn || me.ct !== 'body' || !st.map || !v) return;
+  const m = st.map, fl = floorAt(m, v.x, v.y), t = performance.now() / 1000;
+  for (const p of st.fakeGlare ? s.players.concat(st.fakeGlare) : s.players) { // (st.fakeGlare: screenshot tests)
+    if (!p.a || p.tm === side || !p.ad || p.dn || p.ct !== 'body' || p.x == null || !String(p.aa || '').includes('sniper')) continue;
+    const dx = v.x - p.x, dy = v.y - p.y, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    if (d < 3 * PX_PER_M || d > GLARE_MAX || floorAt(m, p.x, p.y) !== fl || Math.abs(angDiff(p.ag, a)) > GLARE_ANG) continue;
+    if (castSight(m, p.x, p.y, a, d, null) < d - 6) continue; // a wall, a prop or boards in between
+    if (smokes(s).some(q => { const u = Math.max(0, Math.min(1, ((q.x - p.x) * dx + (q.y - p.y) * dy) / (d * d))); return Math.hypot(p.x + dx * u - q.x, p.y + dy * u - q.y) < q.r; })) continue;
+    const S0 = w2s(p.x, p.y), pad = 30 * DPR, on = S0.x > pad && S0.x < VW - pad && S0.y > pad && S0.y < VH - pad;
+    const cx = Math.max(pad, Math.min(VW - pad, S0.x)), cy = Math.max(pad, Math.min(VH - pad, S0.y)), W0 = on ? { x: p.x + Math.cos(p.ag) * 7, y: p.y + Math.sin(p.ag) * 7 } : screenToWorld(cx, cy);
+    const k = (on ? 2.5 : 1.5) * (0.85 + 0.25 * Math.sin(t * 9 + p.x)) * DPR / Math.max(0.4, st.zoom); // about 40 px across on screen, whatever the zoom
+    ctx.save(); ctx.globalAlpha = 1; ctx.translate(W0.x, W0.y); ctx.scale(k, k);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 12); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.3, 'rgba(255,244,200,0.9)'); g.addColorStop(0.6, 'rgba(255,225,150,0.35)'); g.addColorStop(1, 'rgba(255,220,140,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,240,0.95)'; ctx.rotate(t * 0.6);
+    for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(0, -1); ctx.lineTo(i % 2 ? 14 : 22, 0); ctx.lineTo(0, 1); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+  }
+}
 function deathMarks(view, now) {
   if (!view || !st.map) return;
   const fl = floorAt(st.map, view.x, view.y), t = performance.now() / 1000;

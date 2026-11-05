@@ -110,13 +110,14 @@ for (const [id, w] of Object.entries(WEAPONS)) {
   const hit = (ax, ay) => {
     Object.assign(q, { op: 'ember', alive: true, downed: false, ctrl: 'body', staged: false, x: p.x + Math.cos(a) * 120, y: p.y + Math.sin(a) * 120 }); q.hp = 100;
     g.shotAim = { x: ax, y: ay }; g.hitscan(p, p.x, p.y, a, 600, 30, 'test', 'AR'); g.shotAim = null;
-    lastHp = q.hp; return q.alive && !q.downed ? (q.hp < 100 ? 'body' : 'miss') : 'dead';
+    lastHp = q.hp; return q.alive && !q.downed ? (q.hp < q.maxHp ? 'body' : 'miss') : 'dead';
   };
   { const r = hit(p.x + Math.cos(a) * 120, p.y + Math.sin(a) * 120); if (r !== 'dead') fail('crosshair on the head, bullet through it: no headshot', r, lastHp); }
   const far = hit(p.x + Math.cos(a) * 160, p.y + Math.sin(a) * 160), near = hit(p.x + Math.cos(a) * 80, p.y + Math.sin(a) * 80);
   if (far !== 'body') fail('crosshair behind the target still headshot');
   if (near !== 'body') fail('crosshair in front of the target still headshot');
-  if (hit(q.x - Math.sin(a) * 4, q.y + Math.cos(a) * 4) !== 'dead') fail('crosshair on the edge of the head (4 px) did not headshot');
+  if (hit(q.x - Math.sin(a) * 2.8, q.y + Math.cos(a) * 2.8) !== 'dead') fail('crosshair inside the head zone (2.8 px) did not headshot');
+  if (hit(q.x - Math.sin(a) * 4, q.y + Math.cos(a) * 4) === 'dead') fail('crosshair on the outer edge of the drawn head (4 px) still headshot (he asked: only the middle two-thirds)');
   p.alive = A;
 }
 console.log(fails ? `${fails} failure(s)` : 'PASS aim');

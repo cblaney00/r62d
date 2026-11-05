@@ -389,6 +389,7 @@ const GUN_OWN = {
   ox:      { boom: 54, drive: 3.0, v: 1.05 },
   drummer: { body: 950, boom: 70, v: 0.9 },
   pike:    { crack: 1.1, blastTau: 0.02, boom: 45, boomTau: 0.14, drive: 3.2, mech: 0, v: 1.25 },
+  saker:   { crack: 1.25, blastTau: 0.016, boom: 52, boomTau: 0.11, drive: 3.4, mech: 0, v: 1.3 }, // sharper: the brake throws the blast sideways
   heron:   { boom: 60, v: 1.05 },
   gnat:    { body: 1600, bodyTau: 0.02, boom: 105, v: 0.62 },
   javelin: { body: 1150, boom: 82, v: 0.82 },

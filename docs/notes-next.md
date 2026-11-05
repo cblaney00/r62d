@@ -1,0 +1,16 @@
+# Things worth doing next (Claude's notes, not his list)
+
+Written 2026-11-05 at the end of the defender-bots / sniper batch. These are follow-ups Claude noticed; nothing here is
+on his to-do list unless he asks for it.
+
+- Bots ignore scope glare: they don't take cover or avoid the angle when a sniper glints at them. People do.
+- No sound for the glare (just the glint). A faint "ting" when it first lights up could help; ask him.
+- Glare and the Saker LR have not been played by him yet; the glint size (about 40 px) may need tuning on his screen.
+- Rotation holes only fit on about half the rounds: `hardenWalls` leaves few soft walls between a site room and the
+  rooms beside it. Map changes were left out on purpose (he chose bots only); he mentioned the maps have too many
+  hallways, so a later map pass could turn some hallways near sites into rooms worth holding.
+- With the new defence, attack wins went from 56% to about 58-60% for ordinary bots and 46% to 53% for pros. If
+  defence feels weak, the first knobs are how long the outer pair holds (`game.timer > 40` for 'space' in bots.js)
+  and how many reinforcements the earnest bots spend.
+- Pros will only start picking the Saker after practice has tried it (training learns guns per operator).
+- Defender bots still don't open rotation holes with shotguns or hammers, only melee; slow but works.

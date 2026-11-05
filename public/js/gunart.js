@@ -23,6 +23,7 @@ export const G = {
   ox:      { body: '#3a3d36', furn: '#2c2f2a', stock: 'heavy', rec: [20, 58], bar: 100, guard: [58, 84], mag: 'belt', grip: 32, rail: true, bipod: true, handle: true },
   drummer: { body: '#33373a', furn: '#2a2d30', stock: 'adjust', rec: [24, 56], bar: 94, guard: [56, 78], mag: 'drum', grip: 34, rail: true, bipod: true },
   pike:    { body: '#2e3230', furn: '#5a4630', stock: 'cheek', rec: [28, 52], bar: 102, guard: [52, 82], mag: 'short', grip: 34, rail: true, bolt: true },
+  saker:   { body: '#b29a6c', furn: '#a38a5b', stock: 'thumb', rec: [26, 54], bar: 100, guard: [54, 86], mag: 'short', grip: 36, rail: true, bolt: true, brake: true, tan: true },
   heron:   { body: '#41443c', furn: '#55533f', stock: 'cheek', rec: [26, 52], bar: 96, guard: [52, 78], mag: 'straight', grip: 34, rail: true },
   gnat:    { body: '#2a2d31', furn: '#1f2124', stock: 'none', rec: [38, 72], bar: 76, guard: [72, 72], mag: 'gripLong', grip: 44, pistol: true },
   javelin: { body: '#2f3338', furn: '#3a3f45', stock: 'adjust', rec: [24, 54], bar: 82, guard: [54, 70], mag: 'curved', grip: 36, rail: true },
@@ -80,12 +81,14 @@ export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   if (g.stock === 'wood') part(ctx, [r0, 15, 10, 17, 2, 19, 2, 27, 9, 27, r0, 22], g.furn, 1.5);
   if (g.stock === 'heavy') part(ctx, [r0, 14, 4, 15, 2, 17, 2, 28, 6, 29, 12, 24, r0, 23], g.furn);
   if (g.stock === 'bullpup') { part(ctx, [r0, 15, 4, 15, 2, 17, 2, 25, r0, 25], g.furn); box(ctx, 2, 16, 2, 9, '#15171a'); }
+  if (g.stock === 'thumb') { part(ctx, [r0, 15, 12, 15, 4, 14, 2, 16, 2, 28, 6, 29, 13, 25, 20, 25, r0, 22], g.furn); part(ctx, [13, 19, 19, 19, 17, 23, 14, 23], '#1a1b1d'); box(ctx, 6, 11.5, 13, 2.8, shadeCol(g.furn, 0.8)); box(ctx, r0 - 2, 16, 2, 6, '#2a2b2d'); } // thumbhole stock, raised cheek piece, folding hinge
   if (g.stock === 'cheek') { part(ctx, [r0, 16, 10, 17, 3, 17, 2, 28, 8, 29, 14, 24, r0, 22], g.furn); box(ctx, 9, 13.5, 12, 3, shadeCol(g.furn, 1.15)); }
   // --- barrel and handguard ---
   if (a.barrel === 'heavy') box(ctx, r1 - 2, mid - 2.1, muzzle - r1 + 2, 4.2, '#1b1d20', 1.8); // thick fluted barrel
   else box(ctx, r1 - 2, mid - 1.4, muzzle - r1 + 2, 2.8, '#1e2023', 1.6);
   if (a.barrel === 'heavy') for (let i = (g.guard[1] || r1) + 2; i < muzzle - 2; i += 3) box(ctx, i, mid - 0.4, 1.8, 0.8, '#2c2f33');
   if (g.double) box(ctx, r1 - 2, mid - 4.4, muzzle - r1 + 2, 2.8, '#24262a', 1.6); // second barrel on top
+  if (g.brake) { box(ctx, muzzle - 1, mid - 2.8, 9, 5.6, '#1c1d1f', 1.2); for (let i = 0; i < 3; i++) box(ctx, muzzle + 1 + i * 2.4, mid - 2.8, 1.1, 5.6, '#0b0b0c'); muzzle += 8; } // big muzzle brake
   if (g.can) { box(ctx, r1, mid - 3.2, muzzle - r1 + 12, 6.4, '#1a1c1f', 1.7); for (let i = r1 + 3; i < muzzle + 10; i += 3) box(ctx, i, mid - 3.2, 0.6, 6.4, '#2a2d31'); muzzle += 12; } // built-in suppressor
   if (g.pump) { box(ctx, r1, bot - 1, g.guard[1] - r1 + 8, 3, '#202225'); box(ctx, g.guard[0], bot - 1.8, g.guard[1] - g.guard[0], 5, g.furn, 1.5); for (let i = 0; i < 5; i++) box(ctx, g.guard[0] + 2 + i * 3.5, bot - 1.4, 0.7, 4.2, shadeCol(g.furn, 0.6)); }
   else if (g.guard[1] > g.guard[0]) { part(ctx, [g.guard[0], top + 0.5, g.guard[1], top + 1.5, g.guard[1], bot - 0.5, g.guard[0], bot], g.furn); for (let i = g.guard[0] + 3; i < g.guard[1] - 2; i += 4) box(ctx, i, mid - 0.6, 2.2, 1.2, shadeCol(g.furn, 0.55)); }
