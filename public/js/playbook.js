@@ -3,7 +3,7 @@
 // drones, holds or roams, and where it ends up, with the team's players and what each one does.
 import { CELL, DUR } from '/shared/constants.js';
 import { MAPS, MAP_LIST, buildMap } from '/shared/map.js';
-import { OPERATORS, WEAPONS, RIOT, ATTACH, LOADOUTS, JOBS } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, RIOT, ATTACH, LOADOUTS, JOBS, SIDEARMS } from '/shared/operators.js';
 import { PRO_TEAMS, playbook, ATK_JOBS, DEF_JOBS, JOB_NAME } from '/shared/pros.js';
 import { MapRenderer } from './mapdraw.js';
 import { drawWebcam } from './webcam.js';
@@ -91,7 +91,7 @@ function patchCard(pl, side) {
   // guns: the ones those operators carry
   const can = new Set(jobOps.flatMap(o => LOADOUTS[o] ? [...LOADOUTS[o].primaries, ...LOADOUTS[o].secondaries] : []));
   const guns = Object.entries(P.guns || {}).filter(([w, r]) => can.has(w) && r[0]).sort((a, b) => b[1][0] - a[1][0]);
-  const mains = guns.filter(([w]) => !(WEAPONS[w] && WEAPONS[w].cls === 'Pistol')), top = mains[0] || guns[0];
+  const mains = guns.filter(([w]) => !SIDEARMS.has(w)), top = mains[0] || guns[0];
   if (top) {
     out.push('<b>Guns</b><ul>' + mains.slice(0, 3).map(([w, r], i) => {
       const k = r[2] / r[0], others = mains.filter(([x]) => x !== w), avg = others.length ? others.reduce((a, [, q]) => a + q[2], 0) / Math.max(1, others.reduce((a, [, q]) => a + q[0], 0)) : k;

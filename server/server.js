@@ -140,8 +140,10 @@ const PLAY_VERSION = playVersion() || VERSION.id;
 const TRAIN_WORKERS = Math.max(1, Math.min(6, Number(process.env.R62D_TRAIN_WORKERS) || Math.floor(os.cpus().length / 4)));
 let trainer = null; // { list: workers, rounds: this session's }
 const stopTrainer = () => { if (trainer) for (const w of trainer.list) w.terminate(); trainer = null; };
+// a match being played: the main one, free play, a tutorial or Esports TV (people in the menus are fine)
+const matchOn = () => game.phase !== 'lobby' || [...tutorials].some(g => g.phase !== 'lobby' && !g.heldUntil);
 function trainCheck(force = false) {
-  const busy = game.phase !== 'lobby' || [...tutorials].some(g => g.phase !== 'lobby' && !g.heldUntil); // a match being played (people in the menus are fine)
+  const busy = matchOn();
   if (trainer && busy) { stopTrainer(); return 'a match is being played'; } // someone is playing: practice another time
   if (busy) return 'a match is being played';
   if (trainer) return '';
@@ -157,6 +159,9 @@ function trainCheck(force = false) {
   }
 }
 setInterval(trainCheck, 5 * 60 * 1000); setTimeout(trainCheck, 60 * 1000);
+// he asked: never practise while a game is running. Checked every 2 s while practice runs, so it stops right away
+// (the 5-minute check above only starts it again once nobody is playing).
+setInterval(() => { if (trainer && matchOn()) { stopTrainer(); console.log('Pro practice stopped: a match started.'); } }, 2000);
 
 const humans = () => [...game.players.values()].filter(p => !p.bot).length;
 
