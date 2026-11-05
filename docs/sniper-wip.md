@@ -1,4 +1,4 @@
-# Paused 2026-11-04 (second session): items 1-4 of his list
+# Done 2026-11-04 (kept for his answers; see CLAUDE.md "Batch of 2026-11-04")
 
 His answers: scope = detailed reticle, view round the lens blurred + dimmed but movement shows; Shift steadies for as
 long as held (like the AWP). Reach ring: a faint ring that fades in only near the limit. Loadouts: attachments shared
