@@ -115,6 +115,17 @@ const UNI = {
   audit: ['#4a5a6a', '#2a343e', 'stripe', '#5ad0c0'], tonic: ['#4aa08a', '#2a6a5a', 'plain', null], ward: ['#3a4252', '#2a303c', 'hex', '#7aa0e8'],
   girder: ['#5e6064', '#3a3c40', 'hazard', '#e0c030'], magpie: ['#1a1c1e', '#e6e6e0', 'split', '#f2f2ec'],
 };
+// side colours on the clothing (he asked: every attacker wears some orange, every defender some blue, placed differently
+// per operator so each one stays easy to tell apart): bigger armbands for all, plus a mix of helmet band, vest stripe,
+// gloves and a patch on the back gear. Fixed by side, not by your team (the ring round the feet still is).
+export const SIDE_COL = { atk: '#ff7a1f', def: '#2f93ff' };
+const ACC_SETS = [['band', 'gloves'], ['vest'], ['gloves', 'pack'], ['band', 'vest'], ['vest', 'gloves'], ['band'], ['pack', 'vest'], ['band', 'pack']];
+const accCache = {};
+export function accentsOf(op) {
+  if (accCache[op]) return accCache[op];
+  const team = OPERATORS[op] ? OPERATORS[op].team : 'atk', i = Object.keys(OPERATORS).filter(k => OPERATORS[k].team === team).indexOf(op);
+  return (accCache[op] = new Set(ACC_SETS[(i < 0 ? 0 : i) % ACC_SETS.length]));
+}
 const uniCache = {};
 export function uniformOf(op, team) {
   if (uniCache[op]) return uniCache[op];
@@ -221,7 +232,7 @@ function drawGun(ctx, wkey, recoil) {
 // p: {x,y,aim,team,op,walk,ads,crouch,downed,recoil,reload,brace,scan,melee,ally,flash,w}
 export function drawOperator(ctx, p, t) {
   const o = OPERATORS[p.op]; if (!o) return;
-  const u = curU = uniformOf(p.op, o.team);
+  const u = curU = uniformOf(p.op, o.team), tc = SIDE_COL[o.team] || SIDE_COL.atk, acc = accentsOf(p.op);
   const skin = SKIN[(p.op.charCodeAt(0) + p.op.length) % SKIN.length];
   const ca = Math.cos(-p.aim), sa = Math.sin(-p.aim);
   LX = -0.6 * ca + 0.8 * sa; LY = -0.6 * sa - 0.8 * ca;
@@ -276,12 +287,14 @@ export function drawOperator(ctx, p, t) {
   else if (id === 'panel') { box(ctx, -12.5, -6, 4.5, 12, 1, '#59626b'); ctx.fillStyle = '#d9b02a'; for (let i = 0; i < 3; i++) ctx.fillRect(-12.3, -5 + i * 4, 4, 1); }
   else if (id === 'jammer') { box(ctx, -11.5, -4, 4.5, 8, 1.2, '#2b2f36'); ctx.fillStyle = '#55c1e8'; ctx.fillRect(-10.5, -2.5, 1.2, 1.2); cap(ctx, -9, -3, -14, -9, 0.6, '#999'); }
   else drawPack(ctx, PACK[p.op], o, u); // every operator carries something of their own
+  if (acc.has('pack') && PACK[p.op] !== 'none') { box(ctx, -12, -1.6, 2.6, 3.2, 0.6, tc, false); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.3; ctx.strokeRect(-12, -1.6, 2.6, 3.2); }
 
   // ---- torso & plate carrier ----
   const sh = cr ? 0.93 : 1;
   drawTorso(ctx, p.op, o, u, sh);
-  { const tc = (p.ring ?? p.ally) === false ? '#ff8a3d' : '#46a8ff'; // (p.ring: Esports TV, by side) // team trim (he chose): an armband on each shoulder in your team's or the enemy's colour
-    for (const s of [-1, 1]) { ctx.fillStyle = tc; ctx.beginPath(); ctx.ellipse(-1.2, s * 7.9 * sh, 2, 1.25, 0, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.3; ctx.stroke(); } }
+  { // side trim (he asked): a wide armband on each shoulder, attackers orange and defenders blue, plus this operator's own accents
+    if (acc.has('vest')) { ctx.fillStyle = tc; ctx.fillRect(-5.4, -5.6 * sh, 1.7, 11.2 * sh); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-3.7, -5.6 * sh, 0.35, 11.2 * sh); }
+    for (const s of [-1, 1]) { ctx.fillStyle = tc; ctx.beginPath(); ctx.ellipse(-1, s * 7.9 * sh, 2.7, 1.7, 0, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 0.35; ctx.stroke(); } }
   if (o.team === 'def') { box(ctx, -1.8, -6.2, 1.8, 2.4, 0.4, '#141518'); cap(ctx, -1, -6, -1.5, -10, 0.5, '#111'); } // radio
   if (id === 'slug' || id === 'sticky') { cap(ctx, -4.5, -6.5, 3.5, 6.5, 1.6, '#3a2a1a'); ctx.fillStyle = '#b02a2a'; for (let i = 0; i < 6; i++) ctx.fillRect(-4 + i * 1.3, -5.2 + i * 2.05, 0.9, 1.1); }
   if (id === 'emp') { for (const yy of [-3, 1.5]) { ell(ctx, -2.5, yy, 1.4, 1.4, '#7d4fb0'); ctx.fillStyle = `rgba(200,150,255,${0.5 + 0.5 * Math.sin(t * 4 + yy)})`; ctx.beginPath(); ctx.arc(-2.5, yy, 0.5, 0, 7); ctx.fill(); } }
@@ -304,7 +317,7 @@ export function drawOperator(ctx, p, t) {
   ctx.translate(p.ads || p.slide ? 2 : 0, p.ads || p.slide ? 0 : 1.4); // sliding: the gun is up as if aiming in, the only way you can hold it
   const up = p.up > 0.02 ? Math.min(1, p.up) : 0; // aiming up through a hatch (he asked, pose only): seen from above the raised gun and arms look short
   if (up) { ctx.translate(-1.5 * up, 0); ctx.scale(1 - 0.55 * up, 1 + 0.08 * up); }
-  const glove = (x, y) => { ell(ctx, x, y, 1.7, 1.6, '#1f1f20'); };
+  const gc = acc.has('gloves') ? tc : '#1f1f20', glove = (x, y) => { ell(ctx, x, y, 1.7, 1.6, gc); };
   if (shield) { // the shield hand holds the grip on the inside of the shield, wherever it has swung to (he asked)
     const sp = p.shieldPose || { rot: 0 }, ga = sp.rot - 0.45, hx = -2 + 10.6 * Math.cos(ga), hy = 10.6 * Math.sin(ga);
     const sx = -0.5, sy = -7 * bw, ex = (sx + hx) / 2 + Math.cos(ga - 1.2) * 2.2, ey = (sy + hy) / 2 + Math.sin(ga - 1.2) * 2.2;
@@ -395,6 +408,7 @@ export function drawOperator(ctx, p, t) {
       ctx.fillStyle = o.color; ctx.fillRect(-4.5, -0.6, 3.2, 1.2);
       if (id === 'stim') { ctx.fillStyle = '#fff'; ctx.fillRect(-3.2, -1.7, 3.4, 3.4); ctx.fillStyle = '#c22'; ctx.fillRect(-2.1, -1.4, 1.2, 2.8); ctx.fillRect(-2.9, -0.6, 2.8, 1.2); }
   }
+  if (acc.has('band')) { ctx.strokeStyle = tc; ctx.lineWidth = 1.3; ctx.lineCap = 'butt'; ctx.beginPath(); ctx.arc(0, 0, 4.2, Math.PI - 1.15, Math.PI + 1.15); ctx.stroke(); } // a band round the back of the headgear
   if (up) { // tipped back, the face shows past the front of the helmet: chin and eyes
     ctx.globalAlpha *= Math.min(1, up * 1.4);
     ell(ctx, 4.6, 0, 1.9, 3.1, skin); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(5.8, -1.6, 0.5, 3.2);

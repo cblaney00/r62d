@@ -676,3 +676,31 @@ export function sprayWords(w) {
 
 // which side carries a gun ('atk' / 'def'), from the loadouts
 export const gunSide = w => { for (const [op, L] of Object.entries(LOADOUTS)) if (L.primaries.includes(w) || L.secondaries.includes(w)) return OPERATORS[op].team; return null; };
+
+// ---- what killed you (he asked: fewer alerts, but say plainly what you died to, above all an ability) ----
+// Things that aren't a gun or an operator's ability; abilities explain themselves from their own description.
+const CAUSE_TEXT = {
+  'Melee': 'A melee hit up close. It finishes a downed player at once.',
+  'Shield Bash': 'A shield slammed into you: it hurts and staggers. Back off or shoot past the shield’s edge.',
+  'Bled out': 'You were downed and nobody revived you in time.',
+  'Frag Grenade': 'A thrown grenade that bursts after its fuse. When you hear one land, get out of the room.',
+  'Claymore': 'A trip mine with a red laser across its front. It blows when you walk into the laser.',
+  'Breach Charge': 'A charge set on a wall to blow it open. It hurts anyone right beside that wall, on both sides.',
+  'Nitro Pack': 'A bomb thrown by hand and set off by remote when someone comes close.',
+  'Impact Grenade': 'A small grenade that bursts the moment it hits something.',
+  'Stun Grenade': 'A flash grenade: it blinds and deafens for a moment.',
+};
+const firstWords = t => { const m = String(t || '').match(/^.*?[.!?](\s+.*?[.!?])?(?=\s|$)/); const f = m ? m[0] : String(t || ''); return f.length > 190 ? f.slice(0, f.search(/[.!?]/) + 1) || f.slice(0, 190) : f; };
+// cause name (as sent with the kill) → { kind: 'gun' | 'ability' | 'gadget' | 'other', title, text, op (whose ability) }
+export function causeOf(w, killerOp) {
+  w = w || '';
+  const gun = Object.values(WEAPONS).find(g => g.name === w);
+  if (gun) return { kind: 'gun', title: w, text: (CLASS_NAME[gun.cls] || gun.cls) + (gun.trait ? ' · ' + gun.trait : '') };
+  const same = (a, b) => a && b && (a === b || a.startsWith(b) || b.startsWith(a));
+  const K = OPERATORS[killerOp], mine = K && same(K.ability.name, w) ? killerOp : null;
+  const op = mine || Object.keys(OPERATORS).find(k => same(OPERATORS[k].ability.name, w));
+  if (op) return { kind: 'ability', title: OPERATORS[op].ability.name, text: firstWords(OPERATORS[op].ability.desc), op };
+  const gk = Object.values(GADGETS).find(g => g.name === w);
+  return { kind: gk ? 'gadget' : 'other', title: w || 'Unknown', text: CAUSE_TEXT[w] || '' };
+}
+

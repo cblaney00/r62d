@@ -5,7 +5,7 @@ import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './ping
 import { parseCommand } from '/shared/commands.js';
 import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
@@ -1374,6 +1374,14 @@ function banner(text, sub, color) {
   b.querySelector('.t').style.color = color || ''; b.classList.add('show'); st.bannerT = performance.now() / 1000 + 3;
 }
 function addFeed(text) { const d = document.createElement('div'); d.textContent = text; $('feed').appendChild(d); setTimeout(() => d.remove(), 7000); }
+// what killed you (he asked: fewer alert marks, more explanation, above all for an ability): shown while you are dead
+function deathCard(kc) {
+  const c = causeOf(kc.w, kc.kop), K = OPERATORS[kc.kop], who = kc.self ? 'YOURSELF' : esc((kc.kn || 'Unknown').replace(/^\[\w+\] /, '')) + (K ? ` <span>· ${K.name}</span>` : '');
+  const tag = c.kind === 'ability' ? `${OPERATORS[c.op].name}'S ABILITY` : c.kind === 'gadget' ? 'GADGET' : c.kind === 'gun' ? '' : '';
+  const x = [kc.hs ? '<b>HEADSHOT</b>' : '', kc.wall ? 'THROUGH A WALL' : '', kc.km >= 1 && c.kind === 'gun' ? `${Math.round(kc.km)} M AWAY` : '', kc.team ? '<b>TEAMKILL</b>' : '', kc.dnBy ? `DOWNED BY ${esc(kc.dnBy.replace(/^\[\w+\] /, '').toUpperCase())}` : ''].filter(Boolean);
+  return `<div class="dk">KILLED BY ${who}</div><div class="dw">${esc(c.title.toUpperCase())}${tag ? `<i>${tag}</i>` : ''}</div>` +
+    (c.text ? `<div class="dt">${esc(c.text)}</div>` : '') + (x.length ? `<div class="dx">${x.join(' · ')}</div>` : '');
+}
 function addKill(k, v, w, hs) {
   if (!v) return;
   const side = mySide(), cls = p => p && p.tm === side ? 'a' : 'e';
@@ -2109,7 +2117,7 @@ function draw(s, view, now, dt) {
     const gh = !isMe && stairGhost(st.map, p.x, p.y);
     if (gh && (ally || (!p.sh && ghostSeen(gh)))) {
       ctx.globalAlpha = 0.9;
-      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x + u.x * 15, gh.y + u.y * 15);
@@ -2145,7 +2153,7 @@ function draw(s, view, now, dt) {
       ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     drawOperator(ctx, {
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, slide: p.sd, downed: p.dn,
-      sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
+      sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
     if (elv) ctx.restore();
     drawn.push(p);
@@ -2283,9 +2291,9 @@ function draw(s, view, now, dt) {
         ctx.fillStyle = p.dn ? '#ff5050' : '#3aa0ff'; ctx.beginPath(); ctx.arc(p.x + u.x * 17, p.y + u.y * 17, 2, 0, 7); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(p.n + (p.dn ? ' ▼' : ''), p.x + u.x * 21, p.y + u.y * 21);
       } else if (spotted.has(p.id)) {
-        ctx.strokeStyle = '#ff3b3b'; ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.moveTo(p.x, p.y - 22); ctx.lineTo(p.x - 4, p.y - 29); ctx.lineTo(p.x + 4, p.y - 29); ctx.closePath(); ctx.stroke();
-        ctx.fillStyle = 'rgba(255,60,60,0.25)'; ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, 7); ctx.fill();
+        const u = UP(), tx = p.x + u.x * 19, ty = p.y + u.y * 19, px = -u.y, py = u.x; // spotted: a small faint triangle above them (he asked: fewer, quieter marks)
+        ctx.fillStyle = 'rgba(255,70,60,0.5)';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + u.x * 4 + px * 2.2, ty + u.y * 4 + py * 2.2); ctx.lineTo(tx + u.x * 4 - px * 2.2, ty + u.y * 4 - py * 2.2); ctx.closePath(); ctx.fill();
       }
     }
     // objective markers
@@ -2295,12 +2303,7 @@ function draw(s, view, now, dt) {
     if (side === 'atk') for (const e of ents) if (e.ty === 'defuser') marker(e.x, e.y, 'D', '#f2c14e', view);
     drawScanBlips(now);
     if (!st.tv) deathMarks(view, now); // TV: the cards and kill feed already say who is down; no big marks over the action
-    // an enemy your team can see who is off the edge of your screen: a mark at the edge, so nobody shoots you unseen
-    st.foesSeen = drawn.filter(p => p.tm !== side);
-    for (const p of drawn) if (p.tm !== side) {
-      const { x: sx, y: sy } = w2s(p.x, p.y);
-      if ((sx < 0 || sy < 0 || sx > VW || sy > VH) && (!view || floorAt(st.map, p.x, p.y) === floorAt(st.map, view.x, view.y))) marker(p.x, p.y, '!', '#ff5040', view); // another floor (seen in the stairs window): no edge mark
-    }
+    st.foesSeen = drawn.filter(p => p.tm !== side); // (the red ! at the screen edge for off-screen enemies is gone: he asked for fewer alert marks)
     // Sounds you can't see (he asked: hearing someone must not tell you exactly where to shoot blindly): no arrows
     // towards footsteps or gunfire any more. Only which floor: footsteps running on the floor just above or below
     // and gunfire there show as a faint "▲ FOOTSTEPS ABOVE" / "▼ GUNFIRE BELOW" by you, with no direction.
@@ -2637,9 +2640,11 @@ function hud(s) {
     const mates = s.players.filter(p => p.a && p.sq === me.sq);
     setText('viewlabel', mates.length ? `SPECTATING ${mates[st.spect % mates.length].n.toUpperCase()} · CLICK TO SWITCH` : '');
     setCls($('kcBtn'), 'hidden', !st.killcam || !!st.tv); setHTML('kcBtn', `<b>${label('interact')}</b> WATCH KILLCAM`);
+    const kc = st.killcam && !st.tv ? st.killcam : null;
+    setCls($('deathCard'), 'hidden', !kc); if (kc) { setHTML('deathCard', kc.card || (kc.card = deathCard(kc))); setCls($('deathCard'), 'team', !!(kc.team || kc.self)); }
     return;
   }
-  $('br').style.visibility = ''; setCls($('kcBtn'), 'hidden', true); if (st.killcam && performance.now() - st.killcam.got > 3000) st.killcam = null; // alive again: the old killcam is gone
+  $('br').style.visibility = ''; setCls($('kcBtn'), 'hidden', true); setCls($('deathCard'), 'hidden', true); if (st.killcam && performance.now() - st.killcam.got > 3000) st.killcam = null; // alive again: the old killcam is gone
   const o = OPERATORS[me.op];
   setHTML('opname', `${o.name}<small>${o.role.toUpperCase()}</small>`);
   setText('hpnum', me.hp);
@@ -2674,7 +2679,7 @@ function hud(s) {
     const list = feedList(s, me), c = list.find(e => e.id === me.fi);
     if (c) {
       const ro = c.ow && c.ow !== me.id, who = ro ? `${ownerName(s, c.ow).toUpperCase()}'S ` : c.ow ? 'YOUR ' : '';
-      vl = `${who}${feedKind(c)} ${list.indexOf(c) + 1}/${list.length} · ${(roomAt(st.map, c.x, c.y) || 'outside').toUpperCase()} · ${ro || c.ty !== 'cam' ? 'WATCH ONLY' : 'MOUSE LOOK'} · ${label('leanL')} ${label('leanR')} SWITCH · CLICK PING${c.off || c.j ? ' · DISRUPTED' : ''}`;
+      vl = `${FEED_GROUPS[feedGroup(c)]} · ${who}${feedKind(c)} ${list.indexOf(c) + 1}/${list.length} · ${(roomAt(st.map, c.x, c.y) || 'outside').toUpperCase()} · ${ro || c.ty !== 'cam' ? 'WATCH ONLY' : 'MOUSE LOOK'} · ${label('leanL')} ${label('leanR')} SWITCH · CLICK PING${c.off || c.j ? ' · DISRUPTED' : ''}`;
     }
   }
   setText('viewlabel', vl);
@@ -2787,7 +2792,8 @@ function bodySounds(me, dt) {
 // Everything your team can look through (the server's feeds()): defence every working camera, map,
 // turret or sticky; attack every drone and wall scope. Only your own drone/gadget is yours to steer.
 function feedList(s, me) {
-  return s.ents.filter(e => e.tm === me.tm && (me.tm === 'def' ? (e.ty === 'cam' && e.hp > 0) || e.ty === 'bird' : e.ty === 'drone' || e.ty === 'scope'));
+  return s.ents.filter(e => e.tm === me.tm && (me.tm === 'def' ? (e.ty === 'cam' && e.hp > 0) || e.ty === 'bird' || e.ty === 'scope' : e.ty === 'drone' || e.ty === 'scope'))
+    .map((c, i) => [feedGroup(c), i, c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]); // same groups and order as the server's feeds()
 }
 const TRAPS = new Set(['clamp', 'prox', 'concuss', 'alarm', 'mine']), TRAP_SEEN = 2 * PX_PER_M;
 function feedKind(c) { return c.ty === 'drone' ? 'DRONE' : c.ty === 'bird' ? (c.pe ? 'BIRD · LANDED' : 'BIRD') : c.ty === 'scope' && c.fl ? (c.fl === 'up' ? 'PERISCOPE ▲' : 'PERISCOPE ▼') : c.ty === 'scope' ? 'WALL SCOPE' : c.tu ? 'TURRET' : c.ow ? 'STICKY CAM' : 'CAMERA'; }
@@ -2802,18 +2808,23 @@ function feedView(c, me) {
   return { x: c.x, y: c.y, ang: ro ? c.ag || 0 : st.aim, fov: 1.9, range: 650, near: 14, kind: 'cam', off: c.off, cam: c, ro };
 }
 
-// Clickable list of the team's cameras / drones along the bottom while you're looking through them.
+// Clickable list of the team's cameras / drones along the bottom while you're looking through them, in labelled groups (he asked)
+const FEED_GROUPS = ['INDOOR', 'OUTDOOR', 'DRONES', 'UTILITY'];
+const feedGroup = c => c.ty === 'cam' && !c.ow ? (c.oc !== undefined ? 1 : 0) : c.ty === 'drone' ? 2 : 3;
 function camBar(s, me) {
   const bar = $('cambar');
   if (me.ct !== 'cam' && me.ct !== 'drone') { if (bar.innerHTML) bar.innerHTML = ''; return; }
-  const def = me.tm === 'def', list = def ? s.ents.filter(e => (e.ty === 'cam' || e.ty === 'bird') && e.tm === 'def') : feedList(s, me); // broken cameras stay listed, greyed
+  const def = me.tm === 'def', list0 = def ? s.ents.filter(e => (e.ty === 'cam' || e.ty === 'bird' || e.ty === 'scope') && e.tm === 'def') : feedList(s, me); // broken cameras stay listed, greyed
+  const list = list0.map((c, i) => [feedGroup(c), i, c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]); // grouped like the server's feeds() (he asked)
   const cur = me.ct === 'drone' ? me.did : me.fi;
-  let n = 0;
+  let n = 0, on = 0, lastG = -1;
   const html = list.map(c => {
+    const g = feedGroup(c), head = g !== lastG ? `${lastG >= 0 ? '</div>' : ''}<div class="cgrp"><em>${FEED_GROUPS[g]}</em>` : ''; lastG = g;
+    if (g === 1 && !on) { on = 1; n = 0; } // outdoor cameras count from 1 again
     const live = !def || c.hp > 0 || c.ty === 'bird', mine = c.ow === me.id;
     const name = c.ow ? (mine ? 'MY ' : `${ownerName(s, c.ow).toUpperCase()}'S `) + (c.ty === 'cam' ? (c.tu ? 'TURRET' : 'STICKY') : c.ty === 'scope' ? 'SCOPE' : c.ty === 'bird' ? 'BIRD' : 'DRONE') : `CAM ${++n}`;
-    return `<button data-id="${live ? c.id : ''}" class="${c.id === cur ? 'on' : ''} ${live ? '' : 'dead'}">${esc(name)}<small>${esc(c.oc !== undefined ? 'OUTSIDE · ' + ['EAST', 'SOUTH', 'WEST', 'NORTH'][((Math.round((c.wn || 0) / (Math.PI / 2)) % 4) + 4) % 4] + ' WALL' : (roomAt(st.map, c.x, c.y) || 'outside').toUpperCase())}${c.off || c.j ? ' · DISRUPTED' : ''}</small></button>`;
-  }).join('');
+    return head + `<button data-id="${live ? c.id : ''}" class="${c.id === cur ? 'on' : ''} ${live ? '' : 'dead'}">${esc(name)}<small>${esc(c.oc !== undefined ? 'OUTSIDE · ' + ['EAST', 'SOUTH', 'WEST', 'NORTH'][((Math.round((c.wn || 0) / (Math.PI / 2)) % 4) + 4) % 4] + ' WALL' : (roomAt(st.map, c.x, c.y) || 'outside').toUpperCase())}${c.off || c.j ? ' · DISRUPTED' : ''}</small></button>`;
+  }).join('') + (lastG >= 0 ? '</div>' : '');
   if (bar.innerHTML !== html) {
     bar.innerHTML = html;
     for (const b of bar.querySelectorAll('button')) b.onclick = e => { e.stopPropagation(); if (b.dataset.id) st.evq.push({ k: 'camSet', id: b.dataset.id }); };
@@ -2949,7 +2960,7 @@ function drawStairView(s, me, now) {
     const ally = p.tm === side;
     if (!ally && (p.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue;
     const a = anim(p.id);
-    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
   }
   c.restore();
   // soft round edge, so it melts into this floor's map
@@ -3014,7 +3025,7 @@ function drawWindowView(s, me, now, view) {
     const ally = p.tm === side;
     if (!ally && (p.sh ? !teamSeesBody(at.x, at.y) : !teamSees(at.x, at.y))) continue;
     const a = anim(p.id);
-    drawOperator(c, { x: at.x, y: at.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+    drawOperator(c, { x: at.x, y: at.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
     if (!ally && !p.dn) st.heads.push({ x: at.x + o.x, y: at.y + o.y });
   }
   // darker with distance from the wall: a floor or more down, and it fades out at the end of what you can see
@@ -3067,7 +3078,7 @@ function drawHatchView(s, me, now) {
       const ally = p.tm === side;
       if (!ally && (p.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue;
       const a = anim(p.id);
-      drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+      drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
       if (!ally && !p.dn) st.heads.push({ x: p.x - o.x, y: p.y - o.y });
     }
     c.fillStyle = 'rgba(8,10,14,0.32)'; c.fillRect(x0, y0, x1 - x0, y1 - y0); // a floor away: a little darker

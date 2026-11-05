@@ -3,7 +3,7 @@ import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOL
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
-import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
 import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
@@ -560,6 +560,7 @@ export class Game {
     let mul = 1;
     if (this.time < p.slowUntil) mul *= 0.45;
     if (p.bracing) mul *= p.riot ? RIOT[p.riot].speed : 0.82; // shield up: a little slower, never a crawl (he asked); each riot shield its own
+    const canSprint = mul >= 1 || (p.bracing && !p.riot && mul >= 0.82 - 1e-9); // BULWARK can sprint with the shield up (he asked); it swings like a jog meanwhile
     if (p.prep) mul *= p.prep.mode === 'place' ? 0 : 0.6; // setting something down: still; winding up a throw: slowed
     if (p.scanning) mul *= 0.6;
     if (this.time < (p.boostUntil || 0)) mul *= 1.25; // Adrenal Shot
@@ -571,7 +572,7 @@ export class Game {
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
       (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK);
     const gw = p.guns && p.guns[p.slot] ? moveOf(WEAPONS[p.guns[p.slot].w]) : [1, 1];
-    return { armor: o.armor, mul, downed: p.downed, frozen, gw: gw[0], ga: gw[1], ns: mul < 1 ? 1 : undefined }; // ns: anything slowing you stops a sprint
+    return { armor: o.armor, mul, downed: p.downed, frozen, gw: gw[0], ga: gw[1], ns: canSprint ? undefined : 1 }; // ns: anything slowing you stops a sprint
   }
 
   applyMove(p, dt) {
@@ -943,6 +944,8 @@ export class Game {
     if (last) for (const e of last.ps) if (!ids.has(e[0]) && [q, src].some(o => o && Math.hypot(o.x - e[1], o.y - e[2]) < 320)) ids.add(e[0]); // others close by, for the picture
     const j = this.judgeKill(q, src, wname, frames);
     const m = { t: 'killcam', killer: src ? src.id : null, kn: src ? src.name : '', victim: q.id, w: wname || '', hs: this.headshot ? 1 : 0, rating: j.rating, why: j.why, bug: j.bug,
+      kop: src ? src.op : null, km: src ? r1(Math.hypot(src.x - q.x, src.y - q.y) / PX_PER_M) : 0, wall: this.shotPens ? 1 : 0, team: src && src !== q && this.side(src) === this.side(q) ? 1 : 0, self: src === q ? 1 : 0,
+      dnBy: (() => { const d = q.downedBy != null && this.players.get(q.downedBy); return d && d !== src ? d.name : null; })(),
       fr: frames.map(f => ({ t: r2(f.t - now), ps: f.ps.filter(e => ids.has(e[0])) })),
       shots: (this.shotLog || []).filter(s => s.t >= now - 5.5 && ids.has(s.id)).map(s => ({ ...s, t: r2(s.t - now) })),
       names: Object.fromEntries([...ids].map(id => { const p = this.players.get(id); return [id, p ? [p.name, this.side(p) === this.side(q) ? 1 : 0] : ['?', 0]]; })) };
@@ -1064,9 +1067,11 @@ export class Game {
       const small = OPERATORS[q.op] && OPERATORS[q.op].ability.id === 'brace' ? 0.6 : 1; // BULWARK: a smaller head to hit (he asked); the shield still covers it from the front
       const sa = this.shotAim, head = miss < HEAD_R * small && (!sa || Math.hypot(sa.x - at.x, sa.y - at.y) <= HEAD_AIM * small);
       if (src && src.tracerUntil > this.time && this.side(q) !== this.side(src)) this.spot(this.side(src), q.id, 4); // MARK's tracer rounds
+      this.shotPens = pens; // the death card says "through a wall"
       if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
       else if (head && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
       else this.damage(q, dmg * mult * fall, src, wname, ang);
+      this.shotPens = 0;
     } else if (best && best.e && best.e.tu) { best.e.offUntil = Math.max(best.e.offUntil || 0, this.time + 8); this.events.push({ e: 'hit', k: 'spark', x: r1(ex), y: r1(ey) }); }
     else if (best && best.e) this.hitEnt(best.e, src);
     else if (kind === 'hard' || kind === 'prop') this.events.push({ e: 'hit', k: kind, x: r1(ex), y: r1(ey) });
@@ -1335,7 +1340,7 @@ export class Game {
   }
 
   // the shield's pose right now (shieldPose in shared/operators.js); the drawing uses the same rule from the snapshot
-  shieldOf(q) { return shieldPose(q.gait, q.moving === 2, false, this.time < (q.shieldDownUntil || 0), q.aside || 0, riotArc(q.riot, q.input && q.input.crouch, !q.moving)); }
+  shieldOf(q) { return shieldPose(q.gait, q.moving >= 2, false, this.time < (q.shieldDownUntil || 0), q.aside || 0, riotArc(q.riot, q.input && q.input.crouch, !q.moving)); }
   hasShield(q) { return OPERATORS[q.op].ability.id === 'brace' || (!!q.riot && !q.riotBroken); } // BULWARK, or a riot shield that hasn't cracked
 
   // ---------------- rappelling (he asked: attackers need a quicker way up; see addRopes in shared/map.js) ----------------
@@ -1602,8 +1607,11 @@ export class Game {
 
   // Everything a team can look through, flipped through with left/right or the mouse wheel:
   // defence every working camera (map, turret, sticky); attack every drone and wall scope.
+  // in groups (he asked): indoor map cameras, outdoor cameras, drones, then utility (gadget cameras, scopes, birds); flipping goes through them in that order
   feeds(team) {
-    return this.ents.filter(e => e.team === team && (team === TEAM.DEF ? (e.type === 'cam' && e.hp > 0) || e.type === 'scope' || e.type === 'bird' : e.type === 'drone' || e.type === 'scope'));
+    const grp = e => e.type === 'cam' && !e.owner ? (e.oc !== undefined ? 1 : 0) : e.type === 'drone' ? 2 : 3;
+    return this.ents.filter(e => e.team === team && (team === TEAM.DEF ? (e.type === 'cam' && e.hp > 0) || e.type === 'scope' || e.type === 'bird' : e.type === 'drone' || e.type === 'scope'))
+      .map((e, i) => [grp(e), i, e]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
   }
   feed(p) { const f = this.ent(p.feedId); return f && this.feeds(this.side(p)).includes(f) ? f : null; }
   // only the one who placed a gadget camera can turn it or fire its laser; map cameras are anyone's
@@ -2722,6 +2730,16 @@ export class Game {
     }
   }
 
+  // the name a blast is known by in the kill feed and the death card: the owner's ability, else the gadget (he asked: say what killed you)
+  blastName(e, o) {
+    const k = e.type === 'nade' ? e.kind : e.type === 'clusterwave' ? 'cluster' : e.type, own = e.owner != null && this.players.get(e.owner), O = own && OPERATORS[own.op];
+    if (O && O.ability.id === k) return O.ability.name;
+    if (GADGETS[k]) return GADGETS[k].name;
+    const ab = Object.values(OPERATORS).find(x => x.ability.id === k);
+    if (ab) return ab.ability.name;
+    return o.kind.charAt(0).toUpperCase() + o.kind.slice(1);
+  }
+
   explode(e, o) {
     const owner = this.players.get(e.owner);
     this.noise(e.x, e.y, e.team, 1100);
@@ -2756,7 +2774,7 @@ export class Game {
       });
       if (blocked) continue;
       const dmg = o.dmg * (1 - (d / o.r) * 0.75) * (self ? (o.selfMul ?? 1) : 1);
-      this.damage(q, dmg, owner, o.kind === 'slug' ? 'Breaching Round' : o.kind.charAt(0).toUpperCase() + o.kind.slice(1), Math.atan2(q.y - e.y, q.x - e.x));
+      this.damage(q, dmg, owner, this.blastName(e, o), Math.atan2(q.y - e.y, q.x - e.x));
     }
     for (const g of [...this.ents]) {
       if (g === e || g.team === e.team || Math.hypot(g.x - e.x, g.y - e.y) > o.r) continue;

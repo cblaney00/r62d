@@ -43,5 +43,13 @@ p.input = { fire: 1 }; p.prevInput = {}; p.msgFire = false; p.spr = true; p.clic
 g.tickPlayer(p, 1 / 30); if (gun.ammo !== ammo0) fail('shot while sprinting');
 p.spr = false; g.tickPlayer(p, 1 / 30); if (gun.ammo !== ammo0) fail('shot before the gun came up');
 g.time += 0.31; p.prevInput = { fire: 1 }; g.tickPlayer(p, 1 / 30); if (gun.ammo !== ammo0 - 1) fail('the held click never fired', gun.ammo, ammo0);
+// BULWARK sprints with his shield up (he asked); a riot shield still can't
+p.op = 'bulwark'; p.bracing = true; p.riot = null; p.shieldMode = 'shield';
+const bRun = speed({}), bFast = speed({ sprint: 1 });
+if (!(bFast > bRun * 1.3)) fail('BULWARK should sprint with the shield up', bRun, bFast);
+console.log(`bulwark run ${bRun.toFixed(0)} px/s, sprint ${bFast.toFixed(0)} px/s`);
+p.op = 'onyx'; p.riot = 'aegis'; const rFast = speed({ sprint: 1 }), rRun = speed({});
+if (rFast > rRun * 1.05) fail('a riot shield should not sprint', rRun, rFast);
+p.bracing = false; p.riot = null;
 console.log(fails ? `${fails} failure(s)` : 'PASS sprint');
 process.exit(fails ? 1 : 0);

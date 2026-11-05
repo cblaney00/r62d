@@ -274,6 +274,9 @@ tr.me { color: var(--gold); } tr.dead { opacity: 0.5; }
 /* ---------- camera bar ---------- */
 #cambar { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 6px; pointer-events: auto; }
 #cambar:empty { display: none; }
+#cambar .cgrp { display: flex; gap: 6px; position: relative; padding: 14px 6px 0 0; border-right: 1px solid rgba(255,255,255,0.12); }
+#cambar .cgrp:last-child { border-right: 0; padding-right: 0; }
+#cambar .cgrp em { position: absolute; top: 0; left: 0; font: 700 11px var(--head); font-style: normal; letter-spacing: 0.2em; color: var(--gold); text-shadow: 0 1px 2px #000; }
 #cambar button { font-size: 13px; padding: 6px 12px; background: var(--panel); text-align: left; line-height: 1.2; }
 #cambar button small { display: block; color: var(--dim); font-size: 11px; letter-spacing: 0.1em; }
 #cambar button.on { border-color: var(--gold); color: var(--gold); }
@@ -877,6 +880,14 @@ html.tv #tvHelp { bottom: 6px; }
 .pbPatch ul { margin: 2px 0 0; padding-left: 16px; } .pbPatch li b { font: 700 13px var(--head); letter-spacing: 0.03em; color: #fff; } .pbPatch li { margin: 2px 0; } .pbPatch li i { color: var(--dim); }
 /* killcam (he asked): watch your death again, then the BS rating */
 #kcBtn { position: absolute; top: 116px; left: 50%; transform: translateX(-50%); font: 600 14px var(--head); letter-spacing: 0.18em; color: #efe6e2; background: rgba(38, 26, 28, 0.82); border: 1px solid rgba(214, 138, 124, 0.35); border-radius: 3px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); animation: none; transition: background 0.15s, border-color 0.15s; padding: 7px 16px 7px 8px; cursor: pointer; z-index: 6; pointer-events: auto; }
+#deathCard { position: absolute; bottom: 132px; left: 50%; transform: translateX(-50%); width: min(560px, 86vw); background: rgba(24, 18, 20, 0.86); border: 1px solid rgba(214, 138, 124, 0.3); border-left: 3px solid var(--enemy); border-radius: 3px; padding: 10px 14px 11px; color: #e9e2df; font: 500 15px var(--body, sans-serif); box-shadow: 0 6px 22px rgba(0,0,0,0.4); pointer-events: none; z-index: 5; }
+#deathCard.team { border-left-color: var(--ally); }
+#deathCard .dk { font: 600 12px var(--head); letter-spacing: 0.2em; color: #b9a6a1; }
+#deathCard .dw { font: 700 22px var(--head); letter-spacing: 0.06em; color: #fff; margin: 2px 0 1px; }
+#deathCard .dw i { font-style: normal; font: 600 12px var(--head); letter-spacing: 0.16em; color: #f2c14e; background: rgba(242, 193, 78, 0.12); border-radius: 2px; padding: 2px 6px; margin-left: 8px; vertical-align: 4px; }
+#deathCard .dt { color: #d8cfcc; line-height: 1.35; }
+#deathCard .dx { margin-top: 6px; font: 600 13px var(--head); letter-spacing: 0.12em; color: #c9b8b3; }
+#deathCard .dx b { color: #ff7a6a; font-weight: 700; }
 #kcBtn:hover { background: rgba(58, 36, 36, 0.92); border-color: rgba(226, 158, 142, 0.6); }
 #kcBtn b { background: rgba(214, 138, 124, 0.2); color: #f0c4b8; border-radius: 2px; padding: 1px 7px; margin-right: 10px; letter-spacing: 0; }
 #killcam { position: fixed; inset: 0; z-index: 60; background: rgba(3,5,8,0.82); display: flex; align-items: center; justify-content: center; }
