@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
+import crypto from 'node:crypto';
 import { attachWebSocket } from './ws.js';
 import { Worker } from 'node:worker_threads';
 import dgram from 'node:dgram';
@@ -88,7 +89,7 @@ function api(req, res) {
     let b = ''; req.on('data', d => { if (b.length < 8000) b += d; }); req.on('end', () => { try { perfLog.push({ ip: req.socket.remoteAddress, ...JSON.parse(b) }); if (perfLog.length > 200) perfLog.shift(); } catch {} json(200, { ok: true }); });
     return;
   }
-  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, running: !!trainer, session: trainer ? trainer.rounds : 0, current: VERSION.id });
+  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, running: !!trainer, session: trainer ? trainer.rounds : 0, current: PLAY_VERSION });
   if (u.pathname === '/api/train' && req.method === 'POST') { const r = trainCheck(true); return json(200, { running: !!trainer, why: r || '' }); } // TRAIN THE PROS button
   if (u.pathname === '/api/match') { const m = store.match(q('id')); return m ? json(200, m) : json(404, { error: 'no such match' }); }
   if (u.pathname === '/api/players') return json(200, Object.values(store.profiles).map(p => ({ id: p.id, name: p.name, matches: p.stats.matches, wins: p.stats.wins, kills: p.stats.kills, deaths: p.stats.deaths })));
@@ -131,18 +132,33 @@ setInterval(() => {
 
 // Practice for the pro teams (he asked): 200 rounds whenever the game's version changes (not daily any more); they run
 // in a background thread while nobody is playing (they stop the moment someone joins a match). No AI service: all here.
-let trainer = null;
+// He asked: practice with each new GAMEPLAY change. The practice version is a fingerprint of the code that plays the
+// matches (server/ and shared/), so a change to menus, pictures or sounds doesn't send the pros back to practice.
+function playVersion() {
+  const h = crypto.createHash('sha1'), walk = d => { for (const f of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (f.name.endsWith('.js')) h.update(f.name).update(fs.readFileSync(p)); } };
+  try { for (const d of ['server', 'shared']) walk(path.join(ROOT, d)); return 'p' + h.digest('hex').slice(0, 7); } catch { return VERSION.id; }
+}
+const PLAY_VERSION = playVersion();
+// He asked for it a lot faster and allowed more of the computer: several practice threads at once, each flat out
+// (a quarter of the computer's cores, 1 to 6; R62D_TRAIN_WORKERS changes it). Still only while no match is on.
+const TRAIN_WORKERS = Math.max(1, Math.min(6, Number(process.env.R62D_TRAIN_WORKERS) || Math.floor(os.cpus().length / 4)));
+let trainer = null; // { list: workers, rounds: this session's }
+const stopTrainer = () => { if (trainer) for (const w of trainer.list) w.terminate(); trainer = null; };
 function trainCheck(force = false) {
   const busy = game.phase !== 'lobby' || [...tutorials].some(g => g.phase !== 'lobby' && !g.heldUntil); // a match being played (people in the menus are fine)
-  if (trainer && busy) { trainer.terminate(); trainer = null; return 'a match is being played'; } // someone is playing: practice another time
+  if (trainer && busy) { stopTrainer(); return 'a match is being played'; } // someone is playing: practice another time
   if (busy) return 'a match is being played';
-  if (trainer || !VERSION.id) return '';
-  newVersion(VERSION.id);
-  if (!needsTraining(VERSION.id)) return `they have done their ${training.verRounds} rounds on this version`;
-  trainer = new Worker(new URL('./train-worker.js', import.meta.url), { resourceLimits: { maxOldGenerationSizeMb: 512 }, workerData: { minutes: Number(process.env.R62D_TRAIN_MIN) || 60, rounds: roundsLeft(VERSION.id) } }); trainer.rounds = 0;
-  trainer.on('message', m => { if (m.done) { training.at = Date.now(); console.log(`Pro teams trained on version ${VERSION.id}: ${training.rounds} practice rounds so far.`); } else { addResults(m); if (trainer) trainer.rounds += m.rounds || 0; } saveTraining(); });
-  trainer.on('error', e => console.log('Pro training stopped:', e.message));
-  trainer.on('exit', () => { trainer = null; });
+  if (trainer) return '';
+  newVersion(PLAY_VERSION);
+  if (!needsTraining(PLAY_VERSION)) return `they have done their ${training.verRounds} rounds on this version`;
+  const left = roundsLeft(PLAY_VERSION), n = Math.min(TRAIN_WORKERS, left), me = trainer = { list: [], rounds: 0, live: n };
+  for (let i = 0; i < n; i++) { // the rounds shared out between the threads
+    const w = new Worker(new URL('./train-worker.js', import.meta.url), { resourceLimits: { maxOldGenerationSizeMb: 512 }, workerData: { minutes: Number(process.env.R62D_TRAIN_MIN) || 60, rounds: Math.ceil((left - i) / n), duty: 1 } });
+    me.list.push(w);
+    w.on('message', m => { if (trainer !== me) return; if (m.done) { if (--me.live === 0) { training.at = Date.now(); console.log(`Pro teams trained on version ${PLAY_VERSION}: ${training.rounds} practice rounds so far.`); } } else { addResults(m); me.rounds += m.rounds || 0; } saveTraining(); });
+    w.on('error', e => console.log('Pro training stopped:', e.message));
+    w.on('exit', () => { w.done = true; if (trainer === me && me.list.every(x => x.done)) trainer = null; });
+  }
 }
 setInterval(trainCheck, 5 * 60 * 1000); setTimeout(trainCheck, 60 * 1000);
 

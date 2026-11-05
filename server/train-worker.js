@@ -10,10 +10,11 @@ import { planKey, opKey } from './training.js';
 const until = Date.now() + (workerData.minutes || 15) * 60 * 1000, dt = 1 / 30;
 // Gently (he asked: Lando's server sounded like a jet taking off): work DUTY of the time, rest the rest, so practice
 // uses about a third of one core (measured 38%) instead of 160% flat out; 200 rounds still take only ~15 minutes. Rounds left over carry on the next time it runs.
-const DUTY = Math.min(1, Math.max(0.05, Number(process.env.R62D_TRAIN_DUTY) || 0.15)), WORK_MS = 20;
+// He asked later (2026-11-04) for much faster practice and allowed more power: server.js runs several threads at duty 1.
+const DUTY = Math.min(1, Math.max(0.05, Number(process.env.R62D_TRAIN_DUTY) || workerData.duty || 0.15)), WORK_MS = 20;
 const rest = ms => new Promise(r => setTimeout(r, ms));
 let workT = performance.now();
-const breather = async () => { const w = performance.now() - workT; if (w >= WORK_MS) { await rest(w * (1 - DUTY) / DUTY); workT = performance.now(); } };
+const breather = async () => { if (DUTY >= 1) return; const w = performance.now() - workT; if (w >= WORK_MS) { await rest(w * (1 - DUTY) / DUTY); workT = performance.now(); } };
 let left = workerData.rounds || 200;
 let mi = Math.floor(Math.random() * MAP_LIST.length);
 while (Date.now() < until && left > 0) {

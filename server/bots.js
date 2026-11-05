@@ -252,7 +252,8 @@ function pfBuf(N) {
   return PF;
 }
 const DIR8X = [1, -1, 0, 0, 1, 1, -1, -1], DIR8Y = [0, 0, 1, -1, 1, -1, 1, -1];
-function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside = false) {
+// cap/near (angleOn): stop after `cap` cells and, with `near`, return the way to the cell that got closest to the goal
+function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside = false, cap = 30000, near = false) {
   const W = map.W, H = map.H, N = W * H;
   const start = sy * W + sx, goal = gy * W + gx;
   const B = pfBuf(N), st = B.stamp, G = B.g, FR = B.from, seen = B.seen, shut = B.shut;
@@ -309,10 +310,12 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside
   const ly = k => { const f = F[flAt ? flAt[k] : 0]; return ((k / W) | 0) + (f ? f.y0 : 0); };
   const glx = lx(goal), gly = ly(goal), gfl = flAt ? flAt[goal] : 0;
   const h = k => Math.hypot(glx - lx(k), gly - ly(k)) + (flAt && flAt[k] !== gfl ? 6 : 0);
-  while (hn && iter++ < 30000) {
+  let best = start, bestH = Infinity;
+  while (hn && iter++ < cap) {
     const k = pop();
     if (k === goal) break;
     if (shut[k] === st) continue; shut[k] = st;
+    if (near) { const hk2 = h(k); if (hk2 < bestH) { bestH = hk2; best = k; } }
     const x = k % W, y = (k / W) | 0;
     const pk = map.portal ? map.portal[k] : -1; // the end of a staircase leads to the other floor
     if (pk >= 0) { const ng = G[k] + 1; if (ng < gOf(pk)) { setG(pk, ng, k); push(ng + h(pk), pk); } continue; }
@@ -326,9 +329,10 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside
       if (ng < gOf(nk)) { setG(nk, ng, k); push(ng + h(nk), nk); }
     }
   }
-  if (fromOf(goal) < 0 && goal !== start) return null;
+  let end = goal;
+  if (fromOf(goal) < 0 && goal !== start) { if (!near || best === start) return null; end = best; }
   const path = [];
-  for (let k = goal; k !== start && k >= 0; k = fromOf(k)) path.push(k);
+  for (let k = end; k !== start && k >= 0; k = fromOf(k)) path.push(k);
   return path.reverse();
 }
 
@@ -531,13 +535,14 @@ function turnTo(p, a, rate, dt) {
 // He asked (Esports TV): bots stared at walls while holding, then snapped round at contact. The angle worth holding
 // toward pt: pt itself when it can be seen, else the corner it would come round (the furthest point of the way there
 // still in sight), else the nearest way in roughly that way. Worked out at most every 1.2 s per bot.
+const ANGLE_CAP = 2500;
 function angleOn(game, p, pt) {
   if (!pt) return null;
   const ai = p.ai, m = game.map;
   if (los(m, p.x, p.y, pt.x, pt.y)) return pt;
   const key = Math.floor(pt.y / CELL) * m.W + Math.floor(pt.x / CELL);
   if (ai.aoKey === key && game.time < ai.aoT) return ai.ao;
-  const path = findPath(m, Math.floor(p.x / CELL), Math.floor(p.y / CELL), Math.floor(pt.x / CELL), Math.floor(pt.y / CELL), ai.noVault, false, game.side(p) === TEAM.DEF) || [];
+  const path = findPath(m, Math.floor(p.x / CELL), Math.floor(p.y / CELL), Math.floor(pt.x / CELL), Math.floor(pt.y / CELL), ai.noVault, false, game.side(p) === TEAM.DEF, false, ANGLE_CAP, true) || []; // only the first stretch is used, so a capped search does (pro practice was 63% this)
   let best = null;
   for (let i = 0; i < path.length && i < 80; i++) {
     const x = (path[i] % m.W + 0.5) * CELL, y = (Math.floor(path[i] / m.W) + 0.5) * CELL;

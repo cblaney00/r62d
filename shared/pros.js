@@ -78,7 +78,13 @@ function flood(m, starts) {
 // Everything the plans need about one bomb site: its ways in (doors/windows and breakable walls, each with a spot to
 // stack outside and a spot just inside), which way in is closest to the attackers, hatches above it, the rooms
 // round it, and the spots defenders hold.
+// worked out once per map build (a new one each round) and site: the plans and the bots ask for it several times a round
+const INTEL = new WeakMap();
 export function siteIntel(m, si) {
+  let c = INTEL.get(m); if (!c) INTEL.set(m, c = {});
+  return c[si] || (c[si] = siteIntel0(m, si));
+}
+function siteIntel0(m, si) {
   const site = m.sites[si], inSite = inRooms(m, site.rooms), W = m.W;
   const at = k => inSite(k % W, Math.floor(k / W));
   const spawns = (m.atkSpawns || []).map(s => ({ ...s, k: Math.floor(s.y / CELL) * W + Math.floor(s.x / CELL) }));
