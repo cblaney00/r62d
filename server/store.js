@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { OP_LIST, cleanLoadout } from '../shared/operators.js';
+import { OP_LIST, WEAPONS, cleanLoadout, cleanAtt, resolveLoadout } from '../shared/operators.js';
 import { matchXp, levelFor, START_MMR, rankOf, mmrChange } from '../shared/progress.js';
 
 const DIR = process.env.R62D_DATA || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -98,13 +98,18 @@ class Store {
     p.loadouts[op] = cleanLoadout(op, l); this.dirty.add('p');
     return p.loadouts[op];
   }
+  // one gun's attachments for every operator who hasn't ticked "only for this operator" (resolveLoadout)
+  setGun(token, w, a) {
+    const p = this.byToken(token); if (!p || !WEAPONS[w] || !a || typeof a !== 'object') return;
+    (p.guns || (p.guns = {}))[w] = cleanAtt(w, a); this.dirty.add('p');
+  }
   // per-player settings: key bindings and volumes
   setSettings(token, st) {
     const p = this.byToken(token); if (!p || !st || typeof st !== 'object') return;
     const json = JSON.stringify(st); if (json.length > 8000) return;
     p.settings = JSON.parse(json); this.dirty.add('p');
   }
-  loadout(token, op) { const p = this.byToken(token); return cleanLoadout(op, p && p.loadouts[op]); }
+  loadout(token, op) { const p = this.byToken(token); return resolveLoadout(op, p && p.loadouts[op], p && p.guns); }
 
   // A finished match: add it to history and to each player's lifetime stats.
   recordMatch(m) {
@@ -146,4 +151,4 @@ store.saveBug = rec => {
   try { fs.mkdirSync(path.join(DIR, 'bugs'), { recursive: true }); fs.writeFileSync(path.join(DIR, 'bugs', id + '.json'), JSON.stringify(rec, null, 1)); } catch (e) { console.log('could not save bug', e.message); }
   return id;
 };
-export const publicProfile = p => p && ({ id: p.id, name: p.name, created: p.created, lastSeen: p.lastSeen, loadouts: p.loadouts, stats: p.stats, settings: p.settings || null, xp: p.xp || 0, level: levelFor(p.xp || 0), mmr: p.mmr ?? START_MMR, rank: rankOf(p.mmr ?? START_MMR) });
+export const publicProfile = p => p && ({ id: p.id, name: p.name, created: p.created, lastSeen: p.lastSeen, loadouts: p.loadouts, guns: p.guns || {}, stats: p.stats, settings: p.settings || null, xp: p.xp || 0, level: levelFor(p.xp || 0), mmr: p.mmr ?? START_MMR, rank: rankOf(p.mmr ?? START_MMR) });

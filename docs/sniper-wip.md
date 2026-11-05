@@ -1,44 +1,24 @@
-# Long view + sniper scope: work in progress (paused 2026-11-04)
+# Paused 2026-11-04 (second session): items 1-4 of his list
 
-The to-do item (first in "To do" in r6-todo.md, not ticked yet):
-zoom right out when looking down a sightline more than 1.5x the normal range; a sniper scope for slow marksman
-rifles whose reticle snaps to the orange mark; Shift slows the sensitivity (a Settings slider) and steadies the aim fast
-enough for quickscopes.
+His answers: scope = detailed reticle, view round the lens blurred + dimmed but movement shows; Shift steadies for as
+long as held (like the AWP). Reach ring: a faint ring that fades in only near the limit. Loadouts: attachments shared
+per gun, a tick "Only for <operator>" keeps one operator's own. TV: more wide map shots with both teams' sight in their
+colours, on the floor where the action is (not always the bomb's floor).
 
-## His answers
-- Scope look: a detailed sniper reticle; the rest of your view is **blurred and dimmed**, but movement must still
-  show (like peripheral vision) so you can unscope when someone comes close.
-- Shift steadies **for as long as you hold it**, no breath limit (he said: like the AWP in CS2).
+## In the code (tests pass: attachments, aim, weapons, sharedguns) but NOT yet played or screenshotted
+- Item 1 sniper/long view: everything from before plus Settings slider `steadySens` (Mouse & Aim), `#scopeVeil`
+  (backdrop blur + dim with a clear lens, `scopeVeil()` in main.js, plain wash on Low), sniper reticle in `sightLook`,
+  normal crosshair hidden when scoped (`me.at` > 0.6). Sniper `ads` 1.3; tests/attachments.js allows its pin-point spread.
+- Item 2 reach circle: `AIM_REACH`/`aimReach` in shared/operators.js (metres: hip 18 … scope 34, sniper 48),
+  `reachOf` in main.js replaces `FIT_H`; view grows to fit the circle; crosshair glides back in when the reach shrinks;
+  faint dashed ring past 82% of reach (in `crosshair()`). Armory uses the same `aimReach`.
+- Item 3 shared guns: `resolveLoadout(op, l, guns)` + `own` in `cleanLoadout` (shared/operators.js), `store.setGun`,
+  profile `guns`, `loadout` message may carry `gun: {w, a}`, ops.js tick box `.attown`. `node tests/sharedguns.js`.
 
-## Done (in the code, not yet played)
-- `shared/operators.js`: new sight `sniper` in `ATTACH.sight` ("Sniper Scope": adsSpread 0.45, ads 1.35, hip 1.35,
-  zoom 1); `attachFor` offers it only on DMRs with rpm ≤ 300 (Longbow, Pike); `ADS_START.sniper` 10 m.
-- `public/js/gunart.js`: side-view picture of the sniper scope.
-- `public/js/main.js`:
-  - `scopeOn(me)` / `sniperOn(me)` replace the old `includes('scope')` checks; `FIT_H` gives the sniper `LONG_H`.
-  - Long view: `LONG_H` 1500 world px tall, `LONG_R` 2400 px. Camera: `st.farS` now casts to `LONG_R`; `st.longV` is on
-    when `farS` > 1.5x `norm` (off below 1.3x; `norm` = what a 470-tall view reaches that way, at least 560 px), or
-    while aimed in with the sniper scope. Then `want` may go up to `LONG_H`, Crosshair-mode `capH` too, and the body
-    viewer's `range` is `LONG_R` instead of 1100.
-  - `adsReset`: with the sniper the crosshair jumps to the end of your sightline (`q.see`, where the tick/orange mark sits).
-  - `steadying()` (sniper, aiming in, walk or sprint key held) and `scopeSway(dt, me, now)` (called before `sendInput`):
-    a figure-of-eight sway of the real aim (0.011 rad, more when moving), steadied to 0.0008 within ~0.1 s.
-    Steadying also blocks sprint and the sprint+W turn, and multiplies the mouse sensitivity by `steadySens`.
-  - The `steadySens` slider does not exist yet: the code falls back to 0.5 when it is missing.
-- `public/js/armory.js`: `scoped()` counts the sniper too.
-
-## Still to do
-1. Settings slider `steadySens` (Settings → Mouse & Aim, "Steady aim sensitivity", 10–100, default 50, shown as ×):
-   index.html row next to `adsSens`; add to `showSens`, the `r62d-sens` localStorage, the profile `settings`
-   (save + load list), and the number-box `DIV` table.
-2. The scope look: a `#scopeVeil` div between `#fog` and `#over` (backdrop-filter blur + darken, a radial mask with a
-   clear lens round the reticle, CSS vars set only when they move ≥1 px; plain dark wash on Low graphics), shown only
-   while scoped with the sniper. A detailed reticle in `sightLook` ('sniper': fine lines, mil-dots, thick posts, lens
-   ring); hide the normal crosshair when `me.at` > 0.6. Warning: CLAUDE.md lessons say GPU Firefox can lag on new
-   effects, so he must try it on his screen.
-3. `node tests/attachments.js` fails: Pike + match + pad + sniper gives ads 1.60 (just over the test's limit). Lower the
-   sniper's `ads` to ~1.3 or let the test allow it.
-4. Run `node tests/aim.js`, `node tests/weapons.js`, a screenshot (tests/shoot.mjs) of the long view and the scope,
-   then let him play it (Free Play, Longbow or Pike with the Sniper Scope).
-5. Tick the item in r6-todo.md (move to Done with a short plain description), update CLAUDE.md, commit,
-   then run `vibenote --collect-usage` (he asked for that when everything is done).
+## Left to do
+1. Item 4 (TV, public/js/tv.js `tvDirector` + main.js TV overview at ~line 1540 `st.tvOv`): cut to `T.overview`
+   more often (both teams' vision already drawn there), pick the floor with the most action/players instead of the
+   bomb's floor.
+2. Screenshot the long view, scope and reach ring (tests/shoot.mjs), check the Operators page tick box, then let him
+   play (Free Play, Longbow or Pike + Sniper Scope). GPU Firefox may lag on the blur: he must try it.
+3. Tick items in r6-todo.md, update CLAUDE.md, commit, run `vibenote --collect-usage`.

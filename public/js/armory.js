@@ -6,7 +6,7 @@
 import { PX_PER_M } from '/shared/constants.js';
 import { drawXhair } from './crosshair.js';
 import { lockMouse } from './keys.js';
-import { WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
+import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -154,11 +154,11 @@ function tick(el, dt) {
 
 // world: shooter at (0, 0), dummies straight ahead (up the screen), in the same pixels as a match.
 // The camera works like a match's: the room-size view, sliding ahead down the lane, widening when you aim in (2x scope
-// most) and growing / sliding to keep you and the crosshair on screen (main.js camera, FIT_H, keep).
+// most) and growing / sliding to keep you and the crosshair on screen (main.js camera, reach circle, keep).
 const ROOM_W = 330; // the range is this wide either side of you
 const farEnd = () => S.dist * M + 60; // the backstop
 const scoped = () => /scope|sniper/.test(String(attOf(S.w).sight || ''));
-const fitCap = () => S.mouse.r ? (scoped() ? 1000 : 820) : 700;
+const reach = () => aimReach(attOf(S.w).sight, !!S.mouse.r) * PX_PER_M; // the match's circle of reach (main.js reachOf)
 const aimMin = () => 46 * O.dpr() / (S.z || 1), aimMax = () => S.reachW || 400;
 function adsAim() { const l = Math.hypot(S.aim.x, S.aim.y) || 1, d = adsStart(attOf(S.w).sight) * M; S.aim = { x: S.aim.x / l * d, y: S.aim.y / l * d }; } // per sight, as in a match
 function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): sideways turns as if never past TURN_R
@@ -192,8 +192,8 @@ function camera(cv, dt) {
   S.adsZ += ((S.mouse.r ? (scoped() ? 1.3 : 1.12) : 1) - S.adsZ) * (1 - Math.exp(-dt * 18));
   let vh = S.envH * S.adsZ;
   if (O.mode() !== 'cursor') {
-    const cap = fitCap(), need = Math.min(cap, (q.d + mg) / (2 * e));
-    S.reachW = Math.max(160, cap * 2 * e - mg);
+    S.reachW = reach();
+    const cap = S.reachW + mg, need = Math.min(cap, (q.d + mg) / (2 * e));
     S.fitH = S.fitH ? S.fitH + (need - S.fitH) * (1 - Math.exp(-dt * 8)) : need;
     vh = Math.max(vh, S.fitH);
   }

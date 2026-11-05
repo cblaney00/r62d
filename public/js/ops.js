@@ -1,6 +1,6 @@
 // The Operators page: who each operator is, their gear choices (saved per player), and your stats with them.
 import { RIOT } from '/shared/operators.js';
-import { OPERATORS, WEAPONS, GADGETS, LOADOUTS, GADGET_COUNT, BIOS, JOBS, cleanLoadout, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, LOADOUTS, GADGET_COUNT, BIOS, JOBS, resolveLoadout, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import { shade } from './textures.js';
@@ -32,7 +32,7 @@ export function showLoadout(d, { profile, send, op }) {
   fillDetail(d, op, panel, true);
 }
 
-function loadoutOf(op) { return cleanLoadout(op, state.profile && state.profile.loadouts && state.profile.loadouts[op]); }
+function loadoutOf(op) { return resolveLoadout(op, state.profile && state.profile.loadouts && state.profile.loadouts[op], state.profile && state.profile.guns); }
 
 function render(el) {
   // laid out the way you meet them in a match (he asked): attack or defence, then each role with its operators
@@ -81,7 +81,8 @@ function fillDetail(d, k, anim, compact, force) {
     const a = cleanAtt(w, cur.att[w], k), opts = attachFor(w);
     return `<div class="atts" data-slot="${slot}"><div class="atthead">${WEAPONS[w].name} attachments</div>` + ATTACH_SLOTS.map(([s, label]) => `<div class="attrow"><span>${label}</span>` +
       opts[s].map(v => `<button class="att ${a[s] === v ? 'on' : ''}" data-w="${w}" data-s="${s}" data-v="${v}" title="${ATTACH[s][v].desc}">${ATTACH[s][v].short}</button>`).join('') +
-      `<em>${ATTACH[s][a[s]].desc}</em></div>`).join('') + '</div>';
+      `<em>${ATTACH[s][a[s]].desc}</em></div>`).join('') +
+      `<label class="attown"><input type="checkbox" data-w="${w}" ${cur.own[w] ? 'checked' : ''}><b>Only for ${o.name}</b><small>${cur.own[w] ? `${o.name} keeps this setup; other operators use your shared one` : `These attachments are used on the ${WEAPONS[w].name} for every operator`}</small></label></div>`;
   };
   const gadgetCard = g => `<button class="wcard g ${cur.gadget === g ? 'on' : ''}" data-slot="gadget" data-v="${g}">
       <div class="wn">${GADGETS[g].name}<small>×${GADGET_COUNT[g]}</small></div><p>${GADGET_DESC[g]}</p></button>`;
@@ -103,16 +104,23 @@ function fillDetail(d, k, anim, compact, force) {
     <h3>GADGET</h3><div class="cards">${L.gadgets.map(gadgetCard).join('')}</div>
     <p class="hint">Your choices are saved to your profile and used every time you pick ${o.name}.</p>`;
   d.scrollTop = keepScroll;
-  const save = l => {
-    if (state.profile) { state.profile.loadouts = { ...state.profile.loadouts, [k]: l }; }
-    if (state.send) state.send({ t: 'loadout', op: k, l });
+  const save = (l, gun) => {
+    if (state.profile) { state.profile.loadouts = { ...state.profile.loadouts, [k]: l }; if (gun) state.profile.guns = { ...state.profile.guns, [gun.w]: gun.a }; }
+    if (state.send) state.send({ t: 'loadout', op: k, l, gun });
     refresh();
   };
-  const bindAtts = root => { for (const b of root.querySelectorAll('.att')) b.onclick = () => {
-    const l = loadoutOf(k), w = b.dataset.w;
-    l.att = { ...l.att, [w]: { ...cleanAtt(w, l.att[w], k), [b.dataset.s]: b.dataset.v } };
-    save(l);
-  }; };
+  const bindAtts = root => {
+    for (const b of root.querySelectorAll('.att')) b.onclick = () => {
+      const l = loadoutOf(k), w = b.dataset.w, a = { ...cleanAtt(w, l.att[w], k), [b.dataset.s]: b.dataset.v };
+      if (l.own[w]) { l.att = { ...l.att, [w]: a }; save(l); } else save(l, { w, a }); // ticked: this operator only; else every operator's
+    };
+    for (const c of root.querySelectorAll('.attown input')) c.onchange = () => {
+      const l = loadoutOf(k), w = c.dataset.w, a = cleanAtt(w, l.att[w], k);
+      l.own = { ...l.own, [w]: c.checked };
+      if (c.checked) { l.att = { ...l.att, [w]: a }; save(l); } // starts from the setup it had
+      else save(l, state.profile && state.profile.guns && state.profile.guns[w] ? null : { w, a }); // first shared set for this gun: this one
+    };
+  };
   const pics = {}; // gun picture per card, redrawn only when that gun's attachments change
   const drawPics = () => { for (const p of d.querySelectorAll('.wpic')) {
     const w = p.dataset.w, a = WEAPONS[w] ? cleanAtt(w, cur.att[w], k) : null, key = JSON.stringify(a);

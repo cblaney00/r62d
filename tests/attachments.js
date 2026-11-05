@@ -21,7 +21,8 @@ for (const w of Object.keys(WEAPONS)) {
   }
   for (const b of opts.barrel) for (const g of opts.grip) for (const s of opts.sight) {
     const m = gunMods(w, { barrel: b, grip: g, sight: s });
-    if (m.ads < 0.6 || m.ads > 1.6 || m.kick < 0.6 || m.sway < 0.35 || m.hip < 0.5 || m.adsSpread < 0.5 || m.range > 1.35 || m.dmg < 0.85)
+    const sn = s === 'sniper'; // the sniper scope is meant to be pin-point (and slow to aim in)
+    if (m.ads < 0.6 || m.ads > 1.6 || m.kick < 0.6 || m.sway < 0.35 || m.hip < 0.5 || m.adsSpread < (sn ? 0.35 : 0.5) || m.range > 1.35 || m.dmg < 0.85)
       bad(`${w} ${b}/${g}/${s}: out of range ${JSON.stringify(m)}`);
   }
 }

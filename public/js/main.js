@@ -5,7 +5,7 @@ import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './ping
 import { parseCommand } from '/shared/commands.js';
 import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { S, setMapScale } from './textures.js';
@@ -148,7 +148,8 @@ const AHEAD = () => Math.max(36 * DPR, VH * 0.13); // screen room always left be
 const AIM_MIN = () => 46 * DPR / (st.zoom || 1), AIM_MAX = () => st.reachW || 400;
 // how far a view can grow to fit you and your crosshair: further when aiming in, furthest with a 2x scope
 const scopeOn = me => !!me && /scope|sniper/.test(String(me.aa || '')), sniperOn = me => !!me && String(me.aa || '').includes('sniper');
-const FIT_H = me => me && me.ad ? (sniperOn(me) ? LONG_H : scopeOn(me) ? 1000 : 820) : 700;
+// the crosshair's reach: a circle round you (AIM_REACH), its size set by your sight while aiming in
+const reachOf = (me, ads) => aimReach(me && me.aa ? attFromCode(me.aa).sight : 'iron', ads ?? !!(me && me.ad)) * PX_PER_M;
 // Long sightlines (he asked): looking down a line more than 1.5x the normal range, the view opens right out the way you
 // face, up to LONG_H world px tall, and you see out to LONG_R. The sniper scope always gets that view while aimed in.
 const LONG_H = 1500, LONG_R = 2400;
@@ -170,9 +171,9 @@ function freeMove(dx, dy) {
 function adsReset() {
   const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l, d = st.me && st.me.aa ? adsStart(attFromCode(st.me.aa).sight) * PX_PER_M : ADS_DIST;
   if (sniperOn(st.me)) { // sniper scope (he asked): the reticle snaps out to the mark at the end of your sightline
-    const keep = st.reachW; st.reachW = Math.max(keep || 0, LONG_R); aimOff = { x: ux * LONG_R, y: uy * LONG_R };
+    const R = reachOf(st.me, true), keep = st.reachW; st.reachW = R; aimOff = { x: ux * R, y: uy * R };
     const q = freeAimPoint(); st.reachW = keep;
-    const to = Math.max(AIM_MIN(), q.see - 2); aimOff = { x: ux * to, y: uy * to }; return;
+    const to = Math.max(AIM_MIN(), Math.min(R, q.see - 2)); aimOff = { x: ux * to, y: uy * to }; return;
   }
   const far = Math.max(l, d); aimOff = { x: ux * far, y: uy * far };
   const q = freeAimPoint(), to = q.stopped ? Math.max(AIM_MIN(), q.see) : d;
@@ -783,7 +784,7 @@ cv.addEventListener('mousemove', e => {
   if (st.mapV) { const V = st.mapV, c = 1.15 * DPR; V.cx = Math.max(0, Math.min(VW, V.cx + e.movementX * c)); V.cy = Math.max(0, Math.min(VH, V.cy + e.movementY * c)); return; }
   if (document.pointerLockElement === cv) {
     const ads = mouse.r && st.me && st.me.a && st.me.ct === 'body';
-    const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * (steadying() ? ($('steadySens') ? $('steadySens').value / 100 : 0.5) : 1) * DPR;
+    const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1) * DPR;
     if (padOn && aimMode === 'free') { freeMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'pad') { padMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'face') { faceMove(e.movementX * k, e.movementY * k, ads); return; }
@@ -1595,13 +1596,14 @@ function frame(nowMs) {
   st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18));
   st.viewH = st.envH * st.adsZ;
   // Crosshair mode: the crosshair can go anywhere you can see; if you and it don't fit on screen, the view grows
-  // (up to FIT_H) and st.reachW is how far it can go in the way you face at the largest view
+  // to hold it, and st.reachW (a circle round you, reachOf) is how far it can go
   const freeAim = !st.tv && view && view.kind === 'body' && padOn && aimMode === 'free' && !gpRecent();
   if (freeAim) {
     const q = freeAimPoint(), cA = Math.abs(Math.cos(st.aim)), sA = Math.abs(Math.sin(st.aim));
     const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), mg = (50 * DPR + AHEAD()) / (st.zoom || 1);
-    const capH = Math.max(FIT_H(me), st.longV ? LONG_H : 0), need = Math.min(capH, (q.ad + mg) / (2 * e));
-    st.reachW = Math.max(160, capH * 2 * e - mg);
+    st.reachW = reachOf(me);
+    { const l = Math.hypot(aimOff.x, aimOff.y); if (l > st.reachW) { const k = (st.reachW + (l - st.reachW) * Math.exp(-dt * 10)) / l; aimOff = { x: aimOff.x * k, y: aimOff.y * k }; } } // stopped aiming in: it glides back inside
+    const capH = Math.max(st.longV ? LONG_H : 0, st.reachW + mg), need = Math.min(capH, (q.ad + mg) / (2 * e)); // (tall enough to reach it straight up)
     st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need;
     st.viewH = Math.max(st.viewH, st.fitH);
   } else st.fitH = 0;
@@ -2430,6 +2432,20 @@ function sightLook(sight, x, y, k) {
     ctx.strokeStyle = `rgba(255,170,60,${0.6 * k})`; ctx.lineWidth = 1.6 * d;
     ctx.beginPath(); ctx.moveTo(x - 7 * d, y + 20 * d); ctx.lineTo(x, y + 13 * d); ctx.lineTo(x + 7 * d, y + 20 * d); ctx.stroke();
     ctx.strokeStyle = `rgba(255,170,60,${0.16 * k})`; ctx.lineWidth = d; ctx.beginPath(); ctx.arc(x, y, 44 * d, 0, 7); ctx.stroke();
+  } else if (sight === 'sniper') { // a proper sniper reticle: fine cross with mil-dots, thick posts, the lens ring
+    const R = scopeLensR(), a = k;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = `rgba(0,0,0,${0.85 * a})`; ctx.lineWidth = 3 * d; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.stroke(); // lens edge
+    ctx.strokeStyle = `rgba(160,190,210,${0.25 * a})`; ctx.lineWidth = d; ctx.beginPath(); ctx.arc(x, y, R - 3 * d, 0, 7); ctx.stroke();
+    const gap = R * 0.45, fine = R * 0.06;
+    ctx.strokeStyle = `rgba(0,0,0,${0.9 * a})`; ctx.lineWidth = 4.5 * d; // posts from the edge in
+    for (const [ux, uy] of [[1, 0], [-1, 0], [0, 1]]) { ctx.beginPath(); ctx.moveTo(x + ux * (R - 2 * d), y + uy * (R - 2 * d)); ctx.lineTo(x + ux * gap, y + uy * gap); ctx.stroke(); }
+    ctx.lineWidth = 1.1 * d; ctx.beginPath(); // the fine cross
+    ctx.moveTo(x - gap, y); ctx.lineTo(x - fine, y); ctx.moveTo(x + fine, y); ctx.lineTo(x + gap, y);
+    ctx.moveTo(x, y - R + 2 * d); ctx.lineTo(x, y - fine); ctx.moveTo(x, y + fine); ctx.lineTo(x, y + gap); ctx.stroke();
+    ctx.fillStyle = `rgba(0,0,0,${0.9 * a})`; // mil-dots
+    for (let i = 1; i <= 4; i++) { const o = fine + (gap - fine) * i / 4.5; for (const [px, py] of [[o, 0], [-o, 0], [0, o], [0, -o]]) { ctx.beginPath(); ctx.arc(x + px, y + py, 1.6 * d, 0, 7); ctx.fill(); } }
+    ctx.fillStyle = `rgba(255,70,50,${0.95 * a})`; ctx.beginPath(); ctx.arc(x, y, 1.4 * d, 0, 7); ctx.fill(); // the lit centre
   } else if (sight === 'scope') { // a lens: the screen edges darken a little, range ticks beside the crosshair
     const r = Math.hypot(W, H) / 2, g = ctx.createRadialGradient(W / 2, H / 2, r * 0.55, W / 2, H / 2, r);
     g.addColorStop(0, 'rgba(0,8,14,0)'); g.addColorStop(1, `rgba(0,8,14,${0.42 * k})`);
@@ -2438,6 +2454,17 @@ function sightLook(sight, x, y, k) {
     for (const sgn of [-1, 1]) for (let i = 1; i <= 3; i++) { const o = (26 + i * 9) * d; ctx.beginPath(); ctx.moveTo(x + sgn * o, y - 3 * d); ctx.lineTo(x + sgn * o, y + 3 * d); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x - 3 * d, y + o); ctx.lineTo(x + 3 * d, y + o); ctx.stroke(); }
   }
   ctx.restore();
+}
+// the sniper's clear lens, in canvas px, and the blurred, dimmed view round it (#scopeVeil; its CSS only changes when it
+// moves a pixel, so the browser isn't asked to redo the blur's mask every frame for nothing)
+const scopeLensR = () => Math.min(VW, VH) * 0.3;
+function scopeVeil(p) {
+  const el = $('scopeVeil');
+  if (!p || st.tv) { setCls(el, 'hidden', true); st.veilK = ''; return; }
+  setCls(el, 'hidden', false); setCls(el, 'flat', gfxLevel() === 'low');
+  const k = Math.round(p.x / DPR) + ',' + Math.round(p.y / DPR) + ',' + Math.round(scopeLensR() / DPR);
+  if (st.veilK === k) return; st.veilK = k;
+  el.style.setProperty('--sx', Math.round(p.x / DPR) + 'px'); el.style.setProperty('--sy', Math.round(p.y / DPR) + 'px'); el.style.setProperty('--sr', Math.round(scopeLensR() / DPR) + 'px');
 }
 function drawWheelNow() { if (st.wheel) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); drawWheel(ctx, st.wheel, DPR); ctx.restore(); } }
 function crosshair(me, now) {
@@ -2468,6 +2495,7 @@ function crosshair(me, now) {
     ctx.beginPath(); ctx.moveTo(6 * DPR, 0); ctx.lineTo(-3 * DPR, -5 * DPR); ctx.lineTo(-1 * DPR, 0); ctx.lineTo(-3 * DPR, 5 * DPR); ctx.closePath(); ctx.stroke(); ctx.fill(); ctx.restore();
   }
   if (me.at > 0.05 && me.ct === 'body' && fxOn('sight')) sightLook(attFromCode(me.aa).sight, x, y, Math.min(1, me.at));
+  scopeVeil(me.at > 0.3 && me.ct === 'body' && sniperOn(me) ? { x, y } : null);
   if (me.ad && st.heads) for (const h of st.heads) {
     const H = w2s(h.x, h.y), r = Math.max(2.5 * DPR, HEAD_AIM * (st.zoom || 1)), on = Math.hypot(x - H.x, y - H.y) <= r;
     ctx.lineWidth = (on ? 2 : 1.2) * DPR;
@@ -2482,9 +2510,13 @@ function crosshair(me, now) {
     ctx.beginPath(); ctx.arc(px, py, R, ca - FACE_ADS, ca + FACE_ADS); ctx.stroke();
     for (const e of [ca - FACE_ADS, ca + FACE_ADS]) { const q = 7 * DPR; ctx.beginPath(); ctx.moveTo(px + Math.cos(e) * (R - q), py + Math.sin(e) * (R - q)); ctx.lineTo(px + Math.cos(e) * (R + q), py + Math.sin(e) * (R + q)); ctx.stroke(); }
   }
+  if (fq && st.reachW) { // near the edge of your reach (he chose): a faint ring round you fades in
+    const R = st.reachW * (st.zoom || 1), f = Math.max(0, Math.min(1, (Math.hypot(aimOff.x, aimOff.y) / st.reachW - 0.82) / 0.16));
+    if (f > 0) { ctx.save(); ctx.globalAlpha = f * 0.35; ctx.strokeStyle = '#fff'; ctx.lineWidth = DPR; ctx.setLineDash([6 * DPR, 6 * DPR]); ctx.beginPath(); ctx.arc(px, py, R, 0, 7); ctx.stroke(); ctx.restore(); }
+  }
   if (me.mv === 3) ctx.globalAlpha = 0.3; // sprinting: gun down
   else if (fq && fq.stopped) ctx.globalAlpha = 0.45; // bullets stop at a wall before it: faded
-  drawXhair(ctx, x, y, xh, spread, DPR);
+  if (!(sniperOn(me) && me.at > 0.6 && me.ct === 'body')) drawXhair(ctx, x, y, xh, spread, DPR); // (the sniper reticle takes over)
   ctx.globalAlpha = 1;
   // points popups under the crosshair (he asked, R6-style): newest at the top, each fades after a couple of seconds
   if (st.ptsPops && st.ptsPops.length && fxOn('pts')) {
@@ -3308,8 +3340,8 @@ window.__r62d = { PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
-  try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode };
+  try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value, +$('steadySens').value])); } catch {}
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, aim: aimMode, aimV: 2, xh, lean: leanMode };
 }
 let saveTimer = 0;
 function saveSettings() {
@@ -3318,7 +3350,7 @@ function saveSettings() {
 }
 function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else if (s.binds && s.bindsVersion === 4) { applyBinds(s.binds, 4); setTimeout(saveSettings, 500); } else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
-  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
+  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens', 'steadySens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.xh) setXhair(s.xh, false);
   if (s.lean) setLean(s.lean, false);
@@ -3343,13 +3375,13 @@ document.addEventListener('pointerlockchange', () => {
 // let go of the mouse whenever a menu is open or the match is over
 setInterval(() => { if (document.pointerLockElement && document.pointerLockElement !== $('armCanvas') && (menuOpen() || !playing())) document.exitPointerLock(); }, 150);
 $('pResume').addEventListener('click', () => { if (playing() && !isTouch && !st.tv) lockMouse(cv); }); // TV: nothing to aim, keep the mouse free // a phone has no mouse to capture (asking anyway re-opened this menu)
-const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; };
-for (const id of ['sens', 'adsSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
-try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; } } catch {}
+const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; $('steadySensVal').textContent = ($('steadySens').value / 100).toFixed(2) + '×'; };
+for (const id of ['sens', 'adsSens', 'steadySens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
+try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; if (v[2]) $('steadySens').value = v[2]; } } catch {}
 showSens();
 // Every slider in Settings also has a box to type the number into (he asked). It shows the number the way the
 // slider's label did (sensitivity as 1.00, not 100) and keeps up when settings are loaded from the profile.
-{ const DIV = { sens: 100, adsSens: 100 }, rows = [];
+{ const DIV = { sens: 100, adsSens: 100, steadySens: 100 }, rows = [];
   for (const r of $('settings').querySelectorAll('input[type=range]')) {
     const div = DIV[r.id] || 1, lab = $(r.id + 'Val') || $(r.id + 'V'), n = document.createElement('input'), unit = document.createElement('span');
     n.type = 'number'; n.className = 'num'; n.min = r.min / div; n.max = r.max / div; n.step = (+r.step || 1) / div;

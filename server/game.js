@@ -226,6 +226,7 @@ export class Game {
     else if (m.t === 'chat') { this.chat(p, { text: m.text, team: m.team }); if (m.team) botHear(this, p, String(m.text || '').slice(0, 140)); } // bots take directions and questions, typed or spoken
     else if (m.t === 'loadout') {
       const l = store.setLoadout(p.token, m.op, m.l);
+      if (m.gun) store.setGun(p.token, m.gun.w, m.gun.a); // a shared gun setup changed
       const prof = store.byToken(p.token);
       if (prof) p.sock.send(JSON.stringify({ t: 'profile', profile: publicProfile(prof) }));
     }

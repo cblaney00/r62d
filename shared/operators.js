@@ -332,8 +332,11 @@ export function defaultLoadout(op) {
 export function cleanLoadout(op, l) {
   const L = LOADOUTS[op], d = defaultLoadout(op);
   if (!L || !l || typeof l !== 'object') return { ...d, att: {} };
-  const att = {};
-  for (const w of [...L.primaries, ...L.secondaries]) if (WEAPONS[w] && l.att && l.att[w]) att[w] = cleanAtt(w, l.att[w]);
+  const att = {}, own = {};
+  for (const w of [...L.primaries, ...L.secondaries]) if (WEAPONS[w]) {
+    if (l.att && l.att[w]) att[w] = cleanAtt(w, l.att[w]);
+    if (l.own && l.own[w]) own[w] = true;
+  }
   const primary = L.primaries.includes(l.primary) ? l.primary : d.primary;
   let secondary = L.secondaries.includes(l.secondary) ? l.secondary : d.secondary;
   if (RIOT[primary] && !(WEAPONS[secondary] && WEAPONS[secondary].cls === 'Pistol')) secondary = L.secondaries.find(w => WEAPONS[w].cls === 'Pistol') || secondary; // behind a shield: a pistol
@@ -341,8 +344,16 @@ export function cleanLoadout(op, l) {
     primary,
     secondary,
     gadget: L.gadgets.includes(l.gadget) ? l.gadget : d.gadget,
-    att,
+    att, own,
   };
+}
+// Gun setups are shared (he asked): the attachments you pick for a gun go on that gun for every operator, kept in the
+// profile's `guns`, unless that operator's "only for this operator" tick (`own`) keeps their own set in `att`.
+// Older profiles without a shared set for a gun keep using each operator's own.
+export function resolveLoadout(op, l, guns) {
+  const c = cleanLoadout(op, l);
+  for (const w of [c.primary, c.secondary]) if (WEAPONS[w] && !c.own[w] && guns && guns[w]) c.att[w] = cleanAtt(w, guns[w]);
+  return c;
 }
 
 // ---- roles (he asked: pick a role before each round; it limits you to that role's operators, so new players
@@ -406,7 +417,7 @@ export const ATTACH = {
     scope: { name: '2.0× Scope', short: '2× scope', desc: '+ Very accurate aimed shots, and you see further ahead. − Slowest to aim in, looser hip fire.', adsSpread: 0.7, ads: 1.2, hip: 1.08, zoom: 1 },
     // he asked: a sniper scope for the slow marksman rifles. Aiming in snaps the reticle out to the mark at the end of
     // your sightline, everything round the lens blurs, and holding Shift steadies it (main.js scopeSway)
-    sniper: { name: 'Sniper Scope', short: 'Sniper', desc: '+ Pin-point aimed shots, the view opens right out and the reticle jumps to the end of your sightline; hold Shift to steady it. − Slowest to aim in, wild hip fire, everything round the lens is a blur.', adsSpread: 0.45, ads: 1.35, hip: 1.35, zoom: 1 },
+    sniper: { name: 'Sniper Scope', short: 'Sniper', desc: '+ Pin-point aimed shots, the view opens right out and the reticle jumps to the end of your sightline; hold Shift to steady it. − Slowest to aim in, wild hip fire, everything round the lens is a blur.', adsSpread: 0.45, ads: 1.3, hip: 1.35, zoom: 1 },
   },
 };
 export const ATTACH_SLOTS = [['barrel', 'Barrel'], ['grip', 'Grip'], ['sight', 'Sight']];
@@ -472,6 +483,10 @@ export function gunMods(w, a) {
 // how far out (metres) aiming in puts the crosshair, per sight (he asked: a red dot should feel different from a 2x)
 export const ADS_START = { iron: 2.5, reddot: 3.5, holo: 3, prism: 5, scope: 6.5, sniper: 10 };
 export const adsStart = sight => ADS_START[sight] || 2.5;
+// how far the crosshair can be pulled out from you, in metres, the same all the way round (he asked: a circle, bigger
+// with a stronger sight). Hip fire has the shortest reach; aiming in uses the sight's.
+export const AIM_REACH = { hip: 18, iron: 20, holo: 21, reddot: 23, prism: 28, scope: 34, sniper: 48 };
+export const aimReach = (sight, ads) => (ads && AIM_REACH[sight]) || AIM_REACH.hip;
 export const attCode = a => [a.barrel, a.grip, a.sight].join(',');
 export const attFromCode = s => { const [barrel, grip, sight] = String(s || '').split(','); return { barrel, grip, sight }; };
 
