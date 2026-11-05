@@ -75,12 +75,14 @@ function api(req, res) {
   // the addresses friends type to join this server (shown in the lobby)
   if (u.pathname === '/api/addr') {
     const urls = [];
-    // OPEN TO LAN (he asked): the home-network address first (cable, then Wi-Fi), the homelab VPN last
-    for (const [dev, list] of Object.entries(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) {
-      const vpn = /^wg|^tun|^tailscale/.test(dev) || a.address.startsWith('10.10.'), wifi = /^wl/.test(dev);
-      urls.push({ url: `http://${a.address}:${PORT}`, vpn, net: vpn ? 'homelab VPN' : wifi ? 'Wi-Fi' : 'cable' });
+    // OPEN TO LAN (he asked: always the right VPN, whatever else he is connected to): read fresh on every ask, so it
+    // follows the VPN going on or off. The homelab VPN (wg-homelab, 10.10.0.x) first whenever it is up, then any other
+    // VPN, then the home network (cable, then Wi-Fi). Virtual networks (containers, virtual machines) are left out.
+    for (const [dev, list] of Object.entries(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal && !/^(docker|br-|veth|virbr|vboxnet|vmnet|lxc|podman|cni)/.test(dev)) {
+      const homelab = dev === 'wg-homelab' || a.address.startsWith('10.10.0.'), vpn = homelab || /^(wg|tun|tap|tailscale|zt|nordlynx|proton|mullvad)/.test(dev), wifi = /^wl/.test(dev);
+      urls.push({ url: `http://${a.address}:${PORT}`, vpn, homelab, net: homelab ? 'homelab VPN' : vpn ? `VPN (${dev})` : wifi ? 'Wi-Fi' : 'cable' });
     }
-    const rank = u => (u.vpn ? 2 : u.net === 'Wi-Fi' ? 1 : 0);
+    const rank = u => (u.homelab ? 0 : u.vpn ? 1 : u.net === 'Wi-Fi' ? 3 : 2);
     urls.sort((a, b) => rank(a) - rank(b));
     return json(200, { urls, host: os.hostname(), version: VERSION, port: PORT, players: humans(), local: BIND === '127.0.0.1' });
   }

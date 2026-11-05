@@ -1032,3 +1032,5 @@ html.tv canvas#game { cursor: default; }
 #freeOps .foSlot button { font-size: 12px; padding: 4px 8px; }
 #freeOps .foSlot button.on { border-color: #f2c14e; color: #f2c14e; }
 #freeOps .foSlot em { display: block; font-size: 11px; color: var(--dim); margin-top: 3px; font-style: normal; }
+
+#lanOther .warn { color: #ffcf5a; margin-bottom: 6px; }

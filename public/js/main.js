@@ -1050,8 +1050,8 @@ function renderLobby(s) {
   $('botLevel').classList.toggle('locked', !!s.rk); // ranked: the lobby's rank decides
   { const t = s.rk ? 'RANKED: ON' : 'RANKED: OFF'; if ($('rankedBtn').textContent !== t) { $('rankedBtn').textContent = t; $('rankedBtn').classList.toggle('primary', !!s.rk); } st.rk = !!s.rk; }
   // the address friends type to join (the first network card is the wired one)
-  if (st.addr === undefined || (st.addrT && performance.now() - st.addrT > 15000)) { st.addr = st.addr || null; st.addrT = performance.now(); fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
-  const u = st.addr && !st.addr.local && st.addr.urls[0], jt = !u ? '' : `Friends at home join at ${u.url} · OPEN TO LAN shows a code to scan with a phone`;
+  if (st.addr === undefined || (st.addrT && performance.now() - st.addrT > 3000)) { st.addr = st.addr || null; st.addrT = performance.now(); fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
+  const u = st.addr && !st.addr.local && st.addr.urls[0], jt = !u ? '' : `Friends join at ${u.url}${u.homelab ? ' (homelab VPN)' : ' · homelab VPN off'} · OPEN TO LAN shows a code to scan with a phone`;
   if ($('joinAddr').textContent !== jt) $('joinAddr').textContent = jt;
   for (const b of ['lanBtn', 'pLan']) $(b).classList.toggle('hidden', !!(st.addr && st.addr.local)); // the program's PLAY: this computer only, nobody to invite
   for (const sq of [0, 1]) {
@@ -3224,16 +3224,24 @@ for (const b of $('inputSeg').querySelectorAll('button')) {
   dz.addEventListener('input', () => { setTiltDead(+dz.value); show(); }); }
 // ---- OPEN TO LAN (he asked, like Minecraft): the address and a QR code for phones, and which computer + version this is ----
 const lanText = a => a ? `${a.host} · version ${a.version.id}${a.version.date ? ' (' + a.version.date + ')' : ''}` : '';
-function openLan() {
-  audio.ui('open'); $('lanDlg').classList.remove('hidden');
+// OPEN TO LAN (he asked: always current with the right VPN): the homelab VPN address is the main one (and the code)
+// whenever the VPN is on; the dialog asks again every 2 s while it is open, so turning the VPN on or off shows at once.
+function lanFill() {
   fetch('/api/addr').then(r => r.json()).then(a => {
-    st.addr = a; const lan = a.urls.filter(u => !u.vpn), main = lan[0] || a.urls[0];
-    if (!main) { $('lanUrl').textContent = 'No network found: is this computer connected?'; return; }
+    st.addr = a; const main = a.urls[0], key = a.urls.map(u => u.url).join(' ');
+    if (key === st.lanKey) return; st.lanKey = key;
+    if (!main) { $('lanUrl').textContent = 'No network found: is this computer connected?'; $('lanOther').innerHTML = ''; return; }
     drawQr($('lanQr'), main.url, 7);
-    $('lanUrl').innerHTML = `<b>${esc(main.url)}</b><span>over ${esc(main.net)}</span>`;
-    $('lanOther').innerHTML = a.urls.filter(u => u !== main).map(u => `<div>${esc(u.url)} <span>(${esc(u.net)}${u.vpn ? ', for friends on the VPN' : ''})</span></div>`).join('');
+    const vpnOff = !a.urls.some(u => u.homelab);
+    $('lanUrl').innerHTML = `<b>${esc(main.url)}</b><span>over ${esc(main.net)}${main.homelab ? ': friends on the VPN join here' : ''}</span>`;
+    $('lanOther').innerHTML = (vpnOff ? '<div class="warn">The homelab VPN is off: only people on your home network can join. Turn it on and this updates by itself.</div>' : '')
+      + a.urls.filter(u => u !== main).map(u => `<div>${esc(u.url)} <span>(${esc(u.net)}${u.vpn ? '' : ', people on your home network'})</span></div>`).join('');
     $('lanServer').textContent = 'Running on ' + lanText(a);
-  }).catch(() => { $('lanUrl').textContent = 'Could not reach the game server.'; });
+  }).catch(() => { st.lanKey = null; $('lanUrl').textContent = 'Could not reach the game server.'; });
+}
+function openLan() {
+  audio.ui('open'); $('lanDlg').classList.remove('hidden'); st.lanKey = null; lanFill();
+  clearInterval(st.lanT); st.lanT = setInterval(() => { if ($('lanDlg').classList.contains('hidden')) clearInterval(st.lanT); else lanFill(); }, 2000);
 }
 $('lanBtn').onclick = openLan; $('pLan').onclick = () => { $('pause').classList.add('hidden'); openLan(); };
 $('lanClose').onclick = () => { audio.ui('back'); $('lanDlg').classList.add('hidden'); };
