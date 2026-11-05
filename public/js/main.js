@@ -2442,16 +2442,16 @@ function sightLook(sight, x, y, k) {
   } else if (sight === 'sniper') { // a proper sniper reticle: fine cross with mil-dots, thick posts, the lens ring
     const R = scopeLensR(), a = k;
     ctx.lineCap = 'butt';
-    ctx.strokeStyle = `rgba(0,0,0,${0.85 * a})`; ctx.lineWidth = 3 * d; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.stroke(); // lens edge
+    ctx.strokeStyle = `rgba(0,0,0,${0.85 * a})`; ctx.lineWidth = 2.2 * d; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.stroke(); // lens edge
     ctx.strokeStyle = `rgba(160,190,210,${0.25 * a})`; ctx.lineWidth = d; ctx.beginPath(); ctx.arc(x, y, R - 3 * d, 0, 7); ctx.stroke();
     const gap = R * 0.45, fine = R * 0.06;
-    ctx.strokeStyle = `rgba(0,0,0,${0.9 * a})`; ctx.lineWidth = 4.5 * d; // posts from the edge in
+    ctx.strokeStyle = `rgba(0,0,0,${0.9 * a})`; ctx.lineWidth = 3 * d; // posts from the edge in
     for (const [ux, uy] of [[1, 0], [-1, 0], [0, 1]]) { ctx.beginPath(); ctx.moveTo(x + ux * (R - 2 * d), y + uy * (R - 2 * d)); ctx.lineTo(x + ux * gap, y + uy * gap); ctx.stroke(); }
     ctx.lineWidth = 1.1 * d; ctx.beginPath(); // the fine cross
     ctx.moveTo(x - gap, y); ctx.lineTo(x - fine, y); ctx.moveTo(x + fine, y); ctx.lineTo(x + gap, y);
     ctx.moveTo(x, y - R + 2 * d); ctx.lineTo(x, y - fine); ctx.moveTo(x, y + fine); ctx.lineTo(x, y + gap); ctx.stroke();
     ctx.fillStyle = `rgba(0,0,0,${0.9 * a})`; // mil-dots
-    for (let i = 1; i <= 4; i++) { const o = fine + (gap - fine) * i / 4.5; for (const [px, py] of [[o, 0], [-o, 0], [0, o], [0, -o]]) { ctx.beginPath(); ctx.arc(x + px, y + py, 1.6 * d, 0, 7); ctx.fill(); } }
+    for (let i = 1; i <= 4; i++) { const o = fine + (gap - fine) * i / 4.5; for (const [px, py] of [[o, 0], [-o, 0], [0, o], [0, -o]]) { ctx.beginPath(); ctx.arc(x + px, y + py, 1.2 * d, 0, 7); ctx.fill(); } }
     ctx.fillStyle = `rgba(255,70,50,${0.95 * a})`; ctx.beginPath(); ctx.arc(x, y, 1.4 * d, 0, 7); ctx.fill(); // the lit centre
   } else if (sight === 'scope') { // a lens: the screen edges darken a little, range ticks beside the crosshair
     const r = Math.hypot(W, H) / 2, g = ctx.createRadialGradient(W / 2, H / 2, r * 0.55, W / 2, H / 2, r);
@@ -2464,7 +2464,7 @@ function sightLook(sight, x, y, k) {
 }
 // the sniper's clear lens, in canvas px, and the blurred, dimmed view round it (#scopeVeil; its CSS only changes when it
 // moves a pixel, so the browser isn't asked to redo the blur's mask every frame for nothing)
-const scopeLensR = () => Math.min(VW, VH) * 0.3;
+const scopeLensR = () => Math.min(VW, VH) * 0.1; // he asked for a third of the first size (it was 0.3)
 function scopeVeil(p) {
   const el = $('scopeVeil');
   if (!p || st.tv) { setCls(el, 'hidden', true); st.veilK = ''; return; }

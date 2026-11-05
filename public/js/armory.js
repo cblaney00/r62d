@@ -170,8 +170,9 @@ function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): si
   if (l > hi) l = Math.max(hi, Math.min(l, l0)); else if (l < lo) l = lo;
   S.aim = { x: Math.cos(a) * l, y: Math.sin(a) * l };
 }
-function screenToWorld(cv, x, y) { return { x: (x - cv.width / 2) / S.z + S.cam.x, y: (y - cv.height / 2) / S.z + S.cam.y }; }
-function w2s(cv, x, y) { return { x: (x - S.cam.x) * S.z + cv.width / 2, y: (y - S.cam.y) * S.z + cv.height / 2 }; }
+const CAM0 = { x: 0, y: -150 }; // the first frame works out the aim before the camera has a place
+function screenToWorld(cv, x, y) { const c = S.cam || CAM0, z = S.z || 1; return { x: (x - cv.width / 2) / z + c.x, y: (y - cv.height / 2) / z + c.y }; }
+function w2s(cv, x, y) { const c = S.cam || CAM0; return { x: (x - c.x) * S.z + cv.width / 2, y: (y - c.y) * S.z + cv.height / 2 }; }
 // the point you aim at, held at the range's walls like a wall holds it in a match
 function aimPoint(cv) {
   let x, y;
@@ -198,7 +199,7 @@ function camera(cv, dt) {
     vh = Math.max(vh, S.fitH);
   }
   S.z = H / vh;
-  const reach = vh * 0.5, lead = Math.max(0, Math.min(reach - 70, far - (reach - 40)));
+  const half = vh * 0.5, lead = Math.max(0, Math.min(half - 70, far - (half - 40))); // (not "reach": that name is the reach circle above)
   const lx = q.x * 0.22, ly = q.y * 0.22, ll = Math.hypot(lx, ly), mx = vh * (S.mouse.r ? (scoped() ? 0.46 : 0.32) : 0.2);
   let ax = ll > mx ? lx / ll * mx : lx, ay = ll > mx ? ly / ll * mx : ly;
   if (lead > Math.hypot(ax, ay)) { ax = 0; ay = -lead; }
