@@ -5,7 +5,7 @@ import { Game } from './game.js';
 import { buildMap, MAP_LIST } from '../shared/map.js';
 import { OPERATORS, WEAPONS } from '../shared/operators.js';
 import { PHASE, TEAM } from '../shared/constants.js';
-import { planKey, opKey } from './training.js';
+import { planKey, opKey, gunKey, attKey } from './training.js';
 
 const until = Date.now() + (workerData.minutes || 15) * 60 * 1000, dt = 1 / 30;
 // Gently (he asked: Lando's server sounded like a jet taking off): work DUTY of the time, rest the rest, so practice
@@ -28,11 +28,11 @@ while (Date.now() < until && left > 0) {
     g.tick(dt); t += dt; await breather();
     if (rs) for (const e of g.events) if (e.e === 'kill' && e.killer && e.killer !== e.victim) {
       const k = g.players.get(e.killer), v = g.players.get(e.victim); if (!k || !v || !k.op || g.side(k) === g.side(v)) continue;
-      const a = rs[k.id], b = rs[v.id]; if (a) { a.k++; if (!GUNS.has(e.w)) a.sk++; if (e.hs) a.hs++; if (!rs.first) { rs.first = 1; a.fk++; } } if (b) b.d++;
+      const a = rs[k.id], b = rs[v.id]; if (a) { a.k++; if (a.g2 && e.w === a.g2n) a.k2++; if (!GUNS.has(e.w)) a.sk++; if (e.hs) a.hs++; if (!rs.first) { rs.first = 1; a.fk++; } } if (b) b.d++;
     }
     g.events = [];
     if (g.phase !== last) {
-      if (g.phase === PHASE.PREP) { rs = {}; for (const p of g.players.values()) if (p.op) rs[p.id] = { op: p.op, sq: p.squad, ab: OPERATORS[p.op].ability.count, k: 0, d: 0, sk: 0, hs: 0, fk: 0 }; }
+      if (g.phase === PHASE.PREP) { rs = {}; for (const p of g.players.values()) if (p.op) { const g1 = p.guns[0], g2 = p.guns[1]; rs[p.id] = { op: p.op, sq: p.squad, ab: OPERATORS[p.op].ability.count, k: 0, d: 0, sk: 0, hs: 0, fk: 0, k2: 0, pro: p.pro && p.pro.pl.name, g1: p.riot || (g1 && g1.w), a1: !p.riot && g1 && g1.att, g2: g2 && g2.w, a2: g2 && g2.att, g2n: g2 && WEAPONS[g2.w].name }; } }
       if (g.phase === PHASE.ROUND_END && g.winner !== null && g.winner !== undefined) {
         const res = { plans: {}, ops: {}, rounds: 1 };
         for (const sq of [0, 1]) {
@@ -43,6 +43,17 @@ while (Date.now() < until && left > 0) {
         }
         if (rs) { res.opx = {}; for (const [id, r] of Object.entries(rs)) { if (id === 'first') continue; const p = g.players.get(id), u = p && OPERATORS[r.op].ability.count ? Math.max(0, r.ab - p.abilityCount) : 0;
           const x = res.opx[r.op] || (res.opx[r.op] = [0, 0, 0, 0, 0, 0, 0, 0, 0]); x[0]++; x[8]++; x[1] += g.winner === r.sq ? 1 : 0; x[2] += r.k; x[3] += r.d; x[4] += r.sk; x[5] += u; x[6] += r.hs; x[7] += r.fk; } } // rounds, wins, kills, deaths, skill kills, skill uses, headshots, opening kills, rounds the uses were counted in
+        if (rs) { // guns and attachments (all pros, and per pro): [rounds, wins, kills, deaths]; the main gun gets the kills not made with the sidearm
+          Object.assign(res, { guns: {}, att: {}, pro: {} });
+          const add = (tbl, k, a) => { const x = tbl[k] || (tbl[k] = [0, 0, 0, 0]); a.forEach((v, i) => { x[i] += v; }); };
+          for (const [id, r] of Object.entries(rs)) { if (id === 'first') continue;
+            const win = g.winner === r.sq ? 1 : 0, P = r.pro && (res.pro[r.pro] || (res.pro[r.pro] = { ops: {}, guns: {}, att: {} }));
+            const rec1 = [1, win, r.k - r.k2, r.d], rec2 = [1, win, r.k2, 0];
+            if (P) add(P.ops, r.op, [1, win, r.k, r.d]);
+            for (const [w, a, rec] of [[r.g1, r.a1, rec1], [r.g2, r.a2, rec2]]) if (w) {
+              add(res.guns, gunKey(r.op, w), rec); if (P) add(P.guns, w, rec);
+              if (a) for (const slot of ['barrel', 'grip', 'sight']) { const k = attKey(w, slot, a[slot]); add(res.att, k, rec); if (P) add(P.att, k, rec); }
+            } } }
         rs = null;
         parentPort.postMessage(res); left--;
       }

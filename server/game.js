@@ -4,7 +4,7 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatch
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
-import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick } from './bots.js';
+import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
@@ -447,7 +447,7 @@ export class Game {
   equip(p) {
     const o = OPERATORS[p.op];
     p.alive = true; p.downed = false; p.maxHp = ARMOR_HP[o.armor]; p.hp = p.maxHp;
-    const L = p.bot ? this.botLoadout(p.op) : store.loadout(p.token, p.op);
+    const L = p.bot ? this.botLoadout(p.op, p) : store.loadout(p.token, p.op);
     p.loadout = L; p.gadget = L.gadget;
     p.riot = RIOT[L.primary] ? L.primary : null; p.riotBroken = false; p.riotHp = p.riot ? RIOT[p.riot].hp : 0; // a riot shield as the primary: held up in front, pistol behind it
     p.guns = [p.riot ? null : L.primary, L.secondary].filter(Boolean).map(w => {
@@ -2825,7 +2825,8 @@ export class Game {
   }
   blankMatchStats() { return { score: 0, rounds: 0, roundsWon: 0, kills: 0, deaths: 0, downs: 0, revives: 0, plants: 0, defuses: 0, shots: 0, hits: 0, damage: 0, playSeconds: 0, ops: {} }; }
   opStat(p) { if (!p.ms) p.ms = this.blankMatchStats(); return p.ms.ops[p.op] || (p.ms.ops[p.op] = { rounds: 0, roundsWon: 0, kills: 0, deaths: 0 }); }
-  botLoadout(op) {
+  botLoadout(op, p) {
+    if (p && p.pro) return proLoadout(this, p, op); // the pros: what they found strong in practice
     const L = LOADOUTS[op], pick = a => a.length ? a[Math.floor(Math.random() * a.length)] : null;
     const l = { primary: pick(L.primaries), secondary: pick(L.secondaries), gadget: pick(L.gadgets), att: {} };
     for (const w of [l.primary, l.secondary]) if (w && WEAPONS[w]) { const o = attachFor(w); l.att[w] = { barrel: pick(o.barrel), grip: pick(o.grip), sight: pick(o.sight) }; }

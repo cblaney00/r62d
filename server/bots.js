@@ -7,9 +7,9 @@
 import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
-import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel } from '../shared/pros.js';
-import { planWeight, opWeight } from './training.js';
+import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess } from './training.js';
 import { compose, LINES, FUN, WAYS } from '../shared/comms.js';
 import { parseCommand } from '../shared/commands.js';
 
@@ -1838,7 +1838,7 @@ function proPlan(game, squad, side) {
     const team = PRO_TEAMS[squad], list = playbook(game.map, game.site, side, team);
     if (!list.length) return st;
     const last = (game.proLast || {})[squad]; // don't run the same plan twice in a row after losing with it
-    const w = game.proExplore ? list.map(() => 1) // practice: try everything
+    const w = game.proExplore ? (g => list.map((_, i) => (i === g ? 1 : 0)))(best(list.map(pl => plainGuess(planRecord(game.map.id, game.site, side, pl.id))))) // practice: new plays get tried, strong-looking ones chased
       : list.map((pl, i) => (pl.id === last ? 0.25 : 1) / (1 + i * 0.3) * planWeight(game.map.id, game.site, side, pl.id) ** 2); // the team's style, and what has won in practice
     let r = Math.random() * w.reduce((a, b) => a + b, 0), pick = list[0];
     for (let i = 0; i < list.length; i++) if ((r -= w[i]) <= 0) { pick = list[i]; break; }
@@ -1866,7 +1866,9 @@ export function proPickOp(game, p) {
   const all = opsForTeam(side === 'atk' ? TEAM.ATK : TEAM.DEF).filter(o => jobOf(o) === job), lastOp = (p.pro.lastOps || (p.pro.lastOps = {}))[side];
   const weigh = o => (pl.pool[side].includes(o) ? 2 : 1) * opWeight(game.map.id, side, o) ** 2 * (o === lastOp ? 0.35 : 1);
   const draw = list => { const out = [], left = list.map(o => [o, weigh(o)]); while (left.length) { let r = Math.random() * left.reduce((a, b) => a + b[1], 0), i = 0; while (i < left.length - 1 && (r -= left[i][1]) > 0) i++; out.push(left.splice(i, 1)[0][0]); } return out; };
-  let pool = game.proExplore || game.proAnyOp ? all.sort(() => Math.random() - 0.5) : draw(all); // practice / balance tests: any operator of their job
+  const mine = (training.pro[pl.name] || {}).ops || {};
+  let pool = game.proExplore ? all.map(o => [o, plainGuess(training.ops[opKey(game.map.id, side, o)]) + (recGuess(mine[o]) - 0.5) * 0.5]).sort((a, b) => b[1] - a[1]).map(a => a[0]) // practice: try the unknown, chase what looks strong
+    : game.proAnyOp ? all.sort(() => Math.random() - 0.5) : draw(all); // balance tests: any operator of their job
   if (side === 'atk' && job === 'breach' && j && j.breach != null && !(game.proExplore && Math.random() < 0.5)) pool = draw(pool.filter(o => HARD_BREACH.includes(o))).concat(pool.filter(o => !HARD_BREACH.includes(o))); // the plan opens a wall: a hard breacher, in case it is reinforced
   else if (side === 'atk' && job === 'breach' && j && j.hatch && !game.proExplore) pool.sort((a, b) => HARD_BREACH.includes(a) - HARD_BREACH.includes(b)); // a hatch: a soft one
   const rq = game.tv && game.tv.req && game.tv.req.find(o => all.includes(o)); if (rq) pool = [rq, ...pool.filter(o => o !== rq)]; // ESPORTS TV viewer request: this player plays it
@@ -1878,6 +1880,21 @@ export function proPickOp(game, p) {
     if (at) p.spawn = game.map.atkSpawns.slice().sort((a, b) => Math.hypot(a.x - at.x, a.y - at.y) - Math.hypot(b.x - at.x, b.y - at.y))[0].name;
   }
   return true;
+}
+const best = xs => xs.reduce((bi, x, i) => (x > xs[bi] ? i : bi), 0);
+// A pro's guns and attachments (he asked: they should find what is strong this patch). Every gun the operator has and
+// every attachment that fits gets a guess from practice (all pros' results with it, that player's own counted double);
+// the best guess wins. In practice the guesses are true to the numbers (so little-tried things get their turn); in real
+// matches they are wider, so a pro still varies a bit.
+export function proLoadout(game, p, op) {
+  const L = LOADOUTS[op], me = training.pro[p.pro.pl.name] || {}, spread = game.proExplore ? 1 : 1.6;
+  const pickGun = list => list.length ? list[best(list.map(w => recGuess(blend(training.guns[gunKey(op, w)], (me.guns || {})[w]), spread)))] : null;
+  const l = { primary: pickGun(L.primaries), secondary: pickGun(L.secondaries), gadget: L.gadgets[Math.floor(Math.random() * L.gadgets.length)], att: {} };
+  for (const w of [l.primary, l.secondary]) if (w && WEAPONS[w] && !RIOT[w]) {
+    const ok = attachFor(w), a = l.att[w] = {};
+    for (const slot of ['barrel', 'grip', 'sight']) a[slot] = ok[slot][best(ok[slot].map(c => recGuess(blend(training.att[attKey(w, slot, c)], (me.att || {})[attKey(w, slot, c)]), spread)))];
+  }
+  return cleanLoadout(op, l);
 }
 function proDroneGoal(game, p) { // preparation: find the objective first (nearest sites first), then this player's spot
   const m = game.map, side = proSide(game, p), st = proPlan(game, p.squad, side), j = st.plan && st.plan.jobs[p.pro.pl.jobs.atk];

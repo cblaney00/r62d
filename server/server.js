@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import { attachWebSocket } from './ws.js';
 import { Worker } from 'node:worker_threads';
 import dgram from 'node:dgram';
-import { training, addResults, saveTraining, needsTraining, newVersion, roundsLeft } from './training.js';
+import { training, addResults, saveTraining, needsTraining, newVersion, roundsLeft, playVersion } from './training.js';
 import { Game } from './game.js';
 const perfLog = [];
 import { store, publicProfile } from './store.js';
@@ -89,7 +89,7 @@ function api(req, res) {
     let b = ''; req.on('data', d => { if (b.length < 8000) b += d; }); req.on('end', () => { try { perfLog.push({ ip: req.socket.remoteAddress, ...JSON.parse(b) }); if (perfLog.length > 200) perfLog.shift(); } catch {} json(200, { ok: true }); });
     return;
   }
-  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, running: !!trainer, session: trainer ? trainer.rounds : 0, current: PLAY_VERSION });
+  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, guns: training.guns, att: training.att, pro: training.pro, running: !!trainer, session: trainer ? trainer.rounds : 0, current: PLAY_VERSION });
   if (u.pathname === '/api/train' && req.method === 'POST') { const r = trainCheck(true); return json(200, { running: !!trainer, why: r || '' }); } // TRAIN THE PROS button
   if (u.pathname === '/api/match') { const m = store.match(q('id')); return m ? json(200, m) : json(404, { error: 'no such match' }); }
   if (u.pathname === '/api/players') return json(200, Object.values(store.profiles).map(p => ({ id: p.id, name: p.name, matches: p.stats.matches, wins: p.stats.wins, kills: p.stats.kills, deaths: p.stats.deaths })));
@@ -134,11 +134,7 @@ setInterval(() => {
 // in a background thread while nobody is playing (they stop the moment someone joins a match). No AI service: all here.
 // He asked: practice with each new GAMEPLAY change. The practice version is a fingerprint of the code that plays the
 // matches (server/ and shared/), so a change to menus, pictures or sounds doesn't send the pros back to practice.
-function playVersion() {
-  const h = crypto.createHash('sha1'), walk = d => { for (const f of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (f.name.endsWith('.js')) h.update(f.name).update(fs.readFileSync(p)); } };
-  try { for (const d of ['server', 'shared']) walk(path.join(ROOT, d)); return 'p' + h.digest('hex').slice(0, 7); } catch { return VERSION.id; }
-}
-const PLAY_VERSION = playVersion();
+const PLAY_VERSION = playVersion() || VERSION.id;
 // He asked for it a lot faster and allowed more of the computer: several practice threads at once, each flat out
 // (a quarter of the computer's cores, 1 to 6; R62D_TRAIN_WORKERS changes it). Still only while no match is on.
 const TRAIN_WORKERS = Math.max(1, Math.min(6, Number(process.env.R62D_TRAIN_WORKERS) || Math.floor(os.cpus().length / 4)));

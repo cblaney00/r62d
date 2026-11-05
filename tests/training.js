@@ -9,6 +9,8 @@ const got = await new Promise(res => {
   const w = new Worker(new URL('../server/train-worker.js', import.meta.url), { workerData: { minutes: +(process.argv[2] || 2) } });
   let n = 0; w.on('message', m => { if (m.done) { w.terminate(); res(n); } else { addResults(m); n += m.rounds; } }); w.on('error', e => { bad(e.message); res(n); });
 });
+if (got && !(Object.keys(training.guns).length && Object.keys(training.att).length && Object.keys(training.pro).length)) bad('no gun / attachment / per-pro results');
+else console.log(`${Object.keys(training.guns).length} gun results, ${Object.keys(training.att).length} attachment results, ${Object.keys(training.pro).length} pros: ${Object.keys(training.pro).join(', ')}`);
 const plans = Object.keys(training.plans).length, ops = Object.keys(training.ops).length;
 if (got && !Object.keys(training.opx || {}).length) bad('no per-operator numbers (opx) for BALL KNOWLEDGE'); else console.log('opx sample:', JSON.stringify(Object.entries(training.opx).slice(0, 3)));
 console.log(`${got} practice rounds: ${plans} plan results, ${ops} operator results`);

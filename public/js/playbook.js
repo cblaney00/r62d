@@ -3,7 +3,7 @@
 // drones, holds or roams, and where it ends up, with the team's players and what each one does.
 import { CELL, DUR } from '/shared/constants.js';
 import { MAPS, MAP_LIST, buildMap } from '/shared/map.js';
-import { OPERATORS } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, RIOT, ATTACH, LOADOUTS, JOBS } from '/shared/operators.js';
 import { PRO_TEAMS, playbook, ATK_JOBS, DEF_JOBS, JOB_NAME } from '/shared/pros.js';
 import { MapRenderer } from './mapdraw.js';
 import { drawWebcam } from './webcam.js';
@@ -29,8 +29,9 @@ export function closePlaybook(el) {
 function render(el) {
   const T = PRO_TEAMS[S.team], side = S.side;
   el.querySelector('#pbTeams').innerHTML = PRO_TEAMS.map((t, i) => `<button data-i="${i}" class="${i === S.team ? 'on' : ''}" style="--tc:${t.colour}"><b>[${t.tag}] ${esc(t.name)}</b><span>${esc(t.style)}</span></button>`).join('')
-    + `<h4>Players</h4>` + T.players.map(p => `<div class="pbPlayer"><canvas class="pbCam" width="96" height="72" data-n="[${T.tag}] ${esc(p.name)}"></canvas><b>${esc(p.name)}${p.igl ? ' <em>IGL</em>' : ''}</b><span>${esc(JOB_NAME[p.jobs[side]] || p.jobs[side])}: ${p.pool[side].map(o => esc(OPERATORS[o].name)).join(' / ')} <i>· favourites, plays every ${esc((JOB_NAME[p.jobs[side]] || '').toLowerCase())} operator</i></span><ul>${p.traits.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>`).join('');
+    + `<h4>Players</h4><p class="dim small">Click a player for what they play this patch, and why.</p>` + T.players.map(p => `<div class="pbPlayer${S.openPro === p.name ? ' open' : ''}" data-pro="${esc(p.name)}"><canvas class="pbCam" width="96" height="72" data-n="[${T.tag}] ${esc(p.name)}"></canvas><b>${esc(p.name)}${p.igl ? ' <em>IGL</em>' : ''}</b><span>${esc(JOB_NAME[p.jobs[side]] || p.jobs[side])}: ${p.pool[side].map(o => esc(OPERATORS[o].name)).join(' / ')} <i>· favourites, plays every ${esc((JOB_NAME[p.jobs[side]] || '').toLowerCase())} operator</i></span><ul>${p.traits.map(t => `<li>${esc(t)}</li>`).join('')}</ul>${S.openPro === p.name ? patchCard(p, side) : ''}</div>`).join('');
   for (const c of el.querySelectorAll('.pbCam')) drawWebcam(c, { name: c.dataset.n, pro: true, colour: T.colour }, 1); // the same face as on the broadcast
+  for (const d of el.querySelectorAll('.pbPlayer')) d.onclick = () => { audio.ui(); S.openPro = S.openPro === d.dataset.pro ? null : d.dataset.pro; render(el); };
   for (const b of el.querySelectorAll('#pbTeams button')) b.onclick = () => { audio.ui(); S.team = +b.dataset.i; S.plan = 0; render(el); };
   el.querySelector('#pbMaps').innerHTML = MAP_LIST.map(k => `<button data-id="${k}" class="${k === S.id ? 'on' : ''}">${esc(MAPS[k].name)}</button>`).join('');
   for (const b of el.querySelectorAll('#pbMaps button')) b.onclick = () => { audio.ui(); S.id = b.dataset.id; S.site = 0; S.plan = 0; render(el); };
@@ -60,6 +61,67 @@ function render(el) {
   const wb = el.querySelector('#pbWatch'); if (wb) wb.onclick = () => { audio.ui(); if (S.anim) stopAnim(el); else startAnim(el); };
   draw(el);
 }
+// ---------------- a pro's patch (he asked: what they like to play this patch and why: operators, guns, attachments, tactics) ----------------
+// From practice on this version (server/training.js: pro[name] = { ops, guns, att } as [rounds, wins, kills, deaths],
+// plans per map|site|side|plan). The pros pick by these numbers, so the reasons are the real ones.
+const gunName = w => (WEAPONS[w] && WEAPONS[w].name) || (RIOT[w] && RIOT[w].name) || w;
+const kd = r => r[3] ? r[2] / r[3] : r[2];
+const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+const f1 = x => (Math.round(x * 10) / 10).toFixed(1);
+function patchCard(pl, side) {
+  const P = S.train && S.train.pro && S.train.pro[pl.name];
+  if (!S.train) return '<div class="pbPatch"><p class="dim">Loading practice results…</p></div>';
+  if (!P) return '<div class="pbPatch"><p class="dim">No practice on this patch yet: press TRAIN THE PROS.</p></div>';
+  const job = pl.jobs[side], jobOps = (JOBS[side].find(j => j.id === job) || { ops: [] }).ops;
+  const ops = jobOps.map(o => [o, P.ops[o]]).filter(([, r]) => r && r[0]).sort((a, b) => b[1][0] - a[1][0]);
+  const rounds = ops.reduce((a, [, r]) => a + r[0], 0), out = [];
+  out.push(`<h5>THIS PATCH · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}</h5><p class="dim small">${rounds} practice rounds as ${esc(JOB_NAME[job] || job)} on this version.</p>`);
+  if (!ops.length) return `<div class="pbPatch">${out.join('')}<p class="dim">Not enough practice on this side yet.</p></div>`;
+  // operators: most played first, and why
+  const bestKd = Math.max(...ops.map(([, r]) => kd(r))), bestWin = Math.max(...ops.map(([, r]) => r[1] / r[0]));
+  out.push('<b>Operators</b><ul>' + ops.slice(0, 4).map(([o, r], i) => {
+    const w = pct(r[1], r[0]), k = kd(r), why = r[0] < 4 ? 'still trying it out'
+      : i === 0 && k >= bestKd - 0.01 && r[1] / r[0] >= bestWin - 0.01 ? 'the strongest of the role so far: best fights and rounds won'
+      : i === 0 && k >= bestKd - 0.01 ? 'wins the most fights of the role'
+      : i === 0 && r[1] / r[0] >= bestWin - 0.01 ? 'the team wins most often with it'
+      : i === 0 ? 'the steadiest results over the most rounds'
+      : k >= bestKd - 0.01 ? 'great in fights, so it keeps coming back'
+      : w < 40 ? 'losing more than winning, being dropped' : 'a solid second choice';
+    return `<li><b>${esc(OPERATORS[o].name)}</b> ${pct(r[0], rounds)}% of rounds · won ${w}% · ${f1(k)} K/D · <i>${why}</i></li>`; }).join('') + '</ul>');
+  // guns: the ones those operators carry
+  const can = new Set(jobOps.flatMap(o => LOADOUTS[o] ? [...LOADOUTS[o].primaries, ...LOADOUTS[o].secondaries] : []));
+  const guns = Object.entries(P.guns || {}).filter(([w, r]) => can.has(w) && r[0]).sort((a, b) => b[1][0] - a[1][0]);
+  const mains = guns.filter(([w]) => !(WEAPONS[w] && WEAPONS[w].cls === 'Pistol')), top = mains[0] || guns[0];
+  if (top) {
+    out.push('<b>Guns</b><ul>' + mains.slice(0, 3).map(([w, r], i) => {
+      const k = r[2] / r[0], others = mains.filter(([x]) => x !== w), avg = others.length ? others.reduce((a, [, q]) => a + q[2], 0) / Math.max(1, others.reduce((a, [, q]) => a + q[0], 0)) : k;
+      const why = r[0] < 4 ? 'only a few rounds with it' : k > avg * 1.1 ? `more kills a round than ${pl.name}'s other guns (${f1(k)} vs ${f1(avg)})` : k < avg * 0.9 ? 'fewer kills than the others' : 'about even with the others';
+      return `<li><b>${esc(gunName(w))}</b> ${pct(r[0], mains.reduce((a, [, q]) => a + q[0], 0))}% of rounds · ${f1(k)} kills a round · <i>${why}</i></li>`; }).join('') + '</ul>');
+    // attachments on the main gun: the choice used most in each slot, against that slot's other choices
+    const w = top[0], att = P.att || {}, rows = [];
+    for (const [slot, label] of [['barrel', 'Barrel'], ['grip', 'Grip'], ['sight', 'Sight']]) {
+      const cs = Object.entries(att).filter(([k]) => k.startsWith(`${w}|${slot}|`)).map(([k, r]) => [k.split('|')[2], r]).sort((a, b) => b[1][0] - a[1][0]);
+      if (!cs.length) continue;
+      const [c, r] = cs[0], A = ATTACH[slot][c], k = r[2] / r[0], rest = cs.slice(1), rk = rest.length ? rest.reduce((a, [, q]) => a + q[2], 0) / Math.max(1, rest.reduce((a, [, q]) => a + q[0], 0)) : null;
+      const plus = A && A.desc && A.desc.startsWith('+') ? A.desc.split('−')[0].replace('+', '').trim().replace(/\.$/, '').toLowerCase() : '';
+      const why = r[0] < 4 ? 'still testing' : rk === null ? 'the only one tried so far' : k > rk * 1.08 ? `${f1(k)} kills a round with it, ${f1(rk)} with the others` : k < rk * 0.92 ? 'kept for the feel, though the others are scoring a bit more' : 'about as good as the rest';
+      rows.push(`<li>${label}: <b>${esc(A ? A.short : c)}</b>${plus ? ' (' + esc(plus) + ')' : ''} · ${pct(r[0], cs.reduce((a, [, q]) => a + q[0], 0))}% · <i>${why}</i></li>`);
+    }
+    if (rows.length) out.push(`<b>On the ${esc(gunName(w))}</b><ul>${rows.join('')}</ul>`);
+  }
+  // tactics: the team's plays on this side, all maps, with this player's part on the map shown
+  const byPlan = {};
+  for (const [k, r] of Object.entries(S.train.plans || {})) { const [, , sd, id] = k.split('|'); if (sd !== side) continue; const b = byPlan[id] || (byPlan[id] = { n: 0, w: 0 }); b.n += r.n; b.w += r.w; }
+  const names = {}; for (const p of S.plans || []) names[p.id] = p;
+  const plays = Object.entries(byPlan).filter(([, b]) => b.n >= 4).sort((a, b) => (b[1].w + 1) / (b[1].n + 2) - (a[1].w + 1) / (a[1].n + 2));
+  if (plays.length) {
+    out.push('<b>Tactics</b><ul>' + plays.slice(0, 3).map(([id, b]) => { const pn = names[id], task = pn && pn.jobs[job] && pn.jobs[job].task;
+      return `<li><b>${esc(pn ? pn.name : id)}</b> won ${pct(b.w, b.n)}% of ${b.n} practice rounds${task ? ` · ${esc(pl.name)}'s part here: ${esc(task)}` : ''}</li>`; }).join('') + '</ul>');
+    const worst = plays[plays.length - 1]; if (plays.length > 3 && worst[1].w / worst[1].n < 0.4) out.push(`<p class="dim small">Going off: ${esc((names[worst[0]] || {}).name || worst[0])} (won ${pct(worst[1].w, worst[1].n)}%), so it is called less.</p>`);
+  }
+  return `<div class="pbPatch">${out.join('')}</div>`;
+}
+
 // ---------------- watch a play (he asked: an example of each play playing out, the way a coach would explain it) ----------------
 // Straight lines on a whiteboard, not a real match: each player a dot that moves along the plan in time (6× speed),
 // captions for each beat, and the other team faded in their usual spots for context.
