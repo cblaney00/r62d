@@ -14,7 +14,7 @@ export const PRO_TEAMS = [
   {
     id: 'nwd', tag: 'NWD', name: 'Northwind', colour: '#5ec8ff',
     style: 'Fast and aggressive. They hit before the defenders are set, trade kills tight and win on speed and surprise.',
-    prefer: { atk: ['fast', 'split', 'window', 'pinch', 'default', 'vertical', 'lurk', 'fake', 'late'], def: ['roam', 'bait', 'hold', 'hunter', 'cross', 'vert', 'tworooms', 'retake', 'turtle'] },
+    prefer: { atk: ['fast', 'split', 'window', 'pinch', 'default', 'vertical', 'lurk', 'fake', 'late'], def: ['layers', 'roam', 'bait', 'cross', 'hunter', 'hold', 'vert', 'retake', 'tworooms', 'turtle'] },
     players: [
       { name: 'Halden', igl: true, jobs: { atk: 'support', def: 'anchor' }, pool: { atk: ['talon', 'volt', 'haze'], def: ['mason', 'shunt', 'girder'] },
         react: 0.23, aim: 0.6, turn: 10, over: 0.2, calm: 0.85, traits: ['In-game leader: calls the plan and the switches', 'Very calm in clutches', 'Slow to rotate: trusts his read too long'] },
@@ -31,7 +31,7 @@ export const PRO_TEAMS = [
   {
     id: 'irc', tag: 'IRC', name: 'Ironclad Collective', colour: '#f2a65a',
     style: 'Slow and methodical. Full droning, utility before every push, crossfires on defence; they win the last minute.',
-    prefer: { atk: ['default', 'late', 'vertical', 'pinch', 'fake', 'lurk', 'split', 'window', 'fast'], def: ['hold', 'cross', 'turtle', 'tworooms', 'retake', 'vert', 'bait', 'hunter', 'roam'] },
+    prefer: { atk: ['default', 'late', 'vertical', 'pinch', 'fake', 'lurk', 'split', 'window', 'fast'], def: ['cross', 'layers', 'hold', 'retake', 'vert', 'tworooms', 'bait', 'hunter', 'roam', 'turtle'] },
     players: [
       { name: 'Sable', igl: true, jobs: { atk: 'intel', def: 'intel' }, pool: { atk: ['glint', 'kestrel', 'mark'], def: ['argus', 'kite', 'audit'] },
         react: 0.24, aim: 0.56, turn: 10, over: 0.2, calm: 0.9, traits: ['In-game leader who plays from information', 'Reads rotations early', 'Slow: sometimes runs the clock too low'] },
@@ -264,21 +264,31 @@ export function playbook(m, si, side, team) {
     const hold = w => w ? w.hold : I.siteCentre;
     const nearRoom = I.near[0] ? I.centre(I.near[0]) : I.siteCentre, nearRoom2 = I.near[1] ? I.centre(I.near[1]) : nearRoom;
     const roamAt = I.roam ? I.centre(I.roam) : nearRoom;
-    plans.push({ id: 'hold', name: 'Hold the site', tempo: 'slow', idea: 'Three on the site covering every way in, a trapper who wires the doors and then anchors, and one roamer who slows the attack and falls back at 1:30.',
+    // he asked: fewer defenders right on the site, the rooms leading to it held too, rotations through the holes made in
+    // preparation. Most plays keep two on the site; Hold keeps three, Retake one, Turtle (rare) all five.
+    plans.push({ id: 'layers', name: 'Layers', tempo: 'slow', idea: 'Two on the site, two holding the rooms that lead to it, one roamer. The outer pair slows the attack and rotates back through the holes we opened when they commit.',
+      jobs: {
+        anchor: { task: `Anchors the site, watching ${doorName(I.main)}.`, hold: hold(I.main), watch: I.main.pos },
+        support: { task: 'Holds the other side of the site and heals the anchor.', hold: hold(I.side || I.wall), watch: (I.side || I.wall || I.main).pos },
+        trapper: { task: 'Traps the outer doors of the room beside the site, then holds that room.', hold: nearRoom, watch: I.main.pos },
+        intel: { task: 'Holds the second room beside the site on cameras; calls the rotation.', hold: nearRoom2, watch: I.main.pos },
+        roamer: { task: 'Roams on the attackers\' route, then joins the outer rooms.', roam: roamAt, until: 70, hold: nearRoom, watch: I.main.pos },
+      } });
+    plans.push({ id: 'hold', name: 'Hold the site', tempo: 'slow', idea: 'Three on the site covering every way in, two in the rooms beside it who slow the attack and rotate in when it comes.',
       jobs: {
         anchor: { task: `Anchors the site, watching ${doorName(I.main)}.`, hold: hold(I.main), watch: I.main.pos },
         trapper: { task: 'Traps the doors and windows, then holds the second angle on the site.', hold: hold(I.side || I.wall), watch: (I.side || I.wall || I.main).pos },
-        intel: { task: 'Takes space in the room beside the site early (he asked: space matters), then holds a corner of the site with a camera feed in mind; calls rotations.', roam: nearRoom, until: 75, hold: I.siteCentre, watch: I.main.pos },
+        intel: { task: 'Holds the room beside the site (he asked: space matters) on cameras; calls rotations.', hold: nearRoom, watch: I.main.pos },
         support: { task: 'Plays next to the anchor for the trade and keeps everyone healthy.', hold: hold(I.main), watch: I.main.pos, nearAnchor: true },
-        roamer: { task: 'Roams on the attackers\' route to slow them, back on site by 1:30.', roam: roamAt, until: 70, hold: I.siteCentre, watch: I.main.pos },
+        roamer: { task: 'Roams on the attackers\' route to slow them, then holds the second room beside the site.', roam: roamAt, until: 70, hold: nearRoom2, watch: I.main.pos },
       } });
-    plans.push({ id: 'roam', name: 'Deep roam', tempo: 'fast', idea: 'Two roamers go out early and hunt the attackers on their way in; three anchors hold the site. Time spent fighting roamers is time the attack does not have.',
+    plans.push({ id: 'roam', name: 'Deep roam', tempo: 'fast', idea: 'Two roamers go out early and hunt the attackers on their way in; two anchors hold the site and the intel player the room beside it. Time spent fighting roamers is time the attack does not have.',
       jobs: {
         anchor: { task: 'Holds the site door.', hold: hold(I.main), watch: I.main.pos },
         trapper: { task: 'Traps the ways in, then holds the other side of the site.', hold: hold(I.side || I.main), watch: (I.side || I.main).pos },
-        intel: { task: 'Holds the back of the site and calls what the cameras see.', hold: I.siteCentre, watch: I.main.pos },
-        support: { task: 'Roams with the roamer as a pair, back at 1:00.', roam: nearRoom2, until: 60, hold: hold(I.main), watch: I.main.pos },
-        roamer: { task: 'Hunts far out on the attackers\' route, back at 1:00.', roam: roamAt, until: 60, hold: I.siteCentre, watch: I.main.pos },
+        intel: { task: 'Holds the room beside the site and calls what the cameras see.', hold: nearRoom, watch: I.main.pos },
+        support: { task: 'Roams with the roamer as a pair, back to the room beside the site at 1:00.', roam: nearRoom2, until: 60, hold: nearRoom2, watch: I.main.pos },
+        roamer: { task: 'Hunts far out on the attackers\' route, back at 1:00.', roam: roamAt, until: 60, hold: nearRoom, watch: I.main.pos },
       } });
     plans.push({ id: 'cross', name: 'Crossfire', tempo: 'slow', idea: 'Two on site, two in the rooms beside it: anyone who comes in through the door is shot from two sides at once.',
       jobs: {
@@ -330,14 +340,14 @@ export function playbook(m, si, side, team) {
         support: { task: `Plays beside the anchor in ${bA.room || 'site A'}.`, hold: { x: bA.x, y: bA.y }, watch: I.main.pos, nearAnchor: true },
         trapper: { task: `Traps both rooms, then holds ${bB.room || 'site B'}.`, hold: { x: bB.x, y: bB.y }, watch: (I.side || I.main).pos },
         intel: { task: `Holds ${bB.room || 'site B'} on cameras.`, hold: { x: bB.x, y: bB.y }, watch: (I.side || I.main).pos },
-        roamer: { task: 'A short roam, then back to whichever room is hit.', roam: roamAt, until: 70, hold: I.siteCentre, watch: I.main.pos },
+        roamer: { task: 'A short roam, then waits beside the site and rotates to whichever room is hit.', roam: roamAt, until: 70, hold: nearRoom, watch: I.main.pos },
       } });
     plans.push({ id: 'hunter', name: 'Hunter', tempo: 'fast', idea: 'The roamer never comes back: hides far out all round and shoots the attackers in the back once they commit to the site.',
       jobs: {
         anchor: { task: 'Holds the site door.', hold: hold(I.main), watch: I.main.pos },
         trapper: { task: 'Traps the ways in, then holds the other side.', hold: hold(I.side || I.main), watch: (I.side || I.main).pos },
-        intel: { task: 'Calls where the attackers are so the hunter knows when to strike.', hold: I.siteCentre, watch: I.main.pos },
-        support: { task: 'A short roam beside the site, back by 1:30.', roam: nearRoom2, until: 50, hold: hold(I.main), watch: I.main.pos },
+        intel: { task: 'Calls where the attackers are from the room beside the site, so the hunter knows when to strike.', hold: nearRoom, watch: I.main.pos },
+        support: { task: 'A short roam beside the site, then holds the second room beside it.', roam: nearRoom2, until: 50, hold: nearRoom2, watch: I.main.pos },
         roamer: { task: 'Hides far out all round, then hits the attackers from behind.', roam: roamAt, until: 170, hold: nearRoom, watch: I.main.pos },
       } });
   }

@@ -35,7 +35,7 @@ function persona(p) {
 }
 
 // The job for this round. Bots on a side split the roles between them; the order shifts every round.
-const ROLES = { [TEAM.ATK]: ['entry', 'support', 'flank', 'intel', 'entry'], [TEAM.DEF]: ['anchor', 'roamer', 'space', 'anchor', 'roamer'] }; // space: holds a room beside the site (he asked: take space, the clock is the attackers' enemy)
+const ROLES = { [TEAM.ATK]: ['entry', 'support', 'flank', 'intel', 'entry'], [TEAM.DEF]: ['anchor', 'space', 'roamer', 'anchor', 'space'] }; // space: holds a room leading to the site (he asked: take space; fewer right on the site, usually two anchors)
 function roleFor(game, p, team) {
   const mates = [...game.players.values()].filter(q => q.bot && game.side(q) === team).sort((a, b) => +a.id.slice(1) - +b.id.slice(1));
   const list = ROLES[team];
@@ -150,23 +150,134 @@ export function botPickOp(game, p) {
   if (!p.op) { p.job = null; game.pickOp(p, free[Math.floor(Math.random() * free.length)]); } // never stuck: any free operator
 }
 
-// is cell k inside (or in the wall round) one of the site's rooms?
-// the next thing a defender bot reinforces: hatches over the site first, then the site's breakable walls
-// (outside-facing ones before the one between the two site rooms)
-function reinforceNext(game) {
-  const m = game.map, site = m.sites[game.site], W = m.W, inSite = siteTest(m, site);
-  const h = (m.hatches || []).find(h => m.tiles[h.cells[0]] === T.HATCH && h.below.some(k => inRoomOf(m, site.rooms, k % W, Math.floor(k / W))));
-  if (h) { game.reinforceHatch(h.id); return true; }
-  let best = null, bs = -1;
-  for (let k = 0; k < m.tiles.length; k++) {
-    if (m.tiles[k] !== T.SOFT || !inSite(k % W, Math.floor(k / W)) || inRoomOf(m, site.rooms, k % W, Math.floor(k / W))) continue;
-    const sides = [1, -1, W, -W].map(d => k + d).filter(q => m.tiles[q] === T.FLOOR || m.tiles[q] === T.GROUND);
-    const inner = sides.filter(q => inRoomOf(m, site.rooms, q % W, Math.floor(q / W))).length;
-    const score = (sides.length - inner > 0 ? 2 : 1) + Math.random() * 0.5; // a wall to the outside of the site beats the partner wall
-    if (sides.length && inner && score > bs) { bs = score; best = k; }
+// he asked: fewer defenders right on the site, the rooms leading to it set up too, no boarding yourselves into the site
+// (rotations are a big part of the game), and a preparation that keeps everyone busy instead of waiting for drones.
+// Worked out once a round for the defending team: which rooms beside the site are held, which site walls become
+// rotation holes (left soft, knocked open in preparation), which openings get boarded and where the traps go.
+const WALLISH = [T.SOFT, T.REINF, T.HARD];
+function defSetup(game) {
+  const m = game.map;
+  if (game._ds && game._ds.m === m && game._ds.si === game.site) return game._ds;
+  const site = m.sites[game.site], W = m.W, I = intelOf(game);
+  const roomAtK = k => { const x = k % W, y = Math.floor(k / W); return m.rooms.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null; };
+  const isSite = r => !!r && site.rooms.includes(r.name);
+  const flr = k => m.tiles[k] === T.FLOOR || m.tiles[k] === T.GROUND;
+  // the two sides of an opening: the first floor cell each way across it
+  const across = o => {
+    const k = o.cells[0], set = new Set(o.cells);
+    for (const d of [1, W]) {
+      const out = [];
+      for (const s of [-1, 1]) for (let j = 1; j <= 3; j++) { const c = k + s * d * j; if (set.has(c)) continue; if (flr(c)) { out.push(c); break; } if (!WALLISH.includes(m.tiles[c]) && m.openId[c] !== o.id) break; }
+      if (out.length === 2) return out;
+    }
+    return null;
+  };
+  const held = I.near.slice(0, 2); if (!held.length && I.roam) held.push(I.roam);
+  const heldN = new Set(held.map(r => r.name));
+  // rotation holes: two soft cells in a plain wall between a site room and an indoor room beside it, away from the
+  // attackers' main way in; a held room first
+  const holes = [], reserved = new Set();
+  const cand = [];
+  for (let k = W; k < m.tiles.length - W; k++) {
+    if (m.tiles[k] !== T.SOFT || m.shape[k] || m.dhole && m.dhole[k]) continue;
+    for (const d of [1, W]) {
+      const a = k - d, b = k + d; if (!flr(a) || !flr(b) || m.floor[a] !== m.floor[b]) continue;
+      const ra = roomAtK(a), rb = roomAtK(b); if (isSite(ra) === isSite(rb) || !(isSite(ra) ? ra : rb)) continue;
+      if (m.tiles[a] === T.GROUND || m.tiles[b] === T.GROUND) continue;
+      const along = d === 1 ? W : 1, k2 = k + along;
+      if (m.tiles[k2] !== T.SOFT || m.shape[k2] || !flr(k2 - d) || !flr(k2 + d) || !WALLISH.includes(m.tiles[k - along]) || !WALLISH.includes(m.tiles[k2 + along])) continue;
+      const inS = isSite(ra) ? -1 : 1, other = (isSite(ra) ? rb : ra) || { name: 'corridor' + k }, c = { x: (k % W + 0.5) * CELL, y: (Math.floor(k / W) + 0.5) * CELL };
+      const fromMain = I.main ? Math.hypot(c.x - I.main.pos.x, c.y - I.main.pos.y) / CELL : 20;
+      if (fromMain < 6) continue;
+      cand.push({ cells: [k, k2], d: d * inS, room: other.name, s: (heldN.has(other.name) ? 10 : 0) + Math.min(fromMain, 20) * 0.3 + Math.random() * 3 });
+    }
   }
-  if (best === null) return false;
-  game.reinforceWall(best); return true;
+  cand.sort((a, b) => b.s - a.s);
+  for (const c of cand) {
+    if (holes.length >= 2 || holes.some(h => h.room === c.room || Math.abs(h.cells[0] % W - c.cells[0] % W) + Math.abs(Math.floor(h.cells[0] / W) - Math.floor(c.cells[0] / W)) < 8)) continue;
+    holes.push(c);
+  }
+  for (const h of holes) for (const k of h.cells) for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) reserved.add(k + dy * W + dx); // reinforcing nearby would spread into it
+  // boards: the site's doors that lead to a held room (or to the other site room) stay open for rotating; the rest
+  // may be boarded. The held rooms' own doors out (away from the site) are the first line.
+  const siteBoards = [], outerBoards = [], traps = [];
+  for (const o of m.openings) {
+    const sd = across(o); if (!sd) continue;
+    const [r1, r2] = sd.map(roomAtK), s1 = isSite(r1), s2 = isSite(r2);
+    if (s1 !== s2) { const other = s1 ? r2 : r1; if (!(other && heldN.has(other.name))) siteBoards.push(o.id); traps.push(o.id); }
+    else if (!s1 && (r1 && heldN.has(r1.name)) !== (r2 && heldN.has(r2.name))) { outerBoards.push(o.id); traps.unshift(o.id); }
+  }
+  return (game._ds = { m, si: game.site, held, holes, reserved, siteBoards, outerBoards, traps, holeBy: new Map(), across });
+}
+
+// where the attack is coming in: an enemy the team has spotted in or right by the site, or a teammate just killed there.
+// Defenders outside the site rotate to it (he asked: rotations are a big part of the game).
+function siteHot(game, team) {
+  const c = game._hot || (game._hot = {});
+  if (c.t === game.time && c.team === team) return c.pt;
+  const m = game.map, site = m.sites[game.site], test = siteTest(m, site), W = m.W;
+  const inOrBy = (x, y) => { const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); for (let dy = -3; dy <= 3; dy += 3) for (let dx = -3; dx <= 3; dx += 3) if (test(cx + dx, cy + dy)) return true; return false; };
+  let pt = null;
+  for (const id of game.spots[team].keys()) { const q = game.players.get(id); if (q && q.alive && inOrBy(q.x, q.y)) { pt = { x: q.x, y: q.y }; break; } }
+  const d = game.lastDeath && game.lastDeath[team];
+  if (!pt && d && game.time - d.t < 6 && inOrBy(d.x, d.y)) pt = { x: d.x, y: d.y };
+  Object.assign(c, { t: game.time, team, pt }); void W;
+  return pt;
+}
+
+// the next thing to reinforce: hatches over the site first, then the site's breakable walls (outside-facing ones before
+// the one between the two site rooms), never a wall kept soft for a rotation hole. Returns where to stand.
+function reinforceTarget(game) {
+  const m = game.map, site = m.sites[game.site], W = m.W, inSite = siteTest(m, site), ds = defSetup(game);
+  const claimed = game._claimed && game._claimed.m === m ? game._claimed : (game._claimed = { m, s: new Set() });
+  const h = (m.hatches || []).find(h => !claimed.s.has('h' + h.id) && m.tiles[h.cells[0]] === T.HATCH && h.below.some(k => inRoomOf(m, site.rooms, k % W, Math.floor(k / W))));
+  if (h) { claimed.s.add('h' + h.id); return { x: h.x, y: h.y, run: () => m.tiles[h.cells[0]] === T.HATCH && game.reinforce > 0 && (game.reinforceHatch(h.id), game.reinforce--, true) }; }
+  let best = null, bs = -1, stand = null;
+  for (let k = 0; k < m.tiles.length; k++) {
+    if (m.tiles[k] !== T.SOFT || ds.reserved.has(k) || claimed.s.has(k) || !inSite(k % W, Math.floor(k / W)) || inRoomOf(m, site.rooms, k % W, Math.floor(k / W))) continue;
+    const sides = [1, -1, W, -W].map(d => k + d).filter(q => m.tiles[q] === T.FLOOR || m.tiles[q] === T.GROUND);
+    const inner = sides.filter(q => inRoomOf(m, site.rooms, q % W, Math.floor(q / W)));
+    const score = (sides.length - inner.length > 0 ? 2 : 1) + Math.random() * 0.5; // a wall to the outside of the site beats the partner wall
+    if (sides.length && inner.length && score > bs) { bs = score; best = k; stand = inner[0]; }
+  }
+  if (best === null) return null;
+  for (let d = -2; d <= 2; d++) { claimed.s.add(best + d); claimed.s.add(best + d * W); }
+  return { x: (stand % W + 0.5) * CELL, y: (Math.floor(stand / W) + 0.5) * CELL, face: { x: (best % W + 0.5) * CELL, y: (Math.floor(best / W) + 0.5) * CELL },
+    run: () => m.tiles[best] === T.SOFT && game.reinforce > 0 && (game.reinforceWall(best), game.reinforce--, true) };
+}
+
+// Preparation as real work (he asked: everyone stood waiting for drones): each job is walked to and takes as long as a
+// person needs (boards 2.5 s, reinforcing 3 s, a gadget a moment), nearest job next. Unfinished work carries on into
+// the first seconds of the action phase unless an enemy is heard.
+function prepWork(game, p, inp, dt, heard) {
+  const ai = p.ai;
+  if (!ai.tasks || (!ai.tasks.length && !ai.task)) return false;
+  if (game.phase === PHASE.ACTION && (elapsedAction(game) > 12 || heard)) { ai.tasks = null; ai.task = null; return false; }
+  let t = ai.task;
+  if (!t) {
+    let bi = 0, bd = Infinity;
+    for (let i = 0; i < ai.tasks.length; i++) { const q = ai.tasks[i], d = q.x == null ? 1e6 : Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; bi = i; } }
+    t = ai.tasks.splice(bi, 1)[0];
+    if (t.pick) { const g = t.pick(); if (!g) return true; Object.assign(t, g); }
+    t.left = t.wait; t.T = 0; ai.task = t;
+  }
+  t.T += dt;
+  const m = game.map, W = m.W;
+  if (t.melee) { // a rotation hole: swing at each cell (soft wall, then the stub it leaves) until it is open floor
+    const k = t.melee.find(c => m.tiles[c] === T.SOFT || m.tiles[c] === T.RUBBLE);
+    if (k === undefined || t.T > 25) { ai.task = null; if (k === undefined && !ai.holeSaid) { ai.holeSaid = true; teamSay(game, p, `Rotation hole open ${place(game, p.x, p.y) || 'by the site'}`, 'rot' + t.melee[0]); } return true; }
+    const sc = k + t.d, sx = (sc % W + 0.5) * CELL, sy = (Math.floor(sc / W) + 0.5) * CELL; // from the site's side
+    if (Math.hypot(sx - p.x, sy - p.y) > 7) { moveTo(game, p, inp, { x: sx, y: sy }, dt); return true; }
+    aimAt(p, (k % W + 0.5) * CELL, (Math.floor(k / W) + 0.5) * CELL);
+    if (p.meleeCd <= 0) game.event(p, { k: 'melee' });
+    return true;
+  }
+  if (t.T > 20) { ai.task = null; return true; } // can't get there: skip it
+  if (Math.hypot(t.x - p.x, t.y - p.y) > (t.r || 20)) { moveTo(game, p, inp, { x: t.x, y: t.y }, dt); return true; }
+  if (t.face) aimAt(p, t.face.x, t.face.y);
+  inp.crouch = 1;
+  if ((t.left -= dt) > 0) return true;
+  t.run(); ai.task = null; return true;
 }
 
 function siteTest(m, site) {
@@ -175,70 +286,77 @@ function siteTest(m, site) {
 }
 function inRoomOf(m, names, x, y) { return m.rooms.some(r => names.includes(r.name) && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h); }
 
-// Defending bots fortify the site the moment preparation begins.
+// Defending bots plan their preparation the moment it begins, then walk round doing it (prepWork).
 export function botPrep(game, p) {
   if (game.side(p) !== TEAM.DEF) return;
-  const m = game.map, site = m.sites[game.site], W = m.W;
+  const m = game.map, site = m.sites[game.site], W = m.W, ds = defSetup(game);
   const inSite = siteTest(m, site);
   const siteOpenings = m.openings.filter(o => o.cells.some(k => inSite(k % W, Math.floor(k / W))));
-  const op = OPERATORS[p.op];
+  const op = OPERATORS[p.op], ai = p.ai || (p.ai = {});
   // he asked: above Silver, defenders set the site up in earnest (every way in boarded, all their gadgets out); lower ranks are sloppy
   const lvl = p.pro ? TOP_BOT : lvlOf(game, p), earnest = lvl >= 3;
   const boardP = earnest ? 1 : lvl === 2 ? 0.6 : 0.35;
-  // he asked: doors must not start the match planked. Boarding takes a person ~2.5 s each (holding E) plus the walk to
-  // the next one, so the bots' boards go up one at a time through preparation instead of all at once.
-  p.ai.boardQ = siteOpenings.filter(o => m.tiles[o.cells[0]] === T.OPEN && Math.random() < boardP).map(o => o.id);
-  p.ai.boardT = 2 + Math.random() * 4;
-  // reinforce: two each, one at a time through preparation (he asked: walls went solid the instant prep began,
-  // as if walking by did it; a person holds E for DUR.reinforce), run by the queue at the top of botThink
-  p.ai.reinfN = 2; p.ai.reinfT = 1 + Math.random() * 5;
+  const tasks = ai.tasks = []; ai.task = null; ai.holeSaid = false;
+  const cxy = k => ({ x: (k % W + 0.5) * CELL, y: (Math.floor(k / W) + 0.5) * CELL });
+  const later = (x, y, run, wait = 0.7, extra = {}) => tasks.push({ x, y, run, wait, ...extra });
+  const opSpot = id => { const o = m.openings[id], sd = ds.across(o); return sd ? cxy(sd[0]) : cxy(o.cells[0]); }; // stand beside it, on one side
+  // boards (he asked: not boarding yourselves in): the site's doors to the held rooms stay open; the held rooms' outer
+  // doors and the other site doors are shared out, one board each, a board takes as long as a person's
+  const mates = [...game.players.values()].filter(q => q.bot && game.side(q) === TEAM.DEF), mi = Math.max(0, mates.indexOf(p)), n = Math.max(1, mates.length);
+  const boards = [...ds.outerBoards, ...ds.siteBoards].filter((id, i) => i % n === mi && m.tiles[m.openings[id].cells[0]] === T.OPEN && Math.random() < boardP);
+  for (const id of boards) { const s = opSpot(id); later(s.x, s.y, () => { if (p.barri > 0 && game.barricade(id, T.BARRI)) p.barri--; }, DUR.barricade, { face: cxy(m.openings[id].cells[0]) }); }
+  // reinforcing: two each, picked when it is their turn (walls already done or claimed are skipped)
+  for (let i = 0; i < 2; i++) tasks.push({ x: site.bombs[0].x, y: site.bombs[0].y, pick: () => reinforceTarget(game), wait: DUR.reinforce });
+  // a rotation hole (Gold up, and Silver half the time): the first bot free knocks it open, wall then stub
+  if (lvl >= 3 || (lvl === 2 && Math.random() < 0.5)) for (const h of ds.holes) if (!ds.holeBy.has(h)) { ds.holeBy.set(h, p.id); const c = cxy(h.cells[0]); tasks.push({ x: c.x, y: c.y, melee: h.cells, d: h.d }); break; }
   const bomb = site.bombs[Math.floor(Math.random() * 2)];
   const near = (d) => game.freeSpotNear(bomb.x, bomb.y, d);
   const id = op.ability.id;
-  if (id === 'panel') for (const o of siteOpenings.slice(0, 3)) { if (p.abilityCount > 0 && game.barricade(o.id, T.PANEL)) p.abilityCount--; }
-  if (id === 'jammer') for (let i = 0; i < 2; i++) { const s = near(60); game.ents.push({ id: game.eid(), type: 'jammer', x: s.x, y: s.y, team: TEAM.DEF, owner: p.id, hp: 1 }); p.abilityCount--; }
-  // traps by the site's doors and windows, eyes and ears around it
-  const placeAt = (type, x, y, extra = {}) => { game.ents.push({ id: game.eid(), type, x, y, ang: Math.random() * 6.28, team: TEAM.DEF, owner: p.id, hp: 1, ...extra }); };
-  const atOpening = i => { const o = siteOpenings[i % siteOpenings.length], k = o.cells[0]; return game.freeSpotNear((k % W + 0.5) * CELL, (Math.floor(k / W) + 0.5) * CELL, 18); };
-  if (id === 'alarm' && siteOpenings.length) for (let i = 0; p.abilityCount > 0 && i < 3; i++) { const s = atOpening(i); placeAt('alarm', s.x, s.y, { arm: 0 }); p.abilityCount--; }
+  const placeAt = (type, x, y, extra = {}) => later(x, y, () => game.ents.push({ id: game.eid(), type, x, y, ang: Math.random() * 6.28, team: TEAM.DEF, owner: p.id, hp: 1, ...extra }));
+  // traps go on the held rooms' outer doors first (the first line), then the site's ways in
+  const trapIds = ds.traps.length ? ds.traps : siteOpenings.map(o => o.id);
+  const atOpening = i => { const k = m.openings[trapIds[(i + mi) % trapIds.length]].cells[0], c = cxy(k); return game.freeSpotNear(c.x, c.y, 18); };
+  const openK = i => m.openings[trapIds[(i + mi) % trapIds.length]].cells[0];
+  if (id === 'panel') for (const o of siteOpenings.slice(0, 3)) { const s = opSpot(o.id); later(s.x, s.y, () => { if (p.abilityCount > 0 && game.barricade(o.id, T.PANEL)) p.abilityCount--; }, 1.5); }
+  if (id === 'jammer') for (let i = 0; i < 2; i++) { const s = near(60); placeAt('jammer', s.x, s.y); p.abilityCount--; }
+  if (id === 'alarm' && trapIds.length) for (let i = 0; p.abilityCount > 0 && i < 3; i++) { const s = atOpening(i); placeAt('alarm', s.x, s.y, { arm: 0 }); p.abilityCount--; }
   if (id === 'pace') for (let i = 0; i < 2; i++) { const s = near(80 + i * 60); placeAt('pace', s.x, s.y, { life: 999, hit: {} }); p.abilityCount--; } // RALLY: beacons on the routes round the site
-  if (id === 'beam') for (const o of siteOpenings.slice(-2)) { if (p.abilityCount > 0 && game.barricade(o.id, T.BEAM, true)) p.abilityCount--; } // GIRDER: brace two ways into the site
+  if (id === 'beam') for (const id2 of ds.siteBoards.slice(-2)) { const s = opSpot(id2); later(s.x, s.y, () => { if (p.abilityCount > 0 && game.barricade(id2, T.BEAM, true)) p.abilityCount--; }, 1.5); } // GIRDER: brace ways into the site, not the rotation doors
   if (id === 'station') { const s = near(30); placeAt('station', s.x, s.y, { pool: 100 }); p.abilityCount--; }
   if (id === 'catcher') for (let i = 0; i < 2; i++) { const s = near(50); placeAt('catcher', s.x, s.y, { c: 2 }); p.abilityCount--; }
   if (id === 'radar') { const s = near(120); placeAt('radar', s.x, s.y, { life: 15, t: 0 }); p.abilityCount--; }
-  if (['prox', 'concuss', 'clamp'].includes(id) && siteOpenings.length) for (let i = 0; p.abilityCount > 0 && i < 3; i++) { const s = atOpening(i); placeAt(id, s.x, s.y, { arm: 0 }); p.abilityCount--; }
+  if (['prox', 'concuss', 'clamp'].includes(id) && trapIds.length) for (let i = 0; p.abilityCount > 0 && i < 3; i++) { const s = atOpening(i); placeAt(id, s.x, s.y, { arm: 0 }); p.abilityCount--; }
   if (id === 'sensor') while (p.abilityCount > 0) { const s = near(150); placeAt('sensor', s.x, s.y, { t: 0, pingT: 0 }); p.abilityCount--; }
   if (id === 'plates') { const s = near(30); placeAt('plates', s.x, s.y, { c: 5 }); p.abilityCount--; }
   if (id === 'turret' || id === 'stickycam') while (p.abilityCount > 0) {
     const s = near(100); placeAt('cam', s.x, s.y, { offUntil: 0, tu: id === 'turret' ? 1 : 0, ang: Math.atan2(s.y - bomb.y, s.x - bomb.x) }); p.abilityCount--;
   }
-  if (id === 'grid') for (let k = 0; k < m.tiles.length && p.abilityCount > 0; k++) {
-    if (m.tiles[k] !== T.REINF || !inSite(k % W, Math.floor(k / W)) || Math.random() < 0.6) continue;
-    placeAt('grid', (k % W + 0.5) * CELL, (Math.floor(k / W) + 0.5) * CELL, { cell: k }); p.abilityCount--;
-  }
-  if (id === 'mine') for (const o of siteOpenings.slice(0, 2)) {
-    const k = o.cells[0], s = game.freeSpotNear((k % W + 0.5) * CELL, (Math.floor(k / W) + 0.5) * CELL, 14);
-    placeAt('mine', s.x, s.y, { ang: 0, arm: 0 }); p.abilityCount--;
-  }
-  // a deployable shield in the site, facing the nearest way in (earnest only)
+  if (id === 'grid') for (let i = 0; i < 2; i++) tasks.push({ x: bomb.x, y: bomb.y, wait: 1, pick: () => { // on reinforced site walls, once there are some
+    const k = m.tiles.findIndex((t, k) => t === T.REINF && inSite(k % W, Math.floor(k / W)) && !game.ents.some(e => e.type === 'grid' && e.cell === k) && Math.random() < 0.3);
+    if (k < 0 || p.abilityCount <= 0) return null; const c = cxy(k);
+    return { x: c.x, y: c.y, run: () => { game.ents.push({ id: game.eid(), type: 'grid', x: c.x, y: c.y, ang: 0, team: TEAM.DEF, owner: p.id, hp: 1, cell: k }); p.abilityCount--; } };
+  } });
+  if (id === 'mine') for (let i = 0; i < 2; i++) { const c = cxy(openK(i)), s = game.freeSpotNear(c.x, c.y, 14); placeAt('mine', s.x, s.y, { ang: 0, arm: 0 }); p.abilityCount--; }
+  // a deployable shield in the site, facing a way in (earnest only)
   if (earnest && p.gadget === 'dshield' && p.gadgetCount > 0 && siteOpenings.length) {
     const s = near(50), o = siteOpenings[Math.floor(Math.random() * siteOpenings.length)], k = o.cells[0];
-    if (game.placeShield({ x: s.x, y: s.y, aim: Math.atan2((Math.floor(k / W) + 0.5) * CELL - s.y, (k % W + 0.5) * CELL - s.x) })) p.gadgetCount--;
+    p.gadgetCount--; later(s.x, s.y, () => { if (!game.placeShield({ x: s.x, y: s.y, aim: Math.atan2((Math.floor(k / W) + 0.5) * CELL - s.y, (k % W + 0.5) * CELL - s.x) })) p.gadgetCount++; }, 1);
   }
-  // their gadget too: a claymore or barbed wire just inside a way into the site (earnest: all of them, each at its own way in;
+  // their gadget too: a claymore or barbed wire just inside a way in (earnest: all of them, each at its own way in;
   // the lowest ranks often forget)
-  for (let g = 0; g < (earnest ? 3 : 1); g++) if ((p.gadget === 'claymore' || p.gadget === 'wire') && p.gadgetCount > 0 && siteOpenings.length && (earnest || Math.random() < (lvl >= 2 ? 0.8 : 0.5))) {
-    const i = Math.floor(Math.random() * siteOpenings.length), s = atOpening(i), k = siteOpenings[i].cells[0];
+  for (let g = 0; g < (earnest ? 3 : 1); g++) if ((p.gadget === 'claymore' || p.gadget === 'wire') && p.gadgetCount > 0 && trapIds.length && (earnest || Math.random() < (lvl >= 2 ? 0.8 : 0.5))) {
+    const s = atOpening(g), k = openK(g);
     const ang = Math.atan2((Math.floor(k / W) + 0.5) * CELL - s.y, (k % W + 0.5) * CELL - s.x);
-    if (p.gadget === 'claymore') placeAt('claymore', s.x, s.y, { ang, arm: 0 }); else { delete s.hp; game.ents.push({ id: game.eid(), type: 'wire', x: s.x, y: s.y, ang, team: TEAM.DEF, owner: p.id }); }
+    if (p.gadget === 'claymore') placeAt('claymore', s.x, s.y, { ang, arm: 0 }); else later(s.x, s.y, () => game.ents.push({ id: game.eid(), type: 'wire', x: s.x, y: s.y, ang, team: TEAM.DEF, owner: p.id }));
     p.gadgetCount--;
   }
-  // stair watch (he asked): from Gold up, one roamer waits by the stairs nearest the site to shoot drones coming up or down
+  // stair watch (he asked): from Gold up, one roamer waits by the stairs nearest the site to shoot drones coming up or
+  // down, once their own preparation is done
   if (earnest && (m.stairs || []).length && ![...game.players.values()].some(q => q !== p && q.bot && q.squad === p.squad && q.ai && q.ai.stairWatch)) {
     const fl = floorAt(m, bomb.x, bomb.y); let best = null, bd = Infinity;
     for (let i = 0; i < m.stairs.length; i++) { const e = stairEnds(m, i, 0); for (const q of [e.top, e.bottom]) { if (floorAt(m, q.x, q.y) !== fl) continue; const d = Math.hypot(q.x - bomb.x, q.y - bomb.y); if (d < bd) { bd = d; best = q; } } }
-    if (best && bd < 30 * CELL) (p.ai || (p.ai = {})).stairWatch = game.freeSpotNear(best.x, best.y, 40);
-  }
+    if (best && bd < 30 * CELL) ai.stairWatch = game.freeSpotNear(best.x, best.y, 40);
+  } else ai.stairWatch = null;
 }
 
 // ---- path finding (A* over cells; barricades are passable but costly) ----
@@ -654,16 +772,6 @@ export function botThink(game, p, dt) {
   flushReplies(game);
   amateurComms(game, p, dt);
   const ai = p.ai;
-  if (game.phase === PHASE.PREP && ai.boardQ && ai.boardQ.length && p.alive && !p.downed && (ai.boardT -= dt) <= 0) { // the next board of the queue set in botPrep
-    const id = ai.boardQ.shift(), o = game.map.openings[id];
-    if (p.barri > 0 && game.barricade(id, T.BARRI)) p.barri--;
-    else if (o && o.cells.every(c => game.map.tiles[c] === T.OPEN) && (ai.boardTry = (ai.boardTry || 0) + 1) < 12) ai.boardQ.push(id); // someone stood in it: try again later
-    ai.boardT = DUR.barricade + 1 + Math.random() * 2;
-  }
-  if (game.phase === PHASE.PREP && ai.reinfN > 0 && p.alive && !p.downed && (ai.reinfT -= dt) <= 0) {
-    if (game.reinforce > 0 && reinforceNext(game)) { game.reinforce--; ai.reinfN--; } else ai.reinfN = 0;
-    ai.reinfT = DUR.reinforce + 1.5 + Math.random() * 3;
-  }
   const inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
   p.input = inp;
   if (p.alive && p.ctrl === 'drone') {
@@ -861,6 +969,7 @@ export function botThink(game, p, dt) {
 
   // --- a pro's part of the team plan ---
   if (ai.cmd && botCmd(game, p, inp, dt)) return; // a person on the team asked for something
+  if (team === TEAM.DEF && !game.planted && prepWork(game, p, inp, dt, heardRecently)) return; // preparation: boards, walls, traps, rotation holes
   if (p.pro && (action || game.phase === PHASE.PREP) && proAct(game, p, inp, dt, team)) return;
 
   // --- objective ---
@@ -887,7 +996,7 @@ export function botThink(game, p, dt) {
     else goal = ai.push || (ai.push = nearBomb(game, site, 60));
   } else {
     if (game.planted) { goal = game.planted; if (Math.hypot(goal.x - p.x, goal.y - p.y) < 24) act = 'defuse'; }
-    else if (game.phase === PHASE.PREP && ai.stairWatch) { goal = ai.stairWatch; ai.watchingStairs = true; } // waits for drones there
+    else if (game.phase === PHASE.PREP && ai.stairWatch && ai.role !== 'space') { goal = ai.stairWatch; ai.watchingStairs = true; } // waits for drones there
     else {
       // he asked: defenders wander a little: every so often, while nothing is heard, a new spot round the site
       if (!heardRecently && game.time > (ai.holdT || 0)) { ai.hold = nearBomb(game, site, ai.role === 'anchor' ? 60 : 100); ai.holdT = game.time + 10 + Math.random() * 18; }
@@ -972,15 +1081,21 @@ export function botThink(game, p, dt) {
 
   // he asked: defenders take space when they can do it without leaving the site open. The 'space' defender holds a room
   // beside the site on the attackers' side (two anchors stay on it) until the clock runs down or the team is losing people.
-  if (!atk && ai.role === 'space' && action && !game.planted) {
+  // he asked: fewer on the site, the rooms leading to it held, and rotations. The 'space' defenders each hold one of the
+  // rooms beside the site (shared out between them) and rotate in through the open doors and holes when the attack
+  // commits there (an enemy spotted on the site or a teammate killed on it), the team is losing people, or the clock runs down.
+  const hot = !atk && !game.planted && (ai.role === 'space' || ai.role === 'roamer') ? siteHot(game, team) : null;
+  if (hot && !ai.rotated && action) { ai.rotated = true; ai.hold = game.freeSpotNear(hot.x + (p.x - hot.x) * 0.4, hot.y + (p.y - hot.y) * 0.4, 40); ai.holdT = game.time + 15; teamSay(game, p, `Rotating to ${place(game, hot.x, hot.y)}`, 'rot' + p.squad); }
+  if (!atk && ai.role === 'space' && !game.planted && !ai.rotated) {
     const mates = [...game.players.values()].filter(q => q.squad === p.squad), lost = mates.filter(q => !q.alive || q.downed).length;
-    if (game.timer > 70 && lost < 2) {
-      if (!ai.spaceAt) { const I = intelOf(game), r = I && (I.near[0] || I.roam); ai.spaceAt = r ? game.freeSpotNear(...Object.values(I.centre(r)), Math.min(r.w, r.h) * CELL * 0.3) : null; }
-      if (ai.spaceAt) return moveTo(game, p, inp, ai.spaceAt, dt, true);
+    if (game.timer > 40 && lost < 3 || !action) {
+      if (!ai.spaceAt) { const ds = defSetup(game), sp = mates.filter(q => q.bot && q.ai && q.ai.role === 'space'), r = ds.held[Math.max(0, sp.indexOf(p)) % Math.max(1, ds.held.length)] || intelOf(game).roam;
+        ai.spaceAt = r ? game.freeSpotNear((r.x + r.w / 2) * CELL, (r.y + r.h / 2) * CELL, Math.min(r.w, r.h) * CELL * 0.3) : null; }
+      if (ai.spaceAt) { const r = moveTo(game, p, inp, ai.spaceAt, dt, true); if (paranoid) checkAngles(game, p, dt, 1.5); return r; }
     }
   }
   // a roaming defender spends the first part of the round in rooms around the site, then falls back to it
-  if (!atk && ai.role === 'roamer' && action && !game.planted) {
+  if (!atk && ai.role === 'roamer' && action && !game.planted && !ai.rotated) {
     ai.roamFor = ai.roamFor ?? 50 + me.aggr * 70;
     ai.roamFor -= dt;
     if (ai.roamFor > 0 && game.timer > 60) { // the clock: back to the site
@@ -1218,10 +1333,11 @@ function impatience(game, p, team, site, me) {
     ai.push = nearBomb(game, site, 40 + Math.random() * 60); ai.bomb = null;
   } else {
     const I = intelOf(game), rooms = I ? [...(I.near || []), I.roam].filter(Boolean) : [];
-    if (rooms.length && Math.random() < bold * 0.6) { const r = rooms[Math.floor(Math.random() * rooms.length)], c = I.centre(r); ai.hold = game.freeSpotNear(c.x, c.y, Math.min(r.w, r.h) * CELL * 0.35); }
+    if (rooms.length && ai.role !== 'anchor' && Math.random() < bold * 0.6) { const r = rooms[Math.floor(Math.random() * rooms.length)], c = I.centre(r); ai.hold = game.freeSpotNear(c.x, c.y, Math.min(r.w, r.h) * CELL * 0.35); }
     else ai.hold = nearBomb(game, site, 60 + Math.random() * 60);
     ai.holdT = game.time + 12 + Math.random() * 10;
     if (ai.role === 'roamer') ai.roamT = 0; // a roamer: on to another room
+    if (ai.role === 'space') ai.spaceAt = null; // a space player: another spot in its room
   }
 }
 
@@ -1733,7 +1849,7 @@ export function botHear(game, p, text) {
     case 'reinforce': {
       if (team === TEAM.ATK) { say(first, 'ansWrongSide'); return c; }
       if (!inPrep) { say(first, 'ansLate'); return c; }
-      first.ai = first.ai || {}; first.ai.reinfN = (first.ai.reinfN || 0) + 2; first.ai.reinfT = 0; say(first, 'ansReinforce'); return c; }
+      first.ai = first.ai || {}; const ts = first.ai.tasks || (first.ai.tasks = []); for (let i = 0; i < 2; i++) ts.push({ x: first.x, y: first.y, pick: () => reinforceTarget(game), wait: DUR.reinforce }); say(first, 'ansReinforce'); return c; }
     case 'drone': {
       if (team === TEAM.DEF) { say(first, 'ansWrongSide'); return c; }
       const pilot = [...asked, ...bots].find(q => q.ctrl === 'drone'); if (!pilot) { say(first, 'ansNoDrone'); return c; }
@@ -1839,7 +1955,7 @@ function proPlan(game, squad, side) {
     if (!list.length) return st;
     const last = (game.proLast || {})[squad]; // don't run the same plan twice in a row after losing with it
     const w = game.proExplore ? (g => list.map((_, i) => (i === g ? 1 : 0)))(best(list.map(pl => plainGuess(planRecord(game.map.id, game.site, side, pl.id))))) // practice: new plays get tried, strong-looking ones chased
-      : list.map((pl, i) => (pl.id === last ? 0.25 : 1) / (1 + i * 0.3) * planWeight(game.map.id, game.site, side, pl.id) ** 2); // the team's style, and what has won in practice
+      : list.map((pl, i) => (pl.id === last ? 0.25 : 1) * (pl.id === 'turtle' ? 0.3 : 1) / (1 + i * 0.3) * planWeight(game.map.id, game.site, side, pl.id) ** 2); // the team's style, and what has won in practice
     let r = Math.random() * w.reduce((a, b) => a + b, 0), pick = list[0];
     for (let i = 0; i < list.length; i++) if ((r -= w[i]) <= 0) { pick = list[i]; break; }
     Object.assign(st, { plan: pick, side, site: game.site, go: Math.round((pick.go || 0) * DUR.action / 180), gone: false, swapped: false, rotate: null, retake: false, called: false });
@@ -1929,7 +2045,9 @@ function proDirector(game, squad, st, team, el) {
       if (!st.retake) { const near3 = mates.filter(q => q.alive && !q.downed && near(q, game.planted, 300)).length; if (near3 >= Math.min(3, alive) || game.planted.t < 30 || game.time - (st.plantSeen ?? (st.plantSeen = game.time)) > 8) { st.retake = true; proCall(game, squad, 'Retake now, all together, utility first.', 'retake'); } }
       return;
     }
-    for (const w of [plan.ways.main, plan.ways.side]) if (w && spottedNear(game, team, w.pos, 170) >= 2 && (!st.rotate || st.rotate.w !== w)) {
+    const hot = siteHot(game, team), ws = [plan.ways.main, plan.ways.side].filter(Boolean); // he asked: pros know rotations matter: one on the site or a teammate killed there is enough
+    const hw = hot && ws.slice().sort((a, b) => Math.hypot(a.pos.x - hot.x, a.pos.y - hot.y) - Math.hypot(b.pos.x - hot.x, b.pos.y - hot.y))[0];
+    for (const w of ws) if ((spottedNear(game, team, w.pos, 170) >= 2 || w === hw) && (!st.rotate || st.rotate.w !== w)) {
       st.rotate = { w, t: game.time, at: game.freeSpotNear(w.hold.x, w.hold.y, 20) }; proCall(game, squad, `Rotate: they are hitting ${w.kind === 'stairs' ? 'the stairs' : 'the ' + w.kind}.`, 'rotate', { way: WAYS.includes(w.kind) ? w.kind : 'door' }); break;
     }
   }
@@ -2063,7 +2181,7 @@ function proAct(game, p, inp, dt, team) {
     if (!near(p, stage, 14) && !near(p, game.planted, 200)) { moveTo(game, p, inp, stage, dt, true); return true; }
     watch(game.planted, true); return true;
   }
-  const rot = st.rotate && game.time > st.rotate.t + (ROTATE_DELAY[name] ?? 0) && ['support', 'intel', 'roamer'].includes(p.pro.pl.jobs.def) ? st.rotate : null;
+  const rot = st.rotate && game.time > st.rotate.t + (ROTATE_DELAY[name] ?? 0) && p.pro.pl.jobs.def !== 'anchor' ? st.rotate : null;
   const roaming = action && j.roam && el < (j.until || 0) + (TIMING[name] || 0) && !rot;
   if (!roaming && (ai.reposT = (ai.reposT ?? 16 + Math.random() * 14) - dt) <= 0) { ai.reposT = 18 + Math.random() * 16; ai.spreadOff = { x: Math.round((Math.random() - 0.5) * 4), y: Math.round((Math.random() - 0.5) * 4) }; ai.spread = null; } // a new angle now and then
   const spot = roaming ? (ai.roamAt || (ai.roamAt = game.freeSpotNear(j.roam.x, j.roam.y, 50))) : spreadSpot(game, p, rot ? rot.at : j.hold, 72, rot ? rot.w.pos : j.watch); // defenders don't bunch either

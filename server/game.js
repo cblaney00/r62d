@@ -1239,6 +1239,7 @@ export class Game {
   kill(q, src, wname) {
     if (!q.alive) return;
     this.ropeFall(q);
+    if (src && src !== q) (this.lastDeath || (this.lastDeath = {}))[this.side(q)] = { x: q.x, y: q.y, t: this.time }; // defender bots rotate when someone falls on the site
     if (q.pro && src && src !== q) (this.proTrade || (this.proTrade = {}))[q.squad] = { x: q.x, y: q.y, from: { x: src.x, y: src.y }, t: this.time }; // the pros trade a teammate's death
     if (src && src !== q && this.side(src) !== this.side(q)) { // what the pros say about it: the one who died says who and where, the one who got the kill says so
       const nm = o => OPERATORS[o.op] ? OPERATORS[o.op].name[0] + OPERATORS[o.op].name.slice(1).toLowerCase() : 'someone', rm = (x, y) => (roomAt(this.map, x, y) || 'outside').replace(/^\dF /, '');
