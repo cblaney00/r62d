@@ -10,6 +10,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 - [ ] the the drag out reticle range limit circular from the player and change depending on the scope used
 - [ ] save gun loadouts across characters, there should be a character specific checkmark you can select when making a weapon operator specific
 - [ ] the auto director should show both teams viewpoints more from the wide angles, make sure its focused in on the correct floor
+- [ ] it disconnects me from the game when i switch characters in free play
 
 ## Done
 
