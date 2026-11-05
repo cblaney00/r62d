@@ -1842,7 +1842,7 @@ function proPlan(game, squad, side) {
       : list.map((pl, i) => (pl.id === last ? 0.25 : 1) / (1 + i * 0.3) * planWeight(game.map.id, game.site, side, pl.id) ** 2); // the team's style, and what has won in practice
     let r = Math.random() * w.reduce((a, b) => a + b, 0), pick = list[0];
     for (let i = 0; i < list.length; i++) if ((r -= w[i]) <= 0) { pick = list[i]; break; }
-    Object.assign(st, { plan: pick, side, site: game.site, go: pick.go || 0, gone: false, swapped: false, rotate: null, retake: false, called: false });
+    Object.assign(st, { plan: pick, side, site: game.site, go: Math.round((pick.go || 0) * DUR.action / 180), gone: false, swapped: false, rotate: null, retake: false, called: false });
     (game.proLast || (game.proLast = {}))[squad] = pick.id;
   }
   return st;
@@ -1967,7 +1967,7 @@ function spreadSpot(game, p, base, gap, look = null) {
       const d = Math.hypot(x - look.x, y - look.y) || 1, ux = (x - look.x) / d, uy = (y - look.y) / d, ax = t.x - look.x, ay = t.y - look.y;
       if (ax * ux + ay * uy > 20 && Math.abs(ax * uy - ay * ux) < 18) crowd++;
     }
-    const sc = crowd * 100 + Math.hypot(dx - off.x, dy - off.y) + Math.random() * 0.5;
+    const sc = crowd * 100 + Math.hypot(dx - off.x, dy - off.y) + Math.random() * 0.5 + (ai.spreadFrom && Math.hypot(x - ai.spreadFrom.x, y - ai.spreadFrom.y) < 48 ? 40 : 0); // a re-pick really moves
     if (sc < bs) { bs = sc; best = { x, y }; }
   }
   ai.spreadKey = key; ai.spread = best || base; return ai.spread;
@@ -2019,8 +2019,8 @@ function proAct(game, p, inp, dt, team) {
       if (!near(p, spot, 14)) { moveTo(game, p, inp, spot, dt); if (near(p, spot, 260)) inp.walk = 1; return true; }
       // he asked: two pros stood in one spot for over a minute, saying and doing nothing. While waiting they work the
       // area: every so often another spot round the stack (a new angle, clearing the corners), and a word to the team.
-      if ((ai.waitT = (ai.waitT ?? 9 + Math.random() * 6) - dt) <= 0) {
-        ai.waitT = 10 + Math.random() * 8; ai.spreadOff = { x: Math.round((Math.random() - 0.5) * 6), y: Math.round((Math.random() - 0.5) * 6) }; ai.spread = null;
+      if ((ai.waitT = (ai.waitT ?? 6 + Math.random() * 5) - dt) <= 0) {
+        ai.waitT = 7 + Math.random() * 5; ai.spreadOff = { x: Math.round((Math.random() - 0.5) * 10), y: Math.round((Math.random() - 0.5) * 10) }; ai.spread = null; ai.spreadFrom = { x: p.x, y: p.y }; // (Kaze and Brick looked stuck waiting: now a real new spot every 7-12 s)
         if (!game.spots[team].size && Math.random() < 0.2) talk(game, p, 'quiet', { place: place(game, p.x, p.y) }, 'wait' + place(game, p.x, p.y));
       }
       if (j.clear != null && el > go - 9 && game.map.tiles[j.clear] === T.BARRI) { // a boarded window: shoot the boards off from the stack (as R6 teams do) instead of hitting them three times in the open

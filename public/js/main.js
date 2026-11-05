@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -605,7 +605,7 @@ function onEvent(e, s, players) {
       const v = players.get(e.victim), k = e.killer ? players.get(e.killer) : null;
       const prev = st.snaps.length > 1 ? st.snaps[st.snaps.length - 2].players.get(e.victim) : null;
       const pos = prev && prev.x !== undefined ? prev : null;
-      if (pos && v && (v.tm === mySide() || teamSees(pos.x, pos.y))) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide(), n: v.n, t: performance.now() / 1000 }); st.rend.pool(pos.x, pos.y); }
+      if (pos && v && (v.tm === mySide() || teamSees(pos.x, pos.y))) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide(), ring: tvRing(v), n: v.n, t: performance.now() / 1000 }); st.rend.pool(pos.x, pos.y); }
       addKill(k, v, e.w, e.hs);
       if (e.hs && k && k.id === st.id) audio.ui('headshot');
       break;
@@ -1084,7 +1084,7 @@ function buildSelect(s) {
       d.innerHTML = `<div class="who"></div>`;
       d.appendChild(c);
       const info = document.createElement('div'); info.className = 'info';
-      info.innerHTML = `<div class="nm">${o.name}</div><div class="role">${o.role}</div><div class="ab">${o.ability.name}</div>`;
+      info.innerHTML = `<div class="nm">${o.name}</div><div class="role">${o.role}</div><div class="ab">${o.ability.name}</div><div class="more">${esc(o.ability.desc)}</div>`;
       d.appendChild(info);
       d.onmouseenter = () => { if (!document.querySelector('#opgrid .op.mine')) showSelLoadout(k, false); };
       d.onclick = () => { send({ t: 'pick', op: k }); };
@@ -1094,14 +1094,14 @@ function buildSelect(s) {
     if (grid.firstChild) showSelLoadout(grid.firstChild.dataset.op, false);
   }
   const mates = s.players.filter(p => p.sq === me.sq);
-  // roles (he asked): choose one first, then only its operators are shown. Counts show how many teammates took each.
+  // roles (he asked; a small icon left of each name, he asked too): choose one first, then only its operators are shown. Counts show how many teammates took each.
   const jobs = JOBS[side], myJob = me.jb, rb = $('roleBar');
   const rk = [s.rd, side, myJob, me.lk, ...mates.map(p => p.jb)].join(':');
   if (rb.dataset.k !== rk) {
     rb.dataset.k = rk; rb.classList.toggle('choose', !myJob);
     rb.innerHTML = (myJob ? '' : '<div class="rbHead">CHOOSE YOUR ROLE</div>') + jobs.map(j => {
       const n = mates.filter(p => p.jb === j.id).length;
-      return `<button data-r="${j.id}" class="${myJob === j.id ? 'on' : ''}" title="${esc(j.desc)}"><b>${j.name.toUpperCase()}</b>${n ? `<i>${n}</i>` : ''}`
+      return `<button data-r="${j.id}" class="${myJob === j.id ? 'on' : ''}" title="${esc(j.desc)}"><b>${roleIcon(j.id)}${j.name.toUpperCase()}</b>${n ? `<i>${n}</i>` : ''}`
         + (myJob ? '' : `<span>${esc(j.desc)}</span><small>${j.ops.map(o => OPERATORS[o].name.toUpperCase()).join(' · ')}</small>`) + '</button>';
     }).join('');
     for (const b of rb.querySelectorAll('button')) b.onclick = () => { if (st.me && st.me.lk) return; audio.ui(); send({ t: 'role', r: b.dataset.r }); };
@@ -2108,7 +2108,7 @@ function draw(s, view, now, dt) {
     const gh = !isMe && stairGhost(st.map, p.x, p.y);
     if (gh && (ally || (!p.sh && ghostSeen(gh)))) {
       ctx.globalAlpha = 0.9;
-      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+      drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x + u.x * 15, gh.y + u.y * 15);
@@ -2121,7 +2121,7 @@ function draw(s, view, now, dt) {
     if (wgAt) {
       wg = { ...wg, x: wgAt.x, y: wgAt.y };
       ctx.globalAlpha = 0.9;
-      drawOperator(ctx, { x: wg.x, y: wg.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: wg.rope ? 0 : Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil }, now);
+      drawOperator(ctx, { x: wg.x, y: wg.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: wg.rope ? 0 : Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil }, now);
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
       const F = st.map.floors[Math.max(0, floorAt(st.map, p.x, p.y))];
@@ -2143,7 +2143,7 @@ function draw(s, view, now, dt) {
       ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.arc(p.x, p.y, 15.5, 0, 7); ctx.stroke(); ctx.restore();
       ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     drawOperator(ctx, {
-      x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, slide: p.sd, downed: p.dn,
+      x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, slide: p.sd, downed: p.dn,
       sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
     if (elv) ctx.restore();
@@ -2201,7 +2201,7 @@ function draw(s, view, now, dt) {
     if (a.stepAcc > 31) { a.stepAcc = 0; audio.step(e.x, e.y, surfaceAt(e.x, e.y), 2, false); }
     const ally = e.tm === side; if (!ally && !seen(e.x, e.y)) continue;
     if (ally) ctx.globalAlpha = 0.45;
-    drawOperator(ctx, { x: e.x, y: e.y, aim: e.ag, op: e.op, w: e.w, ally, walk: a.walk, legs: 1 }, now);
+    drawOperator(ctx, { x: e.x, y: e.y, aim: e.ag, op: e.op, w: e.w, ally, ring: tvRing(e), walk: a.walk, legs: 1 }, now);
     ctx.globalAlpha = 1;
   }
   for (const e of ents) if (e.ty === 'smoke') drawSmoke(ctx, e, now, gq.smoke);
@@ -2697,13 +2697,27 @@ function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!e
 function setText(id, v) { const el = $(id), t = String(v); if (el && el.textContent !== t) el.textContent = t; }
 function setCls(el, c, on) { if (el.classList.contains(c) !== on) el.classList.toggle(c, on); }
 
+// Esports TV (he asked): rings by side, defenders blue and attackers orange, whoever the camera rides with
+const tvRing = p => st.tv && p && p.tm ? p.tm === 'def' : undefined;
+// role icons (he asked): simple line drawings in the button's colour
+const RI = {
+  breach: '<path d="M12 2l2 6 6-3-3 6 6 2-6 2 3 6-6-3-2 6-2-6-6 3 3-6-6-2 6-2-3-6 6 3z"/>',
+  entry: '<path d="M14 3h6v18h-6"/><path d="M3 12h11M10 8l4 4-4 4"/>',
+  intel: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  support: '<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/><path d="M12 8v8M8 12h8"/>',
+  flank: '<path d="M4 20V10a6 6 0 0 1 6-6h8"/><path d="M14 0.5l4 3.5-4 3.5"/>',
+  anchor: '<circle cx="12" cy="5" r="2"/><path d="M12 7v14M8 10h8"/><path d="M4 13a8 8 0 0 0 16 0"/>',
+  trapper: '<path d="M3 14a9 9 0 0 0 18 0z"/><path d="M6 14l2-3 2 3 2-3 2 3 2-3 2 3"/>',
+  roamer: '<path d="M8 3c2 0 2.5 3 2 5s-1 3-3 3-2.5-2-2.5-4S6 3 8 3z"/><path d="M16 10c2 0 2.5 3 2 5s-1 3-3 3-2.5-2-2.5-4 1.5-4 3.5-4z"/><path d="M6 13.5h3M14 20.5h3"/>',
+};
+const roleIcon = id => RI[id] ? `<svg class="rIcon" viewBox="0 0 24 24" aria-hidden="true">${RI[id]}</svg>` : '';
 function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;
   if (me.ro) { // on a rope
     if (!me.ro[0]) return me.ro[2] < 0 && !me.ro[4] ? 'LETTING GO…' : `CLIMBING ${Math.round(me.ro[3] * 100)}%`;
     const r = m.ropes[me.ro[1]], atW = r && ropeAtWindow(r, x, y), hop = (i, n) => n >= 0 ? m.floors[m.ropes[n].f].name : i;
-    const what = !atW ? 'MOVE TO SLIDE ALONG THE WALL' : ropeWindowOpen(m, r) ? `<b>${label('vault')}</b>CLIMB IN` : `<b>${label('melee')}</b>BREAK THE BOARDS (OR SHOOT A WAY IN)`;
-    const up = r.up >= 0 ? hop('', r.up) : r.roof ? 'ROOF' : '', upKey = atW && ropeWindowOpen(m, r) ? label('sprint') : label('vault') + (bindsFor('sprint')[0] ? ' / ' + label('sprint') : '');
+    const what = !atW ? 'MOVE TO SLIDE ALONG THE WALL' : ropeWindowOpen(m, r) ? `<b>${label('vault')}</b>CLIMB IN` : ropeWindowBoarded(m, r) ? `<b>${label('vault')}</b>SWING IN THROUGH THE BOARDS` : 'WINDOW BLOCKED';
+    const up = r.up >= 0 ? hop('', r.up) : r.roof ? 'ROOF' : '', upKey = label('sprint');
     return `${what}${up ? `  ·  <b>${upKey}</b>UP TO ${up}` : ''}  ·  <b>${label('interact')}</b>${r.down >= 0 ? 'DOWN TO ' + hop('', r.down) : 'LET GO'}`;
   }
   const down = s.players.find(p => p.a && p.dn && p.tm === side && p.id !== me.id && Math.hypot(p.x - x, p.y - y) < 26);
@@ -2934,7 +2948,7 @@ function drawStairView(s, me, now) {
     const ally = p.tm === side;
     if (!ally && (p.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue;
     const a = anim(p.id);
-    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+    drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
   }
   c.restore();
   // soft round edge, so it melts into this floor's map
@@ -2999,7 +3013,7 @@ function drawWindowView(s, me, now, view) {
     const ally = p.tm === side;
     if (!ally && (p.sh ? !teamSeesBody(at.x, at.y) : !teamSees(at.x, at.y))) continue;
     const a = anim(p.id);
-    drawOperator(c, { x: at.x, y: at.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+    drawOperator(c, { x: at.x, y: at.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
     if (!ally && !p.dn) st.heads.push({ x: at.x + o.x, y: at.y + o.y });
   }
   // darker with distance from the wall: a floor or more down, and it fades out at the end of what you can see
@@ -3050,7 +3064,7 @@ function drawHatchView(s, me, now) {
       const ally = p.tm === side;
       if (!ally && (p.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue;
       const a = anim(p.id);
-      drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
+      drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
       if (!ally && !p.dn) st.heads.push({ x: p.x - o.x, y: p.y - o.y });
     }
     c.fillStyle = 'rgba(8,10,14,0.32)'; c.fillRect(x0, y0, x1 - x0, y1 - y0); // a floor away: a little darker

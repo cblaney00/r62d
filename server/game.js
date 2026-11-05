@@ -1,6 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
-import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight } from '../shared/map.js';
+import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
@@ -931,7 +931,7 @@ export class Game {
       const m = JSON.stringify({ t: 'tvclip', killer: c.killer, victim: c.victim, w: c.w, hs: c.hs, big: c.big, kx: c.kx, ky: c.ky, vx: c.vx, vy: c.vy,
         fr: frames.map(f => ({ t: r2(f.t - c.at), ps: f.ps.filter(e => ids.has(e[0])) })),
         shots: (this.shotLog || []).filter(s => s.t >= c.at - 5 && s.t <= c.at + 1.2 && ids.has(s.id)).map(s => ({ ...s, t: r2(s.t - c.at) })),
-        names: Object.fromEntries([...ids].map(id => { const p = this.players.get(id); return [id, p ? [p.name.replace(/^\[\w+\] /, ''), p.squad === 0 ? 1 : 0] : ['?', 0]]; })) });
+        names: Object.fromEntries([...ids].map(id => { const p = this.players.get(id); return [id, p ? [p.name.replace(/^\[\w+\] /, ''), this.side(p) === TEAM.DEF ? 1 : 0] : ['?', 0]]; })) });
       for (const sk of this.tv.socks) if (sk.open) sk.send(m);
     }
     this.tvClipQ = this.tvClipQ.filter(c => this.time < c.due);
@@ -1397,10 +1397,12 @@ export class Game {
 
   // Vault over the low thing in front of you (toward ang: where you're moving, else where you look).
   startVault(p, ang) {
-    if (p.rope) { // hanging outside a window: climb in once it is open
+    if (p.rope) { // hanging outside a window: climb in, swinging through wooden boards (he chose); never up to the roof
       const r = p.rope.st === 'hang' && this.map.ropes[p.rope.r];
-      if (!r || p.downed) return false;
-      if (!ropeWindowOpen(this.map, r) || !ropeAtWindow(r, p.x, p.y)) return this.ropeUp(p, r); // no way in here: Space goes on up
+      if (!r || p.downed || !ropeAtWindow(r, p.x, p.y)) return false;
+      const smash = !ropeWindowOpen(this.map, r);
+      if (smash && !ropeWindowBoarded(this.map, r)) return false; // reinforced or blocked: no way in here
+      if (smash) { for (const k of r.cells) if (this.map.tiles[k] === T.BARRI) this.destroyCell(k); this.noise(p.x, p.y, this.side(p), 700); }
       p.rope = null;
       p.vault = { x0: p.x, y0: p.y, x1: r.inside.x, y1: r.inside.y, t: 0, dur: VAULT_TIME * 1.3 };
       this.noise(p.x, p.y, this.side(p), 320);

@@ -226,7 +226,7 @@ export function drawOperator(ctx, p, t) {
   const ca = Math.cos(-p.aim), sa = Math.sin(-p.aim);
   LX = -0.6 * ca + 0.8 * sa; LY = -0.6 * sa - 0.8 * ca;
   ctx.save(); ctx.translate(p.x, p.y);
-  ctx.strokeStyle = p.ally ? 'rgba(70,170,255,0.7)' : 'rgba(255,120,40,0.75)'; ctx.lineWidth = 0.9;
+  ctx.strokeStyle = (p.ring ?? p.ally) ? 'rgba(70,170,255,0.7)' : 'rgba(255,120,40,0.75)'; ctx.lineWidth = 0.9;
   ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.stroke();
   const sg = ctx.createRadialGradient(2, 3, 2, 2, 3, 14); sg.addColorStop(0, 'rgba(0,0,0,0.45)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(2, 3, 14, 0, 7); ctx.fill();
@@ -280,7 +280,7 @@ export function drawOperator(ctx, p, t) {
   // ---- torso & plate carrier ----
   const sh = cr ? 0.93 : 1;
   drawTorso(ctx, p.op, o, u, sh);
-  { const tc = p.ally === false ? '#ff8a3d' : '#46a8ff'; // team trim (he chose): an armband on each shoulder in your team's or the enemy's colour
+  { const tc = (p.ring ?? p.ally) === false ? '#ff8a3d' : '#46a8ff'; // (p.ring: Esports TV, by side) // team trim (he chose): an armband on each shoulder in your team's or the enemy's colour
     for (const s of [-1, 1]) { ctx.fillStyle = tc; ctx.beginPath(); ctx.ellipse(-1.2, s * 7.9 * sh, 2, 1.25, 0, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.3; ctx.stroke(); } }
   if (o.team === 'def') { box(ctx, -1.8, -6.2, 1.8, 2.4, 0.4, '#141518'); cap(ctx, -1, -6, -1.5, -10, 0.5, '#111'); } // radio
   if (id === 'slug' || id === 'sticky') { cap(ctx, -4.5, -6.5, 3.5, 6.5, 1.6, '#3a2a1a'); ctx.fillStyle = '#b02a2a'; for (let i = 0; i < 6; i++) ctx.fillRect(-4 + i * 1.3, -5.2 + i * 2.05, 0.9, 1.1); }

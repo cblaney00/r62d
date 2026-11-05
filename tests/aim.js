@@ -28,7 +28,9 @@ for (const [id, w] of Object.entries(WEAPONS)) {
     const aim = 0.7 + Math.random(); p.aim = aim; shots.length = 0;
     g.fire(p, gun, w);
     const tag = `${w.name} ${st.ads ? 'aimed' : 'hip'} ${st.run ? 'running' : 'still'}:`;
-    if (w.pellets === 1 && !near(shots[0], aim)) fail(tag, 'first shot off by', shots[0] - aim);
+    // aimed in: dead on; from the hip: inside the small first-shot cone (HIP_FIRST, he asked), never further
+    const cone0 = spreadCone(w, m, { at: st.ads, run: st.run }) + 1e-9;
+    if (w.pellets === 1 && (st.ads ? !near(shots[0], aim) : Math.abs(shots[0] - aim) > cone0)) fail(tag, 'first shot off by', shots[0] - aim, 'cone', cone0);
     if (w.pellets > 1) { const mid = shots.reduce((a, b) => a + b, 0) / shots.length; if (Math.abs(mid - aim) > 0.01) fail(tag, 'pellets not centred', mid - aim); }
     // follow-ups: inside the cone round aim + recoil
     for (let n = 0; n < 8 && w.pellets === 1; n++) {
@@ -45,7 +47,7 @@ for (const [id, w] of Object.entries(WEAPONS)) {
   tick(30); let off = 0;
   for (let i = 0; i < 6; i++) { g.fire(p, gun, w); p.rc = 0; tick(Math.round(30 * (60 / w.rpm + 0.12))); shots.length = 0; p.aim = 1; g.fire(p, gun, w); off += Math.abs(shots[0] - 1 - 0); p.rc = 0; tick(30); }
   if (off === 0) fail('fast taps were all perfectly exact');
-  tick(Math.ceil(30 * (settleTime(w) + 60 / w.rpm)) + 2); shots.length = 0; p.aim = 1; p.rc = 0; g.fire(p, gun, w);
+  tick(Math.ceil(30 * (settleTime(w) + 60 / w.rpm)) + 2); shots.length = 0; p.aim = 1; p.rc = 0; p.adsT = 1; g.fire(p, gun, w); // (aimed in: the hip has its small first-shot cone)
   if (!near(shots[0], 1)) fail('a shot after waiting the settle time was not exact', shots[0] - 1);
 }
 // a click that arrives with one aim, then more input with another aim before the tick: the shot uses the click's aim
@@ -56,7 +58,7 @@ for (const [id, w] of Object.entries(WEAPONS)) {
   g.handle(p, { t: 'input', s: 1, k: { fire: 1 }, a: 1.234, dt: 0.005 });
   g.handle(p, { t: 'input', s: 2, k: {}, a: 2.5, dt: 0.005 });
   tick(1);
-  if (shots.length !== 1) fail('quick click fired', shots.length, 'shots'); else if (!near(shots[0], 1.234)) fail('quick click used aim', shots[0], 'not 1.234');
+  if (shots.length !== 1) fail('quick click fired', shots.length, 'shots'); else if (Math.abs(shots[0] - 1.234) > spreadCone(w, gunMods('p10'), {}) + 1e-9) fail('quick click used aim', shots[0], 'not 1.234');
 }
 // holding the trigger fires at the gun's real rate (not rounded to whole server ticks); a pistol tapped a hair early still fires
 for (const [id, w] of Object.entries(WEAPONS)) {

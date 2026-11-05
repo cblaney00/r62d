@@ -116,6 +116,8 @@ export const ropeS = (r, x, y) => (x - r.hang.x) * r.tx + (y - r.hang.y) * r.ty;
 export const ropeAtWindow = (r, x, y) => Math.abs(ropeS(r, x, y)) <= r.half - 4;
 // Is this rope's window open enough to climb in (not boarded, reinforced or blocked)?
 export function ropeWindowOpen(m, r) { return r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE); }
+// ...or only wooden boards in the way: a swing in smashes through them (he chose, like Rainbow Six); reinforced stops you
+export function ropeWindowBoarded(m, r) { return r.cells.some(k => m.tiles[k] === T.BARRI) && r.cells.every(k => m.tiles[k] === T.BARRI || m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE); }
 
 // ---- Looking over the roof's edge, and outside cameras (he asked) ----
 // The roof's edge is cut into short straight stretches (up to EDGE_LEN cells) that work like open upper windows:

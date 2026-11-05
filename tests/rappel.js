@@ -31,10 +31,15 @@ for (const id of MAP_LIST) {
     tick(6, { left: 1 }); tick(6, { up: 1 }); const s2 = ropeS(r, a.x, a.y);
     if (r.b - r.a > 20 && !(s1 > s0 + 4 || s2 < s0 - 4)) fail(id, 'rope', r.i, 'could not slide along the wall', s0, s1, s2);
     if (s2 < r.a - 0.5 || s1 > r.b + 0.5) fail(id, 'rope', r.i, 'slid past the end');
-    // back to the window, boarded: no way in
-    for (const k of r.cells) m.tiles[k] = T.BARRI;
+    // back to the window: blocked = no way in and Space never goes up; boarded = Space swings in through the boards (he chose)
     a.x = r.hang.x; a.y = r.hang.y; tick(0.1);
-    { const u = [r.up, r.roof]; r.up = -1; r.roof = null; if (g.startVault(a, 0)) fail(id, 'rope', r.i, 'climbed in through boards'); r.up = u[0]; r.roof = u[1]; } // (with a stop above, Space goes on up instead)
+    const hang = { ...a.rope }, cells0 = r.cells.map(k => m.tiles[k]);
+    for (const k of r.cells) m.tiles[k] = T.HARD;
+    if (g.startVault(a, 0) || !a.rope || a.rope.st !== 'hang') fail(id, 'rope', r.i, 'Space at a blocked window did something', JSON.stringify(a.rope));
+    r.cells.forEach((k, i) => { m.tiles[k] = cells0[i]; });
+    g.barricade(m.openId[r.cells[0]], T.BARRI, true);
+    if (!g.startVault(a, 0) || r.cells.some(k => m.tiles[k] === T.BARRI)) fail(id, 'rope', r.i, 'Space did not swing in through the boards');
+    a.vault = null; a.rope = hang; a.x = r.hang.x; a.y = r.hang.y; tick(0.1);
     // three melee hits from the rope break the boards
     g.barricade(m.openId[r.cells[0]], T.BARRI, true); a.aim = r.out + Math.PI;
     for (let i = 0; i < 3; i++) { a.meleeCd = 0; g.melee(a); }

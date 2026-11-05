@@ -607,8 +607,11 @@ export const penOf = w => w.pen || PEN[w.cls] || 0.5;
 // how "hot" the gun still is: the shots of this burst, cooling to 0 over the settle time (fractions make a smaller cone)
 export const aimHeat = (w, shots, idle, m) => shots * Math.max(0, 1 - Math.max(0, idle - 60 / w.rpm * 1.05) / (settleTime(w) * (m && m.settle || 1)));
 // half-width of the cone (radians) for the next shot; shots = shots already fired in this burst
+export const HIP_FIRST = 0.022;
 export function spreadCone(w, m, { at = 0, run = 0, crouch = false, shots = 0 } = {}) {
-  if (shots <= 0 && w.pellets === 1) return 0;
+  // a settled first shot: dead on when aimed in, but from the hip a small cone (he asked: hip headshots were too easy).
+  // HIP_FIRST rad at most: still on the body at 5 m, a headshot past a few metres mostly luck; it closes as you aim in
+  if (shots <= 0 && w.pellets === 1) return (HIP_FIRST + run * 0.05) * m.hip * (1 - at);
   const f = w.pellets > 1 ? 1 : Math.min(1, shots); // partly cooled: a partly opened cone
   const hip = (w.spread * (crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip;
   const ads = w.ads * m.adsSpread * (1 + run * 0.5);
