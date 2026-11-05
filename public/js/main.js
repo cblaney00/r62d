@@ -20,7 +20,7 @@ import { openMapInfo, closeMapInfo } from './mapinfo.js';
 import { openPlaybook, closePlaybook } from './playbook.js';
 import { openKnowledge, closeKnowledge } from './knowledge.js';
 import { PRO_TEAMS } from '/shared/pros.js';
-import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair } from './crosshair.js';
+import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair, drawSightLook } from './crosshair.js';
 import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
@@ -2227,11 +2227,19 @@ function draw(s, view, now, dt) {
       fctx.fillStyle = '#000'; fillPoly(fctx, visionPolygon(v, sm, v === view ? 0 : 140));
     }
     fctx.globalCompositeOperation = 'source-over';
-  }
+    // past an upper floor's (or the roof's) edge: the ground far below, as in its open air (mapdraw makeBelow), never live
+    const fb = st.floorRect, below = st.rend.below && st.rend.below.off[st.camFloor];
+    st.belowOut = !!(fb && below);
+    if (st.belowOut) {
+      const L = st.cam.x - ex - 50, Tp = st.cam.y - ey - 50, W2 = ex * 2 + 100, H2 = ey * 2 + 100;
+      fctx.save(); fctx.beginPath(); fctx.rect(L, Tp, W2, H2); fctx.rect(fb[0], fb[1], fb[2] - fb[0], fb[3] - fb[1]); fctx.clip('evenodd'); fctx.fillStyle = '#000'; fctx.fillRect(L, Tp, W2, H2);
+      st.rend.drawBelow(fctx, st.camFloor, L, Tp, W2, H2); fctx.restore();
+    }
+  } else st.belowOut = false;
   // everything from here on goes on the top layer, above the blackout
   ctx = octx; overDirty = true;
   ctx.setTransform(TA, TB, TC, TD, ox, oy);
-  if (st.floorRect) { // hide the neighbouring floors that sit beside this one in the map grid
+  if (st.floorRect && !st.belowOut) { // hide the neighbouring floors that sit beside this one in the map grid (the fog step covers them with the ground below)
     const [a, b, c, d] = st.floorRect;
     ctx.fillStyle = '#050607';
     const L = st.cam.x - ex - 50, R = st.cam.x + ex + 50, Tp = st.cam.y - ey - 50, B = st.cam.y + ey + 50;
@@ -2425,43 +2433,7 @@ function gunHeat(me, w, now) {
   return Math.max(srv, own);
 }
 
-// each sight has its own faint look while aiming in (he asked: interesting but never in the way); nothing covers the middle
-function sightLook(sight, x, y, k) {
-  const W = ctx.canvas.width, H = ctx.canvas.height, d = DPR;
-  ctx.save();
-  if (sight === 'reddot') { // a soft red bloom round the crosshair, like the glass of the dot catching light
-    const g = ctx.createRadialGradient(x, y, 4 * d, x, y, 34 * d); g.addColorStop(0, `rgba(255,60,60,${0.10 * k})`); g.addColorStop(1, 'rgba(255,60,60,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 34 * d, 0, 7); ctx.fill();
-  } else if (sight === 'holo') { // the holographic ring, broken at the four points
-    ctx.strokeStyle = `rgba(120,230,255,${0.38 * k})`; ctx.lineWidth = 1.3 * d;
-    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(x, y, 26 * d, i * Math.PI / 2 + 0.25, (i + 1) * Math.PI / 2 - 0.25); ctx.stroke(); }
-  } else if (sight === 'prism') { // an amber chevron under the crosshair and a faint etched ring
-    ctx.strokeStyle = `rgba(255,170,60,${0.6 * k})`; ctx.lineWidth = 1.6 * d;
-    ctx.beginPath(); ctx.moveTo(x - 7 * d, y + 20 * d); ctx.lineTo(x, y + 13 * d); ctx.lineTo(x + 7 * d, y + 20 * d); ctx.stroke();
-    ctx.strokeStyle = `rgba(255,170,60,${0.16 * k})`; ctx.lineWidth = d; ctx.beginPath(); ctx.arc(x, y, 44 * d, 0, 7); ctx.stroke();
-  } else if (sight === 'sniper') { // a proper sniper reticle: fine cross with mil-dots, thick posts, the lens ring
-    const R = scopeLensR(), a = k;
-    ctx.lineCap = 'butt';
-    ctx.strokeStyle = `rgba(0,0,0,${0.85 * a})`; ctx.lineWidth = 2.2 * d; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.stroke(); // lens edge
-    ctx.strokeStyle = `rgba(160,190,210,${0.25 * a})`; ctx.lineWidth = d; ctx.beginPath(); ctx.arc(x, y, R - 3 * d, 0, 7); ctx.stroke();
-    const gap = R * 0.45, fine = R * 0.06;
-    ctx.strokeStyle = `rgba(0,0,0,${0.9 * a})`; ctx.lineWidth = 3 * d; // posts from the edge in
-    for (const [ux, uy] of [[1, 0], [-1, 0], [0, 1]]) { ctx.beginPath(); ctx.moveTo(x + ux * (R - 2 * d), y + uy * (R - 2 * d)); ctx.lineTo(x + ux * gap, y + uy * gap); ctx.stroke(); }
-    ctx.lineWidth = 1.1 * d; ctx.beginPath(); // the fine cross
-    ctx.moveTo(x - gap, y); ctx.lineTo(x - fine, y); ctx.moveTo(x + fine, y); ctx.lineTo(x + gap, y);
-    ctx.moveTo(x, y - R + 2 * d); ctx.lineTo(x, y - fine); ctx.moveTo(x, y + fine); ctx.lineTo(x, y + gap); ctx.stroke();
-    ctx.fillStyle = `rgba(0,0,0,${0.9 * a})`; // mil-dots
-    for (let i = 1; i <= 4; i++) { const o = fine + (gap - fine) * i / 4.5; for (const [px, py] of [[o, 0], [-o, 0], [0, o], [0, -o]]) { ctx.beginPath(); ctx.arc(x + px, y + py, 1.2 * d, 0, 7); ctx.fill(); } }
-    ctx.fillStyle = `rgba(255,70,50,${0.95 * a})`; ctx.beginPath(); ctx.arc(x, y, 1.4 * d, 0, 7); ctx.fill(); // the lit centre
-  } else if (sight === 'scope') { // a lens: the screen edges darken a little, range ticks beside the crosshair
-    const r = Math.hypot(W, H) / 2, g = ctx.createRadialGradient(W / 2, H / 2, r * 0.55, W / 2, H / 2, r);
-    g.addColorStop(0, 'rgba(0,8,14,0)'); g.addColorStop(1, `rgba(0,8,14,${0.42 * k})`);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = `rgba(0,0,0,${0.5 * k})`; ctx.lineWidth = d;
-    for (const sgn of [-1, 1]) for (let i = 1; i <= 3; i++) { const o = (26 + i * 9) * d; ctx.beginPath(); ctx.moveTo(x + sgn * o, y - 3 * d); ctx.lineTo(x + sgn * o, y + 3 * d); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x - 3 * d, y + o); ctx.lineTo(x + 3 * d, y + o); ctx.stroke(); }
-  }
-  ctx.restore();
-}
+const sightLook = (sight, x, y, k) => drawSightLook(ctx, sight, x, y, k, DPR, scopeLensR()); // in crosshair.js, shared with the Armory
 // the sniper's clear lens, in canvas px, and the blurred, dimmed view round it (#scopeVeil; its CSS only changes when it
 // moves a pixel, so the browser isn't asked to redo the blur's mask every frame for nothing)
 const scopeLensR = () => Math.min(VW, VH) * 0.1; // he asked for a third of the first size (it was 0.3)
@@ -3264,7 +3236,7 @@ function setTab(tab) {
   if ((tab === 'ops' || tab === 'profile') && !st.token) { audio.ui('back'); $('name').focus(); tab = 'play'; }
   if (tab === 'ops') { showOps(); return; }
   if (tab === 'profile') { showProfile(); return; }
-  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR }); return; }
+  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR, steady: () => $('steadySens').value / 100, low: () => gfxLevel() === 'low' }); return; }
   if (tab === 'maps') { audio.ui('open'); openMapInfo($('mapsPage')); return; }
   if (tab === 'knowledge') { audio.ui('open'); openKnowledge($('bkPage')); return; }
   if (tab === 'playbook') { audio.ui('open'); trainInfo(); openPlaybook($('playbookPage')); return; }

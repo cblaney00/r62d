@@ -4,7 +4,7 @@
 // match (he asked): the mouse is captured on the first click, the crosshair moves with your sensitivity and aiming mode,
 // it is your own crosshair, distances are real metres, the view widens when you aim in and follows the crosshair out.
 import { PX_PER_M } from '/shared/constants.js';
-import { drawXhair } from './crosshair.js';
+import { drawXhair, drawSightLook } from './crosshair.js';
 import { lockMouse } from './keys.js';
 import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -22,7 +22,7 @@ const modsOf = w => gunMods(w, attOf(w));
 
 let S = null; // range state while open
 window.__armory = () => S; // for screenshot tests
-let O = { sens: () => 1, xh: () => null, mode: () => 'free', dpr: () => 1 }; // the match's settings, from main.js
+let O = { sens: () => 1, xh: () => null, mode: () => 'free', dpr: () => 1, steady: () => 0.4, low: () => false }; // the match's settings, from main.js
 
 // Esc while the mouse is captured only lets go of it (as in a match); it doesn't close the Armory
 export function armoryHoldsEsc() {
@@ -41,7 +41,7 @@ export function openArmory(el, opts) {
   cv.onmousemove = e => {
     const dpr = O.dpr();
     if (document.pointerLockElement === cv) {
-      const k = O.sens(S.mouse.r) * dpr;
+      const k = O.sens(S.mouse.r) * (steadying() ? O.steady() : 1) * dpr;
       if (O.mode() === 'cursor') { S.mouse.x = Math.max(0, Math.min(cv.width, S.mouse.x + e.movementX * k)); S.mouse.y = Math.max(0, Math.min(cv.height, S.mouse.y + e.movementY * k)); }
       else freeMove(e.movementX * k, e.movementY * k);
     } else { const r = cv.getBoundingClientRect(); S.mouse.x = (e.clientX - r.left) * dpr; S.mouse.y = (e.clientY - r.top) * dpr; }
@@ -75,9 +75,10 @@ export function openArmory(el, opts) {
     cv.addEventListener('touchend', tend); cv.addEventListener('touchcancel', tend);
   }
   S.up = e => { if (e.button === 0) S.mouse.l = false; if (e.button === 2) S.mouse.r = false; };
-  S.key = e => { if (e.code === 'KeyR') reload(); };
+  S.key = e => { if (e.code === 'KeyR') reload(); if (e.key === 'Shift') S.shift = true; };
+  S.keyUp = e => { if (e.key === 'Shift') S.shift = false; };
   S.lock = () => { S.lockAsked = false; if (document.pointerLockElement !== cv) { S.unlockT = performance.now(); S.mouse.l = S.mouse.r = false; } };
-  addEventListener('mouseup', S.up); addEventListener('keydown', S.key); document.addEventListener('pointerlockchange', S.lock);
+  addEventListener('mouseup', S.up); addEventListener('keydown', S.key); addEventListener('keyup', S.keyUp); document.addEventListener('pointerlockchange', S.lock);
   for (const b of el.querySelectorAll('#armDist button')) b.onclick = () => { audio.ui(); S.dist = +b.dataset.d; resetRange(el); };
   el.querySelector('#armReset').onclick = () => { audio.ui(); resetRange(el); };
   let last = performance.now();
@@ -87,7 +88,7 @@ export function openArmory(el, opts) {
 export function closeArmory(el) {
   el.classList.add('hidden');
   if (!S) return;
-  cancelAnimationFrame(S.raf); removeEventListener('mouseup', S.up); removeEventListener('keydown', S.key); document.removeEventListener('pointerlockchange', S.lock);
+  cancelAnimationFrame(S.raf); removeEventListener('mouseup', S.up); removeEventListener('keydown', S.key); removeEventListener('keyup', S.keyUp); S.shift = false; veil(null); document.removeEventListener('pointerlockchange', S.lock);
   if (document.pointerLockElement === S.cv) document.exitPointerLock();
   S.mouse.l = S.mouse.r = false;
 }
@@ -136,6 +137,7 @@ function tick(el, dt) {
   const w = WEAPONS[S.w], cv = el.querySelector('#armCanvas');
   S.t += dt; S.fireCd -= dt; S.bloom = Math.max(0, S.bloom - dt * 0.15);
   S.adsT = Math.max(0, Math.min(1, S.adsT + (S.mouse.r ? 1 : -2) * dt / (adsTime(w) * modsOf(S.w).ads)));
+  sway(dt);
   if (S.t - S.lastShot > 0.1) S.rc *= Math.exp(-dt * 12);
   if (S.shots && !aimHeat(w, S.shots, S.t - S.lastShot, modsOf(S.w))) { S.rc = 0; S.shots = 0; } // settled: the next shot is exact
   if (S.reloadT > 0) { S.reloadT -= dt; if (S.reloadT <= 0) { S.ammo = w.mag; audio.foley(w.cls === 'Shotgun' ? 'shell' : 'magIn', undefined, undefined, true); } }
@@ -157,10 +159,31 @@ function tick(el, dt) {
 // most) and growing / sliding to keep you and the crosshair on screen (main.js camera, reach circle, keep).
 const ROOM_W = 330; // the range is this wide either side of you
 const farEnd = () => S.dist * M + 60; // the backstop
-const scoped = () => /scope|sniper/.test(String(attOf(S.w).sight || ''));
+const scoped = () => /scope|sniper/.test(String(attOf(S.w).sight || '')), sniper = () => attOf(S.w).sight === 'sniper';
+const steadying = () => !!(S && S.mouse.r && S.shift && sniper()); // Shift while scoped: steady aim, slower mouse (as in a match)
 const reach = () => aimReach(attOf(S.w).sight, !!S.mouse.r) * PX_PER_M; // the match's circle of reach (main.js reachOf)
 const aimMin = () => 46 * O.dpr() / (S.z || 1), aimMax = () => S.reachW || 400;
-function adsAim() { const l = Math.hypot(S.aim.x, S.aim.y) || 1, d = adsStart(attOf(S.w).sight) * M; S.aim = { x: S.aim.x / l * d, y: S.aim.y / l * d }; } // per sight, as in a match
+function adsAim() { // per sight, as in a match; the sniper scope jumps out to the targets (or the wall, if that is nearer)
+  const l = Math.hypot(S.aim.x, S.aim.y) || 1, ux = S.aim.x / l, uy = S.aim.y / l;
+  if (sniper()) { const R = reach(); S.aim = { x: ux * R, y: uy * R }; const to = Math.max(aimMin(), Math.min(R, S.dist * M, aimPoint(S.cv).d - 2)); S.aim = { x: ux * to, y: uy * to }; return; }
+  const d = adsStart(attOf(S.w).sight) * M; S.aim = { x: ux * d, y: uy * d };
+}
+// the sniper scope sways in a slow figure of eight (main.js scopeSway); Shift steadies it
+function sway(dt) {
+  const want = sniper() ? S.adsT * (steadying() ? 0.0008 : 0.011) : 0;
+  S.swayA = (S.swayA || 0) + (want - (S.swayA || 0)) * (1 - Math.exp(-dt * (want < (S.swayA || 0) ? 22 : 4)));
+  const v = S.swayA * (Math.sin(S.t * 1.3) + 0.5 * Math.sin(S.t * 2.9 + 1)), d = v - (S.swayV || 0); S.swayV = v;
+  if (d && O.mode() !== 'cursor') { const c = Math.cos(d), s = Math.sin(d); S.aim = { x: S.aim.x * c - S.aim.y * s, y: S.aim.x * s + S.aim.y * c }; }
+}
+const lensR = cv => Math.min(cv.width, cv.height) * 0.1; // same share of the view as a match's lens
+function veil(p, cv) { // the blurred, dimmed range round the clear lens (#armVeil, like the match's #scopeVeil)
+  const el = document.getElementById('armVeil'); if (!el) return;
+  if (!p) { el.classList.add('hidden'); S.veilK = ''; return; }
+  const dpr = O.dpr(), k = [cv.offsetLeft, cv.offsetTop, cv.offsetWidth, cv.offsetHeight, Math.round(p.x / dpr), Math.round(p.y / dpr), Math.round(lensR(cv) / dpr), O.low()].join();
+  el.classList.remove('hidden'); if (S.veilK === k) return; S.veilK = k; el.classList.toggle('flat', O.low());
+  Object.assign(el.style, { left: cv.offsetLeft + 'px', top: cv.offsetTop + 'px', width: cv.offsetWidth + 'px', height: cv.offsetHeight + 'px' });
+  el.style.setProperty('--sx', Math.round(p.x / dpr) + 'px'); el.style.setProperty('--sy', Math.round(p.y / dpr) + 'px'); el.style.setProperty('--sr', Math.round(lensR(cv) / dpr) + 'px');
+}
 function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): sideways turns as if never past TURN_R
   const z = S.z || 1; dx /= z; dy /= z;
   const o = S.aim, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = aimMin(), hi = aimMax();
@@ -185,12 +208,12 @@ function aimPoint(cv) {
 }
 function aimAngle(cv) { const p = aimPoint(cv); return Math.atan2(p.y, p.x); }
 function camera(cv, dt) {
-  const H = cv.height, e = Math.min(cv.width / H / 2, 0.5), mg = 86 * O.dpr() / (S.z || 1), q = aimPoint(cv);
+  const H = cv.height, e = Math.min(cv.width / H / 2, 0.5), lens = sniper() && S.mouse.r ? lensR(cv) : 0, mg = (86 * O.dpr() + lens) / (S.z || 1), q = aimPoint(cv);
   // looking up a long lane, like down a sightline in a match: the view grows up to 680 and slides ahead
   const far = farEnd(), want = Math.max(470, Math.min(680, (far + 110) / (2 * 0.5)));
   if (!S.envH || Math.abs(want - S.envH) > S.envH * 0.15) S.envH = S.envH || want, S.envWant = want;
   S.envH += ((S.envWant || want) - S.envH) * (1 - Math.exp(-dt * 6));
-  S.adsZ += ((S.mouse.r ? (scoped() ? 1.3 : 1.12) : 1) - S.adsZ) * (1 - Math.exp(-dt * 18));
+  S.adsZ += ((S.mouse.r ? (sniper() ? 1.5 : scoped() ? 1.3 : 1.12) : 1) - S.adsZ) * (1 - Math.exp(-dt * 18));
   let vh = S.envH * S.adsZ;
   if (O.mode() !== 'cursor') {
     S.reachW = reach();
@@ -200,7 +223,7 @@ function camera(cv, dt) {
   }
   S.z = H / vh;
   const half = vh * 0.5, lead = Math.max(0, Math.min(half - 70, far - (half - 40))); // (not "reach": that name is the reach circle above)
-  const lx = q.x * 0.22, ly = q.y * 0.22, ll = Math.hypot(lx, ly), mx = vh * (S.mouse.r ? (scoped() ? 0.46 : 0.32) : 0.2);
+  const lx = q.x * 0.22, ly = q.y * 0.22, ll = Math.hypot(lx, ly), mx = vh * (S.mouse.r ? (sniper() ? 0.5 : scoped() ? 0.46 : 0.32) : 0.2);
   let ax = ll > mx ? lx / ll * mx : lx, ay = ll > mx ? ly / ll * mx : ly;
   if (lead > Math.hypot(ax, ay)) { ax = 0; ay = -lead; }
   S.leadV = S.leadV || { x: ax, y: ay }; const kl = 1 - Math.exp(-dt * 4);
@@ -211,7 +234,7 @@ function camera(cv, dt) {
   if (O.mode() !== 'cursor') {
     const hw = cv.width / 2 / S.z, hh = H / 2 / S.z;
     const keep = (x, y, m) => { S.cam.x = Math.min(x + hw - m, Math.max(x - hw + m, S.cam.x)); S.cam.y = Math.min(y + hh - m, Math.max(y - hh + m, S.cam.y)); };
-    keep(0, 0, 50 * O.dpr() / S.z); keep(q.x, q.y, 36 * O.dpr() / S.z);
+    keep(0, 0, 50 * O.dpr() / S.z); keep(q.x, q.y, (36 * O.dpr() + lens) / S.z); // the whole sniper lens stays on screen
   }
 }
 
@@ -307,7 +330,9 @@ function draw(cv, dt) {
     if (on) { c.fillStyle = 'rgba(255,59,59,0.22)'; c.fill(); }
   }
   const cone = spreadCone(w, modsOf(S.w), { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot, modsOf(S.w)) }), xh = O.xh();
-  if (xh) drawXhair(c, x, y, xh, xh.dynamic ? Math.tan(cone) * Math.hypot(Q.x - O0.x, Q.y - O0.y) / dpr : 0, dpr);
+  if (S.adsT > 0.05) drawSightLook(c, attOf(S.w).sight, x, y, Math.min(1, S.adsT), dpr, lensR(cv));
+  veil(S.adsT > 0.3 && sniper() ? { x, y } : null, cv);
+  if (xh && !(sniper() && S.adsT > 0.6)) drawXhair(c, x, y, xh, xh.dynamic ? Math.tan(cone) * Math.hypot(Q.x - O0.x, Q.y - O0.y) / dpr : 0, dpr);
   const dm = q.d / M;
   if (dm >= 8) {
     c.font = `700 ${12 * dpr}px Barlow Condensed, sans-serif`; c.textAlign = 'left'; c.textBaseline = 'top';

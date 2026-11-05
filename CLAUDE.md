@@ -289,3 +289,8 @@ His wishes so far:
 - He asked: a lot faster, more power allowed, and practice with each new gameplay change. The practice version is `PLAY_VERSION` in server.js (a fingerprint of every .js in server/ and shared/), not the git commit, so menu/art/sound changes don't trigger it. `TRAIN_WORKERS` threads (cores/4, 1–6, `R62D_TRAIN_WORKERS`) share the rounds at duty 1 (`workerData.duty`; `R62D_TRAIN_DUTY` still overrides). 200 rounds ~1 min on his PC (was ~15).
 - The real saving: `angleOn` (which corner a bot watches) ran a full `findPath` and was 63% of practice; it now passes `cap` `ANGLE_CAP` 2500 + `near` (returns the way to the closest cell reached). `siteIntel` is cached per map build (`INTEL` WeakMap in shared/pros.js). Measure with a bot-only loop: ~0.35 ms a tick (was ~0.8).
 
+
+## Batch of 2026-11-05
+- Ground far below (he asked: the air round upper floors and the roof was black): `makeBelow`/`drawBelow` in mapdraw.js (the ground floor is drawn first, copied once at 1/5 size, dulled, box-blurred, indoor cells painted as roofs); void cells of floors above ground show it in the map picture, and the fog step draws it past the floor's edge (`st.belowOut` skips the black `floorRect` fill).
+- Armory sniper: `drawSightLook` (moved from main.js `sightLook` to crosshair.js) shared with the Armory; armory.js `sniper`/`steadying`/`sway`/`veil` (`#armVeil`, same CSS as `#scopeVeil`), aim-in jumps to the targets' distance, options `steady`/`low` from main.js.
+- `AIM_REACH` prism 36, scope 44, sniper 64 m (he asked; red dot/holo unchanged).

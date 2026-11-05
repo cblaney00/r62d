@@ -43,7 +43,60 @@ export class MapRenderer {
     this.pat = floorPatterns(this.ctx);
     // (there is no grey copy any more: the fog layer draws this picture and the browser greys it, CSS filter on #fog.
     // Keeping a grey copy up to date with ctx.filter is what made his real Firefox slower the longer he played.)
-    this.region(0, 0, map.W - 1, map.H - 1);
+    // the ground floor first, so the open air beside the upper floors and the roof can show it far below (makeBelow)
+    const gi = map.groundFloor ?? 0, G = map.floors && map.floors[gi];
+    if (G && map.floors.length > gi + 1) {
+      this.region(G.gx, 0, G.gx + G.w - 1, map.H - 1); this.makeBelow(gi);
+      if (G.gx > 0) this.region(0, 0, G.gx - 1, map.H - 1);
+      this.region(G.gx + G.w, 0, map.W - 1, map.H - 1);
+    } else this.region(0, 0, map.W - 1, map.H - 1);
+  }
+  // Far below (he asked: the open air beside an upper floor or the roof was plain black): the ground floor's outdoors,
+  // made once when the map is drawn: small, so it comes out blurred when stretched, dulled and darkened, buildings below
+  // shown as plain roofs. It never changes during the round, so it reads as the view far below, not live sight
+  // (looking out of a window still shows the real ground there: drawWindowView in main.js).
+  makeBelow(gi) {
+    const m = this.map, G = m.floors[gi], K = 0.2, w = Math.ceil(G.w * CELL * K), h = Math.ceil(G.h * CELL * K);
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high';
+    this.c.drawTo(x, G.gx * CELL * this.S, 0, G.w * CELL * this.S, G.h * CELL * this.S, 0, 0, w, h);
+    const inRoom = new Uint8Array(m.W * m.H);
+    for (const r of m.rooms || []) for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) if (xx >= 0 && yy >= 0 && xx < m.W && yy < m.H) inRoom[yy * m.W + xx] = 1;
+    const OUT_FL = new Set([FL.GRASS, FL.ASPHALT, FL.SAND, FL.SNOW]);
+    for (let cy = 0; cy < G.h; cy++) for (let cx = G.gx; cx < G.gx + G.w; cx++) { // a building below: its roof, not its rooms
+      const k = cy * m.W + cx, t = m.tiles[k];
+      if (t === T.GROUND || t === T.VOID || (!inRoom[k] && !SOLID.has(t) && OUT_FL.has(m.floor[k]))) continue;
+      const v = 92 + hash(cx >> 1, cy >> 1, 5) * 14 | 0; x.fillStyle = `rgb(${v},${v + 2},${v + 6})`;
+      x.fillRect((cx - G.gx) * CELL * K, cy * CELL * K, CELL * K + 0.5, CELL * K + 0.5);
+    }
+    const d = x.getImageData(0, 0, w, h), px = d.data, f = new Float32Array(w * h * 3);
+    for (let i = 0, j = 0; i < px.length; i += 4, j += 3) { // dull: most of the colour gone, dark, a little cool
+      const l = px[i] * 0.3 + px[i + 1] * 0.59 + px[i + 2] * 0.11;
+      f[j] = (l + (px[i] - l) * 0.35) * 0.8; f[j + 1] = (l + (px[i + 1] - l) * 0.35) * 0.8; f[j + 2] = (l + (px[i + 2] - l) * 0.35) * 0.8 + 6;
+    }
+    const blur = (n, step, lines, stride) => { // box blur (radius 1) along one direction of every line
+      const tmp = new Float32Array(n * 3);
+      for (let L = 0; L < lines; L++) {
+        const b = L * stride;
+        for (let i = 0; i < n; i++) for (let ch = 0; ch < 3; ch++) {
+          let sum = 0, q = 0; for (let o = -1; o <= 1; o++) { const ii = i + o; if (ii >= 0 && ii < n) { sum += f[(b + ii * step) * 3 + ch]; q++; } }
+          tmp[i * 3 + ch] = sum / q;
+        }
+        for (let i = 0; i < n; i++) for (let ch = 0; ch < 3; ch++) f[(b + i * step) * 3 + ch] = tmp[i * 3 + ch];
+      }
+    };
+    for (let r = 0; r < 2; r++) { blur(w, 1, h, w); blur(h, w, w, 1); }
+    for (let i = 0, j = 0; i < px.length; i += 4, j += 3) { px[i] = f[j]; px[i + 1] = f[j + 1]; px[i + 2] = f[j + 2]; px[i + 3] = 255; }
+    x.putImageData(d, 0, 0);
+    // which floor each column belongs to, and what to add to a point there to get the ground under it (-floorOff)
+    const col = new Int16Array(m.W).fill(-1), off = [];
+    m.floors.forEach((F, i) => { if (i <= gi) return; off[i] = { x: ((F.x0 - F.gx) - (G.x0 - G.gx)) * CELL, y: (F.y0 - G.y0) * CELL }; for (let cx = F.gx; cx < F.gx + F.w && cx < m.W; cx++) col[cx] = i; });
+    this.below = { c, K, G, col, off };
+  }
+  // draw the view far below into world rect (x, y, w, h) of floor fi; the caller clips to where it shows
+  drawBelow(ctx, fi, x, y, w, h) {
+    const b = this.below, o = b && b.off[fi]; if (!o) return;
+    ctx.drawImage(b.c, (x + o.x - b.G.gx * CELL) * b.K, (y + o.y) * b.K, w * b.K, h * b.K, x, y, w, h);
   }
   // run fn once for every piece of the map picture that a world rectangle touches, with this.ctx drawing in world units there
   onTiles(x0, y0, x1, y1, fn) {
@@ -85,13 +138,17 @@ export class MapRenderer {
     }
     // the map's own painted details (road lines, mats, stains)
     for (const fn of m.decor || []) fn(x);
-    // void: open air beside upper floors, earth around basements
+    // void: open air beside upper floors (the ground far below shows through it: makeBelow), earth around basements
+    const B = this.below, airs = new Map();
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
       const vk = cy * m.W + cx;
       if (m.tiles[vk] !== T.VOID && m.floor[vk] !== FL.VOID) continue;
       x.fillStyle = m.tiles[vk] === T.VOID ? '#07090c' : '#101318'; x.fillRect(cx * CELL, cy * CELL, CELL, CELL);
+      const fi = B ? B.col[cx] : -1;
+      if (fi > 0 && B.off[fi]) { if (!airs.has(fi)) airs.set(fi, new Path2D()); airs.get(fi).rect(cx * CELL, cy * CELL, CELL, CELL); continue; }
       if (hash(cx, cy, 9) < 0.25) { x.fillStyle = 'rgba(255,255,255,0.025)'; x.fillRect(cx * CELL + hash(cx, cy, 1) * 12, cy * CELL + hash(cx, cy, 2) * 12, 3, 3); }
     }
+    for (const [fi, path] of airs) { x.save(); x.clip(path); this.drawBelow(x, fi, x0 * CELL, y0 * CELL, (x1 - x0 + 1) * CELL, (y1 - y0 + 1) * CELL); x.restore(); }
     // sloped wall cells are open on one or both sides: each small patch shows the floor of the nearest plain neighbour
     if (m.shape) for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
       if (!m.shape[cy * m.W + cx]) continue;
