@@ -302,6 +302,8 @@ export function drawOperator(ctx, p, t) {
   if (p.reload) ctx.rotate(0.38 + Math.sin(t * 9) * 0.05);
   if (p.sprint) ctx.rotate(p.sprint * 0.85); // sprinting: gun down across the body
   ctx.translate(p.ads || p.slide ? 2 : 0, p.ads || p.slide ? 0 : 1.4); // sliding: the gun is up as if aiming in, the only way you can hold it
+  const up = p.up > 0.02 ? Math.min(1, p.up) : 0; // aiming up through a hatch (he asked, pose only): seen from above the raised gun and arms look short
+  if (up) { ctx.translate(-1.5 * up, 0); ctx.scale(1 - 0.55 * up, 1 + 0.08 * up); }
   const glove = (x, y) => { ell(ctx, x, y, 1.7, 1.6, '#1f1f20'); };
   if (shield) { // the shield hand holds the grip on the inside of the shield, wherever it has swung to (he asked)
     const sp = p.shieldPose || { rot: 0 }, ga = sp.rot - 0.45, hx = -2 + 10.6 * Math.cos(ga), hy = 10.6 * Math.sin(ga);
@@ -316,6 +318,12 @@ export function drawOperator(ctx, p, t) {
     drawGun(ctx, p.w, rec);
     limb(ctx, [-0.5, -7 * bw, 4, -6.5, 4 + L * 0.52 - rec, 0.9], 3.2, u.cloth);
     glove(5.5 - rec, 2.6); glove(4 + L * 0.52 - rec, 0.9);
+  }
+  if (up && WEAPONS[p.w] && !shield) { // the muzzle points at you: its dark bore and a bright rim at the gun's front
+    const mx = (pistol ? 7.5 : 4 + L) - rec, r = 0.9 + 0.7 * up;
+    ctx.save(); ctx.translate(mx, 1.2); ctx.scale(1 / (1 - 0.55 * up), 1);
+    ctx.fillStyle = '#0b0c0e'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(190,200,210,0.75)'; ctx.lineWidth = 0.45; ctx.stroke(); ctx.restore();
   }
   if (id === 'dart') { box(ctx, 5 + L * 0.2, -4.8, 3.5, 1.8, 0.5, '#2b3a38'); ctx.fillStyle = '#4fb3a9'; ctx.fillRect(7.6 + L * 0.2, -4.4, 0.8, 0.8); }
   if (id === 'scan') { box(ctx, 4 + L * 0.2, -5.4, 3.6, 2.2, 0.5, '#1d2030'); ctx.fillStyle = p.scan ? '#a0b0ff' : '#4656c0'; ctx.fillRect(4.6 + L * 0.2, -4.9, 2.4, 1.2); }
@@ -348,6 +356,7 @@ export function drawOperator(ctx, p, t) {
 
   if (p.slide) { ctx.translate(3.4, 0.5); ctx.rotate(0.14); } // sliding (he asked): the head leans down onto the gun, as when aiming in
   // ---- head & headgear ----
+  if (up) ctx.translate(-1.6 * up, 0); // head tipped back
   ell(ctx, 0.8, 0, 4.3, 4.3, skin);
   const earCups = () => { ell(ctx, 0, -4.7, 1.8, 1.3, '#151618'); ell(ctx, 0, 4.7, 1.8, 1.3, '#151618'); };
   const hg = HEADGEAR[p.op];
@@ -385,6 +394,12 @@ export function drawOperator(ctx, p, t) {
       box(ctx, 3.4, -1.4, 1.8, 2.8, 0.4, '#141516');                                   // NVG mount
       ctx.fillStyle = o.color; ctx.fillRect(-4.5, -0.6, 3.2, 1.2);
       if (id === 'stim') { ctx.fillStyle = '#fff'; ctx.fillRect(-3.2, -1.7, 3.4, 3.4); ctx.fillStyle = '#c22'; ctx.fillRect(-2.1, -1.4, 1.2, 2.8); ctx.fillRect(-2.9, -0.6, 2.8, 1.2); }
+  }
+  if (up) { // tipped back, the face shows past the front of the helmet: chin and eyes
+    ctx.globalAlpha *= Math.min(1, up * 1.4);
+    ell(ctx, 4.6, 0, 1.9, 3.1, skin); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(5.8, -1.6, 0.5, 3.2);
+    ctx.fillStyle = '#121314'; for (const yy of [-1.4, 1.4]) { ctx.beginPath(); ctx.arc(4.2, yy, 0.5, 0, 7); ctx.fill(); }
+    ctx.globalAlpha /= Math.min(1, up * 1.4);
   }
   if (p.scan) { ctx.strokeStyle = `rgba(140,160,255,${0.4 + 0.3 * Math.sin(t * 10)})`; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(0, 0, 9 + (t * 20) % 8, 0, 7); ctx.stroke(); }
   ctx.restore();

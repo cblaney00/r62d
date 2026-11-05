@@ -28,7 +28,7 @@ function frame(ms) {
     ctx.fillStyle = '#dfe6e0'; ctx.fillText(show === 'ops' ? OPERATORS[it].name : it.label, x + 6, y + 14);
     if (show === 'ops') {
       ctx.setTransform(Z, 0, 0, Z, x + cw / 2, y + ch / 2 + 6);
-      drawOperator(ctx, { x: 0, y: 0, aim: -Math.PI / 2, op: it, w: OPERATORS[it].primary, ally: OPERATORS[it].team === 'def', walk: 0, legs: 1 }, t);
+      drawOperator(ctx, { x: 0, y: 0, aim: -Math.PI / 2, op: it, w: OPERATORS[it].primary, ally: OPERATORS[it].team === 'def', walk: 0, legs: 1, up: +new URLSearchParams(location.search).get('up') || 0 }, t);
     } else {
       for (const [k, ally] of [[0.3, true], [0.7, false]]) {
         ctx.setTransform(Z, 0, 0, Z, x + cw * k, y + ch / 2 + 6);

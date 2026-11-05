@@ -6,9 +6,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] lets have less alert marks in the game in general but more explanation to what you died to, especially if it was an ability
 
 ## Done
 
+- [x] make sure you cant see too much through the hatches upwards as the bottom person and make it obvious when the character is aiming upward with a different pose (from below, an open hatch now only shows a small ring of the room above, about 1 m past the hole's edge, wherever you stand, as he chose; bots and shots follow the same rule. Anyone aiming up into a hatch, open or closed, now has a raised-gun pose: gun and arms drawn short with the muzzle pointing up, head tipped back with the face showing, as he chose with no extra mark. Not yet played by him)
 - [x] add a little icon next to the character roles in the operator screen before a game to the left of the words, redesign that page generally to not have so much empty space (every role now has its own small icon left of its name, on the big role cards and the role tabs; after you choose a role the operator cards grow to fill the left side, three across, each with a line about its ability, so the empty space under them is gone. Not yet seen by him)
 - [x] i cant swing into 2nd floor windows it just takes me to the roof when i press the spacebar (Space at a boarded window used to send you up to the roof. Now Space swings you in, smashing the wooden boards on the way (loud), as he chose. A reinforced or blocked window does nothing, and Space never takes you to the roof; the sprint key still climbs up. Not yet played by him)
 - [x] hip fire first shots should not be accurate, too easy to headshot without ADSing first (a settled first shot from the hip now lands in a small cone, a bit, as he chose: still on the body at 5 m, a headshot past a few metres is mostly luck. Aimed in, it is still dead on. Not yet played by him)

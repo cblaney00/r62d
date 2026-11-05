@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -1733,6 +1733,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
   const c = cursor(), mw = aimMode === 'free' && padOn && !gpRecent() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
   msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
+  st.aimUp = ctrl === 'body' && me && me.a && !me.dn && !!aimUpHatch(st.map, st.pred.x, st.pred.y, mw.x, mw.y); // your own aim-up pose, without waiting for the server
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
   if (ev.length) msg.ev = ev;
   st.pending.push({ s: msg.s, k, dt: msg.dt });
@@ -2144,7 +2145,7 @@ function draw(s, view, now, dt) {
       ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     drawOperator(ctx, {
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, slide: p.sd, downed: p.dn,
-      sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
+      sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv === 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
     if (elv) ctx.restore();
     drawn.push(p);
@@ -3043,11 +3044,13 @@ function drawHatchView(s, me, now) {
     const Q = [[K.x0, K.y0], [K.x1, K.y0], [K.x1, K.y1], [K.x0, K.y1]].map(([x, y]) => [K.ex + (x - K.ex) / K.f, K.ey + (y - K.ey) / K.f]);
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const [x, y] of Q) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    if (K.lim) { x0 = Math.max(x0, K.lim.x0); y0 = Math.max(y0, K.lim.y0); x1 = Math.min(x1, K.lim.x1); y1 = Math.min(y1, K.lim.y1); } // from below: only a small ring round the hole
     x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W * CELL, x1); y1 = Math.min(m.H * CELL, y1);
     if (x1 <= x0 || y1 <= y0) continue;
     c.save(); c.translate(-o.x, -o.y);
     c.beginPath(); c.moveTo(P[0], P[1]); for (let i = 2; i < P.length; i += 2) c.lineTo(P[i], P[i + 1]); c.closePath(); c.clip();
     c.beginPath(); c.moveTo(Q[0][0], Q[0][1]); for (const [x, y] of Q.slice(1)) c.lineTo(x, y); c.closePath(); c.clip();
+    if (K.lim) { c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip(); }
     R.c.drawTo(c, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0);
     const inBox = (x, y) => x >= x0 - 20 && x < x1 + 20 && y >= y0 - 20 && y < y1 + 20;
     for (const e0 of s.ents) {
