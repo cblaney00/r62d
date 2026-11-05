@@ -939,8 +939,15 @@ function tvShotBox(fi, s, site) {
   if (!st.tv.ovUntil) return build;
   const now = performance.now() / 1000, had = st.tv.shotBox;
   if (had && had.f === fi && now < had.t) return had.b; // steady: looked at again twice a second
-  const pts = site.bombs.map(b => [b.x, b.y]), bx = site.bombs[0].x, by = site.bombs[0].y;
-  for (const p of s.players) if (p.a && p.x !== undefined && floorAt(st.map, p.x, p.y) === fi && Math.hypot(p.x - bx, p.y - by) < 26 * CELL) pts.push([p.x, p.y]);
+  const bx = site.bombs[0].x, by = site.bombs[0].y, bombF = floorAt(st.map, bx, by);
+  // the opening shot frames the objective and the people near it; the director's later wide shots frame the players
+  // where the action is (st.tv.ovPts, from tvDirector)
+  let pts = !st.tv.opening && st.tv.ovPts && st.tv.ovPts.length ? st.tv.ovPts.slice() : null;
+  if (!pts) {
+    pts = bombF === fi ? site.bombs.map(b => [b.x, b.y]) : [];
+    for (const p of s.players) if (p.a && p.x !== undefined && floorAt(st.map, p.x, p.y) === fi && (bombF !== fi || Math.hypot(p.x - bx, p.y - by) < 26 * CELL)) pts.push([p.x, p.y]);
+    if (!pts.length) return build;
+  }
   const pad = 4 * CELL, minH = 620, minW = minH * 16 / 9;
   let x0 = Math.min(...pts.map(q => q[0])) - pad, x1 = Math.max(...pts.map(q => q[0])) + pad, y0 = Math.min(...pts.map(q => q[1])) - pad, y1 = Math.max(...pts.map(q => q[1])) + pad;
   if (x1 - x0 < minW) { const c = (x0 + x1) / 2; x0 = c - minW / 2; x1 = c + minW / 2; }
@@ -1537,7 +1544,7 @@ function frame(nowMs) {
       cx += lvx; cy += lvy;
     }
   } else if (st.tv && inGame) { // TV overview (he asked: it was mostly empty ground): framed on the building, not the whole floor
-    const site = st.map.sites[s.site], fi = Math.max(0, floorAt(st.map, site.bombs[0].x, site.bombs[0].y)), B = tvShotBox(fi, s, site);
+    const site = st.map.sites[s.site], fi = st.tv.ovFloor >= 0 ? st.tv.ovFloor : Math.max(0, floorAt(st.map, site.bombs[0].x, site.bombs[0].y)), B = tvShotBox(fi, s, site); // the floor where the action is (tvDirector)
     st.tvOv = { f: fi, h: Math.max(B.y1 - B.y0, (B.x1 - B.x0) * VH / VW) * 1.08 };
     cx = (B.x0 + B.x1) / 2; cy = (B.y0 + B.y1) / 2;
   } else { // menus: slow drift over the map

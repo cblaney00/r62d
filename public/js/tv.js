@@ -29,7 +29,8 @@ export function tvBubbles(now) {
 
 // The director cuts to where it matters: a plant or defuse, someone shooting or about to meet an enemy, the defuser
 // carrier, the last one alive; it stays on someone at least ~3 s unless they die. 1-5 / 6-0 (or a player card) follow
-// someone yourself, A goes back to the director, M shows the whole floor of the objective.
+// someone yourself, A goes back to the director, M shows the floor where the action is; the director
+// also goes wide on its own now and then (both teams' sight shows there).
 export function tvDirector(s, players, now) {
   const T = st.tv; for (const e of s.ev) if (e.e === 'shot') T.shot[e.id] = now;
   // he asked: in preparation, show the defenders setting up (gadgets placed, walls reinforced, doors boarded)
@@ -44,9 +45,9 @@ export function tvDirector(s, players, now) {
   const onScreen = p => { if (!p || p.x === undefined || T.overview) return !!(p && T.overview); const q = w2s(p.x, p.y); return q.x > 0 && q.y > 0 && q.x < innerWidth && q.y < innerHeight; };
   for (const e of s.ev) if (e.e === 'kill' && e.killer) { const k = s.players.find(p => p.id === e.killer), v = st.snaps.length > 1 ? st.snaps[st.snaps.length - 2].players.get(e.victim) : null;
     (T.seen || (T.seen = {}))[e.victim] = e.killer === T.follow || e.victim === T.follow || onScreen(k) || onScreen(v); }
-  if (s.ph === PHASE.ACTION && T.lastPh !== PHASE.ACTION) { T.lastPh = s.ph; if (T.auto) { T.overview = true; T.ovUntil = now + 3.5; } } // the opening map shot
+  if (s.ph === PHASE.ACTION && T.lastPh !== PHASE.ACTION) { T.lastPh = s.ph; if (T.auto) { T.overview = true; T.ovUntil = now + 3.5; T.opening = true; T.nextWide = now + 15; } } // the opening map shot
   if (s.ph !== PHASE.ACTION) T.lastPh = s.ph;
-  if (T.ovUntil && now > T.ovUntil) { T.ovUntil = 0; if (T.auto) T.overview = false; }
+  if (T.ovUntil && now > T.ovUntil) { T.ovUntil = 0; T.opening = false; if (T.auto) T.overview = false; }
   const cur = players.get(T.follow), curOk = cur && cur.a && !cur.dn;
   // he asked: show both teams about evenly. Screen time per team is counted (older time fades out over ~2 minutes) and
   // the team that has had less gets a lift that grows with the gap; the more exciting shot still wins when it really is.
@@ -58,6 +59,17 @@ export function tvDirector(s, players, now) {
   const fl = p => floorAt(st.map, p.x, p.y), recentShot = (p, w) => now - (T.shot[p.id] || -9) < w;
   const fighting = p => recentShot(p, 1.8) || alive.some(q => q.sq !== p.sq && fl(q) === fl(p) && Math.hypot(q.x - p.x, q.y - p.y) < 260 && recentShot(q, 1.8));
   T.calm = !T.ovUntil && !(curOk && fighting(cur)) && !(T.overview && alive.some(fighting)); // (an instant replay waits for this)
+  // he asked: wide shots on the floor where the action is (not always the bomb's floor). Each floor is weighed by who is
+  // on it (fights count triple, a plant/defuse more); the wide shot frames the players there (T.ovPts), and the floor
+  // only changes when another one clearly leads for over a second, so it doesn't flick between floors.
+  const wt = st.map.floors.map(() => 0);
+  for (const p of alive) { const f = fl(p); if (f >= 0) wt[f] += 1 + (fighting(p) ? 2 : 0) + (p.bu ? 4 : 0); }
+  const top = wt.indexOf(Math.max(...wt));
+  if (T.ovFloor === undefined) T.ovFloor = alive.length ? top : undefined;
+  else if (alive.length && top !== T.ovFloor && wt[top] > wt[T.ovFloor] + 0.5) { T.ovLead = T.ovLead || now; if (now - T.ovLead > 1.2) { T.ovFloor = top; T.ovLead = 0; } }
+  else T.ovLead = 0;
+  const onF = alive.filter(p => fl(p) === T.ovFloor), hot = onF.filter(p => fighting(p) || onF.some(q => q.sq !== p.sq && Math.hypot(q.x - p.x, q.y - p.y) < 16 * 36));
+  T.ovPts = (hot.length ? hot : onF).map(p => [p.x, p.y]);
   if (!T.auto && curOk) return;
   if (T.ovUntil) return;
   // the followed player died or went down: one beat on it, then the killer (the trade is the story)
@@ -94,6 +106,13 @@ export function tvDirector(s, players, now) {
   const quiet = curOk && curSc < 15;
   const minHold = prep ? 9 : 7; // he asked: it cut too often
   if (curOk && held < minHold) return;
+  // he asked: show both teams' viewpoints more from the wide angle. The director goes wide for 5 s (both teams' sight
+  // drawn in their colours) when players of both sides are closing in on one floor before anyone fires, or when nothing
+  // much is going on; at most every ~20 s, never in preparation and never out of a fight.
+  if (!prep && now > (T.nextWide || 0)) {
+    const standoff = new Set(hot.map(p => p.sq)).size === 2 && hot.length >= 3 && !alive.some(fighting);
+    if (standoff || (quiet && held > 10)) { T.overview = true; T.ovUntil = now + 5; T.nextWide = now + 18 + Math.random() * 8; return; }
+  }
   let best = null, bs = -1;
   for (const p of alive) { const sc = score(p) + Math.random() * 2 + (p.id === T.follow ? 18 - (quiet ? Math.max(0, held - 12) * 3 : 0) : 0); if (sc > bs) { bs = sc; best = p; } }
   if (!best || best.id === T.follow) return;
