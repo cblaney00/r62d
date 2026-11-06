@@ -9,7 +9,7 @@ export const SNAP_RATE = 20;       // snapshots sent per second
 // Body radius for bumping into walls and people. 7 px (14 across, ~0.4 m: a person turned a little
 // sideways) so a body fits through every one-cell gap beside furniture and round door frames; at 10 a
 // lot of rooms had corners and gaps behind bookcases nobody could get into. Bullets use HIT_R instead.
-export const PLAYER_R = 7;
+export const PLAYER_R = 6; // he asked twice for slimmer bodies: 10 → 7 → 6 (0.33 m across), so ordinary gaps between furniture feel roomy
 export const DRONE_R = 2.5;         // a small drone (he asked for smaller: was 3.5); passes the drone holes at the foot of walls (map.dhole)
 // drone sprint (he asked, like R6): hold Shift for 1.6x speed for up to 3 s; 3 a round; 6 s before the next one
 export const DRONE_SPRINT = { mul: 1.6, time: 3, wait: 6, charges: 3 };

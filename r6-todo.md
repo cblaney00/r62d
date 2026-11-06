@@ -6,10 +6,10 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] can we also make all the character models skinnier? they all feel really fat, also make it so their collision area is smaller because i feel like im squeezing through reasonably sized paths in rooms
 
 ## Done
 
+- [x] can we also make all the character models skinnier? they all feel really fat, also make it so their collision area is smaller because i feel like im squeezing through reasonably sized paths in rooms (every build is about 15% narrower (heavies, mediums and lights alike; heads unchanged), and the bumping size round a body went from 0.39 m to 0.33 m across, so gaps between furniture leave more room. Bullets hit the slimmer bodies as drawn, so people are a little harder to hit (heavy 6.6, medium 6.0, light 5.5 px, were 7.5 / 6.8 / 6.2). Every map is still fully reachable, and drone holes still let only drones through. Not yet played by him)
 - [x] when a wall is reinforced it should be a smaller area per reinforcement (each reinforcement now covers 1.3 m of wall (3 cells) instead of 2.2 m (5 cells), so a whole wall takes about twice as many. The team still has 10 a round. Not yet played by him)
 - [x] the sniper also needs some kind of nerf because with the 1.5x prism i just destroyed all the silvers in the vicinity (the Pike and Saker LR only drop someone with one body shot when aimed in through the Sniper Scope, the one that blurs the screen round the lens and glints at whoever it points at. With a 1.5x prism, any other sight or from the hip they hit hard but a full-health heavy or medium survives one body shot (the Saker leaves a heavy at about 45 of 150); headshots still kill as before. Not yet played by him)
 - [x] add shift+S as a way to hold for sprint as well, i notice i do it a lot (holding the sprint key with S now sprints the way you aim, exactly like sprint + W; without the sprint key S still walks backwards. Not yet played by him)

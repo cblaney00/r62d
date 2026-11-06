@@ -64,8 +64,8 @@ export const SIDEARMS = new Set(['p10', 'vex50', 'bison', 'gnat', 'stub', 'sparr
 export const ARMOR_HP = { 1: 150, 2: 132, 3: 120 }; // he asked: everyone a bit tougher (+20%); the Pike still kills with one body shot
 // build follows armor too: heavies stay broad, mediums and lights are skinnier (drawn narrower AND harder to hit).
 // HIT_R is how close (px) a bullet must pass to a body's centre to hit it; walls still use PLAYER_R for bumping.
-export const BODY_W = { 1: 0.95, 2: 0.84, 3: 0.76 };
-export const HIT_R = { 1: 7.5, 2: 6.8, 3: 6.2 };
+export const BODY_W = { 1: 0.8, 2: 0.71, 3: 0.64 }; // he asked: everyone skinnier (was 0.95 / 0.84 / 0.76)
+export const HIT_R = { 1: 6.6, 2: 6.0, 3: 5.5 }; // shrunk with the drawings (was 7.5 / 6.8 / 6.2)
 export const hitR = (op) => HIT_R[OPERATORS[op]?.armor] ?? 6.8;
 export const bodyW = (op) => BODY_W[OPERATORS[op]?.armor] ?? 0.84;
 
