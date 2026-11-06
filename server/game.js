@@ -41,6 +41,8 @@ const MAX_BANS = 8; // he asked: at most 8 banned operators in a match
 const BAN_GAP = 2.6; // seconds between Esports TV bans, long enough to read each one
 
 const SCAN_BEAT = 0.8, SCAN_BLUR = 1.5 * PX_PER_M; // WRAITH's scanner: a new blip per heartbeat, this far off the real spot at most
+// aimed in through the sniper scope (the Pike's and Saker's one-shot body kill needs it, he asked)
+const scopedIn = p => { const g = p && p.guns && p.guns[p.slot]; return !!(g && g.att && g.att.sight === 'sniper' && (p.adsT || 0) >= 0.6); };
 export class Game {
   // opts.tut: a private tutorial match for one player (see tutAction), with its timers held
   // while the coach explains each step, and nothing saved to their profile.
@@ -1077,7 +1079,7 @@ export class Game {
       this.shotPens = pens; // the death card says "through a wall"
       if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
       else if (head && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
-      else if (W && W.oneShot && !pens && !q.downed && mult >= 1) this.damage(q, 9999, src, wname, ang); // he asked: the big sniper rifles still drop anyone with one clean body shot
+      else if (W && W.oneShot && !pens && !q.downed && mult >= 1 && scopedIn(src)) this.damage(q, 9999, src, wname, ang); // he asked: the big sniper rifles still drop anyone with one clean body shot; then (a prism made it too strong) only aimed in through the sniper scope
       else this.damage(q, dmg * mult * fall, src, wname, ang);
       this.shotPens = 0;
     } else if (best && best.e && best.e.tu) { best.e.offUntil = Math.max(best.e.offUntil || 0, this.time + 8); this.events.push({ e: 'hit', k: 'spark', x: r1(ex), y: r1(ey) }); }

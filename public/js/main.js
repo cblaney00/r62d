@@ -724,15 +724,17 @@ function pressAction(a, e) {
 const sliding = () => st.pred && (st.pred.slT > 0 || st.pred.slR > 0) && st.me && st.me.ct === 'body' && !st.tv;
 const slideAim = a => st.pred.slA + Math.max(-SLIDE.lock, Math.min(SLIDE.lock, angDiff(a, st.pred.slA)));
 function trySlide() { if (!st.pred || !st.pred.spr || st.pred.scd > 0 || !st.me || st.me.ct !== 'body') return false; st.slideReq = performance.now(); return true; }
+// he asked: sprint + S sprints too (he kept pressing it): on your body it is sent as sprint + W, where you aim
+const sprintBack = () => !!(st.me && st.me.ct === 'body' && !gpRecent() && keys.has('sprint') && keys.has('down') && !keys.has('up') && !steadying());
 // How much the movement keys are turned: Rotate view, Face aiming (W goes the way you face), sprint + W (he asked: where you aim).
 function moveTurn() {
   const body = st.me && st.me.ct === 'body';
-  if (body && !gpRecent() && (aimMode === 'face' || (keys.has('sprint') && keys.has('up') && !steadying()))) return st.aim + Math.PI / 2;
+  if (body && !gpRecent() && (aimMode === 'face' || (keys.has('sprint') && (keys.has('up') || sprintBack()) && !steadying()))) return st.aim + Math.PI / 2;
   return -(st.rot || 0);
 }
 // Vaulting goes the way you're moving, or where you look when standing still.
 function vaultDir() {
-  const mx = (keys.has('right') || gpk.right ? 1 : 0) - (keys.has('left') || gpk.left ? 1 : 0), my = (keys.has('down') || gpk.down ? 1 : 0) - (keys.has('up') || gpk.up ? 1 : 0);
+  const mx = (keys.has('right') || gpk.right ? 1 : 0) - (keys.has('left') || gpk.left ? 1 : 0), my = sprintBack() ? -1 : (keys.has('down') || gpk.down ? 1 : 0) - (keys.has('up') || gpk.up ? 1 : 0);
   return mx || my ? Math.atan2(my, mx) + moveTurn() : st.aim;
 }
 // Read the controller once a frame and turn it into the same actions as the keyboard and mouse.
@@ -1688,7 +1690,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const ev = st.evq; st.evq = [];
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
   const k = {
-    up: keys.has('up') || gpk.up ? 1 : 0, down: keys.has('down') || gpk.down ? 1 : 0, left: keys.has('left') || gpk.left ? 1 : 0, right: keys.has('right') || gpk.right ? 1 : 0,
+    up: keys.has('up') || gpk.up || sprintBack() ? 1 : 0, down: (keys.has('down') || gpk.down) && !sprintBack() ? 1 : 0, left: keys.has('left') || gpk.left ? 1 : 0, right: keys.has('right') || gpk.right ? 1 : 0,
     walk: keys.has('walk') || gpk.walk ? 1 : 0, sprint: keys.has('sprint') && performance.now() >= (st.sprintHold || 0) ? 1 : 0, slide: performance.now() - (st.slideReq ?? -1e9) < 120 ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch || st.crouchT ? 1 : 0, prone: st.prone && me && me.a && !me.dn ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
     lean: me && me.ct === 'body' ? leanNow() : 0, jump: performance.now() - (st.jumpReq || -1e9) < 120 ? 1 : 0,

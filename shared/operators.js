@@ -38,11 +38,11 @@ export const WEAPONS = {
   drummer: { name: 'Drummer LMG', cls: 'LMG', dmg: 22, rpm: 860, mag: 60, reserve: 180, reload: 3.6, spread: 0.085, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 1050, len: 16,
              adsMul: 0.8, kickMul: 0.8, swayMul: 1.5, trait: 'A light, fast-firing LMG that hoses a doorway: quick to aim and reload for its kind, but its soft bullets wander side to side.' },
   pike:    { name: 'Pike Bolt-Action', cls: 'DMR', mode: 'bolt-action', dmg: 112, rpm: 50, mag: 5, reserve: 30, reload: 3.2, spread: 0.09, ads: 0.002, bloom: 0.05, auto: false, pellets: 1, range: 1600, len: 20,
-             pen: 0.8, adsMul: 1.3, kickMul: 1.5, settle: 0.9, oneShot: true, trait: 'One clean body shot drops anyone. A slow bolt between shots, slow to aim, hopeless from the hip; its scope glints at whoever it points at.' },
+             pen: 0.8, adsMul: 1.3, kickMul: 1.5, settle: 0.9, oneShot: true, trait: 'Aimed in through the sniper scope, one clean body shot drops anyone. A slow bolt between shots, slow to aim, hopeless from the hip; its scope glints at whoever it points at.' },
   // he asked: a sniper that feels more modern, tan, like a British L115 (our own design and name): a straight-pull bolt
   // that cycles fast, quicker to aim, a big muzzle brake that tames the kick but is loud. Still one shot to the body.
   saker:   { name: 'Saker LR', cls: 'DMR', mode: 'straight-pull', dmg: 120, rpm: 72, mag: 5, reserve: 30, reload: 2.9, spread: 0.09, ads: 0.0018, bloom: 0.05, auto: false, pellets: 1, range: 1700, len: 21,
-             pen: 0.7, adsMul: 1.15, kickMul: 1.15, settle: 0.75, oneShot: true, trait: 'Modern long-range rifle: one clean body shot drops anyone, and the straight-pull bolt is back on target faster than the Pike. Thinner walls stop more of it; loud, and its scope glints.' },
+             pen: 0.7, adsMul: 1.15, kickMul: 1.15, settle: 0.75, oneShot: true, trait: 'Modern long-range rifle: aimed in through the sniper scope, one clean body shot drops anyone, and the straight-pull bolt is back on target faster than the Pike. Thinner walls stop more of it; loud, and its scope glints.' },
   heron:   { name: 'Heron Marksman', cls: 'DMR', dmg: 44, rpm: 480, mag: 20, reserve: 100, reload: 2.4, spread: 0.055, ads: 0.007, bloom: 0.014, auto: false, pellets: 1, range: 1200, len: 16,
              adsMul: 0.85, kickMul: 0.7, settle: 0.4, trait: 'A quick-firing marksman rifle with light recoil: three fast hits drop anyone.' },
   gnat:    { name: 'Gnat Machine Pistol', cls: 'MP', dmg: 17, rpm: 1050, mag: 20, reserve: 100, reload: 1.7, spread: 0.09, ads: 0.035, bloom: 0.011, auto: true, pellets: 1, range: 700, len: 7,
