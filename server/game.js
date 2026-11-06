@@ -4,7 +4,7 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatch
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
-import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout } from './bots.js';
+import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
@@ -218,7 +218,7 @@ export class Game {
     }
     else if (m.t === 'lock') { if (this.phase === PHASE.SELECT && p.op) p.locked = true; }
     else if (m.t === 'site') { // like R6, the defenders choose which objective to defend while picking operators
-      if (this.phase === PHASE.SELECT && this.side(p) === TEAM.DEF && Number.isInteger(m.n) && m.n >= 0 && m.n < this.map.sites.length && m.n !== this.site) {
+      if (this.phase === PHASE.SELECT && this.side(p) === TEAM.DEF && Number.isInteger(m.n) && m.n >= 0 && m.n < this.map.sites.length && m.n !== this.site && this.siteOpen(m.n)) {
         this.site = m.n; this.msg(`${p.name} chose to defend ${this.map.sites[m.n].name}`, TEAM.DEF);
       }
     }
@@ -304,7 +304,7 @@ export class Game {
     assignPros(this); this.proState = {}; this.proLast = {}; this.proLog = [];
     this.score = [0, 0]; this.round = 0; // round 1: squad 0 attacks (the tutorial: you attack, then defend)
     for (const p of this.players.values()) { p.kills = 0; p.deaths = 0; p.ms = this.blankMatchStats(); }
-    this.departed = []; this.roundLog = []; this.matchStart = Date.now(); this.bans = []; this.banRun = null;
+    this.departed = []; this.roundLog = []; this.matchStart = Date.now(); this.bans = []; this.banRun = null; this.sitesUsed = [];
     this.nextRound();
   }
 
@@ -313,7 +313,10 @@ export class Game {
     this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
     this.baseTiles = this.map.tiles.slice(); // how the walls were built (SOLDER welds broken soft walls back)
     this.ents = []; this.planted = null; this.winner = null; this.reason = ''; this.noises = [];
-    this.site = this.tut ? 0 : Math.floor(Math.random() * this.map.sites.length);
+    // he asked: a site played once this match can't be chosen again until every site has been played (then all reopen)
+    if (!this.sitesUsed || this.sitesUsed.length >= this.map.sites.length) this.sitesUsed = [];
+    const open = this.map.sites.map((_, i) => i).filter(i => this.siteOpen(i));
+    this.site = this.tut ? 0 : open[Math.floor(Math.random() * open.length)];
     this.siteRevealed = false;
     this.spots = { atk: new Map(), def: new Map() };
     this.reinforce = 10;
@@ -323,10 +326,14 @@ export class Game {
     this.phase = PHASE.SELECT; this.timer = DUR.select;
     this.events.push({ e: 'newmap', v: this.mapVersion });
     this.events.push({ e: 'banner', text: `ROUND ${this.round}`, sub: 'Choose your operator' });
+    if (!this.tut && !this.free) siteVote(this); // the defending bots vote on the site (a person on the team can still change it)
   }
+
+  siteOpen(n) { return !(this.sitesUsed || []).includes(n); }
 
   beginPrep() {
     const map = this.map;
+    if (!this.tut && !this.free && this.sitesUsed && !this.sitesUsed.includes(this.site)) this.sitesUsed.push(this.site);
     for (const p of this.players.values()) {
       const team = this.side(p);
       if (!p.op) { // random unpicked operator
@@ -2928,7 +2935,7 @@ export class Game {
     const common = JSON.stringify({
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId, rm: this.randomMap ? 1 : 0,
-      site: this.site, rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
+      site: this.site, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       tvl: this.tv ? this.botLevel : undefined, bn: this.tv && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
       bq: this.tv && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, this.banRun.t - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, ev: this.events, spots, time: r2(this.time),

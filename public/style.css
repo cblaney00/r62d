@@ -81,6 +81,7 @@ input { font: 600 20px var(--head); padding: 10px 14px; background: rgba(0,0,0,0
 #siteChoice { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; font: 600 15px var(--head); letter-spacing: 0.1em; color: var(--dim); }
 #siteChoice button { padding: 5px 12px; font-size: 14px; }
 #siteChoice button.on { background: #8fc8ff; color: #000; border-color: #8fc8ff; }
+#siteChoice button.used { opacity: 0.35; text-decoration: line-through; cursor: default; }
 #selInfo { font: 600 18px var(--head); color: var(--dim); letter-spacing: 0.1em; margin-top: 6px; }
 #selTime { font: 700 56px var(--head); color: var(--gold); text-align: right; line-height: 1; }
 #selTime small { font-size: 18px; letter-spacing: 0.15em; color: var(--dim); margin: 0 4px; }

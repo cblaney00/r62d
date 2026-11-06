@@ -76,6 +76,29 @@ export function tvBanPick(game, sq, sd) {
   if (lead) say(game, lead, pickOne([`Ban ${talkOp(best)}.`, `${talkOp(best)}, ban it.`, fav.has(best) ? `They love ${talkOp(best)}. Ban.` : `${talkOp(best)} has been winning here, ban it.`]));
   return best;
 }
+// he asked: the defending bots vote on which site to defend, by what the pros have learned in practice (how often the
+// defence won there, all plays together). Pros trust those numbers; lower ranks are less sure of them (wider guesses),
+// so their votes spread more. Only sites still open this match (game.siteOpen) are on the ballot; ties go to the
+// stronger total. Each voter says their pick in team chat, then the result.
+export function siteVote(game) {
+  const voters = [...game.players.values()].filter(p => p.bot && game.side(p) === TEAM.DEF);
+  const open = game.map.sites.map((_, i) => i).filter(i => game.siteOpen(i));
+  if (!voters.length || !open.length) return;
+  const rec = {}; for (const i of open) rec[i] = { w: 0, n: 0 };
+  for (const [k, r] of Object.entries(training.plans)) { const [m, s, sd] = k.split('|'); if (m === game.map.id && sd === TEAM.DEF && rec[+s] && r) { rec[+s].w += r.w || 0; rec[+s].n += r.n || 0; } }
+  const name = i => game.map.sites[i].name, votes = {}, sum = {};
+  for (const p of voters) {
+    const spread = p.pro ? 1 : 1 + (TOP_BOT - lvlOf(game, p)) * 0.5;
+    let best = open[0], bg = -9;
+    for (const i of open) { const g = plainGuess(rec[i], spread); sum[i] = (sum[i] || 0) + g; if (g > bg) { bg = g; best = i; } }
+    votes[best] = (votes[best] || 0) + 1;
+    if (open.length > 1) say(game, p, pickOne([`${name(best)} for me.`, `I vote ${name(best)}.`, bg > 0.55 && rec[best].n >= 20 ? `${name(best)}, we win there.` : `${name(best)}.`]));
+  }
+  const win = open.reduce((a, b) => ((votes[b] || 0) > (votes[a] || 0) || ((votes[b] || 0) === (votes[a] || 0) && sum[b] > sum[a]) ? b : a));
+  game.site = win;
+  const lead = voters.find(p => p.pro && p.pro.i === 0) || voters[0];
+  say(game, lead, open.length > 1 ? `Vote: ${name(win)} (${votes[win]} of ${voters.length}).` : `Last site left: ${name(win)}.`);
+}
 function say(game, p, text) {
   if (!p) return;
   if (p.pro) (game.proLog || (game.proLog = [])).push({ round: game.round, squad: p.squad, team: p.pro.tag, text, who: p.pro.pl.name });
