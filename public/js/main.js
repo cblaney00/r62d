@@ -8,7 +8,7 @@ import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DR
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, drawRaised, litWalls, sightClip, looks } from './look.js';
+import { tilt, drawRaised, sightClip, looks } from './look.js';
 import { S, setMapScale } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
@@ -2236,8 +2236,7 @@ function draw(s, view, now, dt) {
     if (!view) return go(null);
     // walls in colour exactly where your team's sight reaches (raised with them), like the floor: no cell-by-cell snapping
     c.save(); c.clip(sightClip(vpolys, vviews, st.cam, RH)); go(k => T_[k] !== T.TALL); c.restore();
-    const seen = litWalls(rm, vpolys, vviews, now); // a car, crate or shelf you see shows whole
-    go(k => T_[k] === T.TALL && seen.has(k));
+    c.save(); c.clip(sightClip(vpolys, vviews, st.cam, RH, rm)); go(k => T_[k] === T.TALL); c.restore(); // cars, crates, shelves: only the part in sight
   } : null;
   showFog(!!(view && inGame));
   if (view && inGame) {

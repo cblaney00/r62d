@@ -143,30 +143,6 @@ export function drawRaised(ctx, R, m, cam, h, x0, y0, x1, y1, keep = null) {
     if (r.sh) ctx.restore();
   }
 }
-// the wall cells your team sees right now: the cell each sight line ends in (vision polygons reach 7 px into the wall
-// they stop at) and its neighbours no deeper than it from the eye (so the stub of an inside wall behind an outside one
-// stays dark). views[i] is the eye of polys[i]. A wall seen in the last 0.45 s still counts, so walls don't flicker
-// between colour and grey as the sight lines sweep over them (seen: cell → time, kept between frames).
-const seenAt = new Map();
-export function litWalls(m, polys, views, now, into = new Set()) {
-  const W = m.W, rise = riseOf(m), hg = k => height(m, k, rise);
-  polys.forEach((pts, j) => {
-    const v = views[j];
-    for (let i = 0; i < pts.length; i += 2) {
-      const px = pts[i], py = pts[i + 1], x = Math.floor(px / CELL), y = Math.floor(py / CELL), d0 = Math.hypot(px - v.x, py - v.y);
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        const k = (y + dy) * W + x + dx;
-        if (hg(k) > 0 && (!dx && !dy || Math.hypot((x + dx + 0.5) * CELL - v.x, (y + dy + 0.5) * CELL - v.y) <= d0 + CELL * 0.3)) seenAt.set(k, now);
-      }
-    }
-  });
-  for (const [k, t] of seenAt) { if (now - t > 0.45 || seenAt.size > 20000) seenAt.delete(k); else into.add(k); }
-  // a car, crate or bookcase is one thing: seen at all, all of it shows (half of it in colour and half grey looked broken)
-  const q = [...into].filter(k => m.tiles[k] === T.TALL);
-  for (let i = 0; i < q.length && i < 4000; i++) for (const n of [q[i] - 1, q[i] + 1, q[i] - W, q[i] + W]) if (m.tiles[n] === T.TALL && !into.has(n)) { into.add(n); q.push(n); }
-  return into;
-}
-
 // ---------------------------------------------------------------- camera tilt
 // The world layers (#world) are turned in 3D: a fixed angle (the top of the screen a little further away) plus a lean
 // with your movement and a kick when you shoot or something blows up close by. The mouse is turned back with untilt.
@@ -200,15 +176,22 @@ export const tilt = {
   },
 };
 
-// where your team sees, for the raised walls: each sight line carried CELL further on (the vision shapes stop 7 px into
-// a wall, the raised walls need their whole thickness), raised to each height the walls are drawn at, all as one path
-export function sightClip(polys, views, cam, h) {
-  const p = new Path2D(), push = 12;
+// where your team sees, for the raised walls: each sight line carried 12 px further on (the vision shapes stop 7 px into
+// a wall, the raised walls need their whole thickness), raised to each height the walls are drawn at, all as one path.
+// With m (cars, crates, shelves): a line that stops in a T.TALL cell is carried on through it to its far side, so the
+// part of a car your sight lines reach lights up through its whole depth and the rest stays grey (he asked: a car
+// seen only in part used to light up whole)
+export function sightClip(polys, views, cam, h, m) {
+  const p = new Path2D(), tall = (x, y) => m.tiles[Math.floor(y / CELL) * m.W + Math.floor(x / CELL)] === T.TALL;
   polys.forEach((pts, j) => {
     const v = views[j], far = [];
     for (let i = 0; i < pts.length; i += 2) {
-      const dx = pts[i] - v.x, dy = pts[i + 1] - v.y, d = Math.hypot(dx, dy);
-      far.push(d > 1 && d < v.range - 1 ? pts[i] + dx / d * push : pts[i], d > 1 && d < v.range - 1 ? pts[i + 1] + dy / d * push : pts[i + 1]);
+      const x = pts[i], y = pts[i + 1], dx = x - v.x, dy = y - v.y, d = Math.hypot(dx, dy);
+      if (!(d > 1 && d < v.range - 1)) { far.push(x, y); continue; }
+      const ux = dx / d, uy = dy / d;
+      let push = 12;
+      if (m && tall(x, y)) { push = 2; while (push < 80 && tall(x + ux * push, y + uy * push)) push += 2; }
+      far.push(x + ux * push, y + uy * push);
     }
     for (const f of [0, 0.7, 1]) {
       for (let i = 0; i < far.length; i += 2) { const x = far[i] + (far[i] - cam.x) * h * f, y = far[i + 1] + (far[i + 1] - cam.y) * h * f; i ? p.lineTo(x, y) : p.moveTo(x, y); }
