@@ -7,7 +7,7 @@
 import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
-import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel } from '../shared/pros.js';
 import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess } from './training.js';
 import { compose, LINES, FUN, WAYS } from '../shared/comms.js';
@@ -826,10 +826,10 @@ export function botThink(game, p, dt) {
     // loud noises (gunfire, blasts, sirens) are heard through the whole building, a floor up or down too, unless it is huge
     const r = n.r >= 900 && fd <= 1 ? Math.max(n.r, 2400 - fd * 600) : n.r * (fd === 0 ? 1 : 0.5);
     const hd = Math.hypot(ln.x - lp.x, ln.y - lp.y);
-    if (hd < r * (p.pro ? 0.8 : 1)) { if (p.pro) { const e = hd * 0.22 + (floorAt(map, n.x, n.y) === floorAt(map, p.x, p.y) ? 0 : 60), a = Math.random() * 6.28, rr = Math.random() * e; ai.heard = { x: n.x + Math.cos(a) * rr, y: n.y + Math.sin(a) * rr, t: n.t }; } else ai.heard = { x: n.x, y: n.y, t: n.t }; } // pros hear like people: roughly where, not exactly
+    if (hd < r * (p.pro ? 0.8 : EAR[lvlOf(game, p)])) { if (p.pro) { const e = hd * 0.22 + (floorAt(map, n.x, n.y) === floorAt(map, p.x, p.y) ? 0 : 60), a = Math.random() * 6.28, rr = Math.random() * e; ai.heard = { x: n.x + Math.cos(a) * rr, y: n.y + Math.sin(a) * rr, t: n.t }; } else ai.heard = { x: n.x, y: n.y, t: n.t }; } // pros hear like people: roughly where, not exactly
   }
   // --- team intel: an enemy a teammate (or camera) spotted close by is worth turning to face, once in a while ---
-  if (!ai.heard || game.time - ai.heard.t > 3) for (const id of game.spots[team].keys()) {
+  if ((p.pro || lvlOf(game, p) >= 2) && (!ai.heard || game.time - ai.heard.t > 3)) for (const id of game.spots[team].keys()) { // (Copper and Bronze don't follow the callouts)
     const q = game.players.get(id); if (!q || !q.alive) continue;
     ai.spotT = ai.spotT || {};
     if (game.time - (ai.spotT[id] || -99) < 8 || Math.hypot(q.x - p.x, q.y - p.y) > 420 || floorAt(map, q.x, q.y) !== floorAt(map, p.x, p.y)) continue;
@@ -910,10 +910,11 @@ export function botThink(game, p, dt) {
     if (ai.strafeT <= 0) { ai.strafeT = 0.6 + Math.random(); ai.strafe = Math.random() < peekSkill(game, p) ? (Math.random() < 0.5 ? -1 : 1) : 0; }
     { const lu = linedUp(game, p, enemy); if (lu) { ai.strafe = lu; ai.strafeT = 0.5; } } // a teammate on the same line from the enemy: step off it // he asked: strafe-peeking in a fight is a hard skill, used now and then by a few, not by everyone all the time
     if (ai.strafe) { const sa = p.aim + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); inp.walk = 1; }
+    if ((p.pro || lvlOf(game, p) >= 4) && p.hp < p.maxHp * 0.4 && enemy.hp > p.hp && !game.planted) { const ba = Math.atan2(p.y - enemy.y, p.x - enemy.x); setDir(inp, Math.cos(ba), Math.sin(ba)); inp.walk = 1; } // Platinum up: losing the fight, back out of it while shooting
     return;
   }
   ai.seen = null;
-  if (gun && gun.ammo < WEAPONS[gun.w].mag * 0.3 && gun.reserve > 0) game.startReload(p);
+  if (gun && gun.ammo < WEAPONS[gun.w].mag * (!p.pro && lvlOf(game, p) <= 1 ? 0.85 : 0.3) && gun.reserve > 0) game.startReload(p); // Copper and Bronze reload half-full magazines the moment a fight ends
   if (p.slot !== 0 && p.guns[0] && p.guns[0].ammo + p.guns[0].reserve > 0) game.event(p, { k: 'slot', n: 0 }); // back to the main gun once it's quiet
 
   // --- an enemy drone in sight: turn and shoot it (one hit breaks it) ---
@@ -995,6 +996,7 @@ export function botThink(game, p, dt) {
   // --- a pro's part of the team plan ---
   if (ai.cmd && botCmd(game, p, inp, dt)) return; // a person on the team asked for something
   if (team === TEAM.DEF && !game.planted && prepWork(game, p, inp, dt, heardRecently)) return; // preparation: boards, walls, traps, rotation holes
+  if (action && !p.downed && rankHabits(game, p, inp, dt, team, site, gun)) return; // by rank: wandering off alone, trading a teammate, shooting through walls
   if (p.pro && (action || game.phase === PHASE.PREP) && proAct(game, p, inp, dt, team)) return;
 
   // --- objective ---
@@ -1095,7 +1097,7 @@ export function botThink(game, p, dt) {
       else { turnTo(p, lead.aim, 2, dt); return; }
     }
     // close to the objective: walk (quiet), and now and then stop to check the angles
-    if (toGoal < (ai.role === 'entry' ? 220 : 360) - me.aggr * 80 && game.timer > 45) { // close: walk quietly and check angles, unless the clock says run
+    if (!loud(game, p) && toGoal < (ai.role === 'entry' ? 220 : 360) - me.aggr * 80 && game.timer > 45) { // close: walk quietly and check angles, unless the clock says run (Copper and Bronze often just run in)
       inp.walk = 1;
       ai.pauseT = (ai.pauseT ?? 2 + Math.random() * 3) - dt;
       if (ai.pauseT < 0 && game.timer > 75) { if (ai.pauseT < -(0.4 + me.patience)) ai.pauseT = 2 + Math.random() * 4; checkAngles(game, p, dt, 1); return; }
@@ -1592,6 +1594,93 @@ function botDrone(game, p, dt) {
 }
 
 // the doorway or window nearest to this bot that it can see (to hold an angle on): the site's own when defending it
+// ---- game sense by rank (he asked: Copper and Bronze still do dumb things, Silver/Gold an average player, a Champion
+// team should leave him no chance). How much of what they hear they notice:
+const EAR = [0.6, 0.8, 1, 1, 1, 1, 1];
+// Copper always, Bronze half the rounds, Silver now and then: runs up to the site instead of walking in quietly
+function loud(game, p) {
+  if (p.pro) return false;
+  const lvl = lvlOf(game, p), ai = p.ai;
+  if (ai.loud === undefined) ai.loud = Math.random() < [1, 0.5, 0.2, 0, 0, 0, 0][lvl];
+  return ai.loud;
+}
+const WANDER = [0.35, 0.2, 0.05, 0, 0, 0, 0]; // chance a round of going off alone to a room nobody needs
+const TRADE = [0.4, 0.4, 0.25, 0.55, 0.8, 0.9, 1]; // chance of going for the trade when a teammate dies close by
+const WALLBANG = [0, 0, 0, 0.1, 0.25, 0.5, 0.85]; // chance of shooting through a thin wall at a spotted enemy (pros 0.9)
+function rankHabits(game, p, inp, dt, team, site, gun) {
+  const ai = p.ai, lvl = p.pro ? PRO_LEVEL : lvlOf(game, p), m = game.map;
+  // wandering off alone (Copper, Bronze): a random room away from the site for a while, as if it forgot the plan
+  if (!p.pro && ai.wander === undefined) {
+    ai.wander = null;
+    if (Math.random() < WANDER[lvl] && !p.hasDefuser) {
+      const rooms = m.rooms.filter(r => !site.rooms.includes(r.name));
+      const r = rooms[Math.floor(Math.random() * rooms.length)];
+      if (r) ai.wander = { at: game.freeSpotNear((r.x + r.w / 2) * CELL, (r.y + r.h / 2) * CELL, Math.min(r.w, r.h) * CELL * 0.3), until: game.time + 20 + Math.random() * 25 };
+    }
+  }
+  if (ai.wander && !game.planted) {
+    if (game.time > ai.wander.until || Math.hypot(ai.wander.at.x - p.x, ai.wander.at.y - p.y) < 30 && Math.random() < dt * 0.15) ai.wander = null;
+    else { moveTo(game, p, inp, ai.wander.at, dt); return true; }
+  }
+  // the trade: a teammate just died close by → swing onto where the shot came from. From Gold up they walk in with the
+  // crosshair already on that spot; Copper and Bronze charge in running (and loud)
+  const tr = game.proTrade && game.proTrade[p.squad];
+  if (!p.pro && tr && game.time - tr.t < 4 && Math.hypot(tr.x - p.x, tr.y - p.y) < 320 && !(team === TEAM.ATK && p.hasDefuser)) {
+    if (ai.tradeT !== tr.t) { ai.tradeT = tr.t; ai.trading = Math.random() < TRADE[lvl]; }
+    if (ai.trading && tr.from && Math.hypot(tr.from.x - p.x, tr.from.y - p.y) > 24) {
+      moveTo(game, p, inp, tr.from, dt);
+      if (lvl >= 2) { const pt = angleOn(game, p, tr.from) || tr.from; turnTo(p, Math.atan2(pt.y - p.y, pt.x - p.x), skill(game, p).turn, dt); inp.walk = Math.hypot(tr.x - p.x, tr.y - p.y) < 120 ? 1 : 0; }
+      return true;
+    }
+  }
+  // through the wall: an enemy the team has spotted, close, behind one or two soft walls (no concrete) → a burst through
+  const W = gun && WEAPONS[gun.w], wb = p.pro ? 0.9 : WALLBANG[lvl];
+  if (wb && W && gun.ammo > 0 && penOf(W) >= 0.4 && !p.reloadT) {
+    if (ai.wbUntil > game.time && ai.wbAt) {
+      const q = game.players.get(ai.wbAt);
+      if (q && q.alive) {
+        const a = Math.atan2(q.y - p.y, q.x - p.x) + (ai.wbErr || 0); ai.wbErr = (ai.wbErr || 0) * Math.exp(-dt * 6);
+        turnTo(p, a, skill(game, p).turn, dt); inp.ads = 1;
+        const d = Math.hypot(q.x - p.x, q.y - p.y); p.aimX = p.x + Math.cos(p.aim) * d; p.aimY = p.y + Math.sin(p.aim) * d;
+        if (Math.abs(angDiff(a, p.aim)) < 0.05) shootInput(inp, ai, gun);
+        return true;
+      }
+      ai.wbUntil = 0;
+    }
+    ai.wbT = ai.wbT || {};
+    for (const [id, until] of game.spots[team]) {
+      if (until < game.time || game.time < (ai.wbT[id] || 0)) continue;
+      const q = game.players.get(id);
+      if (!q || !q.alive || q.staged) continue;
+      const d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < 40 || d > 12 * PX_PER_M || floorAt(m, q.x, q.y) !== floorAt(m, p.x, p.y) || los(m, p.x, p.y, q.x, q.y)) continue;
+      ai.wbT[id] = game.time + 5;
+      if (Math.random() > wb || !thinWalls(game, p, q)) continue;
+      ai.wbAt = id; ai.wbUntil = game.time + 0.7 + Math.random() * 0.6; ai.wbErr = (Math.random() - 0.5) * 0.15;
+      return true;
+    }
+  }
+  return false;
+}
+// the line from p to q only crosses soft walls or boards (at most two of them) and no teammate stands near it
+function thinWalls(game, p, q) {
+  const m = game.map, d = Math.hypot(q.x - p.x, q.y - p.y), dx = (q.x - p.x) / d, dy = (q.y - p.y) / d;
+  let walls = 0, inWall = false, ok = true;
+  walkRay(p.x, p.y, dx, dy, d, (cx, cy) => {
+    const t = tileAt(m, cx, cy), solid = stopsBullet(t) || t === T.SOFT || t === T.BARRI;
+    if (solid && t !== T.SOFT && t !== T.BARRI) { ok = false; return true; }
+    if (solid && !inWall) walls++;
+    inWall = solid; return walls > 2 && (ok = false, true);
+  });
+  if (!ok || !walls) return false;
+  for (const o of game.players.values()) {
+    if (o === p || !o.alive || game.side(o) !== game.side(p)) continue;
+    const t = (o.x - p.x) * dx + (o.y - p.y) * dy;
+    if (t > 0 && t < d + 30 && Math.abs((o.y - p.y) * dx - (o.x - p.x) * dy) < 20) return false;
+  }
+  return true;
+}
+
 // He asked: bots should look roughly where an enemy would come from — Hard and Expert always, Normal some of the time,
 // Easy never (they look where they walk). A threat point: the nearest doorway, window, staircase end or open hatch
 // they can see, roughly ahead of them (dir), 2–11 m away.
@@ -1964,7 +2053,7 @@ function mouseTurn(p, a, rate, dt) {
 }
 function proSkill(p) { // human limits, per player; under pressure (hurt) a nervous player gets slower and shakier
   const pl = p.pro.pl, press = p.hp < p.maxHp * 0.45 ? 1 - pl.calm : 0;
-  return { react: Math.max(0.16, pl.react - 0.04) + press * 0.08, reactX: 0.05, expect: Math.max(0.15, pl.react * 0.8), turn: pl.turn, err: pl.aim * (1 + press * 0.7), settle: 10, shake: 0.5, tol: 0.1, see: 700, body: 6, head: (0.62 - pl.aim * 0.4) * (1 - press * 0.4), drone: 0.32 };
+  return { react: Math.max(0.17, pl.react - 0.03) + press * 0.08, reactX: 0.05, expect: Math.max(0.17, pl.react * 0.85), turn: pl.turn, err: pl.aim * (1 + press * 0.7), settle: 10, shake: 0.5, tol: 0.1, see: 850, body: 5, head: (0.8 - pl.aim * 0.2) * (1 - press * 0.4), drone: 0.22 };
 }
 const proSide = (game, p) => (game.side(p) === TEAM.ATK ? 'atk' : 'def');
 function proState(game, squad) {
