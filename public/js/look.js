@@ -166,6 +166,12 @@ export const tilt = {
   },
   kick(k = 1) { if (this.lean && this.on) this.kvx -= 9 * k; },
   flat() { if (this.M) { this.el.style.transform = ''; this.M = null; document.documentElement.classList.remove('tilt3d', 'edgeblur'); } }, // menus: straight down
+  // a point on the flat world layers (CSS px) → where it shows on the screen
+  project(x, y) {
+    const M = this.M; if (!M) return { x, y };
+    const w = M.m14 * x + M.m24 * y + M.m44;
+    return { x: (M.m11 * x + M.m21 * y + M.m41) / w, y: (M.m12 * x + M.m22 * y + M.m42) / w };
+  },
   // a point on the screen (CSS px) → the same point on the flat world layers
   untilt(sx, sy) {
     const M = this.M; if (!M) return { x: sx, y: sy };

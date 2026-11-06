@@ -157,7 +157,7 @@ const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45;
 // Turning (he asked: hard to pull the mouse round, flicks must be possible): moving the mouse sideways turns you as if
 // the crosshair were never further than TURN_R from you, so a far-out crosshair turns as quickly as a near one; moving
 // it towards / away from you changes the distance 1:1. Close in it is exactly 1:1 like a pointer.
-const TURN_R = 160, ADS_DIST = 2.5 * PX_PER_M; // aiming in puts the crosshair 2.5 m out, the way you face (he chose 5 m, then asked for half)
+const TURN_R = 160;
 function freeMove(dx, dy) {
   const z = st.zoom || 1; dx /= z; dy /= z;
   const o = aimOff, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = AIM_MIN(), hi = AIM_MAX();
@@ -170,15 +170,19 @@ function freeMove(dx, dy) {
 }
 // aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked), else to its sight's distance
 function adsReset() {
-  const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l, d = st.me && st.me.aa ? adsStart(attFromCode(st.me.aa).sight) * PX_PER_M : ADS_DIST;
+  const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l; let d = adsStart(st.me && st.me.aa ? attFromCode(st.me.aa).sight : 'iron') * PX_PER_M;
   // a set distance per sight, whatever distance you were at (he asked); a nearer wall stops it, but not the edge of a
   // doorway: if 2 of 5 lines spread over ±2.5° get through, it goes the full distance (no jumping onto door frames)
+  // The sniper scope goes as far as you can see that way (he asked): the second-longest of those 5 sight lines, so a
+  // sliver past a door frame doesn't count, within its reach
+  const a = Math.atan2(uy, ux), sn = st.me && st.me.aa && attFromCode(st.me.aa).sight === 'sniper';
+  if (sn) { const ds = []; for (let i = -2; i <= 2; i++) ds.push(castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, reachOf(st.me, true), null)); ds.sort((p, q) => q - p); d = Math.max(AIM_MIN(), ds[1] - 4); }
   const keep = st.reachW; st.reachW = Math.max(keep || 0, d);
   aimOff = { x: ux * d, y: uy * d };
-  const q = freeAimPoint(), a = Math.atan2(uy, ux);
+  const q = freeAimPoint();
   let pass = 0; for (let i = -2; i <= 2; i++) if (castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, d, null, true) + 2 >= d - 4) pass++;
   st.reachW = keep;
-  const to = q.stopped && pass < 2 ? Math.max(AIM_MIN(), q.see) : d;
+  const to = !sn && q.stopped && pass < 2 ? Math.max(AIM_MIN(), q.see) : Math.min(d, q.d);
   aimOff = { x: ux * to, y: uy * to };
 }
 // Sniper scope sway (he asked): scoped in, the reticle drifts in a slow figure of eight; holding Shift (walk or sprint
@@ -1680,6 +1684,12 @@ function frame(nowMs) {
       st.cam.x = lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, camPre.x));
       st.cam.y = tp > bt ? (tp + bt) / 2 : Math.max(tp, Math.min(bt, camPre.y));
     }
+  }
+  if (freeAim) { // the crosshair always stays on the real screen (he saw it go off): at the floor's edge the camera stops
+    // but the crosshair didn't, and the tilt crops the edges, so here the view may pass the edge just enough to show it
+    const q = freeAimPoint(), s0 = w2s(q.ax, q.ay), p = tilt.project(s0.x / DPR, s0.y / DPR), m = AHEAD() * 0.7 / DPR;
+    const px = Math.max(m, Math.min(VW / DPR - m, p.x)), py = Math.max(m, Math.min(VH / DPR - m, p.y));
+    if (px !== p.x || py !== p.y) { const u = tilt.untilt(px, py), w = screenToWorld(u.x * DPR, u.y * DPR); st.cam.x += q.ax - w.x; st.cam.y += q.ay - w.y; }
   }
   if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
 
