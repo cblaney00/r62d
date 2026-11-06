@@ -4,7 +4,7 @@
 // match (he asked): the mouse is captured on the first click, the crosshair moves with your sensitivity and aiming mode,
 // it is your own crosshair, distances are real metres, the view widens when you aim in and follows the crosshair out.
 import { PX_PER_M } from '/shared/constants.js';
-import { drawXhair, drawSightLook } from './crosshair.js';
+import { drawXhair, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
 import { lockMouse } from './keys.js';
 import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -165,8 +165,7 @@ const reach = () => aimReach(attOf(S.w).sight, !!S.mouse.r) * PX_PER_M; // the m
 const aimMin = () => 46 * O.dpr() / (S.z || 1), aimMax = () => S.reachW || 400;
 function adsAim() { // per sight, as in a match; the sniper scope jumps out to the targets (or the wall, if that is nearer)
   const l = Math.hypot(S.aim.x, S.aim.y) || 1, ux = S.aim.x / l, uy = S.aim.y / l;
-  if (sniper()) { const R = reach(); S.aim = { x: ux * R, y: uy * R }; const to = Math.max(aimMin(), Math.min(R, S.dist * M, aimPoint(S.cv).d - 2)); S.aim = { x: ux * to, y: uy * to }; return; }
-  const d = adsStart(attOf(S.w).sight) * M; S.aim = { x: ux * d, y: uy * d };
+  const d = Math.max(aimMin(), Math.min(adsStart(attOf(S.w).sight) * M, farEnd() - 2)); S.aim = { x: ux * d, y: uy * d }; // a set distance per sight (he asked), never past the backstop
 }
 // the sniper scope sways in a slow figure of eight (main.js scopeSway); Shift steadies it
 function sway(dt) {
@@ -321,9 +320,12 @@ function draw(cv, dt) {
   // crosshair: your own one, kicked round you by recoil and with the true spread gap, exactly as in a match
   const q = aimPoint(cv), Q = w2s(cv, q.x, q.y), rc = S.rc, cs = Math.cos(rc), sn = Math.sin(rc);
   const x = O0.x + (Q.x - O0.x) * cs - (Q.y - O0.y) * sn, y = O0.y + (Q.x - O0.x) * sn + (Q.y - O0.y) * cs;
+  const LM = sniper() && S.adsT > 0.3 ? lensMag(S.adsT) : 1, LR = lensR(cv); // the sniper lens magnifies (as in a match)
+  if (LM > 1.01) magnify(c, cv, x, y, LR, LM);
   if (S.mouse.r) for (const d of S.dummies) { // aiming in: each target's head zone, red when the crosshair is on it
     if (d.hp <= 0) continue;
-    const H = w2s(cv, d.x, d.y), hr = Math.max(2.5 * dpr, HEAD_AIM * z), on = Math.hypot(x - H.x, y - H.y) <= hr;
+    const H0 = w2s(cv, d.x, d.y), H = lensPt(H0.x, H0.y, x, y, LR, LM); if (!H) continue;
+    const hr = Math.max(2.5 * dpr, HEAD_AIM * z) * H.k, on = Math.hypot(x - H.x, y - H.y) <= hr;
     c.lineWidth = (on ? 2 : 1.2) * dpr;
     c.strokeStyle = 'rgba(0,0,0,0.6)'; c.beginPath(); c.arc(H.x, H.y, hr + 1.2 * dpr, 0, 7); c.stroke();
     c.strokeStyle = on ? '#ff3b3b' : 'rgba(255,255,255,0.55)'; c.beginPath(); c.arc(H.x, H.y, hr, 0, 7); c.stroke();

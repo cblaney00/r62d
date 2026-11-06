@@ -44,6 +44,30 @@ export function drawXhair(ctx, x, y, o, spread, k) {
   ctx.restore();
 }
 
+// The sniper lens magnifies (he asked): LENS_ZOOM times at full aim, easing in as you aim in. lensMag(at) = the zoom now.
+export const LENS_ZOOM = 3;
+export const lensMag = at => 1 + (LENS_ZOOM - 1) * Math.max(0, Math.min(1, (at - 0.3) / 0.5));
+// draws src's circle round (x, y) of radius r / M blown up to radius r on ctx (identity transform, canvas px). src may be
+// ctx's own canvas (copied first); k = src px per ctx px (a smaller canvas, like the fog)
+const lensTmp = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+export function magnify(ctx, src, x, y, r, M, k = 1) {
+  const sr = r / M, n = Math.max(1, Math.ceil(sr * 2 * k));
+  if (lensTmp.width !== n) { lensTmp.width = n; lensTmp.height = n; }
+  const t = lensTmp.getContext('2d'); t.clearRect(0, 0, n, n);
+  t.drawImage(src, (x - sr) * k, (y - sr) * k, sr * 2 * k, sr * 2 * k, 0, 0, n, n);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.clip();
+  ctx.clearRect(x - r, y - r, r * 2, r * 2); ctx.drawImage(lensTmp, 0, 0, n, n, x - r, y - r, r * 2, r * 2);
+  ctx.restore();
+}
+// a point seen in the lens: where it shows (null = hidden under the lens rim)
+export function lensPt(px, py, x, y, r, M) {
+  if (M <= 1.01) return { x: px, y: py, k: 1 };
+  const dx = px - x, dy = py - y, d = Math.hypot(dx, dy);
+  if (d * M <= r) return { x: x + dx * M, y: y + dy * M, k: M };
+  return d <= r ? null : { x: px, y: py, k: 1 };
+}
+
 // each sight has its own faint look while aiming in (he asked: interesting but never in the way); nothing covers the middle
 export function drawSightLook(ctx, sight, x, y, k, d, lensR) { // d = device pixel ratio, lensR = sniper lens radius in px
   const W = ctx.canvas.width, H = ctx.canvas.height;

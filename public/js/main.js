@@ -21,7 +21,7 @@ import { openMapInfo, closeMapInfo } from './mapinfo.js';
 import { openPlaybook, closePlaybook } from './playbook.js';
 import { openKnowledge, closeKnowledge } from './knowledge.js';
 import { PRO_TEAMS } from '/shared/pros.js';
-import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair, drawSightLook } from './crosshair.js';
+import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
 import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
@@ -153,7 +153,7 @@ const scopeOn = me => !!me && /scope|sniper/.test(String(me.aa || '')), sniperOn
 const reachOf = (me, ads) => aimReach(me && me.aa ? attFromCode(me.aa).sight : 'iron', ads ?? !!(me && me.ad)) * PX_PER_M;
 // Long sightlines (he asked): looking down a line more than 1.5x the normal range, the view opens right out the way you
 // face, up to LONG_H world px tall, and you see out to LONG_R. The sniper scope always gets that view while aimed in.
-const LONG_H = 1500, LONG_R = 2400;
+const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45;
 // Turning (he asked: hard to pull the mouse round, flicks must be possible): moving the mouse sideways turns you as if
 // the crosshair were never further than TURN_R from you, so a far-out crosshair turns as quickly as a near one; moving
 // it towards / away from you changes the distance 1:1. Close in it is exactly 1:1 like a pointer.
@@ -171,13 +171,14 @@ function freeMove(dx, dy) {
 // aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked), else to its sight's distance
 function adsReset() {
   const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l, d = st.me && st.me.aa ? adsStart(attFromCode(st.me.aa).sight) * PX_PER_M : ADS_DIST;
-  if (sniperOn(st.me)) { // sniper scope (he asked): the reticle snaps out to the mark at the end of your sightline
-    const R = reachOf(st.me, true), keep = st.reachW; st.reachW = R; aimOff = { x: ux * R, y: uy * R };
-    const q = freeAimPoint(); st.reachW = keep;
-    const to = Math.max(AIM_MIN(), Math.min(R, q.see - 2)); aimOff = { x: ux * to, y: uy * to }; return;
-  }
-  const far = Math.max(l, d); aimOff = { x: ux * far, y: uy * far };
-  const q = freeAimPoint(), to = q.stopped ? Math.max(AIM_MIN(), q.see) : d;
+  // a set distance per sight, whatever distance you were at (he asked); a nearer wall stops it, but not the edge of a
+  // doorway: if 2 of 5 lines spread over ±2.5° get through, it goes the full distance (no jumping onto door frames)
+  const keep = st.reachW; st.reachW = Math.max(keep || 0, d);
+  aimOff = { x: ux * d, y: uy * d };
+  const q = freeAimPoint(), a = Math.atan2(uy, ux);
+  let pass = 0; for (let i = -2; i <= 2; i++) if (castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, d, null, true) + 2 >= d - 4) pass++;
+  st.reachW = keep;
+  const to = q.stopped && pass < 2 ? Math.max(AIM_MIN(), q.see) : d;
   aimOff = { x: ux * to, y: uy * to };
 }
 // Sniper scope sway (he asked): scoped in, the reticle drifts in a slow figure of eight; holding Shift (walk or sprint
@@ -250,6 +251,13 @@ function cursor() {
 // in the way, so flicks got caught). x, y = ax, ay = that point (sent to the server for headshots). see = how far you
 // can see along your aim, shot = how far a bullet gets (through soft walls and barricades); when something is in the
 // way a tick marks it and the crosshair fades if bullets can't reach it.
+// how tall (world px) the view must be to hold you and a point (dx, dy) from you, with the room kept round both
+// (80 px round you, AHEAD × 1.3 past the crosshair) and a little spare for the tilt cropping the screen edges
+function fitBoth(dx, dy) {
+  const r = st.rot || 0, c = Math.cos(r), s = Math.sin(r), sx = Math.abs(dx * c - dy * s), sy = Math.abs(dx * s + dy * c);
+  const f = 1 / 1.1, mp = (80 * DPR + AHEAD() * 1.3) / VH;
+  return Math.max(sy / Math.max(0.2, f - mp), sx / Math.max(0.2, f * VW / VH - mp));
+}
 function freeAimPoint() {
   let l = Math.min(Math.hypot(aimOff.x, aimOff.y) || 1, AIM_MAX());
   const a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), s = Math.sin(a);
@@ -1575,6 +1583,12 @@ function frame(nowMs) {
     }
     st.lastViewPos = view ? { x: view.x, y: view.y } : null;
   }
+  if (!st.tv && view && view.kind === 'body' && padOn && aimMode === 'free' && !gpRecent() && st.zoom) { // Crosshair mode: the target keeps
+    // you and the crosshair on screen with room past it (he asked), so the view glides there instead of jumping
+    const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
+    const keepT = (x, y, m) => { cx = Math.min(x + hw - m, Math.max(x - hw + m, cx)); cy = Math.min(y + hh - m, Math.max(y - hh + m, cy)); };
+    keepT(st.pred.x, st.pred.y, 80 * DPR / st.zoom); keepT(q.ax, q.ay, AHEAD() * 1.3 / st.zoom); // (80: clear of the corner panels)
+  }
   const k = 1 - Math.exp(-dt * 14);
   if (Math.hypot(cx - st.cam.x, cy - st.cam.y) > 420) { st.cam.x = cx; st.cam.y = cy; if (view) st.leadV = null; } // spawned, new round: be there at once
   st.cam.x += (cx - st.cam.x) * k; st.cam.y += (cy - st.cam.y) * k;
@@ -1610,7 +1624,11 @@ function frame(nowMs) {
   }
   // the room-size zoom only moves for a real change (a new room, a long corridor), not every small turn of
   // your aim, and then settles quickly, so the view isn't always slowly drifting in and out (he asked for less slow panning)
-  if (!st.envWant || Math.abs(want - st.envWant) > st.envWant * 0.15 || (view && view.kind !== 'body')) st.envWant = want;
+  // A body's view only takes a new size once it has held for ENV_HOLD s (he asked: sweeping your aim past a doorway made the
+  // view jump out and back), so a sightline you only pass over doesn't count
+  const big = !st.envWant || Math.abs(want - st.envWant) > st.envWant * 0.15;
+  st.envBigT = big ? (st.envBigT || 0) + dt : 0;
+  if (!st.envWant || (view && view.kind !== 'body') || st.envBigT >= ENV_HOLD) { st.envWant = want; st.envBigT = 0; }
   st.envH = st.envH || st.envWant;
   st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * (view && view.kind === 'body' ? 3 : 6))); // a gentle glide, not a pump
   // aiming down sights widens the view, fast (he asked: it used to zoom in, the opposite of what you want); a 2x scope widest
@@ -1626,7 +1644,7 @@ function frame(nowMs) {
     const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), mg = (50 * DPR + AHEAD()) / (st.zoom || 1);
     st.reachW = reachOf(me);
     { const l = Math.hypot(aimOff.x, aimOff.y); if (l > st.reachW) { const k = (st.reachW + (l - st.reachW) * Math.exp(-dt * 10)) / l; aimOff = { x: aimOff.x * k, y: aimOff.y * k }; } } // stopped aiming in: it glides back inside
-    const capH = Math.max(st.longV ? LONG_H : 0, st.reachW + mg), need = Math.min(capH, (q.ad + mg) / (2 * e)); // (tall enough to reach it straight up)
+    const capH = Math.max(st.longV ? LONG_H : 0, st.reachW + mg), need = Math.min(capH, fitBoth(q.ax - st.pred.x, q.ay - st.pred.y)); // (tall enough to reach it straight up)
     st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need;
     st.viewH = Math.max(st.viewH, st.fitH);
   } else st.fitH = 0;
@@ -1635,7 +1653,8 @@ function frame(nowMs) {
   if (freeAim) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
     const keep = (x, y, m) => { st.cam.x = Math.min(x + hw - m, Math.max(x - hw + m, st.cam.x)); st.cam.y = Math.min(y + hh - m, Math.max(y - hh + m, st.cam.y)); };
-    keep(st.pred.x, st.pred.y, 50 * DPR / st.zoom); keep(q.ax, q.ay, AHEAD() / st.zoom); // always some room past the crosshair (he asked)
+    // (the camera's target already keeps the room, gliding, above: this only stops it slipping off at the very edge)
+    keep(st.pred.x, st.pred.y, 30 * DPR / st.zoom); keep(q.ax, q.ay, AHEAD() * 0.8 / st.zoom); // (the tilt crops the screen edges a little)
   }
   if (view && view.kind === 'cam' && !view.dr) { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
   const camPre = { x: st.cam.x, y: st.cam.y };
@@ -2503,6 +2522,30 @@ function scopeVeil(p) {
   if (st.veilK === k) return; st.veilK = k;
   el.style.setProperty('--sx', Math.round(p.x / DPR) + 'px'); el.style.setProperty('--sy', Math.round(p.y / DPR) + 'px'); el.style.setProperty('--sr', Math.round(scopeLensR() / DPR) + 'px');
 }
+// the sniper lens magnifies (he asked): the map and people (#game) go into #lensA, the blackout into #lensF (greyed by
+// CSS like #fog), both in #scopeLens, a round box over the lens above the veil; #over is magnified in place
+function scopeLens(p, r, M) {
+  const el = $('scopeLens');
+  if (!p || st.tv) { setCls(el, 'hidden', true); st.lensK = ''; return; }
+  setCls(el, 'hidden', false);
+  const A = $('lensA'), F = $('lensF'), n = Math.ceil(r * 2), k = Math.round(p.x / DPR) + ',' + Math.round(p.y / DPR) + ',' + Math.round(r / DPR);
+  if (A.width !== n) { A.width = A.height = F.width = F.height = n; }
+  if (st.lensK !== k) { st.lensK = k; const s = r / DPR; el.style.width = el.style.height = (s * 2) + 'px'; el.style.transform = `translate(${p.x / DPR - s}px, ${p.y / DPR - s}px)`; }
+  const a = A.getContext('2d'), sr = r / M;
+  a.setTransform(1, 0, 0, 1, 0, 0); a.fillStyle = '#050607'; a.fillRect(0, 0, n, n);
+  // the map: world -> lens px is (w2s(world) - p) * M + r
+  const O = w2s(0, 0), ex = w2s(1, 0), ey = w2s(0, 1);
+  a.setTransform((ex.x - O.x) * M, (ex.y - O.y) * M, (ey.x - O.x) * M, (ey.y - O.y) * M, (O.x - p.x) * M + r, (O.y - p.y) * M + r);
+  const cs = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([u, v]) => screenToWorld(p.x + u * sr, p.y + v * sr)), m = st.rend.map;
+  const wx0 = Math.max(0, Math.min(...cs.map(q => q.x)) - 4), wy0 = Math.max(0, Math.min(...cs.map(q => q.y)) - 4);
+  const wx1 = Math.min(m.W * CELL, Math.max(...cs.map(q => q.x)) + 4), wy1 = Math.min(m.H * CELL, Math.max(...cs.map(q => q.y)) + 4), G = st.rend.c.width / st.rend.Wp;
+  if (wx1 > wx0 && wy1 > wy0) st.rend.c.drawTo(a, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
+  a.setTransform(1, 0, 0, 1, 0, 0);
+  a.drawImage(cv, p.x - sr, p.y - sr, sr * 2, sr * 2, 0, 0, n, n);
+  const f = F.getContext('2d'); f.clearRect(0, 0, n, n);
+  if (fogShown) { const fk = fog.width / VW; f.drawImage(fog, (p.x - sr) * fk, (p.y - sr) * fk, sr * 2 * fk, sr * 2 * fk, 0, 0, n, n); }
+  magnify(ctx, ctx.canvas, p.x, p.y, r, M);
+}
 function drawWheelNow() { if (st.wheel) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); drawWheel(ctx, st.wheel, DPR); ctx.restore(); } }
 function crosshair(me, now) {
   if (st.tv) return; // watching: no crosshair of your own on the broadcast
@@ -2531,10 +2574,13 @@ function crosshair(me, now) {
     ctx.save(); ctx.translate(cx0, cy0); ctx.rotate(a); ctx.globalAlpha = 0.75; ctx.fillStyle = '#f2c14e'; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 1.5 * DPR;
     ctx.beginPath(); ctx.moveTo(6 * DPR, 0); ctx.lineTo(-3 * DPR, -5 * DPR); ctx.lineTo(-1 * DPR, 0); ctx.lineTo(-3 * DPR, 5 * DPR); ctx.closePath(); ctx.stroke(); ctx.fill(); ctx.restore();
   }
+  const LM = me.at > 0.3 && me.ct === 'body' && sniperOn(me) ? lensMag(me.at) : 1, LR = scopeLensR();
+  scopeLens(LM > 1.01 ? { x, y } : null, LR, LM);
   if (me.at > 0.05 && me.ct === 'body' && fxOn('sight')) sightLook(attFromCode(me.aa).sight, x, y, Math.min(1, me.at));
   scopeVeil(me.at > 0.3 && me.ct === 'body' && sniperOn(me) ? { x, y } : null);
   if (me.ad && st.heads) for (const h of st.heads) {
-    const H = w2s(h.x, h.y), r = Math.max(2.5 * DPR, HEAD_AIM * (st.zoom || 1)), on = Math.hypot(x - H.x, y - H.y) <= r;
+    const H0 = w2s(h.x, h.y), H = lensPt(H0.x, H0.y, x, y, LR, LM); if (!H) continue;
+    const r = Math.max(2.5 * DPR, HEAD_AIM * (st.zoom || 1)) * H.k, on = Math.hypot(x - H.x, y - H.y) <= r;
     ctx.lineWidth = (on ? 2 : 1.2) * DPR;
     ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(H.x, H.y, r + 1.2 * DPR, 0, 7); ctx.stroke();
     ctx.strokeStyle = on ? '#ff3b3b' : 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.arc(H.x, H.y, r, 0, 7); ctx.stroke();
@@ -2552,7 +2598,8 @@ function crosshair(me, now) {
     if (f > 0) { ctx.save(); ctx.globalAlpha = f * 0.35; ctx.strokeStyle = '#fff'; ctx.lineWidth = DPR; ctx.setLineDash([6 * DPR, 6 * DPR]); ctx.beginPath(); ctx.arc(px, py, R, 0, 7); ctx.stroke(); ctx.restore(); }
   }
   if (me.mv === 3) ctx.globalAlpha = 0.3; // sprinting: gun down
-  else if (fq && fq.stopped) ctx.globalAlpha = 0.45; // bullets stop at a wall before it: faded
+  else { st.xhFade = (st.xhFade ?? 1) + ((fq && fq.stopped ? 0.45 : 1) - (st.xhFade ?? 1)) * Math.min(1, (now - (st.xhFadeT || now)) * 14); ctx.globalAlpha = st.xhFade; } // bullets stop at a wall before it: faded, gliding (no flicker past door frames)
+  st.xhFadeT = now;
   if (!(sniperOn(me) && me.at > 0.6 && me.ct === 'body')) drawXhair(ctx, x, y, xh, spread, DPR); // (the sniper reticle takes over)
   ctx.globalAlpha = 1;
   // points popups under the crosshair (he asked, R6-style): newest at the top, each fades after a couple of seconds

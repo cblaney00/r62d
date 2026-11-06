@@ -29,7 +29,10 @@ canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: b
 #loadTip { margin-top: 16px; font: 500 14px var(--body, inherit); color: rgba(255,255,255,0.45); letter-spacing: 0.02em; min-height: 18px; }
 #mapLayer { position: fixed; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 canvas#fog, canvas#over, #vignette { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; }
-canvas#fog { visibility: hidden; filter: grayscale(1) brightness(0.42) contrast(1.15); } /* greys the remembered map (main.js fog step) */
+canvas#fog { visibility: hidden; filter: grayscale(1) brightness(0.42) contrast(1.15); }
+#scopeLens { position: fixed; left: 0; top: 0; pointer-events: none; border-radius: 50%; overflow: hidden; }
+#scopeLens canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+canvas#lensF { filter: grayscale(1) brightness(0.42) contrast(1.15); } /* (the same as #fog) */ /* greys the remembered map (main.js fog step) */
 /* sniper scope (he asked): the view round the lens is blurred and dimmed, but movement still shows; main.js sets --sx/--sy/--sr */
 #scopeVeil, #armVeil { position: fixed; inset: 0; pointer-events: none; backdrop-filter: blur(3px) brightness(0.5); background: rgba(0,6,10,0.18);
   -webkit-mask-image: radial-gradient(circle at var(--sx, 50%) var(--sy, 50%), transparent calc(var(--sr, 200px) - 3px), #000 calc(var(--sr, 200px) + 14px));
