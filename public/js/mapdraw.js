@@ -4,6 +4,7 @@ import { CELL, T, FL, MAT, CELL_HP } from '/shared/constants.js';
 import { S, floorPatterns, hash, shade, canvas } from './textures.js';
 import { polyIn } from '/shared/physics.js';
 import { drawOutProp } from './outprops.js';
+import { lightMap, applyLight, looks } from './look.js';
 
 const SOLID = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL]);
 const WALLISH = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.BARRI]);
@@ -41,6 +42,7 @@ export class MapRenderer {
     this.c = new Tiled(Math.ceil(this.Wp * this.S), Math.ceil(this.Hp * this.S)); // the map picture (shown by mount)
     this.ctx = this.dctx = this.c.tiles[0].ctx; // set to each piece in turn while drawing (onTiles)
     this.pat = floorPatterns(this.ctx);
+    this.lm = looks.light ? lightMap(map) : null; // room lighting (look.js), laid over every part as it is drawn
     // (there is no grey copy any more: the fog layer draws this picture and the browser greys it, CSS filter on #fog.
     // Keeping a grey copy up to date with ctx.filter is what made his real Firefox slower the longer he played.)
     // the ground floor first, so the open air beside the upper floors and the roof can show it far below (makeBelow)
@@ -285,6 +287,7 @@ export class MapRenderer {
       if (t === T.RUBBLE) this.stub(x, y, k);
       if (m.hatchAt && (m.hatchAt[k] >= 0 || m.hatchBelow[k] >= 0) && x >= x0 && x <= x1 && y >= y0 && y <= y1) this.hatchCell(x, y, k);
     }
+    if (this.lm) applyLight(ctx, this.lm, x0, y0, x1, y1);
     ctx.restore();
   }
   // Changed cells are redrawn a little at a time, nearest to the camera first, so seeing a whole

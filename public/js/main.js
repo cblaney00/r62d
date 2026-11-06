@@ -8,6 +8,7 @@ import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DR
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
+import { tilt, drawRaised, litWalls, looks } from './look.js';
 import { S, setMapScale } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
@@ -54,10 +55,10 @@ let DPR = 1, VW = 0, VH = 0;
 
 // Graphics quality (saved per computer): how many pixels get drawn and how many extras are added.
 const GFX = {
-  low:    { scale: 0.6,  fog: 0.3,  parts: 0.35, smoke: 7,  shade: false, rays: 0.5, map: 1.25, grey: 0.75 },
+  low:    { scale: 0.6,  fog: 0.3,  parts: 0.35, smoke: 7,  shade: false, rays: 0.5, map: 1.25, grey: 0.75, raised: false },
   medium: { scale: 0.8,  fog: 0.4,  parts: 0.6,  smoke: 11, shade: true, rays: 0.7, map: 2, grey: 1 },
-  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1, map: 2.5, grey: 1.5 },
-  ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2, map: 3, grey: 1.5 },
+  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1, map: 2.5, grey: 1.5, blur: true },
+  ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2, map: 3, grey: 1.5, blur: true },
 };
 const LEVELS = ['low', 'medium', 'high', 'ultra'];
 // "auto" (the default) starts from a guess about this computer and steps down by itself if the game can't keep up
@@ -793,7 +794,7 @@ cv.addEventListener('mousemove', e => {
     if (padOn && (aimMode === 'turn' || aimMode === 'spin')) { turnMove(e.movementX * k, e.movementY * k); return; }
     mouse.x = Math.max(0, Math.min(VW, mouse.x + e.movementX * k));
     mouse.y = Math.max(0, Math.min(VH, mouse.y + e.movementY * k));
-  } else { mouse.x = e.clientX * DPR; mouse.y = e.clientY * DPR; }
+  } else { const u = tilt.untilt(e.clientX, e.clientY); mouse.x = u.x * DPR; mouse.y = u.y * DPR; } // (the tilted world layers: look.js)
 });
 cv.addEventListener('mousedown', e => {
   audio.initAudio();
@@ -848,7 +849,8 @@ setLean(leanMode, false);
 const leanNow = () => leanMode === 'toggle' ? st.leanT || 0 : (keys.has('leanR') ? 1 : 0) - (keys.has('leanL') ? 1 : 0);
 // screen effects anyone can switch off (he asked), remembered on this computer
 const FX_OPTS = [['shake', 'Screen shake'], ['hurt', 'Red edges when hurt'], ['hit', 'Hit markers'], ['pts', 'Points pop-ups'], ['sight', 'Sight glow when aiming in'],
-  ['compass', 'Bomb-site compass'], ['pip', 'Stairs preview window'], ['site', 'Bomb-site found card'], ['vignette', 'Dark screen corners']];
+  ['compass', 'Bomb-site compass'], ['pip', 'Stairs preview window'], ['site', 'Bomb-site found card'], ['vignette', 'Dark screen corners'],
+  ['tilt', 'Camera tilt'], ['lean', 'Camera lean and kick'], ['walls3d', 'Raised walls'], ['lights', 'Room lighting'], ['blur', 'Soft screen edges']];
 let fxOff = new Set(); try { fxOff = new Set(JSON.parse(localStorage.getItem('r62d-fxoff') || '[]')); } catch {}
 const fxOn = k => !fxOff.has(k);
 function renderFxList() {
@@ -857,7 +859,11 @@ function renderFxList() {
   for (const b of el.querySelectorAll('button')) b.onclick = () => { audio.ui(); const k = b.dataset.fx; fxOff.has(k) ? fxOff.delete(k) : fxOff.add(k);
     try { localStorage.setItem('r62d-fxoff', JSON.stringify([...fxOff])); } catch {} renderFxList(); applyFx(); };
 }
-function applyFx() { const v = $('vignette'); if (v) v.style.display = fxOn('vignette') ? '' : 'none'; }
+function applyFx() {
+  const v = $('vignette'); if (v) v.style.display = fxOn('vignette') ? '' : 'none';
+  tilt.on = fxOn('tilt'); tilt.lean = fxOn('lean');
+  if (looks.light !== fxOn('lights')) { looks.light = fxOn('lights'); if (st.rend) { st.rend = new MapRenderer(st.known, st.base); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); st.warm = 4; } }
+}
 applyFx();
 function renderSettings() {
   renderFxList();
@@ -1737,7 +1743,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   { // a fresh click: open the crosshair gap now instead of when the server's answer comes back
     const w = WEAPONS[me.w];
     if (k.fire && !st.fireK && w && me.a && ctrl === 'body' && ph === PHASE.ACTION && me.am > 0 && !(st.shotPred && now - st.shotPred.t < 60 / w.rpm))
-      st.shotPred = { w: me.w, t: now, sh: gunHeat(me, w, now) + 1 };
+      st.shotPred = { w: me.w, t: now, sh: gunHeat(me, w, now) + 1 }; tilt.kick(0.5);
     st.fireK = k.fire;
   }
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
@@ -2042,7 +2048,7 @@ function draw(s, view, now, dt) {
   const wx0 = Math.max(fr ? fr[0] : 0, st.cam.x - ex - 20), wy0 = Math.max(fr ? fr[1] : 0, st.cam.y - ey - 20);
   const wx1 = Math.min(fr ? fr[2] : m.W * CELL, st.cam.x + ex + 20), wy1 = Math.min(fr ? fr[3] : m.H * CELL, st.cam.y + ey + 20);
   tq = pfa('mapblit', tq);
-  if (!s) { showFog(false); return; }
+  if (!s) { showFog(false); tilt.flat(); return; }
   const me = st.me, side = me ? me.tm : null;
   const inGame = s.ph === PHASE.PREP || s.ph === PHASE.ACTION || s.ph === PHASE.ROUND_END;
   const sm = smokes(s);
@@ -2220,6 +2226,12 @@ function draw(s, view, now, dt) {
   fx.drawLights(ctx); tq = pfa('fx', tq);
 
   // --- line-of-sight blackout ---
+  const vpolys = []; // (the sight shapes, for the raised walls below)
+  const raise = inGame && gq.raised !== false && fxOn('walls3d') ? (c, which) => { // raised walls (look.js) for the walls on screen
+    const fr = st.floorRect, lit = !view ? null : which === 1 && st.litW ? st.litW : (st.litW = litWalls(st.rend.map, vpolys)); // (worked out once a frame)
+    const X0 = Math.max(fr ? fr[0] : 0, wx0 - 40), Y0 = Math.max(fr ? fr[1] : 0, wy0 - 40), X1 = Math.min(fr ? fr[2] : m.W * CELL, wx1 + 40), Y1 = Math.min(fr ? fr[3] : m.H * CELL, wy1 + 40);
+    drawRaised(c, st.rend, st.rend.map, st.cam, 0.045, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1, lit, which);
+  } : null;
   showFog(!!(view && inGame));
   if (view && inGame) {
     const fk = fog.width / VW;
@@ -2235,7 +2247,7 @@ function draw(s, view, now, dt) {
     for (const v of st.viewers) {
       if (v.off) continue;
       if (v.near) { fctx.fillStyle = v === view ? 'rgba(0,0,0,0.5)' : '#000'; fillPoly(fctx, nearPolygon(v, sm)); }
-      fctx.fillStyle = '#000'; fillPoly(fctx, visionPolygon(v, sm, v === view ? 0 : 140));
+      const vp = visionPolygon(v, sm, v === view ? 0 : 140); vpolys.push(vp); fctx.fillStyle = '#000'; fillPoly(fctx, vp);
     }
     fctx.globalCompositeOperation = 'source-over';
     // past an upper floor's (or the roof's) edge: the ground far below, as in its open air (mapdraw makeBelow), never live
@@ -2246,6 +2258,7 @@ function draw(s, view, now, dt) {
       fctx.save(); fctx.beginPath(); fctx.rect(L, Tp, W2, H2); fctx.rect(fb[0], fb[1], fb[2] - fb[0], fb[3] - fb[1]); fctx.clip('evenodd'); fctx.fillStyle = '#000'; fctx.fillRect(L, Tp, W2, H2);
       st.rend.drawBelow(fctx, st.camFloor, L, Tp, W2, H2); fctx.restore();
     }
+    if (raise) raise(fctx, 0); // raised walls out of sight go into the blackout, so the browser greys them like the rest
   } else st.belowOut = false;
   // everything from here on goes on the top layer, above the blackout
   ctx = octx; overDirty = true;
@@ -2257,6 +2270,14 @@ function draw(s, view, now, dt) {
     if (L < a) ctx.fillRect(L, Tp, a - L, B - Tp);
     if (R > c) ctx.fillRect(c, Tp, R - c, B - Tp);
     if (B > d) ctx.fillRect(a, d, c - a, B - d);
+  }
+  if (raise) { raise(ctx, view ? 1 : null); st.litW = null; } // raised walls in sight (look.js), above the blackout
+  { // the camera tilt follows your movement across the screen
+    const p = st.pred, lp = st.tiltLast || p, k = dt > 0 ? 1 / dt : 0, vx = p && lp ? (p.x - lp.x) * k : 0, vy = p && lp ? (p.y - lp.y) * k : 0;
+    st.tiltLast = p ? { x: p.x, y: p.y } : null;
+    const jump = Math.hypot(vx, vy) > 600; // a floor change or respawn: no lean
+    tilt.update(dt, jump ? 0 : (vx * cr - vy * sr) * z, jump ? 0 : (vx * sr + vy * cr) * z, shake, innerWidth, innerHeight);
+    const de = document.documentElement; de.classList.toggle('tilt3d', tilt.on === true); de.classList.toggle('edgeblur', fxOn('blur') && gq.blur === true);
   }
   if (inGame && view) { drawStairView(s, st.me, now); drawHatchView(s, st.me, now); drawWindowView(s, st.me, now, view); drawWindowMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
   if (st.tv && inGame) { // each team's sight, faintly in its own colour (pro team colours, else blue / orange)

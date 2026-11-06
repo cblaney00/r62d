@@ -12,7 +12,7 @@ export class FX {
   tracer(x, y, x2, y2, col = '255,220,150') { this.tracers.push({ x, y, x2, y2, life: 0.04, max: 0.04, col }); }
 
   muzzle(x, y, a) {
-    this.lights.push({ x, y, r: 70, life: 0.05, max: 0.05, col: '255,190,110', a: 0.35 });
+    this.lights.push({ x, y, r: 115, life: 0.06, max: 0.06, col: '255,186,105', a: 0.42 }); // a shot lights up the room round it for a moment
     // shell casing flies out to the right
     const ca = a + Math.PI / 2 + (Math.random() - 0.5) * 0.6, sp = 60 + Math.random() * 50;
     this.add({ type: 'casing', x, y, vx: Math.cos(ca) * sp, vy: Math.sin(ca) * sp, life: 0.9, max: 0.9, rot: Math.random() * 6, vr: 20, size: 1 });

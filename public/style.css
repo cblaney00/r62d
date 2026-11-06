@@ -37,6 +37,13 @@ canvas#fog { visibility: hidden; filter: grayscale(1) brightness(0.42) contrast(
 #armVeil { position: absolute; inset: auto; } /* the Armory's, placed over its range by armory.js */
 #scopeVeil.flat, #armVeil.flat { backdrop-filter: none; background: rgba(0,6,10,0.5); }
 #vignette { background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.5) 100%); }
+#world { position: fixed; inset: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; background: #050607; }
+#world > canvas#game { pointer-events: auto; }
+/* soft focus round the screen edges (cinematic look, High and Ultra; Settings → Screen effects can switch it off) */
+#edgeBlur { position: fixed; inset: 0; pointer-events: none; display: none; -webkit-backdrop-filter: blur(1.8px); backdrop-filter: blur(1.8px); mask-image: radial-gradient(ellipse 75% 70% at 50% 55%, transparent 62%, black 100%); }
+html.edgeblur #edgeBlur { display: block; }
+/* tilted camera: the far (top) edge fades into a cool haze, like depth */
+html.tilt3d #vignette { background: linear-gradient(to bottom, rgba(8,12,20,0.42), rgba(8,12,20,0) 30%), radial-gradient(ellipse at 50% 55%, transparent 45%, rgba(0,0,0,0.5) 100%); }
 #ui { position: fixed; inset: 0; pointer-events: none; }
 #ui .screen, #ui button, #ui input, #corner { pointer-events: auto; }
 .hidden { display: none !important; }
