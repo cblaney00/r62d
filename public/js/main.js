@@ -8,7 +8,7 @@ import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DR
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, drawRaised, litWalls, looks } from './look.js';
+import { tilt, drawRaised, litWalls, sightClip, looks } from './look.js';
 import { S, setMapScale } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
@@ -2227,10 +2227,17 @@ function draw(s, view, now, dt) {
 
   // --- line-of-sight blackout ---
   const vpolys = [], vviews = []; // (the sight shapes and their eyes, for the raised walls below)
-  const raise = inGame && gq.raised !== false && fxOn('walls3d') ? (c, which) => { // raised walls (look.js) for the walls on screen
-    const fr = st.floorRect, lit = !view ? null : which === 1 && st.litW ? st.litW : (st.litW = litWalls(st.rend.map, vpolys, vviews, now)); // (worked out once a frame)
+  const RH = 0.045; // raised walls (look.js): how tall, as a share of the distance from the middle of the view
+  const raise = inGame && gq.raised !== false && fxOn('walls3d') ? (c, pass) => { // pass 'fog' (all, greyed by #fog) or 'lit'
+    const fr = st.floorRect, rm = st.rend.map, T_ = rm.tiles;
     const X0 = Math.max(fr ? fr[0] : 0, wx0 - 40), Y0 = Math.max(fr ? fr[1] : 0, wy0 - 40), X1 = Math.min(fr ? fr[2] : m.W * CELL, wx1 + 40), Y1 = Math.min(fr ? fr[3] : m.H * CELL, wy1 + 40);
-    drawRaised(c, st.rend, st.rend.map, st.cam, 0.045, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1, lit, which);
+    const go = keep => drawRaised(c, st.rend, rm, st.cam, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1, keep);
+    if (pass === 'fog') return go(null);
+    if (!view) return go(null);
+    // walls in colour exactly where your team's sight reaches (raised with them), like the floor: no cell-by-cell snapping
+    c.save(); c.clip(sightClip(vpolys, vviews, st.cam, RH)); go(k => T_[k] !== T.TALL); c.restore();
+    const seen = litWalls(rm, vpolys, vviews, now); // a car, crate or shelf you see shows whole
+    go(k => T_[k] === T.TALL && seen.has(k));
   } : null;
   showFog(!!(view && inGame));
   if (view && inGame) {
@@ -2258,7 +2265,7 @@ function draw(s, view, now, dt) {
       fctx.save(); fctx.beginPath(); fctx.rect(L, Tp, W2, H2); fctx.rect(fb[0], fb[1], fb[2] - fb[0], fb[3] - fb[1]); fctx.clip('evenodd'); fctx.fillStyle = '#000'; fctx.fillRect(L, Tp, W2, H2);
       st.rend.drawBelow(fctx, st.camFloor, L, Tp, W2, H2); fctx.restore();
     }
-    if (raise) raise(fctx, 0); // raised walls out of sight go into the blackout, so the browser greys them like the rest
+    if (raise) raise(fctx, 'fog'); // all raised walls into the blackout (the browser greys them like the rest); the seen ones go over them below
   } else st.belowOut = false;
   // everything from here on goes on the top layer, above the blackout
   ctx = octx; overDirty = true;
@@ -2271,7 +2278,7 @@ function draw(s, view, now, dt) {
     if (R > c) ctx.fillRect(c, Tp, R - c, B - Tp);
     if (B > d) ctx.fillRect(a, d, c - a, B - d);
   }
-  if (raise) { raise(ctx, view ? 1 : null); st.litW = null; } // raised walls in sight (look.js), above the blackout
+  if (raise) raise(ctx, 'lit'); // raised walls in sight (look.js), above the blackout
   { // the camera tilt follows your movement across the screen
     const p = st.pred, lp = st.tiltLast || p, k = dt > 0 ? 1 / dt : 0, vx = p && lp ? (p.x - lp.x) * k : 0, vy = p && lp ? (p.y - lp.y) * k : 0;
     st.tiltLast = p ? { x: p.x, y: p.y } : null;

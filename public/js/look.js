@@ -80,8 +80,9 @@ function riseOf(m) {
 const height = (m, k, rise) => { const t = m.tiles[k]; return t === T.TALL ? (rise[k] ? HGT[t] : 0) : HGT[t] || 0; };
 // faces: [dx, dy, light] — light from the top left, so faces turned that way are brighter
 const FACES = [[0, 1, 0.5], [0, -1, 0.78], [1, 0, 0.6], [-1, 0, 0.72]];
-// which: 1 = only the walls in sight, 0 = only the others (drawn into the blackout, which the browser greys), null = all
-export function drawRaised(ctx, R, m, cam, h, x0, y0, x1, y1, lit, which = null) {
+// keep(k): which wall cells to draw (main.js: everything into the blackout, which the browser greys; then, on top, the
+// walls clipped to where your team sees, and whole cars/crates you see)
+export function drawRaised(ctx, R, m, cam, h, x0, y0, x1, y1, keep = null) {
   const W = m.W, tiles = m.tiles, rise = riseOf(m), hg = k => height(m, k, rise), G = R.c.width / R.Wp, cx = cam.x, cy = cam.y;
   x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(W - 1, x1); y1 = Math.min(m.H - 1, y1);
   const up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f]; // a point raised to height f
@@ -94,10 +95,10 @@ export function drawRaised(ctx, R, m, cam, h, x0, y0, x1, y1, lit, which = null)
   for (let y = y0; y <= y1; y++) {
     let run = null;
     for (let x = x0; x <= x1 + 1; x++) {
-      const k = y * W + x, f = x <= x1 ? hg(k) : 0, on = f > 0, L = on && (!lit || lit.has(k)) ? 1 : 0;
+      const k = y * W + x, f = x <= x1 ? hg(k) : 0, on = f > 0 && (!keep || keep(k)), L = 1;
       const sh = on && m.shape && m.shape[k];
       if (run && (!on || f !== run.f || L !== run.L || sh)) { tops.push(run); run = null; }
-      if (!on || which !== null && L !== which) { if (run) { tops.push(run); run = null; } continue; }
+      if (!on) continue;
       const t = tiles[k], base = t === T.SOFT && m.mat && m.mat[k] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.HARD], X = x * CELL, Y = y * CELL;
       if (sh) { // an angled or curved piece: its own edges, its own top
         for (const P of sh) {
@@ -198,3 +199,21 @@ export const tilt = {
     return { x: (c * e - b * f) / det, y: (a * f - c * d) / det };
   },
 };
+
+// where your team sees, for the raised walls: each sight line carried CELL further on (the vision shapes stop 7 px into
+// a wall, the raised walls need their whole thickness), raised to each height the walls are drawn at, all as one path
+export function sightClip(polys, views, cam, h) {
+  const p = new Path2D(), push = 12;
+  polys.forEach((pts, j) => {
+    const v = views[j], far = [];
+    for (let i = 0; i < pts.length; i += 2) {
+      const dx = pts[i] - v.x, dy = pts[i + 1] - v.y, d = Math.hypot(dx, dy);
+      far.push(d > 1 && d < v.range - 1 ? pts[i] + dx / d * push : pts[i], d > 1 && d < v.range - 1 ? pts[i + 1] + dy / d * push : pts[i + 1]);
+    }
+    for (const f of [0, 0.7, 1]) {
+      for (let i = 0; i < far.length; i += 2) { const x = far[i] + (far[i] - cam.x) * h * f, y = far[i + 1] + (far[i + 1] - cam.y) * h * f; i ? p.lineTo(x, y) : p.moveTo(x, y); }
+      p.closePath();
+    }
+  });
+  return p;
+}
