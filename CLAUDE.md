@@ -227,7 +227,7 @@ His wishes so far:
   Lesson: a wing's walls drawn after a door on the shared wall cover it, so doors/windows on a shared wall go AFTER the wing's `box`; `node tests/openings.js` catches a covered opening. Watch for "a sloped wall runs into furniture" lines from any test.
 
 ## Batch of 2026-11-03
-- Bots reinforce over prep, not at once (he saw walls go solid as he walked by): `reinforceNext` + `ai.reinfN`/`reinfT` queue at the top of `botThink`. `node tests/botreinforce.js`.
+- One reinforcement = the cell + `REINF_HALF` 1 each side (3 cells, he asked for smaller; was 2 each side). Bots reinforce over prep, not at once (he saw walls go solid as he walked by): `reinforceNext` + `ai.reinfN`/`reinfT` queue at the top of `botThink`. `node tests/botreinforce.js`.
 - Chat hidden on splash/lobby (CSS sibling rule). Mouse taken automatically when playing (`st.autoLockN`, 3 tries a match; play.sh sets `dom.user_activation.transient.timeout` 86400 so the last menu click still counts; Firefox also allows it in DOM fullscreen).
 - Fog speed: no grey copy any more. The fog step draws the colour map (`st.rend.c`) and `#fog` has a CSS `filter: grayscale…`; the stairs view dulls with a dark wash. (ctx.filter on map changes made his GPU Firefox slower over time.) Confirmed on his screen 2026-11-03: 60 fps, ~6–7 ms a frame on High (was ~25).
 - Esports TV bans: `tvBanStep`/`isBanned` in game.js (`this.bans`, `banRun`, `BAN_GAP`), `tvBanPick` in bots.js; snapshot `bn`/`bq`. Picking screen `tvDraft` in main.js (`#tvDraft`, `html.tvsel` hides webcams). `node tests/tvbans.js`. TV viewers count as joined in `screens` (the lobby used to show behind).

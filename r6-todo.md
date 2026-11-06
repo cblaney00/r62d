@@ -6,11 +6,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] when a wall is reinforced it should be a smaller area per reinforcement
 - [ ] can we also make all the character models skinnier? they all feel really fat, also make it so their collision area is smaller because i feel like im squeezing through reasonably sized paths in rooms
 
 ## Done
 
+- [x] when a wall is reinforced it should be a smaller area per reinforcement (each reinforcement now covers 1.3 m of wall (3 cells) instead of 2.2 m (5 cells), so a whole wall takes about twice as many. The team still has 10 a round. Not yet played by him)
 - [x] the sniper also needs some kind of nerf because with the 1.5x prism i just destroyed all the silvers in the vicinity (the Pike and Saker LR only drop someone with one body shot when aimed in through the Sniper Scope, the one that blurs the screen round the lens and glints at whoever it points at. With a 1.5x prism, any other sight or from the hip they hit hard but a full-health heavy or medium survives one body shot (the Saker leaves a heavy at about 45 of 150); headshots still kill as before. Not yet played by him)
 - [x] add shift+S as a way to hold for sprint as well, i notice i do it a lot (holding the sprint key with S now sprints the way you aim, exactly like sprint + W; without the sprint key S still walks backwards. Not yet played by him)
 - [x] the bots should vote on what site to do based on what the pros think are good sites, each one chosen cannot be chosen again in that game unless there is overtime (he chose: there is no overtime yet, so once every site has been played they all open again; the rule binds people too (used sites are greyed and crossed out on the site picker); the vote shows as short chat lines. The defending bots each vote by how often the defence has won at each site in pro practice; pros trust those numbers, lower ranks are less sure so their votes spread more; ties go to the stronger total. Each bot says its pick, then "Vote: Kitchen / Lounge (3 of 5)". A person on the defending team can still change it to any open site. Not yet watched by him)

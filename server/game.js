@@ -42,6 +42,7 @@ const BAN_GAP = 2.6; // seconds between Esports TV bans, long enough to read eac
 
 const SCAN_BEAT = 0.8, SCAN_BLUR = 1.5 * PX_PER_M; // WRAITH's scanner: a new blip per heartbeat, this far off the real spot at most
 // aimed in through the sniper scope (the Pike's and Saker's one-shot body kill needs it, he asked)
+const REINF_HALF = 1;
 const scopedIn = p => { const g = p && p.guns && p.guns[p.slot]; return !!(g && g.att && g.att.sight === 'sniper' && (p.adsT || 0) >= 0.6); };
 export class Game {
   // opts.tut: a private tutorial match for one player (see tutAction), with its timers held
@@ -1440,12 +1441,13 @@ export class Game {
 
   facingCell(p, reach) { return facingCell(this.map, p.x, p.y, p.aim, reach); }
 
+  // he asked: a smaller patch per reinforcement (was 5 cells, 2.2 m): the cell + REINF_HALF each side = 3 cells, 1.3 m
   reinforceWall(k) {
     const m = this.map, W = m.W, x = k % W, y = Math.floor(k / W);
     const isW = (cx, cy) => { const t = tileAt(m, cx, cy); return t === T.SOFT || t === T.REINF || t === T.HARD; };
     const horiz = (isW(x - 1, y) || isW(x + 1, y)) && !(isW(x, y - 1) && isW(x, y + 1));
     const cells = [k];
-    for (const s of [-1, 1]) for (let i = 1; i <= 2; i++) {
+    for (const s of [-1, 1]) for (let i = 1; i <= REINF_HALF; i++) {
       const cx = horiz ? x + s * i : x, cy = horiz ? y : y + s * i;
       if (tileAt(m, cx, cy) !== T.SOFT) break;
       cells.push(cy * W + cx);
