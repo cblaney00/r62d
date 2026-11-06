@@ -18,7 +18,7 @@ export function lightMap(map) {
   map.rooms.forEach((r, i) => { for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) room[y * W + x] = i; });
   const tile = k => map.tiles[k], passes = k => { const t = tile(k); return !SOLID.has(t) && t !== T.TALL && t !== T.VOID && t !== T.DSHIELD; };
   const L = new Float32Array(N), lamp = new Float32Array(N);
-  for (let k = 0; k < N; k++) L[k] = room[k] >= 0 ? 0.4 : 1;
+  for (let k = 0; k < N; k++) L[k] = room[k] >= 0 ? 0.64 : 1; // (0.4 made insides too dark and blue, he said)
   const seen = new Int32Array(N).fill(-1); let stamp = 0;
   const spread = (sx, sy, R, add, into) => { // light from (sx, sy) cells out to R cells, carried round corners by a flood
     const s = ++stamp, q = [Math.floor(sy) * W + Math.floor(sx)]; if (q[0] < 0 || q[0] >= N) return;
@@ -45,7 +45,7 @@ export function lightMap(map) {
   for (let k = 0; k < N; k++) {
     if (room[k] < 0 || tile(k) === T.VOID) continue;
     const l = Math.min(1.2, L[k] + lamp[k]), j = k * 4;
-    di.data[j] = 12; di.data[j + 1] = 18; di.data[j + 2] = 36; di.data[j + 3] = Math.max(0, Math.min(1, 1 - l)) * 0.6 * 255;
+    di.data[j] = 18; di.data[j + 1] = 18; di.data[j + 2] = 24; di.data[j + 3] = Math.max(0, Math.min(1, 1 - l)) * 0.5 * 255;
     wi.data[j] = 255; wi.data[j + 1] = 188; wi.data[j + 2] = 112; wi.data[j + 3] = Math.max(0, Math.min(1, lamp[k] - 0.2)) * 0.22 * 255;
   }
   dc.putImageData(di, 0, 0); wc.putImageData(wi, 0, 0);
@@ -67,11 +67,22 @@ export function applyLight(ctx, lm, x0, y0, x1, y1) {
 const HGT = { [T.HARD]: 1, [T.SOFT]: 1, [T.REINF]: 1, [T.PANEL]: 1, [T.TALL]: 0.7, [T.DSHIELD]: 0.45 };
 const SIDE = { [T.HARD]: [107, 112, 118], [T.SOFT]: [178, 170, 155], [T.REINF]: [76, 84, 93], [T.PANEL]: [53, 59, 66], [T.TALL]: [70, 60, 50], [T.DSHIELD]: [40, 45, 52] };
 const BRICK = [125, 68, 52];
+// furniture and things outdoors only stand up when they are boxy: a round tree, rock or bush raised as its square cells
+// showed a square slab of grass round it (he saw it as strange shapes)
+const BOXY = new Set(['crates', 'wall', 'car', 'dumpster', 'rack', 'shelf', 'container', 'cabinet', 'bookshelf', 'pillar', 'van', 'locker', 'train', 'fridge', 'truck', 'booth', 'schoolbus', 'bus', 'gatehouse', 'lifthut', 'signalbox', 'tankcar', 'counter', 'forklift', 'snowcat', 'stall', 'cart']);
+const RISE = new WeakMap(); // map → per cell: 1 where a tall cell belongs to a boxy thing
+function riseOf(m) {
+  let r = RISE.get(m); if (r) return r;
+  RISE.set(m, r = new Uint8Array(m.W * m.H));
+  for (const p of m.props || []) if (BOXY.has(p.kind)) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) r[y * m.W + x] = 1;
+  return r;
+}
+const height = (m, k, rise) => { const t = m.tiles[k]; return t === T.TALL ? (rise[k] ? HGT[t] : 0) : HGT[t] || 0; };
 // faces: [dx, dy, light] — light from the top left, so faces turned that way are brighter
 const FACES = [[0, 1, 0.5], [0, -1, 0.78], [1, 0, 0.6], [-1, 0, 0.72]];
 // which: 1 = only the walls in sight, 0 = only the others (drawn into the blackout, which the browser greys), null = all
 export function drawRaised(ctx, R, m, cam, h, x0, y0, x1, y1, lit, which = null) {
-  const W = m.W, tiles = m.tiles, hg = k => HGT[tiles[k]] || 0, G = R.c.width / R.Wp, cx = cam.x, cy = cam.y;
+  const W = m.W, tiles = m.tiles, rise = riseOf(m), hg = k => height(m, k, rise), G = R.c.width / R.Wp, cx = cam.x, cy = cam.y;
   x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(W - 1, x1); y1 = Math.min(m.H - 1, y1);
   const up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f]; // a point raised to height f
   const paths = new Map(), tops = [];
@@ -90,11 +101,15 @@ export function drawRaised(ctx, R, m, cam, h, x0, y0, x1, y1, lit, which = null)
       const t = tiles[k], base = t === T.SOFT && m.mat && m.mat[k] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.HARD], X = x * CELL, Y = y * CELL;
       if (sh) { // an angled or curved piece: its own edges, its own top
         for (const P of sh) {
+          let pcx = 0, pcy = 0; for (let i = 0; i < P.length; i += 2) { pcx += P[i]; pcy += P[i + 1]; } pcx /= P.length / 2; pcy /= P.length / 2;
           for (let i = 0; i < P.length; i += 2) {
             const ax = P[i], ay = P[i + 1], bx = P[(i + 2) % P.length], by = P[(i + 3) % P.length];
-            const nx = by - ay, ny = -(bx - ax), side = nx * ((ax + bx) / 2 - cx) + ny * ((ay + by) / 2 - cy); // normal · (edge - camera)
-            if (side >= 0) continue; // turned away from the camera
-            const len = Math.hypot(nx, ny) || 1, lt = 0.62 + 0.14 * (-nx - ny) / len;
+            let nx = by - ay, ny = -(bx - ax); const len = Math.hypot(nx, ny) || 1, mx = (ax + bx) / 2, my = (ay + by) / 2;
+            if (nx * (mx - pcx) + ny * (my - pcy) < 0) { nx = -nx; ny = -ny; } // pointing out of the piece, whichever way it was wound
+            if (nx * (cx - mx) + ny * (cy - my) <= 0) continue; // turned away from the camera
+            const ok = Math.floor((mx + nx / len * 0.5) / CELL), oy = Math.floor((my + ny / len * 0.5) / CELL), on = oy * W + ok; // just outside the edge
+            if (on !== k && hg(on) >= f && !(m.shape && m.shape[on])) continue; // against more wall: hidden inside it
+            const lt = 0.62 + 0.14 * (-nx - ny) / len;
             face(base + '|' + L + '|' + lt.toFixed(1), ax, ay, bx, by, f);
           }
         }
@@ -127,14 +142,27 @@ export function drawRaised(ctx, R, m, cam, h, x0, y0, x1, y1, lit, which = null)
     if (r.sh) ctx.restore();
   }
 }
-// the wall cells your team sees right now: the cells where sight lines end (vision polygons reach 7 px into the wall
-// they stop at) and the wall cells beside them
-export function litWalls(m, polys, into = new Set()) {
-  const W = m.W, hg = k => HGT[m.tiles[k]] || 0;
-  for (const pts of polys) for (let i = 0; i < pts.length; i += 2) {
-    const x = Math.floor(pts[i] / CELL), y = Math.floor(pts[i + 1] / CELL);
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const k = (y + dy) * W + x + dx; if (hg(k) > 0) into.add(k); }
-  }
+// the wall cells your team sees right now: the cell each sight line ends in (vision polygons reach 7 px into the wall
+// they stop at) and its neighbours no deeper than it from the eye (so the stub of an inside wall behind an outside one
+// stays dark). views[i] is the eye of polys[i]. A wall seen in the last 0.45 s still counts, so walls don't flicker
+// between colour and grey as the sight lines sweep over them (seen: cell → time, kept between frames).
+const seenAt = new Map();
+export function litWalls(m, polys, views, now, into = new Set()) {
+  const W = m.W, rise = riseOf(m), hg = k => height(m, k, rise);
+  polys.forEach((pts, j) => {
+    const v = views[j];
+    for (let i = 0; i < pts.length; i += 2) {
+      const px = pts[i], py = pts[i + 1], x = Math.floor(px / CELL), y = Math.floor(py / CELL), d0 = Math.hypot(px - v.x, py - v.y);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const k = (y + dy) * W + x + dx;
+        if (hg(k) > 0 && (!dx && !dy || Math.hypot((x + dx + 0.5) * CELL - v.x, (y + dy + 0.5) * CELL - v.y) <= d0 + CELL * 0.3)) seenAt.set(k, now);
+      }
+    }
+  });
+  for (const [k, t] of seenAt) { if (now - t > 0.45 || seenAt.size > 20000) seenAt.delete(k); else into.add(k); }
+  // a car, crate or bookcase is one thing: seen at all, all of it shows (half of it in colour and half grey looked broken)
+  const q = [...into].filter(k => m.tiles[k] === T.TALL);
+  for (let i = 0; i < q.length && i < 4000; i++) for (const n of [q[i] - 1, q[i] + 1, q[i] - W, q[i] + W]) if (m.tiles[n] === T.TALL && !into.has(n)) { into.add(n); q.push(n); }
   return into;
 }
 

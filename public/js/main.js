@@ -2226,9 +2226,9 @@ function draw(s, view, now, dt) {
   fx.drawLights(ctx); tq = pfa('fx', tq);
 
   // --- line-of-sight blackout ---
-  const vpolys = []; // (the sight shapes, for the raised walls below)
+  const vpolys = [], vviews = []; // (the sight shapes and their eyes, for the raised walls below)
   const raise = inGame && gq.raised !== false && fxOn('walls3d') ? (c, which) => { // raised walls (look.js) for the walls on screen
-    const fr = st.floorRect, lit = !view ? null : which === 1 && st.litW ? st.litW : (st.litW = litWalls(st.rend.map, vpolys)); // (worked out once a frame)
+    const fr = st.floorRect, lit = !view ? null : which === 1 && st.litW ? st.litW : (st.litW = litWalls(st.rend.map, vpolys, vviews, now)); // (worked out once a frame)
     const X0 = Math.max(fr ? fr[0] : 0, wx0 - 40), Y0 = Math.max(fr ? fr[1] : 0, wy0 - 40), X1 = Math.min(fr ? fr[2] : m.W * CELL, wx1 + 40), Y1 = Math.min(fr ? fr[3] : m.H * CELL, wy1 + 40);
     drawRaised(c, st.rend, st.rend.map, st.cam, 0.045, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1, lit, which);
   } : null;
@@ -2247,7 +2247,7 @@ function draw(s, view, now, dt) {
     for (const v of st.viewers) {
       if (v.off) continue;
       if (v.near) { fctx.fillStyle = v === view ? 'rgba(0,0,0,0.5)' : '#000'; fillPoly(fctx, nearPolygon(v, sm)); }
-      const vp = visionPolygon(v, sm, v === view ? 0 : 140); vpolys.push(vp); fctx.fillStyle = '#000'; fillPoly(fctx, vp);
+      const vp = visionPolygon(v, sm, v === view ? 0 : 140); vpolys.push(vp); vviews.push(v); fctx.fillStyle = '#000'; fillPoly(fctx, vp);
     }
     fctx.globalCompositeOperation = 'source-over';
     // past an upper floor's (or the roof's) edge: the ground far below, as in its open air (mapdraw makeBelow), never live
@@ -3398,7 +3398,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
