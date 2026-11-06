@@ -1275,13 +1275,14 @@ export class Game {
     this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) });
     this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) });
     this.removeEnt(e);
-    if (e.type === 'drone' || e.type === 'bird') this.droneLost(e);
+    if (e.type === 'drone' || e.type === 'bird') this.droneLost(e, src);
   }
 
   // a drone has 1 hp: one bullet, hit, blast or zap and it's gone; its pilot drops back into their body
-  droneLost(e) {
+  droneLost(e, src) {
     const o = this.players.get(e.owner);
     if (!o) return;
+    if (this.tv) this.events.push({ e: 'dlost', id: o.id, by: src && src.id }); // Esports TV: the director cuts away (tvDirector)
     if (o.droneId === e.id) {
       o.droneId = null;
       if (o.ctrl === 'drone') { o.ctrl = 'body'; const list = o.staged ? this.feeds(this.side(o)) : []; if (list.length) this.watch(o, list[0]); }

@@ -80,6 +80,13 @@ export function tvDirector(s, players, now) {
     const killer = Object.entries(T.kills || {}).filter(([, ts]) => now - ts[ts.length - 1] < 2.5).map(([id]) => players.get(id)).find(q => q && q.a && !q.dn);
     if (killer) { T.follow = killer.id; T.cutT = now; send({ t: 'tv', a: 'follow', id: killer.id }); return; }
   } else T.diedT = 0;
+  // he asked: when the followed player's drone is shot, go to whoever shot it, else to someone else (not back to their body)
+  for (const e of s.ev) if (e.e === 'dlost' && e.id === T.follow && curOk) {
+    const by = players.get(e.by);
+    if (by && by.a && !by.dn && by.sq !== cur.sq) { T.follow = by.id; T.cutT = now; send({ t: 'tv', a: 'follow', id: by.id }); return; }
+    T.leave = cur.id;
+  }
+  const leave = curOk && T.leave === cur.id;
   const score = p => {
     let sc = 0, contact = 0;
     if (p.bu) sc += 120; // planting / defusing / reviving: the objective
@@ -102,22 +109,22 @@ export function tvDirector(s, players, now) {
   };
   const held = now - (T.cutT || -99);
   const curSc = curOk ? score(cur) : -1;
-  if (curOk && fighting(cur)) return; // never cut away from a fight in progress
+  if (curOk && !leave && fighting(cur)) return; // never cut away from a fight in progress
   const quiet = curOk && curSc < 15;
   const minHold = prep ? 9 : 7; // he asked: it cut too often
-  if (curOk && held < minHold) return;
+  if (curOk && !leave && held < minHold) return;
   // he asked: show both teams' viewpoints more from the wide angle. The director goes wide for 5 s (both teams' sight
   // drawn in their colours) when players of both sides are closing in on one floor before anyone fires, or when nothing
   // much is going on; at most every ~20 s, never in preparation and never out of a fight.
-  if (!prep && now > (T.nextWide || 0)) {
+  if (!prep && !leave && now > (T.nextWide || 0)) {
     const standoff = new Set(hot.map(p => p.sq)).size === 2 && hot.length >= 3 && !alive.some(fighting);
     if (standoff || (quiet && held > 10)) { T.overview = true; T.ovUntil = now + 5; T.nextWide = now + 18 + Math.random() * 8; return; }
   }
   let best = null, bs = -1;
-  for (const p of alive) { const sc = score(p) + Math.random() * 2 + (p.id === T.follow ? 18 - (quiet ? Math.max(0, held - 12) * 3 : 0) : 0); if (sc > bs) { bs = sc; best = p; } }
+  for (const p of alive) { if (leave && p.id === cur.id) continue; const sc = score(p) + Math.random() * 2 + (p.id === T.follow ? 18 - (quiet ? Math.max(0, held - 12) * 3 : 0) : 0); if (sc > bs) { bs = sc; best = p; } }
   if (!best || best.id === T.follow) return;
-  if (curOk && bs < curSc * 1.7 + 30 && !(quiet && held > 16)) return; // only a much better shot is worth a cut
-  T.follow = best.id; T.cutT = now; if (T.prepSeen) T.prepSeen.add(best.id); send({ t: 'tv', a: 'follow', id: best.id });
+  if (curOk && !leave && bs < curSc * 1.7 + 30 && !(quiet && held > 16)) return; // only a much better shot is worth a cut
+  T.leave = null; T.follow = best.id; T.cutT = now; if (T.prepSeen) T.prepSeen.add(best.id); send({ t: 'tv', a: 'follow', id: best.id });
 }
 function tvFollow(id) { const T = st.tv; T.auto = !id; T.overview = false; if (id) { T.follow = id; T.cutT = performance.now() / 1000; send({ t: 'tv', a: 'follow', id }); } }
 export function tvKey(e) {
