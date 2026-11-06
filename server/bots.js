@@ -17,14 +17,16 @@ import { parseCommand } from '../shared/commands.js';
 // expect: the same when they were already listening for that enemy. turn: how fast they swing their aim (radians/s).
 // err: how far off the first aim is; settle: how fast it closes in. tol: how close the aim must be before they fire.
 // see: how far they notice people (px). body: how widely their aim point wanders over the body (px). head: how often they go for the head (shaky low ranks still rarely land it).
+// shake: how unsteady the hand is once on you. The times to get on you (react + aim, 10 m, surprised) are his, checked by
+// node tests/aimtime.js: Copper 1.5 s, Bronze 1.1, Silver 0.9, Gold 0.8, Platinum 0.7, Diamond 0.5, Champion 0.3.
 const SKILL = [ // the ranks (he asked): Copper, Bronze, Silver, Gold, Platinum, Diamond, Champion
-  { react: 0.95, reactX: 0.6, expect: 0.6, turn: 3.5, err: 1.7, settle: 0.8, tol: 0.3, see: 460, body: 15, head: 0.3, drone: 0.8 },  // Copper
-  { react: 0.75, reactX: 0.5, expect: 0.45, turn: 4.5, err: 1.4, settle: 1.0, tol: 0.26, see: 520, body: 13, head: 0.44, drone: 0.7 },  // Bronze (was Easy)
-  { react: 0.5, reactX: 0.35, expect: 0.3, turn: 7, err: 1.0, settle: 1.4, tol: 0.2, see: 650, body: 11, head: 0.53, drone: 0.5 },     // Silver (was Normal)
-  { react: 0.42, reactX: 0.3, expect: 0.26, turn: 8.5, err: 0.88, settle: 1.6, tol: 0.17, see: 690, body: 9.5, head: 0.54, drone: 0.45 }, // Gold
-  { react: 0.36, reactX: 0.24, expect: 0.22, turn: 10, err: 0.75, settle: 1.9, tol: 0.15, see: 720, body: 8, head: 0.6, drone: 0.4 },    // Platinum (was Hard)
-  { react: 0.28, reactX: 0.14, expect: 0.18, turn: 12.5, err: 0.55, settle: 2.5, tol: 0.12, see: 780, body: 6, head: 0.65, drone: 0.3 },  // Diamond (was Expert)
-  { react: 0.23, reactX: 0.1, expect: 0.16, turn: 14, err: 0.42, settle: 3, tol: 0.1, see: 820, body: 5, head: 0.6, drone: 0.25 },  // Champion // turn: he asked for faster turning
+  { react: 0.75, reactX: 0.4, expect: 0.45, turn: 3.5, err: 1.2, settle: 2.1, shake: 1.3, tol: 0.3, see: 460, body: 15, head: 0.3, drone: 0.8 },  // Copper
+  { react: 0.55, reactX: 0.3, expect: 0.35, turn: 4.5, err: 1.0, settle: 2.9, shake: 1.15, tol: 0.26, see: 520, body: 13, head: 0.44, drone: 0.7 },  // Bronze
+  { react: 0.45, reactX: 0.25, expect: 0.28, turn: 7, err: 0.9, settle: 3.6, shake: 1, tol: 0.2, see: 650, body: 11, head: 0.53, drone: 0.5 },     // Silver
+  { react: 0.4, reactX: 0.2, expect: 0.25, turn: 8.5, err: 0.85, settle: 3.9, shake: 0.95, tol: 0.17, see: 690, body: 9.5, head: 0.54, drone: 0.45 }, // Gold
+  { react: 0.35, reactX: 0.18, expect: 0.22, turn: 10, err: 0.8, settle: 4.6, shake: 0.9, tol: 0.15, see: 720, body: 8, head: 0.6, drone: 0.4 },    // Platinum
+  { react: 0.25, reactX: 0.12, expect: 0.18, turn: 12.5, err: 0.7, settle: 6, shake: 0.8, tol: 0.12, see: 780, body: 6, head: 0.65, drone: 0.3 },  // Diamond
+  { react: 0.17, reactX: 0.06, expect: 0.15, turn: 14, err: 0.5, settle: 8.5, shake: 0.6, tol: 0.1, see: 820, body: 5, head: 0.65, drone: 0.25 },  // Champion // turn: he asked for faster turning
 ];
 const lvlOf = (game, p) => game.tut ? 0 : Math.max(0, Math.min(TOP_BOT, p.level ?? game.botLevel ?? DEFAULT_LEVEL));
 const skill = (game, p) => p.pro ? proSkill(p) : SKILL[lvlOf(game, p)]; // p.level: a test can give one bot its own
@@ -870,7 +872,7 @@ export function botThink(game, p, dt) {
       if (game.tut) { ai.react -= 0.7; ai.err *= 1.8; } // tutorial bots are slow and shaky, so a beginner can win
     }
     ai.react += dt; ai.err *= Math.exp(-dt * S.settle);
-    ai.err += (Math.random() - 0.5) * dt * 0.6; // hands are never perfectly steady
+    ai.err += (Math.random() - 0.5) * dt * 0.6 * (S.shake ?? 1); // hands are never perfectly steady
     const os = (ai.os || 0) / Math.max(1, d), want = Math.atan2(enemy.y + (enemy.x - p.x) * os - p.y, enemy.x - (enemy.y - p.y) * os - p.x) + ai.err; // somewhere across the body, not always the head
     turnTo(p, want, S.turn, dt);
     p.aimX = p.x + Math.cos(p.aim) * d; p.aimY = p.y + Math.sin(p.aim) * d; // their crosshair sits on what they aim at (it used to stay where the last throw went, so bots could almost never headshot)
@@ -1962,7 +1964,7 @@ function mouseTurn(p, a, rate, dt) {
 }
 function proSkill(p) { // human limits, per player; under pressure (hurt) a nervous player gets slower and shakier
   const pl = p.pro.pl, press = p.hp < p.maxHp * 0.45 ? 1 - pl.calm : 0;
-  return { react: pl.react + press * 0.08, reactX: 0.08, expect: Math.max(0.17, pl.react * 0.85), turn: pl.turn, err: pl.aim * (1 + press * 0.7), settle: 2.6, tol: 0.1, see: 700, body: 6, head: (0.62 - pl.aim * 0.4) * (1 - press * 0.4), drone: 0.32 };
+  return { react: Math.max(0.16, pl.react - 0.04) + press * 0.08, reactX: 0.05, expect: Math.max(0.15, pl.react * 0.8), turn: pl.turn, err: pl.aim * (1 + press * 0.7), settle: 10, shake: 0.5, tol: 0.1, see: 700, body: 6, head: (0.62 - pl.aim * 0.4) * (1 - press * 0.4), drone: 0.32 };
 }
 const proSide = (game, p) => (game.side(p) === TEAM.ATK ? 'atk' : 'def');
 function proState(game, squad) {
