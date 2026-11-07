@@ -37,3 +37,6 @@ Don't `pkill -f` a pattern that also appears in the same shell command line (it 
 `node tests/pros.js [--only <map>] [--rounds N]` checks the pros themselves: a plan from the playbook every round,
 the leader's calls and switches, human reaction times (first sight to first shot never under ~0.17 s), and a pro team
 beating Expert bots over N maps.
+
+## Cut-off check
+`tests/uicheck.js` is a snippet for a `tests/shoot.mjs` "js" step (newlines removed): it lists text past the window or clipped by its box. Run it on every menu page and HUD screen at 1280×720 and 1920×1080. Closed Ball Knowledge cards report CLIPPED on purpose (they fade out; click opens them). Close pages with their CLOSE/DONE buttons (`getClientRects`, not `offsetParent`: they are fixed), the pause menu with RESUME.
