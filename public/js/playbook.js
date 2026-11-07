@@ -1,22 +1,25 @@
-// The PLAYBOOK (he asked: a tab to see the pro teams' game plans and try to execute them). Pick a team, a map, a site
-// and attack or defence; each plan is drawn on the site's floor: where every job stacks, what it opens, where it
-// drones, holds or roams, and where it ends up, with the team's players and what each one does.
-import { CELL, DUR } from '/shared/constants.js';
+// The PLAYBOOK (he asked: a tab to see the pro teams' game plans and try to execute them). He asked later for more
+// room: a page per esports team (banner, record, roster), a full page per player (who they are, how they play, what
+// they play this patch), and a PLAYS page where the plan fills the screen. On PLAYS: pick a team, a map, a site and
+// attack or defence; each plan is drawn on the site's floor: where every job stacks, what it opens, where it drones,
+// holds or roams, and where it ends up, with the team's players and what each one does.
+import { CELL, DUR, PX_PER_M } from '/shared/constants.js';
 import { MAPS, MAP_LIST, buildMap } from '/shared/map.js';
 import { OPERATORS, WEAPONS, RIOT, ATTACH, LOADOUTS, JOBS, SIDEARMS } from '/shared/operators.js';
-import { PRO_TEAMS, playbook, ATK_JOBS, DEF_JOBS, JOB_NAME } from '/shared/pros.js';
+import { PRO_TEAMS, playbook, ATK_JOBS, DEF_JOBS, JOB_NAME, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '/shared/pros.js';
 import { MapRenderer } from './mapdraw.js';
 import { drawWebcam } from './webcam.js';
 import * as audio from './audio.js';
 
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const JOB_COL = { breach: '#ff7a3d', entry: '#ff4f6a', intel: '#5ec8ff', support: '#8be38b', flank: '#d79bff', anchor: '#ffcf5a', trapper: '#ff7a3d', roamer: '#d79bff' };
+const YEAR = 2026;
 let S = null;
 
 export function openPlaybook(el) {
   el.classList.remove('hidden');
   fetch('/api/training').then(r => r.json()).then(t => { if (S) { S.train = t; render(el); } }).catch(() => {});
-  if (!S) S = { team: 0, id: MAP_LIST[0], side: 'atk', site: 0, plan: 0 };
+  if (!S) S = { tab: 0, player: null, pside: 'atk', team: 0, id: MAP_LIST[0], side: 'atk', site: 0, plan: 0, info: true };
   S.resize = () => draw(el); addEventListener('resize', S.resize);
   render(el);
 }
@@ -26,17 +29,113 @@ export function closePlaybook(el) {
   if (S) { removeEventListener('resize', S.resize); S.rend = null; S.map = null; S.loaded = null; }
 }
 
+// ---------------- the pages: NORTHWIND · IRONCLAD · PLAYS (and a player's own page) ----------------
 function render(el) {
+  el.querySelector('#pbTabs').innerHTML = PRO_TEAMS.map((t, i) => `<button data-t="${i}" class="${S.tab === i ? 'on' : ''}" style="--tc:${t.colour}"><em>${esc(t.tag)}</em>${esc(t.name.toUpperCase())}</button>`).join('')
+    + `<button data-t="plays" class="${S.tab === 'plays' ? 'on' : ''}" style="--tc:#f2c14e">PLAYS</button>`;
+  for (const b of el.querySelectorAll('#pbTabs button')) b.onclick = () => { audio.ui(); if (S.anim) stopAnim(el, true); S.tab = b.dataset.t === 'plays' ? 'plays' : +b.dataset.t; S.player = null; if (S.tab !== 'plays') S.team = S.tab; render(el); };
+  const team = el.querySelector('#pbTeamPage'), plays = el.querySelector('#pbPlaysPage');
+  team.classList.toggle('hidden', S.tab === 'plays'); plays.classList.toggle('hidden', S.tab !== 'plays');
+  if (S.tab === 'plays') return renderPlays(el);
+  const T = PRO_TEAMS[S.tab], pl = S.player && T.players.find(p => p.name === S.player);
+  team.innerHTML = pl ? playerPage(T, pl) : teamPage(T);
+  team.scrollTop = S.keepScroll ? team.scrollTop : 0; S.keepScroll = false;
+  for (const c of team.querySelectorAll('canvas.pbCam')) drawWebcam(c, { name: c.dataset.n, pro: true, colour: T.colour }, 1); // the same face as on the broadcast
+  for (const d of team.querySelectorAll('[data-pro]')) d.onclick = () => { audio.ui(); S.player = d.dataset.pro; S.pside = 'atk'; render(el); };
+  const back = team.querySelector('.pbBack'); if (back) back.onclick = () => { audio.ui('back'); S.player = null; render(el); };
+  for (const b of team.querySelectorAll('[data-ps]')) b.onclick = () => { audio.ui(); S.pside = b.dataset.ps; S.keepScroll = true; render(el); };
+  for (const b of team.querySelectorAll('[data-goplays]')) b.onclick = () => { audio.ui(); S.tab = 'plays'; S.team = PRO_TEAMS.indexOf(T); S.player = null; render(el); };
+}
+
+// practice numbers per player: both sides added up (training.pro[name].tend[side])
+const tendOf = (name, side) => { const P = S.train && S.train.pro && S.train.pro[name], t = P && P.tend; if (!t) return null; if (side) return t[side] || null; const o = {}; for (const x of Object.values(t)) for (const [k, v] of Object.entries(x)) o[k] = (o[k] || 0) + v; return o; };
+const per = (t, k) => t && t.r ? (t[k] || 0) / t.r : 0;
+const flagOf = cc => `<span class="pbFlag">${esc(cc)}</span>`;
+
+function teamPage(T) {
+  const igl = T.players.find(p => p.igl), rec = T.players.map(p => tendOf(p.name)).filter(Boolean);
+  const r = rec.reduce((a, t) => a + (t.r || 0), 0), w = rec.reduce((a, t) => a + (t.w || 0), 0), k = rec.reduce((a, t) => a + (t.k || 0), 0), d = rec.reduce((a, t) => a + (t.d || 0), 0);
+  const stat = (v, l) => `<div class="pbStat"><b>${v}</b><span>${l}</span></div>`;
+  return `<div class="pbBanner" style="--tc:${T.colour}"><div class="pbTag">${esc(T.tag)}</div><div class="pbTeamName"><h3>${esc(T.name)}</h3><p>${esc(T.style)}</p><p class="dim">In-game leader: <b>${esc(igl ? igl.name : '?')}</b></p></div>
+      <div class="pbStats">${r ? stat(pct(w, r) + '%', 'rounds won in practice') + stat(f1(k / Math.max(1, d)), 'team K/D') + stat(Math.round(r / 5), 'practice rounds') : stat('–', 'no practice on this patch yet')}</div>
+      <button class="pbGo" data-goplays="1">THEIR PLAYS ›</button></div>
+    <h4 class="pbH">ROSTER <span class="dim">· click a player for their profile</span></h4>
+    <div class="pbRoster">${T.players.map(p => { const b = p.bio || {};
+      return `<div class="pbCard" data-pro="${esc(p.name)}" style="--tc:${T.colour}"><canvas class="pbCam" width="240" height="180" data-n="[${T.tag}] ${esc(p.name)}"></canvas>
+        <div class="pbCardTxt"><b>${esc(p.name)}${p.igl ? ' <em>IGL</em>' : ''}</b><small>${esc(b.real || '')}</small>
+        <span>${flagOf(b.cc || '')} ${esc(b.country || '')} · ${b.age || '?'}</span>
+        <span class="pbJobs"><i style="--jc:${JOB_COL[p.jobs.atk]}">${esc(JOB_NAME[p.jobs.atk])}</i><i style="--jc:${JOB_COL[p.jobs.def]}">${esc(JOB_NAME[p.jobs.def])}</i></span>
+        <span class="dim">${esc(p.traits[0])}</span><span class="pbMore">VIEW PROFILE ›</span></div></div>`; }).join('')}</div>`;
+}
+
+// a 0..1 bar with words at the ends
+const bar = (label, v, lo, hi, note = '') => `<div class="pbBar"><span>${esc(label)}</span><div><i style="width:${Math.round(Math.max(0.03, Math.min(1, v)) * 100)}%"></i></div><small>${esc(lo)}<em>${esc(hi)}</em></small>${note ? `<p>${esc(note)}</p>` : ''}</div>`;
+// the things a TV viewer would want to know: how this player compares with the nine other pros in practice
+const METRICS = [
+  ['fk', 'opening kills', (n, v) => `Wins the opening duel: the first kill of the round in ${Math.round(v * 100)}% of rounds, ${n}.`, (n) => `Rarely takes the first fight.`],
+  ['fd', 'first deaths', (n, v) => `Lives on the edge: the first one to die in ${Math.round(v * 100)}% of rounds, ${n}.`, null],
+  ['cl', 'clutches', (n, v) => `Clutch player: won ${Math.round(v * 100)} of every 100 rounds as the last one standing, ${n}.`, null],
+  ['hs', 'headshots', (n, v, t) => `Head hunter: ${pct(t.hs, t.k)}% of kills are headshots, ${n}.`, null, t => t.k ? t.hs / t.k : 0],
+  ['dist', 'kill distance', (n, v) => `Fights from far away: kills average ${f1(v)} m, ${n}.`, (n, v) => `Fights up close: kills average only ${f1(v)} m.`, t => t.k ? t.dist / t.k / PX_PER_M : 0],
+  ['cams', 'cameras shot', (n, v) => `Camera hunter: shoots ${f1(v)} cameras or gadgets a round, ${n}.`, null, t => per(t, 'cams') + per(t, 'gadgets')],
+  ['lean', 'leans', (n, v) => `Loves a lean: holds and takes fights leaning out from cover ${f1(v)} times a round, ${n}.`, null],
+  ['slide', 'slides', (n, v) => `Flashy mover: ${f1(v)} power slides across doorways a round, ${n}.`, null],
+  ['wallbang', 'wallbangs', (n, v) => `Shoots through walls at spotted enemies ${f1(v)} times a round, ${n}.`, null],
+  ['droneKill', 'drones shot', (n, v) => `Drone killer: shoots ${f1(v)} drones a round on defence, ${n}.`, null, t => per(t, 'droneKill')],
+  ['revive', 'revives', (n, v) => `Picks teammates up: ${f1(v * 10)} revives every 10 rounds, ${n}.`, null],
+  ['sv', 'survival', (n, v) => `Hard to kill: alive at the end of ${Math.round(v * 100)}% of rounds, ${n}.`, (n, v) => `Trades their life for the team: alive at the end of only ${Math.round(v * 100)}% of rounds.`],
+  ['spot', 'callouts', (n, v) => `The team's eyes: ${f1(v)} enemies spotted for the team a round, ${n}.`, null],
+  ['prone', 'lying down', (n, v) => `Plays deep and low: lies down at an off-angle ${f1(v)} times a round, ${n}.`, null],
+];
+function watchFor(pl) {
+  const all = PRO_TEAMS.flatMap(t => t.players).map(p => [p, tendOf(p.name)]).filter(([, t]) => t && t.r >= 6), me = all.find(([p]) => p === pl);
+  if (!me) return [];
+  const out = [];
+  for (const [k, , hiTxt, loTxt, f] of METRICS) {
+    const val = t => (f ? f(t) : per(t, k)), vs = all.map(([p, t]) => [p, val(t)]).sort((a, b) => b[1] - a[1]), i = vs.findIndex(([p]) => p === pl), v = vs[i][1];
+    if (!(vs[0][1] > 0)) continue;
+    if (i === 0) out.push([0, hiTxt('the most of any pro', v, me[1])]);
+    else if (i === 1 && v > 0) out.push([1, hiTxt('second only to ' + vs[0][0].name, v, me[1])]);
+    else if (i === vs.length - 1 && loTxt) out.push([2, loTxt('', v, me[1])]);
+  }
+  return out.sort((a, b) => a[0] - b[0]).slice(0, 6).map(x => x[1]);
+}
+function playerPage(T, pl) {
+  const b = pl.bio || {}, [aggr, patience] = PRO_PERSONA[pl.name] || [0.5, 0.5], peek = PRO_PEEK[pl.name] ?? 0.06, timing = PRO_TIMING[pl.name] || 0, rot = PRO_ROTATE[pl.name] || 0;
+  const m = pl.mouse || {}, t = tendOf(pl.name), side = S.pside;
+  const sens = m.cm360 >= 50 ? 'low: precise, slow to turn round' : m.cm360 <= 26 ? 'high: lightning flicks, shakier' : 'middle of the road';
+  const ops = s => `<div class="pbRole" style="--jc:${JOB_COL[pl.jobs[s]]}"><small>${s === 'atk' ? 'ATTACK' : 'DEFENCE'}</small><b>${esc(JOB_NAME[pl.jobs[s]])}</b><span>${pl.pool[s].map(o => esc(OPERATORS[o].name)).join(' · ')}</span></div>`;
+  const num = (v, l) => `<div class="pbStat"><b>${v}</b><span>${l}</span></div>`;
+  const watch = watchFor(pl);
+  return `<button class="pbBack">‹ ${esc(T.name.toUpperCase())}</button>
+    <div class="pbHero" style="--tc:${T.colour}"><canvas class="pbCam big" width="360" height="270" data-n="[${T.tag}] ${esc(pl.name)}"></canvas>
+      <div class="pbHeroTxt"><small>[${esc(T.tag)}] ${esc(T.name)}${pl.igl ? ' · IN-GAME LEADER' : ''}</small><h3>${esc(pl.name)}</h3><p class="pbReal">${esc(b.real || '')}</p>
+        <div class="pbFacts"><span>${flagOf(b.cc || '')} ${esc(b.country || '')}</span><span>Age ${b.age || '?'}</span><span>Pro since ${b.since || '?'} (${b.since ? YEAR - b.since : '?'} years)</span></div>
+        ${b.quote ? `<blockquote>“${esc(b.quote)}”</blockquote>` : ''}</div>
+      <div class="pbStats col">${t ? num(f1(t.k / Math.max(1, t.d)), 'K/D in practice') + num(pct(t.w, t.r) + '%', 'rounds won') + num(pct(t.hs, t.k) + '%', 'headshots') : num('–', 'no practice yet')}</div></div>
+    <div class="pbGrid">
+      <section><h4>THEIR STORY</h4><p>${esc(b.story || '')}</p><div class="pbRoles">${ops('atk')}${ops('def')}</div></section>
+      <section><h4>HOW THEY PLAY</h4>
+        ${bar('Aggression', aggr, 'careful', 'all-in')}${bar('Patience', patience, 'restless', 'waits for ever')}${bar('Strafe-peeking', peek / 0.35, 'rare', 'constant')}
+        ${bar('Reactions', (0.27 - pl.react) / 0.09, 'steady', 'lightning', `${Math.round(pl.react * 1000)} ms to react`)}${bar('Composure', pl.calm, 'nervy', 'ice cold')}
+        <p class="pbNote">Mouse: ${m.cm360} cm per full turn (${sens}).${timing ? ` Their flaw: ${timing < 0 ? `goes about ${-timing} s early` : `about ${timing} s late`} to their part of the plan.` : ''}${rot === Infinity ? ' Never leaves the site to rotate.' : rot ? ` Slow to rotate: trusts their read about ${rot} s too long.` : ''}</p>
+        <ul class="pbTraits">${pl.traits.slice(0, -1).map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>
+      <section><h4>WATCH FOR</h4>${watch.length ? `<ul class="pbWatch">${watch.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="dim">Not enough practice on this patch yet: press TRAIN THE PROS.</p>'}
+        ${t ? `<div class="pbNums">${num(f1(per(t, 'fk') * 10), 'opening kills / 10 rounds')}${num(t.cl || 0, 'clutches won')}${num(t.k ? f1(t.dist / t.k / PX_PER_M) + ' m' : '–', 'average kill distance')}${num(f1(per(t, 'cams') + per(t, 'gadgets')), 'cameras + gadgets shot a round')}${num(f1(per(t, 'lean')), 'leans a round')}${num(t.plant || 0, 'plants')}</div>` : ''}</section>
+      <section class="wide"><h4>THIS PATCH <span class="seg pbPs">${['atk', 'def'].map(s => `<button data-ps="${s}" class="${s === side ? 'on' : ''}">${s === 'atk' ? 'ATTACK' : 'DEFENCE'}</button>`).join('')}</span></h4>${patchCard(pl, side)}</section>
+    </div>`;
+}
+
+function renderPlays(el) {
   const T = PRO_TEAMS[S.team], side = S.side;
-  el.querySelector('#pbTeams').innerHTML = PRO_TEAMS.map((t, i) => `<button data-i="${i}" class="${i === S.team ? 'on' : ''}" style="--tc:${t.colour}"><b>[${t.tag}] ${esc(t.name)}</b><span>${esc(t.style)}</span></button>`).join('')
-    + `<h4>Players</h4><p class="dim small">Click a player for what they play this patch, and why.</p>` + T.players.map(p => `<div class="pbPlayer${S.openPro === p.name ? ' open' : ''}" data-pro="${esc(p.name)}"><canvas class="pbCam" width="96" height="72" data-n="[${T.tag}] ${esc(p.name)}"></canvas><b>${esc(p.name)}${p.igl ? ' <em>IGL</em>' : ''}</b><span>${esc(JOB_NAME[p.jobs[side]] || p.jobs[side])}: ${p.pool[side].map(o => esc(OPERATORS[o].name)).join(' / ')} <i>· favourites, plays every ${esc((JOB_NAME[p.jobs[side]] || '').toLowerCase())} operator</i></span><ul>${p.traits.map(t => `<li>${esc(t)}</li>`).join('')}</ul>${S.openPro === p.name ? patchCard(p, side) : ''}</div>`).join('');
-  for (const c of el.querySelectorAll('.pbCam')) drawWebcam(c, { name: c.dataset.n, pro: true, colour: T.colour }, 1); // the same face as on the broadcast
-  for (const d of el.querySelectorAll('.pbPlayer')) d.onclick = () => { audio.ui(); S.openPro = S.openPro === d.dataset.pro ? null : d.dataset.pro; render(el); };
-  for (const b of el.querySelectorAll('#pbTeams button')) b.onclick = () => { audio.ui(); S.team = +b.dataset.i; S.plan = 0; render(el); };
+  el.querySelector('#pbPlayTeam').innerHTML = PRO_TEAMS.map((t, i) => `<button data-i="${i}" class="${i === S.team ? 'on' : ''}" style="--tc:${t.colour}">[${t.tag}] ${esc(t.name)}</button>`).join('');
+  for (const b of el.querySelectorAll('#pbPlayTeam button')) b.onclick = () => { audio.ui(); if (S.anim) stopAnim(el, true); S.team = +b.dataset.i; S.plan = 0; render(el); };
   el.querySelector('#pbMaps').innerHTML = MAP_LIST.map(k => `<button data-id="${k}" class="${k === S.id ? 'on' : ''}">${esc(MAPS[k].name)}</button>`).join('');
-  for (const b of el.querySelectorAll('#pbMaps button')) b.onclick = () => { audio.ui(); S.id = b.dataset.id; S.site = 0; S.plan = 0; render(el); };
+  for (const b of el.querySelectorAll('#pbMaps button')) b.onclick = () => { audio.ui(); if (S.anim) stopAnim(el, true); S.id = b.dataset.id; S.site = 0; S.plan = 0; render(el); };
   el.querySelector('#pbSide').innerHTML = ['atk', 'def'].map(s => `<button data-s="${s}" class="${s === side ? 'on' : ''}">${s === 'atk' ? 'ATTACK' : 'DEFENCE'}</button>`).join('');
-  for (const b of el.querySelectorAll('#pbSide button')) b.onclick = () => { audio.ui(); S.side = b.dataset.s; S.plan = 0; render(el); };
+  for (const b of el.querySelectorAll('#pbSide button')) b.onclick = () => { audio.ui(); if (S.anim) stopAnim(el, true); S.side = b.dataset.s; S.plan = 0; render(el); };
+  const info = el.querySelector('#pbInfoBtn'); info.textContent = S.info ? 'HIDE DETAILS ▸' : '◂ SHOW DETAILS'; info.onclick = () => { audio.ui(); S.info = !S.info; render(el); };
+  el.querySelector('.pbStage').classList.toggle('noinfo', !S.info);
   if (S.loaded !== S.id) {
     const cv = el.querySelector('#pbCanvas'), c = cv.getContext('2d'); fit(cv);
     c.fillStyle = '#0b0e12'; c.fillRect(0, 0, cv.width, cv.height); c.fillStyle = 'rgba(255,255,255,0.6)'; c.font = '600 22px Barlow Condensed, sans-serif'; c.textAlign = 'center'; c.fillText('Drawing the map…', cv.width / 2, cv.height / 2);
@@ -46,17 +145,17 @@ function render(el) {
   }
   const m = S.map;
   el.querySelector('#pbSites').innerHTML = m.sites.map((s, i) => `<button data-i="${i}" class="${i === S.site ? 'on' : ''}">${esc(s.name)}</button>`).join('');
-  for (const b of el.querySelectorAll('#pbSites button')) b.onclick = () => { audio.ui(); S.site = +b.dataset.i; S.plan = 0; render(el); };
+  for (const b of el.querySelectorAll('#pbSites button')) b.onclick = () => { audio.ui(); if (S.anim) stopAnim(el, true); S.site = +b.dataset.i; S.plan = 0; render(el); };
   S.plans = playbook(m, S.site, side, T);
   S.plan = Math.min(S.plan, S.plans.length - 1);
-  const won = p => { const r = S.train && S.train.plans[`${S.id}|${S.site}|${side}|${p.id}`]; return r && r.n >= 3 ? ` · won ${Math.round(r.w / r.n * 100)}% in practice (${r.n})` : ''; }; // what practice says
-  el.querySelector('#pbPlans').innerHTML = S.plans.map((p, i) => `<button data-i="${i}" class="${i === S.plan ? 'on' : ''}">${esc(p.name)}<span>${esc(p.tempo)}${p.go !== undefined ? ' · go at ' + clock(p.go) : ''}${won(p)}</span></button>`).join('');
+  const won = p => { const r = S.train && S.train.plans[`${S.id}|${S.site}|${side}|${p.id}`]; return r && r.n >= 3 ? ` · won ${Math.round(r.w / r.n * 100)}% (${r.n})` : ''; }; // what practice says
+  el.querySelector('#pbPlans').innerHTML = S.plans.map((p, i) => `<button data-i="${i}" class="${i === S.plan ? 'on' : ''}">${esc(p.name)}<span>${esc(p.tempo)}${p.go !== undefined ? ' · go ' + clock(p.go) : ''}${won(p)}</span></button>`).join('');
   for (const b of el.querySelectorAll('#pbPlans button')) b.onclick = () => { audio.ui(); if (S.anim) { cancelAnimationFrame(S.anim.raf); S.anim = null; } S.plan = +b.dataset.i; render(el); };
   const plan = S.plans[S.plan], jobs = side === 'atk' ? ATK_JOBS : DEF_JOBS;
   el.querySelector('#pbDetail').innerHTML = !plan ? '<p class="dim">No plan for this site.</p>' : `<h3>${esc(plan.name)}</h3><p>${esc(plan.idea)}</p>`
+    + (plan ? `<button id="pbWatch" class="primary">${S.anim ? '■ STOP' : '▶ WATCH THIS PLAY'}</button>` : '')
     + jobs.map(j => { const t = plan.jobs[j]; if (!t) return ''; const pl = T.players.find(p => p.jobs[side] === j);
       return `<div class="pbJob" style="--jc:${JOB_COL[j]}"><b>${esc(JOB_NAME[j] || j)}${pl ? ' · ' + esc(pl.name) : ''}</b><span>${esc(t.task)}</span></div>`; }).join('')
-    + (plan ? `<button id="pbWatch" class="primary">${S.anim ? '■ STOP' : '▶ WATCH THIS PLAY'}</button>` : '')
     + `<p class="dim small">Their leader changes the plan during the round when it goes wrong: two players down early, the clock under a minute, the way in stacked with defenders (switch to the other way in), or a plant to retake.</p>`;
   const wb = el.querySelector('#pbWatch'); if (wb) wb.onclick = () => { audio.ui(); if (S.anim) stopAnim(el); else startAnim(el); };
   draw(el);
@@ -68,6 +167,9 @@ const gunName = w => (WEAPONS[w] && WEAPONS[w].name) || (RIOT[w] && RIOT[w].name
 const kd = r => r[3] ? r[2] / r[3] : r[2];
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
 const f1 = x => (Math.round(x * 10) / 10).toFixed(1);
+// every plan's name (they read the same on every map): from the map on the PLAYS page, else one drawn up once
+let NAMED = null;
+function planNames(side) { if (!NAMED) { const m = S.map || buildMap(MAP_LIST[0]); NAMED = {}; for (const sd of ['atk', 'def']) NAMED[sd] = m.sites.flatMap((x, i) => playbook(m, i, sd, PRO_TEAMS[0]).concat(playbook(m, i, sd, PRO_TEAMS[1]))); } return NAMED[side]; }
 function patchCard(pl, side) {
   const P = S.train && S.train.pro && S.train.pro[pl.name];
   if (!S.train) return '<div class="pbPatch"><p class="dim">Loading practice results…</p></div>';
@@ -75,11 +177,11 @@ function patchCard(pl, side) {
   const job = pl.jobs[side], jobOps = (JOBS[side].find(j => j.id === job) || { ops: [] }).ops;
   const ops = jobOps.map(o => [o, P.ops[o]]).filter(([, r]) => r && r[0]).sort((a, b) => b[1][0] - a[1][0]);
   const rounds = ops.reduce((a, [, r]) => a + r[0], 0), out = [];
-  out.push(`<h5>THIS PATCH · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}</h5><p class="dim small">${rounds} practice rounds as ${esc(JOB_NAME[job] || job)} on this version.</p>`);
+  out.push(`<p class="dim small pbWide">${rounds} practice rounds as ${esc(JOB_NAME[job] || job)} on this version. The pros pick by these numbers, so the reasons are the real ones.</p>`);
   if (!ops.length) return `<div class="pbPatch">${out.join('')}<p class="dim">Not enough practice on this side yet.</p></div>`;
   // operators: most played first, and why
   const bestKd = Math.max(...ops.map(([, r]) => kd(r))), bestWin = Math.max(...ops.map(([, r]) => r[1] / r[0]));
-  out.push('<b>Operators</b><ul>' + ops.slice(0, 4).map(([o, r], i) => {
+  out.push('<div class="pbCol"><b>Operators</b><ul>' + ops.slice(0, 4).map(([o, r], i) => {
     const w = pct(r[1], r[0]), k = kd(r), why = r[0] < 4 ? 'still trying it out'
       : i === 0 && k >= bestKd - 0.01 && r[1] / r[0] >= bestWin - 0.01 ? 'the strongest of the role so far: best fights and rounds won'
       : i === 0 && k >= bestKd - 0.01 ? 'wins the most fights of the role'
@@ -87,16 +189,16 @@ function patchCard(pl, side) {
       : i === 0 ? 'the steadiest results over the most rounds'
       : k >= bestKd - 0.01 ? 'great in fights, so it keeps coming back'
       : w < 40 ? 'losing more than winning, being dropped' : 'a solid second choice';
-    return `<li><b>${esc(OPERATORS[o].name)}</b> ${pct(r[0], rounds)}% of rounds · won ${w}% · ${f1(k)} K/D · <i>${why}</i></li>`; }).join('') + '</ul>');
+    return `<li><b>${esc(OPERATORS[o].name)}</b> ${pct(r[0], rounds)}% of rounds · won ${w}% · ${f1(k)} K/D · <i>${why}</i></li>`; }).join('') + '</ul></div>');
   // guns: the ones those operators carry
   const can = new Set(jobOps.flatMap(o => LOADOUTS[o] ? [...LOADOUTS[o].primaries, ...LOADOUTS[o].secondaries] : []));
   const guns = Object.entries(P.guns || {}).filter(([w, r]) => can.has(w) && r[0]).sort((a, b) => b[1][0] - a[1][0]);
   const mains = guns.filter(([w]) => !SIDEARMS.has(w)), top = mains[0] || guns[0];
   if (top) {
-    out.push('<b>Guns</b><ul>' + mains.slice(0, 3).map(([w, r], i) => {
+    out.push('<div class="pbCol"><b>Guns</b><ul>' + mains.slice(0, 3).map(([w, r], i) => {
       const k = r[2] / r[0], others = mains.filter(([x]) => x !== w), avg = others.length ? others.reduce((a, [, q]) => a + q[2], 0) / Math.max(1, others.reduce((a, [, q]) => a + q[0], 0)) : k;
       const why = r[0] < 4 ? 'only a few rounds with it' : k > avg * 1.1 ? `more kills a round than ${pl.name}'s other guns (${f1(k)} vs ${f1(avg)})` : k < avg * 0.9 ? 'fewer kills than the others' : 'about even with the others';
-      return `<li><b>${esc(gunName(w))}</b> ${pct(r[0], mains.reduce((a, [, q]) => a + q[0], 0))}% of rounds · ${f1(k)} kills a round · <i>${why}</i></li>`; }).join('') + '</ul>');
+      return `<li><b>${esc(gunName(w))}</b> ${pct(r[0], mains.reduce((a, [, q]) => a + q[0], 0))}% of rounds · ${f1(k)} kills a round · <i>${why}</i></li>`; }).join('') + '</ul></div>');
     // attachments on the main gun: the choice used most in each slot, against that slot's other choices
     const w = top[0], att = P.att || {}, rows = [];
     for (const [slot, label] of [['barrel', 'Barrel'], ['grip', 'Grip'], ['sight', 'Sight']]) {
@@ -107,16 +209,16 @@ function patchCard(pl, side) {
       const why = r[0] < 4 ? 'still testing' : rk === null ? 'the only one tried so far' : k > rk * 1.08 ? `${f1(k)} kills a round with it, ${f1(rk)} with the others` : k < rk * 0.92 ? 'kept for the feel, though the others are scoring a bit more' : 'about as good as the rest';
       rows.push(`<li>${label}: <b>${esc(A ? A.short : c)}</b>${plus ? ' (' + esc(plus) + ')' : ''} · ${pct(r[0], cs.reduce((a, [, q]) => a + q[0], 0))}% · <i>${why}</i></li>`);
     }
-    if (rows.length) out.push(`<b>On the ${esc(gunName(w))}</b><ul>${rows.join('')}</ul>`);
+    if (rows.length) out.push(`<div class="pbCol"><b>On the ${esc(gunName(w))}</b><ul>${rows.join('')}</ul></div>`);
   }
   // tactics: the team's plays on this side, all maps, with this player's part on the map shown
   const byPlan = {};
   for (const [k, r] of Object.entries(S.train.plans || {})) { const [, , sd, id] = k.split('|'); if (sd !== side) continue; const b = byPlan[id] || (byPlan[id] = { n: 0, w: 0 }); b.n += r.n; b.w += r.w; }
-  const names = {}; for (const p of S.plans || []) names[p.id] = p;
+  const names = {}; for (const p of planNames(side)) names[p.id] = p; for (const p of S.plans || []) names[p.id] = p;
   const plays = Object.entries(byPlan).filter(([, b]) => b.n >= 4).sort((a, b) => (b[1].w + 1) / (b[1].n + 2) - (a[1].w + 1) / (a[1].n + 2));
   if (plays.length) {
-    out.push('<b>Tactics</b><ul>' + plays.slice(0, 3).map(([id, b]) => { const pn = names[id], task = pn && pn.jobs[job] && pn.jobs[job].task;
-      return `<li><b>${esc(pn ? pn.name : id)}</b> won ${pct(b.w, b.n)}% of ${b.n} practice rounds${task ? ` · ${esc(pl.name)}'s part here: ${esc(task)}` : ''}</li>`; }).join('') + '</ul>');
+    out.push('<div class="pbCol"><b>Tactics</b><ul>' + plays.slice(0, 3).map(([id, b]) => { const pn = names[id], sp = (S.plans || []).find(x => x.id === id), task = sp && sp.jobs[job] && sp.jobs[job].task; // (their part only on the map open on PLAYS)
+      return `<li><b>${esc(pn ? pn.name : id)}</b> won ${pct(b.w, b.n)}% of ${b.n} practice rounds${task ? ` · ${esc(pl.name)}'s part here: ${esc(task)}` : ''}</li>`; }).join('') + '</ul></div>');
     const worst = plays[plays.length - 1]; if (plays.length > 3 && worst[1].w / worst[1].n < 0.4) out.push(`<p class="dim small">Going off: ${esc((names[worst[0]] || {}).name || worst[0])} (won ${pct(worst[1].w, worst[1].n)}%), so it is called less.</p>`);
   }
   return `<div class="pbPatch">${out.join('')}</div>`;
@@ -176,7 +278,7 @@ function startAnim(el) {
   const loop = () => { if (!S || !S.anim) return; draw(el); const t = -40 + (performance.now() - S.anim.t0) / 1000 * SPEED; if (t > S.anim.end + 4) return stopAnim(el); S.anim.raf = requestAnimationFrame(loop); };
   render(el); S.anim.raf = requestAnimationFrame(loop);
 }
-function stopAnim(el) { if (S.anim) cancelAnimationFrame(S.anim.raf); S.anim = null; render(el); }
+function stopAnim(el, quiet) { if (S.anim) cancelAnimationFrame(S.anim.raf); S.anim = null; if (!quiet) render(el); }
 const clock = s => `${Math.floor((DUR.action - s) / 60)}:${String(Math.round((DUR.action - s) % 60)).padStart(2, '0')}`;
 function fit(cv) {
   const r = cv.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
@@ -187,7 +289,17 @@ function draw(el) {
   if (!S || !S.map || !S.rend || !S.plans) return;
   const cv = el.querySelector('#pbCanvas'), d = fit(cv), c = cv.getContext('2d'), m = S.map, site = m.sites[S.site], plan = S.plans[S.plan];
   const fl = m.flAt[Math.floor(site.bombs[0].y / CELL) * m.W + Math.floor(site.bombs[0].x / CELL)], F = m.floors[fl] || m.floors[0];
-  const W = F.w * CELL, H = F.h * CELL, z = Math.min(cv.width / W, cv.height / H) * 0.97, ox = (cv.width - W * z) / 2 - F.gx * CELL * z, oy = (cv.height - H * z) / 2;
+  const W = F.w * CELL, H = F.h * CELL;
+  // he asked for the plays bigger: close up on the site and the plan's spots on this floor, not the whole floor
+  const box = [Infinity, Infinity, -Infinity, -Infinity], grow = (x, y) => { box[0] = Math.min(box[0], x); box[1] = Math.min(box[1], y); box[2] = Math.max(box[2], x); box[3] = Math.max(box[3], y); };
+  const onFl = q => q && m.flAt[Math.floor(q.y / CELL) * m.W + Math.floor(q.x / CELL)] === fl;
+  for (const r of m.rooms) if (site.rooms.includes(r.name)) { grow(r.x * CELL, r.y * CELL); grow((r.x + r.w) * CELL, (r.y + r.h) * CELL); }
+  for (const t of Object.values((plan && plan.jobs) || {})) for (const q of [t.stack, t.target, t.hold, t.roam, t.drone, t.fake, t.watch]) if (onFl(q)) grow(q.x, q.y);
+  const mg = 6 * CELL, half = 16 * CELL, bcx = (box[0] + box[2]) / 2, bcy = (box[1] + box[3]) / 2;
+  const bw = Math.max(box[2] - box[0] + mg * 2, half * 2), bh = Math.max(box[3] - box[1] + mg * 2, half * 2);
+  const z = Math.min(cv.width / Math.min(bw, W), cv.height / Math.min(bh, H)) * 0.97;
+  const keepIn = (c, lo, len, view) => (view >= len ? lo + len / 2 : Math.max(lo + view / 2, Math.min(lo + len - view / 2, c))); // the view stays on the floor
+  const ox = cv.width / 2 - keepIn(bcx, F.gx * CELL, W, cv.width / z) * z, oy = cv.height / 2 - keepIn(bcy, 0, H, cv.height / z) * z;
   const R = S.rend, k = R.c.width / R.Wp, px = d / z;
   c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#0b0e12'; c.fillRect(0, 0, cv.width, cv.height);
   c.setTransform(z, 0, 0, z, ox, oy); R.c.drawTo(c, F.gx * CELL * k, 0, F.w * CELL * k, F.h * CELL * k, F.gx * CELL, 0, W, H);

@@ -54,6 +54,28 @@ export const PRO_TEAMS = [
 const MOUSE = {"Halden":[45,45,140,0.05],"Kaze":[22,40,170,0.07],"Brick":[40,45,130,0.05],"Moth":[50,45,120,0.045],"Juno":[34,45,150,0.045],"Sable":[55,50,130,0.04],"Torvi":[25,40,165,0.065],"Pax":[38,45,140,0.06],"Grit":[60,50,130,0.04],"Wisp":[30,45,150,0.05]};
 for (const t of PRO_TEAMS) for (const pl of t.players) { const [cm360, pad, hand, steady] = MOUSE[pl.name]; pl.mouse = { cm360, pad, hand, steady }; pl.traits = [...pl.traits, `Sensitivity: ${cm360} cm per 360° turn${cm360 >= 50 ? ' (low: precise, slow to turn round)' : cm360 <= 26 ? ' (high: lightning flicks, shakier)' : ''}`]; }
 for (const t of PRO_TEAMS) for (const pl of t.players) for (const side of ['atk', 'def']) pl.pool[side] = pl.pool[side].filter(o => jobOf(o) === pl.jobs[side]);
+// Each pro's habits (used by server/bots.js, shown on the PLAYBOOK player pages): PEEK = how often they strafe-peek in a
+// fight (others 0.06); PERSONA = [aggression, patience]; TIMING = seconds early (-) or late (+) to their part of the
+// plan (their flaws); ROTATE = seconds slow to rotate (Infinity: never rotates)
+export const PRO_PEEK = { Kaze: 0.35, Torvi: 0.3, Wisp: 0.15, Juno: 0.12 };
+export const PRO_PERSONA = { Halden: [0.45, 0.8], Kaze: [0.95, 0.2], Brick: [0.6, 0.6], Moth: [0.2, 0.85], Juno: [0.5, 0.9], Sable: [0.35, 0.9], Torvi: [0.9, 0.3], Pax: [0.5, 0.6], Grit: [0.3, 0.95], Wisp: [0.7, 0.35] };
+export const PRO_TIMING = { Wisp: -6, Moth: 5, Juno: 8 };
+export const PRO_ROTATE = { Halden: 4, Grit: Infinity };
+// Who they are (he asked: full made-up profiles for the PLAYBOOK, all fictional): real name, age, home country, the year
+// they turned pro, their road here, and a line they are known for.
+export const PRO_BIO = {
+  Halden: { real: 'Erik Halden Lund', age: 29, country: 'Norway', cc: 'NO', since: 2019, story: 'A former youth chess champion from Bergen who swapped boards for breach charges. Founded Northwind with Kaze in a rented flat above a bakery and has called every round they have played since.', quote: 'I don’t need to see you. I already know where you are going.' },
+  Kaze: { real: 'Kenji Arai', age: 22, country: 'Japan', cc: 'JP', since: 2022, story: 'Topped the Tokyo ranked ladder at sixteen playing on a borrowed laptop at an internet café. Moved to Europe at nineteen; still the first one through the door every round and the loudest one in the bus afterwards.', quote: 'If I wait, they get ready. So I don’t wait.' },
+  Brick: { real: 'Marcus Okafor', age: 26, country: 'England', cc: 'GB', since: 2020, story: 'A carpenter’s apprentice from Leeds who says he learned breaching by knocking down real walls. Known for building trap set-ups nobody has seen before, then forgetting the rest of the world once the shooting starts.', quote: 'Every wall is a door if you ask it nicely.' },
+  Moth: { real: 'Ilse Varga', age: 24, country: 'Hungary', cc: 'HU', since: 2021, story: 'Studied radio engineering in Budapest and treats every drone like a lab experiment. Holds the unofficial record for keeping one drone alive a whole round in a final. Rarely first into a fight, almost never wrong about where it will be.', quote: 'Information is the only gun that never runs dry.' },
+  Juno: { real: 'Ana Ribeiro', age: 25, country: 'Brazil', cc: 'BR', since: 2020, story: 'Grew up in São Paulo playing tournaments on a dial-up connection with a 200 ping. Says it taught her patience: she won two majors in one-against-three clutches and lurks longer than anyone thinks is reasonable.', quote: 'Everybody panics in a clutch. I just get quieter.' },
+  Sable: { real: 'Mireille Dubois', age: 31, country: 'France', cc: 'FR', since: 2017, story: 'The oldest player in the league and a former army signals officer. Built Ironclad around one idea: never take a fight you have not already seen on a camera. Her teams are famous for winning in the last twenty seconds.', quote: 'The clock is not against us. It is against them.' },
+  Torvi: { real: 'Torvald Sørensen', age: 23, country: 'Denmark', cc: 'DK', since: 2021, story: 'A former junior handball goalkeeper with reflexes to match. Plays off his own flashes like nobody else, and when Ironclad are ahead he can’t resist one more wide swing.', quote: 'Flash, count one, go. Never two.' },
+  Pax: { real: 'Daniel Kowalski', age: 27, country: 'Poland', cc: 'PL', since: 2019, story: 'Ironclad’s utility man: every smoke, every flash, every revive. Off the server he is a nervous talker who hums before big rounds; on it he is always one step behind the entry for the trade.', quote: 'If you die, I am already there. Promise.' },
+  Grit: { real: 'Hamish MacLeod', age: 28, country: 'Scotland', cc: 'GB', since: 2018, story: 'A sheep farmer’s son from the Highlands who plays like a stone wall: plants himself on the site and does not move. Teammates joke that he has never once rotated; the stats say they are right.', quote: 'The bomb is here. So I am here.' },
+  Wisp: { real: 'Lena Hoffmann', age: 21, country: 'Germany', cc: 'DE', since: 2023, story: 'The youngest player in the league, signed straight out of school after a viral clip of a four-kill flank. Times her flanks to the second, sets traps in corners nobody checks, and sometimes cannot wait for the call.', quote: 'The best angle is the one you forgot existed.' },
+};
+for (const t of PRO_TEAMS) for (const pl of t.players) pl.bio = PRO_BIO[pl.name];
 export const proTeam = id => PRO_TEAMS.find(t => t.id === id);
 
 // ---------------- reading a map: what the plans are made from ----------------

@@ -8,7 +8,7 @@ import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, 
 import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
 import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
-import { PRO_TEAMS, playbook, siteIntel } from '../shared/pros.js';
+import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
 import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess } from './training.js';
 import { compose, LINES, FUN, WAYS } from '../shared/comms.js';
 import { parseCommand } from '../shared/commands.js';
@@ -1863,11 +1863,9 @@ export const __findPath = (...a) => findPath(...a); // for tests
 // lurking too long, never rotating ...).
 // ======================================================================================================================
 // how often someone strafe-peeks in a fight (he asked: a hard skill, not something everyone does all the time)
-const PEEK = { Kaze: 0.35, Torvi: 0.3, Wisp: 0.15, Juno: 0.12 }, PEEK_LVL = [0.02, 0.03, 0.06, 0.09, 0.12, 0.18, 0.22];
+const PEEK = PRO_PEEK, PEEK_LVL = [0.02, 0.03, 0.06, 0.09, 0.12, 0.18, 0.22];
 function peekSkill(game, p) { return p.pro ? (PEEK[p.pro.pl.name] ?? 0.06) : PEEK_LVL[lvlOf(game, p)]; }
-const PERSONA = { Halden: [0.45, 0.8], Kaze: [0.95, 0.2], Brick: [0.6, 0.6], Moth: [0.2, 0.85], Juno: [0.5, 0.9], Sable: [0.35, 0.9], Torvi: [0.9, 0.3], Pax: [0.5, 0.6], Grit: [0.3, 0.95], Wisp: [0.7, 0.35] };
-const TIMING = { Wisp: -6, Moth: 5, Juno: 8 }; // seconds early (-) or late (+) to their part of the plan: their flaws
-const ROTATE_DELAY = { Halden: 4, Grit: Infinity }; // slow to rotate; never rotates
+const PERSONA = PRO_PERSONA, TIMING = PRO_TIMING, ROTATE_DELAY = PRO_ROTATE; // (in shared/pros.js: the PLAYBOOK shows them)
 // The pros talk (he asked: you can see what they say, an insight into their thoughts; not everything is said, but a
 // change of plan always is, and specific information has to be spoken because pings are limited). A line goes to their
 // team (team chat, and Esports TV viewers). Each player leaves a few seconds between lines, the same news isn't
