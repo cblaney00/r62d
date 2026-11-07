@@ -158,6 +158,23 @@ const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45;
 // the crosshair were never further than TURN_R from you, so a far-out crosshair turns as quickly as a near one; moving
 // it towards / away from you changes the distance 1:1. Close in it is exactly 1:1 like a pointer.
 const TURN_R = 160;
+// On a drone the ping reticle reaches DRONE_PING_R from it (he asked: a bit past what the drone sees). The view zooms out
+// to hold you and the crosshair (he asked: zoom, never let it leave the screen), up to FIT_MAX world px tall; only past
+// that does it slide along.
+const DRONE_PING_R = 10 * PX_PER_M, FIT_MAX = 2000;
+// how far the crosshair can sit along angle a before the edge of your floor (the camera can't follow it there)
+function floorLim(a, l) {
+  const c = Math.cos(a), s = Math.sin(a), F = st.map.floors[Math.max(0, floorAt(st.map, st.pred.x, st.pred.y))], m = 10, x0 = F.gx * CELL + m, x1 = (F.gx + F.w) * CELL - m, y1 = F.h * CELL - m;
+  if (c > 1e-6) l = Math.min(l, (x1 - st.pred.x) / c); else if (c < -1e-6) l = Math.min(l, (x0 - st.pred.x) / c);
+  if (s > 1e-6) l = Math.min(l, (y1 - st.pred.y) / s); else if (s < -1e-6) l = Math.min(l, (m - st.pred.y) / s);
+  return Math.max(1, l);
+}
+// a screen point (device px) pulled in so it shows at least m CSS px inside the real screen, the tilt's cropping included
+function onScreen(x, y, m) {
+  const p = tilt.project(x / DPR, y / DPR), px = Math.max(m, Math.min(VW / DPR - m, p.x)), py = Math.max(m, Math.min(VH / DPR - m, p.y));
+  if (px === p.x && py === p.y) return { x, y };
+  const u = tilt.untilt(px, py); return { x: u.x * DPR, y: u.y * DPR };
+}
 function freeMove(dx, dy) {
   const z = st.zoom || 1; dx /= z; dy /= z;
   const o = aimOff, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = AIM_MIN(), hi = AIM_MAX();
@@ -166,6 +183,7 @@ function freeMove(dx, dy) {
   if (l < 0) { l = -l; a += Math.PI; } // pulled through the middle: out the other side
   if (l > hi) l = Math.max(hi, Math.min(l, l0)); // no pushing past the reach (a reach that just shrank keeps your spot)
   else if (l < lo) l = lo;
+  if (st.map && !(st.winViewsOn && winAimed(a))) l = Math.min(l, Math.max(lo, floorLim(a, l))); // nor past the floor's edge, where it would stop while the mouse kept going
   aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l };
 }
 // aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked), else to its sight's distance
@@ -240,7 +258,11 @@ function screenToWorld(sx, sy) {
 }
 // the point you aim at, in screen pixels (with the aim pad this sits ahead of your character)
 function cursor() {
-  if (!padOn) return mouse;
+  if (!padOn) { // Cursor aiming: the pointer itself, kept within the drone's ping reach while you drive one
+    if (!(st.me && st.me.a && st.me.ct === 'drone')) return mouse;
+    const P = w2s(st.pred.x, st.pred.y), dx = mouse.x - P.x, dy = mouse.y - P.y, l = Math.hypot(dx, dy), R = DRONE_PING_R * (st.zoom || 1);
+    return l <= R ? mouse : { x: P.x + dx / l * R, y: P.y + dy / l * R };
+  }
   const z = st.zoom || 1, P0 = w2s(st.pred.x, st.pred.y), px = P0.x, py = P0.y;
   if (aimMode === 'free' && !gpRecent()) { const q = freeAimPoint(); return w2s(q.x, q.y); }
   const cx = Math.cos(padAng + (st.rot || 0)), cy = Math.sin(padAng + (st.rot || 0)), m = 30 * DPR;
@@ -249,7 +271,8 @@ function cursor() {
   if (cx > 0.01) d = Math.min(d, (VW - m - px) / cx); else if (cx < -0.01) d = Math.min(d, (m - px) / cx);
   if (cy > 0.01) d = Math.min(d, (VH - m - py) / cy); else if (cy < -0.01) d = Math.min(d, (m - py) / cy);
   d = Math.max(d, 24 * DPR);
-  return { x: px + cx * d, y: py + cy * d };
+  if (st.me && st.me.ct === 'drone') d = Math.min(d, DRONE_PING_R * z);
+  return onScreen(px + cx * d, py + cy * d, 24); // (the tilt crops the screen's edges)
 }
 // Crosshair mode: the crosshair stays at the distance you put it (he asked: it used to jump onto every door frame
 // in the way, so flicks got caught). x, y = ax, ay = that point (sent to the server for headshots). see = how far you
@@ -266,12 +289,7 @@ function freeAimPoint() {
   let l = Math.min(Math.hypot(aimOff.x, aimOff.y) || 1, AIM_MAX());
   const a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), s = Math.sin(a);
   const outWin = st.map && st.winViewsOn && winAimed(a); // aiming out of an upper window, down at the ground below
-  if (st.map && !outWin) { // never off the edge of the floor you are on (the camera can't follow it there)
-    const F = st.map.floors[Math.max(0, floorAt(st.map, st.pred.x, st.pred.y))], m = 10, x0 = F.gx * CELL + m, x1 = (F.gx + F.w) * CELL - m, y1 = F.h * CELL - m;
-    if (c > 1e-6) l = Math.min(l, (x1 - st.pred.x) / c); else if (c < -1e-6) l = Math.min(l, (x0 - st.pred.x) / c);
-    if (s > 1e-6) l = Math.min(l, (y1 - st.pred.y) / s); else if (s < -1e-6) l = Math.min(l, (m - st.pred.y) / s);
-    l = Math.max(1, l);
-  }
+  if (st.map && !outWin) l = floorLim(a, l); // never off the edge of the floor you are on
   let see = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null) + 2 : l;
   let shot = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null, true) + 2 : l;
   if (outWin) { // out past the window the air ends at the floor's edge: the crosshair is on the ground below, not on a wall
@@ -806,6 +824,7 @@ cv.addEventListener('mousemove', e => {
     if (padOn && (aimMode === 'turn' || aimMode === 'spin')) { turnMove(e.movementX * k, e.movementY * k); return; }
     mouse.x = Math.max(0, Math.min(VW, mouse.x + e.movementX * k));
     mouse.y = Math.max(0, Math.min(VH, mouse.y + e.movementY * k));
+    const p = onScreen(mouse.x, mouse.y, 12); mouse.x = p.x; mouse.y = p.y; // never under the tilt's cropped edges
   } else { const u = tilt.untilt(e.clientX, e.clientY); mouse.x = u.x * DPR; mouse.y = u.y * DPR; } // (the tilted world layers: look.js)
 });
 cv.addEventListener('mousedown', e => {
@@ -1587,7 +1606,7 @@ function frame(nowMs) {
     }
     st.lastViewPos = view ? { x: view.x, y: view.y } : null;
   }
-  if (!st.tv && view && view.kind === 'body' && padOn && aimMode === 'free' && !gpRecent() && st.zoom) { // Crosshair mode: the target keeps
+  if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && aimMode === 'free' && !gpRecent() && st.zoom) { // Crosshair mode: the target keeps
     // you and the crosshair on screen with room past it (he asked), so the view glides there instead of jumping
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
     const keepT = (x, y, m) => { cx = Math.min(x + hw - m, Math.max(x - hw + m, cx)); cy = Math.min(y + hh - m, Math.max(y - hh + m, cy)); };
@@ -1641,14 +1660,13 @@ function frame(nowMs) {
   st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18));
   st.viewH = st.envH * st.adsZ;
   // Crosshair mode: the crosshair can go anywhere you can see; if you and it don't fit on screen, the view grows
-  // to hold it, and st.reachW (a circle round you, reachOf) is how far it can go
-  const freeAim = !st.tv && view && view.kind === 'body' && padOn && aimMode === 'free' && !gpRecent();
+  // to hold it, and st.reachW (a circle round you, reachOf; on a drone DRONE_PING_R) is how far it can go
+  const freeAim = !st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && aimMode === 'free' && !gpRecent();
   if (freeAim) {
-    const q = freeAimPoint(), cA = Math.abs(Math.cos(st.aim)), sA = Math.abs(Math.sin(st.aim));
-    const e = Math.min(cA > 0.01 ? VW / VH / 2 / cA : 99, sA > 0.01 ? 0.5 / sA : 99), mg = (50 * DPR + AHEAD()) / (st.zoom || 1);
-    st.reachW = reachOf(me);
-    { const l = Math.hypot(aimOff.x, aimOff.y); if (l > st.reachW) { const k = (st.reachW + (l - st.reachW) * Math.exp(-dt * 10)) / l; aimOff = { x: aimOff.x * k, y: aimOff.y * k }; } } // stopped aiming in: it glides back inside
-    const capH = Math.max(st.longV ? LONG_H : 0, st.reachW + mg), need = Math.min(capH, fitBoth(q.ax - st.pred.x, q.ay - st.pred.y)); // (tall enough to reach it straight up)
+    const q = freeAimPoint(), dr = view.kind === 'drone';
+    st.reachW = dr ? DRONE_PING_R : reachOf(me);
+    { const l = Math.hypot(aimOff.x, aimOff.y); if (l > st.reachW) { const k = (st.reachW + (dr ? 0 : (l - st.reachW) * Math.exp(-dt * 10))) / l; aimOff = { x: aimOff.x * k, y: aimOff.y * k }; } } // stopped aiming in: it glides back inside (onto a drone: at once)
+    const need = Math.min(FIT_MAX, fitBoth(q.ax - st.pred.x, q.ay - st.pred.y));
     st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need;
     st.viewH = Math.max(st.viewH, st.fitH);
   } else st.fitH = 0;
@@ -1687,9 +1705,8 @@ function frame(nowMs) {
   }
   if (freeAim) { // the crosshair always stays on the real screen (he saw it go off): at the floor's edge the camera stops
     // but the crosshair didn't, and the tilt crops the edges, so here the view may pass the edge just enough to show it
-    const q = freeAimPoint(), s0 = w2s(q.ax, q.ay), p = tilt.project(s0.x / DPR, s0.y / DPR), m = AHEAD() * 0.7 / DPR;
-    const px = Math.max(m, Math.min(VW / DPR - m, p.x)), py = Math.max(m, Math.min(VH / DPR - m, p.y));
-    if (px !== p.x || py !== p.y) { const u = tilt.untilt(px, py), w = screenToWorld(u.x * DPR, u.y * DPR); st.cam.x += q.ax - w.x; st.cam.y += q.ay - w.y; }
+    const q = freeAimPoint(), s0 = w2s(q.ax, q.ay), u = onScreen(s0.x, s0.y, AHEAD() * 0.7 / DPR);
+    if (u.x !== s0.x || u.y !== s0.y) { const w = screenToWorld(u.x, u.y); st.cam.x += q.ax - w.x; st.cam.y += q.ay - w.y; }
   }
   if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
 
