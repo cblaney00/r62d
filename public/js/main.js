@@ -8,7 +8,7 @@ import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DR
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, drawRaised, sightClip, looks } from './look.js';
+import { tilt, raisedFrame, drawRaised, sightClip, looks } from './look.js';
 import { S, setMapScale } from './textures.js';
 import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
@@ -469,7 +469,7 @@ function loadMap(mv, tiles, hp, id, holes) {
   // broken glass lies in and just around every window; splinters appear where barricades get smashed
   st.glass = new Set(); st.splinters = new Set();
   for (const o of st.map.openings) if (o.kind === 'window') for (const k of o.cells) for (const d of [0, 1, -1, st.map.W, -st.map.W]) st.glass.add(k + d);
-  st.rend = new MapRenderer(st.known, st.base); st.rend.mount(mapLayer); perfWatch.skip = 2; st.warm = 4;
+  st.rend = new MapRenderer(st.known, st.base); st.rend.mount(mapLayer); st.rend.lowCopy(); perfWatch.skip = 2; st.warm = 4;
   st.rend.splinters = st.splinters;
   st.corpses = []; fx.clear(); st.pending = [];
   st.loadMs = Math.round(performance.now() - t0); // map build + picture (shown in __r62d for speed checks)
@@ -2278,15 +2278,21 @@ function draw(s, view, now, dt) {
   // --- line-of-sight blackout ---
   const vpolys = [], vviews = []; // (the sight shapes and their eyes, for the raised walls below)
   const RH = 0.045; // raised walls (look.js): how tall, as a share of the distance from the middle of the view
+  let rf = null; // this frame's raised walls, worked out once for both passes (look.js keeps the pieces between frames)
   const raise = inGame && gq.raised !== false && fxOn('walls3d') ? (c, pass) => { // pass 'fog' (all, greyed by #fog) or 'lit'
-    const fr = st.floorRect, rm = st.rend.map, T_ = rm.tiles;
-    const X0 = Math.max(fr ? fr[0] : 0, wx0 - 40), Y0 = Math.max(fr ? fr[1] : 0, wy0 - 40), X1 = Math.min(fr ? fr[2] : m.W * CELL, wx1 + 40), Y1 = Math.min(fr ? fr[3] : m.H * CELL, wy1 + 40);
-    const go = keep => drawRaised(c, st.rend, rm, st.cam, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1, keep);
-    if (pass === 'fog') return go(null);
-    if (!view) return go(null);
+    const t0 = performance.now(), rm = st.rend.map;
+    if (!rf) {
+      const fr = st.floorRect;
+      const X0 = Math.max(fr ? fr[0] : 0, wx0 - 40), Y0 = Math.max(fr ? fr[1] : 0, wy0 - 40), X1 = Math.min(fr ? fr[2] : m.W * CELL, wx1 + 40), Y1 = Math.min(fr ? fr[3] : m.H * CELL, wy1 + 40);
+      rf = raisedFrame(st.rend, rm, st.cam, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1);
+    }
+    // wall tops from the small copy of the map when the screen shows less than it holds (far out)
+    const pk = pass === 'fog' ? fog.width / VW * z : z, pic = pk <= st.rend.S * 0.25 ? st.rend.lowCopy() : st.rend.c;
+    if (pass === 'fog' || !view) { drawRaised(c, st.rend, rf, [0, 1], pic); pfa('raise', t0); return; }
     // walls in colour exactly where your team's sight reaches (raised with them), like the floor: no cell-by-cell snapping
-    c.save(); c.clip(sightClip(vpolys, vviews, st.cam, RH)); go(k => T_[k] !== T.TALL); c.restore();
-    c.save(); c.clip(sightClip(vpolys, vviews, st.cam, RH, rm)); go(k => T_[k] === T.TALL); c.restore(); // cars, crates, shelves: only the part in sight
+    c.save(); c.clip(sightClip(vpolys, vviews, st.cam, RH)); drawRaised(c, st.rend, rf, [0], pic); c.restore();
+    c.save(); c.clip(sightClip(vpolys, vviews, st.cam, RH, rm)); drawRaised(c, st.rend, rf, [1], pic); c.restore(); // cars, crates, shelves: only the part in sight
+    pfa('raise', t0);
   } : null;
   showFog(!!(view && inGame));
   if (view && inGame) {
@@ -2296,8 +2302,10 @@ function draw(s, view, now, dt) {
     fctx.fillStyle = '#000'; fctx.fillRect(0, 0, fog.width, fog.height);
     fctx.setTransform(TA * fk, TB * fk, TC * fk, TD * fk, ox * fk, oy * fk);
     // the remembered map: the colour picture, greyed by the browser (CSS filter on #fog), not a grey copy of our own
-    const G = st.rend.c.width / st.rend.Wp;
-    if (wx1 > wx0 && wy1 > wy0) st.rend.c.drawTo(fctx, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
+    // (far out, from its small copy: the fog layer has fewer pixels than that holds, and shrinking the whole picture each frame lagged)
+    const tb = performance.now(), pic = fk * z <= st.rend.S * 0.25 ? st.rend.lowCopy() : st.rend.c, G = pic.width / st.rend.Wp;
+    if (wx1 > wx0 && wy1 > wy0) pic.drawTo(fctx, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
+    pfa('fogblit', tb);
     // cut out everything your team can see right now
     fctx.globalCompositeOperation = 'destination-out';
     for (const v of st.viewers) {

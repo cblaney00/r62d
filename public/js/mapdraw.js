@@ -15,14 +15,19 @@ const WALLISH = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.BARRI]);
 // The pieces overlap by 2 pixels so scaled copies never show a seam.
 export class Tiled {
   constructor(w, h, ts = 1024) {
-    this.width = w; this.height = h; this.ts = ts; this.tiles = [];
+    this.width = w; this.height = h; this.ts = ts; this.tiles = []; this.cols = Math.ceil(w / ts);
     for (let y = 0; y < h; y += ts) for (let x = 0; x < w; x += ts) {
       const tw = Math.min(ts + 2, w - x), th = Math.min(ts + 2, h - y), c = canvas(tw, th);
       this.tiles.push({ c, ctx: c.getContext('2d'), x, y, w: tw, h: th });
     }
   }
   // the pieces touching a rectangle (picture pixels)
-  touching(x0, y0, x1, y1) { return this.tiles.filter(t => x1 > t.x && x0 < t.x + t.w && y1 > t.y && y0 < t.y + t.h); }
+  touching(x0, y0, x1, y1) { // (worked out from the grid: drawn many times a frame far out)
+    const ts = this.ts, out = [], c0 = Math.max(0, Math.floor((x0 - 2) / ts)), c1 = Math.min(this.cols - 1, Math.floor(x1 / ts));
+    const r0 = Math.max(0, Math.floor((y0 - 2) / ts)), r1 = Math.min(Math.ceil(this.height / ts) - 1, Math.floor(y1 / ts));
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const t = this.tiles[r * this.cols + c]; if (t && x1 > t.x && x0 < t.x + t.w && y1 > t.y && y0 < t.y + t.h) out.push(t); }
+    return out;
+  }
   // like ctx.drawImage(picture, sx, sy, sw, sh, dx, dy, dw, dh)
   drawTo(ctx, sx, sy, sw, sh, dx, dy, dw, dh) {
     const kx = dw / sw, ky = dh / sh, ts = this.ts;
@@ -106,6 +111,27 @@ export class MapRenderer {
     for (const t of this.c.touching(x0 * S, y0 * S, x1 * S, y1 * S)) {
       this.ctx = this.dctx = t.ctx; t.ctx.setTransform(S, 0, 0, S, -t.x, -t.y); fn(t);
     }
+    if (this.lo) this.loDirty.push([x0, y0, x1, y1]);
+  }
+  // A small copy of the picture (a quarter of its pixels each way), for a view far out: shrinking the whole picture
+  // into the fog layer and the wall tops every frame cost more the further out the view was (he noticed it as lag).
+  // Changed spots are copied over when it is next used.
+  lowCopy() {
+    const K = 0.25, S = this.S, k = S * K;
+    if (!this.lo) {
+      this.lo = new Tiled(Math.ceil(this.c.width * K), Math.ceil(this.c.height * K));
+      for (const t of this.lo.tiles) t.ctx.imageSmoothingQuality = 'high';
+      this.loDirty = [[0, 0, this.Wp, this.Hp]];
+    }
+    for (const [x0, y0, x1, y1] of this.loDirty.splice(0)) {
+      const a = Math.max(0, Math.floor(x0 * k) - 1), b = Math.max(0, Math.floor(y0 * k) - 1), c = Math.min(this.lo.width, Math.ceil(x1 * k) + 1), d = Math.min(this.lo.height, Math.ceil(y1 * k) + 1);
+      for (const t of this.lo.touching(a, b, c, d)) {
+        const p = Math.max(a, t.x), q = Math.max(b, t.y), r = Math.min(c, t.x + t.w), u = Math.min(d, t.y + t.h); if (r <= p || u <= q) continue;
+        t.ctx.clearRect(p - t.x, q - t.y, r - p, u - q);
+        this.c.drawTo(t.ctx, p / K, q / K, (r - p) / K, (u - q) / K, p - t.x, q - t.y, r - p, u - q);
+      }
+    }
+    return this.lo;
   }
 
   t(x, y) { const m = this.map; return x < 0 || y < 0 || x >= m.W || y >= m.H ? T.HARD : m.tiles[y * m.W + x]; }
@@ -318,7 +344,7 @@ export class MapRenderer {
   mark() {} // (the pieces shown are the ones drawn into)
   flush() {}
 
-  cellChanged(k) { (this.pending || (this.pending = new Set())).add(k); } // drawn by process()
+  cellChanged(k) { (this.pending || (this.pending = new Set())).add(k); (this.wallsDirty || (this.wallsDirty = new Set())).add(k); } // drawn by process(); raised walls (look.js) work that block out again
 
   // the waist-high stub of a soft wall knocked through (T.RUBBLE): a broken edge with the studs showing, rubble round it
   stub(x, y, k) {

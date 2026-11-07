@@ -80,67 +80,105 @@ function riseOf(m) {
 const height = (m, k, rise) => { const t = m.tiles[k]; return t === T.TALL ? (rise[k] ? HGT[t] : 0) : HGT[t] || 0; };
 // faces: [dx, dy, light] — light from the top left, so faces turned that way are brighter
 const FACES = [[0, 1, 0.5], [0, -1, 0.78], [1, 0, 0.6], [-1, 0, 0.72]];
-// keep(k): which wall cells to draw (main.js: everything into the blackout, which the browser greys; then, on top, the
-// walls clipped to where your team sees, and whole cars/crates you see)
-export function drawRaised(ctx, R, m, cam, h, x0, y0, x1, y1, keep = null) {
-  const W = m.W, tiles = m.tiles, rise = riseOf(m), hg = k => height(m, k, rise), G = R.c.width / R.Wp, cx = cam.x, cy = cam.y;
-  x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(W - 1, x1); y1 = Math.min(m.H - 1, y1);
-  const up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f]; // a point raised to height f
-  const paths = new Map(), tops = [];
-  const face = (key, ax, ay, bx, by, f) => {
-    let p = paths.get(key); if (!p) paths.set(key, p = new Path2D());
-    const [ux, uy] = up(ax, ay, f), [vx, vy] = up(bx, by, f);
-    p.moveTo(ax, ay); p.lineTo(bx, by); p.lineTo(vx, vy); p.lineTo(ux, uy); p.closePath();
-  };
+// The wall pieces are worked out once per block of cells (CH × CH) and kept (he asked: zoomed out it lagged, more of it
+// should stay ready): each block holds its faces (both ends, which way it faces, its colour) and its tops, in two
+// groups, walls and tall things (cars, crates, shelves). A block is worked out again only when a cell in or next to it
+// changes (MapRenderer.cellChanged fills R.wallsDirty). Each frame only the faces turned toward the camera are raised,
+// once, and the same paths serve every pass (raisedFrame, then drawRaised per group).
+const CH = 16;
+const KEPT = new WeakMap(); // renderer → { m, cw, blocks: [] }
+function block(R, m, bx, by) {
+  const W = m.W, rise = riseOf(m), hg = k => height(m, k, rise), out = [{ faces: [], tops: [] }, { faces: [], tops: [] }];
+  const x0 = bx * CH, y0 = by * CH, x1 = Math.min(W - 1, x0 + CH - 1), y1 = Math.min(m.H - 1, y0 + CH - 1);
   for (let y = y0; y <= y1; y++) {
     let run = null;
     for (let x = x0; x <= x1 + 1; x++) {
-      const k = y * W + x, f = x <= x1 ? hg(k) : 0, on = f > 0 && (!keep || keep(k)), L = 1;
+      const k = y * W + x, f = x <= x1 ? hg(k) : 0, on = f > 0, g = on && m.tiles[k] === T.TALL ? 1 : 0;
       const sh = on && m.shape && m.shape[k];
-      if (run && (!on || f !== run.f || L !== run.L || sh)) { tops.push(run); run = null; }
+      if (run && (!on || f !== run.f || g !== run.g || sh)) { out[run.g].tops.push(run); run = null; }
       if (!on) continue;
-      const t = tiles[k], base = t === T.SOFT && m.mat && m.mat[k] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.HARD], X = x * CELL, Y = y * CELL;
+      const t = m.tiles[k], base = t === T.SOFT && m.mat && m.mat[k] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.HARD], X = x * CELL, Y = y * CELL;
+      const col = lt => `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`, faces = out[g].faces;
       if (sh) { // an angled or curved piece: its own edges, its own top
         for (const P of sh) {
           let pcx = 0, pcy = 0; for (let i = 0; i < P.length; i += 2) { pcx += P[i]; pcy += P[i + 1]; } pcx /= P.length / 2; pcy /= P.length / 2;
           for (let i = 0; i < P.length; i += 2) {
-            const ax = P[i], ay = P[i + 1], bx = P[(i + 2) % P.length], by = P[(i + 3) % P.length];
-            let nx = by - ay, ny = -(bx - ax); const len = Math.hypot(nx, ny) || 1, mx = (ax + bx) / 2, my = (ay + by) / 2;
+            const ax = P[i], ay = P[i + 1], bx2 = P[(i + 2) % P.length], by2 = P[(i + 3) % P.length];
+            let nx = by2 - ay, ny = -(bx2 - ax); const len = Math.hypot(nx, ny) || 1, mx = (ax + bx2) / 2, my = (ay + by2) / 2;
             if (nx * (mx - pcx) + ny * (my - pcy) < 0) { nx = -nx; ny = -ny; } // pointing out of the piece, whichever way it was wound
-            if (nx * (cx - mx) + ny * (cy - my) <= 0) continue; // turned away from the camera
-            const ok = Math.floor((mx + nx / len * 0.5) / CELL), oy = Math.floor((my + ny / len * 0.5) / CELL), on = oy * W + ok; // just outside the edge
-            if (on !== k && hg(on) >= f && !(m.shape && m.shape[on])) continue; // against more wall: hidden inside it
-            const lt = 0.62 + 0.14 * (-nx - ny) / len;
-            face(base + '|' + L + '|' + lt.toFixed(1), ax, ay, bx, by, f);
+            const ok = Math.floor((mx + nx / len * 0.5) / CELL), oy = Math.floor((my + ny / len * 0.5) / CELL), on2 = oy * W + ok; // just outside the edge
+            if (on2 !== k && hg(on2) >= f && !(m.shape && m.shape[on2])) continue; // against more wall: hidden inside it
+            faces.push({ ax, ay, bx: bx2, by: by2, nx, ny, px: mx, py: my, f, x, y, c: col(+(0.62 + 0.14 * (-nx - ny) / len).toFixed(1)) });
           }
         }
-        tops.push({ x, y, n: 1, f, L, sh });
+        out[g].tops.push({ x, y, n: 1, f, sh });
         continue;
       }
       for (const [dx, dy, lt] of FACES) {
         const n = k + dy * W + dx, nx = x + dx, ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f && !(m.shape && m.shape[n])) continue;
-        // the face is seen when the camera is on its side of it
-        const ex = dx > 0 ? X + CELL : X, ey = dy > 0 ? Y + CELL : Y;
-        if (dx && (cx - ex) * dx <= 0 || dy && (cy - ey) * dy <= 0) continue;
-        if (dx) face(base + '|' + L + '|' + lt, ex, Y, ex, Y + CELL, f); else face(base + '|' + L + '|' + lt, X, ey, X + CELL, ey, f);
+        const ex = dx > 0 ? X + CELL : X, ey = dy > 0 ? Y + CELL : Y; // seen when the camera is on its side of it
+        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, x, y, c: col(lt) });
+        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, x, y, c: col(lt) });
       }
-      if (!run) run = { x, y, n: 0, f, L }; run.n++;
+      if (!run) run = { x, y, n: 0, f, g }; run.n++;
     }
   }
-  for (const [key, p] of paths) {
-    const [rgb, , lt] = key.split('|'), c = rgb.split(',').map(Number), k = +lt;
-    ctx.fillStyle = `rgb(${c[0] * k | 0},${c[1] * k | 0},${c[2] * k | 0})`; ctx.fill(p);
-  }
-  for (const r of tops) {
-    const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f;
-    if (r.sh) {
-      ctx.save(); ctx.beginPath();
-      for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); } ctx.closePath(); }
-      ctx.clip();
+  return out;
+}
+function kept(R, m) {
+  let K = KEPT.get(R);
+  if (!K || K.m !== m) KEPT.set(R, K = { m, cw: Math.ceil(m.W / CH), blocks: [] });
+  if (R.wallsDirty && R.wallsDirty.size) { // a changed cell can change its neighbours' faces: drop the blocks round it
+    for (const k of R.wallsDirty) {
+      const x = k % m.W, y = Math.floor(k / m.W);
+      for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const bx = Math.floor((x + dx) / CH), by = Math.floor((y + dy) / CH); if (bx >= 0 && by >= 0) K.blocks[by * K.cw + bx] = null; }
     }
-    R.c.drawTo(ctx, X * G, Y * G, w * G, CELL * G, tx, ty, w * s, CELL * s);
-    if (r.sh) ctx.restore();
+    R.wallsDirty.clear();
+  }
+  return K;
+}
+// this frame's raised walls in cells x0..y1 (inclusive), seen from cam: per group, a path per colour and the tops
+export function raisedFrame(R, m, cam, h, x0, y0, x1, y1) {
+  const K = kept(R, m), cx = cam.x, cy = cam.y, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
+  x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W - 1, x1); y1 = Math.min(m.H - 1, y1);
+  const groups = [{ paths: new Map(), tops: [] }, { paths: new Map(), tops: [] }];
+  for (let by = Math.floor(y0 / CH); by <= Math.floor(y1 / CH); by++) for (let bx = Math.floor(x0 / CH); bx <= Math.floor(x1 / CH); bx++) {
+    const i = by * K.cw + bx, B = K.blocks[i] || (K.blocks[i] = block(R, m, bx, by));
+    const whole = bx * CH >= x0 && by * CH >= y0 && bx * CH + CH - 1 <= x1 && by * CH + CH - 1 <= y1; // else: check each piece is in range
+    for (let g = 0; g < 2; g++) {
+      const G = groups[g];
+      for (const F of B[g].faces) {
+        if (F.nx * (cx - F.px) + F.ny * (cy - F.py) <= 0) continue; // turned away from the camera
+        if (!whole && (F.x < x0 || F.x > x1 || F.y < y0 || F.y > y1)) continue;
+        let p = G.paths.get(F.c); if (!p) G.paths.set(F.c, p = new Path2D());
+        const [ux, uy] = up(F.ax, F.ay, F.f), [vx, vy] = up(F.bx, F.by, F.f);
+        p.moveTo(F.ax, F.ay); p.lineTo(F.bx, F.by); p.lineTo(vx, vy); p.lineTo(ux, uy); p.closePath();
+      }
+      for (const r of B[g].tops) {
+        if (!whole && (r.y < y0 || r.y > y1 || r.x + r.n - 1 < x0 || r.x > x1)) continue;
+        G.tops.push(r);
+      }
+    }
+  }
+  return { groups, cam: { x: cx, y: cy }, h };
+}
+// draw groups of a raisedFrame (0 walls, 1 tall things); the tops come from pic (the map picture, or its small copy far out)
+export function drawRaised(ctx, R, fr, which, pic = R.c) {
+  const cx = fr.cam.x, cy = fr.cam.y, h = fr.h, G = pic.width / R.Wp, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
+  for (const g of which) {
+    const grp = fr.groups[g];
+    for (const [c, p] of grp.paths) { ctx.fillStyle = c; ctx.fill(p); }
+    for (const r of grp.tops) {
+      const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f;
+      if (r.sh) {
+        ctx.save(); ctx.beginPath();
+        for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); } ctx.closePath(); }
+        ctx.clip();
+      }
+      pic.drawTo(ctx, X * G, Y * G, w * G, CELL * G, tx, ty, w * s, CELL * s);
+      if (r.sh) ctx.restore();
+    }
   }
 }
 // ---------------------------------------------------------------- camera tilt
