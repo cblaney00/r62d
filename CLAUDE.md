@@ -114,6 +114,8 @@ His wishes so far:
 - Setting/art direction (chosen by us, he can change it): modern counter-terror unit,
   crisp detailed top-down style. Your team is blue, enemies orange.
 
+- Map knowledge by rank (he asked: aim is good, now map sense; he chose a smooth climb): `KNOW` in bots.js (Copper … Champion + pros: cams, memo, angles, safe, clever, lean, prone, glare, slide). `gadgetShot` (shoot cameras/traps/gadgets seen; memo = turns to a map camera it knows hangs close by), `glareOn` (step out of a sniper glint, Plat+ spot it), `threatPoint` adds siteIntel off-angle holds for attackers, `knownHold` gives defenders those holds, `pickWay` (non-pro attackers: the obvious way in from where they are, or another; exposure from `m.yard`, spread from mates), `leanSide` (hold and fight leaning past cover), prone at holds (defence), power slides across doorways. Pros get it in proAct `watch`. `feat(p, k)` counts features; practice adds per-pro `training.pro[name].tend[side]` (rounds, wins, kills, deaths, hs, fk/fd, clutches, survived, kill distance, every feat, points reasons via `PTS_FEAT` in train-worker.js). `node tests/features.js [matches] [--levels 0,3,5,7]`; `tests/ladder.js --from N`.
+
 ## How it is built
 
 - **Language:** JavaScript. Node 22 server (no npm packages at all — a tiny hand-written

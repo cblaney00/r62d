@@ -51,7 +51,8 @@ export function addResults(res) {
   }
   for (const [op, a] of Object.entries(res.opx || {})) { const x = training.opx[op] || (training.opx[op] = a.map(() => 0)); a.forEach((v, i) => { x[i] = (x[i] || 0) + v; }); }
   for (const kind of ['guns', 'att']) for (const [k, a] of Object.entries(res[kind] || {})) addRec(training[kind], k, a);
-  for (const [name, P] of Object.entries(res.pro || {})) { const T = training.pro[name] || (training.pro[name] = { ops: {}, guns: {}, att: {} }); for (const kind of ['ops', 'guns', 'att']) for (const [k, a] of Object.entries(P[kind] || {})) addRec(T[kind], k, a); }
+  for (const [name, P] of Object.entries(res.pro || {})) { const T = training.pro[name] || (training.pro[name] = { ops: {}, guns: {}, att: {} }); for (const kind of ['ops', 'guns', 'att']) for (const [k, a] of Object.entries(P[kind] || {})) addRec(T[kind], k, a);
+    for (const [side, t] of Object.entries(P.tend || {})) { const x = (T.tend || (T.tend = {}))[side] || (T.tend[side] = {}); for (const [k, v] of Object.entries(t)) x[k] = (x[k] || 0) + v; } } // tendencies (PLAYBOOK player pages): plain counts per side
   training.rounds += res.rounds || 0; training.verRounds = (training.verRounds || 0) + (res.rounds || 0);
 }
 // a new version of the game makes the old lessons less sure: keep them, but at half weight
@@ -62,7 +63,7 @@ export function newVersion(version) {
   const half = x => x.forEach((v, i) => { x[i] = Math.round(v / 2); });
   for (const x of Object.values(training.opx || {})) half(x);
   for (const kind of ['guns', 'att']) for (const x of Object.values(training[kind])) half(x);
-  for (const P of Object.values(training.pro)) for (const kind of ['ops', 'guns', 'att']) for (const x of Object.values(P[kind] || {})) half(x);
+  for (const P of Object.values(training.pro)) { for (const kind of ['ops', 'guns', 'att']) for (const x of Object.values(P[kind] || {})) half(x); for (const t of Object.values(P.tend || {})) for (const k of Object.keys(t)) t[k] = Math.round(t[k] / 2); }
 }
 export const roundsLeft = version => training.version !== version ? ROUNDS_PER_VERSION : Math.max(0, ROUNDS_PER_VERSION - (training.verRounds || 0));
 export const needsTraining = version => roundsLeft(version) > 0;

@@ -817,7 +817,7 @@ export function botThink(game, p, dt) {
   if (!ai.role) ai.role = roleFor(game, p, team);
   const abId = OPERATORS[p.op].ability.id;
   const useAbility = () => game.event(p, { k: 'ability' });
-  if (action && team === TEAM.ATK && !p.downed && roofPlay(game, p, inp, dt)) return; // (he asked) up on the roof, in through a hatch
+  if (action && team === TEAM.ATK && !p.downed && roofPlay(game, p, inp, dt)) { if (!ai.roofF) { ai.roofF = 1; feat(p, 'roof'); } return; } // (he asked) up on the roof, in through a hatch
 
   // --- hearing: the most recent enemy noise this bot could hear ---
   for (const n of game.noises || []) {
@@ -909,6 +909,8 @@ export function botThink(game, p, dt) {
     ai.strafeT = (ai.strafeT || 0) - dt;
     if (ai.strafeT <= 0) { ai.strafeT = 0.6 + Math.random(); ai.strafe = Math.random() < peekSkill(game, p) ? (Math.random() < 0.5 ? -1 : 1) : 0; }
     { const lu = linedUp(game, p, enemy); if (lu) { ai.strafe = lu; ai.strafeT = 0.5; } } // a teammate on the same line from the enemy: step off it // he asked: strafe-peeking in a fight is a hard skill, used now and then by a few, not by everyone all the time
+    if (ai.leanE !== enemy.id) { ai.leanE = enemy.id; ai.leanF = Math.random() < know(game, p).lean ? leanSide(game, p, want) : 0; if (ai.leanF) feat(p, 'lean'); }
+    if (ai.leanF && !ai.strafe) inp.lean = ai.leanF; // leaning out from the corner to take the fight
     if (ai.strafe) { const sa = p.aim + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); inp.walk = 1; }
     if ((p.pro || lvlOf(game, p) >= 4) && p.hp < p.maxHp * 0.4 && enemy.hp > p.hp && !game.planted) { const ba = Math.atan2(p.y - enemy.y, p.x - enemy.x); setDir(inp, Math.cos(ba), Math.sin(ba)); inp.walk = 1; } // Platinum up: losing the fight, back out of it while shooting
     return;
@@ -935,6 +937,27 @@ export function botThink(game, p, dt) {
   }
   ai.droneSeen = null;
   if (p.downed) return;
+
+  // --- map knowledge (KNOW): a sniper's glint pointing this way → step out of the line (better ranks call it out too) ---
+  if (action) {
+    const sn = game.time < (ai.glareNext || 0) ? null : glareOn(game, p);
+    if (sn) { const gr = ai.glareRoll || (ai.glareRoll = {}); if ((gr[sn.id] ??= Math.random() < know(game, p).glare)) { ai.glareUntil = game.time + 1.1; ai.glareSide = Math.random() < 0.5 ? -1 : 1; ai.glareFrom = sn; ai.glareNext = game.time + 3; feat(p, 'glare'); if (know(game, p).glare >= 0.5) { game.spot(team, sn.id, 2); teamSay(game, p, `Sniper glint ${place(game, sn.x, sn.y)}`, 'gl' + sn.id); } } }
+    if (ai.glareUntil > game.time && ai.glareFrom) { const a = Math.atan2(p.y - ai.glareFrom.y, p.x - ai.glareFrom.x) + Math.PI / 2 * ai.glareSide; setDir(inp, Math.cos(a), Math.sin(a)); return; }
+  }
+  // --- a camera, trap or gadget of theirs in sight (or a map camera it knows hangs close by): shoot it ---
+  if (action && !(heardRecently && game.time - ai.heard.t < 1.5) && gun && gun.ammo > 0 && !p.reloadT) {
+    const g = gadgetShot(game, p);
+    if (g) {
+      if (ai.gAt !== g.e.id) { ai.gAt = g.e.id; ai.gT = game.time; }
+      if (game.time - ai.gT > 3) { (ai.gGive || (ai.gGive = {}))[g.e.id] = game.time + 20; ai.gAt = null; } // can't get it: leave it
+      else {
+        const a = Math.atan2(g.y - p.y, g.x - p.x), d = Math.hypot(g.x - p.x, g.y - p.y); turnTo(p, a, S.turn, dt); inp.ads = 1;
+        p.aimX = p.x + Math.cos(p.aim) * d; p.aimY = p.y + Math.sin(p.aim) * d;
+        if (Math.abs(angDiff(a, p.aim)) < Math.max(0.015, 3 / d)) { shootInput(inp, ai, gun); if (ai.gShot !== g.e.id) { ai.gShot = g.e.id; feat(p, g.e.type === 'cam' ? 'cams' : 'gadgets'); } }
+        return;
+      }
+    }
+  }
 
   // --- an enemy gadget in sight and an arc gun in hand: zap it ---
   if (abId === 'arc' && p.abilityCount > 0 && action) {
@@ -985,7 +1008,7 @@ export function botThink(game, p, dt) {
     if (feeds.length && settled && game.time > ai.camNext && !(hd < 300 && ago < 6) && (safe || worth)) {
       ai.camUntil = game.time + (worth ? 2.5 : 3.5 + Math.random() * 3); ai.camFlip = game.time + 1.2; ai.camHp = p.hp;
       ai.camNext = game.time + (p.pro && p.pro.pl.jobs.def === 'intel' ? 10 : 18) + Math.random() * 16;
-      game.watch(p, feeds[Math.floor(Math.random() * feeds.length)]); return;
+      feat(p, 'feeds'); game.watch(p, feeds[Math.floor(Math.random() * feeds.length)]); return;
     }
   }
 
@@ -1026,7 +1049,9 @@ export function botThink(game, p, dt) {
     else if (game.phase === PHASE.PREP && ai.stairWatch && ai.role !== 'space') { goal = ai.stairWatch; ai.watchingStairs = true; } // waits for drones there
     else {
       // he asked: defenders wander a little: every so often, while nothing is heard, a new spot round the site
-      if (!heardRecently && game.time > (ai.holdT || 0)) { ai.hold = nearBomb(game, site, ai.role === 'anchor' ? 60 : 100); ai.holdT = game.time + 10 + Math.random() * 18; }
+      if (!heardRecently && game.time > (ai.holdT || 0)) { // (map knowledge: an off-angle on a way in, else somewhere round the bomb)
+        const kh = Math.random() < know(game, p).angles ? knownHold(game, p) : null;
+        ai.hold = kh ? kh.at : nearBomb(game, site, ai.role === 'anchor' ? 60 : 100); ai.watch = kh ? kh.watch : null; ai.holdT = game.time + 10 + Math.random() * 18; if (kh) feat(p, 'offAngle'); }
       goal = ai.hold || (ai.hold = nearBomb(game, site, 70));
     }
   }
@@ -1106,6 +1131,14 @@ export function botThink(game, p, dt) {
     if (action && ai.role === 'entry' && p.gadget === 'stun' && p.gadgetCount > 0 && toGoal < 200 && !ai.stunned && los(map, p.x, p.y, goal.x, goal.y)) { ai.stunned = true; aimAt(p, goal.x, goal.y); game.event(p, { k: 'gadget' }); }
   }
 
+  // map knowledge: through a chosen way in (pickWay): to the spot beside it, then in, then on to the objective
+  if (atk && action && !game.planted && !p.hasDefuser && !p.pro && !ai.wayDone) {
+    if (ai.way === undefined) ai.way = pickWay(game, p);
+    const w = ai.way, tgt = w && (ai.wayIn ? w.inside : w.stack);
+    if (!w || (ai.wayT = (ai.wayT || 0) + dt) > 30) ai.wayDone = true;
+    else if (Math.hypot(tgt.x - p.x, tgt.y - p.y) < 28) { if (ai.wayIn) ai.wayDone = true; else ai.wayIn = true; }
+    else return moveTo(game, p, inp, tgt, dt);
+  }
   // he asked: defenders take space when they can do it without leaving the site open. The 'space' defender holds a room
   // beside the site on the attackers' side (two anchors stay on it) until the clock runs down or the team is losing people.
   // he asked: fewer on the site, the rooms leading to it held, and rotations. The 'space' defenders each hold one of the
@@ -1434,6 +1467,10 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
       turnTo(p, Math.atan2(at.y - p.y, at.x - p.x), skill(game, p).turn * 0.6, dt);
       if (linedUp(game, p, ai.watch) && game.time > (ai.lineT || 0)) { ai.lineT = game.time + 3; if (ai.hold === goal) ai.hold = null; if (ai.spread) ai.spread = null; } // in a teammate's line: another spot
       inp.crouch = team === TEAM.DEF || persona(p).patience > 0.5 ? 1 : 0;
+      // map knowledge: holding the angle leaning out from the cover beside it, or (a defender) lying down at it
+      if (ai.poseFor !== ai.watch) { const K = know(game, p); ai.poseFor = ai.watch; ai.leanS = Math.random() < K.lean ? leanSide(game, p, Math.atan2(ai.watch.y - p.y, ai.watch.x - p.x)) : 0; ai.proneH = team === TEAM.DEF && !ai.leanS && Math.random() < K.prone; if (ai.leanS) feat(p, 'lean'); if (ai.proneH) feat(p, 'prone'); }
+      if (at === ai.watch && ai.leanS) inp.lean = ai.leanS;
+      if (ai.proneH) { inp.prone = 1; inp.crouch = 0; }
     }
     return;
   }
@@ -1465,7 +1502,7 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   }
   turnTo(p, lookA, skill(game, p).turn * 0.8, dt);
   if (vaultable(map, next) && Math.hypot(nx - p.x, ny - p.y) < 24) { // climb over it, or note it can't be done and go round
-    if (!game.startVault(p, dirA)) { (ai.noVault || (ai.noVault = new Set())).add(next); ai.path = null; }
+    if (game.startVault(p, dirA)) feat(p, 'vault'); else { (ai.noVault || (ai.noVault = new Set())).add(next); ai.path = null; }
     return;
   }
   if (map.tiles[next] === T.BARRI || map.tiles[next] === T.SOFT || map.tiles[next] === T.PANEL) {
@@ -1479,7 +1516,10 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
   }
   setDir(inp, nx - p.x, ny - p.y);
   if (teamHushed(game, p)) inp.walk = 1; // someone asked for quiet: don't stomp about either
-  else if (!game.tut && game.time - (ai.seenT ?? -99) > 6 && Math.hypot(goal.x - p.x, goal.y - p.y) > 430) { inp.sprint = 1; inp.sa = p.aim; } // a long way to go and no fight on: sprint (loud). Physics only allows it when they look where they go
+  else if (!game.tut && game.time - (ai.seenT ?? -99) > 6 && Math.hypot(goal.x - p.x, goal.y - p.y) > 430) {
+    inp.sprint = 1; inp.sa = p.aim;
+    if (p.spr && oi >= 0 && map.openId[sy * map.W + sx] !== oi && ai.slideO !== oi) { ai.slideO = oi; if (Math.random() < know(game, p).slide) { inp.slide = 1; feat(p, 'slide'); } } // a power slide across a doorway (map knowledge: the flashy ones)
+  } // a long way to go and no fight on: sprint (loud). Physics only allows it when they look where they go
   // stuck? nudge
   if (Math.hypot(p.x - (ai.lx || 0), p.y - (ai.ly || 0)) < 0.5) { ai.stuck = (ai.stuck || 0) + dt; if (ai.stuck > 1) { ai.path = null; ai.stuck = 0; } }
   else ai.stuck = 0;
@@ -1607,6 +1647,83 @@ function loud(game, p) {
 const WANDER = [0.35, 0.2, 0.05, 0, 0, 0, 0]; // chance a round of going off alone to a room nobody needs
 const TRADE = [0.4, 0.4, 0.25, 0.55, 0.8, 0.9, 1]; // chance of going for the trade when a teammate dies close by
 const WALLBANG = [0, 0, 0, 0.1, 0.25, 0.5, 0.85]; // chance of shooting through a thin wall at a spotted enemy (pros 0.9)
+// Map knowledge by rank (he asked: aim is good now, so map sense should climb with rank; he chose a smooth climb:
+// Copper and Bronze mostly use the front doors and walk into cameras, now and then stumbling on something clever;
+// Champion and the pros know every camera spot, off-angle, flank, hatch and rope). One row per rank, the last for pros.
+// cams: chance of shooting a camera / trap / gadget seen; memo: knows where the map's cameras hang (same spots every
+// round) and turns to one close by before noticing it; angles: checks the usual defender off-angles (attack) and holds
+// them (defence) instead of plain doorways; safe: weighs how exposed a way in is and spreads from teammates; clever:
+// chance of a way in other than the obvious one; lean, prone: holding an angle leaning out from cover / lying down;
+// glare: steps out of a sniper scope's glint; slide: slides across a doorway while sprinting.
+const KNOW = [
+  { cams: 0.1, memo: 0, angles: 0, safe: 0, clever: 0.08, lean: 0, prone: 0, glare: 0, slide: 0 },               // Copper
+  { cams: 0.25, memo: 0, angles: 0.1, safe: 0.1, clever: 0.12, lean: 0.04, prone: 0, glare: 0.05, slide: 0 },    // Bronze
+  { cams: 0.45, memo: 0.15, angles: 0.25, safe: 0.25, clever: 0.18, lean: 0.1, prone: 0.03, glare: 0.15, slide: 0 }, // Silver
+  { cams: 0.6, memo: 0.35, angles: 0.4, safe: 0.4, clever: 0.24, lean: 0.18, prone: 0.06, glare: 0.3, slide: 0 },   // Gold
+  { cams: 0.75, memo: 0.55, angles: 0.6, safe: 0.6, clever: 0.3, lean: 0.26, prone: 0.09, glare: 0.5, slide: 0.03 }, // Platinum
+  { cams: 0.9, memo: 0.8, angles: 0.8, safe: 0.8, clever: 0.36, lean: 0.34, prone: 0.12, glare: 0.75, slide: 0.08 }, // Diamond
+  { cams: 1, memo: 0.95, angles: 1, safe: 1, clever: 0.4, lean: 0.42, prone: 0.15, glare: 0.9, slide: 0.15 },     // Champion
+  { cams: 1, memo: 1, angles: 1, safe: 1, clever: 0.4, lean: 0.5, prone: 0.18, glare: 1, slide: 0.3 },            // Pros
+];
+const know = (game, p) => KNOW[p.pro ? 7 : lvlOf(game, p)];
+// what each bot did with the game's features, counted for practice (the PLAYBOOK's tendencies) and tests/features.js
+export const feat = (p, k, n = 1) => { const f = p.feat || (p.feat = {}); f[k] = (f[k] || 0) + n; };
+// a camera, trap or gadget of the other team this bot sees (or, knowing the map, knows is there) and would shoot.
+// Each thing is weighed once (KNOW.cams), so a Copper walks past most of them.
+const NO_SHOOT = new Set(['drone', 'bird', 'decoy', 'cover', 'dshield']);
+function gadgetShot(game, p) {
+  const ai = p.ai, m = game.map, K = know(game, p), team = game.side(p), fl = floorAt(m, p.x, p.y), roll = ai.gRoll || (ai.gRoll = {});
+  let best = null, bd = Infinity;
+  for (const e of game.ents) {
+    if (!(e.hp > 0) || e.team === team || !e.team || NO_SHOOT.has(e.type) || e.tu) continue; // (a turret only breaks through its lens)
+    const out = e.oc !== undefined, x = out ? e.gx : e.x, y = out ? e.gy : e.y; // an outside camera: shot at its spot on the wall from the ground
+    if (out ? fl !== m.groundFloor : floorAt(m, x, y) !== fl) continue;
+    const d = Math.hypot(x - p.x, y - p.y); if (d > 16 * PX_PER_M || d >= bd) continue;
+    const mapCam = e.type === 'cam' && !e.owner, facing = Math.abs(angDiff(Math.atan2(y - p.y, x - p.x), p.aim)) < 0.9;
+    if (!facing && !(mapCam && d < 12 * PX_PER_M && (roll['m' + e.id] ??= Math.random() < K.memo))) continue; // behind them: only a camera they know hangs there
+    if ((roll[e.id] ??= Math.random() < K.cams) === false || (ai.gGive && ai.gGive[e.id] > game.time)) continue;
+    if (!los(m, p.x, p.y, x, y) || !shotClear(game, p, { x, y })) continue;
+    bd = d; best = { e, x, y };
+  }
+  return best;
+}
+// an enemy aimed in through a sniper scope, pointing at this bot from far off: the glint gives it away (main.js scopeGlare)
+function glareOn(game, p) {
+  const m = game.map, fl = floorAt(m, p.x, p.y);
+  for (const q of game.players.values()) {
+    if (!q.alive || q.downed || game.side(q) === game.side(p)) continue;
+    const g = q.guns && q.guns[q.slot]; if (!g || !g.att || g.att.sight !== 'sniper' || !((q.adsT || 0) >= 0.6)) continue;
+    const d = Math.hypot(p.x - q.x, p.y - q.y); if (d < 3 * PX_PER_M || d > 64 * PX_PER_M || floorAt(m, q.x, q.y) !== fl) continue;
+    if (Math.abs(angDiff(q.aim, Math.atan2(p.y - q.y, p.x - q.x))) < 0.14 && los(m, q.x, q.y, p.x, p.y)) return q;
+  }
+  return null;
+}
+// leaning out from cover toward a point: the side with a wall right beside the line (lean past it), else none
+function leanSide(game, p, a) {
+  const r = castSight(game.map, p.x, p.y, a + 0.7, 40, null), l = castSight(game.map, p.x, p.y, a - 0.7, 40, null);
+  return Math.min(r, l) > 30 ? 0 : r < l ? 1 : -1;
+}
+// a way into the site for an attacker (not the pros, who have their plan): the obvious one from where it is, or
+// (KNOW.clever) another; better ranks weigh how exposed each is to the upper windows and spread out from teammates
+function pickWay(game, p) {
+  const m = game.map, K = know(game, p), ways = siteIntel(m, game.site).ways.filter(w => w.kind !== 'wall');
+  if (!ways.length) return null;
+  const exp = w => { if (m.flAt[w.out] !== m.groundFloor || !m.yard || !m.yard.ways) return 0; const near = m.yard.ways.filter(y => Math.hypot(y.k % m.W - w.out % m.W, Math.floor(y.k / m.W) - Math.floor(w.out / m.W)) < 5); return near.length ? Math.min(...near.map(y => y.exp || 0)) : 0; };
+  const mates = w => [...game.players.values()].filter(q => q !== p && q.alive && q.squad === p.squad && q.ai && q.ai.way === w).length;
+  const score = w => Math.hypot(w.stack.x - p.x, w.stack.y - p.y) / CELL + K.safe * (exp(w) * 40 + mates(w) * 18) + Math.random() * 6;
+  const order = ways.slice().sort((a, b) => score(a) - score(b));
+  const w = order.length > 1 && Math.random() < K.clever ? order[1 + Math.floor(Math.random() * (order.length - 1))] : order[0];
+  if (w !== order[0]) feat(p, 'clever');
+  return w;
+}
+// a defender's spot: one of the off-angles on a way in (siteIntel holds), not one a teammate already has
+function knownHold(game, p) {
+  const ways = siteIntel(game.map, game.site).ways.filter(w => w.hold);
+  const taken = [...game.players.values()].filter(q => q !== p && q.alive && q.squad === p.squad && q.ai && q.ai.hold).map(q => q.ai.hold);
+  const free = ways.filter(w => !taken.some(h => Math.hypot(h.x - w.hold.x, h.y - w.hold.y) < 50));
+  const w = (free.length ? free : ways)[Math.floor(Math.random() * (free.length || ways.length))];
+  return w ? { at: game.freeSpotNear(w.hold.x, w.hold.y, 20), watch: w.pos } : null;
+}
 function rankHabits(game, p, inp, dt, team, site, gun) {
   const ai = p.ai, lvl = p.pro ? PRO_LEVEL : lvlOf(game, p), m = game.map;
   // wandering off alone (Copper, Bronze): a random room away from the site for a while, as if it forgot the plan
@@ -1656,7 +1773,7 @@ function rankHabits(game, p, inp, dt, team, site, gun) {
       if (d < 40 || d > 12 * PX_PER_M || floorAt(m, q.x, q.y) !== floorAt(m, p.x, p.y) || los(m, p.x, p.y, q.x, q.y)) continue;
       ai.wbT[id] = game.time + 5;
       if (Math.random() > wb || !thinWalls(game, p, q)) continue;
-      ai.wbAt = id; ai.wbUntil = game.time + 0.7 + Math.random() * 0.6; ai.wbErr = (Math.random() - 0.5) * 0.15;
+      ai.wbAt = id; feat(p, 'wallbang'); ai.wbUntil = game.time + 0.7 + Math.random() * 0.6; ai.wbErr = (Math.random() - 0.5) * 0.15;
       return true;
     }
   }
@@ -1697,6 +1814,9 @@ function threatPoint(game, p, dir) {
   for (const o of m.openings) { const k = o.cells[o.cells.length >> 1]; pts.push({ x: (k % W + 0.5) * CELL, y: (Math.floor(k / W) + 0.5) * CELL }); }
   for (let i = 0; i < (m.stairs || []).length; i++) { const e = stairEnds(m, i, 0); pts.push(e.top, e.bottom); }
   for (const h of m.hatches || []) if (m.tiles[h.cells[0]] === T.HOLE) pts.push({ x: h.x, y: h.y }, { x: h.bx, y: h.by });
+  // map knowledge (KNOW.angles): an attacker who knows the map also checks where defenders like to sit (the off-angles
+  // inside the site), not only the doorways
+  if (game.side(p) === TEAM.ATK && (p.ai.angK ??= Math.random() < know(game, p).angles)) for (const w of siteIntel(m, game.site).ways) if (w.hold) pts.push(w.hold);
   let best = null, bs = Infinity;
   for (const q of pts) {
     const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < 70 || d > 400) continue;
@@ -2234,6 +2354,11 @@ function proAct(game, p, inp, dt, team) {
     else { if ((ai.chkT = (ai.chkT ?? 3 + Math.random() * 3) - dt) <= 0) { ai.chkT = 3 + Math.random() * 4; ai.chk = Math.random() < 0.4 ? threatPoint(game, p, p.aim + (Math.random() - 0.5) * 3) : null; ai.chkUntil = game.time + 1.2; }
       if (ai.chk && game.time < ai.chkUntil) pt = ai.chk; }
     pt = angleOn(game, p, pt); if (pt) turnTo(p, Math.atan2(pt.y - p.y, pt.x - p.x), S.turn * 0.6, dt); inp.crouch = crouch ? 1 : 0; // he asked: crosshair placement matters most — held still on the spot, no drifting
+    // map knowledge: each new spot held leaning out from the cover beside it, or (defence) lying down at a deep angle
+    const K = know(game, p), at = Math.round(p.x / 24) + ',' + Math.round(p.y / 24);
+    if (ai.poseAt !== at) { ai.poseAt = at; ai.leanS = Math.random() < K.lean ? leanSide(game, p, p.aim) : 0; ai.proneH = side === 'def' && crouch && !ai.leanS && Math.random() < K.prone * 1.5; if (ai.leanS) feat(p, 'lean'); if (ai.proneH) feat(p, 'prone'); }
+    if (ai.leanS) inp.lean = ai.leanS;
+    if (ai.proneH) { inp.prone = 1; inp.crouch = 0; }
   };
   const trade = game.proTrade && game.proTrade[p.squad]; // a teammate just died close by: swing onto where it came from
   const objectiveFirst = (team === TEAM.ATK && game.planted) || (team === TEAM.DEF && !game.planted && p.pro.pl.jobs.def === 'anchor'); // he asked: everything in service of the objective
@@ -2285,7 +2410,7 @@ function proAct(game, p, inp, dt, team) {
     }
     const tg = eff(st, j, 'target');
     if (!near(p, tg, 18) && !(ai.tgT = (ai.tgT || 0) + dt, ai.tgT > 25)) { moveTo(game, p, inp, tg, dt); return true; }
-    ai.inSite = true; if (j.plant) ai.bomb = j.plant; // in: the ordinary push to the bomb, plant, hold
+    ai.inSite = true; if (j.plant) ai.bomb = j.plant; if (!['default', 'fast'].includes(plan.id)) feat(p, 'clever'); // (another way in than the obvious one: map knowledge) in: the ordinary push to the bomb, plant, hold
     return false;
   }
   // defence
@@ -2300,5 +2425,6 @@ function proAct(game, p, inp, dt, team) {
   if (!roaming && (ai.reposT = (ai.reposT ?? 16 + Math.random() * 14) - dt) <= 0) { ai.reposT = 18 + Math.random() * 16; ai.spreadOff = { x: Math.round((Math.random() - 0.5) * 4), y: Math.round((Math.random() - 0.5) * 4) }; ai.spread = null; } // a new angle now and then
   const spot = roaming ? (ai.roamAt || (ai.roamAt = game.freeSpotNear(j.roam.x, j.roam.y, 50))) : spreadSpot(game, p, rot ? rot.at : j.hold, 72, rot ? rot.w.pos : j.watch); // defenders don't bunch either
   if (!near(p, spot, 14)) { moveTo(game, p, inp, spot, dt, true); if (roaming && near(p, spot, 200)) inp.walk = 1; return true; }
+  if (!roaming && !rot && !ai.offF) { ai.offF = 1; feat(p, 'offAngle'); } // the plan's holds are the off-angles on the ways in (siteIntel)
   watch(rot ? rot.w.pos : j.watch, !roaming); return true;
 }

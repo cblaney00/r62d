@@ -1,6 +1,6 @@
 // The rank ladder (he asked: Silver/Gold an average player, Diamond hard work, Champion the top 0.8%, Pro better still):
 // each rank plays bot-only matches against the rank above it and the higher rank must win more of the fights (Silver → Gold is the smallest step: his aim times are 0.9 and 0.8 s).
-// Run: node tests/ladder.js [matches per step] [--map <id>]
+// Run: node tests/ladder.js [matches per step] [--map <id>] [--from <rank 0-6>: only the steps from that rank up]
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { buildMap } from '../shared/map.js';
@@ -28,7 +28,7 @@ function play(id, levels) {
   return kills;
 }
 
-for (let L = 0; L < PRO_LEVEL; L++) {
+for (let L = +(arg('--from') || 0); L < PRO_LEVEL; L++) {
   const k = [0, 0];
   for (let i = 0; i < N; i++) { const r = play(maps[i % maps.length], [L + 1, L]); k[0] += r[0]; k[1] += r[1]; }
   const share = k[0] / Math.max(1, k[0] + k[1]), ok = share >= 0.52; // (about ±4% is luck at 8 matches a step)
