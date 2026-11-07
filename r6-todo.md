@@ -8,6 +8,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 - [ ] make sure the pros are trained in all the features the game has to offer, now that most players aim is goood we also need them to have good map knowledge scaled for rank
 - [ ] fix the playbook page, it can be more than 1 page and it should be less cramped, the plays should be on a bigger screen and the features should be broken up. each esports team needs its own page and clicking on one of the players brings up personal information about them as well as personal gameplay tendencies that would be interesting to a esports tv viewer
+- [ ] i need aiming control types grouped so that if people have preferences on how they like it they can change aiming modes. the mode we have been working on is my preference but add some of the different generations of aim as long as there wasnt a functinoal problem with them
 
 ## Done
 
