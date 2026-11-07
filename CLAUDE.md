@@ -118,6 +118,8 @@ His wishes so far:
 
 - Playbook rebuilt (he asked: less cramped, page per team, player pages for TV viewers; he chose tabs NORTHWIND / IRONCLAD / PLAYS, a full player page with BACK, full made-up profiles): playbook.js `render` → `teamPage` (banner, practice record from `tend`, 5 roster cards) / `playerPage` (`PRO_BIO` in shared/pros.js: real name, age, country, since, story, quote; HOW THEY PLAY bars from `PRO_PERSONA`/`PRO_PEEK`/`PRO_TIMING`/`PRO_ROTATE` (moved there from bots.js); WATCH FOR = `watchFor`/`METRICS`, where the pro ranks first/second/last of the ten in practice; THIS PATCH = `patchCard` in four columns, side toggle) / `renderPlays` (plans in a left column, canvas zoomed on the site and the plan's spots, details panel can hide: `S.info`). `planNames` names plans when PLAYS hasn't loaded a map.
 
+- Aiming styles grouped (he asked; Crosshair stays the default, his): Settings → Mouse & Aim `#aimSeg` is now `.aimGroups`: TOP-DOWN (Crosshair, Crosshair Classic, Cursor), JOYSTICK (Aim pad), SHOOTER (Turn, Face, Rotate). Crosshair Classic = `classic` in `AIM_MODES`: the first Crosshair generation as flags on today's code (`freeAimOn()` covers both): no `TURN_R` flick help, 1:1 out and back, aiming in leaves the crosshair put (no `adsReset`); armory.js the same. Older generations left out on purpose: the pad with a dead middle, the camera led from the screen cursor (bounce), aim following the loose pointer before click-in, the crosshair stuck at the screen edge.
+
 ## How it is built
 
 - **Language:** JavaScript. Node 22 server (no npm packages at all — a tiny hand-written

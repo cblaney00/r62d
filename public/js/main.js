@@ -137,7 +137,11 @@ const mouse = { x: 0, y: 0, l: false, r: false, wl: 0, wr: 0 };
 // A controller's right stick always aims like the pad (see gamepad.js).
 // "Rotate" (spin): like an FPS — the view turns with you so you always face up the screen; mouse left/right turns,
 // up/down sets how far ahead the crosshair sits, and W always walks up the screen (k.rot turns the keys).
-const AIM_MODES = ['free', 'face', 'spin', 'pad', 'turn', 'cursor'];
+const AIM_MODES = ['free', 'classic', 'face', 'spin', 'pad', 'turn', 'cursor'];
+// Crosshair Classic (he asked: aiming styles grouped, earlier generations kept for people who like them): the Crosshair
+// mode as it first was. A far-out crosshair turns by its real distance (no TURN_R flick help), it moves out and back at
+// the same speed, and aiming in leaves it where it is. Everything else is the Crosshair mode (freeAimOn).
+const freeAimOn = () => aimMode === 'free' || aimMode === 'classic';
 const FACE_ADS = 15 * Math.PI / 180; // Face aiming (he asked): aiming in keeps you within 15° either side of where you faced
 let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return localStorage.getItem('r62d-aim2') && AIM_MODES.includes(m) ? m : 'free'; } catch { return 'free'; } })();
 // Crosshair mode: where the crosshair sits from your character, in WORLD pixels. It can go anywhere you can see
@@ -178,8 +182,8 @@ function onScreen(x, y, m) {
 function freeMove(dx, dy) {
   const z = st.zoom || 1; dx /= z; dy /= z;
   const o = aimOff, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = AIM_MIN(), hi = AIM_MAX();
-  const r = dx * ux + dy * uy; // moving away from you goes 1.3x faster (he asked), coming back stays 1:1
-  let l = l0 + (r > 0 ? r * 1.3 : r), a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / Math.min(l0, TURN_R);
+  const r = dx * ux + dy * uy, cl = aimMode === 'classic'; // moving away from you goes 1.3x faster (he asked), coming back stays 1:1 (Classic: both 1:1)
+  let l = l0 + (r > 0 && !cl ? r * 1.3 : r), a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / (cl ? l0 : Math.min(l0, TURN_R));
   if (l < 0) { l = -l; a += Math.PI; } // pulled through the middle: out the other side
   if (l > hi) l = Math.max(hi, Math.min(l, l0)); // no pushing past the reach (a reach that just shrank keeps your spot)
   else if (l < lo) l = lo;
@@ -214,7 +218,7 @@ function scopeSway(dt, me, now) {
   st.swayA = (st.swayA || 0) + (want - (st.swayA || 0)) * (1 - Math.exp(-dt * (want < (st.swayA || 0) ? 22 : 4)));
   const v = st.swayA * (Math.sin(now * 1.3) + 0.5 * Math.sin(now * 2.9 + 1)), d = v - (st.swayV || 0);
   st.swayV = v; if (!d) return;
-  if (padOn && aimMode === 'free' && !gpRecent()) { const c = Math.cos(d), s = Math.sin(d); aimOff = { x: aimOff.x * c - aimOff.y * s, y: aimOff.x * s + aimOff.y * c }; }
+  if (padOn && freeAimOn() && !gpRecent()) { const c = Math.cos(d), s = Math.sin(d); aimOff = { x: aimOff.x * c - aimOff.y * s, y: aimOff.x * s + aimOff.y * c }; }
   else padAng = wrapAng(padAng + d);
 }
 const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
@@ -264,7 +268,7 @@ function cursor() {
     return l <= R ? mouse : { x: P.x + dx / l * R, y: P.y + dy / l * R };
   }
   const z = st.zoom || 1, P0 = w2s(st.pred.x, st.pred.y), px = P0.x, py = P0.y;
-  if (aimMode === 'free' && !gpRecent()) { const q = freeAimPoint(); return w2s(q.x, q.y); }
+  if (freeAimOn() && !gpRecent()) { const q = freeAimPoint(); return w2s(q.x, q.y); }
   const cx = Math.cos(padAng + (st.rot || 0)), cy = Math.sin(padAng + (st.rot || 0)), m = 30 * DPR;
   const scoped = scopeOn(st.me);
   let d = VH * 0.07 + padReach * (VH * 0.36 + (scoped ? 0 : 4 * PX_PER_M * z)); // +4 m without a scope (he asked); shortened if it would leave the screen
@@ -818,7 +822,7 @@ cv.addEventListener('mousemove', e => {
   if (document.pointerLockElement === cv) {
     const ads = mouse.r && st.me && st.me.a && st.me.ct === 'body';
     const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1) * DPR;
-    if (padOn && aimMode === 'free') { freeMove(e.movementX * k, e.movementY * k); return; }
+    if (padOn && freeAimOn()) { freeMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'pad') { padMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'face') { faceMove(e.movementX * k, e.movementY * k, ads); return; }
     if (padOn && (aimMode === 'turn' || aimMode === 'spin')) { turnMove(e.movementX * k, e.movementY * k); return; }
@@ -842,7 +846,7 @@ cv.addEventListener('mousedown', e => {
   if (st.wheel) { if (e.button === 2) closeWheel(true); return; }
   if (st.mapV) { if (e.button === 2) st.mapV = null; else if (e.button === 0) mapClick(); return; }
   if (e.button === 0) { mouse.l = true; mouse.wl++; }
-  if (e.button === 2) { mouse.r = true; mouse.wr++; if (aimMode === 'free' && padOn && st.me && st.me.ct === 'body') adsReset(); }
+  if (e.button === 2) { mouse.r = true; mouse.wr++; if (aimMode === 'free' && padOn && st.me && st.me.ct === 'body') adsReset(); } // (Classic: aiming in leaves the crosshair where it is)
 });
 addEventListener('mouseup', e => { if (e.button === 0 && st.wheelMouse) closeWheel(); if (e.button === 0) mouse.l = false; if (e.button === 2) { mouse.r = false; st.faceC = null; } });
 cv.addEventListener('contextmenu', e => e.preventDefault());
@@ -1575,7 +1579,7 @@ function frame(nowMs) {
     if (view.kind === 'body') {
       // he said the view was "super bouncy" when looking round: the lead used the crosshair's place on SCREEN, which itself
       // moves with the camera (a feedback loop). Crosshair mode now leads from the aim point in the world.
-      const fa = !st.tv && padOn && aimMode === 'free' && !gpRecent() ? freeAimPoint() : null;
+      const fa = !st.tv && padOn && freeAimOn() && !gpRecent() ? freeAimPoint() : null;
       const c = cursor(), mw = st.tv ? { x: st.pred.x + Math.cos(st.aim) * 160, y: st.pred.y + Math.sin(st.aim) * 160 } : fa ? { x: fa.ax, y: fa.ay } : screenToWorld(c.x, c.y); // TV: lead the way they look
       const vh = st.viewH || 400;
       const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? (sniperOn(me) ? 0.5 : scopeOn(me) ? 0.46 : 0.32) : 0.2); // a scope looks further ahead
@@ -1606,7 +1610,7 @@ function frame(nowMs) {
     }
     st.lastViewPos = view ? { x: view.x, y: view.y } : null;
   }
-  if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && aimMode === 'free' && !gpRecent() && st.zoom) { // Crosshair mode: the target keeps
+  if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && freeAimOn() && !gpRecent() && st.zoom) { // Crosshair mode: the target keeps
     // you and the crosshair on screen with room past it (he asked), so the view glides there instead of jumping
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
     const keepT = (x, y, m) => { cx = Math.min(x + hw - m, Math.max(x - hw + m, cx)); cy = Math.min(y + hh - m, Math.max(y - hh + m, cy)); };
@@ -1661,7 +1665,7 @@ function frame(nowMs) {
   st.viewH = st.envH * st.adsZ;
   // Crosshair mode: the crosshair can go anywhere you can see; if you and it don't fit on screen, the view grows
   // to hold it, and st.reachW (a circle round you, reachOf; on a drone DRONE_PING_R) is how far it can go
-  const freeAim = !st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && aimMode === 'free' && !gpRecent();
+  const freeAim = !st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && freeAimOn() && !gpRecent();
   if (freeAim) {
     const q = freeAimPoint(), dr = view.kind === 'drone';
     st.reachW = dr ? DRONE_PING_R : reachOf(me);
@@ -1793,7 +1797,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
     st.fireK = k.fire;
   }
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
-  const c = cursor(), mw = aimMode === 'free' && padOn && !gpRecent() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
+  const c = cursor(), mw = freeAimOn() && padOn && !gpRecent() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
   msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
   st.aimUp = ctrl === 'body' && me && me.a && !me.dn && !!aimUpHatch(st.map, st.pred.x, st.pred.y, mw.x, mw.y); // your own aim-up pose, without waiting for the server
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
@@ -2613,7 +2617,7 @@ function crosshair(me, now) {
     ctx.strokeStyle = on ? '#ff3b3b' : 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.arc(H.x, H.y, r, 0, 7); ctx.stroke();
     if (on) { ctx.fillStyle = 'rgba(255,59,59,0.22)'; ctx.fill(); }
   }
-  const fq = aimMode === 'free' && padOn && !gpRecent() ? freeAimPoint() : null;
+  const fq = freeAimOn() && padOn && !gpRecent() ? freeAimPoint() : null;
   if (sliding() || (aimMode === 'face' && padOn && !gpRecent() && mouse.r && me.ct === 'body')) { // aimed in (Face) or sliding: the narrow area you are locked to
     const ca = sliding() ? st.pred.slA : st.faceC ?? padAng, R = Math.hypot(m.x - px, m.y - py);
     ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1 * DPR;
@@ -3548,7 +3552,7 @@ function setAim(m, save = true) {
   for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
   if (m !== 'cursor') { padAng = st.aim || 0; padReach = 0.6; }
   if (m === 'free') aimOff = { x: Math.cos(st.aim || 0) * 150, y: Math.sin(st.aim || 0) * 150 };
-  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', face: 'Face: the map stays still and the mouse turns your character. W walks the way you face, A and D step sideways, S steps back. Aiming in locks you to a narrow 30° area until you let go. Mouse up / down moves the crosshair further / nearer.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Hold sprint and W to sprint toward the crosshair. Push it past the edge of the screen to look further: it goes anywhere you can see. Pull it through your character to turn round.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
+  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', face: 'Face: the map stays still and the mouse turns your character. W walks the way you face, A and D step sideways, S steps back. Aiming in locks you to a narrow 30° area until you let go. Mouse up / down moves the crosshair further / nearer.', classic: 'Crosshair Classic: the first Crosshair mode. The crosshair moves the way your mouse moves and stays with you; the further out it is, the more mouse it takes to turn (like a pointer round a circle). Aiming in leaves it where it is.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Hold sprint and W to sprint toward the crosshair. Push it past the edge of the screen to look further: it goes anywhere you can see. Pull it through your character to turn round.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
     turn: 'Turn: like an FPS. Mouse left / right turns you, mouse up / down moves the crosshair further / nearer.',
     cursor: 'Cursor: you aim at wherever the mouse pointer is.' }[m];
   if (save) saveSettings();

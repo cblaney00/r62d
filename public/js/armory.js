@@ -50,7 +50,7 @@ export function openArmory(el, opts) {
     audio.initAudio();
     if (document.pointerLockElement !== cv && !S.lockAsked) { S.lockAsked = true; lockMouse(cv); return; } // the first click just takes control
     if (e.button === 0) { S.mouse.l = true; S.mouse.edge = true; S.clickT = S.t; }
-    if (e.button === 2) { S.mouse.r = true; adsAim(); } // aiming in: 2.5 m out, as in a match
+    if (e.button === 2) { S.mouse.r = true; if (O.mode() !== 'classic') adsAim(); } // aiming in: 2.5 m out, as in a match
   };
   cv.oncontextmenu = e => e.preventDefault();
   if (isTouch && !el.querySelector('.armTouch')) { // phone: drag on the range to aim; FIRE / AIM (held) and RELOAD buttons
@@ -186,8 +186,8 @@ function veil(p, cv) { // the blurred, dimmed range round the clear lens (#armVe
 function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): sideways turns as if never past TURN_R
   const z = S.z || 1; dx /= z; dy /= z;
   const o = S.aim, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = aimMin(), hi = aimMax();
-  const r = dx * ux + dy * uy;
-  let l = l0 + (r > 0 ? r * 1.3 : r), a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / Math.min(l0, 160);
+  const r = dx * ux + dy * uy, cl = O.mode() === 'classic'; // (Crosshair Classic: 1:1 both ways, turns by the real distance)
+  let l = l0 + (r > 0 && !cl ? r * 1.3 : r), a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / (cl ? l0 : Math.min(l0, 160));
   if (l < 0) { l = -l; a += Math.PI; }
   if (l > hi) l = Math.max(hi, Math.min(l, l0)); else if (l < lo) l = lo;
   S.aim = { x: Math.cos(a) * l, y: Math.sin(a) * l };

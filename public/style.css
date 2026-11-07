@@ -1094,3 +1094,6 @@ html.tv canvas#game { cursor: default; }
 #freeOps .foSlot em { display: block; font-size: 11px; color: var(--dim); margin-top: 3px; font-style: normal; }
 
 #lanOther .warn { color: #ffcf5a; margin-bottom: 6px; }
+
+/* Settings → aiming styles, grouped (he asked) */
+.aimGroups { display: flex; flex-wrap: wrap; gap: 10px 18px; justify-content: flex-end; } .aimGrp { display: flex; flex-direction: column; gap: 4px; } .aimGrp small { font: 700 11px var(--head); letter-spacing: 0.14em; color: var(--dim); }
