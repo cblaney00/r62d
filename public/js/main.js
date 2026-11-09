@@ -163,6 +163,22 @@ const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45;
 // room-size view before it grows to fit the crosshair) the mouse moves it by Settings → Far aim sensitivity (0.5),
 // the same both ways, blended in over 1 m. Aiming in never puts it nearer than ADS_SNAP_MIN (he asked: 2 m).
 const ADS_SNAP_MIN = 2 * PX_PER_M;
+// Held wall (he asked 2026-11-09): keep the orange marker (bullets stop at a wall before the crosshair) on the same wall
+// or anything joined to it for WALL_HOLD s and it turns blue; while it stays blue, aiming in goes to the sight's own
+// distance instead of stopping on that wall. Looking off it (or the marker going away) starts over.
+const WALL_HOLD = 1.5, WALL_TILES = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.TALL, T.DSHIELD]);
+function wallHeld(q, now) {
+  const H = st.wallHold, dt = H ? Math.min(0.1, now - H.at) : 0; // (now: seconds)
+  if (!q || !q.stopped || !st.map || !st.pred) { st.wallHold = null; return; }
+  const m = st.map, a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), sn = Math.sin(a);
+  let k = -1; for (let d = q.shot - 3; d <= q.shot + 12 && k < 0; d += 1.5) { const kk = Math.floor((st.pred.y + sn * d) / CELL) * m.W + Math.floor((st.pred.x + c * d) / CELL); if (WALL_TILES.has(m.tiles[kk])) k = kk; } // the first wall cell where the bullets stop
+  if (k < 0) { st.wallHold = null; return; }
+  if (H && H.set.has(k)) { const was = H.t >= WALL_HOLD; H.t += dt; H.at = now; if (!was && H.t >= WALL_HOLD) H.pop = now; return; }
+  const set = new Set(); // the wall and everything solid joined to it
+  { const q2 = [k]; set.add(k); for (let i = 0; i < q2.length && set.size < 3000; i++) { const c = q2[i]; for (const n of [c - 1, c + 1, c - m.W, c + m.W]) if (n >= 0 && n < m.tiles.length && !set.has(n) && WALL_TILES.has(m.tiles[n])) { set.add(n); q2.push(n); } } }
+  st.wallHold = { set, t: 0, at: now, pop: 0 };
+}
+const wallBlue = () => !!(st.wallHold && st.wallHold.t >= WALL_HOLD);
 const RAISE_FULL = 760, RAISE_NONE = 1150; // raised walls sink flat between these view heights (world px), see draw()
 const farSens = () => { const v = +($('farSens') || {}).value; return v > 0 ? v / 100 : 0.5; };
 function trackR(ux, uy) {
@@ -243,7 +259,7 @@ function adsReset() {
   const q = freeAimPoint();
   let pass = 0; for (let i = -2; i <= 2; i++) if (castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, d, null, true) + 2 >= d - 4) pass++;
   st.reachW = keep;
-  const to = !sn && q.stopped && pass < 2 ? Math.min(d, Math.max(AIM_MIN(), ADS_SNAP_MIN, q.see)) : Math.min(d, q.d); // a wall right in front: still 2 m out (he asked)
+  const to = !sn && q.stopped && pass < 2 && !wallBlue() ? Math.min(d, Math.max(AIM_MIN(), ADS_SNAP_MIN, q.see)) : Math.min(d, q.d); // a wall right in front: still 2 m out (he asked)
   aimOff = { x: ux * to, y: uy * to };
 }
 // Sniper scope sway (he asked): scoped in, the reticle drifts in a slow figure of eight; holding Shift (walk or sprint
@@ -2692,6 +2708,7 @@ function crosshair(me, now) {
     if (on) { ctx.fillStyle = 'rgba(255,59,59,0.22)'; ctx.fill(); }
   }
   const fq = freeAimOn() && padOn && !gpRecent() ? freeAimPoint() : null;
+  wallHeld(fq, now);
   if (sliding() || (aimMode === 'face' && padOn && !gpRecent() && mouse.r && me.ct === 'body')) { // aimed in (Face) or sliding: the narrow area you are locked to
     const ca = sliding() ? st.pred.slA : st.faceC ?? padAng, R = Math.hypot(m.x - px, m.y - py);
     ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1 * DPR;
@@ -2729,8 +2746,20 @@ function crosshair(me, now) {
       ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
       const na = Math.atan2(y - gy, x - gx) + Math.PI / 2, tl = 5 * DPR;
       ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 4 * DPR; ctx.beginPath(); ctx.moveTo(gx - Math.cos(na) * tl, gy - Math.sin(na) * tl); ctx.lineTo(gx + Math.cos(na) * tl, gy + Math.sin(na) * tl); ctx.stroke();
-      ctx.strokeStyle = q.stopped ? '#ff8a5a' : 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2 * DPR; ctx.beginPath(); ctx.moveTo(gx - Math.cos(na) * tl, gy - Math.sin(na) * tl); ctx.lineTo(gx + Math.cos(na) * tl, gy + Math.sin(na) * tl); ctx.stroke();
+      if (q.stopped) { // bullets stop here: a bracket hugging the wall, orange; held on the same wall 1.5 s it turns blue (aiming in then ignores it)
+        const blue = wallBlue(), H = st.wallHold, pk = blue && H.pop ? Math.max(0, 1 - (now - H.pop) / 0.25) : 0, k = (1 + 0.35 * pk) * DPR;
+        const ux = Math.cos(na), uy = Math.sin(na), bx = (x - gx), by = (y - gy), bl = Math.hypot(bx, by) || 1, tx = bx / bl, ty = by / bl; // along the wall / back toward the crosshair
+        const W = 8.5 * k, A = -6 * k, cx = gx - tx * 2 * DPR, cy = gy - ty * 2 * DPR; // (A < 0: the arms point back toward you)
+        const path = () => { ctx.beginPath(); ctx.moveTo(cx - ux * W + tx * A, cy - uy * W + ty * A); ctx.lineTo(cx - ux * W, cy - uy * W); ctx.lineTo(cx + ux * W, cy + uy * W); ctx.lineTo(cx + ux * W + tx * A, cy + uy * W + ty * A); };
+        const col = blue ? '79,179,255' : '255,138,61';
+        ctx.lineJoin = 'round'; path();
+        ctx.strokeStyle = `rgba(${col},0.22)`; ctx.lineWidth = 8 * DPR; ctx.stroke(); // soft halo
+        ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 4.6 * DPR; ctx.stroke();
+        ctx.strokeStyle = `rgb(${col})`; ctx.lineWidth = 2.4 * DPR; ctx.stroke(); ctx.lineJoin = 'miter';
+      } else {
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 4 * DPR; ctx.beginPath(); ctx.moveTo(gx - Math.cos(na) * tl, gy - Math.sin(na) * tl); ctx.lineTo(gx + Math.cos(na) * tl, gy + Math.sin(na) * tl); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2 * DPR; ctx.beginPath(); ctx.moveTo(gx - Math.cos(na) * tl, gy - Math.sin(na) * tl); ctx.lineTo(gx + Math.cos(na) * tl, gy + Math.sin(na) * tl); ctx.stroke();
+      }
       ctx.lineCap = 'butt';
     }
     if (dm >= 8) {

@@ -487,7 +487,8 @@ export function gunMods(w, a) {
 // how far out (metres) aiming in puts the crosshair, per sight (he asked: a red dot should feel different from a 2x)
 // where aiming in puts the crosshair, metres: the range each sight is usually used at (he asked: iron and red dot the
 // shortest, the 1.5x prism further than it was); the sniper scope goes as far as you can see, up to its reach (main.js adsReset)
-export const ADS_START = { iron: 4, reddot: 4, holo: 5.5, prism: 9, scope: 13, sniper: 64 };
+// (he asked 2026-11-09: all 25% further than iron 4, holo 5.5, prism 9, scope 13)
+export const ADS_START = { iron: 5, reddot: 5, holo: 7, prism: 11, scope: 16, sniper: 64 };
 export const adsStart = sight => ADS_START[sight] || ADS_START.iron;
 // how far the crosshair can be pulled out from you, in metres, the same all the way round (he asked: a circle, bigger
 // with a stronger sight). Hip fire has the shortest reach; aiming in uses the sight's.
