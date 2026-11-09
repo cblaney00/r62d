@@ -164,8 +164,8 @@ const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45;
 // the same both ways, blended in over 1 m. Aiming in never puts it nearer than ADS_SNAP_MIN (he asked: 2 m).
 const ADS_SNAP_MIN = 2 * PX_PER_M;
 // Held wall (he asked 2026-11-09): keep the orange marker (bullets stop at a wall before the crosshair) on the same wall
-// or anything joined to it for WALL_HOLD s and it turns blue; while it stays blue, aiming in goes to the sight's own
-// distance instead of stopping on that wall. Looking off it (or the marker going away) starts over.
+// or anything joined to it for WALL_HOLD s and it turns blue; while it stays blue, aiming in snaps the crosshair
+// onto the bracket (the wall), however far away it is (he asked). Looking off it (or the marker going away) starts over.
 const WALL_HOLD = 1.5, WALL_TILES = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.TALL, T.DSHIELD]);
 function wallHeld(q, now) {
   const H = st.wallHold, dt = H ? Math.min(0.1, now - H.at) : 0; // (now: seconds)
@@ -253,13 +253,17 @@ function adsReset() {
   // The sniper scope goes as far as you can see that way (he asked): the second-longest of those 5 sight lines, so a
   // sliver past a door frame doesn't count, within its reach
   const a = Math.atan2(uy, ux), sn = st.me && st.me.aa && attFromCode(st.me.aa).sight === 'sniper';
+  if (wallBlue()) { // the held wall's bracket is blue (he asked): aiming in snaps right onto it, however far it is
+    const q0 = freeAimPoint(), to = Math.min(reachOf(st.me, true), Math.max(AIM_MIN(), ADS_SNAP_MIN, q0.see));
+    aimOff = { x: ux * to, y: uy * to }; return;
+  }
   if (sn) { const ds = []; for (let i = -2; i <= 2; i++) ds.push(castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, reachOf(st.me, true), null)); ds.sort((p, q) => q - p); d = Math.max(AIM_MIN(), ds[1] - 4); }
   const keep = st.reachW; st.reachW = Math.max(keep || 0, d);
   aimOff = { x: ux * d, y: uy * d };
   const q = freeAimPoint();
   let pass = 0; for (let i = -2; i <= 2; i++) if (castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, d, null, true) + 2 >= d - 4) pass++;
   st.reachW = keep;
-  const to = !sn && q.stopped && pass < 2 && !wallBlue() ? Math.min(d, Math.max(AIM_MIN(), ADS_SNAP_MIN, q.see)) : Math.min(d, q.d); // a wall right in front: still 2 m out (he asked)
+  const to = !sn && q.stopped && pass < 2 ? Math.min(d, Math.max(AIM_MIN(), ADS_SNAP_MIN, q.see)) : Math.min(d, q.d); // a wall right in front: still 2 m out (he asked)
   aimOff = { x: ux * to, y: uy * to };
 }
 // Sniper scope sway (he asked): scoped in, the reticle drifts in a slow figure of eight; holding Shift (walk or sprint
