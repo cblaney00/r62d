@@ -91,8 +91,12 @@ CSS
   FF=$!
   for i in $(seq 1 150); do "$HC" clients | grep -q "pid: $FF\$" && break; sleep 0.1; done
   "$HC" dispatch focuswindow "pid:$FF" > /dev/null
-  if [ -s "$R62D_WINFILE" ]; then "$HC" --batch 'dispatch setfloating active; dispatch resizeactive exact 1280 720; dispatch centerwindow' > /dev/null
-  else "$HC" dispatch fullscreen 0 > /dev/null; fi
+  # Only size the game's own window: these commands act on whichever window is in front, so if Firefox is slow to
+  # show they made some other window full screen instead, like the terminal Claude runs in.
+  if "$HC" activewindow | grep -q "pid: $FF\$"; then
+    if [ -s "$R62D_WINFILE" ]; then "$HC" --batch 'dispatch setfloating active; dispatch resizeactive exact 1280 720; dispatch centerwindow' > /dev/null
+    else "$HC" dispatch fullscreen 0 > /dev/null; fi
+  fi
   wait "$FF"
   "$HC" keyword input:accel_profile "$old" > /dev/null
   stop_server
