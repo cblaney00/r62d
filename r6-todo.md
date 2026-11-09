@@ -6,6 +6,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] we need a minimum reticle snap distance even if the orange mark is on a wall right in front of the player
+- [ ] turn off any changes to the difference in speed between pull the reticle away from your character or laterally. i want this aim to feel crispy
+- [ ] i need you to effectively eliminate lag generated from zooming out in any way, this game cannot be lagging. if my computer and run R6 at consistnely above 80fps then it should be able to run this, give me suggestions on how to make this possible even if it means changing the platform that the game is on
+- [ ] we need to tilt the camera a bit, i like the added perspective from the recent graphics overhaul
+- [ ] a button to switch camera modes: the one we have stays the default, the other keeps the camera locked in place like League of Legends / Age of Mythology, and hitting the edge of your view moves the camera
 
 ## Done
 
