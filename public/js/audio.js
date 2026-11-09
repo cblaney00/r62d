@@ -6,6 +6,7 @@ let listener = { x: 0, y: 0 }, occlude = () => 0, indoorAt = () => true, localiz
 // distance between a sound and the listener, measured in the shared building frame (floors stack)
 const L = (x, y) => (localize ? localize(x, y) : { x, y });
 const distTo = (x, y) => { const a = L(x, y), b = L(listener.x, listener.y); return { d: Math.hypot(a.x - b.x, a.y - b.y), dx: a.x - b.x, dy: a.y - b.y }; };
+export function nearListener(x, y, r) { return distTo(x, y).d < r; }
 let lrot = 0; // how far the view is turned (Rotate aiming), so left and right stay left and right on screen
 export function setListenerRot(r) { lrot = r || 0; }
 let vol = { master: sliderGain(70), sfx: 1 };
@@ -88,21 +89,34 @@ function duck(db, strength = 1) {
 export const now = () => (ac ? ac.currentTime : 0);
 
 // Build the output chain for one sound at (x, y). Returns null if inaudible.
+// Where a sound through walls seems to come from: its real spot moved 1.5 m a wall (up to 3.5 m) in a direction that
+// stays put for a couple of seconds per 3 m patch of map, so footsteps don't jitter but you can't pinpoint them
+const BLUR_PX = 36 * 1.5, BLUR_MAX = 36 * 3.5, BLUR_CELL = 108, BLUR_T = 2;
+function blurOf(x, y, walls) {
+  const t = Math.floor((ac ? ac.currentTime : 0) / BLUR_T), cx = Math.floor(x / BLUR_CELL), cy = Math.floor(y / BLUR_CELL);
+  let h = (cx * 73856093) ^ (cy * 19349663) ^ (t * 83492791); h = Math.imul(h ^ (h >>> 13), 0x5bd1e995); h ^= h >>> 15;
+  const a = (h & 0xffff) / 0x10000 * Math.PI * 2, r = Math.min(BLUR_MAX, BLUR_PX * Math.max(1, walls)) * (0.6 + ((h >>> 16) & 0xff) / 640);
+  return { x: Math.cos(a) * r, y: Math.sin(a) * r };
+}
 function out(x, y, gain, range = 900, wet = 0.25) {
   if (!ac || (ac.state !== 'running' && !ac.offline)) return null;
   gain *= MIX[C] ?? 1;
   let pan = 0, walls = 0, d = 0, vert = 0;
   if (x !== undefined) {
-    const dd = distTo(x, y); d = dd.d;
+    let dd = distTo(x, y); d = dd.d;
     vert = (L(x, y).f ?? 0) - (L(listener.x, listener.y).f ?? 0); // +: from the floor above, -: from below
+    if (d > range * 1.15 && !(range >= 1000 && d < 2600)) return null; // out of earshot (before the wall check, which costs a ray)
+    walls = d > 20 ? occlude(x, y) : 0;
+    if (walls || vert) { // he asked: hearing someone through a wall must give a rough area, not their spot (it felt like wallhacks)
+      const o = blurOf(x, y, walls); dd = distTo(x + o.x, y + o.y); d = dd.d;
+    }
     // he asked: loud sounds (gunshots, blasts, breaking glass) carry through the whole building, faint and muffled,
     // unless it is very big or they are more than a floor away
     const carry = range >= 1000 && Math.abs(vert) <= 1 && d < 2600 ? 0.06 * (1 - d / 2600) : 0;
     gain *= Math.max(carry, Math.max(0, 1 - d / range) ** 1.7);
     if (gain < 0.003) return null;
     pan = Math.max(-0.9, Math.min(0.9, (dd.dx * Math.cos(lrot) - dd.dy * Math.sin(lrot)) / 260));
-    walls = d > 20 ? occlude(x, y) : 0;
-    pan *= (walls === 0 ? 1 : walls === 1 ? 0.6 : 0.35) * (vert ? 0.6 : 1); // through walls or floors the side it comes from is vaguer (he asked: no blind pinpointing)
+    pan *= (walls === 0 ? 1 : walls === 1 ? 0.45 : 0.25) * (vert ? 0.6 : 1); // through walls or floors the side it comes from is vaguer (he asked: no blind pinpointing)
   }
   const g = ac.createGain(); g.gain.value = gain * Math.pow(0.55, walls);
   const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
@@ -547,6 +561,7 @@ export function ui(kind = 'click') {
     case 'defeat': for (const [i, fq] of [[0, 147], [0, 175], [1, 139], [1, 165]]) tone(g, t + i * 0.35, 1.7, fq, fq * 0.98, 'sawtooth', 0.008, 0.04); tone(g, t, 1.5, 55, 50, 'sine', 0.075); break;
     case 'round': tone(g, t, 0.7, 110, 110, 'sawtooth', 0.025, 0.05); tone(g, t, 0.7, 165, 165, 'sawtooth', 0.02, 0.05); noise(g, t, 0.6, 'lowpass', 350, 0.5, 0.06, 0.1); break;
     case 'alert': tone(g, t, 0.12, 520, 520, 'square', 0.035, 0.004); tone(g, t + 0.15, 0.16, 390, 390, 'square', 0.035, 0.004); break; // defender outside
+    case 'defdrop': tone(g, t, 0.1, 880, 880, 'triangle', 0.05, 0.003); tone(g, t + 0.12, 0.1, 660, 660, 'triangle', 0.05, 0.003); tone(g, t + 0.24, 0.22, 440, 440, 'triangle', 0.05, 0.003); break; // the defuser fell: three falling chimes
     case 'chat': tone(g, t, 0.08, 330, 300, 'sine', 0.16, 0.004); tone(g, t + 0.06, 0.1, 440, 420, 'sine', 0.1, 0.004); break;
     case 'headshot': tone(g, t, 0.09, 620, 600, 'triangle', 0.45, 0.002); tone(g, t, 0.12, 95, 60, 'sine', 0.5); noise(g, t, 0.04, 'lowpass', 1500, 0.8, 0.3); break;
     case 'hit': tone(g, t, 0.05, 900, 800, 'triangle', 0.52, 0.002); noise(g, t, 0.02, 'bandpass', 1200, 1, 0.3); break;     // dull "tok"

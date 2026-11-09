@@ -60,6 +60,10 @@ export class Game {
     this.events = [];
     this.changed = new Set();
     this.newHoles = []; // bullet holes made since the last snapshot: cell, x, y
+    // which side made each map change since the last snapshot (he asked: what your team changes shows on your map at once,
+    // even out of your sight): `this.by` is the side acting right now (set round handle/tickPlayer/explode/hitscan below)
+    this.by = null; this.chBy = new Map(); this.holeBy = new Map();
+    const ch = this.changed, add = ch.add.bind(ch); ch.add = k => { if (this.by) this.chBy.set(k, this.by); return add(k); };
     this.phase = PHASE.LOBBY;
     this.timer = 0; this.round = 0; this.score = [0, 0]; this.time = 0;
     this.mapId = 'harbor';
@@ -356,7 +360,7 @@ export class Game {
     }
     for (const c of map.outCams || []) // outside cameras under the roof's edge (he asked): watch the yard, the ropes and the roof edge
       this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, gx: c.gx, gy: c.gy, oc: c.i, team: TEAM.DEF, hp: 1, offUntil: 0, ang: c.n, wn: c.n, ws: OUTCAM_TURN, wall: [] });
-    this.boardWindows();
+    this.by = TEAM.DEF; this.boardWindows(); this.by = null; // the defenders' boards: their map shows them
     // defenders start on site, attackers at one spawn (their bodies wait while they drone)
     const site = map.sites[this.site];
     const defCells = this.freeCellsInRooms(site.rooms);
@@ -520,10 +524,12 @@ export class Game {
     for (const p of this.players.values()) if (p.ms && p.alive) p.ms.playSeconds += dt;
     if (this.free) this.freeRespawns();
     for (const p of this.players.values()) {
+      this.by = this.side(p); // a bot's own work (boards, reinforcing in preparation) is its side's
       if (p.bot && !p.hold) { botThink(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
       this.tickPlayer(p, dt);
       p.prevInput = p.input;
     }
+    this.by = null;
     this.tickEnts(dt);
     this.recordHistory(); this.recordCam(); if (this.tv) this.tvClips();
 
@@ -668,7 +674,7 @@ export class Game {
     // defuser pickup
     if (team === TEAM.ATK && p.ctrl === 'body') for (const e of this.ents) {
       if (e.type === 'defuser' && Math.hypot(e.x - p.x, e.y - p.y) < 18) {
-        p.hasDefuser = true; this.removeEnt(e); this.msg(`${p.name} picked up the defuser`, TEAM.ATK); break;
+        p.hasDefuser = true; this.removeEnt(e); this.msg(`${p.name} picked up the defuser`, TEAM.ATK); this.msg('The attackers picked the defuser up again', TEAM.DEF); break;
       }
     }
 
@@ -731,7 +737,7 @@ export class Game {
               const L = p.lanceAt && p.lanceAt.k === f.k && Math.hypot(p.lanceAt.x - hx, p.lanceAt.y - hy) < 5 ? p.lanceAt : (p.lanceAt = { k: f.k, x: hx, y: hy, n: 0 });
               const ring = L.n === 0 ? 0 : L.n <= 6 ? 1 : 2, i = L.n === 0 ? 0 : L.n <= 6 ? L.n - 1 : L.n - 7, cnt = ring === 1 ? 6 : 12, a = i / cnt * Math.PI * 2;
               const h = this.map.holes[f.k] || (this.map.holes[f.k] = []), px = r1(L.x + Math.cos(a) * ring * 2.2), py = r1(L.y + Math.sin(a) * ring * 2.2);
-              h.push(px, py); this.newHoles.push(f.k, px, py); L.n++;
+              h.push(px, py); this.addHole(f.k, px, py); L.n++;
               this.events.push({ e: 'hit', k: 'spark', x: r1(px), y: r1(py) });
               if (L.n >= 19) { this.destroyCell(f.k); p.lanceAt = null; } // carved all the way round: the block falls out
             }
@@ -1098,7 +1104,7 @@ export class Game {
     const ty = dy > 0 ? ((cy + 1) * CELL - y0) / dy : dy < 0 ? (cy * CELL - y0) / dy : Infinity;
     const tm = (tIn + Math.min(tx, ty)) / 2, hx = r1(x0 + dx * tm), hy = r1(y0 + dy * tm);
     for (let i = 0; i < h.length; i += 2) if (Math.abs(h[i] - hx) < 0.6 && Math.abs(h[i + 1] - hy) < 0.6) return;
-    h.push(hx, hy); this.newHoles.push(k, hx, hy);
+    h.push(hx, hy); this.addHole(k, hx, hy);
   }
 
   // ---- hatches: one hp for the whole panel (kept on all four cells so clients see it) ----
@@ -1241,7 +1247,7 @@ export class Game {
         if (src && src !== q && this.side(src) !== this.side(q)) this.pts(src, 50, 'ENEMY DOWNED');
         q.downed = true; q.selfUp = 0; q.hp = DUR.bleedout; q.downedBy = src ? src.id : null; q.busy = null; q.ctrl = 'body';
         q.scanning = false; q.bracing = false; q.reloadT = 0; this.ropeFall(q);
-        this.events.push({ e: 'down', id: q.id, by: src ? src.id : null });
+        this.events.push({ e: 'down', id: q.id, by: src ? src.id : null, df: q.hasDefuser ? 1 : undefined });
         if (q.hasDefuser) this.dropDefuser(q);
       } else this.kill(q, src, wname);
     }
@@ -1265,17 +1271,23 @@ export class Game {
     else if (src && src !== q) { src.kills--; this.pts(src, -50, 'TEAMKILL'); } // a teamkill costs you
     if (q.ms) { q.ms.deaths++; this.opStat(q).deaths++; }
     if (src && src.sock) this.events.push({ e: 'hitmark', to: src.id, kill: true });
-    this.events.push({ e: 'kill', killer: src ? src.id : null, victim: q.id, w: wname || '', hs: this.headshot ? 1 : 0 });
+    this.events.push({ e: 'kill', killer: src ? src.id : null, victim: q.id, w: wname || '', hs: this.headshot ? 1 : 0, df: q.hasDefuser ? 1 : undefined });
     if (q.hasDefuser) this.dropDefuser(q);
     if (q.sock && q.sock.open && !this.tv) try { this.sendKillcam(q, src, wname); } catch (err) { console.log('killcam:', err.message); }
     if (this.tv && this.tv.socks.size && src && src !== q) this.tvKill(q, src, wname);
     const d = this.ent(q.droneId); if (d && this.phase === PHASE.PREP) this.removeEnt(d);
   }
 
+  // he asked: when the carrier goes down the defuser falls where everyone can tell; defenders are told too and see where
+  // it lies (defending is denying the plant), like R6
+  addHole(k, x, y) { this.newHoles.push(k, x, y); if (this.by) this.holeBy.set(k, this.by); }
+
   dropDefuser(p) {
     p.hasDefuser = false;
     this.ents.push({ id: this.eid(), type: 'defuser', x: p.x, y: p.y, team: TEAM.ATK });
-    this.msg('The defuser was dropped', TEAM.ATK);
+    this.msg(`${p.name} dropped the defuser`, TEAM.ATK);
+    this.msg('The attackers dropped the defuser! Keep them off it', TEAM.DEF);
+    this.events.push({ e: 'defdrop', x: r1(p.x), y: r1(p.y) });
   }
 
   hitEnt(e, src) {
@@ -1492,7 +1504,7 @@ export class Game {
     const cx = r1((k % m.W + 0.5) * CELL), cy = r1((Math.floor(k / m.W) + 0.5) * CELL), h = m.holes[k] || (m.holes[k] = []);
     for (let d = -reach; d <= reach; d += 2) for (const [x, y] of [[cx + d, cy], [cx, cy + d]]) {
       let has = false; for (let i = 0; i < h.length; i += 2) if (h[i] === x && h[i + 1] === y) has = true;
-      if (!has) { h.push(x, y); this.newHoles.push(k, x, y); }
+      if (!has) { h.push(x, y); this.addHole(k, x, y); }
     }
     this.changed.add(k);
   }
@@ -2221,7 +2233,7 @@ export class Game {
       return;
     }
     if (m.a === 'tile' && process.env.R62D_FAST && Array.isArray(m.ks)) { // screenshot tests only: set map cells (open a window)
-      for (const k of m.ks) if (this.map.tiles[k] !== undefined) { this.map.tiles[k] = m.v | 0; this.map.hp[k] = m.v === T.BARRI ? CELL_HP[T.BARRI] : 0; delete this.map.holes[k]; if (m.holes) { this.map.holes[k] = m.holes.slice(0, 2); this.newHoles.push(k, m.holes[0], m.holes[1]); } this.changed.add(k); }
+      for (const k of m.ks) if (this.map.tiles[k] !== undefined) { this.map.tiles[k] = m.v | 0; this.map.hp[k] = m.v === T.BARRI ? CELL_HP[T.BARRI] : 0; delete this.map.holes[k]; if (m.holes) { this.map.holes[k] = m.holes.slice(0, 2); this.addHole(k, m.holes[0], m.holes[1]); } this.changed.add(k); }
       return;
     }
     if (m.a === 'start') {
@@ -2638,7 +2650,7 @@ export class Game {
   // TORQUE through a wooden barricade (he asked): straight through, leaving one round hole the size of the disc, nothing else broken
   sawHole(k, x, y) {
     const h = this.map.holes[k] || (this.map.holes[k] = []);
-    for (let oy = -4; oy <= 4; oy += 2) for (let ox = -4; ox <= 4; ox += 2) if (ox * ox + oy * oy <= 17 && h.length < 120) { const hx = r1(x + ox), hy = r1(y + oy); h.push(hx, hy); this.newHoles.push(k, hx, hy); }
+    for (let oy = -4; oy <= 4; oy += 2) for (let ox = -4; ox <= 4; ox += 2) if (ox * ox + oy * oy <= 17 && h.length < 120) { const hx = r1(x + ox), hy = r1(y + oy); h.push(hx, hy); this.addHole(k, hx, hy); }
   }
   sawSlit(k, cx, cy, x0, y0, dx, dy) { // hole points along the disc's path through the cell, three across its width
     const h = this.map.holes[k] || (this.map.holes[k] = []);
@@ -2647,7 +2659,7 @@ export class Game {
     const a = Math.max(0, ...tin), b = Math.min(...tout);
     for (let t = a + 1; t < b; t += 2) for (const o of [-2.6, 0, 2.6]) {
       const hx = r1(x0 + dx * t - dy * o), hy = r1(y0 + dy * t + dx * o);
-      if (h.length < 120) { h.push(hx, hy); this.newHoles.push(k, hx, hy); }
+      if (h.length < 120) { h.push(hx, hy); this.addHole(k, hx, hy); }
     }
   }
 
@@ -2884,7 +2896,10 @@ export class Game {
   broadcast() {
     const cells = [];
     for (const k of this.changed) cells.push(k, this.map.tiles[k], Math.max(0, Math.round(this.map.hp[k])));
-    this.changed.clear(); const holes = this.newHoles; this.newHoles = [];
+    const by = { atk: 1, def: 2 }, cb = [], hb = [];
+    for (const k of this.changed) cb.push(by[this.chBy.get(k)] || 0);
+    for (let i = 0; i < this.newHoles.length; i += 3) hb.push(by[this.holeBy.get(this.newHoles[i])] || 0);
+    this.changed.clear(); this.chBy.clear(); this.holeBy.clear(); const holes = this.newHoles; this.newHoles = [];
     const mine = new Map(); // details only the player themself needs (ammo, gadget counts, recoil...) go to them alone
     const players = [...this.players.values()].map(p => {
       const g = p.guns[p.slot];
@@ -2942,7 +2957,7 @@ export class Game {
       site: this.site, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       tvl: this.tv ? this.botLevel : undefined, bn: this.tv && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
       bq: this.tv && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, this.banRun.t - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
-      players, ents, cells, holes, ev: this.events, spots, time: r2(this.time),
+      players, ents, cells, holes, cb, hb, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];
     for (const p of this.players.values()) if (p.sock && p.sock.open) p.sock.send('{"t":"snap","you":"' + p.id + '",' + (mine.has(p.id) ? '"mine":' + mine.get(p.id) + ',' : '') + common.slice(1));
@@ -2956,3 +2971,12 @@ Game.prototype.hitscan = function (src, x0, y0, ...rest) {
   if (src) { const L = this.shotLog || (this.shotLog = []); L.push({ t: this.time, id: src.id, x0: r1(x0), y0: r1(y0), x: r1(r.x), y: r1(r.y) }); if (L.length > 400) L.splice(0, 150); }
   return r;
 };
+// who is acting, for `this.by` (map changes your own side makes reach your map at once): a player's input and tick,
+// a blast's team, a shot's shooter
+for (const [name, who] of [['handle', (g, p) => g.side(p)], ['tickPlayer', (g, p) => g.side(p)], ['explode', (g, e) => e && e.team], ['hitscan', (g, src) => src && src.squad !== undefined ? g.side(src) : null]]) {
+  const f0 = Game.prototype[name];
+  Game.prototype[name] = function (a, ...rest) {
+    const was = this.by; this.by = who(this, a) || was;
+    try { return f0.call(this, a, ...rest); } finally { this.by = was; }
+  };
+}

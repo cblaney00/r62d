@@ -550,19 +550,21 @@ function onSnap(s) {
   }
   if (s.mv !== st.mv) { if (st.rend) resetMap(s.mv); else loadMap(s.mv, null, null, s.mp); } // same map, new round
   const m = st.map, now = performance.now() / 1000;
-  const changed = [];
+  const changed = [], mine0 = s.players.find(p => p.id === s.you), ours = mine0 ? (mine0.tm === 'atk' ? 1 : 2) : -1, now0 = [];
+  // your own side's changes (a teammate's barricade, reinforcement, breach...) reach your map at once, even out of sight (he asked)
   for (let i = 0; i < s.cells.length; i += 3) {
     const k = s.cells[i];
     if (s.cells[i + 1] === T.BARRI && m.tiles[k] !== T.BARRI) delete m.holes[k]; // freshly boarded up: no old bullet holes
     m.tiles[k] = s.cells[i + 1]; m.hp[k] = s.cells[i + 2];
     holePortal(m, k); // an opened hatch drops you through
-    st.unseen.add(k);
+    if (s.cb && s.cb[i / 3] === ours) now0.push(k); else st.unseen.add(k);
   }
   for (let i = 0; i < (s.holes || []).length; i += 3) { // new bullet holes in soft walls
     const k = s.holes[i];
     (m.holes[k] || (m.holes[k] = [])).push(s.holes[i + 1], s.holes[i + 2]);
-    st.unseen.add(k);
+    if (s.hb && s.hb[i / 3] === ours) now0.push(k); else st.unseen.add(k);
   }
+  if (st.rend) for (const k of now0) { applyKnown(k); st.unseen.delete(k); }
   if (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION && s.ph !== PHASE.ROUND_END) revealAll();
   const players = new Map(s.players.map(p => [p.id, p]));
   if (s.mine && players.has(s.you)) { Object.assign(players.get(s.you), s.mine); st.mineAt = now; } // your own private details
@@ -641,11 +643,12 @@ function onEvent(e, s, players) {
       const prev = st.snaps.length > 1 ? st.snaps[st.snaps.length - 2].players.get(e.victim) : null;
       const pos = prev && prev.x !== undefined ? prev : null;
       if (pos && v && (v.tm === mySide() || teamSees(pos.x, pos.y))) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide(), ring: tvRing(v), n: v.n, t: performance.now() / 1000 }); st.rend.pool(pos.x, pos.y); }
-      addKill(k, v, e.w, e.hs);
+      addKill(k, v, e.w, e.hs, e.df);
       if (e.hs && k && k.id === st.id) audio.ui('headshot');
       break;
     }
-    case 'down': { const v = players.get(e.id); if (v) addFeed(`${v.n} is down`); break; }
+    case 'down': { const v = players.get(e.id); if (v) addFeed(`${v.n} is down${e.df ? ' · DEFUSER DROPPED' : ''}`); break; }
+    case 'defdrop': st.defDrop = { x: e.x, y: e.y, t: now }; audio.ui('defdrop'); fx.lights.push({ x: e.x, y: e.y, r: 60, life: 0.6, max: 0.6, col: '255,220,90', a: 0.6 }); break; // he asked: you must notice it fall
     case 'msg': if (!e.team || e.team === mySide()) addFeed(e.text); break;
     case 'ban': if (st.tv) audio.ui('lock'); break; // (the casters read it below)
     case 'banner': if (!e.team || e.team === mySide()) banner(e.text, e.sub); audio.ui('round'); break;
@@ -1425,11 +1428,12 @@ function deathCard(kc) {
   return `<div class="dk">KILLED BY ${who}</div><div class="dw">${esc(c.title.toUpperCase())}${tag ? `<i>${tag}</i>` : ''}</div>` +
     (c.text ? `<div class="dt">${esc(c.text)}</div>` : '') + (x.length ? `<div class="dx">${x.join(' · ')}</div>` : '');
 }
-function addKill(k, v, w, hs) {
+function addKill(k, v, w, hs, df) {
   if (!v) return;
   const side = mySide(), cls = p => p && p.tm === side ? 'a' : 'e';
   const d = document.createElement('div');
   d.innerHTML = k && k !== v ? `<span class="${cls(k)}">${esc(k.n)}</span><span class="w">${esc(w || '').toUpperCase()}${hs ? ' <b class="hs">✛ HEADSHOT</b>' : ''}</span><span class="${cls(v)}">${esc(v.n)}</span>` : `<span class="${cls(v)}">${esc(v.n)}</span><span class="w">${esc(w || 'DIED').toUpperCase()}</span>`;
+  if (df) d.innerHTML += '<span class="w df">◆ DEFUSER</span>'; // the carrier: the defuser is on the floor now
   $('killfeed').appendChild(d); setTimeout(() => d.remove(), 6000);
   while ($('killfeed').children.length > 6) $('killfeed').firstChild.remove();
 }
@@ -2000,11 +2004,15 @@ audio.setWorld(
 
 // Little sounds from each player's state: footsteps per surface, turning on the spot,
 // aiming, crouching, weapon swaps, reload stages, hammering, planting...
+const FOLEY_NEAR = 4 * PX_PER_M;
 function playerFoley(p, a, moved, own, dt) {
   const w = WEAPONS[p.w], shotgun = w && w.cls === 'Shotgun';
   const pace = p.dn ? 1 : p.wk ? 0 : p.cr ? 1 : p.mv >= 3 ? 3 : 2;
   // legs follow the real step cycle; a foot plants each time the gait passes a multiple of PI
   const gt = p.gt || 0, plant = Math.floor(gt / Math.PI);
+  // someone walking or crouching (or standing still) makes their small sounds (aiming in, crouching, turning, a gun swap)
+  // only for people close by (he asked: hearing them felt like wallhacks)
+  const small = own || (!p.si && (pace >= 2 || audio.nearListener(p.x, p.y, FOLEY_NEAR)));
   if (a.plant !== undefined && plant > a.plant && moved > 0.05 && (own || !p.si) && (own || !(st.me && st.me.df))) audio.step(p.x, p.y, surfaceAt(p.x, p.y), pace, own);
   if (a.plant === undefined || plant < a.plant - 1 || plant > a.plant) a.plant = plant;
   // turning on the spot: feet shuffle round, each shuffle a little step
@@ -2013,14 +2021,14 @@ function playerFoley(p, a, moved, own, dt) {
   if (moved < 0.3 && !p.dn) {
     const before = Math.floor(a.turn / Math.PI);
     a.turn += dAng * 2.4; a.turnAmp = Math.min(1, (a.turnAmp || 0) + dAng * 3);
-    if (Math.floor(a.turn / Math.PI) > before && (own || !p.si)) audio.shuffle(p.x, p.y, surfaceAt(p.x, p.y), own);
+    if (Math.floor(a.turn / Math.PI) > before && small) audio.shuffle(p.x, p.y, surfaceAt(p.x, p.y), own);
   }
   a.walk = gt + Math.PI / 2 + a.turn;
   if (a.pAd !== undefined && (own || !p.si)) { // a silent player (HUSH's shroud, Ghost Step) makes none of these for others
-    if (p.ad !== a.pAd && !p.dn) audio.foley(p.ad ? 'adsIn' : 'adsOut', p.x, p.y, own);
-    if (p.cr !== a.pCr && !p.dn) audio.foley(p.cr ? 'crouch' : 'stand', p.x, p.y, own);
-    if (p.w !== a.pW && p.w) audio.foley('draw', p.x, p.y, own);
-    if (p.mv && !a.pMv) audio.foley('cloth', p.x, p.y, own);
+    if (small && p.ad !== a.pAd && !p.dn) audio.foley(p.ad ? 'adsIn' : 'adsOut', p.x, p.y, own);
+    if (small && p.cr !== a.pCr && !p.dn) audio.foley(p.cr ? 'crouch' : 'stand', p.x, p.y, own);
+    if (small && p.w !== a.pW && p.w) audio.foley('draw', p.x, p.y, own);
+    if (small && p.mv && !a.pMv) audio.foley('cloth', p.x, p.y, own);
     if (p.dn && !a.pDn) audio.foley('hurt', p.x, p.y, own);
   }
   if (p.rl > 0) {
@@ -2199,9 +2207,7 @@ function draw(s, view, now, dt) {
     const vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
     if (st.tv) (st.tvPos || (st.tvPos = new Map())).set(p.id, { x: p.x, y: p.y, p });
     if (!vis) { // ESPORTS TV (he asked): everyone's outline shows through walls; only the followed player's sight is live
-      if (st.tv && !p.dn && p.x !== undefined) { const col = p.sq ? '255,138,61' : '70,168,255';
-        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ag || 0); ctx.strokeStyle = `rgba(${col},0.9)`; ctx.lineWidth = 1.2; ctx.fillStyle = `rgba(${col},0.14)`;
-        ctx.beginPath(); ctx.ellipse(0, 0, 7.5, 10, 0, 0, 7); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(17, 0); ctx.stroke(); ctx.restore(); }
+      if (st.tv && !p.dn && p.x !== undefined) bodyOutline(p, p.sq ? '255,138,61' : '70,168,255', 0.9);
       continue;
     }
     // up on furniture or mid-jump (he asked: an obvious but tidy marker): a shadow below, a dashed ring, drawn a little bigger
@@ -2374,6 +2380,7 @@ function draw(s, view, now, dt) {
       if (!sp.a || sp.id === me.id) continue;
       const p = interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
       if (p.tm === side) {
+        if (!sp.sg && !seen(p.x, p.y)) bodyOutline(p, p.dn ? '255,80,80' : '70,168,255', 0.75); // a teammate out of your sight (he asked): an outline, not their view
         const u = UP();
         ctx.fillStyle = p.dn ? '#ff5050' : '#3aa0ff'; ctx.beginPath(); ctx.arc(p.x + u.x * 17, p.y + u.y * 17, 2, 0, 7); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(p.n + (p.dn ? ' ▼' : ''), p.x + u.x * 21, p.y + u.y * 21);
@@ -2387,7 +2394,10 @@ function draw(s, view, now, dt) {
     const site = m.sites[s.site];
     if (side === 'def' || s.rev) for (const b of site.bombs) marker(b.x, b.y, b.id, '#f2c14e', view);
     if (s.pl) marker(s.pl.x, s.pl.y, '!', '#ff4040', view);
-    if (side === 'atk') for (const e of ents) if (e.ty === 'defuser') marker(e.x, e.y, 'D', '#f2c14e', view);
+    for (const e of ents) if (e.ty === 'defuser') { // a dropped defuser: both sides know where it lies (he asked), bigger for its first seconds
+      const age = st.defDrop && Math.hypot(st.defDrop.x - e.x, st.defDrop.y - e.y) < 30 ? now - st.defDrop.t : 9;
+      marker(e.x, e.y, 'D', '#f2c14e', view, 'DEFUSER', age < 4 ? 1.8 + 0.35 * Math.abs(Math.sin(age * 5)) : 1.2);
+    }
     drawScanBlips(now);
     if (!st.tv) deathMarks(view, now); // TV: the cards and kill feed already say who is down; no big marks over the action
     if (!st.tv) scopeGlare(s, side, now);
@@ -2492,6 +2502,10 @@ function scopeGlare(s, side, now) {
     for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(0, -1); ctx.lineTo(i % 2 ? 14 : 22, 0); ctx.lineTo(0, 1); ctx.closePath(); ctx.fill(); }
     ctx.restore();
   }
+}
+function bodyOutline(p, col, a) { // a body's shape and the way it aims, through walls
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ag || 0); ctx.strokeStyle = `rgba(${col},${a})`; ctx.lineWidth = 1.2; ctx.fillStyle = `rgba(${col},${a * 0.16})`;
+  ctx.beginPath(); ctx.ellipse(0, 0, 7.5, 10, 0, 0, 7); ctx.fill(); ctx.stroke(); if (!p.dn) { ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(17, 0); ctx.stroke(); } ctx.restore();
 }
 function deathMarks(view, now) {
   if (!view || !st.map) return;
@@ -2764,6 +2778,7 @@ function hud(s) {
   if (side === 'def') {
     obj = s.pl ? 'DISABLE THE DEFUSER!' : s.ph === PHASE.PREP ? `FORTIFY: ${site.name}` : `DEFEND: ${site.name}`;
     sub = s.ph === PHASE.PREP ? `Reinforcements left: ${s.rf} · hold ${label('interact')} on walls to reinforce, ${label('interact')} on doors/windows to barricade (as many as you like), melee soft walls for rotation holes` : `Reinforcements left: ${s.rf}`;
+    if (s.ph === PHASE.ACTION && !s.pl && s.ents.some(e => e.ty === 'defuser')) sub = 'The defuser is on the ground · keep them off it · ' + sub;
   } else {
     obj = s.pl ? 'PROTECT THE DEFUSER' : s.ph === PHASE.PREP ? 'LOCATE THE OBJECTIVE WITH YOUR DRONE' : s.rev ? `PLANT THE DEFUSER: ${site.name}` : 'FIND THE OBJECTIVE';
     if (me.df) sub = 'You are carrying the defuser';

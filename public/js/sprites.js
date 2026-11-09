@@ -831,11 +831,14 @@ function drawGadgetBody(ctx, e, t, ally) {
       if (blink) { const a = Math.floor(t * 8) % 3 * 2.09; ctx.strokeStyle = 'rgba(160,200,255,0.9)'; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 3.6, Math.sin(a) * 3.6); ctx.lineTo(0.5, -0.4); ctx.lineTo(Math.cos(a + 2.09) * 3.6, Math.sin(a + 2.09) * 3.6); ctx.stroke(); }
       break;
     }
-    case 'defuser':
+    case 'defuser': { // dropped on the floor (he asked: easy to notice): a soft pulsing yellow glow under it, drawn a size up
+      const gl = ctx.createRadialGradient(0, 0, 0, 0, 0, 13); gl.addColorStop(0, `rgba(255,220,90,${0.35 + 0.2 * Math.sin(t * 5)})`); gl.addColorStop(1, 'rgba(255,220,90,0)');
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0, 0, 13, 0, 7); ctx.fill(); ctx.scale(1.35, 1.35);
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(-4, -2, 9, 6);
       ctx.fillStyle = '#c9a227'; ctx.fillRect(-5, -3, 10, 6); ctx.fillStyle = '#222'; ctx.fillRect(-3, -1.5, 6, 3);
       ctx.fillStyle = blink ? '#ffef6a' : '#7a6a20'; ctx.fillRect(-0.7, -0.7, 1.4, 1.4);
       break;
+    }
   }
   ctx.restore();
 }
