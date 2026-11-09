@@ -165,7 +165,7 @@ const reach = () => aimReach(attOf(S.w).sight, !!S.mouse.r) * PX_PER_M; // the m
 const aimMin = () => 46 * O.dpr() / (S.z || 1), aimMax = () => S.reachW || 400;
 function adsAim() { // per sight, as in a match; the sniper scope jumps out to the targets (or the wall, if that is nearer)
   const l = Math.hypot(S.aim.x, S.aim.y) || 1, ux = S.aim.x / l, uy = S.aim.y / l;
-  const d = Math.max(aimMin(), Math.min(sniper() ? S.dist * M : adsStart(attOf(S.w).sight) * M, farEnd() - 2)); S.aim = { x: ux * d, y: uy * d }; // a set distance per sight (he asked), never past the backstop
+  const d = Math.max(aimMin(), Math.min(sniper() ? S.dist * M : adsStart(attOf(S.w).sight, S.w) * M, farEnd() - 2)); S.aim = { x: ux * d, y: uy * d }; // a set distance per sight (he asked), never past the backstop
 }
 // the sniper scope sways in a slow figure of eight (main.js scopeSway); Shift steadies it
 function sway(dt) {

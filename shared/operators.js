@@ -488,8 +488,14 @@ export function gunMods(w, a) {
 // where aiming in puts the crosshair, metres: the range each sight is usually used at (he asked: iron and red dot the
 // shortest, the 1.5x prism further than it was); the sniper scope goes as far as you can see, up to its reach (main.js adsReset)
 // (he asked 2026-11-09: all 25% further than iron 4, holo 5.5, prism 9, scope 13)
-export const ADS_START = { iron: 5, reddot: 5, holo: 7, prism: 11, scope: 16, sniper: 64 };
-export const adsStart = sight => ADS_START[sight] || ADS_START.iron;
+// (he asked 2026-11-09, later): the distance now depends on the gun AND the sight, the gun much more: the gun gives
+// the distance with iron sights (ADS_GUN per class, ADS_OWN for a few guns that differ from their class), the sight
+// stretches it (ADS_SIGHT, at most 1.8x; the gun spans 2-11 m, 5.5x)
+export const ADS_GUN = { Shotgun: 2.5, MP: 3, Pistol: 3.5, SMG: 4.5, AR: 6, LMG: 7, DMR: 9 };
+export const ADS_OWN = { stub: 2, anvil: 5, bison: 4.5, heron: 8, pike: 11, saker: 11 };
+export const ADS_SIGHT = { iron: 1, reddot: 1.1, holo: 1.25, prism: 1.5, scope: 1.8 };
+export const ADS_START = { sniper: 64 }; // the sniper scope: as far as you can see (main.js adsReset), up to its reach
+export const adsStart = (sight, w) => { const g = WEAPONS[w]; return (ADS_OWN[w] ?? (g && ADS_GUN[g.cls]) ?? ADS_GUN.AR) * (ADS_SIGHT[sight] || 1); };
 // how far the crosshair can be pulled out from you, in metres, the same all the way round (he asked: a circle, bigger
 // with a stronger sight). Hip fire has the shortest reach; aiming in uses the sight's.
 export const AIM_REACH = { hip: 18, iron: 20, holo: 21, reddot: 23, prism: 36, scope: 44, sniper: 64 }; // he asked: the 1.5x, 2x and sniper further (were 28, 34, 48)

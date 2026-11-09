@@ -249,7 +249,7 @@ function freeMove(dx, dy) {
 }
 // aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked; never nearer than 2 m), else to its sight's distance
 function adsReset() {
-  const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l; let d = adsStart(st.me && st.me.aa ? attFromCode(st.me.aa).sight : 'iron') * PX_PER_M;
+  const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l; let d = adsStart(st.me && st.me.aa ? attFromCode(st.me.aa).sight : 'iron', st.me && st.me.w) * PX_PER_M; // gun first, then sight (he asked)
   // a set distance per sight, whatever distance you were at (he asked); a nearer wall stops it, but not the edge of a
   // doorway: if 2 of 5 lines spread over ±2.5° get through, it goes the full distance (no jumping onto door frames)
   // The sniper scope goes as far as you can see that way (he asked): the second-longest of those 5 sight lines, so a
