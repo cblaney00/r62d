@@ -166,12 +166,14 @@ const ADS_SNAP_MIN = 2 * PX_PER_M;
 // Held wall (he asked 2026-11-09): keep the orange marker (bullets stop at a wall before the crosshair) on the same wall
 // or anything joined to it for WALL_HOLD s and it turns blue; while it stays blue, aiming in snaps the crosshair
 // onto the bracket (the wall), however far away it is (he asked). Looking off it (or the marker going away) starts over.
+const RING_R = 13; // the team-coloured circle round each person (drawOperator)
 const WALL_HOLD = 1.5, WALL_TILES = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.TALL, T.DSHIELD]);
 function wallHeld(q, now) {
   const H = st.wallHold, dt = H ? Math.min(0.1, now - H.at) : 0; // (now: seconds)
   if (!q || !q.stopped || !st.map || !st.pred) { st.wallHold = null; return; }
   const m = st.map, a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), sn = Math.sin(a);
-  let k = -1; for (let d = q.shot - 3; d <= q.shot + 12 && k < 0; d += 1.5) { const kk = Math.floor((st.pred.y + sn * d) / CELL) * m.W + Math.floor((st.pred.x + c * d) / CELL); if (WALL_TILES.has(m.tiles[kk])) k = kk; } // the first wall cell where the bullets stop
+  let k = q.person ? 'p' + q.person.id : -1; // on a person: held on that same person
+  if (q.person) { if (H && H.set.has(k)) { const was = H.t >= WALL_HOLD; H.t += dt; H.at = now; if (!was && H.t >= WALL_HOLD) H.pop = now; } else st.wallHold = { set: new Set([k]), t: 0, at: now, pop: 0 }; return; } for (let d = q.shot - 3; d <= q.shot + 12 && k < 0; d += 1.5) { const kk = Math.floor((st.pred.y + sn * d) / CELL) * m.W + Math.floor((st.pred.x + c * d) / CELL); if (WALL_TILES.has(m.tiles[kk])) k = kk; } // the first wall cell where the bullets stop
   if (k < 0) { st.wallHold = null; return; }
   if (H && H.set.has(k)) { const was = H.t >= WALL_HOLD; H.t += dt; H.at = now; if (!was && H.t >= WALL_HOLD) H.pop = now; return; }
   const set = new Set(); // the wall and everything solid joined to it
@@ -254,7 +256,7 @@ function adsReset() {
   // sliver past a door frame doesn't count, within its reach
   const a = Math.atan2(uy, ux), sn = st.me && st.me.aa && attFromCode(st.me.aa).sight === 'sniper';
   if (wallBlue()) { // the held wall's bracket is blue (he asked): aiming in snaps right onto it, however far it is
-    const q0 = freeAimPoint(), to = Math.min(reachOf(st.me, true), Math.max(AIM_MIN(), ADS_SNAP_MIN, q0.see));
+    const q0 = freeAimPoint(), to = Math.min(reachOf(st.me, true), Math.max(AIM_MIN(), ADS_SNAP_MIN, q0.person ? q0.person.d + RING_R : q0.see)); // a person: onto them
     aimOff = { x: ux * to, y: uy * to }; return;
   }
   if (sn) { const ds = []; for (let i = -2; i <= 2; i++) ds.push(castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, reachOf(st.me, true), null)); ds.sort((p, q) => q - p); d = Math.max(AIM_MIN(), ds[1] - 4); }
@@ -263,7 +265,7 @@ function adsReset() {
   const q = freeAimPoint();
   let pass = 0; for (let i = -2; i <= 2; i++) if (castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, d, null, true) + 2 >= d - 4) pass++;
   st.reachW = keep;
-  const to = !sn && q.stopped && pass < 2 ? Math.min(d, Math.max(AIM_MIN(), ADS_SNAP_MIN, q.see)) : Math.min(d, q.d); // a wall right in front: still 2 m out (he asked)
+  const to = q.person ? Math.min(d, Math.max(AIM_MIN(), ADS_SNAP_MIN, q.person.d + RING_R)) : !sn && q.stopped && pass < 2 ? Math.min(d, Math.max(AIM_MIN(), ADS_SNAP_MIN, q.see)) : Math.min(d, q.d); // a wall right in front: still 2 m out (he asked)
   aimOff = { x: ux * to, y: uy * to };
 }
 // Sniper scope sway (he asked): scoped in, the reticle drifts in a slow figure of eight; holding Shift (walk or sprint
@@ -360,7 +362,16 @@ function freeAimPoint() {
     if (st.map.tiles[k] === T.VOID) { see = l; if (shot >= see - 40 || st.map.tiles[Math.floor((st.pred.y + s * (shot + 3)) / CELL) * st.map.W + Math.floor((st.pred.x + c * (shot + 3)) / CELL)] === T.VOID) shot = l; }
   }
   const x = st.pred.x + c * l, y = st.pred.y + s * l;
-  return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
+  // someone in the way (he asked): the marker stops on their team-coloured circle, unless the crosshair is on them
+  let person = null;
+  if (st.rings && st.map) for (const r of st.rings) {
+    const ox = r.x - st.pred.x, oy = r.y - st.pred.y, along = ox * c + oy * s, perp = Math.abs(oy * c - ox * s);
+    if (along <= 0 || perp > RING_R || Math.hypot(x - r.x, y - r.y) <= RING_R) continue;
+    const edge = along - Math.sqrt(RING_R * RING_R - perp * perp);
+    if (edge > 4 && edge < see - 2 && edge < shot - 2 && edge < l - 4 && (!person || edge < person.d)) person = { id: r.id, x: r.x, y: r.y, d: edge };
+  }
+  if (person) see = shot = person.d;
+  return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, person, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
 }
 // is this aim (from where you stand) out through one of the windows you are looking down from?
 function winAimed(a) {
@@ -2233,7 +2244,7 @@ function draw(s, view, now, dt) {
   }
 
   // players
-  const drawn = []; st.heads = []; // enemies you can see: their head zones show while you aim in
+  const drawn = []; st.heads = []; st.rings = []; // st.rings: everyone drawn but you, for the orange/blue marker (it stops on their circle) // enemies you can see: their head zones show while you aim in
   for (const sp of s.players) {
     if (!sp.a || sp.sg) continue; // an attacker waiting off the map during preparation
     const isMe = me && sp.id === me.id;
@@ -2289,7 +2300,7 @@ function draw(s, view, now, dt) {
       sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
     if (elv) ctx.restore();
-    drawn.push(p);
+    drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x, y: p.y });
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x, y: p.y });
     if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see
       const L = Math.min(260, castSight(st.map, p.x, p.y, p.ag, 260, sm));
