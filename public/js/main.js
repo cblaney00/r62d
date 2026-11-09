@@ -174,6 +174,8 @@ function trackR(ux, uy) {
 // the normal following camera and one that stays where it is, at the size it had. Pushing the crosshair (or the cursor)
 // into the edge band of the screen scrolls it that way, faster the deeper in, and the crosshair travels with it; your
 // character reaching the edge or going to another floor brings it along. st.camLock = { x, y, h } (h: view height).
+// He asked next: camCentre (H) glides it back onto you (L.home); holding the wheel button and moving the mouse drags
+// the view like grabbing the map (st.mDrag, mousemove), after which it may go anywhere (L.free) until you centre it.
 const LOCK_EDGE = 30; // CSS px: the crosshair stops this far inside the screen
 const camLocked = view => !!(st.camLock && view && view.kind === 'body' && !st.tv);
 function toggleCamLock() {
@@ -181,20 +183,21 @@ function toggleCamLock() {
   st.camLock = st.camLock ? null : { x: st.cam.x, y: st.cam.y, h: Math.max(240, (st.viewH || 400) / viewMul() / (st.adsZ || 1)) };
   audio.ui('hover'); flashCamTag();
 }
-function flashCamTag() { const el = $('camTag'); if (!el) return; el.innerHTML = st.camLock ? `CAMERA LOCKED · <b>${label('camLock')}</b> to follow` : `CAMERA FOLLOWS · <b>${label('camLock')}</b> to lock`; el.classList.remove('hidden'); el.classList.toggle('on', !!st.camLock); clearTimeout(flashCamTag.t); flashCamTag.t = st.camLock ? 0 : setTimeout(() => { flashCamTag.t = 0; el.classList.add('hidden'); }, 1800); }
+function flashCamTag() { const el = $('camTag'); if (!el) return; el.innerHTML = st.camLock ? `CAMERA LOCKED · <b>${label('camLock')}</b> to follow · <b>${label('camCentre')}</b> centre · hold wheel button to drag` : `CAMERA FOLLOWS · <b>${label('camLock')}</b> to lock`; el.classList.remove('hidden'); el.classList.toggle('on', !!st.camLock); clearTimeout(flashCamTag.t); flashCamTag.t = st.camLock ? 0 : setTimeout(() => { flashCamTag.t = 0; el.classList.add('hidden'); }, 1800); }
 function lockedTarget(dt, view) {
   const L = st.camLock, hh = L.h * (st.adsZ || 1) * viewMul() / 2, hw = hh * VW / VH;
-  if (floorAt(st.map, L.x, L.y) !== floorAt(st.map, view.x, view.y)) { L.x = view.x; L.y = view.y; } // another floor: go with you
+  if (floorAt(st.map, L.x, L.y) !== floorAt(st.map, view.x, view.y)) { L.x = view.x; L.y = view.y; L.free = false; } // another floor: go with you
+  if (L.home) { const k = 1 - Math.exp(-dt * 12); L.x += (view.x - L.x) * k; L.y += (view.y - L.y) * k; if (Math.hypot(view.x - L.x, view.y - L.y) < 2) L.home = false; } // centre key: glide back onto you
   const fa = padOn && freeAimOn() && !gpRecent() ? freeAimPoint() : null;
   const sp = fa ? w2s(fa.ax, fa.ay) : cursor(), p = tilt.project(sp.x / DPR, sp.y / DPR), W = VW / DPR, H = VH / DPR;
   const band = LOCK_EDGE + Math.min(W, H) * 0.07, dep = v => Math.max(0, Math.min(1, v / (band - LOCK_EDGE)));
   const ex = dep(band - p.x) > 0 ? -dep(band - p.x) : dep(p.x - (W - band)), ey = dep(band - p.y) > 0 ? -dep(band - p.y) : dep(p.y - (H - band));
   if (ex || ey) {
-    const v = hh * 1.8 * dt, mx = ex * v, my = ey * v; L.x += mx; L.y += my;
+    const v = hh * 3.2 * dt, mx = ex * v, my = ey * v; L.x += mx; L.y += my;
     if (fa) aimOff = { x: aimOff.x + mx, y: aimOff.y + my }; // the crosshair rides along (its reach still holds it)
   }
   const m = 0.82; // you never leave the middle 82% of the view: at its edge the view comes with you
-  L.x = Math.max(view.x - hw * m, Math.min(view.x + hw * m, L.x)); L.y = Math.max(view.y - hh * m, Math.min(view.y + hh * m, L.y));
+  if (!L.free) { L.x = Math.max(view.x - hw * m, Math.min(view.x + hw * m, L.x)); L.y = Math.max(view.y - hh * m, Math.min(view.y + hh * m, L.y)); } // (after a drag the view may go anywhere on the floor until you centre it)
   return { x: L.x, y: L.y };
 }
 // On a drone the ping reticle reaches DRONE_PING_R from it (he asked: a bit past what the drone sees). The view zooms out
@@ -780,6 +783,7 @@ function pressAction(a, e) {
     case 'wheel': openWheel(); break;
     case 'map': toggleMapV(); break;
     case 'camLock': toggleCamLock(); break;
+    case 'camCentre': if (st.camLock) { st.camLock.home = true; st.camLock.free = false; } break;
     case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
     case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
@@ -860,6 +864,7 @@ cv.addEventListener('mousemove', e => {
   if (st.wheel) { const W = st.wheel, c = 1.15 * DPR, R = WHEEL_CLAMP * DPR; W.dx += e.movementX * c; W.dy += e.movementY * c; const L = Math.hypot(W.dx, W.dy); if (L > R) { W.dx *= R / L; W.dy *= R / L; } return; } // the wheel holds your aim still
   if (st.mapV) { const V = st.mapV, c = 1.15 * DPR; V.cx = Math.max(0, Math.min(VW, V.cx + e.movementX * c)); V.cy = Math.max(0, Math.min(VH, V.cy + e.movementY * c)); return; }
   if (document.pointerLockElement === cv) {
+    if (st.mDrag && st.camLock) { const z = st.zoom || 1; st.camLock.x -= e.movementX * DPR / z; st.camLock.y -= e.movementY * DPR / z; st.camLock.free = true; st.mDrag.d += Math.abs(e.movementX) + Math.abs(e.movementY); return; } // grab the map: your aim stays put
     const ads = mouse.r && st.me && st.me.a && st.me.ct === 'body';
     const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1) * DPR;
     if (padOn && freeAimOn()) { freeMove(e.movementX * k, e.movementY * k); return; }
@@ -888,7 +893,7 @@ cv.addEventListener('mousedown', e => {
   if (e.button === 0) { mouse.l = true; mouse.wl++; }
   if (e.button === 2) { mouse.r = true; mouse.wr++; if (aimMode === 'free' && padOn && st.me && st.me.ct === 'body') adsReset(); } // (Classic: aiming in leaves the crosshair where it is)
 });
-addEventListener('mouseup', e => { if (e.button === 0 && st.wheelMouse) closeWheel(); if (e.button === 0) mouse.l = false; if (e.button === 2) { mouse.r = false; st.faceC = null; } });
+addEventListener('mouseup', e => { if (e.button === 1 && st.mDrag) { if (st.mDrag.d < 6) st.spotReq = true; st.mDrag = null; } if (e.button === 0 && st.wheelMouse) closeWheel(); if (e.button === 0) mouse.l = false; if (e.button === 2) { mouse.r = false; st.faceC = null; } });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => {
   if (st.mapV) { mapFloorStep(e.deltaY > 0 ? 1 : -1); return; }
@@ -897,7 +902,7 @@ cv.addEventListener('wheel', e => {
   if (st.me.ct === 'cam' || st.me.ct === 'drone') st.evq.push({ k: e.deltaY > 0 ? 'camNext' : 'camPrev' }); // flip through the team's cameras / drones
   else st.evq.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 });
 }, { passive: true });
-cv.addEventListener('mousedown', e => { if (e.button === 1) { e.preventDefault(); st.spotReq = true; } });
+cv.addEventListener('mousedown', e => { if (e.button === 1) { e.preventDefault(); if (st.camLock && playing() && !st.tv) st.mDrag = { d: 0 }; else st.spotReq = true; } }); // locked camera: hold the wheel button and move to drag the view (a still click still pings)
 
 // ---------------- settings ----------------
 function toggleSettings() { $('settings').classList.toggle('hidden'); renderSettings(); }
@@ -962,7 +967,7 @@ $('setReset').onclick = () => { resetBinds(); renderSettings(); };
 for (const [id, name] of PRESETS) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => { audio.ui(); applyPreset(id); renderSettings(); }; $('keyPresets').appendChild(b); }
 const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'sprint', 'walk', 'crouch', 'crouchTap', 'prone', 'vault', 'leanL', 'leanR']],
   ['FIGHTING', ['primary', 'secondary', 'melee', 'reload', 'ability', 'gadget', 'interact']],
-  ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'wheel', 'map', 'camLock', 'chat', 'scoreboard']],
+  ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'wheel', 'map', 'camLock', 'camCentre', 'chat', 'scoreboard']],
   ['MENUS & FREE PLAY', ['settings', 'pause', 'opNext', 'opPrev', 'opGrid']]];
 // crosshair: chosen in Settings, saved in your profile
 let xh = (() => { try { return cleanXhair(JSON.parse(localStorage.getItem('r62d-xh') || 'null')); } catch { return cleanXhair(); } })();

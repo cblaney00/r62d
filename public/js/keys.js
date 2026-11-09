@@ -26,7 +26,8 @@ export const ACTIONS = [
   ['chat', 'Chat (opens team chat; / switches team ⇄ all)', 'KeyY', 'Enter'],
   ['wheel', 'Ping wheel: hold, drag toward a ping, let go', 'KeyX', ''],
   ['map', 'Map: open or close, click it to ping', 'CapsLock', ''],
-  ['camLock', 'Camera: follow you / lock in place (push the crosshair to the screen edge to move it)', 'KeyL', ''],
+  ['camLock', 'Camera: follow you / lock in place (locked: crosshair at the screen edge scrolls, hold the wheel button to drag)', 'KeyL', ''],
+  ['camCentre', 'Camera: centre on you (locked camera)', 'KeyH', ''],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['opNext', 'Free play: next operator', 'KeyN', ''],
   ['opPrev', 'Free play: previous operator', 'KeyB', ''],
@@ -70,12 +71,12 @@ export function applyBinds(saved, from = BINDS_VERSION) {
 export function resetBinds() { try { localStorage.removeItem(KEY); } catch {} loadBinds(); if (onChange) onChange(binds); }
 // Layouts from other games (he asked, and chose the games): only what differs from ours. Actions a game lacks (leaning, walking) go on free keys.
 export const PRESETS = [
-  ['cs2', 'Counter-Strike 2', { interact: ['KeyE', ''], ability: ['KeyQ', 'KeyZ'], gadget: ['Digit4', 'KeyG'], leanL: ['KeyX', ''], leanR: ['KeyC', ''], prone: ['KeyB', ''], opPrev: ['', ''], spot: ['KeyT', ''], melee: ['Digit3', ''] }],
+  ['cs2', 'Counter-Strike 2', { camCentre: ['KeyJ', ''], interact: ['KeyE', ''], ability: ['KeyQ', 'KeyZ'], gadget: ['Digit4', 'KeyG'], leanL: ['KeyX', ''], leanR: ['KeyC', ''], prone: ['KeyB', ''], opPrev: ['', ''], spot: ['KeyT', ''], melee: ['Digit3', ''] }],
   ['r6', 'Rainbow Six Siege', { crouch: ['', ''], crouchTap: ['KeyC', ''], prone: ['ControlLeft', ''], sprint: ['ShiftLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['Digit3', 'KeyG'], ability: ['Digit4', ''], view: ['Digit5', ''], drone: ['Digit6', ''], melee: ['KeyV', ''] }],
-  ['cod', 'Call of Duty (modern)', { sprint: ['ShiftLeft', ''], crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyX', 'Digit4'], leanL: ['KeyQ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
+  ['cod', 'Call of Duty (modern)', { camCentre: ['KeyJ', ''], sprint: ['ShiftLeft', ''], crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyX', 'Digit4'], leanL: ['KeyQ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
   ['mw2', 'Modern Warfare 2 (2009)', { sprint: ['ShiftLeft', ''], crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyQ', 'Digit4'], leanL: ['KeyZ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
-  ['halo', 'Halo', { sprint: ['ShiftLeft', ''], crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyE', ''], melee: ['KeyQ', 'KeyV'], gadget: ['KeyG', ''], ability: ['KeyF', ''], leanL: ['KeyZ', ''], leanR: ['KeyX', ''] }],
-  ['swbf2', 'Star Wars Battlefront II (2017)', { sprint: ['ShiftLeft', ''], crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], ability: ['KeyQ', ''], gadget: ['KeyE', 'KeyG'], leanL: ['KeyZ', ''], leanR: ['KeyX', ''], melee: ['KeyV', ''] }],
+  ['halo', 'Halo', { camCentre: ['KeyJ', ''], sprint: ['ShiftLeft', ''], crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyE', ''], melee: ['KeyQ', 'KeyV'], gadget: ['KeyG', ''], ability: ['KeyF', ''], leanL: ['KeyZ', ''], leanR: ['KeyX', ''] }],
+  ['swbf2', 'Star Wars Battlefront II (2017)', { camCentre: ['KeyJ', ''], sprint: ['ShiftLeft', ''], crouch: ['ControlLeft', ''], prone: ['KeyC', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], ability: ['KeyQ', ''], gadget: ['KeyE', 'KeyG'], leanL: ['KeyZ', ''], leanR: ['KeyX', ''], melee: ['KeyV', ''] }],
 ];
 export function applyPreset(name) {
   const pr = PRESETS.find(p => p[0] === name); if (!pr) return;
