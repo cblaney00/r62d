@@ -14,6 +14,7 @@ const BARRI_BULLET_HP = 320; // bullet damage that breaks a whole wooden barrica
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+const DART_MAX = 8 * PX_PER_M, DART_SPEED = 700; // KESTREL's thrown dart
 const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
 // everyday bots: their own names, never a pro's (he asked) or a gun's
@@ -1738,9 +1739,11 @@ export class Game {
       this.ents.push({ id: this.eid(), type: 'cutter', x: w.x, y: w.y, cell: w.k, hatch: w.hatch, team, owner: p.id, t: 5, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
     } else if (id === 'dart') {
-      const d = castSight(this.map, p.x, p.y, p.aim, 380, null);
-      const x = p.x + Math.cos(p.aim) * (d - 3), y = p.y + Math.sin(p.aim) * (d - 3);
-      this.ents.push({ id: this.eid(), type: 'dart', x, y, team, owner: p.id, life: 10, ping: 0, hp: 1 });
+      // thrown (he asked): it flies toward the crosshair a little off (±0.1 rad, about half a metre at 5 m, and
+      // ±10% in distance, up to DART_MAX) and sticks in the first wall it meets; it only works once it has landed
+      const tx = p.aimX ?? p.x + ca * 200, ty = p.aimY ?? p.y + sa * 200;
+      const a = p.aim + (Math.random() + Math.random() - 1) * 0.1, go = Math.max(30, Math.min(DART_MAX, Math.hypot(tx - p.x, ty - p.y))) * (0.9 + Math.random() * 0.2);
+      this.ents.push({ id: this.eid(), type: 'dart', x: p.x + Math.cos(a) * 8, y: p.y + Math.sin(a) * 8, ang: a, fly: go - 8, team, owner: p.id, life: 10, ping: 0, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'dart', x: r1(p.x), y: r1(p.y) });
     } else if (id === 'slug') {
       this.ents.push({ id: this.eid(), type: 'slug', x: p.x + Math.cos(p.aim) * 12, y: p.y + Math.sin(p.aim) * 12,
@@ -2486,11 +2489,19 @@ export class Game {
           }
           break;
         case 'dart':
+          if (e.fly > 0) { // in the air at DART_SPEED; stops 3 px short of the first wall or barricade in its way
+            const c = Math.cos(e.ang), s = Math.sin(e.ang), step = Math.min(e.fly, DART_SPEED * dt);
+            const wt = walkRay(e.x, e.y, c, s, step + 3, (cx, cy) => { const t = tileAt(this.map, cx, cy); return blocksDrone(t) || t === T.BARRI || t === T.VOID; });
+            if (wt < step + 3) { const g = Math.max(0, wt - 3); e.x += c * g; e.y += s * g; e.fly = 0; this.events.push({ e: 'snd', s: 'place', x: r1(e.x), y: r1(e.y) }); }
+            else { e.x += c * step; e.y += s * step; e.fly -= step; if (e.fly <= 0) this.events.push({ e: 'snd', s: 'bounce', x: r1(e.x), y: r1(e.y) }); }
+            break;
+          }
           e.life -= dt; e.ping -= dt;
           if (e.ping <= 0 && !this.jammedAt(e.x, e.y)) {
             e.ping = 1.5;
-            let any = false;
-            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 170) { this.spot(e.team, q.id, 1.6); any = true; }
+            let any = false; const sm = this.smokeList(), fl = floorAt(this.map, e.x, e.y);
+            // only who it can see from where it sits (he asked: nothing through walls, floors or anything solid)
+            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 170 && floorAt(this.map, q.x, q.y) === fl && los(this.map, e.x, e.y, q.x, q.y, sm)) { this.spot(e.team, q.id, 1.6); any = true; }
             this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any });
           }
           if (e.life <= 0) this.removeEnt(e);

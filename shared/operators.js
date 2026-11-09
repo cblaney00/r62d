@@ -87,7 +87,7 @@ export const OPERATORS = {
              ability: { id: 'cutter', name: 'Plasma Cutter', count: 2, desc: 'Stick it on any wall. After 5 seconds it burns a large hole — even through reinforced walls. Jammers stop it.' },
              gadget: 'smoke', gadgetCount: 2, color: '#e8742a', helmet: '#565c4c', look: 'mask' },
   kestrel: { team: 'atk', name: 'KESTREL', role: 'Recon',         armor: 3, primary: 'longbow', secondary: 'p10',
-             ability: { id: 'dart', name: 'Seeker Dart', count: 3, desc: 'Fire a dart into a wall. For 10 seconds it pings every enemy near it, through walls, for your whole team.' },
+             ability: { id: 'dart', name: 'Seeker Dart', count: 3, desc: 'Throw a seeker dart (a little off where you aim, up to 8 m); it sticks in the first wall it hits. For 10 seconds it pings every enemy it can see near it for your whole team. It cannot see through walls.' },
              gadget: 'frag', gadgetCount: 2, color: '#4fb3a9', helmet: '#5a5f4a', look: 'cap' },
   hammer:  { team: 'atk', name: 'HAMMER',  role: 'Soft Breacher', armor: 2, primary: 'tusk', secondary: 'p10',
              ability: { id: 'slug', name: 'Breaching Rounds', count: 4, desc: 'Launch an explosive round that blows open soft walls, barricades and anyone standing behind them.' },
@@ -500,7 +500,7 @@ export const attFromCode = s => { const [barrel, grip, sight] = String(s || '').
 export const BIOS = {
   // every background different (he asked: too many were shipyard welders)
   ember:   { real: 'Ines Duarte', from: 'Porto', text: 'A glassblower who spent fifteen years at a furnace hotter than any wall. She reads heat the way others read faces, and her plasma cutter goes through steel like it is still molten.' },
-  kestrel: { real: 'Tomas Halvorsen', from: 'Tromsø', text: 'An avalanche forecaster who learned to see danger before it moves. His seeker darts listen through the snowpack of a building and call out who is buried behind it.' },
+  kestrel: { real: 'Tomas Halvorsen', from: 'Tromsø', text: 'An avalanche forecaster who learned to see danger before it moves. His seeker darts watch a doorway or a corner and call out whoever steps into view.' },
   hammer:  { real: 'Dele Okafor', from: 'Lagos', text: 'A quarry foreman who has blasted more rock than most people have walked on. He loads breaching rounds by feel and never waits for the dust to settle.' },
   talon:   { real: 'Mei Lin Zhao', from: 'Singapore', text: 'A hardware hacker who once shut down a casino floor with a pocket device. Her EMP grenades kill electronics in a tight circle, wall or no wall.' },
   bulwark: { real: 'Viktor Brandt', from: 'Hamburg', text: 'A former goalkeeper for a second-division side, he still plants his feet and dares people to get past. Behind his shield he moves like a slow, stubborn tide.' },

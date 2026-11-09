@@ -23,7 +23,13 @@ const sees = (team, p) => g.spots[team].has(p.id);
 
 // ---------- attack ----------
 fresh(); m.tiles[wk] = T.REINF; setup(a, 'ember', wx - 22, wy, 0); use(a); ticks(5.3); ok(m.tiles[wk] !== T.REINF, 'EMBER cutter did not burn through a reinforced wall');
-fresh(); setup(a, 'kestrel', wx - 30, wy, 0); setup(d, 'lynx', wx + 40, wy, Math.PI); use(a); ticks(2); ok(sees('atk', d), 'KESTREL dart did not reveal the defender behind the wall');
+// KESTREL (he asked): the dart is thrown a little off and sees only what it can see, never through the wall it is in
+fresh(); setup(a, 'kestrel', wx - 30, wy, 0); a.aimX = wx; a.aimY = wy; setup(d, 'lynx', wx + 40, wy, Math.PI); setup(d2, 'lynx', wx - 3 * CELL, wy, 0); use(a); ticks(2);
+{ const dt = g.ents.find(e => e.type === 'dart'); ok(dt && !dt.fly && Math.abs(dt.x - wx) < 20, 'KESTREL dart did not stick in the wall', dt && dt.x - wx); }
+ok(!sees('atk', d), 'KESTREL dart revealed the defender behind the wall'); ok(sees('atk', d2), 'KESTREL dart did not reveal the defender in sight');
+{ const hit = []; for (let i = 0; i < 40; i++) { g.ents = []; setup(a, 'kestrel', X, Y, 0); a.aimX = X + 180; a.aimY = Y; a.abilityCount = 3; use(a); ticks(0.6); const e = g.ents.find(e => e.type === 'dart'); if (e) hit.push(Math.hypot(e.x - X - 180, e.y - Y)); }
+  const mx = Math.max(...hit), mean = hit.reduce((s, v) => s + v, 0) / hit.length; console.log(`  dart throws at 5 m: ${hit.length} landed, off by ${(mean / 36).toFixed(2)} m on average, ${(mx / 36).toFixed(2)} m at most`);
+  ok(hit.length === 40 && mean > 3 && mx < 40, 'KESTREL dart throw scatter is off', mean, mx); }
 fresh(); setup(a, 'hammer', wx - 60, wy, 0); use(a); ticks(0.5); ok(m.tiles[wk] !== T.SOFT, 'HAMMER breaching round did not open the soft wall');
 fresh(); setup(a, 'talon', X, Y, 0); g.ents.push({ id: g.eid(), type: 'jammer', x: X + 60, y: Y, team: TEAM.DEF, owner: d.id, hp: 1 });
 g.detonate({ type: 'nade', kind: 'emp', x: X + 50, y: Y, team: TEAM.ATK, owner: a.id }); ok(!g.ents.some(e => e.type === 'jammer'), 'TALON EMP did not destroy a jammer');
