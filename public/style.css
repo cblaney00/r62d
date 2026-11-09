@@ -561,6 +561,9 @@ button.big { font-size: 22px; padding: 14px 34px; }
 #freeHint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 4px 12px; background: rgba(0,0,0,0.6); border-radius: 3px;
   font: 600 13px var(--body); letter-spacing: 0.04em; color: #d9e0e6; white-space: nowrap; pointer-events: none; }
 #freeHint b { color: #f2c14e; font-weight: 700; }
+#camTag { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); padding: 3px 10px; background: rgba(0,0,0,0.55); border-radius: 3px;
+  font: 600 12px var(--body); letter-spacing: 0.06em; color: #d9e0e6; white-space: nowrap; pointer-events: none; }
+#camTag.on { color: #f2c14e; } #camTag b { color: #fff; }
 #freeHint kbd { font-size: 12px; }
 
 /* tutorial: the menu page and the coach box in the match */

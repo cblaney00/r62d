@@ -57,7 +57,7 @@ let DPR = 1, VW = 0, VH = 0;
 const GFX = {
   low:    { scale: 0.6,  fog: 0.3,  parts: 0.35, smoke: 7,  shade: false, rays: 0.5, map: 1.25, grey: 0.75, raised: false },
   medium: { scale: 0.8,  fog: 0.4,  parts: 0.6,  smoke: 11, shade: true, rays: 0.7, map: 2, grey: 1 },
-  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1, map: 2.5, grey: 1.5, blur: true },
+  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1, map: 2.5, grey: 1.5 }, // (no soft blurred edges: with the tilt they cost a third of the frame on his GPU)
   ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2, map: 3, grey: 1.5, blur: true },
 };
 const LEVELS = ['low', 'medium', 'high', 'ultra'];
@@ -139,8 +139,8 @@ const mouse = { x: 0, y: 0, l: false, r: false, wl: 0, wr: 0 };
 // up/down sets how far ahead the crosshair sits, and W always walks up the screen (k.rot turns the keys).
 const AIM_MODES = ['free', 'classic', 'face', 'spin', 'pad', 'turn', 'cursor'];
 // Crosshair Classic (he asked: aiming styles grouped, earlier generations kept for people who like them): the Crosshair
-// mode as it first was. A far-out crosshair turns by its real distance (no TURN_R flick help), it moves out and back at
-// the same speed, and aiming in leaves it where it is. Everything else is the Crosshair mode (freeAimOn).
+// mode as it first was: aiming in leaves it where it is, and no slower mouse far out. Both move 1:1 every way now (he
+// asked for crispy aim). Everything else is the Crosshair mode (freeAimOn).
 const freeAimOn = () => aimMode === 'free' || aimMode === 'classic';
 const FACE_ADS = 15 * Math.PI / 180; // Face aiming (he asked): aiming in keeps you within 15° either side of where you faced
 let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return localStorage.getItem('r62d-aim2') && AIM_MODES.includes(m) ? m : 'free'; } catch { return 'free'; } })();
@@ -158,10 +158,45 @@ const reachOf = (me, ads) => aimReach(me && me.aa ? attFromCode(me.aa).sight : '
 // Long sightlines (he asked): looking down a line more than 1.5x the normal range, the view opens right out the way you
 // face, up to LONG_H world px tall, and you see out to LONG_R. The sniper scope always gets that view while aimed in.
 const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45;
-// Turning (he asked: hard to pull the mouse round, flicks must be possible): moving the mouse sideways turns you as if
-// the crosshair were never further than TURN_R from you, so a far-out crosshair turns as quickly as a near one; moving
-// it towards / away from you changes the distance 1:1. Close in it is exactly 1:1 like a pointer.
-const TURN_R = 160;
+// Crispy aim (he asked 2026-11-09): the crosshair follows the mouse 1:1 in every direction, like a pointer (the old
+// sideways flick help and the 1.3x faster outward pull are gone). Past the edge of your normal view (st.trackHH, the
+// room-size view before it grows to fit the crosshair) the mouse moves it by Settings → Far aim sensitivity (0.5),
+// the same both ways, blended in over 1 m. Aiming in never puts it nearer than ADS_SNAP_MIN (he asked: 2 m).
+const ADS_SNAP_MIN = 2 * PX_PER_M;
+const RAISE_FULL = 760, RAISE_NONE = 1150; // raised walls sink flat between these view heights (world px), see draw()
+const farSens = () => { const v = +($('farSens') || {}).value; return v > 0 ? v / 100 : 0.5; };
+function trackR(ux, uy) {
+  const hh = st.trackHH; if (!hh) return Infinity;
+  const hw = hh * VW / VH, c = Math.abs(ux), s = Math.abs(uy);
+  return Math.min(c > 0.01 ? hw / c : Infinity, s > 0.01 ? hh / s : Infinity) - hh * 0.26;
+}
+// Locked camera (his idea, 2026-11-09; like League of Legends / Age of Mythology): the camLock key (L) switches between
+// the normal following camera and one that stays where it is, at the size it had. Pushing the crosshair (or the cursor)
+// into the edge band of the screen scrolls it that way, faster the deeper in, and the crosshair travels with it; your
+// character reaching the edge or going to another floor brings it along. st.camLock = { x, y, h } (h: view height).
+const LOCK_EDGE = 30; // CSS px: the crosshair stops this far inside the screen
+const camLocked = view => !!(st.camLock && view && view.kind === 'body' && !st.tv);
+function toggleCamLock() {
+  if (st.tv || !playing()) return;
+  st.camLock = st.camLock ? null : { x: st.cam.x, y: st.cam.y, h: Math.max(240, (st.viewH || 400) / viewMul() / (st.adsZ || 1)) };
+  audio.ui('hover'); flashCamTag();
+}
+function flashCamTag() { const el = $('camTag'); if (!el) return; el.innerHTML = st.camLock ? `CAMERA LOCKED · <b>${label('camLock')}</b> to follow` : `CAMERA FOLLOWS · <b>${label('camLock')}</b> to lock`; el.classList.remove('hidden'); el.classList.toggle('on', !!st.camLock); clearTimeout(flashCamTag.t); flashCamTag.t = st.camLock ? 0 : setTimeout(() => { flashCamTag.t = 0; el.classList.add('hidden'); }, 1800); }
+function lockedTarget(dt, view) {
+  const L = st.camLock, hh = L.h * (st.adsZ || 1) * viewMul() / 2, hw = hh * VW / VH;
+  if (floorAt(st.map, L.x, L.y) !== floorAt(st.map, view.x, view.y)) { L.x = view.x; L.y = view.y; } // another floor: go with you
+  const fa = padOn && freeAimOn() && !gpRecent() ? freeAimPoint() : null;
+  const sp = fa ? w2s(fa.ax, fa.ay) : cursor(), p = tilt.project(sp.x / DPR, sp.y / DPR), W = VW / DPR, H = VH / DPR;
+  const band = LOCK_EDGE + Math.min(W, H) * 0.07, dep = v => Math.max(0, Math.min(1, v / (band - LOCK_EDGE)));
+  const ex = dep(band - p.x) > 0 ? -dep(band - p.x) : dep(p.x - (W - band)), ey = dep(band - p.y) > 0 ? -dep(band - p.y) : dep(p.y - (H - band));
+  if (ex || ey) {
+    const v = hh * 1.8 * dt, mx = ex * v, my = ey * v; L.x += mx; L.y += my;
+    if (fa) aimOff = { x: aimOff.x + mx, y: aimOff.y + my }; // the crosshair rides along (its reach still holds it)
+  }
+  const m = 0.82; // you never leave the middle 82% of the view: at its edge the view comes with you
+  L.x = Math.max(view.x - hw * m, Math.min(view.x + hw * m, L.x)); L.y = Math.max(view.y - hh * m, Math.min(view.y + hh * m, L.y));
+  return { x: L.x, y: L.y };
+}
 // On a drone the ping reticle reaches DRONE_PING_R from it (he asked: a bit past what the drone sees). The view zooms out
 // to hold you and the crosshair (he asked: zoom, never let it leave the screen), up to FIT_MAX world px tall; only past
 // that does it slide along.
@@ -182,15 +217,16 @@ function onScreen(x, y, m) {
 function freeMove(dx, dy) {
   const z = st.zoom || 1; dx /= z; dy /= z;
   const o = aimOff, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = AIM_MIN(), hi = AIM_MAX();
-  const r = dx * ux + dy * uy, cl = aimMode === 'classic'; // moving away from you goes 1.3x faster (he asked), coming back stays 1:1 (Classic: both 1:1)
-  let l = l0 + (r > 0 && !cl ? r * 1.3 : r), a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / (cl ? l0 : Math.min(l0, TURN_R));
+  if (aimMode === 'free') { const tr = trackR(ux, uy); if (l0 > tr) { const m = 1 + (farSens() - 1) * Math.min(1, (l0 - tr) / PX_PER_M); dx *= m; dy *= m; } } // far out: slower, the same every way
+  const r = dx * ux + dy * uy; // 1:1 out, back and sideways
+  let l = l0 + r, a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / l0;
   if (l < 0) { l = -l; a += Math.PI; } // pulled through the middle: out the other side
   if (l > hi) l = Math.max(hi, Math.min(l, l0)); // no pushing past the reach (a reach that just shrank keeps your spot)
   else if (l < lo) l = lo;
   if (st.map && !(st.winViewsOn && winAimed(a))) l = Math.min(l, Math.max(lo, floorLim(a, l))); // nor past the floor's edge, where it would stop while the mouse kept going
   aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l };
 }
-// aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked), else to its sight's distance
+// aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked; never nearer than 2 m), else to its sight's distance
 function adsReset() {
   const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l; let d = adsStart(st.me && st.me.aa ? attFromCode(st.me.aa).sight : 'iron') * PX_PER_M;
   // a set distance per sight, whatever distance you were at (he asked); a nearer wall stops it, but not the edge of a
@@ -204,7 +240,7 @@ function adsReset() {
   const q = freeAimPoint();
   let pass = 0; for (let i = -2; i <= 2; i++) if (castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, d, null, true) + 2 >= d - 4) pass++;
   st.reachW = keep;
-  const to = !sn && q.stopped && pass < 2 ? Math.max(AIM_MIN(), q.see) : Math.min(d, q.d);
+  const to = !sn && q.stopped && pass < 2 ? Math.min(d, Math.max(AIM_MIN(), ADS_SNAP_MIN, q.see)) : Math.min(d, q.d); // a wall right in front: still 2 m out (he asked)
   aimOff = { x: ux * to, y: uy * to };
 }
 // Sniper scope sway (he asked): scoped in, the reticle drifts in a slow figure of eight; holding Shift (walk or sprint
@@ -743,6 +779,7 @@ function pressAction(a, e) {
     case 'spot': st.spotReq = true; break;
     case 'wheel': openWheel(); break;
     case 'map': toggleMapV(); break;
+    case 'camLock': toggleCamLock(); break;
     case 'chat': if (st.id) { e && e.preventDefault(); keys.delete('chat'); openChat(true); } break;
     case 'left': case 'right': if (st.me && st.me.ct === 'cam') ev.push({ k: a === 'right' ? 'camNext' : 'camPrev' }); break;
     case 'swap': if (st.me) ev.push({ k: 'slot', n: st.me.sl === 0 ? 1 : 0 }); break;
@@ -925,7 +962,7 @@ $('setReset').onclick = () => { resetBinds(); renderSettings(); };
 for (const [id, name] of PRESETS) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => { audio.ui(); applyPreset(id); renderSettings(); }; $('keyPresets').appendChild(b); }
 const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'sprint', 'walk', 'crouch', 'crouchTap', 'prone', 'vault', 'leanL', 'leanR']],
   ['FIGHTING', ['primary', 'secondary', 'melee', 'reload', 'ability', 'gadget', 'interact']],
-  ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'wheel', 'map', 'chat', 'scoreboard']],
+  ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'wheel', 'map', 'camLock', 'chat', 'scoreboard']],
   ['MENUS & FREE PLAY', ['settings', 'pause', 'opNext', 'opPrev', 'opGrid']]];
 // crosshair: chosen in Settings, saved in your profile
 let xh = (() => { try { return cleanXhair(JSON.parse(localStorage.getItem('r62d-xh') || 'null')); } catch { return cleanXhair(); } })();
@@ -1620,7 +1657,10 @@ function frame(nowMs) {
     const keepT = (x, y, m) => { cx = Math.min(x + hw - m, Math.max(x - hw + m, cx)); cy = Math.min(y + hh - m, Math.max(y - hh + m, cy)); };
     keepT(st.pred.x, st.pred.y, 80 * DPR / st.zoom); keepT(q.ax, q.ay, AHEAD() * 1.3 / st.zoom); // (80: clear of the corner panels)
   }
+  const locked = camLocked(view);
+  if (locked) { const t = lockedTarget(dt, view); cx = t.x; cy = t.y; }
   const k = 1 - Math.exp(-dt * 14);
+  if (locked) { st.cam.x = cx; st.cam.y = cy; } else
   if (Math.hypot(cx - st.cam.x, cy - st.cam.y) > 420) { st.cam.x = cx; st.cam.y = cy; if (view) st.leadV = null; } // spawned, new round: be there at once
   st.cam.x += (cx - st.cam.x) * k; st.cam.y += (cy - st.cam.y) * k;
   if (view && view.kind !== 'body') { st.cam.x = cx; st.cam.y = cy; }
@@ -1666,7 +1706,8 @@ function frame(nowMs) {
   const adsZ = view && view.kind === 'body' && me && me.ad ? (sniperOn(me) ? 1.5 : scopeOn(me) ? 1.3 : 1.12) : 1;
   st.adsZ = st.adsZ || 1;
   st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18));
-  st.viewH = st.envH * st.adsZ;
+  st.viewH = (locked ? st.camLock.h : st.envH) * st.adsZ;
+  st.trackHH = st.viewH * viewMul() / 2; // the normal view's half height: past it the mouse moves the crosshair slower (freeMove)
   // Crosshair mode: the crosshair can go anywhere you can see; if you and it don't fit on screen, the view grows
   // to hold it, and st.reachW (a circle round you, reachOf; on a drone DRONE_PING_R) is how far it can go
   const freeAim = !st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && freeAimOn() && !gpRecent();
@@ -1676,11 +1717,11 @@ function frame(nowMs) {
     { const l = Math.hypot(aimOff.x, aimOff.y); if (l > st.reachW) { const k = (st.reachW + (dr ? 0 : (l - st.reachW) * Math.exp(-dt * 10))) / l; aimOff = { x: aimOff.x * k, y: aimOff.y * k }; } } // stopped aiming in: it glides back inside (onto a drone: at once)
     const need = Math.min(FIT_MAX, fitBoth(q.ax - st.pred.x, q.ay - st.pred.y));
     st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need;
-    st.viewH = Math.max(st.viewH, st.fitH);
+    if (!locked) st.viewH = Math.max(st.viewH, st.fitH);
   } else st.fitH = 0;
   st.viewH *= viewMul(); // Settings: how much of the map you see (phones start further out)
   st.zoom = VH / st.viewH;
-  if (freeAim) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
+  if (freeAim && !locked) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
     const keep = (x, y, m) => { st.cam.x = Math.min(x + hw - m, Math.max(x - hw + m, st.cam.x)); st.cam.y = Math.min(y + hh - m, Math.max(y - hh + m, st.cam.y)); };
     // (the camera's target already keeps the room, gliding, above: this only stops it slipping off at the very edge)
@@ -1711,10 +1752,13 @@ function frame(nowMs) {
       st.cam.y = tp > bt ? (tp + bt) / 2 : Math.max(tp, Math.min(bt, camPre.y));
     }
   }
+  if (locked) { st.camLock.x = st.cam.x; st.camLock.y = st.cam.y; } // (after the floor's edge stops it)
   if (freeAim) { // the crosshair always stays on the real screen (he saw it go off): at the floor's edge the camera stops
     // but the crosshair didn't, and the tilt crops the edges, so here the view may pass the edge just enough to show it
-    const q = freeAimPoint(), s0 = w2s(q.ax, q.ay), u = onScreen(s0.x, s0.y, AHEAD() * 0.7 / DPR);
-    if (u.x !== s0.x || u.y !== s0.y) { const w = screenToWorld(u.x, u.y); st.cam.x += q.ax - w.x; st.cam.y += q.ay - w.y; }
+    const q = freeAimPoint(), s0 = w2s(q.ax, q.ay), u = onScreen(s0.x, s0.y, locked ? LOCK_EDGE : AHEAD() * 0.7 / DPR);
+    if (u.x !== s0.x || u.y !== s0.y) { const w = screenToWorld(u.x, u.y);
+      if (locked) aimOff = { x: aimOff.x + w.x - q.ax, y: aimOff.y + w.y - q.ay }; // locked camera: the crosshair stops at the screen edge (and pans the view, lockedTarget)
+      else { st.cam.x += q.ax - w.x; st.cam.y += q.ay - w.y; } }
   }
   if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
 
@@ -2283,9 +2327,12 @@ function draw(s, view, now, dt) {
 
   // --- line-of-sight blackout ---
   const vpolys = [], vviews = []; // (the sight shapes and their eyes, for the raised walls below)
-  const RH = 0.045; // raised walls (look.js): how tall, as a share of the distance from the middle of the view
+  // raised walls (look.js): how tall, as a share of the distance from the middle of the view. Zoomed far out they sink
+  // flat (full up to RAISE_FULL world px tall, none past RAISE_NONE): there they are a few pixels, and on his graphics
+  // card any raised-wall drawing over a whole far view halved the frame rate (he asked 2026-11-09: no lag at any zoom)
+  const RH = 0.045 * Math.max(0, Math.min(1, (RAISE_NONE - (st.viewH || 0)) / (RAISE_NONE - RAISE_FULL)));
   let rf = null; // this frame's raised walls, worked out once for both passes (look.js keeps the pieces between frames)
-  const raise = inGame && gq.raised !== false && fxOn('walls3d') ? (c, pass) => { // pass 'fog' (all, greyed by #fog) or 'lit'
+  const raise = inGame && RH > 0.002 && gq.raised !== false && fxOn('walls3d') ? (c, pass) => { // pass 'fog' (all, greyed by #fog) or 'lit'
     const t0 = performance.now(), rm = st.rend.map;
     if (!rf) {
       const fr = st.floorRect;
@@ -2765,6 +2812,7 @@ function hud(s) {
   setText('roundNo', s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`);
   // free play: which keys switch operator, and who you'd get
   $('freeHint').classList.toggle('hidden', !s.fp);
+  if (!playing() || (!st.camLock && !flashCamTag.t)) setCls($('camTag'), 'hidden', true); else if (st.camLock) setCls($('camTag'), 'hidden', false);
   if (s.fp && me.op) {
     const all = [...opsForTeam('atk'), ...opsForTeam('def')], i = all.indexOf(me.op), n = all.length;
     const nm = k => `${OPERATORS[k].name}${OPERATORS[k].team !== side ? (OPERATORS[k].team === 'atk' ? ' (attack)' : ' (defence)') : ''}`;
@@ -3427,7 +3475,7 @@ function setTab(tab) {
   if ((tab === 'ops' || tab === 'profile') && !st.token) { audio.ui('back'); $('name').focus(); tab = 'play'; }
   if (tab === 'ops') { showOps(); return; }
   if (tab === 'profile') { showProfile(); return; }
-  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR, steady: () => $('steadySens').value / 100, low: () => gfxLevel() === 'low' }); return; }
+  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR, steady: () => $('steadySens').value / 100, far: () => farSens(), low: () => gfxLevel() === 'low' }); return; }
   if (tab === 'maps') { audio.ui('open'); openMapInfo($('mapsPage')); return; }
   if (tab === 'knowledge') { audio.ui('open'); openKnowledge($('bkPage')); return; }
   if (tab === 'playbook') { audio.ui('open'); trainInfo(); openPlaybook($('playbookPage')); return; }
@@ -3505,13 +3553,13 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { PF, st, fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
-  try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value, +$('steadySens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, aim: aimMode, aimV: 2, xh, lean: leanMode };
+  try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value, +$('steadySens').value, +$('farSens').value])); } catch {}
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, farSens: +$('farSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode };
 }
 let saveTimer = 0;
 function saveSettings() {
@@ -3520,7 +3568,7 @@ function saveSettings() {
 }
 function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else if (s.binds && s.bindsVersion === 4) { applyBinds(s.binds, 4); setTimeout(saveSettings, 500); } else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
-  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens', 'steadySens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
+  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens', 'steadySens', 'farSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.xh) setXhair(s.xh, false);
   if (s.lean) setLean(s.lean, false);
@@ -3545,13 +3593,13 @@ document.addEventListener('pointerlockchange', () => {
 // let go of the mouse whenever a menu is open or the match is over
 setInterval(() => { if (document.pointerLockElement && document.pointerLockElement !== $('armCanvas') && (menuOpen() || !playing())) document.exitPointerLock(); }, 150);
 $('pResume').addEventListener('click', () => { if (playing() && !isTouch && !st.tv) lockMouse(cv); }); // TV: nothing to aim, keep the mouse free // a phone has no mouse to capture (asking anyway re-opened this menu)
-const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; $('steadySensVal').textContent = ($('steadySens').value / 100).toFixed(2) + '×'; };
-for (const id of ['sens', 'adsSens', 'steadySens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
-try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; if (v[2]) $('steadySens').value = v[2]; } } catch {}
+const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; $('steadySensVal').textContent = ($('steadySens').value / 100).toFixed(2) + '×'; $('farSensVal').textContent = ($('farSens').value / 100).toFixed(2) + '×'; };
+for (const id of ['sens', 'adsSens', 'steadySens', 'farSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
+try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; if (v[2]) $('steadySens').value = v[2]; if (v[3]) $('farSens').value = v[3]; } } catch {}
 showSens();
 // Every slider in Settings also has a box to type the number into (he asked). It shows the number the way the
 // slider's label did (sensitivity as 1.00, not 100) and keeps up when settings are loaded from the profile.
-{ const DIV = { sens: 100, adsSens: 100, steadySens: 100 }, rows = [];
+{ const DIV = { sens: 100, adsSens: 100, steadySens: 100, farSens: 100 }, rows = [];
   for (const r of $('settings').querySelectorAll('input[type=range]')) {
     const div = DIV[r.id] || 1, lab = $(r.id + 'Val') || $(r.id + 'V'), n = document.createElement('input'), unit = document.createElement('span');
     n.type = 'number'; n.className = 'num'; n.min = r.min / div; n.max = r.max / div; n.step = (+r.step || 1) / div;

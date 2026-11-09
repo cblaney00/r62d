@@ -26,6 +26,7 @@ export const ACTIONS = [
   ['chat', 'Chat (opens team chat; / switches team ⇄ all)', 'KeyY', 'Enter'],
   ['wheel', 'Ping wheel: hold, drag toward a ping, let go', 'KeyX', ''],
   ['map', 'Map: open or close, click it to ping', 'CapsLock', ''],
+  ['camLock', 'Camera: follow you / lock in place (push the crosshair to the screen edge to move it)', 'KeyL', ''],
   ['scoreboard', 'Scoreboard (hold)', 'Tab', ''],
   ['opNext', 'Free play: next operator', 'KeyN', ''],
   ['opPrev', 'Free play: previous operator', 'KeyB', ''],

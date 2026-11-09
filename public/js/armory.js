@@ -183,11 +183,12 @@ function veil(p, cv) { // the blurred, dimmed range round the clear lens (#armVe
   Object.assign(el.style, { left: cv.offsetLeft + 'px', top: cv.offsetTop + 'px', width: cv.offsetWidth + 'px', height: cv.offsetHeight + 'px' });
   el.style.setProperty('--sx', Math.round(p.x / dpr) + 'px'); el.style.setProperty('--sy', Math.round(p.y / dpr) + 'px'); el.style.setProperty('--sr', Math.round(lensR(cv) / dpr) + 'px');
 }
-function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): sideways turns as if never past TURN_R
+function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): 1:1 every way, slower past the normal view
   const z = S.z || 1; dx /= z; dy /= z;
   const o = S.aim, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = aimMin(), hi = aimMax();
-  const r = dx * ux + dy * uy, cl = O.mode() === 'classic'; // (Crosshair Classic: 1:1 both ways, turns by the real distance)
-  let l = l0 + (r > 0 && !cl ? r * 1.3 : r), a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / (cl ? l0 : Math.min(l0, 160));
+  if (O.mode() === 'free' && O.far && S.trackHH) { const hh = S.trackHH, hw = hh * (S.aspect || 16 / 9), c = Math.abs(ux), s = Math.abs(uy); const tr = Math.min(c > 0.01 ? hw / c : Infinity, s > 0.01 ? hh / s : Infinity) - hh * 0.26; if (l0 > tr) { const m = 1 + (O.far() - 1) * Math.min(1, (l0 - tr) / PX_PER_M); dx *= m; dy *= m; } }
+  const r = dx * ux + dy * uy;
+  let l = l0 + r, a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / l0;
   if (l < 0) { l = -l; a += Math.PI; }
   if (l > hi) l = Math.max(hi, Math.min(l, l0)); else if (l < lo) l = lo;
   S.aim = { x: Math.cos(a) * l, y: Math.sin(a) * l };
@@ -214,6 +215,7 @@ function camera(cv, dt) {
   S.envH += ((S.envWant || want) - S.envH) * (1 - Math.exp(-dt * 6));
   S.adsZ += ((S.mouse.r ? (sniper() ? 1.5 : scoped() ? 1.3 : 1.12) : 1) - S.adsZ) * (1 - Math.exp(-dt * 18));
   let vh = S.envH * S.adsZ;
+  S.trackHH = vh / 2; S.aspect = cv.width / H; // the normal view: past it the crosshair moves slower (freeMove)
   if (O.mode() !== 'cursor') {
     S.reachW = reach();
     const cap = S.reachW + mg, need = Math.min(cap, (q.d + mg) / (2 * e));

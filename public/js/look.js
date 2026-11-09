@@ -85,6 +85,17 @@ const FACES = [[0, 1, 0.5], [0, -1, 0.78], [1, 0, 0.6], [-1, 0, 0.72]];
 // groups, walls and tall things (cars, crates, shelves). A block is worked out again only when a cell in or next to it
 // changes (MapRenderer.cellChanged fills R.wallsDirty). Each frame only the faces turned toward the camera are raised,
 // once, and the same paths serve every pass (raisedFrame, then drawRaised per group).
+// Wall tops are plain fills in the wall's own top colour (the colours mapdraw.js wallFill paints them with): copying
+// thousands of small pieces of the map picture every frame was most of a frame on his graphics card (he asked
+// 2026-11-09: no lag at any zoom). Cars, crates and shelves (group 1) still take their tops from the picture.
+function topColour(m, k) {
+  const t = m.tiles[k], mat = m.mat && m.mat[k];
+  if (t === T.HARD) return mat === MAT.DRYWALL ? '#c4bdaf' : '#7a7f85';
+  if (t === T.REINF) return '#59626c';
+  if (t === T.PANEL) return '#3e454d';
+  if (t === T.DSHIELD) return '#2b3036';
+  return mat === MAT.BRICK ? '#93503b' : '#d8d2c4';
+}
 const CH = 16;
 const KEPT = new WeakMap(); // renderer → { m, cw, blocks: [] }
 function block(R, m, bx, by) {
@@ -94,8 +105,8 @@ function block(R, m, bx, by) {
     let run = null;
     for (let x = x0; x <= x1 + 1; x++) {
       const k = y * W + x, f = x <= x1 ? hg(k) : 0, on = f > 0, g = on && m.tiles[k] === T.TALL ? 1 : 0;
-      const sh = on && m.shape && m.shape[k];
-      if (run && (!on || f !== run.f || g !== run.g || sh)) { out[run.g].tops.push(run); run = null; }
+      const sh = on && m.shape && m.shape[k], tc = on && !g ? topColour(m, k) : '';
+      if (run && (!on || f !== run.f || g !== run.g || sh || tc !== run.tc)) { out[run.g].tops.push(run); run = null; }
       if (!on) continue;
       const t = m.tiles[k], base = t === T.SOFT && m.mat && m.mat[k] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.HARD], X = x * CELL, Y = y * CELL;
       const col = lt => `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`, faces = out[g].faces;
@@ -111,7 +122,7 @@ function block(R, m, bx, by) {
             faces.push({ ax, ay, bx: bx2, by: by2, nx, ny, px: mx, py: my, f, x, y, c: col(+(0.62 + 0.14 * (-nx - ny) / len).toFixed(1)) });
           }
         }
-        out[g].tops.push({ x, y, n: 1, f, sh });
+        out[g].tops.push({ x, y, n: 1, f, sh, tc });
         continue;
       }
       for (const [dx, dy, lt] of FACES) {
@@ -121,7 +132,7 @@ function block(R, m, bx, by) {
         if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, x, y, c: col(lt) });
         else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, x, y, c: col(lt) });
       }
-      if (!run) run = { x, y, n: 0, f, g }; run.n++;
+      if (!run) run = { x, y, n: 0, f, g, tc }; run.n++;
     }
   }
   return out;
@@ -142,7 +153,7 @@ function kept(R, m) {
 export function raisedFrame(R, m, cam, h, x0, y0, x1, y1) {
   const K = kept(R, m), cx = cam.x, cy = cam.y, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
   x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W - 1, x1); y1 = Math.min(m.H - 1, y1);
-  const groups = [{ paths: new Map(), tops: [] }, { paths: new Map(), tops: [] }];
+  const groups = [{ paths: new Map(), tops: [], topPaths: new Map() }, { paths: new Map(), tops: [], topPaths: new Map() }];
   for (let by = Math.floor(y0 / CH); by <= Math.floor(y1 / CH); by++) for (let bx = Math.floor(x0 / CH); bx <= Math.floor(x1 / CH); bx++) {
     const i = by * K.cw + bx, B = K.blocks[i] || (K.blocks[i] = block(R, m, bx, by));
     const whole = bx * CH >= x0 && by * CH >= y0 && bx * CH + CH - 1 <= x1 && by * CH + CH - 1 <= y1; // else: check each piece is in range
@@ -157,7 +168,11 @@ export function raisedFrame(R, m, cam, h, x0, y0, x1, y1) {
       }
       for (const r of B[g].tops) {
         if (!whole && (r.y < y0 || r.y > y1 || r.x + r.n - 1 < x0 || r.x > x1)) continue;
-        G.tops.push(r);
+        if (!r.tc) { G.tops.push(r); continue; }
+        let T2 = G.topPaths.get(r.tc); if (!T2) G.topPaths.set(r.tc, T2 = { p: null, r: [] });
+        const sc = 1 + h * r.f;
+        if (r.sh) { const p = T2.p || (T2.p = new Path2D()); for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? p.lineTo(a, b) : p.moveTo(a, b); } p.closePath(); } }
+        else { const [tx, ty] = up(r.x * CELL, r.y * CELL, r.f); T2.r.push(tx, ty, r.n * CELL * sc, CELL * sc); } // plain rectangles: far cheaper on the graphics card than one big shape
       }
     }
   }
@@ -169,6 +184,7 @@ export function drawRaised(ctx, R, fr, which, pic = R.c) {
   for (const g of which) {
     const grp = fr.groups[g];
     for (const [c, p] of grp.paths) { ctx.fillStyle = c; ctx.fill(p); }
+    for (const [c, T2] of grp.topPaths) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); } // wall tops: plain colour
     for (const r of grp.tops) {
       const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f;
       if (r.sh) {
@@ -182,7 +198,7 @@ export function drawRaised(ctx, R, fr, which, pic = R.c) {
   }
 }
 // ---------------------------------------------------------------- camera tilt
-// The world layers (#world) are turned in 3D: a fixed angle (the top of the screen a little further away) plus a lean
+// The world layers (#world) are turned in 3D: a fixed angle (11°, he asked for more than the first 7°; the top of the screen a little further away) plus a lean
 // with your movement and a kick when you shoot or something blows up close by. The mouse is turned back with untilt.
 export const tilt = {
   on: true, lean: true, el: null, M: null,
@@ -199,7 +215,7 @@ export const tilt = {
     this.kx += this.kvx * dt; this.ky += this.kvy * dt;
     const P = new DOMMatrix(); P.m34 = -1 / Math.max(W, H) / 1.25;
     const M = new DOMMatrix().translateSelf(W / 2, H / 2).multiplySelf(P)
-      .rotateSelf(7 + this.ax + this.kx, this.ay + this.ky, 0).scaleSelf(1.075, 1.075).translateSelf(-W / 2, -H / 2 - H * 0.01);
+      .rotateSelf(11 + this.ax + this.kx, this.ay + this.ky, 0).scaleSelf(1.1, 1.1).translateSelf(-W / 2, -H / 2 - H * 0.01);
     this.M = M; this.el.style.transform = M.toString();
   },
   kick(k = 1) { if (this.lean && this.on) this.kvx -= 9 * k; },
