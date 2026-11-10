@@ -29,6 +29,20 @@ export const G = {
   javelin: { body: '#2f3338', furn: '#3a3f45', stock: 'adjust', rec: [24, 54], bar: 82, guard: [54, 70], mag: 'curved', grip: 36, rail: true },
   sentry:  { body: '#34383d', furn: '#5b5546', stock: 'fold', rec: [24, 52], bar: 84, guard: [52, 72], mag: 'curved', grip: 34, rail: true },
   sparrow: { body: '#3a3d42', furn: '#26282b', stock: 'none', rec: [44, 70], bar: 72, guard: [70, 70], mag: 'grip', grip: 47, pistol: true },
+  verdict: { body: '#3b3e3a', furn: '#2d302c', stock: 'cheek', rec: [26, 54], bar: 96, guard: [54, 80], mag: 'straight', grip: 34, rail: true, selector: true },
+  tandem:  { body: '#40443a', furn: '#5c5a48', stock: 'fold', rec: [24, 52], bar: 86, guard: [52, 72], mag: 'curved', grip: 34, rail: true, taped: true },
+  ferret:  { body: '#2b2e33', furn: '#4a3d33', stock: 'none', rec: [30, 58], bar: 78, guard: [58, 70], mag: 'straight', grip: 38, rail: true },
+  auger:   { body: '#5a5f52', furn: '#30332e', stock: 'adjust', rec: [22, 56], bar: 84, guard: [56, 72], mag: 'long', grip: 38, rail: true, brake: true },
+  quill:   { body: '#3c3f44', furn: '#2a2c30', stock: 'adjust', rec: [24, 50], bar: 96, guard: [50, 74], mag: 'box', grip: 32, rail: true },
+  hedge:   { body: '#3b352d', furn: '#7a5634', stock: 'wood', rec: [26, 44], bar: 92, guard: [50, 68], mag: 'tube', grip: 30, lever: true },
+  cyclone: { body: '#33363a', furn: '#26282b', stock: 'heavy', rec: [20, 56], bar: 100, guard: [56, 80], mag: 'belt', grip: 32, rail: true, handle: true, rotary: true },
+  trestle: { body: '#4a4535', furn: '#3a3629', stock: 'heavy', rec: [22, 56], bar: 98, guard: [56, 82], mag: 'box', grip: 34, rail: true, bipod: true },
+  ranger:  { body: '#2f3134', furn: '#86603a', stock: 'wood', rec: [26, 46], bar: 90, guard: [48, 70], mag: 'tube', grip: 30, lever: true },
+  mammoth: { body: '#2e322f', furn: '#3c403a', stock: 'thumb', rec: [24, 56], bar: 104, guard: [56, 88], mag: 'box', grip: 36, rail: true, bolt: true, brake: true, bipod: true },
+  needle:  { body: '#7a7e83', furn: '#2a2c30', stock: 'none', rec: [36, 72], bar: 86, guard: [72, 72], mag: 'grip', grip: 44, pistol: true },
+  couplet: { body: '#2e3136', furn: '#3a2d26', stock: 'none', rec: [42, 70], bar: 74, guard: [70, 70], mag: 'grip', grip: 46, pistol: true, big: true },
+  whisper: { body: '#2a2c30', furn: '#1d1f22', stock: 'fold', rec: [30, 56], bar: 64, guard: [56, 56], mag: 'grip', grip: 40, rail: true, can: true },
+  hatchet: { body: '#4b4f55', furn: '#2b2d31', stock: 'none', rec: [36, 66], bar: 76, guard: [66, 66], mag: 'gripLong', grip: 44, pistol: true, big: true },
   bison:   { body: '#6a6e73', furn: '#5a3d26', stock: 'none', rec: [36, 62], bar: 84, guard: [62, 62], mag: 'none', grip: 42, pistol: true, revolver: true },
 };
 
@@ -96,15 +110,18 @@ export function drawGunArt(ctx, key, att = {}, X = 0, Y = 0, W = 100, H = 40) {
   if (g.pistol) { part(ctx, [r0, top, r1, top, r1, bot - (g.big ? 0 : 1), r0, bot], g.body, 1.6); for (let i = r0 + 3; i < r0 + 10; i += 1.6) box(ctx, i, top + 1, 0.6, 4, shadeCol(g.body, 0.6)); box(ctx, r0 + 2, bot, r1 - r0 - 8, 2.4, g.furn); }
   else { part(ctx, [r0, top, r1, top, r1, bot, r0 + 4, bot + 1, r0, bot], g.body); box(ctx, r0 + 6, mid - 1.5, 7, 2, shadeCol(g.body, 0.6)); box(ctx, r0 + 16, top + 2, 2.5, 1.2, '#8a8f95'); }
   if (g.bolt) { ctx.strokeStyle = '#1b1d20'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(r0 + 14, mid); ctx.lineTo(r0 + 17, bot + 4); ctx.stroke(); ctx.fillStyle = '#2c2f33'; ctx.beginPath(); ctx.arc(r0 + 17, bot + 4.5, 1.8, 0, Math.PI * 2); ctx.fill(); }
+  if (g.rotary) for (let i = -1; i <= 1; i++) box(ctx, (g.guard[1] || r1) - 4, mid + i * 2.6 - 1, g.bar - (g.guard[1] || r1) + 6, 1.9, i ? '#1b1d20' : '#26292d', 0.9); // a cluster of spinning barrels
+  if (g.selector) box(ctx, r0 + 10, bot - 3, 3, 2, '#c94a2a'); // the fire selector, painted red
   if (g.handle) { part(ctx, [r0 + 8, top, r0 + 10, top - 6, r0 + 24, top - 6, r0 + 26, top], g.body); box(ctx, r0 + 11, top - 4.2, 13, 3, '#0e0f11'); }
   // --- pistol grip and trigger ---
   const gx = g.grip;
   part(ctx, [gx, bot - 0.5, gx + 6, bot - 0.5, gx + 4 + (g.pistol ? 2 : 0), bot + 13, gx - 2 + (g.pistol ? 1 : 0), bot + 13], g.furn, 1.2);
   ctx.strokeStyle = '#15171a'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(gx + 9, bot + 2.5, 2.6, 0, Math.PI); ctx.stroke();
+  if (g.lever) { ctx.strokeStyle = '#3a3d42'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(gx + 8, bot + 6, 7.5, 4.6, 0.15, 0, Math.PI * 2); ctx.stroke(); } // the lever loop round the trigger
   // --- magazine ---
   const mx = g.pistol ? gx - 1 : g.mag === 'bullpup' ? r0 + 14 : gx + 9;
   const ribs = (x0, y0, n, dx) => { for (let i = 0; i < n; i++) box(ctx, x0 + i * dx * 0.25, y0 + i * 2.6, 6, 0.6, 'rgba(0,0,0,0.35)'); };
-  if (g.mag === 'curved') { part(ctx, [mx, bot, mx + 8, bot, mx + 15, bot + 12, mx + 14, bot + 14, mx + 7, bot + 15], '#4a5058', 1.5); ribs(mx + 2, bot + 3, 4, 4); }
+  if (g.mag === 'curved') { if (g.taped) { part(ctx, [mx + 3, bot, mx + 11, bot, mx + 18, bot + 12, mx + 17, bot + 14, mx + 10, bot + 15], '#3c4148', 1.3); } part(ctx, [mx, bot, mx + 8, bot, mx + 15, bot + 12, mx + 14, bot + 14, mx + 7, bot + 15], '#4a5058', 1.5); ribs(mx + 2, bot + 3, 4, 4); if (g.taped) box(ctx, mx + 4, bot + 6, 10, 2.4, '#b8863a'); } // the Tandem: a second magazine taped on
   if (g.mag === 'bullpup') { part(ctx, [mx, bot, mx + 8, bot, mx + 14, bot + 11, mx + 13, bot + 13, mx + 6, bot + 14], '#4a5058', 1.5); ribs(mx + 2, bot + 3, 4, 4); }
   if (g.mag === 'long') { part(ctx, [mx, bot, mx + 6, bot, mx + 8, bot + 20, mx + 2, bot + 20], '#4a5058', 1.5); ribs(mx + 0.5, bot + 3, 7, 0.6); }
   if (g.mag === 'drum') { ctx.fillStyle = '#41464d'; ctx.beginPath(); ctx.arc(mx + 5, bot + 8, 7.5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.6; ctx.stroke(); ctx.beginPath(); ctx.arc(mx + 5, bot + 8, 3, 0, Math.PI * 2); ctx.stroke(); }

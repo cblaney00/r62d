@@ -6,7 +6,7 @@
 import { PX_PER_M } from '/shared/constants.js';
 import { drawXhair, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
 import { lockMouse } from './keys.js';
-import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
+import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -75,8 +75,8 @@ export function openArmory(el, opts) {
     cv.addEventListener('touchend', tend); cv.addEventListener('touchcancel', tend);
   }
   S.up = e => { if (e.button === 0) S.mouse.l = false; if (e.button === 2) S.mouse.r = false; };
-  S.key = e => { if (e.code === 'KeyR') reload(); if (e.key === 'Shift') S.shift = true; };
-  S.keyUp = e => { if (e.key === 'Shift') S.shift = false; };
+  S.key = e => { if (e.code === 'KeyR') reload(); if (e.key === 'Shift') S.shift = true; if (e.key === 'Control') S.low = true; };
+  S.keyUp = e => { if (e.key === 'Shift') S.shift = false; if (e.key === 'Control') S.low = false; };
   S.lock = () => { S.lockAsked = false; if (document.pointerLockElement !== cv) { S.unlockT = performance.now(); S.mouse.l = S.mouse.r = false; } };
   addEventListener('mouseup', S.up); addEventListener('keydown', S.key); addEventListener('keyup', S.keyUp); document.addEventListener('pointerlockchange', S.lock);
   for (const b of el.querySelectorAll('#armDist button')) b.onclick = () => { audio.ui(); S.dist = +b.dataset.d; resetRange(el); };
@@ -130,7 +130,7 @@ function resetRange(el) {
 function reload() {
   const w = WEAPONS[S.w];
   if (S.reloadT > 0 || S.ammo >= w.mag) return;
-  S.reloadT = w.reload; audio.foley(w.cls === 'Shotgun' ? 'shell' : 'magOut', undefined, undefined, true);
+  S.reloadT = reloadLen(w, S); if (w.tandem) S.tap = !S.tap; audio.foley(w.cls === 'Shotgun' ? 'shell' : 'magOut', undefined, undefined, true);
 }
 
 function tick(el, dt) {
@@ -143,7 +143,7 @@ function tick(el, dt) {
   if (S.reloadT > 0) { S.reloadT -= dt; if (S.reloadT <= 0) { S.ammo = w.mag; audio.foley(w.cls === 'Shotgun' ? 'shell' : 'magIn', undefined, undefined, true); } }
   if (S.burst && (S.reloadT > 0 || S.ammo <= 0)) S.burst = 0;
   if (S.burst) { if (S.fireCd <= 0) { fire(w, cv); if (!--S.burst) S.fireCd = Math.max(S.fireCd, w.burstGap || 0.3); } } // the rest of a burst fires by itself
-  else if (S.reloadT <= 0 && S.fireCd <= 0 && ((S.mouse.l && w.auto) || S.mouse.edge || S.t - (S.clickT ?? -9) < 0.15)) { // a click a hair early still fires
+  else if (S.reloadT <= 0 && S.fireCd <= 0 && ((S.mouse.l && fireAuto(w, S.adsT)) || S.mouse.edge || S.t - (S.clickT ?? -9) < 0.15)) { // a click a hair early still fires
     S.clickT = -9;
     if (S.ammo > 0) { fire(w, cv); if (w.burst > 1 && S.ammo > 0) S.burst = w.burst - 1; else if (w.burst > 1) S.fireCd = Math.max(S.fireCd, w.burstGap || 0.3); } else reload();
   }
@@ -240,8 +240,10 @@ function camera(cv, dt) {
 }
 
 function fire(w, cv) {
-  S.ammo--; S.fireCd = Math.max(S.fireCd, -0.02) + 60 / w.rpm; S.fired++;
-  const m = modsOf(S.w), cone = spreadCone(w, m, { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot, modsOf(S.w)) }), rc0 = S.rc;
+  if (S.t - (S.lastShot ?? -9) > 0.25) S.spinFrom = S.t; // the Cyclone winds up
+  S.ammo--; S.fireCd = Math.max(S.fireCd, -0.02) + 60 / fireRpm(w, S.adsT, S.t - S.spinFrom); S.fired++;
+  let m = modsOf(S.w); if (bipodOn(w, S.low, 0)) m = { ...m, kick: m.kick * w.bipod, sway: m.sway * w.bipod }; // Ctrl = crouched, for the Trestle's bipod
+  const cone = spreadCone(w, m, { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot, modsOf(S.w)) }), rc0 = S.rc;
   S.lastShot = S.t; // same rules as a match
   S.shots++; S.rc = Math.max(-recoilMax(w), Math.min(recoilMax(w), S.rc + recoilStep(w, m, S.shots)));
   audio.gunshot(S.w, undefined, undefined, true, !!m.quiet);
@@ -263,7 +265,7 @@ function fire(w, cv) {
       hitAny = true; S.hits++;
       const q = aimPoint(cv), onH = onHead(q.x, q.y, best.x, best.y); // same rule as a match: crosshair on the head
       const miss = Math.abs(best.x * dy - best.y * dx), head = miss < HEAD_R && onH && w.pellets === 1; // a pellet to the head only hurts more
-      const dmg = head ? best.hp : Math.round(w.dmg * m.dmg * fallAt(w, bt, m.range) * (miss < HEAD_R && onH ? 1.8 : 1));
+      const dmg = head ? best.hp : Math.round(fireDmg(w, S.adsT) * m.dmg * fallAt(w, bt, m.range) * (miss < HEAD_R && onH ? 1.8 : 1));
       best.hp -= dmg; best.flash = 1;
       S.pops.push({ x: best.x + (Math.random() - 0.5) * 14, y: best.y - 14, txt: head ? 'HEADSHOT' : String(dmg), head, life: 0.9 });
       if (best.hp <= 0) { best.deadT = 1.6; S.kills++; if (S.first === null) S.first = S.fired; audio.impact('flesh'); }
@@ -347,7 +349,7 @@ function draw(cv, dt) {
   c.textAlign = 'right'; c.font = `700 ${30 * dpr}px Barlow Condensed, sans-serif`; c.fillStyle = '#fff';
   c.fillText(S.reloadT > 0 ? 'RELOADING' : `${S.ammo} / ${w.mag}`, cv.width - 16 * dpr, cv.height - 16 * dpr);
   c.textAlign = 'left'; c.font = `600 ${14 * dpr}px Barlow Condensed, sans-serif`; c.fillStyle = 'rgba(255,255,255,0.6)';
-  c.fillText(isTouch ? 'Drag on the range to aim   ·   hold FIRE to shoot, AIM to aim in' : 'Left mouse: shoot   ·   Right mouse: aim in   ·   R: reload   ·   Esc: let go of the mouse', 14 * dpr, cv.height - 18 * dpr);
+  c.fillText(isTouch ? 'Drag on the range to aim   ·   hold FIRE to shoot, AIM to aim in' : 'Left mouse: shoot   ·   Right mouse: aim in   ·   R: reload' + (WEAPONS[S.w].bipod ? '   ·   Ctrl: crouch (bipod down)' : '') + '   ·   Esc: let go of the mouse', 14 * dpr, cv.height - 18 * dpr);
   if (document.pointerLockElement !== cv && !isTouch) { // not captured yet: the first click only takes control, as in a match
     const a = 0.65 + 0.35 * Math.sin(performance.now() / 260);
     c.textAlign = 'center'; c.font = `700 ${26 * dpr}px Barlow Condensed, sans-serif`; c.fillStyle = `rgba(255,255,255,${a})`;

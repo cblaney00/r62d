@@ -714,7 +714,7 @@ function aimAt(p, x, y) {
   const d = Math.min(300, Math.hypot(x - p.x, y - p.y));
   p.aimX = p.x + Math.cos(p.aim) * d; p.aimY = p.y + Math.sin(p.aim) * d;
 }
-function shootInput(inp, ai, gun) { const w = gun && WEAPONS[gun.w]; inp.fire = w && !w.auto ? (ai.semi = !ai.semi) ? 1 : 0 : 1; }
+function shootInput(inp, ai, gun) { const w = gun && WEAPONS[gun.w]; inp.fire = w && (!w.auto || w.dual) ? (ai.semi = !ai.semi) ? 1 : 0 : 1; }
 
 // ---- breaching: attackers who carry something that opens walls pick a site wall and open it ----
 // tool: which walls it can open, how it is used and how long to stand back afterwards.

@@ -409,6 +409,20 @@ const GUN_OWN = {
   javelin: { body: 1150, boom: 82, v: 0.82 },
   sentry:  { body: 1000, boom: 72, v: 0.9 },
   sparrow: { body: 1250, boom: 90, v: 0.72 },
+  verdict: { crack: 1.0, body: 860, boom: 62, v: 1.0 },
+  tandem:  { body: 940, boom: 70, mech: 0.04, v: 0.92 },
+  ferret:  { body: 1250, bodyTau: 0.026, boom: 88, v: 0.8 },
+  auger:   { crack: 0.85, body: 1100, boom: 78, drive: 2.5, v: 0.86 }, // sharper: the AP rounds
+  quill:   { crack: 0.6, blastTau: 0.016, body: 650, boom: 55, v: 1.15 },
+  hedge:   { mech: 0.05, boom: 46, boomTau: 0.12, v: 1.2 },
+  cyclone: { body: 1050, bodyTau: 0.03, boom: 74, boomTau: 0.05, mech: 0.0, v: 0.78 }, // a buzz, not a hammer
+  trestle: { crack: 1.05, boom: 56, drive: 3.0, v: 1.05 },
+  ranger:  { crack: 0.9, blastTau: 0.018, boom: 50, boomTau: 0.12, mech: 0.07, v: 1.15 },
+  mammoth: { crack: 1.4, blastTau: 0.024, boom: 38, boomTau: 0.2, drive: 3.8, mech: 0, v: 1.45 }, // deafening
+  needle:  { crack: 0.45, body: 1500, boom: 110, v: 0.62 },
+  couplet: { body: 1150, boom: 84, v: 0.78 },
+  whisper: { body: 1500, boom: 100, v: 0.66 },
+  hatchet: { crack: 0.65, body: 980, boom: 70, drive: 2.6, v: 0.92 },
   bison:   { crack: 0.7, blastTau: 0.014, boom: 62, boomTau: 0.09, drive: 2.8, mech: 0, v: 1.05 },
 };
 // a weapon id (or a class name) to its sound recipe

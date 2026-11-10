@@ -5,7 +5,7 @@
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { store } from '../server/store.js';
-import { WEAPONS, gunMods, spreadCone, settleTime, shotOffset, SPRAY, recoilStep } from '../shared/operators.js';
+import { WEAPONS, gunMods, spreadCone, settleTime, shotOffset, SPRAY, recoilStep , fireRpm } from '../shared/operators.js';
 import { BASE_SPEED, castSight } from '../shared/physics.js';
 
 let fails = 0;
@@ -66,7 +66,9 @@ for (const [id, w] of Object.entries(WEAPONS)) {
   const gun = { w: id, ammo: 9999, reserve: 0, att: {}, m: gunMods(id) };
   p.guns = [gun]; p.slot = 0; p.input = {}; p.prevInput = {}; p.fireCd = 0; tick(30);
   p.input = { fire: 1 }; const a0 = gun.ammo; tick(90); p.input = {}; tick(1);
-  const want = w.rpm / 20, got = a0 - gun.ammo; // 3 s of fire
+  // the Cyclone winds up: its rate climbs from spin.from to full over spin.t s (fireRpm), so count it shot by shot
+  let want = w.rpm / 20; if (w.spin) { let t = 0, n = 0; while (t < 3) { n++; t += 60 / fireRpm(w, 0, t); } want = n; }
+  const got = a0 - gun.ammo; // 3 s of fire
   if (Math.abs(got - want) > 1.5) fail(`${w.name}: fired ${got} shots in 3 s, its rate says ${want}`);
 }
 {

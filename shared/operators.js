@@ -56,9 +56,47 @@ export const WEAPONS = {
              adsMul: 0.85, kickMul: 0.6, fall: { from: 260, to: 520, min: 0.65 }, trait: 'A slow, hard-hitting defender\'s carbine: very easy to control and quick to the shoulder, but only 25 rounds and it weakens down long halls.' },
   sparrow: { name: 'Sparrow Compact', cls: 'Pistol', dmg: 28, rpm: 520, mag: 17, reserve: 68, reload: 1.4, spread: 0.05, ads: 0.017, bloom: 0.018, auto: false, pellets: 1, range: 850, len: 6,
              trait: 'A light, quick pistol: fast to fire and reload, but hits softer.' },
+  // He asked (2026-11-10): two more of every type, each one unique ("I would rather a gun not be in the game than be
+  // effectively a remake of another"). Every gun below does one thing no other gun does: its own rule (spin, bipod,
+  // dual, tandem, raise, stagger, wallShot) or a niche nobody else fills.
+  // assault rifles
+  verdict: { name: 'Verdict DMR-Carbine', cls: 'AR', dmg: 26, rpm: 700, mag: 24, reserve: 120, reload: 2.5, spread: 0.065, ads: 0.010, bloom: 0.013, auto: true, pellets: 1, range: 1250, len: 16,
+             dual: { dmg: 47, rpm: 330 }, kickMul: 1.1, trait: 'Two guns in one: full-auto from the hip, but aimed in it fires single heavy rounds (47 damage, three body hits drop anyone). Weak spraying aimed in, weak shots from the hip.' },
+  tandem:  { name: 'Tandem Carbine', cls: 'AR', dmg: 30, rpm: 680, mag: 28, reserve: 140, reload: 2.9, spread: 0.06, ads: 0.015, bloom: 0.012, auto: true, pellets: 1, range: 1000, len: 14,
+             tandem: 1.0, kickMul: 0.9, trait: 'Two magazines taped together: every other reload is a 1-second flip, the next one a slow full change (2.9 s). Count your reloads.' },
+  // submachine guns
+  ferret:  { name: 'Ferret SMG', cls: 'SMG', dmg: 23, rpm: 820, mag: 32, reserve: 160, reload: 2.1, spread: 0.06, ads: 0.024, bloom: 0.011, auto: true, pellets: 1, range: 850, len: 11,
+             hipMul: 0.55, raise: 0.08, adsMul: 1.25, fall: { from: 260, to: 520, min: 0.6 }, trait: 'Built for hip fire on the move: by far the tightest hip spray and up the instant a sprint ends, but slow to aim in and its aimed shots are no better than any SMG.' },
+  auger:   { name: 'Auger AP SMG', cls: 'SMG', dmg: 24, rpm: 620, mag: 35, reserve: 140, reload: 2.4, spread: 0.07, ads: 0.019, bloom: 0.010, auto: true, pellets: 1, range: 950, len: 13,
+             pen: 0.68, kickMul: 1.05, swayMul: 0.8, fall: { from: 300, to: 620, min: 0.7 }, trait: 'Armour-piercing rounds: loses barely anything through soft walls and barricades (as much as a marksman rifle), but fires slowly for an SMG.' },
+  // shotguns
+  quill:   { name: 'Quill Flechette', cls: 'Shotgun', dmg: 24, rpm: 150, mag: 6, reserve: 36, reload: 3.0, spread: 0.07, ads: 0.035, bloom: 0, auto: false, pellets: 4, range: 700, len: 15,
+             pen: 0.55, kickMul: 0.9, fall: { from: 160, to: 520, min: 0.45 }, trait: 'Four steel darts instead of buckshot: a tight pattern that reaches two rooms and pierces walls, but each blast holds few darts, so a miss is a miss.' },
+  hedge:   { name: 'Hedge Lever-12', cls: 'Shotgun', mode: 'lever-action', dmg: 14, rpm: 120, mag: 5, reserve: 35, reload: 2.8, spread: 0.15, ads: 0.10, bloom: 0, auto: false, pellets: 8, range: 400, len: 13,
+             stagger: 0.7, adsMul: 0.75, kickMul: 1.1, trait: 'Quick to the shoulder, and anyone its pellets hit is knocked off balance: slowed for a moment. Five shells, and the lever takes time.' },
+  // light machine guns
+  cyclone: { name: 'Cyclone Rotary', cls: 'LMG', dmg: 21, rpm: 1150, mag: 150, reserve: 150, reload: 6.5, spread: 0.10, ads: 0.03, bloom: 0.008, auto: true, pellets: 1, range: 950, len: 18,
+             spin: { from: 0.35, t: 1.4 }, adsMul: 1.2, kickMul: 0.7, swayMul: 1.1, trait: 'A spinning barrel: starts slow (400 rpm) and winds up over 1.4 s to the fastest fire in the game. 150 rounds and an endless reload. Let go and it winds down.' },
+  trestle: { name: 'Trestle LMG', cls: 'LMG', dmg: 32, rpm: 560, mag: 75, reserve: 150, reload: 4.8, spread: 0.11, ads: 0.022, bloom: 0.010, auto: true, pellets: 1, range: 1150, len: 17,
+             bipod: 0.4, kickMul: 1.35, swayMul: 1.2, adsMul: 1.15, trait: 'Wild on its feet, but crouched or lying still the bipod comes down and the recoil drops by 60%: a fixed gun for holding a long angle.' },
+  // marksman rifles
+  ranger:  { name: 'Ranger Lever Rifle', cls: 'DMR', mode: 'lever-action', dmg: 82, rpm: 115, mag: 7, reserve: 42, reload: 3.0, spread: 0.05, ads: 0.004, bloom: 0.03, auto: false, pellets: 1, range: 1250, len: 15,
+             adsMul: 0.7, kickMul: 1.25, settle: 0.45, trait: 'A short lever-action that aims in as fast as an SMG: two body hits from point blank to across the map, but slow between shots.' },
+  mammoth: { name: 'Mammoth .50', cls: 'DMR', mode: 'bolt-action', dmg: 135, rpm: 40, mag: 3, reserve: 18, reload: 3.8, spread: 0.11, ads: 0.0016, bloom: 0.06, auto: false, pellets: 1, range: 1900, len: 23,
+             pen: 0.9, adsMul: 1.5, kickMul: 1.8, settle: 1.1, oneShot: true, wallShot: 1, trait: 'Anti-materiel rifle: aimed in through the sniper scope, one body hit drops anyone even through one soft wall. Three rounds, the slowest bolt and aim of all, deafening, and its scope glints.' },
+  // pistols
+  needle:  { name: 'Needle Target Pistol', cls: 'Pistol', dmg: 31, rpm: 300, mag: 10, reserve: 50, reload: 1.9, spread: 0.035, ads: 0.004, bloom: 0.01, auto: false, pellets: 1, range: 1200, len: 9,
+             settle: 0.12, kickMul: 0.5, fall: { from: 700, to: 1100, min: 0.85 }, trait: 'A long-slide match pistol: almost no kick, exact again at once and full damage to rifle range, but it fires slowly for a pistol.' },
+  couplet: { name: 'Couplet Pistol', cls: 'Pistol', dmg: 24, rpm: 1100, mag: 18, reserve: 72, reload: 1.7, spread: 0.055, ads: 0.016, bloom: 0.02, auto: false, pellets: 1, range: 800, len: 7,
+             burst: 2, burstGap: 0.24, kickMul: 1.1, trait: 'Fires two rounds with every pull, the second landing almost on the first: two quick pulls drop anyone up close. Nine pulls a magazine.' },
+  // machine pistols
+  whisper: { name: 'Whisper MP', cls: 'MP', dmg: 20, rpm: 880, mag: 30, reserve: 120, reload: 1.9, spread: 0.08, ads: 0.03, bloom: 0.011, auto: true, pellets: 1, range: 700, len: 9,
+             quiet: true, fall: { from: 180, to: 420, min: 0.5 }, trait: 'Built-in suppressor: the only quiet attacker gun. Weak past a room.' },
+  hatchet: { name: 'Hatchet MP', cls: 'MP', dmg: 33, rpm: 600, mag: 15, reserve: 75, reload: 1.8, spread: 0.085, ads: 0.028, bloom: 0.014, auto: true, pellets: 1, range: 650, len: 8,
+             kickMul: 1.6, swayMul: 0.8, fall: { from: 160, to: 380, min: 0.5 }, trait: 'A heavy-calibre machine pistol: four hits drop anyone, but only 15 rounds and it climbs hard.' },
 };
 // guns only carried as a sidearm (second slot)
-export const SIDEARMS = new Set(['p10', 'vex50', 'bison', 'gnat', 'stub', 'sparrow']);
+export const SIDEARMS = new Set(['p10', 'vex50', 'bison', 'gnat', 'stub', 'sparrow', 'needle', 'couplet', 'whisper', 'hatchet']);
 
 // armor: 1 = heavy/slow, 2 = medium, 3 = light/fast. HP follows armor.
 export const ARMOR_HP = { 1: 150, 2: 132, 3: 120 }; // he asked: everyone a bit tougher (+20%); the Pike still kills with one body shot
@@ -252,58 +290,58 @@ export const GADGET_COUNT = { smoke: 2, frag: 2, claymore: 1, breach: 2, stun: 2
 // He asked for side-specific weapons: no gun is carried by both attackers and defenders, and defence has no marksman
 // or sniper rifles (the Anvil slug does that job). tests/weapons.js checks it.
 export const LOADOUTS = {
-  ember:   { primaries: ['k4', 'tusk', 'rook'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'breach'] },
-  kestrel: { primaries: ['longbow', 'k4', 'pike', 'saker'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'claymore'] },
-  hammer:  { primaries: ['tusk', 'javelin', 'ram'], secondaries: ['p10', 'stub'], gadgets: ['claymore', 'frag'] },
-  talon:   { primaries: ['sabre', 'k4', 'trident'], secondaries: ['p10', 'stub'], gadgets: ['breach', 'stun'] },
-  bulwark: { primaries: ['p10', 'bison'], secondaries: [], gadgets: ['stun', 'smoke'] }, // one hand on the shield: pistols only
-  rivet:   { primaries: ['k4', 'sabre', 'tusk'], secondaries: ['p10', 'bison'], gadgets: ['stun', 'smoke'] },
-  haze:    { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['breach', 'frag'] },
-  glint:   { primaries: ['javelin', 'longbow', 'heron'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'claymore'] },
-  brisk:   { primaries: ['javelin', 'tusk', 'visor'], secondaries: ['p10', 'bison'], gadgets: ['stun', 'smoke'] },
-  onyx:    { primaries: ['mule', 'ox', 'aegis'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'breach'] },
-  prism:   { primaries: ['javelin', 'k4', 'heron'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'stun'] },
-  volt:    { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['breach', 'claymore'] },
-  tether:  { primaries: ['longbow', 'k4', 'pike', 'saker'], secondaries: ['p10', 'bison'], gadgets: ['claymore', 'smoke'] },
-  strider: { primaries: ['javelin', 'sabre', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'stun'] },
-  ferro:   { primaries: ['tusk', 'mule', 'k4'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'claymore'] },
-  mason:   { primaries: ['drummer', 'breaker', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
-  veil:    { primaries: ['marten', 'wasp', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['nitro', 'impact'] },
-  lynx:    { primaries: ['lark', 'hornet', 'wasp'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
-  solace:  { primaries: ['breaker', 'lark', 'glass'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
-  wraith:  { primaries: ['lark', 'marten', 'thorn'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
-  bramble: { primaries: ['wasp', 'breaker', 'anvil'], secondaries: ['sparrow', 'vex50'], gadgets: ['wire', 'impact'] },
-  kite:    { primaries: ['hornet', 'lark', 'sentry'], secondaries: ['vex50', 'gnat'], gadgets: ['dshield', 'nitro'] },
-  gravel:  { primaries: ['lark', 'hornet', 'marten'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'wire'] },
-  shunt:   { primaries: ['sentry', 'breaker', 'drummer'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'dshield'] },
-  hush:    { primaries: ['marten', 'wasp', 'anvil'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'nitro'] },
-  shade:   { primaries: ['wasp', 'breaker', 'lark'], secondaries: ['vex50', 'sparrow'], gadgets: ['nitro', 'wire'] },
-  rampart: { primaries: ['breaker', 'drummer', 'bastion'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
-  miasma:  { primaries: ['marten', 'breaker', 'sentry'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
-  snare:   { primaries: ['breaker', 'lark', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['impact', 'nitro'] },
-  argus:   { primaries: ['hornet', 'lark', 'marten'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
-  salvo: { primaries: ['rook', 'k4', 'javelin'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'claymore'] },
-  torque: { primaries: ['ox', 'tusk', 'k4'], secondaries: ['p10', 'bison'], gadgets: ['smoke', 'stun'] },
-  rush: { primaries: ['tusk', 'javelin', 'sabre'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'frag'] },
-  blaze: { primaries: ['trident', 'k4', 'javelin'], secondaries: ['p10', 'bison'], gadgets: ['smoke', 'breach'] },
-  echo: { primaries: ['sabre', 'longbow', 'heron'], secondaries: ['p10', 'bison'], gadgets: ['claymore', 'smoke'] },
-  mark: { primaries: ['heron', 'javelin', 'longbow'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'smoke'] },
-  patch: { primaries: ['k4', 'javelin', 'trident'], secondaries: ['p10', 'bison'], gadgets: ['smoke', 'breach'] },
-  trench: { primaries: ['mule', 'rook', 'tusk'], secondaries: ['p10', 'stub'], gadgets: ['breach', 'frag'] },
-  wren: { primaries: ['javelin', 'sabre', 'trident'], secondaries: ['p10', 'stub'], gadgets: ['smoke', 'stun'] },
-  vapor: { primaries: ['javelin', 'heron', 'tusk'], secondaries: ['p10', 'bison'], gadgets: ['frag', 'stun'] },
-  crow: { primaries: ['sabre', 'javelin', 'tusk'], secondaries: ['p10', 'stub'], gadgets: ['stun', 'smoke'] },
-  solder: { primaries: ['drummer', 'sentry', 'breaker'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'wire'] },
-  latch: { primaries: ['lark', 'wasp', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
-  hound: { primaries: ['marten', 'lark', 'anvil'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'nitro'] },
-  ruse: { primaries: ['wasp', 'lark', 'hornet'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
-  rally: { primaries: ['hornet', 'marten', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
-  lens: { primaries: ['lark', 'hornet', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['dshield', 'nitro'] },
-  magpie: { primaries: ['marten', 'wasp', 'lark'], secondaries: ['sparrow', 'vex50'], gadgets: ['nitro', 'impact'] },
-  audit: { primaries: ['wasp', 'marten', 'lark'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'wire'] },
-  tonic: { primaries: ['breaker', 'lark', 'sentry'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
-  ward: { primaries: ['marten', 'sentry', 'anvil'], secondaries: ['vex50', 'gnat'], gadgets: ['dshield', 'impact'] },
-  girder: { primaries: ['drummer', 'breaker', 'anvil'], secondaries: ['vex50', 'sparrow'], gadgets: ['wire', 'dshield'] },
+  ember:   { primaries: ['k4', 'tusk', 'rook', 'ranger'], secondaries: ['p10', 'stub', 'hatchet'], gadgets: ['smoke', 'breach'] },
+  kestrel: { primaries: ['longbow', 'k4', 'pike', 'saker'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['frag', 'claymore'] },
+  hammer:  { primaries: ['tusk', 'javelin', 'ferret', 'ram'], secondaries: ['p10', 'stub', 'hatchet'], gadgets: ['claymore', 'frag'] },
+  talon:   { primaries: ['sabre', 'verdict', 'trident', 'heron'], secondaries: ['p10', 'stub', 'needle'], gadgets: ['breach', 'stun'] },
+  bulwark: { primaries: ['p10', 'bison', 'needle'], secondaries: [], gadgets: ['stun', 'smoke'] }, // one hand on the shield: pistols only
+  rivet:   { primaries: ['k4', 'sabre', 'quill', 'longbow'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['stun', 'smoke'] },
+  haze:    { primaries: ['verdict', 'javelin', 'trident', 'heron'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['breach', 'frag'] },
+  glint:   { primaries: ['javelin', 'longbow', 'heron'], secondaries: ['p10', 'bison', 'whisper'], gadgets: ['frag', 'claymore'] },
+  brisk:   { primaries: ['ferret', 'tusk', 'ranger', 'visor'], secondaries: ['p10', 'bison', 'hatchet'], gadgets: ['stun', 'smoke'] },
+  onyx:    { primaries: ['mule', 'ox', 'trestle', 'aegis'], secondaries: ['p10', 'stub', 'hatchet'], gadgets: ['smoke', 'breach'] },
+  prism:   { primaries: ['javelin', 'k4', 'heron'], secondaries: ['p10', 'stub', 'whisper'], gadgets: ['smoke', 'stun'] },
+  volt:    { primaries: ['k4', 'javelin', 'verdict', 'heron'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['breach', 'claymore'] },
+  tether:  { primaries: ['longbow', 'k4', 'pike', 'mammoth'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['claymore', 'smoke'] },
+  strider: { primaries: ['ferret', 'sabre', 'trident', 'ranger'], secondaries: ['p10', 'bison', 'whisper'], gadgets: ['frag', 'stun'] },
+  ferro:   { primaries: ['tusk', 'mule', 'quill', 'k4'], secondaries: ['p10', 'stub', 'hatchet'], gadgets: ['stun', 'claymore'] },
+  mason:   { primaries: ['drummer', 'breaker', 'sentry', 'cyclone'], secondaries: ['vex50', 'sparrow', 'couplet'], gadgets: ['dshield', 'wire'] },
+  veil:    { primaries: ['marten', 'wasp', 'anvil', 'auger'], secondaries: ['vex50', 'gnat'], gadgets: ['nitro', 'impact'] },
+  lynx:    { primaries: ['lark', 'hornet', 'wasp', 'auger'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
+  solace:  { primaries: ['breaker', 'lark', 'tandem', 'glass'], secondaries: ['vex50', 'sparrow', 'couplet'], gadgets: ['wire', 'dshield'] },
+  wraith:  { primaries: ['lark', 'marten', 'auger', 'thorn'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
+  bramble: { primaries: ['wasp', 'breaker', 'anvil', 'hedge'], secondaries: ['sparrow', 'vex50', 'couplet'], gadgets: ['wire', 'impact'] },
+  kite:    { primaries: ['hornet', 'lark', 'sentry', 'tandem'], secondaries: ['vex50', 'gnat', 'couplet'], gadgets: ['dshield', 'nitro'] },
+  gravel:  { primaries: ['lark', 'hornet', 'marten', 'auger'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'wire'] },
+  shunt:   { primaries: ['sentry', 'breaker', 'drummer', 'cyclone'], secondaries: ['vex50', 'gnat', 'couplet'], gadgets: ['wire', 'dshield'] },
+  hush:    { primaries: ['marten', 'wasp', 'anvil', 'hedge'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'nitro'] },
+  shade:   { primaries: ['wasp', 'breaker', 'lark', 'tandem'], secondaries: ['vex50', 'sparrow'], gadgets: ['nitro', 'wire'] },
+  rampart: { primaries: ['breaker', 'drummer', 'cyclone', 'bastion'], secondaries: ['vex50', 'sparrow', 'couplet'], gadgets: ['dshield', 'wire'] },
+  miasma:  { primaries: ['marten', 'breaker', 'sentry', 'tandem'], secondaries: ['vex50', 'gnat', 'couplet'], gadgets: ['wire', 'impact'] },
+  snare:   { primaries: ['breaker', 'lark', 'anvil', 'hedge'], secondaries: ['vex50', 'sparrow', 'couplet'], gadgets: ['impact', 'nitro'] },
+  argus:   { primaries: ['hornet', 'lark', 'marten', 'auger'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
+  salvo: { primaries: ['rook', 'k4', 'javelin', 'longbow'], secondaries: ['p10', 'stub', 'needle'], gadgets: ['stun', 'claymore'] },
+  torque: { primaries: ['ox', 'tusk', 'trestle', 'longbow'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['smoke', 'stun'] },
+  rush: { primaries: ['tusk', 'javelin', 'sabre', 'quill'], secondaries: ['p10', 'stub', 'hatchet'], gadgets: ['stun', 'frag'] },
+  blaze: { primaries: ['trident', 'k4', 'javelin', 'heron'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['smoke', 'breach'] },
+  echo: { primaries: ['sabre', 'longbow', 'heron'], secondaries: ['p10', 'bison', 'whisper'], gadgets: ['claymore', 'smoke'] },
+  mark: { primaries: ['heron', 'javelin', 'longbow'], secondaries: ['p10', 'bison', 'whisper'], gadgets: ['frag', 'smoke'] },
+  patch: { primaries: ['k4', 'verdict', 'javelin', 'longbow'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['smoke', 'breach'] },
+  trench: { primaries: ['mule', 'rook', 'trestle', 'longbow'], secondaries: ['p10', 'stub', 'needle'], gadgets: ['breach', 'frag'] },
+  wren: { primaries: ['javelin', 'ferret', 'trident'], secondaries: ['p10', 'stub', 'whisper'], gadgets: ['smoke', 'stun'] },
+  vapor: { primaries: ['javelin', 'heron', 'tusk'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['frag', 'stun'] },
+  crow: { primaries: ['sabre', 'ferret', 'quill'], secondaries: ['p10', 'stub', 'whisper'], gadgets: ['stun', 'smoke'] },
+  solder: { primaries: ['drummer', 'sentry', 'breaker', 'cyclone'], secondaries: ['vex50', 'sparrow', 'couplet'], gadgets: ['dshield', 'wire'] },
+  latch: { primaries: ['lark', 'wasp', 'anvil', 'hedge'], secondaries: ['vex50', 'gnat'], gadgets: ['wire', 'impact'] },
+  hound: { primaries: ['marten', 'lark', 'anvil', 'auger'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'nitro'] },
+  ruse: { primaries: ['wasp', 'lark', 'hornet', 'tandem'], secondaries: ['sparrow', 'gnat'], gadgets: ['nitro', 'impact'] },
+  rally: { primaries: ['hornet', 'marten', 'anvil', 'hedge'], secondaries: ['vex50', 'gnat'], gadgets: ['impact', 'nitro'] },
+  lens: { primaries: ['lark', 'hornet', 'sentry', 'tandem'], secondaries: ['vex50', 'sparrow', 'couplet'], gadgets: ['dshield', 'nitro'] },
+  magpie: { primaries: ['marten', 'wasp', 'lark', 'auger'], secondaries: ['sparrow', 'vex50'], gadgets: ['nitro', 'impact'] },
+  audit: { primaries: ['wasp', 'marten', 'lark', 'auger'], secondaries: ['sparrow', 'gnat'], gadgets: ['impact', 'wire'] },
+  tonic: { primaries: ['breaker', 'lark', 'sentry', 'hedge'], secondaries: ['vex50', 'sparrow', 'couplet'], gadgets: ['wire', 'dshield'] },
+  ward: { primaries: ['marten', 'sentry', 'anvil', 'tandem'], secondaries: ['vex50', 'gnat', 'couplet'], gadgets: ['dshield', 'impact'] },
+  girder: { primaries: ['drummer', 'breaker', 'anvil', 'cyclone'], secondaries: ['vex50', 'sparrow', 'couplet'], gadgets: ['wire', 'dshield'] },
 };
 // Riot shields (he asked: a few operators get one as their third primary, each with its own personality). Picked as the
 // primary, the shield is held up in front all the time and the pistol is drawn behind it (like BULWARK): aim in to swing
@@ -492,7 +530,7 @@ export function gunMods(w, a) {
 // the distance with iron sights (ADS_GUN per class, ADS_OWN for a few guns that differ from their class), the sight
 // stretches it (ADS_SIGHT, at most 1.8x; the gun spans 2-11 m, 5.5x)
 export const ADS_GUN = { Shotgun: 2.5, MP: 3, Pistol: 3.5, SMG: 4.5, AR: 6, LMG: 7, DMR: 9 };
-export const ADS_OWN = { stub: 2, anvil: 5, bison: 4.5, heron: 8, pike: 11, saker: 11 };
+export const ADS_OWN = { stub: 2, anvil: 5, bison: 4.5, heron: 8, pike: 11, saker: 11, verdict: 7, quill: 4.5, ranger: 6, mammoth: 12, needle: 5, ferret: 4 };
 export const ADS_SIGHT = { iron: 1, reddot: 1.1, holo: 1.25, prism: 1.5, scope: 1.8 };
 export const ADS_START = { sniper: 64 }; // the sniper scope: as far as you can see (main.js adsReset), up to its reach
 export const adsStart = (sight, w) => { const g = WEAPONS[w]; return (ADS_OWN[w] ?? (g && ADS_GUN[g.cls]) ?? ADS_GUN.AR) * (ADS_SIGHT[sight] || 1); };
@@ -625,9 +663,9 @@ export const HIP_FIRST = 0.022;
 export function spreadCone(w, m, { at = 0, run = 0, crouch = false, shots = 0 } = {}) {
   // a settled first shot: dead on when aimed in, but from the hip a small cone (he asked: hip headshots were too easy).
   // HIP_FIRST rad at most: still on the body at 5 m, a headshot past a few metres mostly luck; it closes as you aim in
-  if (shots <= 0 && w.pellets === 1) return (HIP_FIRST + run * 0.05) * m.hip * (1 - at);
+  if (shots <= 0 && w.pellets === 1) return (HIP_FIRST + run * 0.05) * m.hip * (w.hipMul || 1) * (1 - at);
   const f = w.pellets > 1 ? 1 : Math.min(1, shots); // partly cooled: a partly opened cone
-  const hip = (w.spread * (crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip;
+  const hip = (w.spread * (crouch && run < 0.15 ? 0.9 : 1) + run * 0.05) * m.hip * (w.hipMul || 1); // the Ferret: a tight hip spray
   const ads = w.ads * m.adsSpread * (1 + run * 0.5);
   const burst = w.pellets > 1 ? 0 : Math.min(0.05, Math.max(0, shots - 1) * w.bloom * 0.5);
   return (hip + (ads - hip) * at) * f + burst * (1 - 0.7 * at);
@@ -672,6 +710,20 @@ export const SPRAY = {
   javelin: { pull: 0.5,  zig: 0.6, per: 4, flip: 0,  k: 0.9, mx: 1 },
   sentry:  { pull: 0.2,  zig: 0.3, per: 6, flip: 0,  k: 0.8, mx: 0.8 },  // almost straight up, very calm
   sparrow: { pull: 0.5,  zig: 0.7, per: 3, flip: 0,  k: 0.9, mx: 1 },
+  verdict: { pull: -0.5, zig: 0.7, per: 3, flip: 8,  k: 1.1, mx: 1.2 },  // left, then right: it was never meant to spray
+  tandem:  { pull: 0.6,  zig: 0.5, per: 7, flip: 14, k: 1,   mx: 1 },    // a slow right drift that comes back the other way
+  ferret:  { pull: -0.3, zig: 1.0, per: 5, flip: 0,  k: 1,   mx: 1 },    // a lazy wobble, slightly left
+  auger:   { pull: 0.9,  zig: 0.2, per: 6, flip: 0,  k: 1.05, mx: 1.2 }, // a firm steady pull right
+  quill:   { pull: -0.5, zig: 0.4, per: 2, flip: 0,  k: 0.9, mx: 1 },
+  hedge:   { pull: 0.7,  zig: 0.5, per: 2, flip: 0,  k: 1.1, mx: 1.2 },
+  cyclone: { pull: 0.1,  zig: 1.5, per: 3, flip: 0,  k: 0.7, mx: 1.3 },  // buzzes side to side, hardly climbs sideways
+  trestle: { pull: -0.9, zig: 0.9, per: 4, flip: 0,  k: 1.35, mx: 1.6 }, // hard left, unless the bipod is down
+  ranger:  { pull: 0.6,  zig: 0.3, per: 2, flip: 0,  k: 1.25, mx: 1.3 },
+  mammoth: { pull: -0.6, zig: 0,   per: 2, flip: 0,  k: 1.8, mx: 1.8 },  // a huge shove, slightly left
+  needle:  { pull: 0.1,  zig: 0.2, per: 3, flip: 0,  k: 0.5, mx: 0.6 },  // barely moves
+  couplet: { pull: 0.8,  zig: 0.2, per: 2, flip: 0,  k: 1.1, mx: 1.1 },
+  whisper: { pull: -0.6, zig: 1.0, per: 3, flip: 0,  k: 1,   mx: 1.2 },
+  hatchet: { pull: 0.4,  zig: 0.6, per: 4, flip: 0,  k: 1.6, mx: 1.7 },  // climbs hard
 };
 for (const [k, w] of Object.entries(WEAPONS)) w.id = k;
 const sprayOf = w => SPRAY[w.id] || { pull: 0.6, zig: 0.6, per: 6, flip: 6, k: 1, mx: 1 };
@@ -719,3 +771,13 @@ export function causeOf(w, killerOp) {
   return { kind: gk ? 'gadget' : 'other', title: w || 'Unknown', text: CAUSE_TEXT[w] || '' };
 }
 
+
+// The new guns' own rules (he asked 2026-11-10: every gun unique), shared by the server and the Armory.
+// at = how far aimed in (0-1), spinT = seconds the trigger has been held, speed = px/s.
+export const dualOn = (w, at) => !!(w.dual && at >= 0.6); // the Verdict, aimed in: single heavy rounds
+export const fireAuto = (w, at) => dualOn(w, at) ? false : !!w.auto;
+export const fireDmg = (w, at) => dualOn(w, at) ? w.dual.dmg : w.dmg;
+export const fireRpm = (w, at, spinT = 9) => dualOn(w, at) ? w.dual.rpm
+  : w.spin ? w.rpm * (w.spin.from + (1 - w.spin.from) * Math.min(1, Math.max(0, spinT) / w.spin.t)) : w.rpm; // the Cyclone winds up
+export const bipodOn = (w, low, speed) => !!(w.bipod && low && speed < 12); // the Trestle: crouched or lying, standing still
+export const reloadLen = (w, gun) => w.tandem && gun && gun.tap ? w.tandem : w.reload; // the Tandem: every other reload is quick

@@ -7,7 +7,7 @@ import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldP
 import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf } from '../shared/operators.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
 const PING_KINDS = new Set(['go', 'omw', 'watch', 'hold', 'danger', 'help', 'enemy', 'open']); // the ping wheel (public/js/pingwheel.js)
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 const BARRI_BULLET_HP = 320; // bullet damage that breaks a whole wooden barricade (he asked)
@@ -610,7 +610,7 @@ export class Game {
     // how loud your steps are follows how fast you move (he asked): walking/crouching is silent, aiming in is faint, a jog is loud
     const loud = p.spr && moved > BASE_SPEED ? SPRINT_LOUD : p.input.crouch || p.pr ? 0 : 320 * Math.max(0, Math.min(1, (moved / PX_PER_M - 1.45) / (M_S.run - 1.45)));
     p.moving = moved < 5 ? 0 : loud === SPRINT_LOUD ? 3 : loud < 60 ? 1 : 2;
-    if (p.spr) p.gunUp = this.time + SPRINT_RAISE;
+    if (p.spr) { const g = p.guns[p.slot], gw = g && WEAPONS[g.w]; p.gunUp = this.time + (gw && gw.raise !== undefined ? gw.raise : SPRINT_RAISE); } // the Ferret comes up at once
     if (p.slT > 0) { p.gunUp = 0; if (!p.sliding) { p.sliding = true; this.noise(p.x, p.y, this.side(p), 420); this.events.push({ e: 'snd', s: 'slide', x: r1(p.x), y: r1(p.y), id: p.id }); } } else p.sliding = false; // you can shoot from the hip during a slide
     if (p.landed) { p.landed = false; if (!p.shrouded) this.noise(p.x, p.y, this.side(p), 220); this.events.push({ e: 'snd', s: 'land', x: r1(p.x), y: r1(p.y), id: p.id }); } // a landing thump
     if (loud >= 30 && !this.ghost(p) && !p.shrouded && this.time - (p.noiseT || 0) > 0.3) { p.noiseT = this.time; this.noise(p.x, p.y, this.side(p), loud); } // running footsteps (none from HUSH's shroud)
@@ -816,18 +816,19 @@ export class Game {
     } else if (canShoot && (inp.fire || click)) {
       const w = WEAPONS[gun.w];
       const edge = !prev.fire || !!click;
-      if (p.fireCd <= 0 && (w.auto || edge)) {
+      const auto = fireAuto(w, p.adsT || 0);
+      if (p.fireCd <= 0 && (auto || edge)) {
         if (gun.ammo > 0) { this.fire(p, gun, w, click); if (w.burst > 1) { p.burst = w.burst - 1; p.burstW = gun.w; if (!gun.ammo) { p.burst = 0; p.fireCd = Math.max(p.fireCd, w.burstGap || 0.3); } } }
         else if (gun.reserve > 0) this.startReload(p);
         else if (edge) this.events.push({ e: 'snd', s: 'empty', x: r1(p.x), y: r1(p.y) });
-      } else if (click && !w.auto && p.fireCd > 0) p.click = click;
+      } else if (click && !auto && p.fireCd > 0) p.click = click;
     } else if (click && gunComing) p.click = click;
   }
 
   startReload(p) {
     const gun = p.guns[p.slot];
     if (!gun || p.reloadT > 0 || gun.reserve <= 0 || gun.ammo >= WEAPONS[gun.w].mag) return;
-    p.reloadT = WEAPONS[gun.w].reload;
+    const rw = WEAPONS[gun.w]; p.reloadT = p.reloadLen = reloadLen(rw, gun); if (rw.tandem) gun.tap = !gun.tap; // the Tandem: the taped magazine, then a full change
     this.events.push({ e: 'snd', s: 'reload', x: r1(p.x), y: r1(p.y), id: p.id });
   }
 
@@ -839,11 +840,16 @@ export class Game {
 
   fire(p, gun, w, click = null) {
     this.noise(p.x, p.y, this.side(p), (gun.m && gun.m.quiet) ? 260 : 950);
-    gun.ammo--; p.fireCd = Math.max(p.fireCd, -1 / 30) + 60 / w.rpm; // keep the leftover: guns fire at their real rate, not rounded up to whole ticks
+    if (this.time - (p.lastShot ?? -9) > 0.25) p.spinFrom = this.time; // the Cyclone winds up from here (and down when you let go)
+    const at0 = p.adsT || 0;
+    gun.ammo--; p.fireCd = Math.max(p.fireCd, -1 / 30) + 60 / fireRpm(w, at0, this.time - p.spinFrom); // keep the leftover: guns fire at their real rate, not rounded up to whole ticks
     if (p.ms) p.ms.shots += w.pellets;
     // hip fire is a loose cone that widens while moving; aimed fire is accurate even on the move (R6 rules)
     const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED + (p.air > 0 ? 1.5 : 0)), at = p.adsT || 0; // mid-jump: wild
-    const m = gun.m || gunMods(gun.w);
+    let m = gun.m || gunMods(gun.w);
+    const low = !!(p.input.crouch || p.pr >= 1);
+    if (bipodOn(w, low, Math.hypot(p.vx || 0, p.vy || 0))) m = { ...m, kick: m.kick * w.bipod, sway: m.sway * w.bipod }; // the Trestle's bipod is down
+    const D = fireDmg(w, at0) * m.dmg; // the Verdict hits harder aimed in
     // the aiming model (shared/operators.js): exact first shot, a fixed cone after that, a fixed recoil pattern
     const cone = spreadCone(w, m, { at, run, crouch: !!(p.input.crouch || p.pr >= 1), shots: aimHeat(w, p.shots || 0, this.time - p.lastShot, m) }) * (this.time < (p.dazeUntil || 0) && p.shots ? 1.7 : 1); // dazed: shaky follow-ups
     const aim = click ? click.a : p.aim, vt = p.viewTime;
@@ -856,9 +862,9 @@ export class Game {
       const hole = this.holeAim(p); // aimed at a spot seen through an open hatch: the bullet goes down (or up) there
       const into = !hole && this.aimedHatch(p, a); // aimed at a closed hatch from on top: shotguns and DMRs chew it
       const eye = leanPoint(this.map, p.x, p.y, p.aim, p.lo || 0); // a lean shoots from the tipped upper body
-      let end = hole ? this.shotThroughHole(p, eye, a, hole, w.range, w.dmg * m.dmg, w.name, w.cls) : this.hitscan(p, eye.x, eye.y, a, into ? into.ad : w.range, w.dmg * m.dmg, w.name, w.cls);
-      if (into && end.k === 'none') this.shotThroughHatch(p, a, into, w.dmg * m.dmg, w.name, w.cls);
-      else if (this.winCarry && end.k === 'none') end = this.shotOutWindow(p, eye, a, w.range, w.dmg * m.dmg, w.name, w.cls);
+      let end = hole ? this.shotThroughHole(p, eye, a, hole, w.range, D, w.name, w.cls) : this.hitscan(p, eye.x, eye.y, a, into ? into.ad : w.range, D, w.name, w.cls);
+      if (into && end.k === 'none') this.shotThroughHatch(p, a, into, D, w.name, w.cls);
+      else if (this.winCarry && end.k === 'none') end = this.shotOutWindow(p, eye, a, w.range, D, w.name, w.cls);
       this.winCarry = null;
       if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
     }
@@ -1087,9 +1093,11 @@ export class Game {
       this.shotPens = pens; // the death card says "through a wall"
       if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
       else if (head && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
-      else if (W && W.oneShot && !pens && !q.downed && mult >= 1 && scopedIn(src)) this.damage(q, 9999, src, wname, ang); // he asked: the big sniper rifles still drop anyone with one clean body shot; then (a prism made it too strong) only aimed in through the sniper scope
+      else if (W && W.oneShot && !q.downed && scopedIn(src) && (!pens && mult >= 1 || W.wallShot && pens <= W.wallShot)) // the Mammoth: through one soft wall too
+        this.damage(q, 9999, src, wname, ang); // he asked: the big sniper rifles still drop anyone with one clean body shot; then (a prism made it too strong) only aimed in through the sniper scope
       else this.damage(q, dmg * mult * fall, src, wname, ang);
       this.shotPens = 0;
+      if (W && W.stagger && q.alive && !q.downed) q.slowUntil = Math.max(q.slowUntil || 0, this.time + W.stagger); // the Hedge knocks them off balance
     } else if (best && best.e && best.e.tu) { best.e.offUntil = Math.max(best.e.offUntil || 0, this.time + 8); this.events.push({ e: 'hit', k: 'spark', x: r1(ex), y: r1(ey) }); }
     else if (best && best.e) this.hitEnt(best.e, src);
     else if (kind === 'hard' || kind === 'prop') this.events.push({ e: 'hit', k: kind, x: r1(ex), y: r1(ey) });
@@ -2920,7 +2928,7 @@ export class Game {
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
-        el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / WEAPONS[g.w].reload) : 0,
+        el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadLen || WEAPONS[g.w].reload)) : 0, rq: p.reloadT > 0 && p.reloadLen && p.reloadLen !== WEAPONS[g.w].reload ? r2(p.reloadLen) : undefined,
         ct: p.ctrl, cf: this.tv && p.ctrl === 'cam' ? p.feedId : undefined, // ESPORTS TV: which camera they are looking through
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
         gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch || p.pr || p.slR > 0 ? 1 : 0, sd: p.slT > 0 ? 1 : undefined, pn: p.pr >= 1 ? 1 : undefined, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, au: p.ctrl === 'body' && !p.downed && !p.rope && aimUpHatch(this.map, p.x, p.y, p.aimX, p.aimY) ? 1 : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
