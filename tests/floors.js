@@ -19,15 +19,15 @@ for (const id of process.argv[2] ? [process.argv[2]] : MAP_LIST) {
   const uppers = m.floors.filter(f => f.i > 0 && !f.roof);
   for (const f of uppers) ok((count.get(f.i) || 0) > 50, id, f.name, 'has almost no breakable floor', count.get(f.i) || 0);
   if (!uppers.length) { console.log(id, 'one floor only'); continue; }
-  // a spot in the middle of a room on the first upper floor
+  // a spot on the first upper floor (room middles first) where someone can stand a step away and set a charge
+  a.op = 'ember'; g.equip(a); Object.assign(a, { alive: true, downed: false, ctrl: 'body', staged: false, input: {}, prevInput: {}, gadgetCount: 3, hp: 9999, maxHp: 9999 });
+  const cands = m.rooms.filter(r => r.fl === uppers[0].i).sort((p, q) => q.w * q.h - p.w * p.h).map(r => floorSpot(m, (r.x + r.w / 2) * CELL, (r.y + r.h / 2) * CELL)).filter(k => k >= 0);
+  for (let k = 0; k < m.tiles.length; k += 5) if (m.flAt[k] === uppers[0].i && floorSpot(m, (k % W + 1) * CELL, (Math.floor(k / W) + 1) * CELL) === k) cands.push(k);
   let spot = null;
-  for (const r of m.rooms.filter(r => r.fl === uppers[0].i).sort((p, q) => q.w * q.h - p.w * p.h)) {
-    const k0 = floorSpot(m, (r.x + r.w / 2) * CELL, (r.y + r.h / 2) * CELL); if (k0 >= 0) { spot = { k0, x: (k0 % W + 1) * CELL, y: (Math.floor(k0 / W) + 1) * CELL }; break; }
-  }
-  if (!spot) for (let k = 0; k < m.tiles.length && !spot; k++) if (m.flAt[k] === uppers[0].i && floorSpot(m, (k % W + 1) * CELL, (Math.floor(k / W) + 1) * CELL) === k) spot = { k0: k, x: (k % W + 1) * CELL, y: (Math.floor(k / W) + 1) * CELL };
+  for (const k0 of cands) { const x = (k0 % W + 1) * CELL, y = (Math.floor(k0 / W) + 1) * CELL;
+    for (const a0 of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) { a.x = x - Math.cos(a0) * 28; a.y = y - Math.sin(a0) * 28; a.aim = a0; if (g.floorCharge(a)) { spot = { k0, x, y }; break; } }
+    if (spot) break; }
   ok(spot, id, 'no room to break a floor in'); if (!spot) continue;
-  // a breach charge set on the floor
-  a.op = 'ember'; g.equip(a); Object.assign(a, { alive: true, downed: false, ctrl: 'body', staged: false, x: spot.x - 14, y: spot.y, aim: 0, input: {}, prevInput: {}, gadgetCount: 3, hp: 9999, maxHp: 9999 });
   const before = m.hatches.length;
   a.gadget = 'breach'; a.gadgetCount = 3; g.useGadget(a);
   const ch = g.ents.find(e => e.type === 'breach');

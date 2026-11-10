@@ -122,6 +122,13 @@ His wishes so far:
 
 - Aiming styles grouped (he asked; Crosshair stays the default, his): Settings → Mouse & Aim `#aimSeg` is now `.aimGroups`: TOP-DOWN (Crosshair, Crosshair Classic, Cursor), JOYSTICK (Aim pad), SHOOTER (Turn, Face, Rotate). Crosshair Classic = `classic` in `AIM_MODES`: the first Crosshair generation as flags on today's code (`freeAimOn()` covers both): no `TURN_R` flick help, 1:1 out and back, aiming in leaves the crosshair put (no `adsReset`); armory.js the same. Older generations left out on purpose: the pad with a dead middle, the camera led from the screen cursor (bounce), aim following the loose pointer before click-in, the crosshair stuck at the screen edge.
 
+- Batch of 2026-11-10 (he asked; he chose every option offered):
+  - Less wasted work: `menuRest` in main.js (menus draw 30/s, nothing behind `COVER_PAGES`), server loop sleeps to the next tick (setTimeout, try/finally), silent music makes no notes.
+  - 14 guns, 2 per type, each with its own rule (`dual` Verdict, `tandem` reload, `hipMul`/`raise` Ferret, `pen` Auger, Quill flechettes, `stagger` Hedge, `spin` Cyclone, `bipod` Trestle, Ranger lever, `wallShot` Mammoth, Needle, Couplet burst pistol, Whisper quiet MP, Hatchet). Shared rules `fireAuto`/`fireDmg`/`fireRpm`/`bipodOn`/`reloadLen` at the end of shared/operators.js, used by server `fire`/`startReload` and armory.js (Ctrl = crouch there). Snapshot `rq` = quick reload length. 19 of the original 26 attackers have a marksman rifle. `node tests/newguns.js`.
+  - Sniper attackers: PERCH `bipod` (`p.bipodSet`, mods ×0.15, DMR 40% faster + half kick, no scope sway via `bp`), MOSS `ghillie` (`gh`: no glare in `scopeGlare`), OSPREY `spotter` (`tickSnipers`: aimed in, enemies within 0.35 rad in clear sight spotted 4 s), NAIL `pierce` (`p.pierceShot` → `this.pierceNow`: 1.5 m through any wall at 40%, never a one-shot). `node tests/snipers.js`.
+  - Breakable floors (all but the roof and floor 0): shared/map.js `cellBelow`/`floorSpot`/`addHatch` make a 2x2 dynamic hatch (`dyn`, `map.dyn` → snapshot `dh` → client `syncDyn`); server `blowFloor` (explode `floor: true`: breach charge set on the floor via `floorCharge`, nitro, cutter, drop charge), never under your own feet. `node tests/floors.js`.
+  - Up-and-down operators: GIMLET `drill` (peephole = hatch with `peep: true`, `addPeep`/`cellAbove`/`peepOk`, `hatchOpen`, `PEEP_HALF`; `map.peeps` → `pp` → `syncPeeps`; drawn by `drawPeeps`), HOIST `grapple` (`grappleTarget`, `p.grapple`, `tickGrapple`), LOCKJAW `htrap` (ent `rig` = hatch id, not `hatch`: breakHatch clears ents with `hatch`), DEADFALL `dropcharge` (ent `dropch`). `node tests/vertical.js [map]`.
+
 ## How it is built
 
 - **Language:** JavaScript. Node 22 server (no npm packages at all — a tiny hand-written
@@ -188,7 +195,7 @@ His wishes so far:
   `node tests/balance.js 12` is the balance report (see docs/balance.md for how to read it and past changes).
   `tests/shoot.mjs` drives a hidden Firefox (run as insideabush, via WebDriver BiDi,
   `--remote-debugging-port`) to take screenshots; see `docs/testing.md`.
-- **Status:** full game — 52 operators, 7 maps, gadgets, drones, cameras, reinforcement, rappelling,
+- **Status:** full game — 60 operators, 40 guns, 7 maps, gadgets, drones, cameras, reinforcement, rappelling,
   barricades, destruction, defuser, DBNO, bots, tutorial, free play, Armory, Map Knowledge, points, HUD, scoreboard.
   **His idea list is `r6-todo.md` — work through it top to bottom, tick items off, keep going.**
   Every idea goes in `r6-todo.md` (there is no other list). Sound mix notes: `docs/sound.md`.
