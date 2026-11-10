@@ -1203,7 +1203,8 @@ export class Game {
   }
   // a charge set on the plain floor in front of you (upper floors only): { k, x, y, floor } like wallInFront, or null
   floorCharge(p) {
-    const x = p.x + Math.cos(p.aim) * 12, y = p.y + Math.sin(p.aim) * 12, k0 = floorSpot(this.map, x, y);
+    const x = p.x + Math.cos(p.aim) * 28, y = p.y + Math.sin(p.aim) * 28, k0 = floorSpot(this.map, x, y); // a step in front: the hole must not open under your own feet
+    if (k0 >= 0 && [k0, k0 + 1, k0 + this.map.W, k0 + this.map.W + 1].some(k => Math.hypot((k % this.map.W + 0.5) * CELL - p.x, (Math.floor(k / this.map.W) + 0.5) * CELL - p.y) < CELL / 2 + PLAYER_R + 2)) return null;
     return k0 < 0 ? null : { k: k0, x: (k0 % this.map.W + 1) * CELL, y: (Math.floor(k0 / this.map.W) + 1) * CELL, floor: true };
   }
   reinforceHatch(id) {
@@ -1954,7 +1955,7 @@ export class Game {
     else if (id === 'drill') { // GIMLET (he asked: a peephole through any floor or ceiling): crouched = the floor, standing = the ceiling
       const x = p.x + Math.cos(p.aim) * 10, y = p.y + Math.sin(p.aim) * 10, here = Math.floor(y / CELL) * this.map.W + Math.floor(x / CELL);
       const down = !!(p.input.crouch || p.pr >= 1), k = down ? here : cellAbove(this.map, here);
-      if (!peepOk(this.map, k)) { this.events.push({ e: 'deny', id: p.id, why: down ? 'No floor below to drill into here' : 'No ceiling to drill here (the roof can\'t be drilled)' }); return; }
+      if (!peepOk(this.map, k)) { this.events.push({ e: 'deny', id: p.id, why: down ? 'Drill on bare floor with a room below it' : 'No ceiling to drill here: bare floor above is needed (the roof can\'t be drilled)' }); return; }
       this.ents.push({ id: this.eid(), type: 'drill', x, y, k, up: !down, t: DRILL_T, team, owner: p.id, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(x), y: r1(y) }); this.noise(x, y, team, 260);
     }
