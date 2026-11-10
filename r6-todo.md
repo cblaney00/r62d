@@ -6,6 +6,11 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] look over the game for things that take lots of computing power for no good reason (like drawing thousands of frames when that is not needed) and cut them
+- [ ] a few new characters with abilities to do with hatches / verticality
+- [ ] more characters that use the sniper rifle on attack
+- [ ] more guns of each type, each one unique: better no gun than one that is a remake of another
+
 
 ## Done
 

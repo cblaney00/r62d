@@ -120,8 +120,11 @@ const held = g => { // a TV nobody is watching: paused; gone after its 20 s
   return true;
 };
 
+// He asked: no wasted work. The loop used to wake 120 times a second to run 30 ticks; now it sleeps until the next
+// tick is due (the catch-up below still handles a late wake-up).
 let last = performance.now(), acc = 0, snapAcc = 0;
-setInterval(() => {
+const loop = () => { try { step(); } finally { setTimeout(loop, Math.max(1, (1 / TICK_RATE - acc) * 1000)); } }; // an error in a tick never stops the loop
+const step = () => {
   const now = performance.now();
   acc += Math.min(0.25, (now - last) / 1000); last = now;
   const dt = 1 / TICK_RATE;
@@ -130,7 +133,8 @@ setInterval(() => {
     snapAcc += dt;
     if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = 0; game.broadcast(); for (const g of tutorials) if (!g.heldUntil) g.broadcast(); }
   }
-}, 1000 / 120);
+};
+setTimeout(loop, 1000 / TICK_RATE);
 
 // Practice for the pro teams (he asked): 200 rounds whenever the game's version changes (not daily any more); they run
 // in a background thread while nobody is playing (they stop the moment someone joins a match). No AI service: all here.

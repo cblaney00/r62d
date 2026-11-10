@@ -1578,8 +1578,24 @@ function interp(id, kind) {
 
 // ---------------- main loop ----------------
 let lastT = performance.now();
+// He asked: no work the screen doesn't need. In the menus the map only drifts slowly behind them, so it is drawn
+// 30 times a second, not at the monitor's full rate (60-165); behind a page that covers the screen (Operators,
+// Armory, Map Knowledge, Ball Knowledge, Playbook, Profile) it isn't drawn at all, only the menu logic runs 4 times
+// a second (so a match starting still shows). Matches, Esports TV and the tutorial are untouched.
+const COVER_PAGES = ['opsPage', 'armoryPage', 'mapsPage', 'bkPage', 'playbookPage', 'profilePage'];
+let restT = 0;
+function menuRest(nowMs) {
+  const s = st.last, ph = s ? s.ph : PHASE.LOBBY;
+  if (st.tv || !st.map || ph === PHASE.PREP || ph === PHASE.ACTION || ph === PHASE.ROUND_END) return false;
+  const covered = COVER_PAGES.some(id => !$(id).classList.contains('hidden'));
+  if (nowMs - restT < (covered ? 250 : 32)) return true;
+  restT = nowMs;
+  if (!covered) return false;
+  lastT = nowMs; screens(s, ph, nowMs / 1000); return true;
+}
 function frame(nowMs) {
   requestAnimationFrame(frame);
+  if (menuRest(nowMs)) return;
   const rawGap = nowMs - lastT, dt = Math.min(0.05, rawGap / 1000); lastT = nowMs;
   const now = nowMs / 1000;
   const s = st.last;

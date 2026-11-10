@@ -105,6 +105,7 @@ function section(bar) {
 }
 
 function schedule(ac) {
+  if (vol < 0.002) { while (nextT < ac.currentTime + 0.25) { step++; nextT += S16; } return; } // music turned off: keep time, make no notes
   while (nextT < ac.currentTime + 0.25) {
     const t = nextT, bar = Math.floor(step / 16), s16 = step % 16;
     const chord = CHORDS[Math.floor(bar / 2) % 4], sec = section(bar), tense = mood === 'select';
