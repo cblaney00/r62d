@@ -4,9 +4,9 @@
 // call out what they see, and react no faster than a fairly experienced player. The bot skill setting
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
-import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
-import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
-import { hatchOpen, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
+import { CELL, PLAYER_R, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
+import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked } from '../shared/physics.js';
+import { hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
 import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess } from './training.js';
@@ -356,6 +356,25 @@ export function botPrep(game, p) {
   if (id === 'turret' || id === 'stickycam') while (p.abilityCount > 0) {
     const s = near(100); placeAt('cam', s.x, s.y, { offUntil: 0, tu: id === 'turret' ? 1 : 0, ang: Math.atan2(s.y - bomb.y, s.x - bomb.x) }); p.abilityCount--;
   }
+  // LOCKJAW (2026-11-10): rig the shut hatches nearest the objective (the site floor or the one above), from whichever side is on the site's floor
+  if (id === 'htrap') {
+    const lb = localPos(m, bomb.x, bomb.y), hs = m.hatches.filter(h => !h.peep && !h.dyn && (m.tiles[h.cells[0]] === T.HATCH || m.tiles[h.cells[0]] === T.HATCHR))
+      .map(h => { const a = localPos(m, h.bx, h.by); return { h, d: Math.hypot(a.x - lb.x, a.y - lb.y) + Math.abs(a.f - lb.f) * 6 * PX_PER_M, low: a.f === lb.f }; }).filter(q => q.d < 30 * PX_PER_M).sort((a, b) => a.d - b.d);
+    for (const { h, low } of hs.slice(0, p.abilityCount)) later(low ? h.bx + 22 : h.x - 22, low ? h.by : h.y, () => { if (p.abilityCount > 0 && !game.ents.some(e => e.type === 'htrap' && e.rig === h.id)) { game.ents.push({ id: game.eid(), type: 'htrap', x: h.x, y: h.y, rig: h.id, arm: DUR.trapArm, team: TEAM.DEF, owner: p.id, hp: 1 }); p.abilityCount--; } }, 1);
+  }
+  // DEADFALL: one drop hole from the floor above down into the objective's room (a way to shoot down and to rotate), the other kept for later
+  if (id === 'dropcharge' && p.abilityCount > 0) tasks.push({ x: bomb.x, y: bomb.y, wait: 0.5, pick: () => { // (picked when it is her turn, so the stand spot is tested on the map as it is then)
+    const bk = Math.floor(bomb.y / CELL) * W + Math.floor(bomb.x / CELL), opts = [];
+    for (let dy = -6; dy <= 6; dy += 2) for (let dx = -6; dx <= 6; dx += 2) {
+      const up = Math.hypot(dx, dy) > 2.5 ? cellAbove(m, bk + dy * W + dx) : -1; if (up < 0) continue;
+      const cx = (up % W + 1) * CELL, cy = (Math.floor(up / W) + 1) * CELL;
+      for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) { const t = { x: cx - Math.cos(a) * 28, y: cy - Math.sin(a) * 28, aim: a }, k = Math.floor(t.y / CELL) * W + Math.floor(t.x / CELL);
+        if (m.tiles[k] === T.FLOOR && !circleBlocked(m, t.x, t.y, PLAYER_R, q => blocksMove(q) || q === T.HOLE) && game.floorCharge(t)) { opts.push({ x: t.x, y: t.y, face: { x: cx, y: cy } }); break; } }
+    }
+    if (!opts.length || p.abilityCount <= 0) return null;
+    const o = opts[Math.floor(Math.random() * opts.length)];
+    return { ...o, r: 6, run: () => { if (p.abilityCount > 0) { aimAt(p, o.face.x, o.face.y); game.useAbility(p); } } };
+  } });
   if (id === 'grid') for (let i = 0; i < 2; i++) tasks.push({ x: bomb.x, y: bomb.y, wait: 1, pick: () => { // on reinforced site walls, once there are some
     const k = m.tiles.findIndex((t, k) => t === T.REINF && inSite(k % W, Math.floor(k / W)) && !game.ents.some(e => e.type === 'grid' && e.cell === k) && Math.random() < 0.3);
     if (k < 0 || p.abilityCount <= 0) return null; const c = cxy(k);
@@ -570,10 +589,12 @@ function shotClear(game, p, q) {
     ok = false; return true;
   });
   if (!ok || rayCovers(m, p.x, p.y, dx, dy, d - 4)) return false;
+  // a gun that carries on through walls (the Mammoth, a marksman rifle, NAIL's piercing round) can hit a teammate far behind the target (the audit found two)
+  const gw = p.guns && p.guns[p.slot] && WEAPONS[p.guns[p.slot].w], far = gw && (p.pierceShot || (gw.pen || 0) >= 0.68 || gw.cls === 'DMR') ? gw.range : d + 300;
   for (const o of game.players.values()) {
-    if (o === p || !o.alive || game.side(o) !== game.side(p)) continue;
+    if (o === p || !o.alive || game.side(o) !== game.side(p) || floorAt(m, o.x, o.y) !== floorAt(m, p.x, p.y)) continue;
     const ax = o.x - p.x, ay = o.y - p.y, along = ax * dx + ay * dy;
-    if (along > 0 && along < d + 300 && Math.abs(ax * dy - ay * dx) < hitR(o.op) + 4 + along * 0.05) return false; // a miss flies on past the target, and spreads
+    if (along > 0 && along < far && Math.abs(ax * dy - ay * dx) < hitR(o.op) + 4 + along * 0.05) return false; // a miss flies on past the target, and spreads
   }
   return true;
 }
@@ -1180,6 +1201,22 @@ export function botThink(game, p, dt) {
 // seconds, or at once when something is heard close by or the body is hit.
 // Abilities the bots never used before (watching pro matches showed ten operators whose skill never came out): each
 // one at the moment a player would reach for it. Rate-limited by ai.abT so nobody empties their charges in a second.
+// GIMLET: where to drill this round: from the floor above the objective down into it, or from below up into it
+// (whichever floor he is on), a few metres from a defuser spot. { x, y (stand), ax, ay (aim), down } or null.
+function drillSpot(game, p, bomb) {
+  const m = game.map, W = m.W, bk = Math.floor(bomb.y / CELL) * W + Math.floor(bomb.x / CELL), myF = floorAt(m, p.x, p.y), bf = floorAt(m, bomb.x, bomb.y);
+  const out = [];
+  for (let dy = -6; dy <= 6; dy += 2) for (let dx = -6; dx <= 6; dx += 2) {
+    if (Math.hypot(dx, dy) < 2.5) continue;
+    const site = bk + dy * W + dx, down = myF >= bf; // above or level: drill down from upstairs; below: drill up
+    const peep = down ? cellAbove(m, site) : site, stand = down ? peep : cellBelow(m, site);
+    if (peep < 0 || stand < 0 || !peepOk(m, peep)) continue;
+    const cx = (stand % W + 0.5) * CELL, cy = (Math.floor(stand / W) + 0.5) * CELL;
+    for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) { const x = cx - Math.cos(a) * 10, y = cy - Math.sin(a) * 10, k = Math.floor(y / CELL) * W + Math.floor(x / CELL);
+      if (m.tiles[k] === T.FLOOR && !circleBlocked(m, x, y, PLAYER_R, t => blocksMove(t) || t === T.HOLE)) { out.push({ x, y, ax: cx, ay: cy, down }); break; } }
+  }
+  return out.length ? out[Math.floor(Math.random() * out.length)] : null;
+}
 function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp, dt) {
   const ok = () => p.abilityCount > 0 && game.time > (ai.abT || 0), done = (wait = 4) => { ai.abT = game.time + wait; };
   const d = enemy ? Math.hypot(enemy.x - p.x, enemy.y - p.y) : Infinity, bomb = site.bombs[0];
@@ -1189,14 +1226,27 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
   // up and down (2026-11-10): GIMLET drills over or under the objective, HOIST climbs through an open hatch toward a
   // site upstairs, LOCKJAW rigs a hatch in preparation, DEADFALL drops a charge over attackers heard right below
   const lp = localPos(game.map, p.x, p.y), lb = localPos(game.map, bomb.x, bomb.y), flat = Math.hypot(lp.x - lb.x, lp.y - lb.y);
-  if (abId === 'drill') { if (!enemy && ok() && game.phase === PHASE.ACTION && Math.abs(lp.f - lb.f) === 1 && flat < 8 * PX_PER_M && Math.random() < dt) { p.input.crouch = lp.f > lb.f ? 1 : 0; inp.crouch = p.input.crouch; useAbility(); done(6); } return; }
+  if (abId === 'drill') { // GIMLET (the audit: he almost never drilled): once a round, early on, to a spot over or under the objective, then drill
+    if (ai.drillRound !== game.round) { ai.drillRound = game.round; ai.drillGoal = Math.random() < 0.8 ? drillSpot(game, p, bomb) : null; ai.drillT = game.time; }
+    const gl = ai.drillGoal;
+    if (!gl || enemy || !ok() || game.time - ai.drillT > 35 || elapsedAction(game) > 80) return;
+    if (Math.hypot(gl.x - p.x, gl.y - p.y) > 8) { moveTo(game, p, inp, gl, dt); return true; }
+    aimAt(p, gl.ax, gl.ay); inp.crouch = gl.down ? 1 : 0;
+    if (!!(p.input && p.input.crouch) === gl.down) { useAbility(); done(6); ai.drillGoal = null; teamSay(game, p, gl.down ? 'Peephole over the objective.' : 'Peephole under the objective.', 'drill'); }
+    return true;
+  }
   if (abId === 'grapple') { if (!enemy && ok() && lb.f > lp.f && !p.grapple && game.grappleTarget(p) && Math.random() < dt * 2) { useAbility(); done(5); } return; }
   if (abId === 'htrap') { if (ok() && game.phase === PHASE.PREP && game.hatchToRig(p)) { useAbility(); done(3); } return; }
   if (abId === 'dropcharge') {
     if (ok() && heard && game.phase === PHASE.ACTION) { const h = localPos(game.map, ai.heard.x, ai.heard.y); if (h.f === lp.f - 1 && Math.hypot(h.x - lp.x, h.y - lp.y) < 3 * PX_PER_M && game.floorCharge(p)) { useAbility(); done(8); } }
     return;
   }
-  if (abId === 'bipod') { if (!p.bipodSet && (p.input.crouch || p.pr >= 1) && Math.hypot(p.vx || 0, p.vy || 0) < 12 && game.time > (ai.abT || 0)) { useAbility(); done(6); } return; }
+  if (abId === 'bipod') { // PERCH: holding an angle (still for a moment), crouch and set it; wanting to move again, lift it (the audit: he never set it)
+    const pi = p.input || {}, moving = !!(pi.up || pi.down || pi.left || pi.right);
+    ai.stillT = moving ? 0 : (ai.stillT || 0) + dt; ai.goT = moving ? (ai.goT || 0) + dt : 0;
+    if (p.bipodSet) { if (ai.goT > (enemy ? 0.6 : 0.25)) { useAbility(); done(6); } else inp.crouch = 1; return; }
+    if (ai.stillT > 2.5 && game.time > (ai.abT || 0)) { /* only a real hold: the audit saw it flipped up and down ~10 times a round */ inp.crouch = 1; if (pi.crouch || p.pr >= 1) { useAbility(); done(3); } }
+    return; }
   if (abId === 'ghillie') { if ((enemy || heard) && ok() && !(p.ghillieUntil > game.time)) { useAbility(); done(14); } return; }
   if (abId === 'spotter') { if ((enemy || heard) && ok() && !(p.spotterUntil > game.time) && Math.random() < dt * 1.5) { useAbility(); done(10); } return; }
   if (abId === 'pierce') { if ((enemy || heard) && ok() && !p.pierceShot && Math.random() < dt) { useAbility(); done(5); } return; }
@@ -1299,8 +1349,9 @@ function roofPick(game, p) {
       const rope = best && m.ropes.filter(r => r.down < 0 && top(r)).sort((a, b) => Math.hypot(top(a).roof.x - best.x, top(a).roof.y - best.y) - Math.hypot(top(b).roof.x - best.x, top(b).roof.y - best.y))[0];
       const team = [...game.players.values()].filter(q => q.bot && q.alive && q.squad === p.squad);
       const lvl = team.some(q => q.pro) ? 7 : lvlOf(game, p);
-      if (rope && team.length >= 2 && Math.random() < ROOF_CHANCE[lvl]) {
-        const pref = q => (q.pro ? ROOF_JOBS.includes(q.pro.pl.jobs.atk) : ['flank', 'intel'].includes(q.ai && q.ai.role)) ? 0 : 1;
+      const hoist = team.some(q => q.op === 'hoist' && q.abilityCount > 0); // HOIST (2026-11-10): the grapple makes the roof a real option
+      if (rope && team.length >= 2 && Math.random() < (hoist ? Math.max(0.75, ROOF_CHANCE[lvl]) : ROOF_CHANCE[lvl])) {
+        const pref = q => q.op === 'hoist' && q.abilityCount > 0 ? -1 : (q.pro ? ROOF_JOBS.includes(q.pro.pl.jobs.atk) : ['flank', 'intel'].includes(q.ai && q.ai.role)) ? 0 : 1;
         const ids = team.filter(q => !q.hasDefuser).sort((a, b) => pref(a) - pref(b) || Math.random() - 0.5).slice(0, lvl >= 5 && team.length >= 4 ? 2 : 1).map(q => q.id);
         plan = { h: best, rope, top: top(rope), ids, dropAt: 40 + Math.random() * 25 };
       }
@@ -1320,7 +1371,9 @@ function roofPlay(game, p, inp, dt) {
   if (st.s === 'go') {
     if (fl === m.roofFloor) { st.s = 'open'; st.t = game.time; if (!ai.roofSaid) { ai.roofSaid = true; teamSay(game, p, 'On the roof.', 'roof'); } }
     else if (fl !== m.groundFloor || game.time - st.t > 45 || p.hasDefuser) { st.s = 'done'; return false; }
-    else { const b = R.rope.base; if (Math.hypot(b.x - p.x, b.y - p.y) > 9) { moveTo(game, p, inp, b, dt); return true; } press('interact'); return true; }
+    else { const b = R.rope.base; if (p.grapple) return true; if (Math.hypot(b.x - p.x, b.y - p.y) > 9) { moveTo(game, p, inp, b, dt); return true; }
+      if (p.op === 'hoist' && p.abilityCount > 0 && !st.hook) { st.hook = true; aimAt(p, b.x - Math.cos(R.rope.out) * 30, b.y - Math.sin(R.rope.out) * 30); const t = game.grappleTarget(p); if (t && t.roof) { game.event(p, { k: 'ability' }); return true; } } // HOIST: grapple straight up
+      press('interact'); return true; }
   }
   if (fl !== m.roofFloor) { st.s = 'done'; return false; } // dropped in through the hatch (or came down the rope)
   if (st.s === 'leave') { const t = R.top.roof; if (Math.hypot(t.x - p.x, t.y - p.y) > 10) { moveTo(game, p, inp, t, dt); return true; } press('interact'); return true; }

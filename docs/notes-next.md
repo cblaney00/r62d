@@ -14,3 +14,10 @@ on his to-do list unless he asks for it.
   and how many reinforcements the earnest bots spend.
 - Pros will only start picking the Saker after practice has tried it (training learns guns per operator).
 - Defender bots still don't open rotation holes with shotguns or hammers, only melee; slow but works.
+
+## Bot audit 2026-11-10 (tests/audit.js [level] [matches] [map]) — open findings
+- LOCKJAW: bots rig hatches in prep, but almost every trap is destroyed while the hatch is still shut (3/3, 4/4, 4/5): attackers shoot or blast it first. Maybe hide it (seen only within 2 m like other traps), or let it survive bullets.
+- "shot from further than any gun reaches" (judgeKill, > 2200 px) shows up with Longbow/Verdict/Hedge kills: probably a stair or window copy across floors measured as plain distance. Not checked yet.
+- "bullet through concrete" reports still appear now and then (Heron, Ferret, Tandem); leaning shots are excluded now; the rest not yet explained.
+- HOIST: grapple used only ~3 times in 30 rounds (roof plays need a site under the roof). PERCH still sets the bipod ~5x a round.
+- Pro practice (600 rounds) ran on the version before these bot fixes; the game re-practises by itself on the next start.

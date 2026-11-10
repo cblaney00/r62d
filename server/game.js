@@ -948,11 +948,11 @@ export class Game {
     // things that should never happen: a bug, saved for fixing
     if (gun) {
       if (!src.alive) bug.push('the shooter was already dead');
-      if (fl(src.x, src.y) === fl(q.x, q.y) && !(src.tracerUntil > this.time) && !(this.time - (src.pierceLast ?? -9) < 1) && this.solidBetween(src, q) && (src.viewTime === null || src.viewTime === undefined || this.solidBetween(src, this.posAt(q, src.viewTime)))) bug.push('the bullet went through concrete or furniture');
+      if (fl(src.x, src.y) === fl(q.x, q.y) && !(src.tracerUntil > this.time) && !(this.time - (src.pierceLast ?? -9) < 1) && this.solidBetween(leanPoint(this.map, src.x, src.y, src.aim, src.lo || 0), q.lo ? leanPoint(this.map, q.x, q.y, q.aim, q.lo) : q) && (src.viewTime === null || src.viewTime === undefined || this.solidBetween(leanPoint(this.map, src.x, src.y, src.aim, src.lo || 0), this.posAt(q, src.viewTime))) && !(src.lo || q.lo) /* a lean shoots from the tipped shoulder: measured from there */) bug.push('the bullet went through concrete or furniture');
       if (Math.hypot(src.x - q.x, src.y - q.y) > 2200) bug.push('shot from further than any gun reaches');
     }
     const st0 = tileAt(this.map, Math.floor(src.x / CELL), Math.floor(src.y / CELL));
-    if (src.alive && !src.vault && !src.rope && (st0 === T.HARD || st0 === T.REINF || st0 === T.TALL || st0 === T.VOID)) bug.push('the shooter was standing inside a wall');
+    if (src.alive && !src.vault && !src.rope && (st0 === T.HARD || st0 === T.REINF || st0 === T.TALL || st0 === T.VOID) && pointSolid(this.map, src.x, src.y, t => t === st0)) bug.push('the shooter was standing inside a wall');
     let prev = null;
     for (const f of frames) { const k = f.ps.find(e => e[0] === src.id); if (k && prev && Math.hypot(k[1] - prev[1], k[2] - prev[2]) > 70 && fl(k[1], k[2]) === fl(prev[1], prev[2])) { bug.push('the shooter jumped across the map'); break; } prev = k; }
     return { rating: Math.min(10, score), why, bug: bug.length ? bug : null };
