@@ -545,3 +545,50 @@ export function peekSeen(m, gh, sx, sy, smokes) {
   }
   return false;
 }
+
+// ---- Breakable floors (he asked 2026-11-10: every floor and ceiling can be broken, except the roof and the lowest
+// floor). A blast (breach charge set on the floor, nitro, SALVO's rounds, DEADFALL's charge, FERRO's hammer...) on an
+// upper floor makes a new hatch-sized hole on the spot: a 2x2 "dynamic hatch" added to map.hatches, so everything a
+// hatch does (dropping through, looking and shooting through, sounds, bots) works for it too. The server lists them
+// in map.dyn (top-left cells, in order) and sends that list in every snapshot; clients add the same ones.
+// The same spot one floor down (grid cell), or -1: none below, or this is the roof or the lowest floor.
+export function cellBelow(m, k) {
+  const W = m.W, x = k % W, y = Math.floor(k / W), f = m.floors.find(q => x >= q.gx && x < q.gx + q.w);
+  if (!f || f.roof || f.i === 0) return -1;
+  const b = m.floors[f.i - 1]; if (!b || b.roof) return -1;
+  const lx = x - f.gx + f.x0 - b.x0, ly = y + f.y0 - b.y0;
+  return lx < 0 || ly < 0 || lx >= b.w || ly >= b.h ? -1 : ly * W + b.gx + lx;
+}
+const floorClear = (m, k) => k >= 0 && m.tiles[k] === T.FLOOR && !(m.shape && m.shape[k]) && !(m.portal[k] >= 0) && !(m.hatchAt[k] >= 0) && !(m.hatchBelow[k] >= 0);
+// Where a hole can open at (x, y): the 2x2 block of clear floor (above and below) nearest the point, its top-left cell, or -1.
+export function floorSpot(m, x, y) {
+  if (!m.hatchAt || !m.floors) return -1;
+  const W = m.W, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  let best = -1, bd = Infinity;
+  for (let oy = -1; oy <= 0; oy++) for (let ox = -1; ox <= 0; ox++) {
+    const k0 = (cy + oy) * W + cx + ox, cells = [k0, k0 + 1, k0 + W, k0 + W + 1];
+    if (cx + ox < 0 || cy + oy < 0 || cx + ox + 1 >= W || cy + oy + 1 >= m.H) continue;
+    if (!cells.every(k => floorClear(m, k) && floorClear(m, cellBelow(m, k)))) continue;
+    if (new Set(cells.map(k => m.flAt ? m.flAt[k] : 0)).size > 1) continue;
+    const d = Math.hypot((cx + ox + 1) * CELL - x, (cy + oy + 1) * CELL - y);
+    if (d < bd) { bd = d; best = k0; }
+  }
+  return best;
+}
+// Add the dynamic hatch whose top-left cell is k0 (still shut: the caller opens it). Returns it.
+export function addHatch(m, k0) {
+  const W = m.W, cells = [k0, k0 + 1, k0 + W, k0 + W + 1], below = cells.map(k => cellBelow(m, k)), id = m.hatches.length;
+  const fi = m.floors.find(q => (k0 % W) >= q.gx && (k0 % W) < q.gx + q.w);
+  for (const k of cells) { m.tiles[k] = T.HATCH; m.hp[k] = 1; m.hatchAt[k] = id; }
+  for (const k of below) m.hatchBelow[k] = id;
+  const h = { id, fl: fi ? fi.i : 0, cells, below, x: (k0 % W + 1) * CELL, y: (Math.floor(k0 / W) + 1) * CELL, bx: (below[0] % W + 1) * CELL, by: (Math.floor(below[0] / W) + 1) * CELL, dyn: true };
+  m.hatches.push(h); (m.dyn || (m.dyn = [])).push(k0);
+  return h;
+}
+// Client side: add any of the server's dynamic hatches this copy of the map doesn't have yet (and their drop-through links).
+export function syncDyn(m, list) {
+  if (!list || !m.hatchAt) return false;
+  let n = 0;
+  for (const k0 of list) if (!(m.hatchAt[k0] >= 0)) { const t = [k0, k0 + 1, k0 + m.W, k0 + m.W + 1].map(k => m.tiles[k]), h = addHatch(m, k0); h.cells.forEach((k, i) => { m.tiles[k] = t[i]; }); for (const k of h.cells) holePortal(m, k); n++; }
+  return n > 0;
+}

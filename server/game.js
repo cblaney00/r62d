@@ -1,5 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
+import { floorSpot, addHatch } from '../shared/map.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
@@ -1152,6 +1153,19 @@ export class Game {
     this.events.push({ e: 'snd', s: 'break', x: r1(h.x), y: r1(h.y) });
     this.noise(h.x, h.y, null, 500);
   }
+  // Breakable floors (he asked 2026-11-10: every floor and ceiling but the roof and the lowest floor): a blast on an
+  // upper floor opens a hatch-sized hole on the spot (shared/map.js floorSpot / addHatch). Returns the hatch or null.
+  blowFloor(x, y) {
+    if (this.map.hatches.some(h => Math.hypot(h.x - x, h.y - y) < CELL * 2.2)) return null; // right on a hatch: that hatch is what breaks
+    const k0 = floorSpot(this.map, x, y); if (k0 < 0) return null;
+    const h = addHatch(this.map, k0); this.breakHatch(h.id);
+    return h;
+  }
+  // a charge set on the plain floor in front of you (upper floors only): { k, x, y, floor } like wallInFront, or null
+  floorCharge(p) {
+    const x = p.x + Math.cos(p.aim) * 12, y = p.y + Math.sin(p.aim) * 12, k0 = floorSpot(this.map, x, y);
+    return k0 < 0 ? null : { k: k0, x: (k0 % this.map.W + 1) * CELL, y: (Math.floor(k0 / this.map.W) + 1) * CELL, floor: true };
+  }
   reinforceHatch(id) {
     const h = this.map.hatches[id];
     for (const c of h.cells) { this.map.tiles[c] = T.HATCHR; this.map.hp[c] = 0; this.changed.add(c); }
@@ -1762,9 +1776,9 @@ export class Game {
     const through = w => { const cx = (w.cx + 0.5) * CELL, cy = (w.cy + 0.5) * CELL, dx = Math.sign(Math.round(cx - w.x)), dy = Math.sign(Math.round(cy - w.y)); return { dx, dy, x: cx + dx * (CELL / 2 + 5), y: cy + dy * (CELL / 2 + 5) }; };
     const used = () => { p.abilityCount--; };
     if (id === 'cutter') {
-      const w = this.wallInFront(p, [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD]) || this.hatchSpot(p, [T.HATCH, T.HATCHR]);
+      const w = this.wallInFront(p, [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD]) || this.hatchSpot(p, [T.HATCH, T.HATCHR]) || this.floorCharge(p);
       if (!w) return;
-      this.ents.push({ id: this.eid(), type: 'cutter', x: w.x, y: w.y, cell: w.k, hatch: w.hatch, team, owner: p.id, t: 5, hp: 1 });
+      this.ents.push({ id: this.eid(), type: 'cutter', x: w.x, y: w.y, cell: w.k, hatch: w.hatch, floor: w.floor, team, owner: p.id, t: 5, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
     } else if (id === 'dart') {
       // thrown (he asked): it flies toward the crosshair a little off (±0.1 rad, about half a metre at 5 m, and
@@ -2069,9 +2083,9 @@ export class Game {
       const n = this.throwNade(p, g); p.gadgetCount--;
       if (g === 'nitro') p.nitroId = n.id;
     } else if (g === 'breach') {
-      const w = this.wallInFront(p, [T.SOFT, T.BARRI]) || this.hatchSpot(p, [T.HATCH]);
+      const w = this.wallInFront(p, [T.SOFT, T.BARRI]) || this.hatchSpot(p, [T.HATCH]) || this.floorCharge(p); // he asked: floors break too
       if (!w) return;
-      this.ents.push({ id: this.eid(), type: 'breach', x: w.x, y: w.y, cell: w.k, hatch: w.hatch, team, owner: p.id, t: 2.5, hp: 1 });
+      this.ents.push({ id: this.eid(), type: 'breach', x: w.x, y: w.y, cell: w.k, hatch: w.hatch, floor: w.floor, team, owner: p.id, t: 2.5, hp: 1 });
       p.gadgetCount--; this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
     } else if (g === 'claymore') {
       this.ents.push({ id: this.eid(), type: 'claymore', x: p.x + Math.cos(p.aim) * 10, y: p.y + Math.sin(p.aim) * 10, ang: p.aim, team, owner: p.id, arm: 1.5, hp: 1 });
@@ -2720,9 +2734,9 @@ export class Game {
     switch (kind) {
       case 'frag': this.explode(e, { r: 75, dmg: 130, cellR: 14, cells: SOFTISH, kind: 'frag' }); break;
       case 'impact': this.explode(e, { r: 34, dmg: 40, cellR: 22, cells: SOFTISH, kind: 'impact' }); break;
-      case 'nitro': this.explode(e, { r: 70, dmg: 140, cellR: 20, cells: SOFTISH, kind: 'nitro' }); break;
+      case 'nitro': this.explode(e, { r: 70, dmg: 140, cellR: 20, cells: SOFTISH, kind: 'nitro', floor: true }); break; // nitro on an upper floor blows a hole in it
       case 'slug': this.explode(e, { r: 36, dmg: 75, cellR: 21, cells: SOFTISH, kind: 'slug', selfMul: 0.3 }); break;
-      case 'breach': this.explode(e, { r: 40, dmg: 60, cellR: 21, cells: SOFTISH, kind: 'breach', at: e.cell }); break;
+      case 'breach': this.explode(e, { r: 40, dmg: 60, cellR: 21, cells: SOFTISH, kind: 'breach', at: e.cell, floor: e.floor }); break;
       case 'claymore': this.explode(e, { r: 50, dmg: 95, cellR: 0, cells: [], kind: 'frag', cone: e.ang }); break;
       case 'mine': {
         this.explode(e, { r: 32, dmg: 40, cellR: 0, cells: [], kind: 'mine' });
@@ -2731,7 +2745,7 @@ export class Game {
         }
         break;
       }
-      case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD, T.HATCH, T.HATCHR, T.RUBBLE, T.BEAM], kind: 'cutter', at: e.cell }); break;
+      case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD, T.HATCH, T.HATCHR, T.RUBBLE, T.BEAM], kind: 'cutter', at: e.cell, floor: e.floor }); break;
       case 'sonar': {
         let any = false;
         // measured in the building (he asked: it couldn't reach up the stairs): the floor above or below counts too, a bit less far
@@ -2834,6 +2848,7 @@ export class Game {
         if (o.cells.includes(m.tiles[k])) this.destroyCell(k);
       }
     }
+    if (o.floor) this.blowFloor(o.at !== undefined && e.floor ? cx + CELL / 2 : cx, o.at !== undefined && e.floor ? cy + CELL / 2 : cy); // a charge on the floor: the hole is centred on it
     for (const q of this.players.values()) {
       if (!q.alive) continue;
       const self = owner && q === owner; // friendly fire: every blast hurts everyone in range, owner included
@@ -3004,7 +3019,7 @@ export class Game {
     const spots = { atk: [...this.spots.atk.keys()], def: [...this.spots.def.keys()] };
     const common = JSON.stringify({
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
-      ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, mp: this.mapId, rm: this.randomMap ? 1 : 0,
+      ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
       site: this.site, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       tvl: this.tv ? this.botLevel : undefined, bn: this.tv && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
       bq: this.tv && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, this.banRun.t - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
