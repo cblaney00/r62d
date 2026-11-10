@@ -114,6 +114,7 @@ const UNI = {
   ruse: ['#3a3048', '#24202e', 'spots', '#8a6ad6'], rally: ['#e05a7a', '#46384a', 'stripe', '#ffffff'], lens: ['#4f6a32', '#3a4a22', 'camo', '#6a8a42'],
   audit: ['#4a5a6a', '#2a343e', 'stripe', '#5ad0c0'], tonic: ['#4aa08a', '#2a6a5a', 'plain', null], ward: ['#3a4252', '#2a303c', 'hex', '#7aa0e8'],
   girder: ['#5e6064', '#3a3c40', 'hazard', '#e0c030'], magpie: ['#1a1c1e', '#e6e6e0', 'split', '#f2f2ec'],
+  perch: ['#6a5e46', '#40382a', 'digital', '#8a7e5e'], moss: ['#4a5a2a', '#36421e', 'tiger', '#7a8a4a'], osprey: ['#8a7a5a', '#4e4432', 'check', '#d8b060'], nail: ['#5a3a34', '#2e2422', 'stripe', '#b85a4a'],
 };
 // side colours on the clothing (he asked: every attacker wears some orange, every defender some blue, placed differently
 // per operator so each one stays easy to tell apart): bigger armbands for all, plus a mix of helmet band, vest stripe,

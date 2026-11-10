@@ -1184,6 +1184,12 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
   const ok = () => p.abilityCount > 0 && game.time > (ai.abT || 0), done = (wait = 4) => { ai.abT = game.time + wait; };
   const d = enemy ? Math.hypot(enemy.x - p.x, enemy.y - p.y) : Infinity, bomb = site.bombs[0];
   const toBomb = Math.min(...site.bombs.map(b => Math.hypot(b.x - p.x, b.y - p.y)));
+  // the snipers (2026-11-10): PERCH sets the bipod whenever crouched or lying still, MOSS wraps up on contact,
+  // OSPREY spots when there is something to look for, NAIL loads a piercing round for the next shot at someone seen or heard
+  if (abId === 'bipod') { if (!p.bipodSet && (p.input.crouch || p.pr >= 1) && Math.hypot(p.vx || 0, p.vy || 0) < 12 && game.time > (ai.abT || 0)) { useAbility(); done(6); } return; }
+  if (abId === 'ghillie') { if ((enemy || heard) && ok() && !(p.ghillieUntil > game.time)) { useAbility(); done(14); } return; }
+  if (abId === 'spotter') { if ((enemy || heard) && ok() && !(p.spotterUntil > game.time) && Math.random() < dt * 1.5) { useAbility(); done(10); } return; }
+  if (abId === 'pierce') { if ((enemy || heard) && ok() && !p.pierceShot && Math.random() < dt) { useAbility(); done(5); } return; }
   if (abId === 'dash' || abId === 'pick') { // RUSH bursts through a board in the way, WREN takes it apart quietly
     const f = game.facingCell(p, abId === 'dash' ? 40 : 28);
     if (f && f.t === T.BARRI && !enemy && ok()) { useAbility(); done(3); }

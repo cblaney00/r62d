@@ -226,6 +226,23 @@ export const HEADGEAR = {
     for (const y of [-2.6, 0, 2.6]) { ctx.beginPath(); ctx.moveTo(-4.4, y); ctx.lineTo(3.6, y); ctx.stroke(); }
     ear(h, ctx, h.shade(h.o.helmet, 0.7));
   },
+  perch(ctx, h) { // PERCH: a flat shooting cap turned backwards, ear defenders over it
+    h.ell(ctx, -0.2, 0, 4.8, 4.7, h.o.helmet); h.cap(ctx, -5.6, -1.6, -5.6, 1.6, 1.6, h.shade(h.o.helmet, 0.7));
+    h.ell(ctx, 0, -4.4, 1.6, 1.3, '#2a2c2e'); h.ell(ctx, 0, 4.4, 1.6, 1.3, '#2a2c2e'); h.cap(ctx, 0, -4.2, 0, 4.2, 0.6, '#1a1c1e');
+  },
+  moss(ctx, h) { // MOSS: a shaggy ghillie hood, strands of burlap all round
+    h.ell(ctx, -0.3, 0, 5.4, 5.3, h.o.helmet);
+    for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, r = 4.6 + (i % 3) * 0.5; h.cap(ctx, Math.cos(a) * 3.6 - 0.3, Math.sin(a) * 3.6, Math.cos(a) * r - 0.3, Math.sin(a) * r, 0.55, i % 2 ? '#5a6a32' : '#7a7a4a'); }
+    h.box(ctx, 2.8, -1.4, 1, 2.8, 0.4, '#141612');
+  },
+  osprey(ctx, h) { // OSPREY: a helmet with a spotting monocular flipped down over one eye
+    h.ell(ctx, -0.2, 0, 5.0, 4.9, h.o.helmet); ctx.strokeStyle = h.shade(h.o.helmet, 0.6); ctx.lineWidth = 0.7; ctx.beginPath(); ctx.arc(-0.2, 0, 4.1, -1.2, 1.2); ctx.stroke();
+    h.cap(ctx, 2.2, -1.6, 5.4, -1.6, 1.1, '#202326'); lens(ctx, 5.2, -2.2, 0.6, 1.2, `rgba(240,200,110,${0.6 + 0.2 * Math.sin(h.t * 2)})`);
+  },
+  nail(ctx, h) { // NAIL: a shipyard welding cap and a respirator, a rivet stud on top
+    h.ell(ctx, 0, 0, 4.7, 4.6, h.o.helmet); h.ell(ctx, -1.2, 0, 0.9, 0.9, '#8a8f95');
+    h.box(ctx, 2.6, -2.2, 1.8, 4.4, 0.8, '#26282b'); h.ell(ctx, 3.6, -2.2, 0.9, 0.9, '#3a3d42'); h.ell(ctx, 3.6, 2.2, 0.9, 0.9, '#3a3d42');
+  },
   girder(ctx, h) { // bald head, welding goggles pushed up on the forehead
     h.ell(ctx, 0.2, 0, 4.4, 4.4, h.shade('#c99a78', 1.05)); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.arc(-1, -1.4, 1.2, 0, 7); ctx.fill();
     strap(h, ctx, '#3a2a1a'); h.ell(ctx, 1.4, -1.6, 1.2, 1.2, '#24282c'); h.ell(ctx, 1.4, 1.6, 1.2, 1.2, '#24282c');
@@ -246,6 +263,7 @@ export const PACK = {
   mason: 'panel', veil: 'jammer', lynx: 'pouches', solace: 'medbag2', wraith: 'cloak2', bramble: 'pouches2', kite: 'antennas', gravel: 'baton',
   shunt: 'toolbox', hush: 'none', shade: 'mics', rampart: 'armorbag', miasma: 'canisters2', snare: 'wire', argus: 'camcase', solder: 'tank4',
   latch: 'wire2', hound: 'darts', ruse: 'speaker', rally: 'bottle', lens: 'tripod', audit: 'radio2', tonic: 'medcase', ward: 'radar', girder: 'girders', magpie: 'hive',
+  perch: 'dragbag', moss: 'cloak', osprey: 'radio', nail: 'ammo',
 };
 // The cut of the vest/jacket over the torso
 export const VEST = {
@@ -255,4 +273,5 @@ export const VEST = {
   mason: 'heavy3', veil: 'rig3', lynx: 'rig4', solace: 'medic2', wraith: 'cloak2', bramble: 'field2', kite: 'jacket3', gravel: 'police',
   shunt: 'overalls2', hush: 'light3', shade: 'shirt2', rampart: 'heavy4', miasma: 'hazmat', snare: 'tweed', argus: 'suit', solder: 'apron2',
   latch: 'hivis', hound: 'poncho', ruse: 'coat3', rally: 'singlet', lens: 'ghillie', audit: 'jacket4', tonic: 'scrubs', ward: 'carrier3', girder: 'hivis2', magpie: 'field',
+  perch: 'heavy2', moss: 'ghillie', osprey: 'parka', nail: 'carrier',
 };

@@ -275,7 +275,7 @@ const steadying = () => !!(st.me && st.me.ct === 'body' && st.me.a && sniperOn(s
 function scopeSway(dt, me, now) {
   const on = me && me.ct === 'body' && me.a && !me.dn && sniperOn(me) && !st.tv ? Math.min(1, me.at || 0) : 0;
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
-  const want = on * (steadying() ? 0.0008 : 0.011 * (1 + run * 1.5));
+  const want = on * (me && me.bp ? 0 : steadying() ? 0.0008 : 0.011 * (1 + run * 1.5)); // PERCH's bipod: no sway at all
   st.swayA = (st.swayA || 0) + (want - (st.swayA || 0)) * (1 - Math.exp(-dt * (want < (st.swayA || 0) ? 22 : 4)));
   const v = st.swayA * (Math.sin(now * 1.3) + 0.5 * Math.sin(now * 2.9 + 1)), d = v - (st.swayV || 0);
   st.swayV = v; if (!d) return;
@@ -2587,7 +2587,7 @@ function scopeGlare(s, side, now) {
   const me = st.me, v = st.pred; if (!me || !me.a || me.dn || me.ct !== 'body' || !st.map || !v) return;
   const m = st.map, fl = floorAt(m, v.x, v.y), t = performance.now() / 1000;
   for (const p of st.fakeGlare ? s.players.concat(st.fakeGlare) : s.players) { // (st.fakeGlare: screenshot tests)
-    if (!p.a || p.tm === side || !p.ad || p.dn || p.ct !== 'body' || p.x == null || !String(p.aa || '').includes('sniper')) continue;
+    if (!p.a || p.tm === side || !p.ad || p.dn || p.ct !== 'body' || p.x == null || !String(p.aa || '').includes('sniper') || p.gh) continue; // MOSS's ghillie: no glint
     const dx = v.x - p.x, dy = v.y - p.y, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
     if (d < 3 * PX_PER_M || d > GLARE_MAX || floorAt(m, p.x, p.y) !== fl || Math.abs(angDiff(p.ag, a)) > GLARE_ANG) continue;
     if (castSight(m, p.x, p.y, a, d, null) < d - 6) continue; // a wall, a prop or boards in between
@@ -2934,7 +2934,7 @@ function hud(s) {
   const salvoWait = ab.id === 'sticky' ? s.ents.filter(e => e.ty === 'sticky' && e.ow === me.id && e.st).length : 0; // SALVO: rounds waiting for her
   st.tBadge = { skill: me.gi || salvoWait || me.lu ? '!' : String(abCount), gadget: me.ni ? '!' : String(me.gc ?? ''), view: side === 'atk' && s.ph === PHASE.ACTION ? String(me.dr ?? '') : '' };
   setHTML('gadgets',
-    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : me.scd ? `${ab.name} ready in ${Math.ceil(me.scd)}s` : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
+    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : me.scd ? `${ab.name} ready in ${Math.ceil(me.scd)}s` : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : me.ap ? 'Piercing round loaded' : me.bp ? 'Bipod down · press to lift' : me.su2 ? `Spotting ${Math.ceil(me.su2)}s · aim in` : me.gw2 ? `Ghillie ${Math.ceil(me.gw2)}s` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
     `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>${label('gadget')}</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +
     `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label

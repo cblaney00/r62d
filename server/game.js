@@ -582,6 +582,7 @@ export class Game {
     if (p.scanning) mul *= 0.6;
     if (this.time < (p.boostUntil || 0)) mul *= 1.25; // Adrenal Shot
     if (p.shrouded) mul *= 0.8;
+    if (p.bipodSet) mul *= 0.15; // PERCH's bipod is down: you can only shuffle
     if (this.ghost(p)) mul *= 0.85; // STRIDER's Ghost Step: careful, slower steps (he asked: it was too strong)
     for (const e of this.ents) if (e.type === 'wire' && e.team !== this.side(p) && Math.hypot(e.x - p.x, e.y - p.y) < 24) { mul *= 0.3; break; }
     const beingRevived = p.downed && [...this.players.values()].some(q => q.busy && q.busy.k === 'revive' && q.busy.target === p.id); // he asked: revives kept failing — the downed crawled out of reach
@@ -619,6 +620,7 @@ export class Game {
   tickPlayer(p, dt) {
     const RUNOUT_SPOT = 3;
     this.tickPrep(p);
+    this.tickSnipers(p);
     // a defender outside the building (preparation or action): the attackers are warned at once, and after RUNOUT_SPOT
     // seconds outside in a row (R6's run-out rule, he chose it) the defender is spotted for them until back inside
     if (p.alive && this.side(p) === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION) && !this.tut) {
@@ -825,6 +827,22 @@ export class Game {
     } else if (click && gunComing) p.click = click;
   }
 
+  // the sniper operators' running parts (he asked 2026-11-10)
+  tickSnipers(p) {
+    if (p.bipodSet && (!p.alive || p.downed || p.ctrl !== 'body' || !(p.input.crouch || p.pr >= 1) || Math.hypot(p.x - p.bipodSet.x, p.y - p.bipodSet.y) > 14)) p.bipodSet = null; // stood up or moved off: the bipod folds
+    if (p.spotterUntil > this.time && p.alive && !p.downed && p.ctrl === 'body' && (p.adsT || 0) >= 0.6 && this.time - (p.spotT || 0) > 0.2) { // OSPREY: whoever the scope sees
+      p.spotT = this.time;
+      const team = this.side(p), fl = floorAt(this.map, p.x, p.y), sm = this.smokeList();
+      for (const q of this.players.values()) {
+        if (!q.alive || q.staged || this.side(q) === team || floorAt(this.map, q.x, q.y) !== fl) continue;
+        const d = Math.hypot(q.x - p.x, q.y - p.y);
+        if (d > 70 * PX_PER_M || Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) > 0.35 || !los(this.map, p.x, p.y, q.x, q.y, sm)) continue;
+        if (!(q.spotFrom && q.spotFrom > this.time)) this.pts(p, 10, 'Spotted an enemy');
+        q.spotFrom = this.time + 4; this.spot(team, q.id, 4);
+      }
+    }
+  }
+
   startReload(p) {
     const gun = p.guns[p.slot];
     if (!gun || p.reloadT > 0 || gun.reserve <= 0 || gun.ammo >= WEAPONS[gun.w].mag) return;
@@ -849,6 +867,8 @@ export class Game {
     let m = gun.m || gunMods(gun.w);
     const low = !!(p.input.crouch || p.pr >= 1);
     if (bipodOn(w, low, Math.hypot(p.vx || 0, p.vy || 0))) m = { ...m, kick: m.kick * w.bipod, sway: m.sway * w.bipod }; // the Trestle's bipod is down
+    if (p.bipodSet && w.cls === 'DMR') { m = { ...m, kick: m.kick * 0.5, sway: m.sway * 0.5 }; p.fireCd -= 60 / fireRpm(w, at0, 9) * 0.4 / 1.4; } // PERCH's bipod: 40% faster bolt, half the kick
+    this.pierceNow = !!(p.pierceShot && w.pellets === 1); if (this.pierceNow) { p.pierceShot = 0; p.pierceLast = this.time; } // NAIL's round
     const D = fireDmg(w, at0) * m.dmg; // the Verdict hits harder aimed in
     // the aiming model (shared/operators.js): exact first shot, a fixed cone after that, a fixed recoil pattern
     const cone = spreadCone(w, m, { at, run, crouch: !!(p.input.crouch || p.pr >= 1), shots: aimHeat(w, p.shots || 0, this.time - p.lastShot, m) }) * (this.time < (p.dazeUntil || 0) && p.shots ? 1.7 : 1); // dazed: shaky follow-ups
@@ -869,7 +889,7 @@ export class Game {
       if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });
-    this.shotW = null; this.shotAim = null;
+    this.shotW = null; this.shotAim = null; this.pierceNow = false;
     p.viewTime = vt;
     p.lastShot = this.time;
     p.shots = (p.shots || 0) + 1; // recoil comes after the shot, so it moves the next one, never this one
@@ -925,7 +945,7 @@ export class Game {
     // things that should never happen: a bug, saved for fixing
     if (gun) {
       if (!src.alive) bug.push('the shooter was already dead');
-      if (fl(src.x, src.y) === fl(q.x, q.y) && !(src.tracerUntil > this.time) && this.solidBetween(src, q) && (src.viewTime === null || src.viewTime === undefined || this.solidBetween(src, this.posAt(q, src.viewTime)))) bug.push('the bullet went through concrete or furniture');
+      if (fl(src.x, src.y) === fl(q.x, q.y) && !(src.tracerUntil > this.time) && !(this.time - (src.pierceLast ?? -9) < 1) && this.solidBetween(src, q) && (src.viewTime === null || src.viewTime === undefined || this.solidBetween(src, this.posAt(q, src.viewTime)))) bug.push('the bullet went through concrete or furniture');
       if (Math.hypot(src.x - q.x, src.y - q.y) > 2200) bug.push('shot from further than any gun reaches');
     }
     const st0 = tileAt(this.map, Math.floor(src.x / CELL), Math.floor(src.y / CELL));
@@ -1032,7 +1052,7 @@ export class Game {
       if (e.oc !== undefined && fl === this.map.groundFloor && !this.fromAbove) { const tg = rayCircle(x0, y0, dx, dy, e.gx, e.gy, 6); if (tg !== null && tg < bestT) { bestT = tg; best = { e }; } } // an outside camera, from the ground below it
     }
     const cov = rayCovers(this.map, x0, y0, dx, dy, bestT); if (cov) { bestT = cov.t; best = null; } // a cover plate in the way
-    let mult = 1, stopT = bestT, kind = best ? 'flesh' : cov ? 'cover' : 'none', pens = 0, wallT = 0, tracerWall = src && src.tracerUntil > this.time && this.shotW ? 2 : 0; // MARK: two cells of solid wall
+    let mult = 1, stopT = bestT, kind = best ? 'flesh' : cov ? 'cover' : 'none', pens = 0, wallT = 0, tracerWall = src && src.tracerUntil > this.time && this.shotW ? 2 : this.pierceNow ? Math.ceil(1.5 * PX_PER_M / CELL) : 0, pierced = 0; // MARK: two cells of solid wall; NAIL: a metre and a half
     const pen = penOf(this.shotW && this.shotW.cls === cls ? this.shotW : { cls });
     const sx = Math.floor(x0 / CELL), sy = Math.floor(y0 / CELL), up = fl > (this.map.groundFloor ?? 99);
     let winK = -1; this.winCarry = null;
@@ -1046,7 +1066,7 @@ export class Game {
       const sh = (stopsBullet(tile) || penBullet(tile)) && shapeAt(this.map, cx, cy);
       if (sh) { const h = rayShape(sh, x0, y0, dx, dy); if (h === null || h > bestT) return false; t = h; } // angled/curved wall: only its solid part
       else if (cx === sx && cy === sy) return false;
-      if (stopsBullet(tile) && tracerWall > 0 && tile !== T.VOID) { tracerWall--; mult *= 0.75; pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) }); return false; }
+      if (stopsBullet(tile) && tracerWall > 0 && tile !== T.VOID) { tracerWall--; mult *= this.pierceNow ? (pierced++ ? 1 : 0.4) : 0.75; pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) }); return false; }
       if (src && src.pr >= 1 && underAt(this.map, k, tile)) return false; // lying down: shoots under the car / table it sees under
       if (stopsBullet(tile) && this.map.holes[k] && throughHole(this.map, k, x0, y0, dx, dy)) return false; // through a lance hole
       if (stopsBullet(tile)) { stopT = t; kind = tile === T.TALL ? 'prop' : 'hard'; best = null; return true; }
@@ -1093,7 +1113,7 @@ export class Game {
       this.shotPens = pens; // the death card says "through a wall"
       if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
       else if (head && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
-      else if (W && W.oneShot && !q.downed && scopedIn(src) && (!pens && mult >= 1 || W.wallShot && pens <= W.wallShot)) // the Mammoth: through one soft wall too
+      else if (W && W.oneShot && !q.downed && scopedIn(src) && !this.pierceNow && (!pens && mult >= 1 || W.wallShot && pens <= W.wallShot)) // the Mammoth: through one soft wall too
         this.damage(q, 9999, src, wname, ang); // he asked: the big sniper rifles still drop anyone with one clean body shot; then (a prism made it too strong) only aimed in through the sniper scope
       else this.damage(q, dmg * mult * fall, src, wname, ang);
       this.shotPens = 0;
@@ -1877,6 +1897,17 @@ export class Game {
     }
     else if (id === 'flare' || id === 'medkit' || id === 'echobox') { this.throwNade(p, id); used(); }
     else if (id === 'spike') place('spike', 10, { life: 15, t: 0, pingT: 0 });
+    else if (id === 'bipod') { // PERCH (he asked: a bipod sniper): crouched or lying and still, the bipod goes down; again lifts it
+      if (p.bipodSet) { p.bipodSet = null; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); return; }
+      if (!(p.input.crouch || p.pr >= 1) || Math.hypot(p.vx || 0, p.vy || 0) > 12) { this.events.push({ e: 'deny', id: p.id, why: 'Crouch or lie down and stand still to set the bipod' }); return; }
+      p.bipodSet = { x: p.x, y: p.y }; this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y), id: p.id });
+    }
+    else if (id === 'ghillie') { p.ghillieUntil = this.time + 12; used(); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); } // MOSS: no scope glint
+    else if (id === 'spotter') { p.spotterUntil = this.time + 8; used(); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); } // OSPREY
+    else if (id === 'pierce') { // NAIL: one armour-piercing round in the chamber
+      if (p.pierceShot) { this.events.push({ e: 'deny', id: p.id, why: 'A piercing round is already loaded' }); return; }
+      p.pierceShot = 1; used(); this.events.push({ e: 'snd', s: 'reload', x: r1(p.x), y: r1(p.y), id: p.id });
+    }
     else if (id === 'tracer') { p.tracerUntil = this.time + 8; used(); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); }
     else if (id === 'cover') { if (this.placeCover(p)) used(); else this.events.push({ e: 'deny', id: p.id, why: 'No room for the cover there' }); }
     else if (id === 'pick') { // WREN: a barricade comes apart quietly
@@ -2931,6 +2962,7 @@ export class Game {
         el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadLen || WEAPONS[g.w].reload)) : 0, rq: p.reloadT > 0 && p.reloadLen && p.reloadLen !== WEAPONS[g.w].reload ? r2(p.reloadLen) : undefined,
         ct: p.ctrl, cf: this.tv && p.ctrl === 'cam' ? p.feedId : undefined, // ESPORTS TV: which camera they are looking through
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
+        gh: p.ghillieUntil > this.time ? 1 : undefined, bp: p.bipodSet ? 1 : undefined, // MOSS's ghillie (no glint), PERCH's bipod
         gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch || p.pr || p.slR > 0 ? 1 : 0, sd: p.slT > 0 ? 1 : undefined, pn: p.pr >= 1 ? 1 : undefined, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, au: p.ctrl === 'body' && !p.downed && !p.rope && aimUpHatch(this.map, p.x, p.y, p.aimX, p.aimY) ? 1 : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
         aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
@@ -2940,7 +2972,7 @@ export class Game {
       if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; } }
       if (p.alive && (p.sock || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
         ga: this.free ? p.guns.map(q => q.w + ':' + attCode(q.att)) : undefined, // free play's gun menu shows what each held gun carries
-        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
+        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, ap: p.pierceShot ? 1 : undefined, su2: p.spotterUntil > this.time ? r1(p.spotterUntil - this.time) : undefined, gw2: p.ghillieUntil > this.time ? r1(p.ghillieUntil - this.time) : undefined, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur), p.rope.climb ? 1 : 0] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
