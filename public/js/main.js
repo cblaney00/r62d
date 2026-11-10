@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -2082,7 +2082,7 @@ audio.setWorld(
     const fa = floorAt(st.map, L.x, L.y), fb = floorAt(st.map, x, y);
     if (fa !== fb) { // an open hatch near both of you lets the sound through
       const lo = Math.min(fa, fb), up = fa > fb ? L : { x, y }, dn = fa > fb ? { x, y } : L;
-      for (const h of st.map.hatches) if (h.fl === lo + 1 && st.map.tiles[h.cells[0]] === T.HOLE && Math.hypot(up.x - h.x, up.y - h.y) < 160 && Math.hypot(dn.x - h.bx, dn.y - h.by) < 220) return 1;
+      for (const h of st.map.hatches) if (h.fl === lo + 1 && hatchOpen(st.map, h) && Math.hypot(up.x - h.x, up.y - h.y) < 160 && Math.hypot(dn.x - h.bx, dn.y - h.by) < 220) return 1;
       for (let i = 0; i < (st.map.stairs || []).length; i++) if (stairLooks(st.map, i, L.x, L.y) && stairLooks(st.map, i, x, y)) return 0; // straight up or down an open staircase
       return Math.min(3, 1 + Math.abs(fa - fb));
     }
@@ -3131,7 +3131,7 @@ function teamViewers(s, view, me, inGame) {
   const body = view && view.kind === 'body' && me.a && !me.dn, sp = body && s.players.find(q => q.id === me.id);
   const stance = sp && sp.pn ? 'prone' : sp && sp.cr ? 'crouch' : 'stand';
   for (const h of m.hatches || []) {
-    if (m.tiles[h.cells[0]] !== T.HOLE) continue;
+    if (!hatchOpen(m, h)) continue;
     if (body) { const hv = hatchSight(m, h, view.x, view.y, stance); if (hv) vs.push(hv); } // your own eyes: only what the opening shows from where you are (drawHatchView)
     let up = false, down = false;
     for (let i = body ? 1 : 0; i < n; i++) { const v = vs[i]; if (!up && canSee(m, v, h.x, h.y, sm)) up = true; if (!down && canSee(m, v, h.bx, h.by, sm)) down = true; }

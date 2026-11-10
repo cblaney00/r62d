@@ -6,7 +6,7 @@
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers } from '../shared/physics.js';
-import { floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
+import { hatchOpen, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
 import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess } from './training.js';
@@ -535,7 +535,7 @@ export function visibleEnemy(game, p, see) {
   // they show from here (the shot goes through: game.holeAim)
   const stance = p.pr >= 1 ? 'prone' : p.input && p.input.crouch ? 'crouch' : 'stand';
   for (const h of m.hatches || []) {
-    const v = m.tiles[h.cells[0]] === T.HOLE && hatchSight(m, h, p.x, p.y, stance); if (!v) continue;
+    const v = hatchOpen(m, h) && hatchSight(m, h, p.x, p.y, stance); if (!v) continue;
     const vf = floorAt(m, v.x, v.y);
     for (const q of game.players.values()) {
       if (!q.alive || q.staged || game.side(q) === team || q.shrouded || floorAt(m, q.x, q.y) !== vf) continue;
@@ -1819,7 +1819,7 @@ function threatPoint(game, p, dir) {
   const m = game.map, W = m.W, pts = [];
   for (const o of m.openings) { const k = o.cells[o.cells.length >> 1]; pts.push({ x: (k % W + 0.5) * CELL, y: (Math.floor(k / W) + 0.5) * CELL }); }
   for (let i = 0; i < (m.stairs || []).length; i++) { const e = stairEnds(m, i, 0); pts.push(e.top, e.bottom); }
-  for (const h of m.hatches || []) if (m.tiles[h.cells[0]] === T.HOLE) pts.push({ x: h.x, y: h.y }, { x: h.bx, y: h.by });
+  for (const h of m.hatches || []) if (hatchOpen(m, h)) pts.push({ x: h.x, y: h.y }, { x: h.bx, y: h.by });
   // map knowledge (KNOW.angles): an attacker who knows the map also checks where defenders like to sit (the off-angles
   // inside the site), not only the doorways
   if (game.side(p) === TEAM.ATK && (p.ai.angK ??= Math.random() < know(game, p).angles)) for (const w of siteIntel(m, game.site).ways) if (w.hold) pts.push(w.hold);

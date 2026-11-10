@@ -352,6 +352,9 @@ export function hatchAtPoint(map, x, y) {
 // The view: { x, y (the middle of the opening on the other floor: walls there block from that point), range, ang: 0,
 // fov: 2pi, near: 0, kind: 'hatch', mask: { ex, ey, f, x0, y0, x1, y1 } (other floor coords), h, up, o (offset to the
 // other floor) }. maskSees(mask, x, y) tests the patch.
+// open: an opened hatch or hole, or a drilled peephole (always open)
+export const hatchOpen = (m, h) => !!h.peep || m.tiles[h.cells[0]] === T.HOLE;
+export const PEEP_HALF = 5; // half the width of GIMLET's peephole, px
 export const HATCH_H = 3.2, EYE_H = { stand: 1.6, crouch: 1.05, prone: 0.3 }, BODY_Z = 1.0, HATCH_LOOK = 7 * CELL;
 // From below (he asked: you shouldn't see too much up through a hatch) the patch is also cut to HATCH_UP_SEE past the
 // opening's edge (mask.lim, other floor coords), so only a small ring round the hole shows, from wherever you stand.
@@ -359,7 +362,7 @@ export const HATCH_UP_SEE = 36;
 const outLim = (k, x, y) => k.lim && (x < k.lim.x0 || x > k.lim.x1 || y < k.lim.y0 || y > k.lim.y1);
 export const maskSees = (k, x, y) => { const X = k.ex + k.f * (x - k.ex), Y = k.ey + k.f * (y - k.ey); if (outLim(k, x, y)) return false; return X >= k.x0 && X <= k.x1 && Y >= k.y0 && Y <= k.y1; };
 export function hatchSight(m, h, x, y, stance = 'stand') {
-  if (!m.tiles || m.tiles[h.cells[0]] !== T.HOLE) return null;
+  if (!m.tiles || !hatchOpen(m, h)) return null;
   const f0 = floorAt(m, x, y), up = f0 === h.fl, fb = floorAt(m, h.bx, h.by); // up: you are above it, looking down
   if (!up && f0 !== fb) return null;
   const cx = up ? h.x : h.bx, cy = up ? h.y : h.by, d = Math.hypot(cx - x, cy - y);
@@ -367,10 +370,11 @@ export function hatchSight(m, h, x, y, stance = 'stand') {
   if (castSight(m, x, y, Math.atan2(cy - y, cx - x), d, null) < d - CELL * 1.2) return null; // something in the way of the opening itself
   const e = EYE_H[stance] || EYE_H.stand, f = up ? e / (HATCH_H + e - BODY_Z) : (HATCH_H - e) / (HATCH_H + BODY_Z - e);
   const o = up ? { x: h.bx - h.x, y: h.by - h.y } : { x: h.x - h.bx, y: h.y - h.by }, ox = up ? h.bx : h.x, oy = up ? h.by : h.y;
-  const mask = { ex: x + o.x, ey: y + o.y, f, x0: ox - CELL, y0: oy - CELL, x1: ox + CELL, y1: oy + CELL };
-  if (!up) { const r = CELL + HATCH_UP_SEE; mask.lim = { x0: ox - r, y0: oy - r, x1: ox + r, y1: oy + r }; }
-  let far = 0; for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) far = Math.max(far, Math.hypot(ox + sx * CELL - mask.ex, oy + sy * CELL - mask.ey));
-  return { x: ox, y: oy, ang: 0, fov: Math.PI * 2, range: up ? Math.min(16 * 36, far / f + 4) : (CELL + HATCH_UP_SEE) * 1.42, near: 0, kind: 'hatch', mask, h, up, o };
+  const hw = h.peep ? PEEP_HALF : CELL; // a drilled peephole is a small opening
+  const mask = { ex: x + o.x, ey: y + o.y, f, x0: ox - hw, y0: oy - hw, x1: ox + hw, y1: oy + hw };
+  if (!up) { const r = hw + HATCH_UP_SEE; mask.lim = { x0: ox - r, y0: oy - r, x1: ox + r, y1: oy + r }; }
+  let far = 0; for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) far = Math.max(far, Math.hypot(ox + sx * hw - mask.ex, oy + sy * hw - mask.ey));
+  return { x: ox, y: oy, ang: 0, fov: Math.PI * 2, range: up ? Math.min(16 * 36, far / f + 4) : (hw + HATCH_UP_SEE) * 1.42, near: 0, kind: 'hatch', mask, h, up, o };
 }
 // Aiming up through a hatch (he asked: others should see it, a raised-gun pose): on the floor under a hatch, within
 // HATCH_LOOK of it, with the crosshair point on its opening (an open hole: anywhere in the small patch it shows). The hatch or null.
@@ -379,7 +383,7 @@ export function aimUpHatch(m, x, y, ax, ay) {
   const f0 = floorAt(m, x, y);
   for (const h of m.hatches) {
     if (floorAt(m, h.bx, h.by) !== f0 || Math.hypot(h.bx - x, h.by - y) > HATCH_LOOK) continue;
-    const r = CELL + (m.tiles[h.cells[0]] === T.HOLE ? HATCH_UP_SEE : 4);
+    const r = (h.peep ? PEEP_HALF : CELL) + (hatchOpen(m, h) ? HATCH_UP_SEE : 4);
     if (Math.abs(ax - h.bx) <= r && Math.abs(ay - h.by) <= r) return h;
   }
   return null;
@@ -592,3 +596,25 @@ export function syncDyn(m, list) {
   for (const k0 of list) if (!(m.hatchAt[k0] >= 0)) { const t = [k0, k0 + 1, k0 + m.W, k0 + m.W + 1].map(k => m.tiles[k]), h = addHatch(m, k0); h.cells.forEach((k, i) => { m.tiles[k] = t[i]; }); for (const k of h.cells) holePortal(m, k); n++; }
   return n > 0;
 }
+
+// GIMLET's floor drill (he asked: a peephole through any floor or ceiling, to look and shoot through): one cell of an
+// upper floor gets a small hole you can see and shoot through both ways (hatchSight with PEEP_HALF) but not fall
+// through: the tile stays plain floor. Kept in map.hatches with peep: true (not in hatchAt, so nothing breaks it open)
+// and listed in map.peeps (upper cells) for the snapshot.
+// The same spot one floor up (grid cell), or -1: no floor above, or only the roof (which is never drilled).
+export function cellAbove(m, k) {
+  const W = m.W, x = k % W, y = Math.floor(k / W), f = m.floors.find(q => x >= q.gx && x < q.gx + q.w);
+  if (!f || f.roof) return -1;
+  const u = m.floors[f.i + 1]; if (!u || u.roof) return -1;
+  const lx = x - f.gx + f.x0 - u.x0, ly = y + f.y0 - u.y0;
+  return lx < 0 || ly < 0 || lx >= u.w || ly >= u.h ? -1 : ly * W + u.gx + lx;
+}
+// can upper cell k take a peephole (plain floor above and below, not already one)?
+export const peepOk = (m, k) => k >= 0 && m.tiles[k] === T.FLOOR && !(m.portal[k] >= 0) && !(m.hatchAt[k] >= 0) && !(m.peeps || []).includes(k) && (() => { const b = cellBelow(m, k); return b >= 0 && (m.tiles[b] === T.FLOOR || m.tiles[b] === T.LOW); })();
+export function addPeep(m, k) {
+  const W = m.W, b = cellBelow(m, k), fi = m.floors.find(q => (k % W) >= q.gx && (k % W) < q.gx + q.w);
+  const h = { id: m.hatches.length, fl: fi ? fi.i : 0, cells: [k], below: [b], x: (k % W + 0.5) * CELL, y: (Math.floor(k / W) + 0.5) * CELL, bx: (b % W + 0.5) * CELL, by: (Math.floor(b / W) + 0.5) * CELL, peep: true };
+  m.hatches.push(h); (m.peeps || (m.peeps = [])).push(k);
+  return h;
+}
+export function syncPeeps(m, list) { if (list && m.hatches) for (const k of list) if (!(m.peeps || []).includes(k)) addPeep(m, k); }
