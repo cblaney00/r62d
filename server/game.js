@@ -1,6 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
-import { floorSpot, addHatch } from '../shared/map.js';
+import { floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
@@ -20,6 +20,8 @@ const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
 // everyday bots: their own names, never a pro's (he asked) or a gun's
 const BOT_NAMES = ['Dusty', 'Pickles', 'Gerald', 'Noodle', 'Biscuit', 'Lenny', 'Toast', 'Wobbles', 'Mittens', 'Chonk', 'Sprout', 'Tumbleweed'];
+const HTRAP_R = 2.5 * PX_PER_M;
+const DRILL_T = 3, GRAPPLE_T = 1.6, GRAPPLE_ROOF = 3, GRAPPLE_REACH = 2.2 * PX_PER_M, DROP_T = 2; // GIMLET's drill, HOIST's climbs, DEADFALL's fuse (s)
 const SPRINT_RAISE = 0.3, SPRINT_LOUD = 520; // seconds to get the gun back up after a sprint; how far sprinting steps carry (a jog is 320)
 const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, sprint: 0, sa: 0, crouch: 0, prone: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0 };
 const JAM_R = 90;
@@ -587,7 +589,7 @@ export class Game {
     if (this.ghost(p)) mul *= 0.85; // STRIDER's Ghost Step: careful, slower steps (he asked: it was too strong)
     for (const e of this.ents) if (e.type === 'wire' && e.team !== this.side(p) && Math.hypot(e.x - p.x, e.y - p.y) < 24) { mul *= 0.3; break; }
     const beingRevived = p.downed && [...this.players.values()].some(q => q.busy && q.busy.k === 'revive' && q.busy.target === p.id); // he asked: revives kept failing — the downed crawled out of reach
-    const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || !!p.rope || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') || beingRevived ||
+    const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || !!p.rope || !!p.grapple || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') || beingRevived ||
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
       (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK);
     const gw = p.guns && p.guns[p.slot] ? moveOf(WEAPONS[p.guns[p.slot].w]) : [1, 1];
@@ -621,7 +623,7 @@ export class Game {
   tickPlayer(p, dt) {
     const RUNOUT_SPOT = 3;
     this.tickPrep(p);
-    this.tickSnipers(p);
+    this.tickSnipers(p); this.tickGrapple(p, dt);
     // a defender outside the building (preparation or action): the attackers are warned at once, and after RUNOUT_SPOT
     // seconds outside in a row (R6's run-out rule, he chose it) the defender is spotted for them until back inside
     if (p.alive && this.side(p) === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION) && !this.tut) {
@@ -806,7 +808,7 @@ export class Game {
     const asT = p.riot ? RIOT[p.riot].aside : SHIELD_ASIDE;
     if (p.bracing) p.aside = Math.max(0, Math.min(1, (p.aside || 0) + (p.input.ads ? dt / asT : -dt / (asT * 0.75)))); else p.aside = 0;
     const canShoot = p.ctrl === "body" && !p.staged && !p.prep && !(p.bracing && p.aside < 1 && !(p.riot && RIOT[p.riot].hip)) && !p.busy && !p.vault && !(p.rope && p.rope.st !== 'hang') && !(p.recoverUntil > this.time) && p.reloadT <= 0 && !p.scanning && gun && !p.spr && !(p.gunUp > this.time) &&
-      !(p.switchUntil > this.time) && !(p.staggerUntil > this.time);
+      !(p.switchUntil > this.time) && !(p.staggerUntil > this.time) && !p.grapple;
     // a click made a hair before the gun is ready is kept until it is (up to 0.15 s), so fast tapping never loses a shot
     const gunComing = p.spr || p.gunUp > this.time; // a click at the end of a sprint fires as soon as the gun is up
     const click = p.click && !(this.time - (p.click.t ?? this.time) > (gunComing ? 0.5 : 0.15)) ? p.click : null; p.click = null;
@@ -1160,6 +1162,44 @@ export class Game {
     const k0 = floorSpot(this.map, x, y); if (k0 < 0) return null;
     const h = addHatch(this.map, k0); this.breakHatch(h.id);
     return h;
+  }
+  // HOIST: where a grapple takes you, { x, y, roof } or null. Under an open hatch (within GRAPPLE_REACH of its middle):
+  // the floor beside it upstairs. Outside on the ground facing a wall of the building: the roof right above, a step in.
+  grappleTarget(p) {
+    const m = this.map, W = m.W, fl = floorAt(m, p.x, p.y), free = (x, y) => { const k = Math.floor(y / CELL) * W + Math.floor(x / CELL); return [T.FLOOR, T.OPEN].includes(m.tiles[k]) && !(m.hatchAt[k] >= 0) && !circleBlocked(m, x, y, PLAYER_R, t => blocksMove(t) || t === T.HOLE); };
+    for (const h of m.hatches) {
+      if (h.peep || !hatchOpen(m, h) || floorAt(m, h.bx, h.by) !== fl || Math.hypot(h.bx - p.x, h.by - p.y) > GRAPPLE_REACH) continue;
+      const a0 = Math.atan2(h.by - p.y, h.bx - p.x) + Math.PI; // land on the side you came from
+      for (let i = 0; i < 8; i++) { const a = a0 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI / 4, x = h.x + Math.cos(a) * CELL * 1.9, y = h.y + Math.sin(a) * CELL * 1.9; if (free(x, y)) return { x, y }; }
+    }
+    const here = Math.floor(p.y / CELL) * W + Math.floor(p.x / CELL);
+    if (m.tiles[here] !== T.GROUND || fl !== m.groundFloor) return null;
+    const f = this.facingCell(p, 30); if (!f || ![T.SOFT, T.HARD, T.REINF, T.BARRI].includes(f.t)) return null;
+    const G = m.floors[fl], R = m.floors[m.roofFloor]; if (!R || !R.roof) return null;
+    const dx = Math.cos(p.aim), dy = Math.sin(p.aim);
+    for (let d = 0; d <= 5; d++) {
+      const gx = f.cx + Math.round(dx * d), gy = f.cy + Math.round(dy * d), lx = gx - G.gx + G.x0 - R.x0, ly = gy + G.y0 - R.y0;
+      if (lx < 0 || ly < 0 || lx >= R.w || ly >= R.h) continue;
+      const k = ly * W + R.gx + lx; if (m.floor[k] !== FL.ROOF || m.tiles[k] !== T.FLOOR) continue;
+      const x = (k % W + 0.5) * CELL + dx * CELL, y = (Math.floor(k / W) + 0.5) * CELL + dy * CELL;
+      if (free(x, y)) return { x, y, roof: true };
+    }
+    return null;
+  }
+  // LOCKJAW: the shut hatch at your feet (on top) or right above you (underneath)
+  hatchToRig(p) {
+    const shut = h => h && !h.peep && !hatchOpen(this.map, h) && !this.ents.some(e => e.type === 'htrap' && e.rig === h.id);
+    const near = hatchNear(this.map, p.x, p.y, p.aim, 20); if (shut(near)) return near;
+    const fl = floorAt(this.map, p.x, p.y);
+    return this.map.hatches.find(h => shut(h) && floorAt(this.map, h.bx, h.by) === fl && Math.hypot(h.bx - p.x, h.by - p.y) < GRAPPLE_REACH) || null;
+  }
+  // HOIST's climb: frozen on the line, then up; down or dead and it is over
+  tickGrapple(p, dt) {
+    const g = p.grapple; if (!g) return;
+    if (!p.alive || p.downed || p.ctrl !== 'body') { p.grapple = null; return; }
+    if ((g.t += dt) < g.dur) return;
+    p.grapple = null; p.x = g.x; p.y = g.y; p.vx = p.vy = 0;
+    this.events.push({ e: 'snd', s: 'land', x: r1(p.x), y: r1(p.y), id: p.id }); this.noise(p.x, p.y, this.side(p), 300);
   }
   // a charge set on the plain floor in front of you (upper floors only): { k, x, y, floor } like wallInFront, or null
   floorCharge(p) {
@@ -1911,6 +1951,31 @@ export class Game {
     }
     else if (id === 'flare' || id === 'medkit' || id === 'echobox') { this.throwNade(p, id); used(); }
     else if (id === 'spike') place('spike', 10, { life: 15, t: 0, pingT: 0 });
+    else if (id === 'drill') { // GIMLET (he asked: a peephole through any floor or ceiling): crouched = the floor, standing = the ceiling
+      const x = p.x + Math.cos(p.aim) * 10, y = p.y + Math.sin(p.aim) * 10, here = Math.floor(y / CELL) * this.map.W + Math.floor(x / CELL);
+      const down = !!(p.input.crouch || p.pr >= 1), k = down ? here : cellAbove(this.map, here);
+      if (!peepOk(this.map, k)) { this.events.push({ e: 'deny', id: p.id, why: down ? 'No floor below to drill into here' : 'No ceiling to drill here (the roof can\'t be drilled)' }); return; }
+      this.ents.push({ id: this.eid(), type: 'drill', x, y, k, up: !down, t: DRILL_T, team, owner: p.id, hp: 1 });
+      used(); this.events.push({ e: 'snd', s: 'place', x: r1(x), y: r1(y) }); this.noise(x, y, team, 260);
+    }
+    else if (id === 'grapple') { // HOIST (he asked): up through an open hatch above you, or onto the roof from an outside wall
+      const to = this.grappleTarget(p);
+      if (!to) { this.events.push({ e: 'deny', id: p.id, why: 'Stand under an open hatch, or outside facing the building\'s wall, to grapple up' }); return; }
+      p.grapple = { t: 0, dur: to.roof ? GRAPPLE_ROOF : GRAPPLE_T, x: to.x, y: to.y, sx: p.x, sy: p.y }; p.adsT = 0; p.reloadT = 0; p.bipodSet = null;
+      used(); this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id }); this.noise(p.x, p.y, team, 420);
+    }
+    else if (id === 'htrap') { // LOCKJAW (he asked): rig a shut hatch; the first attacker to open it or come through is stunned and spotted
+      const h = this.hatchToRig(p);
+      if (!h) { this.events.push({ e: 'deny', id: p.id, why: 'Stand on or under a shut hatch to rig it' }); return; }
+      this.ents.push({ id: this.eid(), type: 'htrap', x: h.x, y: h.y, rig: h.id, arm: DUR.trapArm, team, owner: p.id, hp: 1 });
+      used(); this.events.push({ e: 'snd', s: 'place', x: r1(h.x), y: r1(h.y) });
+    }
+    else if (id === 'dropcharge') { // DEADFALL (he asked): blows a hatch-sized hole into the floor below
+      const w = this.floorCharge(p);
+      if (!w) { this.events.push({ e: 'deny', id: p.id, why: 'Needs plain floor with a room below it' }); return; }
+      this.ents.push({ id: this.eid(), type: 'dropch', x: w.x, y: w.y, cell: w.k, floor: true, t: DROP_T, team, owner: p.id, hp: 1 });
+      used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
+    }
     else if (id === 'bipod') { // PERCH (he asked: a bipod sniper): crouched or lying and still, the bipod goes down; again lifts it
       if (p.bipodSet) { p.bipodSet = null; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); return; }
       if (!(p.input.crouch || p.pr >= 1) || Math.hypot(p.vx || 0, p.vy || 0) > 12) { this.events.push({ e: 'deny', id: p.id, why: 'Crouch or lie down and stand still to set the bipod' }); return; }
@@ -2591,6 +2656,24 @@ export class Game {
           e.x = o.x; e.y = o.y;
           break;
         }
+        case 'drill': // GIMLET: a few seconds' drilling, then the peephole is through
+          if ((e.t -= dt) <= 0) { this.removeEnt(e); if (peepOk(this.map, e.k)) { addPeep(this.map, e.k); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); } }
+          break;
+        case 'dropch': // DEADFALL: the fuse runs, then the floor goes
+          if (!this.jammedAt(e.x, e.y)) e.t -= dt;
+          if (e.t <= 0) { this.removeEnt(e); this.explode(e, { r: 34, dmg: 45, cellR: 0, cells: [], kind: 'breach', at: e.cell, floor: true }); }
+          break;
+        case 'htrap': { // LOCKJAW: once the hatch is open, the first attacker by either side of it
+          if (e.arm > 0) { e.arm -= dt; break; }
+          const h = this.map.hatches[e.rig]; if (!h) { this.removeEnt(e); break; } // (rig, not hatch: opening a hatch clears what sits on it)
+          if (!hatchOpen(this.map, h)) break;
+          const near = [...this.players.values()].filter(q => q.alive && this.side(q) !== e.team && [[h.x, h.y], [h.bx, h.by]].some(([x, y]) => Math.hypot(q.x - x, q.y - y) < HTRAP_R && floorAt(this.map, q.x, q.y) === floorAt(this.map, x, y)));
+          if (!near.length) break;
+          this.removeEnt(e); this.events.push({ e: 'boom', x: r1(h.bx), y: r1(h.by), r: 30, kind: 'stun' }); this.events.push({ e: 'snd', s: 'beep', x: r1(h.x), y: r1(h.y) });
+          for (const q of near) { q.stunUntil = Math.max(q.stunUntil || 0, this.time + 3); this.events.push({ e: 'stun', id: q.id, dur: 3 }); this.spot(e.team, q.id, 6); }
+          const o = this.players.get(e.owner); if (o) this.pts(o, 20 * near.length, 'Hatch trap');
+          break;
+        }
         case 'prox': case 'concuss': case 'clamp': {
           if (e.arm > 0) { e.arm -= dt; break; }
           if (e.fuse !== undefined) { e.fuse -= dt; if (e.fuse <= 0) this.detonate(e); break; }
@@ -2976,7 +3059,7 @@ export class Game {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
         el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadLen || WEAPONS[g.w].reload)) : 0, rq: p.reloadT > 0 && p.reloadLen && p.reloadLen !== WEAPONS[g.w].reload ? r2(p.reloadLen) : undefined,
         ct: p.ctrl, cf: this.tv && p.ctrl === 'cam' ? p.feedId : undefined, // ESPORTS TV: which camera they are looking through
-        bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : null, df: p.hasDefuser ? 1 : 0,
+        bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : p.grapple ? { k: 'grapple', p: r2(p.grapple.t / p.grapple.dur) } : null, df: p.hasDefuser ? 1 : 0,
         gh: p.ghillieUntil > this.time ? 1 : undefined, bp: p.bipodSet ? 1 : undefined, // MOSS's ghillie (no glint), PERCH's bipod
         gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch || p.pr || p.slR > 0 ? 1 : 0, sd: p.slT > 0 ? 1 : undefined, pn: p.pr >= 1 ? 1 : undefined, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, au: p.ctrl === 'body' && !p.downed && !p.rope && aimUpHatch(this.map, p.x, p.y, p.aimX, p.aimY) ? 1 : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
         aa: g && g.att ? attCode(g.att) : '',
@@ -3010,6 +3093,7 @@ export class Game {
       if (e.type === 'scope' && e.fl) o.fl = e.fl;
       if (e.type === 'scope' && e.shieldUntil > this.time) o.sh = r1(e.shieldUntil - this.time);
       if (e.type === 'sticky' && e.stuck) o.st = 1;
+      if (e.type === 'drill' || e.type === 'dropch') o.t = r1(e.t);
       if (e.type === 'cutter' || e.type === 'breach') { o.t = r1(e.t); o.j = this.jammedAt(e.x, e.y) ? 1 : 0; }
       if (e.type === 'drone') { o.j = this.jammedAt(e.x, e.y) ? 1 : 0; o.vx = r1(e.vx || 0); o.vy = r1(e.vy || 0); if (e.grab) o.gr = 1; }
       if (e.type === 'bird') { o.vx = r1(e.vx || 0); o.vy = r1(e.vy || 0); if (e.perch) o.pe = 1; if (e.auto) o.au = 1; }
@@ -3019,7 +3103,7 @@ export class Game {
     const spots = { atk: [...this.spots.atk.keys()], def: [...this.spots.def.keys()] };
     const common = JSON.stringify({
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
-      ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
+      ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, pp: this.map.peeps && this.map.peeps.length ? this.map.peeps : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
       site: this.site, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       tvl: this.tv ? this.botLevel : undefined, bn: this.tv && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
       bq: this.tv && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, this.banRun.t - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,

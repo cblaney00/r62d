@@ -621,6 +621,7 @@ function onSnap(s) {
   if (s.mv !== st.mv) { if (st.rend) resetMap(s.mv); else loadMap(s.mv, null, null, s.mp); } // same map, new round
   const m = st.map, now = performance.now() / 1000;
   if (s.dh) syncDyn(m, s.dh); // holes blown in floors since the round began (shared/map.js)
+  if (s.pp) syncPeeps(m, s.pp); // GIMLET's peepholes
   const changed = [], mine0 = s.players.find(p => p.id === s.you), ours = mine0 ? (mine0.tm === 'atk' ? 1 : 2) : -1, now0 = [];
   // your own side's changes (a teammate's barricade, reinforcement, breach...) reach your map at once, even out of sight (he asked)
   for (let i = 0; i < s.cells.length; i += 3) {
@@ -2449,6 +2450,7 @@ function draw(s, view, now, dt) {
     tilt.update(dt, jump ? 0 : (vx * cr - vy * sr) * z, jump ? 0 : (vx * sr + vy * cr) * z, shake, innerWidth, innerHeight);
     const de = document.documentElement; de.classList.toggle('tilt3d', tilt.on === true); de.classList.toggle('edgeblur', fxOn('blur') && gq.blur === true);
   }
+  if (inGame && view) drawPeeps(); // GIMLET's peepholes, where you can see them
   if (inGame && view) { drawStairView(s, st.me, now); drawHatchView(s, st.me, now); drawWindowView(s, st.me, now, view); drawWindowMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
   if (st.tv && inGame) { // each team's sight, faintly in its own colour (pro team colours, else blue / orange)
     const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
@@ -3065,7 +3067,7 @@ function feedList(s, me) {
   return s.ents.filter(e => e.tm === me.tm && (me.tm === 'def' ? (e.ty === 'cam' && e.hp > 0) || e.ty === 'bird' || e.ty === 'scope' : e.ty === 'drone' || e.ty === 'scope'))
     .map((c, i) => [feedGroup(c), i, c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]); // same groups and order as the server's feeds()
 }
-const TRAPS = new Set(['clamp', 'prox', 'concuss', 'alarm', 'mine']), TRAP_SEEN = 2 * PX_PER_M;
+const TRAPS = new Set(['clamp', 'prox', 'concuss', 'alarm', 'mine', 'htrap']), TRAP_SEEN = 2 * PX_PER_M;
 function feedKind(c) { return c.ty === 'drone' ? 'DRONE' : c.ty === 'bird' ? (c.pe ? 'BIRD · LANDED' : 'BIRD') : c.ty === 'scope' && c.fl ? (c.fl === 'up' ? 'PERISCOPE ▲' : 'PERISCOPE ▼') : c.ty === 'scope' ? 'WALL SCOPE' : c.tu ? 'TURRET' : c.ow ? 'STICKY CAM' : 'CAMERA'; }
 function ownerName(s, id) { const p = s.players.find(p => p.id === id); return p ? p.n.replace(/^\[BOT\] /, '') : 'TEAMMATE'; }
 function feedView(c, me) {
@@ -3395,6 +3397,20 @@ function ghostSeen(gh) {
   const sm = smokes(st.last);
   for (const v of st.viewers || []) if (!v.off && v.kind !== 'hatch' && floorAt(st.map, v.x, v.y) === gh.fl && stairLooks(st.map, gh.s, v.x, v.y) && canSee(st.map, v, gh.x, gh.y, sm)) return true;
   return false;
+}
+// GIMLET's peepholes (he asked): a small ragged hole in the floor from above, a pin of light in the ceiling from below
+function drawPeeps() {
+  const m = st.map; if (!m || !m.peeps || !m.peeps.length) return;
+  for (const h of m.hatches) {
+    if (!h.peep) continue;
+    for (const [x, y, top] of [[h.x, h.y, true], [h.bx, h.by, false]]) {
+      if (!teamSees(x, y)) continue;
+      ctx.save(); ctx.translate(x, y);
+      if (top) { ctx.fillStyle = '#0a0a0b'; ctx.beginPath(); for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2, r = 3.6 + (i % 2) * 0.9; ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); } ctx.fill(); ctx.strokeStyle = 'rgba(200,190,170,0.5)'; ctx.lineWidth = 0.6; ctx.stroke(); }
+      else { ctx.fillStyle = 'rgba(255,240,200,0.18)'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,250,230,0.55)'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, 7); ctx.fill(); }
+      ctx.restore();
+    }
+  }
 }
 function teamSeesBody(x, y) { // seen by someone's own eyes (not a drone, camera or scope)
   const sm = smokes(st.last);

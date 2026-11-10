@@ -1186,6 +1186,16 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
   const toBomb = Math.min(...site.bombs.map(b => Math.hypot(b.x - p.x, b.y - p.y)));
   // the snipers (2026-11-10): PERCH sets the bipod whenever crouched or lying still, MOSS wraps up on contact,
   // OSPREY spots when there is something to look for, NAIL loads a piercing round for the next shot at someone seen or heard
+  // up and down (2026-11-10): GIMLET drills over or under the objective, HOIST climbs through an open hatch toward a
+  // site upstairs, LOCKJAW rigs a hatch in preparation, DEADFALL drops a charge over attackers heard right below
+  const lp = localPos(game.map, p.x, p.y), lb = localPos(game.map, bomb.x, bomb.y), flat = Math.hypot(lp.x - lb.x, lp.y - lb.y);
+  if (abId === 'drill') { if (!enemy && ok() && game.phase === PHASE.ACTION && Math.abs(lp.f - lb.f) === 1 && flat < 8 * PX_PER_M && Math.random() < dt) { p.input.crouch = lp.f > lb.f ? 1 : 0; inp.crouch = p.input.crouch; useAbility(); done(6); } return; }
+  if (abId === 'grapple') { if (!enemy && ok() && lb.f > lp.f && !p.grapple && game.grappleTarget(p) && Math.random() < dt * 2) { useAbility(); done(5); } return; }
+  if (abId === 'htrap') { if (ok() && game.phase === PHASE.PREP && game.hatchToRig(p)) { useAbility(); done(3); } return; }
+  if (abId === 'dropcharge') {
+    if (ok() && heard && game.phase === PHASE.ACTION) { const h = localPos(game.map, ai.heard.x, ai.heard.y); if (h.f === lp.f - 1 && Math.hypot(h.x - lp.x, h.y - lp.y) < 3 * PX_PER_M && game.floorCharge(p)) { useAbility(); done(8); } }
+    return;
+  }
   if (abId === 'bipod') { if (!p.bipodSet && (p.input.crouch || p.pr >= 1) && Math.hypot(p.vx || 0, p.vy || 0) < 12 && game.time > (ai.abT || 0)) { useAbility(); done(6); } return; }
   if (abId === 'ghillie') { if ((enemy || heard) && ok() && !(p.ghillieUntil > game.time)) { useAbility(); done(14); } return; }
   if (abId === 'spotter') { if ((enemy || heard) && ok() && !(p.spotterUntil > game.time) && Math.random() < dt * 1.5) { useAbility(); done(10); } return; }

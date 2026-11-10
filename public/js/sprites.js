@@ -115,6 +115,7 @@ const UNI = {
   audit: ['#4a5a6a', '#2a343e', 'stripe', '#5ad0c0'], tonic: ['#4aa08a', '#2a6a5a', 'plain', null], ward: ['#3a4252', '#2a303c', 'hex', '#7aa0e8'],
   girder: ['#5e6064', '#3a3c40', 'hazard', '#e0c030'], magpie: ['#1a1c1e', '#e6e6e0', 'split', '#f2f2ec'],
   perch: ['#6a5e46', '#40382a', 'digital', '#8a7e5e'], moss: ['#4a5a2a', '#36421e', 'tiger', '#7a8a4a'], osprey: ['#8a7a5a', '#4e4432', 'check', '#d8b060'], nail: ['#5a3a34', '#2e2422', 'stripe', '#b85a4a'],
+  gimlet: ['#6a5a3a', '#3e3424', 'char', '#c8a050'], hoist: ['#2e4a62', '#1e2e3e', 'zig', '#5aa0d8'], lockjaw: ['#4a3a32', '#2a201c', 'check', '#a04a3a'], deadfall: ['#4e4458', '#2e2836', 'hazard', '#e0c030'],
 };
 // side colours on the clothing (he asked: every attacker wears some orange, every defender some blue, placed differently
 // per operator so each one stays easy to tell apart): bigger armbands for all, plus a mix of helmet band, vest stripe,
@@ -613,7 +614,7 @@ export function drawGadget(ctx, e, t, ally) {
 // rings are for the owner's team only, dashed (a circle only where a circle is the real reach).
 const GADGET_OP = { jammer: 'veil', mine: 'lynx', prox: 'bramble', concuss: 'gravel', clamp: 'snare', sensor: 'shade', grid: 'shunt', plates: 'rampart',
   pace: 'rally', sticky: 'salvo', saw: 'torque', spike: 'echo', pick: 'wren', alarm: 'latch', echobox: 'ruse', radar: 'audit', station: 'tonic', healzone: 'patch',
-  catcher: 'ward', dart: 'hound', cover: 'trench', cluster: 'ember', cutter: 'rivet', scope: 'tether' };
+  catcher: 'ward', dart: 'hound', cover: 'trench', cluster: 'ember', cutter: 'rivet', scope: 'tether', drill: 'gimlet', htrap: 'lockjaw', dropch: 'deadfall' };
 const glowCache = {};
 function glow(ctx, ty, r = 9) { // a soft halo in the operator's colour, from a small cached picture (cheap to draw)
   const op = OPERATORS[GADGET_OP[ty]]; if (!op || typeof document === 'undefined') return;
@@ -782,6 +783,23 @@ function drawGadgetBody(ctx, e, t, ally) {
       ctx.fillStyle = '#9aa0a8'; ctx.beginPath();
       for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283, r = i % 2 ? 3.4 : 4.4; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
       ctx.closePath(); ctx.fill(); ctx.fillStyle = '#e0b53a'; ctx.beginPath(); ctx.arc(0, 0, 1.3, 0, 7); ctx.fill();
+      break;
+    }
+    case 'drill': { // GIMLET's drill: a tripod with a spinning bit
+      ctx.strokeStyle = '#2a2c2e'; ctx.lineWidth = 0.8; for (let i = 0; i < 3; i++) { const a = i * 2.09 + 0.3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * 4.5, Math.sin(a) * 4.5); ctx.stroke(); }
+      ctx.fillStyle = opCol('drill'); ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#d8dce0'; ctx.lineWidth = 0.5; const r = t * 30; ctx.beginPath(); ctx.moveTo(Math.cos(r) * 1.6, Math.sin(r) * 1.6); ctx.lineTo(-Math.cos(r) * 1.6, -Math.sin(r) * 1.6); ctx.stroke();
+      break;
+    }
+    case 'htrap': { // LOCKJAW's hatch trap: a flat steel box with a red tell-tale, wired to the hatch
+      ctx.fillStyle = '#3a3d42'; ctx.fillRect(-3.2, -2, 6.4, 4); ctx.strokeStyle = '#1a1c1e'; ctx.lineWidth = 0.4; ctx.strokeRect(-3.2, -2, 6.4, 4);
+      ctx.fillStyle = (t * 2) % 1 < 0.5 ? '#ff4030' : '#601810'; ctx.fillRect(-0.6, -0.6, 1.2, 1.2);
+      ctx.strokeStyle = opCol('htrap'); ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(3.2, 0); ctx.lineTo(7, 1.5); ctx.moveTo(-3.2, 0); ctx.lineTo(-7, -1.5); ctx.stroke();
+      break;
+    }
+    case 'dropch': { // DEADFALL's drop charge: a round shaped charge on the floor, blinking faster as it counts down
+      ctx.fillStyle = '#4a4438'; ctx.beginPath(); ctx.arc(0, 0, 4, 0, 7); ctx.fill(); ctx.strokeStyle = '#e0c030'; ctx.lineWidth = 0.8; ctx.setLineDash([1.2, 1.2]); ctx.beginPath(); ctx.arc(0, 0, 3.2, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = (t * (e.t !== undefined && e.t < 1 ? 8 : 3)) % 1 < 0.5 ? '#ff3020' : '#501008'; ctx.beginPath(); ctx.arc(0, 0, 1, 0, 7); ctx.fill();
       break;
     }
     case 'spike': { // ECHO's seismic spike: a cross-headed stake hammered into the floor, cracks running out of the impact
