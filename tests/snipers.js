@@ -1,7 +1,7 @@
 // The four sniper attackers (he asked 2026-11-10, he chose all four): PERCH's bipod (only crouched/lying and still;
 // faster bolt, half the kick, barely moves, folds when you stand), MOSS's ghillie (no glint flag while it lasts),
 // OSPREY's spotting scope (aimed in, enemies in view are spotted for the team; not through walls), NAIL's piercing
-// round (one shot through reinforced wall at 40% damage, no one-shot kill through it). Run: node tests/snipers.js
+// round (one shot through reinforced wall at 55% damage, no one-shot kill through it). Run: node tests/snipers.js
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { buildMap } from '../shared/map.js';
@@ -43,13 +43,13 @@ const spotted = () => Object.values(g.spots || {}).some(v => v && (v instanceof 
 ok(!spotted(), 'OSPREY spotted through a wall');
 d.x = wx - 1.5 * CELL; d.y = wy + 0; a.spotT = -9; g.tickSnipers(a); ok(spotted(), 'OSPREY did not spot the defender in view');
 
-// NAIL: a piercing round through reinforced wall at 40%; not a one-shot even with a sniper scope
+// NAIL: a piercing round through reinforced wall at 55%; not a one-shot even with a sniper scope
 for (const k of [wk - W, wk, wk + W]) m.tiles[k] = T.REINF;
 setup(a, 'nail', wx - 2 * CELL, wy, 0); setup(d, 'lynx', wx + 2 * CELL, wy, Math.PI); d.hp = d.maxHp = 500;
 a.guns[0] = { w: 'saker', ammo: 5, reserve: 10, att: { sight: 'sniper' }, m: gunMods('saker', { sight: 'sniper' }) };
 shoot(a, d); ok(d.hp === 500, 'a normal round went through reinforced wall', d.hp);
 g.useAbility(a); ok(a.pierceShot === 1, 'round not loaded'); shoot(a, d);
-const dmg = 500 - d.hp; ok(dmg > 0 && dmg < WEAPONS.saker.dmg * 0.5, 'piercing round damage', dmg); ok(!a.pierceShot, 'piercing round not used up');
+const dmg = 500 - d.hp; ok(dmg > 0 && dmg < WEAPONS.saker.dmg * 0.6, 'piercing round damage', dmg); ok(!a.pierceShot, 'piercing round not used up');
 a.guns[0] = { w: 'mammoth', ammo: 5, reserve: 10, att: { sight: 'sniper' }, m: gunMods('mammoth', { sight: 'sniper' }) };
 d.hp = d.maxHp = 150; g.useAbility(a); shoot(a, d); ok(d.alive && !d.downed, 'the Mammoth one-shot through reinforced wall with a piercing round');
 console.log(`PERCH bolt ${down.cd.toFixed(2)} s down vs ${up.cd.toFixed(2)} s up; NAIL through reinforced: ${dmg} damage`);

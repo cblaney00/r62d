@@ -39,7 +39,9 @@ const WINDUP_T = 0.5, SETUP_T = 1.2;
 const THROWN_G = new Set(['smoke', 'frag', 'stun', 'impact', 'nitro']), PLACED_G = new Set(['breach', 'claymore', 'wire', 'dshield']);
 const THROWN_AB = new Set(['emp', 'sonar', 'stickycam', 'gas', 'flare', 'medkit', 'echobox']);
 const PLACED_AB = new Set(['prox', 'concuss', 'clamp', 'sensor', 'plates', 'turret', 'spike', 'alarm', 'pace', 'radar', 'station', 'catcher', 'jammer', 'mine', 'grid', 'cover', 'cutter', 'periscope', 'scope']);
-const LUNGE_M = 4; // CROW: how far the marked lunge reaches (m)
+const LUNGE_M = 5; // CROW: how far the marked lunge reaches (m; was 4, Ball Knowledge 2026-11-10: 40% of rounds won)
+const LUNGE_WIND = 1; // CROW: seconds from drawing the blade to the lunge being ready (was 1.5)
+const PIERCE_DMG = 0.55; // NAIL: damage a piercing round keeps through the wall (was 0.4)
 const SHIELD_ASIDE = 0.45; // BULWARK: seconds to swing the shield out of the way when aiming in // FERRO: seconds between hammer swings // TALON's EMP: a circle about a door wide (he asked), centred inside the wall it stuck to
 const MAX_BANS = 8; // he asked: at most 8 banned operators in a match
 const BAN_GAP = 2.6; // seconds between Esports TV bans, long enough to read each one
@@ -1074,7 +1076,7 @@ export class Game {
       const sh = (stopsBullet(tile) || penBullet(tile)) && shapeAt(this.map, cx, cy);
       if (sh) { const h = rayShape(sh, x0, y0, dx, dy); if (h === null || h > bestT) return false; t = h; } // angled/curved wall: only its solid part
       else if (cx === sx && cy === sy) return false;
-      if (stopsBullet(tile) && tracerWall > 0 && tile !== T.VOID) { tracerWall--; mult *= this.pierceNow ? (pierced++ ? 1 : 0.4) : 0.75; pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) }); return false; }
+      if (stopsBullet(tile) && tracerWall > 0 && tile !== T.VOID) { tracerWall--; mult *= this.pierceNow ? (pierced++ ? 1 : PIERCE_DMG) : 0.75; pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) }); return false; }
       if (src && src.pr >= 1 && underAt(this.map, k, tile)) return false; // lying down: shoots under the car / table it sees under
       if (stopsBullet(tile) && this.map.holes[k] && throughHole(this.map, k, x0, y0, dx, dy)) return false; // through a lance hole
       if (stopsBullet(tile)) { stopT = t; kind = tile === T.TALL ? 'prop' : 'hard'; best = null; return true; }
@@ -1951,7 +1953,7 @@ export class Game {
       const t = [...this.players.values()].filter(q => q.alive && !q.downed && this.side(q) !== this.side(p) && Math.hypot(q.x - p.x, q.y - p.y) < LUNGE_M * PX_PER_M
         && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 0.3 && los(this.map, p.x, p.y, q.x, q.y)).sort((a, b) => Math.abs(angDiff(Math.atan2(a.y - p.y, a.x - p.x), p.aim)) - Math.abs(angDiff(Math.atan2(b.y - p.y, b.x - p.x), p.aim)))[0];
       if (!t) { this.events.push({ e: 'deny', id: p.id, why: 'Aim at an enemy within ' + LUNGE_M + ' m to mark them for a lunge' }); return; }
-      p.lungeTarget = t.id; p.lungeReady = this.time + 1.5; p.lungeUntil = this.time + 6.5; used();
+      p.lungeTarget = t.id; p.lungeReady = this.time + LUNGE_WIND; p.lungeUntil = this.time + LUNGE_WIND + 5; used();
       this.events.push({ e: 'snd', s: 'unsheathe', x: r1(p.x), y: r1(p.y), id: p.id });
       this.events.push({ e: 'lungeWarn', id: t.id, from: p.id });
     }

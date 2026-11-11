@@ -198,7 +198,7 @@ export const OPERATORS = {
              ability: { id: 'burst', name: 'Smoke Burst', count: 2, desc: 'Blast a cone of thick smoke out in front of you. It spreads almost instantly and fills the shape of the room for 8 seconds.' },
              gadget: 'frag', gadgetCount: 2, color: '#9aa8b8', helmet: '#40444c', look: 'mask' },
   crow: { team: 'atk', name: 'CROW', role: 'Lunge Flanker', armor: 3, primary: 'sabre', secondary: 'p10',
-             ability: { id: 'lunge', name: 'Lunge', count: 2, desc: 'Aim at an enemy within 4 metres and draw your blade: they hear it and are warned. After 1.5 seconds, for 5 seconds, your melee is a 4-metre lunge straight at them that downs them, from any side.' },
+             ability: { id: 'lunge', name: 'Lunge', count: 2, desc: 'Aim at an enemy within 5 metres and draw your blade: they hear it and are warned. After 1 second, for 5 seconds, your melee is a 5-metre lunge straight at them that downs them, from any side.' },
              gadget: 'stun', gadgetCount: 2, color: '#3a3d46', helmet: '#2a2c32', look: 'hood' },
   // ---- snipers (he asked 2026-11-10: more attackers with sniper rifles; he chose all four ideas) ----
   perch: { team: 'atk', name: 'PERCH', role: 'Bipod Sniper', armor: 1, primary: 'mammoth', secondary: 'needle',
@@ -211,7 +211,7 @@ export const OPERATORS = {
              ability: { id: 'spotter', name: 'Spotting Scope', count: 2, desc: 'For 8 seconds, every enemy you see while aimed in is marked for your whole team for 4 seconds.' },
              gadget: 'frag', gadgetCount: 2, color: '#d8b060', helmet: '#4a4030', look: 'visor' },
   nail: { team: 'atk', name: 'NAIL', role: 'Piercing Sniper', armor: 2, primary: 'saker', secondary: 'p10',
-             ability: { id: 'pierce', name: 'Piercing Round', count: 3, desc: 'Load one armour-piercing round: your next shot goes through any wall, even reinforced or concrete, up to a metre and a half of it, but hits with only 40% of its damage.' },
+             ability: { id: 'pierce', name: 'Piercing Round', count: 4, desc: 'Load one armour-piercing round: your next shot goes through any wall, even reinforced or concrete, up to a metre and a half of it, but hits with only 55% of its damage.' }, // Ball Knowledge 2026-11-10: was 3 rounds at 40% (39% of rounds won)
              gadget: 'breach', gadgetCount: 1, color: '#b85a4a', helmet: '#40302c', look: 'mask' },
   // ---- up and down (he asked 2026-11-10: characters for hatches and verticality; he chose all four ideas) ----
   gimlet: { team: 'atk', name: 'GIMLET', role: 'Floor Drill', armor: 2, primary: 'k4', secondary: 'p10',
