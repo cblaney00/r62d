@@ -37,6 +37,7 @@ const EMP_R = 36; // buffed (he asked: it was no better than ordinary utility): 
 const LANCE_STEP = 0.5; // RIVET: seconds per burnt-through point (the first is a bullet-sized hole)
 const HAMMER_CD = 2; // was 4, then 2.5 (he asked: Ferro stronger; 2026-11-10 attackers' skills stronger as a whole)
 const WINDUP_T = 0.5, SETUP_T = 1.2;
+const EF_FIELD = { blind: 'stunUntil', stun: 'stunUntil', slow: 'slowUntil', snare: 'clampUntil', daze: 'dazeUntil', deaf: 'deafUntil' };
 const THROWN_G = new Set(['smoke', 'frag', 'stun', 'impact', 'nitro']), PLACED_G = new Set(['breach', 'claymore', 'wire', 'dshield']);
 const THROWN_AB = new Set(['emp', 'sonar', 'stickycam', 'gas', 'flare', 'medkit', 'echobox']);
 const PLACED_AB = new Set(['prox', 'concuss', 'clamp', 'sensor', 'plates', 'turret', 'spike', 'alarm', 'pace', 'radar', 'station', 'catcher', 'jammer', 'mine', 'grid', 'cover', 'cutter', 'periscope', 'scope']);
@@ -482,7 +483,7 @@ export class Game {
     p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false;
     p.rope = null; p.pinged = null; p.sprints = DRONE_SPRINT.charges; p.sprintUntil = 0; p.sprintCd = 0;
-    p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0; p.staged = false;
+    p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0; p.ef = null; p.staged = false;
     p.downedBy = null; p.nitroId = null; p.ai = {};
     p.boostUntil = 0; p.ghostUntil = 0; p.dazeUntil = 0; p.clampUntil = 0; p.plated = false; p.gasId = null;
     p.lanceT = 0; p.lancing = false; p.shrouded = false; p.turretCd = 0; p.shockT = 0;
@@ -893,7 +894,7 @@ export class Game {
       if (into && end.k === 'none') this.shotThroughHatch(p, a, into, D, w.name, w.cls);
       else if (this.winCarry && end.k === 'none') end = this.shotOutWindow(p, eye, a, w.range, D, w.name, w.cls);
       this.winCarry = null;
-      if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined });
+      if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined, nt: m.notrail || undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });
     this.shotW = null; this.shotAim = null; this.pierceNow = false;
@@ -1129,7 +1130,7 @@ export class Game {
         this.damage(q, 9999, src, wname, ang); // he asked: the big sniper rifles still drop anyone with one clean body shot; then (a prism made it too strong) only aimed in through the sniper scope
       else this.damage(q, dmg * mult * fall, src, wname, ang);
       this.shotPens = 0;
-      if (W && W.stagger && q.alive && !q.downed) q.slowUntil = Math.max(q.slowUntil || 0, this.time + W.stagger); // the Hedge knocks them off balance
+      if (W && W.stagger && q.alive && !q.downed) this.effect(q, 'slow', W.stagger, src); // the Hedge knocks them off balance
     } else if (best && best.e && best.e.tu) { best.e.offUntil = Math.max(best.e.offUntil || 0, this.time + 8); this.events.push({ e: 'hit', k: 'spark', x: r1(ex), y: r1(ey) }); }
     else if (best && best.e) this.hitEnt(best.e, src);
     else if (kind === 'hard' || kind === 'prop') this.events.push({ e: 'hit', k: kind, x: r1(ex), y: r1(ey) });
@@ -1759,7 +1760,7 @@ export class Game {
       const q = [...this.players.values()].find(q => q.alive && q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 34 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.0);
       const R = RIOT[p.riot] || { bash: 30, stagger: 1.0, miss: 1.2 }; // BULWARK (no riot shield): stagger was 0.7 (attackers' skills stronger, 2026-11-10)
       if (R.cd && this.time < (p.bashReady || 0)) { p.meleeCd = 0; return; } // THORN: the studs are still charging
-      if (q) { this.damage(q, R.bash, p, 'Shield Bash', p.aim); q.staggerUntil = this.time + R.stagger; q.slowUntil = Math.max(q.slowUntil, this.time + 1); if (R.stun) q.stunUntil = Math.max(q.stunUntil || 0, this.time + R.stun); if (R.cd) p.bashReady = this.time + R.cd; p.meleeCd = 0.8; }
+      if (q) { this.damage(q, R.bash, p, 'Shield Bash', p.aim); q.staggerUntil = this.time + R.stagger; this.effect(q, 'slow', 1, p); if (R.stun) this.effect(q, 'stun', R.stun, p); if (R.cd) p.bashReady = this.time + R.cd; p.meleeCd = 0.8; }
       else { // into a barricade or a wall: the shield's edge works like a swing (the RAM smashes a whole barricade at once)
         const f = this.facingCell(p, 22);
         if (f && f.t === T.BARRI) { for (let i = 0; i < (R.breaks ? 3 : 1); i++) if (this.map.tiles[f.k] === T.BARRI) this.barriHit(f.k); this.events.push({ e: 'hit', k: 'wood', x: r1((f.cx + 0.5) * CELL), y: r1((f.cy + 0.5) * CELL) }); p.meleeCd = 0.9; }
@@ -1894,7 +1895,7 @@ export class Game {
         if (t !== null && t < bt) { bt = t; hitQ = q; hitE = null; }
       }
       if (hitE) { if (hitE.tu) hitE.offUntil = this.time + 10; else this.hitEnt(hitE, p); }
-      if (hitQ) { this.damage(hitQ, 15, p, 'Arc Gun', p.aim); hitQ.stunUntil = Math.max(hitQ.stunUntil, this.time + 0.5); }
+      if (hitQ) { this.damage(hitQ, 15, p, 'Arc Gun', p.aim); this.effect(hitQ, 'stun', 0.5, p); }
       used(); this.events.push({ e: 'arc', v: 1, x: r1(p.x), y: r1(p.y), x2: r1(p.x + ca * bt), y2: r1(p.y + sa * bt) }); // v: VOLT's, the quiet one
     } else if (id === 'hammer') { // he asked: only door and window barricades go in one swing (no soft walls), and a real wait between swings
       if (p.meleeCd > 0 || this.time < (p.hammerCd || 0)) return;
@@ -2096,7 +2097,7 @@ export class Game {
       for (const q of this.players.values()) if (q !== p && q.alive && Math.hypot(q.x - nx, q.y - ny) < PLAYER_R * 2) hit.add(q);
       x = nx; y = ny;
     }
-    for (const q of hit) { q.staggerUntil = this.time + 0.7; q.slowUntil = Math.max(q.slowUntil, this.time + 1); this.damage(q, 10, p, 'Breaching Dash', p.aim); }
+    for (const q of hit) { q.staggerUntil = this.time + 0.7; this.effect(q, 'slow', 1, p); this.damage(q, 10, p, 'Breaching Dash', p.aim); }
     if (Math.hypot(x - p.x, y - p.y) < 8) return false;
     p.vault = { x0: p.x, y0: p.y, x1: x, y1: y, t: 0, dur: 0.28 };
     this.events.push({ e: 'snd', s: 'vault', x: r1(p.x), y: r1(p.y), id: p.id });
@@ -2363,6 +2364,7 @@ export class Game {
       if (q && isFinite(m.x) && isFinite(m.y)) { q.x = m.x; q.y = m.y; if (isFinite(m.aim)) q.aim = m.aim; if (q.bot) q.hold = !!m.hold; }
       return;
     }
+    if (m.a === 'ef' && process.env.R62D_FAST) { const q = this.players.get(m.id); if (q && EF_FIELD[m.k]) this.effect(q, m.k, +m.dur || 4, p); return; } // screenshot tests only: a status effect caused by you
     if (m.a === 'tile' && process.env.R62D_FAST && Array.isArray(m.ks)) { // screenshot tests only: set map cells (open a window)
       for (const k of m.ks) if (this.map.tiles[k] !== undefined) { this.map.tiles[k] = m.v | 0; this.map.hp[k] = m.v === T.BARRI ? CELL_HP[T.BARRI] : 0; delete this.map.holes[k]; if (m.holes) { this.map.holes[k] = m.holes.slice(0, 2); this.addHole(k, m.holes[0], m.holes[1]); } this.changed.add(k); }
       return;
@@ -2486,6 +2488,20 @@ export class Game {
     if (f) b.aim = Math.atan2(f.y - b.y, f.x - b.x);
   }
 
+  // Status effects (he asked: an icon over the head, seen by the side that caused it). kind → the field the game
+  // reads; q.ef[kind] = [until, side of whoever caused it], sent in the snapshot as ef: [[kind, s left, side]]
+  effect(q, kind, dur, by) {
+    const f = EF_FIELD[kind], until = this.time + dur;
+    q[f] = Math.max(q[f] || 0, until);
+    const side = by && typeof by === 'object' ? this.side(by) : by, ef = q.ef || (q.ef = {});
+    ef[kind] = [Math.max(until, ef[kind] ? ef[kind][0] : 0), side];
+  }
+  efOut(p) {
+    if (!p.ef || !p.alive) return undefined;
+    const out = [];
+    for (const k in p.ef) { const [u, sd] = p.ef[k]; if (u > this.time) out.push([k, r1(u - this.time), sd]); else delete p.ef[k]; }
+    return out.length ? out : undefined;
+  }
   spot(team, id, dur) {
     const until = this.time + dur;
     if ((this.spots[team].get(id) || 0) < until) this.spots[team].set(id, until);
@@ -2562,7 +2578,7 @@ export class Game {
           if (e.arm > 0) { e.arm -= dt; break; }
           for (const q of this.players.values()) {
             if (!q.alive || this.side(q) === e.team || this.ghost(q) || Math.hypot(q.x - e.x, q.y - e.y) > 15) continue;
-            q.deafUntil = this.time + 8; this.removeEnt(e); // LATCH's siren: 8 s without hearing footsteps
+            this.effect(q, 'deaf', 8, e.team); this.removeEnt(e); // LATCH's siren: 8 s without hearing footsteps
             this.events.push({ e: 'snd', s: 'siren', x: r1(e.x), y: r1(e.y) }); this.noise(e.x, e.y, e.team, 900); break;
           }
           break;
@@ -2680,7 +2696,7 @@ export class Game {
           const near = [...this.players.values()].filter(q => q.alive && this.side(q) !== e.team && [[h.x, h.y], [h.bx, h.by]].some(([x, y]) => Math.hypot(q.x - x, q.y - y) < HTRAP_R && floorAt(this.map, q.x, q.y) === floorAt(this.map, x, y)));
           if (!near.length) break;
           this.removeEnt(e); this.events.push({ e: 'boom', x: r1(h.bx), y: r1(h.by), r: 30, kind: 'stun' }); this.events.push({ e: 'snd', s: 'beep', x: r1(h.x), y: r1(h.y) });
-          for (const q of near) { q.stunUntil = Math.max(q.stunUntil || 0, this.time + 3); this.events.push({ e: 'stun', id: q.id, dur: 3 }); this.spot(e.team, q.id, 6); }
+          for (const q of near) { this.effect(q, 'blind', 3, e.team); this.events.push({ e: 'stun', id: q.id, dur: 3 }); this.spot(e.team, q.id, 6); }
           const o = this.players.get(e.owner); if (o) this.pts(o, 20 * near.length, 'Hatch trap');
           break;
         }
@@ -2694,7 +2710,7 @@ export class Game {
             if (e.type === 'prox') { e.fuse = 0.9; this.events.push({ e: 'snd', s: 'beep', x: r1(e.x), y: r1(e.y) }); }
             else if (e.type === 'concuss') this.detonate(e);
             else { // clamp: held fast and badly hurt
-              q.clampUntil = this.time + 2; this.spot(e.team, q.id, 3);
+              this.effect(q, 'snare', 2, e.team); this.spot(e.team, q.id, 3);
               this.damage(q, 20, this.players.get(e.owner), 'Clamp Trap', 0);
               this.events.push({ e: 'snd', s: 'clamp', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e);
             }
@@ -2834,7 +2850,7 @@ export class Game {
       case 'mine': {
         this.explode(e, { r: 32, dmg: 40, cellR: 0, cells: [], kind: 'mine' });
         for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < 40) {
-          q.slowUntil = this.time + 3; this.spot(e.team, q.id, 4);
+          this.effect(q, 'slow', 3, e.team); this.spot(e.team, q.id, 4);
         }
         break;
       }
@@ -2854,7 +2870,7 @@ export class Game {
       case 'concuss': {
         this.explode(e, { r: 30, dmg: 15, cellR: 0, cells: [], kind: 'impact' });
         for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < 50) {
-          q.slowUntil = this.time + 4; q.dazeUntil = this.time + 4; this.events.push({ e: 'daze', id: q.id, dur: 4 });
+          this.effect(q, 'slow', 4, e.team); this.effect(q, 'daze', 4, e.team); this.events.push({ e: 'daze', id: q.id, dur: 4 });
         }
         break;
       }
@@ -2869,7 +2885,7 @@ export class Game {
           const d = Math.hypot(q.x - e.x, q.y - e.y);
           if (d < 230 && Math.abs(angDiff(Math.atan2(e.y - q.y, e.x - q.x), q.aim)) < 1.1 && los(this.map, e.x, e.y, q.x, q.y)) {
             const dur = 2.2 * (1 - d / 330);
-            q.stunUntil = Math.max(q.stunUntil, this.time + dur);
+            this.effect(q, 'blind', dur, e.team);
             this.events.push({ e: 'stun', id: q.id, dur: r2(dur) });
           }
         }
@@ -2889,7 +2905,7 @@ export class Game {
           const d = Math.hypot(q.x - e.x, q.y - e.y);
           if (d < 170 && los(this.map, e.x, e.y, q.x, q.y)) {
             const dur = 3.5 * (1 - d / 220);
-            q.stunUntil = Math.max(q.stunUntil, this.time + dur);
+            this.effect(q, 'blind', dur, e.team);
             this.events.push({ e: 'stun', id: q.id, dur: r2(dur) });
           }
         }
@@ -3075,6 +3091,7 @@ export class Game {
         aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,
+        ef: this.efOut(p),
       });
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
       if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; } }

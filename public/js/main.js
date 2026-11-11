@@ -713,7 +713,7 @@ function onEvent(e, s, players) {
   switch (e.e) {
     case 'shot': {
       const w = WEAPONS[e.w]; const a = Math.atan2(e.y2 - e.y, e.x2 - e.x);
-      fx.tracer(e.x, e.y, e.x2, e.y2);
+      if (e.nt) fx.tracer(e.x, e.y, e.x2, e.y2); else fx.trail(e.x, e.y, e.x2, e.y2); // subsonic ammo: only the old brief streak
       const an = anim(e.id);
       if (an.lastShotSnd !== s.time && st.listen && st.map && !e.q && e.id !== st.id) { // gunfire on the floor above or below: an arrow towards it
         const lv = localPos(st.map, st.listen.x, st.listen.y), ls = localPos(st.map, e.x, e.y), fd = ls.f - lv.f;
@@ -742,6 +742,7 @@ function onEvent(e, s, players) {
       break;
     case 'boom':
       fx.explosion(e.x, e.y, e.r, e.kind);
+      if (st.tv && e.kind === 'stun') { fx.ping(e.x, e.y, '255,255,255'); fx.ping(e.x, e.y, '255,250,210'); } // TV: how far the flash reached (no white-out for viewers, he asked)
       if (e.kind !== 'stun' && e.kind !== 'emp') st.rend.scorch(e.x, e.y, Math.min(40, e.r * 0.6));
       audio.explosion(e.x, e.y, e.kind);
       break;
@@ -767,7 +768,7 @@ function onEvent(e, s, players) {
       break;
     }
     case 'matchEnd': st.endT = now; st.mvp = e.mvp; showEnd(e.squad); break;
-    case 'stun': if (st.me && e.id === st.me.id) { st.flashUntil = now + e.dur; audio.tinnitus(e.dur); } break;
+    case 'stun': if (st.me && e.id === st.me.id && !st.tv) { st.flashUntil = now + e.dur; audio.tinnitus(e.dur); } break;
     case 'hurt': if (st.me && e.id === st.me.id) { st.hurtT = now; st.hurtFrom = e.from; } break;
     case 'pts': if (e.to === st.id) { (st.ptsPops || (st.ptsPops = [])).push({ n: e.n, w: e.w, t: now }); if (st.ptsPops.length > 5) st.ptsPops.shift(); } break;
     case 'pingwait': if (e.to === st.id && performance.now() - (st.pingWaitT || 0) > 600) { st.pingWaitT = performance.now(); addFeed(`Ping ready in ${Math.ceil(e.t)} s`); audio.ui('back'); } break;
@@ -2538,7 +2539,13 @@ function draw(s, view, now, dt) {
         const u = UP();
         ctx.fillStyle = p.dn ? '#ff5050' : '#3aa0ff'; ctx.beginPath(); ctx.arc(p.x + u.x * 17, p.y + u.y * 17, 2, 0, 7); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(p.n + (p.dn ? ' ▼' : ''), p.x + u.x * 21, p.y + u.y * 21);
-      } else if (spotted.has(p.id)) {
+      }
+      if (sp.ef && (p.tm === side || seen(p.x, p.y))) {
+        if (st.tv && sp.ef.some(e => e[0] === 'blind')) { const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, 16); g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, 16, 0, 7); ctx.fill(); } // TV: who the flash got
+        drawStatus(p, sp.ef, side, now, p.tm === side ? 28 : 27);
+        ctx.font = '600 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
+      }
+      if (p.tm !== side && spotted.has(p.id)) {
         const u = UP(), tx = p.x + u.x * 19, ty = p.y + u.y * 19, px = -u.y, py = u.x; // spotted: a small faint triangle above them (he asked: fewer, quieter marks)
         ctx.fillStyle = 'rgba(255,70,60,0.5)';
         ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + u.x * 4 + px * 2.2, ty + u.y * 4 + py * 2.2); ctx.lineTo(tx + u.x * 4 - px * 2.2, ty + u.y * 4 - py * 2.2); ctx.closePath(); ctx.fill();
@@ -2657,6 +2664,30 @@ function scopeGlare(s, side, now) {
     for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(0, -1); ctx.lineTo(i % 2 ? 14 : 22, 0); ctx.lineTo(0, 1); ctx.closePath(); ctx.fill(); }
     ctx.restore();
   }
+}
+// Status icons over a head (he asked: blind / slow / snare etc. shown to the side that caused it; TV sees all).
+// ef from the snapshot: [[kind, seconds left, side that caused it], ...]; the ring round each badge runs down.
+const EF_COL = { blind: '255,255,255', stun: '255,226,90', slow: '120,200,255', snare: '255,120,80', daze: '230,190,120', deaf: '200,140,255' };
+const efMax = new Map(); // 'id:kind' -> { mx: time left when it started, last } (for the ring)
+function drawStatus(p, ef, side, now, lift) {
+  const list = ef.filter(e => st.tv || e[2] === side); if (!list.length) return;
+  const u = UP(), th = Math.atan2(u.x, -u.y), R = 3.6, gap = 8.4;
+  ctx.save(); ctx.translate(p.x + u.x * lift, p.y + u.y * lift); ctx.rotate(th);
+  list.forEach(([k, left], i) => {
+    const key = p.id + ':' + k, o = efMax.get(key); if (!o || left > o.last + 0.25) efMax.set(key, { mx: left, last: left }); else o.last = left; const mx = efMax.get(key).mx; if (efMax.size > 300) efMax.clear();
+    const x = (i - (list.length - 1) / 2) * gap, col = EF_COL[k] || '255,255,255';
+    ctx.fillStyle = 'rgba(10,14,20,0.8)'; ctx.beginPath(); ctx.arc(x, 0, R + 0.6, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(${col},0.95)`; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(x, 0, R + 0.2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, left / mx)); ctx.stroke();
+    ctx.strokeStyle = ctx.fillStyle = `rgb(${col})`; ctx.lineWidth = 0.7; ctx.lineCap = 'round'; ctx.beginPath();
+    if (k === 'blind') { ctx.ellipse(x, 0, 2.4, 1.3, 0, 0, 7); ctx.moveTo(x - 2.2, 1.9); ctx.lineTo(x + 2.2, -1.9); } // an eye, struck through
+    else if (k === 'stun') { ctx.moveTo(x + 0.8, -2.4); ctx.lineTo(x - 1, 0.2); ctx.lineTo(x + 1, 0.2); ctx.lineTo(x - 0.8, 2.4); } // a jolt
+    else if (k === 'slow') { for (const d of [-1, 1]) { ctx.moveTo(x + d * 1.4 - 1, -1.6); ctx.lineTo(x + d * 1.4 + 0.6, 0); ctx.lineTo(x + d * 1.4 - 1, 1.6); } ctx.moveTo(x - 2.4, 2.4); ctx.lineTo(x + 2.4, 2.4); } // chevrons over a line
+    else if (k === 'snare') { ctx.arc(x, 1.4, 2.2, Math.PI, 0); ctx.moveTo(x - 2.2, -1.4); ctx.lineTo(x + 2.2, -1.4); for (const d of [-1.2, 0, 1.2]) { ctx.moveTo(x + d, -1.4); ctx.lineTo(x + d, -0.2); } } // jaws
+    else if (k === 'daze') { for (let a = 0; a < 9; a += 0.4) { const r = 0.3 + a * 0.24; ctx.lineTo(x + Math.cos(a) * r, Math.sin(a) * r); } } // a spiral
+    else if (k === 'deaf') { ctx.arc(x - 0.4, -0.3, 1.6, Math.PI * 0.9, Math.PI * 2.3); ctx.lineTo(x - 0.6, 2); ctx.moveTo(x - 2.4, 2.2); ctx.lineTo(x + 2.4, -2.2); } // an ear, struck through
+    ctx.stroke();
+  });
+  ctx.restore();
 }
 function bodyOutline(p, col, a) { // a body's shape and the way it aims, through walls
   ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ag || 0); ctx.strokeStyle = `rgba(${col},${a})`; ctx.lineWidth = 1.2; ctx.fillStyle = `rgba(${col},${a * 0.16})`;

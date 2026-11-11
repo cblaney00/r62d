@@ -8,7 +8,7 @@ for (const [slot] of ATTACH_SLOTS) for (let [id, a] of Object.entries(ATTACH[slo
   if (id === 'none' || id === 'reddot') continue;
   // a gun always has a sight, so sights are measured against the red dot
   if (slot === 'sight') { const r = ATTACH.sight.reddot; a = { ...a }; for (const k of GOOD_LOW) a[k] = (a[k] ?? 1) / (r[k] ?? 1); }
-  const up = GOOD_LOW.some(k => a[k] < 1) || GOOD_HIGH.some(k => a[k] > 1) || a.quiet || a.zoom;
+  const up = GOOD_LOW.some(k => a[k] < 1) || GOOD_HIGH.some(k => a[k] > 1) || a.quiet || a.zoom || a.notrail;
   const down = GOOD_LOW.some(k => a[k] > 1) || GOOD_HIGH.some(k => a[k] < 1) || a.laser;
   if (!up || !down) bad(`${slot} ${id}: needs an upside and a downside`);
   if (!/^\+ .* − /.test(a.desc)) bad(`${slot} ${id}: description should say "+ ... − ..."`);
@@ -19,11 +19,11 @@ for (const w of Object.keys(WEAPONS)) {
     if (opts[slot].length < 3) bad(`${w}: only ${opts[slot].length} ${slot} choices`);
     for (const id of opts[slot]) if (!ATTACH[slot][id]) bad(`${w}: unknown ${slot} ${id}`);
   }
-  for (const b of opts.barrel) for (const g of opts.grip) for (const s of opts.sight) {
-    const m = gunMods(w, { barrel: b, grip: g, sight: s });
+  for (const b of opts.barrel) for (const g of opts.grip) for (const s of opts.sight) for (const am of opts.ammo) {
+    const m = gunMods(w, { barrel: b, grip: g, sight: s, ammo: am });
     const sn = s === 'sniper'; // the sniper scope is meant to be pin-point (and slow to aim in)
     if (m.ads < 0.6 || m.ads > 1.6 || m.kick < 0.6 || m.sway < 0.35 || m.hip < 0.5 || m.adsSpread < (sn ? 0.35 : 0.5) || m.range > 1.35 || m.dmg < 0.85)
-      bad(`${w} ${b}/${g}/${s}: out of range ${JSON.stringify(m)}`);
+      bad(`${w} ${b}/${g}/${s}/${am}: out of range ${JSON.stringify(m)}`);
   }
 }
 const count = Object.values(ATTACH).reduce((n, s) => n + Object.keys(s).length, 0);

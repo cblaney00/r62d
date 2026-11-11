@@ -502,7 +502,14 @@ export const ATTACH = {
     sniper: { name: 'Sniper Scope', short: 'Sniper', desc: '+ Pin-point aimed shots, the view opens right out and the reticle jumps to the end of your sightline; hold Shift to steady it. − Slowest to aim in, wild hip fire, everything round the lens is a blur.', adsSpread: 0.45, ads: 1.3, hip: 1.35, zoom: 1 },
   },
 };
-export const ATTACH_SLOTS = [['barrel', 'Barrel'], ['grip', 'Grip'], ['sight', 'Sight']];
+// Ammo (he asked: bullet trails show where shots come from, and something that hides them): standard rounds leave a
+// trail, subsonic rounds don't (shot event nt), hot loads hit harder but kick more.
+ATTACH.ammo = {
+  none: { name: 'Standard Rounds', short: 'Standard', desc: 'No changes: your bullets leave a trail people can see.' },
+  subsonic: { name: 'Subsonic Rounds', short: 'Subsonic', desc: '+ No bullet trail: nobody sees where your shots come from. − Full damage over 20% less distance.', range: 0.8, notrail: 1 },
+  hot: { name: 'Hot Loads', short: 'Hot loads', desc: '+ 5% more damage. − More recoil drift and shake.', dmg: 1.05, kick: 1.1, sway: 1.06 },
+};
+export const ATTACH_SLOTS = [['barrel', 'Barrel'], ['grip', 'Grip'], ['sight', 'Sight'], ['ammo', 'Ammo']];
 // What fits which gun (he asked: attachments that make sense for the type of gun)
 const FITS = {
   AR:      { barrel: ['none', 'suppressor', 'compensator', 'brake', 'extended', 'heavy'], grip: ['none', 'vertical', 'angled', 'handstop', 'laser'], sight: ['iron', 'reddot', 'holo', 'prism', 'scope'] },
@@ -513,6 +520,7 @@ const FITS = {
   Shotgun: { barrel: ['none', 'suppressor', 'choke', 'short', 'extended'], grip: ['none', 'vertical', 'angled', 'stubby', 'laser'], sight: ['iron', 'reddot', 'holo'] },
   Pistol:  { barrel: ['none', 'suppressor', 'compensator', 'extended'], grip: ['none', 'angled', 'laser'], sight: ['iron', 'reddot', 'holo'] },
 };
+const AMMO_ALL = ['none', 'subsonic', 'hot']; // every gun
 export function attachFor(w) {
   const W = WEAPONS[w], f = FITS[W ? W.cls : 'AR'] || FITS.AR;
   const slug = W && W.pellets === 1; // a one-pellet shotgun (the Anvil slug) has no pellets to keep together
@@ -524,7 +532,7 @@ export function attachFor(w) {
   }
   if (W && SIDEARMS.has(w) && W.cls !== 'MP' && W.cls !== 'Pistol') { grip = grip.filter(g => g !== 'vertical' && g !== 'handstop'); } // sidearms: nothing bulky underneath
   const sight = W && W.cls === 'DMR' && W.rpm <= 300 ? f.sight.concat('sniper') : f.sight; // the sniper scope: slow-firing marksman rifles only
-  return { barrel, grip, sight }; // at least 3 in every slot (he asked)
+  return { barrel, grip, sight, ammo: AMMO_ALL }; // at least 3 in every slot (he asked)
 }
 // Starter attachments (he asked: for players who don't care, a sensible set per operator; the moment they change one,
 // their choice is saved and replaces it). The gun type sets the base, the operator's role tweaks it: quiet jobs
@@ -536,28 +544,28 @@ const START_ATT = {
   Pistol: { barrel: 'none', grip: 'laser', sight: 'reddot' },
 };
 export function defaultAtt(w, op) {
-  const W = WEAPONS[w], ok = attachFor(w), base = { ...(START_ATT[W ? W.cls : 'AR'] || START_ATT.AR) }, job = op ? jobOf(op) : null;
+  const W = WEAPONS[w], ok = attachFor(w), base = { ammo: 'none', ...(START_ATT[W ? W.cls : 'AR'] || START_ATT.AR) }, job = op ? jobOf(op) : null;
   if (W && W.pellets === 1 && W.cls === 'Shotgun') { base.barrel = 'extended'; base.sight = 'reddot'; } // a slug reaches
   if (['flank', 'intel', 'roamer', 'trapper'].includes(job) && !SIDEARMS.has(w)) base.barrel = 'suppressor';
   else if (job === 'anchor' && ['AR', 'LMG', 'SMG'].includes(W && W.cls)) base.barrel = 'extended';
   else if (job === 'entry' && ['SMG', 'Shotgun'].includes(W && W.cls) && !(W.pellets === 1)) base.barrel = 'short';
-  const out = { barrel: 'none', grip: 'none', sight: 'iron' };
+  const out = { barrel: 'none', grip: 'none', sight: 'iron', ammo: 'none' };
   for (const s of Object.keys(out)) if (ok[s].includes(base[s])) out[s] = base[s];
   return out;
 }
 export function cleanAtt(w, a, op = null) {
-  const ok = attachFor(w), out = a && typeof a === 'object' ? { barrel: 'none', grip: 'none', sight: 'iron' } : defaultAtt(w, op); // never chosen: the starter set
+  const ok = attachFor(w), out = a && typeof a === 'object' ? { barrel: 'none', grip: 'none', sight: 'iron', ammo: 'none' } : defaultAtt(w, op); // never chosen: the starter set
   if (a && typeof a === 'object') for (const s of Object.keys(out)) if (ok[s].includes(a[s])) out[s] = a[s];
   return out;
 }
 // All the attachments' effects on a gun, combined.
 export function gunMods(w, a) {
-  const m = { dmg: 1, range: 1, ads: 1, hip: 1, adsSpread: 1, kick: 1, sway: 1, first: 1, settle: 1, quiet: 0, laser: 0, zoom: 0 };
+  const m = { dmg: 1, range: 1, ads: 1, hip: 1, adsSpread: 1, kick: 1, sway: 1, first: 1, settle: 1, quiet: 0, laser: 0, zoom: 0, notrail: 0 };
   const c = cleanAtt(w, a);
   if (WEAPONS[w] && WEAPONS[w].quiet) m.quiet = 1; // built in, no damage lost
   for (const [slot] of ATTACH_SLOTS) {
     const e = ATTACH[slot][c[slot]];
-    for (const k of Object.keys(m)) if (e[k] !== undefined) m[k] = k === 'quiet' || k === 'laser' || k === 'zoom' ? 1 : m[k] * e[k];
+    for (const k of Object.keys(m)) if (e[k] !== undefined) m[k] = k === 'quiet' || k === 'laser' || k === 'zoom' || k === 'notrail' ? 1 : m[k] * e[k];
   }
   return m;
 }
@@ -578,8 +586,8 @@ export const adsStart = (sight, w) => { const g = WEAPONS[w]; return (ADS_OWN[w]
 // with a stronger sight). Hip fire has the shortest reach; aiming in uses the sight's.
 export const AIM_REACH = { hip: 18, iron: 20, holo: 21, reddot: 23, prism: 36, scope: 44, sniper: 64 }; // he asked: the 1.5x, 2x and sniper further (were 28, 34, 48)
 export const aimReach = (sight, ads) => (ads && AIM_REACH[sight]) || AIM_REACH.hip;
-export const attCode = a => [a.barrel, a.grip, a.sight].join(',');
-export const attFromCode = s => { const [barrel, grip, sight] = String(s || '').split(','); return { barrel, grip, sight }; };
+export const attCode = a => [a.barrel, a.grip, a.sight, a.ammo || 'none'].join(',');
+export const attFromCode = s => { const [barrel, grip, sight, ammo = 'none'] = String(s || '').split(','); return { barrel, grip, sight, ammo }; };
 
 export const BIOS = {
   // every background different (he asked: too many were shipyard welders)

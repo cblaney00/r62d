@@ -2312,7 +2312,7 @@ export function proLoadout(game, p, op) {
   const l = { primary: pickGun(L.primaries), secondary: pickGun(L.secondaries), gadget: L.gadgets[Math.floor(Math.random() * L.gadgets.length)], att: {} };
   for (const w of [l.primary, l.secondary]) if (w && WEAPONS[w] && !RIOT[w]) {
     const ok = attachFor(w), a = l.att[w] = {};
-    for (const slot of ['barrel', 'grip', 'sight']) a[slot] = ok[slot][best(ok[slot].map(c => recGuess(blend(training.att[attKey(w, slot, c)], (me.att || {})[attKey(w, slot, c)]), spread)))];
+    for (const slot of ['barrel', 'grip', 'sight', 'ammo']) a[slot] = ok[slot][best(ok[slot].map(c => recGuess(blend(training.att[attKey(w, slot, c)], (me.att || {})[attKey(w, slot, c)]), spread)))];
   }
   return cleanLoadout(op, l);
 }

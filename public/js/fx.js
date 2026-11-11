@@ -1,6 +1,13 @@
 // Particles, tracers, explosions and smoke clouds.
 const MAX = 1400;
 
+export const TRAIL_LIFE = 0.45;
+export function drawTrail(ctx, x, y, x2, y2, k) { // k: 1 fresh → 0 gone
+  const g = ctx.createLinearGradient(x, y, x2, y2), a = k * k;
+  g.addColorStop(0, `rgba(255,214,140,${0.12 * a})`); g.addColorStop(0.5, `rgba(255,224,160,${0.45 * a})`); g.addColorStop(1, `rgba(255,240,200,${0.8 * a})`);
+  ctx.lineCap = 'round'; ctx.strokeStyle = `rgba(255,200,120,${0.13 * a})`; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.strokeStyle = g; ctx.lineWidth = 0.6 + 0.5 * k; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke(); ctx.lineCap = 'butt';
+}
 export class FX {
   constructor() { this.parts = []; this.tracers = []; this.lights = []; this.rings = []; this.shake = 0; this.quality = 1; }
   clear() { this.parts = []; this.tracers = []; this.lights = []; this.rings = []; }
@@ -10,6 +17,9 @@ export class FX {
 
   // thin and brief (he asked: bullets are tiny, so their streaks should be too): about 2-3 frames
   tracer(x, y, x2, y2, col = '255,220,150') { this.tracers.push({ x, y, x2, y2, life: 0.04, max: 0.04, col }); }
+  // a bullet trail (he asked: to see where shots come from; subsonic ammo leaves none): lingers TRAIL_LIFE s, drawn on
+  // #game under the blackout, so you only see the part that crosses what you can see
+  trail(x, y, x2, y2) { this.tracers.push({ x, y, x2, y2, life: TRAIL_LIFE, max: TRAIL_LIFE, trail: 1 }); }
 
   muzzle(x, y, a) {
     this.lights.push({ x, y, r: 115, life: 0.06, max: 0.06, col: '255,186,105', a: 0.42 }); // a shot lights up the room round it for a moment
@@ -102,6 +112,7 @@ export class FX {
     }
     for (const t of this.tracers) {
       const k = t.life / t.max;
+      if (t.trail) { drawTrail(ctx, t.x, t.y, t.x2, t.y2, k); continue; }
       ctx.strokeStyle = `rgba(${t.col},${0.6 * k})`; ctx.lineWidth = 0.45;
       ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(t.x2, t.y2); ctx.stroke();
     }

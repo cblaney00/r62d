@@ -7,6 +7,7 @@ import { PX_PER_M } from '/shared/constants.js';
 import { drawXhair, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
 import { lockMouse } from './keys.js';
 import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
+import { drawTrail, TRAIL_LIFE } from './fx.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
 import * as audio from './audio.js';
@@ -260,7 +261,7 @@ function fire(w, cv) {
       if (t > 0 && t < bt) { bt = t; best = d; }
     }
     const ex = dx * bt, ey = dy * bt;
-    if (tracerPellet(w, i)) S.tracers.push({ x2: ex, y2: ey, life: 0.04 });
+    if (tracerPellet(w, i)) S.tracers.push({ x2: ex, y2: ey, life: m.notrail ? 0.04 : TRAIL_LIFE, trail: !m.notrail });
     if (best) {
       hitAny = true; S.hits++;
       const q = aimPoint(cv), onH = onHead(q.x, q.y, best.x, best.y); // same rule as a match: crosshair on the head
@@ -311,7 +312,7 @@ function draw(cv, dt) {
     c.fillStyle = alive ? '#7fe07f' : '#e05050'; c.fillRect(-11, 11, 22 * Math.max(0, d.hp) / d.max, 2.5);
     c.restore();
   }
-  for (const t of S.tracers) { c.strokeStyle = `rgba(255,220,150,${t.life / 0.04 * 0.6})`; c.lineWidth = 0.45; c.beginPath(); c.moveTo(0, 0); c.lineTo(t.x2, t.y2); c.stroke(); }
+  for (const t of S.tracers) if (t.trail) drawTrail(c, 0, 0, t.x2, t.y2, t.life / TRAIL_LIFE); else { c.strokeStyle = `rgba(255,220,150,${t.life / 0.04 * 0.6})`; c.lineWidth = 0.45; c.beginPath(); c.moveTo(0, 0); c.lineTo(t.x2, t.y2); c.stroke(); }
   // shooter
   const op = OP_LIST.find(k => OPERATORS[k].primary === S.w || OPERATORS[k].secondary === S.w) || 'ember';
   drawOperator(c, { x: 0, y: 0, aim: aimAngle(cv), op, w: S.w, ally: true, walk: 0, legs: 0, ads: S.adsT > 0.5, recoil: S.t - S.lastShot < 0.06 ? 1 : 0, reload: S.reloadT > 0 }, S.t);

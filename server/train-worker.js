@@ -64,7 +64,7 @@ while (Date.now() < until && left > 0) {
             }
             for (const [w, a, rec] of [[r.g1, r.a1, rec1], [r.g2, r.a2, rec2]]) if (w) {
               add(res.guns, gunKey(r.op, w), rec); if (P) add(P.guns, w, rec);
-              if (a) for (const slot of ['barrel', 'grip', 'sight']) { const k = attKey(w, slot, a[slot]); add(res.att, k, rec); if (P) add(P.att, k, rec); }
+              if (a) for (const slot of ['barrel', 'grip', 'sight', 'ammo']) { const k = attKey(w, slot, a[slot]); add(res.att, k, rec); if (P) add(P.att, k, rec); }
             } } }
         rs = null;
         parentPort.postMessage(res); left--;
