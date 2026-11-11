@@ -745,6 +745,10 @@ html.touch #pause .menu, html.touch #quitDlg .menu { zoom: 1.15; }
 #touchUI .tbtn.t1 { right: 160px; width: 120px; }
 #touchUI .tbtn.t2, #touchUI .tbtn.t3 { top: auto; bottom: 20px; width: 84px; height: 84px; border-radius: 50%; font-size: 26px; } /* camera arrows sit where USE / VAULT do (never both at once) */
 #touchUI .tbtn.t2 { right: calc(max(20px, env(safe-area-inset-right)) + 198px); } #touchUI .tbtn.t3 { right: calc(max(20px, env(safe-area-inset-right)) + 104px); }
+#touchUI .tbtn.t7 { right: 290px; width: 64px; } /* MAP */
+#touchUI .tbtn.lean { top: auto; bottom: 122px; height: 40px; width: 84px; font-size: 14px; } #touchUI .tbtn.l1 { left: calc(max(20px, env(safe-area-inset-left)) + 140px); } #touchUI .tbtn.l2 { left: calc(max(20px, env(safe-area-inset-left)) + 232px); } /* above the left FIRE */
+#touchUI .tbtn.lean.act { background: rgba(242,193,78,0.35); border-color: var(--gold); }
+#touchUI #tsLeft.spr { border-color: var(--gold); box-shadow: 0 0 18px rgba(242,193,78,0.45); } #touchUI #tsLeft.spr::after { content: 'SPRINT'; position: absolute; left: 0; right: 0; top: -22px; text-align: center; font: 800 13px var(--head); letter-spacing: 0.2em; color: var(--gold); }
 #touchUI .tbtn.t4 { right: 72px; width: 80px; } #touchUI .tbtn.t5 { right: 20px; width: 44px; }
 #tTurn { position: fixed; inset: 0; z-index: 90; background: rgba(5,7,9,0.96); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font: 700 22px var(--head); letter-spacing: 0.08em; color: #fff; text-align: center; padding: 30px; }
 #tTurn b { font-size: 64px; color: #f2c14e; }
@@ -1159,3 +1163,4 @@ html.tv canvas#game { cursor: default; }
 #codeIn { min-width: 0; }
 .bigCode.long { font-size: 54px; letter-spacing: 0.12em; }
 #lobby:not(.hidden) ~ #corner { display: none; }
+#settings .srow.tpOnly { display: none; } html.trackpad #settings .srow.tpOnly { display: flex; } /* laptop trackpad tip (Settings → Mouse & Aim) */

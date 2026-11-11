@@ -11,7 +11,7 @@ export const PAD_HELP = [
   ['Previous / next camera', 'D-pad left / right'], ['Scoreboard (hold)', 'View'], ['Pause', 'Menu'],
 ];
 // standard-layout button number → what it does (main.js turns these into game actions)
-export const PAD_ACTIONS = { 0: 'interact', 10: 'vault', 1: 'crouch', 2: 'reload', 3: 'swap', 4: 'gadget', 5: 'ability', 8: 'scoreboard', 9: 'pause', 11: 'melee', 12: 'spot', 13: 'droneOrCams', 14: 'camPrev', 15: 'camNext' };
+export const PAD_ACTIONS = { 0: 'interact', 10: 'vault', 1: 'crouch', 2: 'reload', 3: 'swap', 4: 'gadget', 5: 'ability', 8: 'scoreboard', 9: 'pause', 11: 'melee', 12: 'spot', 13: 'droneOrCams', 14: 'camPrev', 15: 'camNext', 20: 'leanL', 21: 'leanR', 22: 'map' }; // 20-22: phone-only buttons (touch.js)
 
 function stick(x, y) {
   const l = Math.hypot(x, y);

@@ -10,7 +10,7 @@ for (const [id, name] of PRESETS) {
   applyPreset(id);
   const b = getBinds(), seen = {};
   for (const k in b) for (const c of b[k]) { if (!c) continue; if (seen[c]) fail(`${name}: ${c} is both ${seen[c]} and ${k}`); seen[c] = k; }
-  for (const [a] of ACTIONS) if (a !== 'opPrev' && a !== 'crouchTap' && !(a === 'crouch' && b.crouchTap.some(Boolean)) && !b[a].some(Boolean)) fail(`${name}: nothing on ${a}`);
+  for (const [a] of ACTIONS) if (a !== 'opPrev' && a !== 'crouchTap' && !((a === 'fire' || a === 'aimIn') && id !== 'trackpad') && !(a === 'crouch' && b.crouchTap.some(Boolean)) && !b[a].some(Boolean)) fail(`${name}: nothing on ${a}`);
   console.log(name.padEnd(32), ['sprint', 'crouch', 'crouchTap', 'prone', 'walk', 'interact', 'gadget', 'ability', 'melee', 'leanL', 'leanR', 'wheel', 'map', 'view', 'drone'].map(a => a + '=' + b[a].filter(Boolean).join('/').replace(/Key|Digit/g, '')).join(' '));
 }
 applyPreset('r6');

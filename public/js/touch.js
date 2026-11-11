@@ -7,6 +7,7 @@
 //   vault, ping, drone/cameras, previous/next camera, scoreboard (hold) and pause.
 // Played sideways only: held upright a "turn your phone sideways" sign covers the match.
 const R = 62; // stick radius in CSS px
+const SPRINT_PUSH = 1.45; // the move thumb this far out (stick radii) sprints
 
 // Full screen on a phone (he found Firefox's bars stayed): browsers only allow it from a tap that has ENDED (touchend /
 // click; a finger landing doesn't count), so every tap anywhere asks again until it's granted, then holds it sideways.
@@ -30,6 +31,9 @@ const sniff = () => {
 const forced = /[?&]touch=1/.test(location.search) ? 'touch' : /[?&]touch=0/.test(location.search) ? 'desk' : null;
 const chosen = forced || store('r62d-input'), sniffed = sniff();
 export const isTouch = (chosen || (sniffed === 'touch' ? 'touch' : 'desk')) === 'touch';
+// Laptop trackpad (he asked, for a friend who may only have a trackpad or a phone): keyboard and mouse rules, plus a
+// shoot key, aiming in as a toggle and aim help (main.js `assistOn`)
+export const isTrackpad = !isTouch && chosen === 'trackpad';
 export const needsInputChoice = !chosen && sniffed === 'ask'; // touch screen AND a mouse: ask on the title screen
 export function setInputChoice(c) { store('r62d-input', c); location.reload(); }
 // Settings that phones especially need (he asked: adjustable): how big the menus and match text are (1 = fit the
@@ -77,13 +81,14 @@ const BUTTONS = [
   { id: 'skill', label: 'SKILL', b: 5, cls: 'r r3 c1' }, { id: 'gadget', label: 'GADGET', b: 4, cls: 'r r3 c2' },
   { id: 'melee', label: 'MELEE', b: 11, cls: 'r r4 c1' }, { id: 'ping', label: 'PING', b: 12, cls: 'r r4 c2' },
   { id: 'view', label: 'DRONE / CAMS', b: 13, cls: 't t1' }, { id: 'prev', label: '◀', b: 14, cls: 't t2 hidden' }, { id: 'next', label: '▶', b: 15, cls: 't t3 hidden' },
-  { id: 'tiltc', label: '⟲ TILT', b: null, cls: 't t6 hidden' }, { id: 'score', label: 'SCORES', b: 8, cls: 't t4' }, { id: 'pause', label: '❚❚', b: 9, cls: 't t5' },
+  { id: 'tiltc', label: '⟲ TILT', b: null, cls: 't t6 hidden' }, { id: 'map', label: 'MAP', b: 22, cls: 't t7' },
+  { id: 'leanL', label: '◀ LEAN', b: 20, cls: 'lean l1' }, { id: 'leanR', label: 'LEAN ▶', b: 21, cls: 'lean l2' }, { id: 'score', label: 'SCORES', b: 8, cls: 't t4' }, { id: 'pause', label: '❚❚', b: 9, cls: 't t5' },
 ];
-const N = 16;
+const N = 23;
 const held = new Array(N).fill(false), trig = { lt: 0, rt: 0 }, tc = { lt: 0, rt: 0 }; // tc: fingers on each trigger button
 let prevHeld = new Array(N).fill(false);
 const ls = { x: 0, y: 0 }, rs = { x: 0, y: 0 };
-let releaseAll = () => {}, fireAim = false; // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
+let releaseAll = () => {}, fireAim = false, sprintLock = false; // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
 let ui = null, shown = false, recentre = () => {};
 export const touchAimReset = () => recentre();
 
@@ -95,7 +100,7 @@ export function touchPad() {
   const pressed = held.map((v, i) => v && !prevHeld[i]), released = prevHeld.map((v, i) => v && !held[i]);
   prevHeld = held.slice();
   const L = (ls.x || ls.y || !tiltOn()) ? ls : tiltV; // a thumb on the stick wins over tilting
-  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsDir: fireAim, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released };
+  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsDir: fireAim, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released };
 }
 export const touchActive = () => isTouch && shown;
 
@@ -135,9 +140,9 @@ function build() {
       if (leftF !== null) return;
       leftF = id; const z = tz(), r = R * z, cx = x, cy = y;
       base.style.left = `${cx / z - 62}px`; base.style.top = `${cy / z - 62}px`; base.style.bottom = 'auto'; base.classList.add('held');
-      const move = (x, y) => { let u = (x - cx) / r, v = (y - cy) / r; const l = Math.hypot(u, v); if (l > 1) { u /= l; v /= l; } ls.x = u; ls.y = v; knob(base, ls); };
+      const move = (x, y) => { let u = (x - cx) / r, v = (y - cy) / r; const l = Math.hypot(u, v); if (l >= SPRINT_PUSH) sprintLock = true; else if (l < 0.6) sprintLock = false; base.classList.toggle('spr', sprintLock); if (l > 1) { u /= l; v /= l; } ls.x = u; ls.y = v; knob(base, ls); }; // push past the ring to sprint (like phone shooters)
       move(x, y);
-      fingers.set(id, { move, end() { leftF = null; ls.x = ls.y = 0; knob(base, ls); base.style.left = base.style.top = base.style.bottom = ''; base.classList.remove('held'); } });
+      fingers.set(id, { move, end() { leftF = null; sprintLock = false; base.classList.remove('spr'); ls.x = ls.y = 0; knob(base, ls); base.style.left = base.style.top = base.style.bottom = ''; base.classList.remove('held'); } });
     }
   };
   // buttons: held while the finger that pressed them is down (wherever it slides)
@@ -181,6 +186,7 @@ export function touchContext(c) {
     const el = ui.querySelector(`[data-id="${id}"]`), want = now - ctxSeen[id] < 400 || el.classList.contains('on');
     if (el.classList.contains('hidden') === want) el.classList.toggle('hidden', !want);
   }
+  for (const [id, d] of [['leanL', -1], ['leanR', 1]]) { const el = ui.querySelector(`[data-id="${id}"]`); el.classList.toggle('hidden', !c.body); el.classList.toggle('act', c.lean === d); } // lean: only on your own body; lit while leaning that way
   const cr = ui.querySelector('[data-id="crouch"]'), cl = c.drone ? 'SPRINT' : 'CROUCH'; // on a drone the crouch button sprints
   if (cr.textContent !== cl) cr.textContent = cl;
   for (const [id, n] of [['skill', c.badge.skill], ['gadget', c.badge.gadget], ['view', c.badge.view]]) { // how many are left, on the button itself
@@ -198,7 +204,7 @@ export function setTouchVisible(on) {
   if (on === shown) return;
   if (on) { tiltLevel = null; ui.querySelector('[data-id="tiltc"]').classList.toggle('hidden', !tiltOn()); } // a match starts level
   shown = on; ui.classList.toggle('hidden', !on); document.documentElement.classList.toggle('touchplay', on); keepAwake(on);
-  if (!on) { releaseAll(); ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
+  if (!on) { releaseAll(); sprintLock = false; ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
 }
 // Menus and match text shrink to fit small screens (the game picture itself always fills the screen), times the
 // player's own size setting. Menus are laid out for ~900 px tall, the match text for ~760 (and both for the width).

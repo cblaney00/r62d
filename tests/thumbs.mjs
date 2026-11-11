@@ -27,7 +27,7 @@ const finger = (name, pts, holdMs = 0, delayMs = 0) => { // delayMs: this thumb 
 };
 const touch = async (...fingers) => { await call('input.performActions', { context: ctx, actions: fingers }); await call('input.releaseActions', { context: ctx }); };
 const tap = async sel => { const c = await centre(sel); if (!c || c[1] > H || c[0] > W) { console.log('  cannot tap (not visible):', sel); return false; } await touch(finger('t', [c, [c[0], c[1], 60]])); return true; };
-const state = async () => JSON.parse(await js(`(() => { const s = window.__r62d.st, m = s.me || {}; return JSON.stringify({ x: Math.round(s.pred.x), y: Math.round(s.pred.y), aimDeg: Math.round(s.aim * 180 / Math.PI), ammo: m.am, ctrl: m.ct, crouch: m.cr, ads: m.ad, full: !!document.fullscreenElement, prompt: document.getElementById('prompt').textContent, shown: [...document.querySelectorAll('#touchUI .tbtn:not(.hidden)')].map(b => b.textContent).join(' ') }); })()`));
+const state = async () => JSON.parse(await js(`(() => { const s = window.__r62d.st, m = s.me || {}; return JSON.stringify({ x: Math.round(s.pred.x), y: Math.round(s.pred.y), aimDeg: Math.round(s.aim * 180 / Math.PI), ammo: m.am, ctrl: m.ct, crouch: m.cr, sprint: !!s.pred.spr, slideCd: Math.round((s.pred.scd || 0) * 10) / 10, prone: !!s.prone, lean: s.leanT || 0, map: !!s.mapV, ads: m.ad, full: !!document.fullscreenElement, prompt: document.getElementById('prompt').textContent, shown: [...document.querySelectorAll('#touchUI .tbtn:not(.hidden)')].map(b => b.textContent).join(' ') }); })()`));
 const report = async what => { const s = await state(); s.fireInputs = await js('window.__fires'); s.ev = await js('JSON.stringify(window.__ev)'); await js('window.__ev = {}; window.__fires = 0'); console.log(what.padEnd(46), JSON.stringify(s)); return s; };
 
 ws.onopen = async () => {
@@ -43,6 +43,7 @@ async function run() {
     await call('browsingContext.setViewport', { context: ctx, viewport: { width: +W, height: +H } });
     await call('browsingContext.navigate', { context: ctx, url, wait: 'complete' });
     await sleep(2000);
+    await js("localStorage.setItem('r62d-name', 'Thumbs'); location.reload(); true"); await sleep(2500); // a returning player: the name is remembered, so menus open straight away
     console.log('touch device?', await js(`('ontouchstart' in window) + ' ' + matchMedia('(pointer: coarse)').matches + ' ' + document.documentElement.className`));
     // menus, all by thumb
     await touch(finger('t', [[W / 2, H / 2], [W / 2, H / 2, 60]])); await sleep(2500);
@@ -56,7 +57,9 @@ async function run() {
         const ok = await tap(`[data-tab="${t}"]`); await sleep(2500); await shot('v-' + t);
         if (t === 'armory') { const c = [W * 0.4, H * 0.5]; await touch(finger('a', [c, [c[0] + 25, c[1] - 10, 300]], 200)); const fb = await centre('.armTouch .fire'); if (fb) await touch(finger('f', [fb, [fb[0], fb[1], 50]], 900)); await sleep(300); await shot('v-armory-touched'); }
         console.log(t, ok, 'open overlays:', await js("[...document.querySelectorAll('.overlay:not(.hidden), #settings:not(.hidden)')].map(e => e.id).join(',')"));
-        await js("window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' }))"); await sleep(600);
+        for (let i = 0; i < 2 && await js("!!document.querySelector('.overlay:not(.hidden), #settings:not(.hidden)')"); i++) { await js("window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' }))"); await sleep(600); } // (the Armory's first Esc lets go of its aim)
+        for (let i = 0; i < 2 && await js("!!document.querySelector('.overlay:not(.hidden) .close')"); i++) { await tap('.overlay:not(.hidden) .close'); await sleep(600); } // a phone has no Esc key: the page's CLOSE button
+        if (await js("!document.getElementById('settings').classList.contains('hidden')")) { await tap('#setClose'); await sleep(600); }
       }
       return;
     }
@@ -84,6 +87,22 @@ async function run() {
     const L = await centre('#tsLeft'); console.log('left stick at', L);
     const R0 = [Math.round(W * 0.78), Math.round(H * 0.45)];
     let s0 = await report('start');
+    if (process.env.SCENARIO === 'more') { // the controls added for phones on 2026-11-10: sprint, slide, lie down, lean, map
+      const L1 = await centre('#tsLeft');
+      await touch(finger('L', [L1, [L1[0], L1[1] - 120, 250], [L1[0], L1[1] - 120, 1500]], 300)); await report('stick pushed past its ring (sprint)');
+      { // sprint right, then tap CROUCH 0.4 s in (WebDriver runs both thumbs' steps side by side, so the tap is lined up with the stick's 100 ms steps)
+        const C0 = await centre('[data-id="crouch"]'), steps = [[L1[0] + 120, L1[1], 250]]; for (let i = 0; i < 10; i++) steps.push([L1[0] + 120, L1[1], 100]);
+        const tap = { type: 'pointer', id: 'C', parameters: { pointerType: 'touch' }, actions: [...Array(6).fill({ type: 'pause', duration: 0 }), { type: 'pointerMove', x: C0[0], y: C0[1], origin: 'viewport' }, { type: 'pointerDown', button: 0 }, { type: 'pause', duration: 0 }, { type: 'pointerUp', button: 0 }] };
+        await touch(finger('L', [L1, ...steps]), tap); await report('sprinting right, CROUCH tapped (slide)');
+      }
+      await sleep(800); const C = await centre('[data-id="crouch"]');
+      await touch(finger('C', [C, [C[0], C[1], 800]])); await sleep(300); await report('CROUCH held 0.8 s (lie down)');
+      await touch(finger('C', [C, [C[0], C[1], 60]])); await sleep(300); await report('CROUCH tapped (up from lying)');
+      const LL = await centre('[data-id="leanL"]'); await touch(finger('Q', [LL, [LL[0], LL[1], 60]])); await sleep(300); await report('LEAN left tapped');
+      await shot('m1-lean');
+      const M = await centre('[data-id="map"]'); await touch(finger('M', [M, [M[0], M[1], 60]])); await sleep(600); await report('MAP tapped'); await shot('m2-map');
+      return;
+    }
     // 1. walk "up" with the left thumb for 2 s (full push)
     await touch(finger('L', [L, [L[0], L[1] - 70, 150]], 2000)); s0 = await report('left thumb pushed up 2 s');
     console.log('  under (330, ' + (H - 200) + '):', await js(`(e => e ? (e.id || e.className || e.tagName) + ' / z ' + getComputedStyle(e).zIndex : 'nothing')(document.elementFromPoint(330, ${H - 200}))`));

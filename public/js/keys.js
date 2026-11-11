@@ -14,6 +14,8 @@ export const ACTIONS = [
   ['leanL', 'Lean left (hold) — on drones / cameras: previous feed', 'KeyQ', ''],
   ['leanR', 'Lean right (hold) — on drones / cameras: next feed', 'KeyE', ''],
   ['reload', 'Reload', 'KeyR', ''],
+  ['fire', 'Shoot (hold) — for a trackpad, so you never have to click and drag', '', ''],
+  ['aimIn', 'Aim in on / off (one tap) — for a trackpad', '', ''],
   ['primary', 'Primary weapon', 'Digit1', ''],
   ['secondary', 'Secondary weapon', 'Digit2', ''],
   ['gadget', 'Gadget / grenade', 'KeyG', ''],
@@ -71,6 +73,8 @@ export function applyBinds(saved, from = BINDS_VERSION) {
 export function resetBinds() { try { localStorage.removeItem(KEY); } catch {} loadBinds(); if (onChange) onChange(binds); }
 // Layouts from other games (he asked, and chose the games): only what differs from ours. Actions a game lacks (leaning, walking) go on free keys.
 export const PRESETS = [
+  // a laptop: left hand on the keys, right hand on the trackpad. Space shoots, E aims in, so the trackpad only aims
+  ['trackpad', 'Laptop trackpad', { fire: ['Space', ''], aimIn: ['KeyE', ''], vault: ['KeyV', ''], melee: ['Digit3', ''], leanR: ['KeyZ', ''], ability: ['Digit4', ''] }],
   ['cs2', 'Counter-Strike 2', { camCentre: ['KeyJ', ''], interact: ['KeyE', ''], ability: ['KeyQ', 'KeyZ'], gadget: ['Digit4', 'KeyG'], leanL: ['KeyX', ''], leanR: ['KeyC', ''], prone: ['KeyB', ''], opPrev: ['', ''], spot: ['KeyT', ''], melee: ['Digit3', ''] }],
   ['r6', 'Rainbow Six Siege', { crouch: ['', ''], crouchTap: ['KeyC', ''], prone: ['ControlLeft', ''], sprint: ['ShiftLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['Digit3', 'KeyG'], ability: ['Digit4', ''], view: ['Digit5', ''], drone: ['Digit6', ''], melee: ['KeyV', ''] }],
   ['cod', 'Call of Duty (modern)', { camCentre: ['KeyJ', ''], sprint: ['ShiftLeft', ''], crouch: ['KeyC', ''], prone: ['ControlLeft', ''], walk: ['AltLeft', ''], interact: ['KeyF', ''], gadget: ['KeyG', ''], ability: ['KeyX', 'Digit4'], leanL: ['KeyQ', ''], leanR: ['KeyE', ''], melee: ['KeyV', ''] }],
@@ -100,7 +104,7 @@ export function keyName(code) {
     .replace('Arrow', '').replace('Control', 'Ctrl').replace('Bracket', ' Bracket');
 }
 // on a phone the prompts name the touch button instead of a key (touch.js buttons)
-const TOUCH_NAMES = { interact: 'USE', vault: 'VAULT', melee: 'MELEE', ability: 'SKILL', gadget: 'GADGET', reload: 'RELOAD', spot: 'PING', crouch: 'CROUCH', ads: 'AIM', walk: 'a light push', view: 'DRONE / CAMS', drone: 'DRONE / CAMS', scoreboard: 'SCORES' };
+const TOUCH_NAMES = { interact: 'USE', vault: 'VAULT', melee: 'MELEE', ability: 'SKILL', gadget: 'GADGET', reload: 'RELOAD', spot: 'PING', crouch: 'CROUCH', ads: 'AIM', walk: 'a light push', view: 'DRONE / CAMS', drone: 'DRONE / CAMS', scoreboard: 'SCORES', sprint: 'a push past the stick ring', prone: 'a long press on CROUCH', crouchTap: 'CROUCH', leanL: '◀ LEAN', leanR: 'LEAN ▶', map: 'MAP', primary: 'SWAP', secondary: 'SWAP' };
 export const label = id => (isTouch && TOUCH_NAMES[id]) || keyName((binds[id] || [])[0]);
 loadBinds();
 // Capture the mouse for aiming, asking for raw movement where the browser allows it (no system mouse acceleration,

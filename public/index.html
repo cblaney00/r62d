@@ -25,7 +25,7 @@
     <div class="tag">TACTICAL 5V5 · HARBOR OFFICE</div>
     <div class="press">CLICK ANYWHERE TO START</div>
     <div id="serverTag"></div>
-    <div id="inputChoice" class="hidden"><p>HOW ARE YOU PLAYING?</p><div><button data-c="touch" class="primary">📱 PHONE / TABLET (TOUCH)</button><button data-c="desk">⌨ KEYBOARD &amp; MOUSE</button></div></div>
+    <div id="inputChoice" class="hidden"><p>HOW ARE YOU PLAYING?</p><div><button data-c="touch" class="primary">📱 PHONE / TABLET (TOUCH)</button><button data-c="desk">⌨ KEYBOARD &amp; MOUSE</button><button data-c="trackpad">💻 LAPTOP TRACKPAD</button></div></div>
     <div class="escq">ESC — QUIT TO DESKTOP</div>
   </div>
 
@@ -200,13 +200,14 @@
       <div class="srow"><div class="sl"><b>Music volume</b><small>The music in the menus</small></div><div class="sctl"><input type="range" id="volMusic" min="0" max="100" value="88"></div></div>
     </section>
     <section class="setPage" data-p="aim"><h3>MOUSE &amp; AIM</h3>
-      <div class="srow"><div class="sl"><b>Playing with</b><small>Phone / tablet shows buttons on the screen</small></div><div class="sctl"><span class="seg" id="inputSeg"><button data-c="desk">Keyboard &amp; mouse</button><button data-c="touch">Phone / tablet</button></span></div></div>
+      <div class="srow"><div class="sl"><b>Playing with</b><small>Phone / tablet shows buttons on the screen. Laptop trackpad: Space shoots, E aims in (a two-finger tap too), and a little aim help</small></div><div class="sctl"><span class="seg" id="inputSeg"><button data-c="desk">Keyboard &amp; mouse</button><button data-c="trackpad">Laptop trackpad</button><button data-c="touch">Phone / tablet</button></span></div></div>
       <div class="srow"><div class="sl"><b>Mouse sensitivity</b><small>How far the aim moves when you move the mouse</small></div><div class="sctl"><input type="range" id="sens" min="20" max="300" value="100"> <b id="sensVal"></b></div></div>
       <div class="srow"><div class="sl"><b>Aiming-in sensitivity</b><small>How fast the aim moves while aiming in (right click)</small></div><div class="sctl"><input type="range" id="adsSens" min="20" max="100" value="60"> <b id="adsSensVal"></b></div></div>
       <div class="srow"><div class="sl"><b>Steady aim sensitivity</b><small>Sniper scope: how fast the aim moves while you hold Shift to steady it</small></div><div class="sctl"><input type="range" id="steadySens" min="10" max="100" value="50"> <b id="steadySensVal"></b></div></div>
       <div class="srow wide"><div class="sl"><b>Aiming style</b><small><span id="aimHint"></span></small></div><div class="sctl"><div class="aimGroups" id="aimSeg"><div class="aimGrp"><small>TOP-DOWN · the map stays still</small><span class="seg"><button data-a="free">Crosshair (default)</button><button data-a="classic">Crosshair Classic</button><button data-a="cursor">Cursor</button></span></div><div class="aimGrp"><small>JOYSTICK</small><span class="seg"><button data-a="pad">Aim pad</button></span></div><div class="aimGrp"><small>SHOOTER · the mouse turns you</small><span class="seg"><button data-a="turn">Turn</button><button data-a="face">Face</button><button data-a="spin">Rotate</button></span></div></div></div>
       <div class="srow"><div class="sl"><b>Far aim sensitivity</b><small>Crosshair style: how fast the crosshair moves once it is past your normal view</small></div><div class="sctl"><input type="range" id="farSens" min="20" max="100" value="50"> <b id="farSensVal"></b></div></div></div>
       <div class="srow"><div class="sl"><b>Leaning</b><small><span id="leanHint"></span></small></div><div class="sctl"><span class="seg" id="leanSeg"><button data-l="toggle">Toggle</button><button data-l="hold">Hold</button></span></div></div>
+      <div class="srow tpOnly"><div class="sl"><b>Trackpad stops while you hold a key?</b><small>Many laptops switch the trackpad off while you type. On Windows: Settings → Bluetooth &amp; devices → Touchpad → Taps → Touchpad sensitivity: <b>Most sensitive</b>. On Linux: turn off "disable while typing" in the touchpad settings.</small></div><div class="sctl"></div></div>
       <div class="srow phoneOnly"><div class="sl"><b>Tilt the phone to move</b><small>Tilt the phone the way you want to walk</small></div><div class="sctl"><span class="seg" id="tiltSeg"><button data-t="0">Off</button><button data-t="1">On</button></span></div></div>
       <div class="srow phoneOnly"><div class="sl"><b>Tilt dead zone</b><small>How far you tilt before you start moving</small></div><div class="sctl"><input type="range" id="tiltDz" min="2" max="25" value="7"> <b id="tiltDzVal"></b></div></div>
     </section>

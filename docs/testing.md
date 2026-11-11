@@ -28,7 +28,7 @@ several fingers at once) at 914×412 and prints position / aim / shots after eac
 2. A Firefox profile (made as insideabush) whose `user.js` has
    `user_pref("general.useragent.override", "Mozilla/5.0 (Android 14; Mobile; rv:133.0) Gecko/133.0 Firefox/133.0");` and
    `user_pref("dom.w3c_touch_events.enabled", 1);`, started headless with `--remote-debugging-port 9333`.
-3. `node tests/thumbs.mjs 9333 <outdir> http://localhost:6263/` — free play by thumb; `SCENARIO=tut` taps through the
+3. `node tests/thumbs.mjs 9333 <outdir> http://localhost:6263/` — free play by thumb; `SCENARIO=more` sprint/slide/lie down/lean/map; `SCENARIO=tut` taps through the
    tutorial, `SCENARIO=menus` opens every menu page (and shoots in the Armory).
 Don't `pkill -f` a pattern that also appears in the same shell command line (it kills that shell); put it in a script.
 

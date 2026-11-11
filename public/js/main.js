@@ -31,7 +31,7 @@ import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX } from '/shar
 import { createCoach } from './tutorial.js';
 import { drawQr } from './qr.js';
 import { readCode, showCode } from '/shared/joincode.js';
-import { touchPad, touchContext, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
+import { touchPad, touchContext, touchActive, isTrackpad, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
 
 const $ = id => document.getElementById(id);
@@ -272,7 +272,8 @@ function adsReset() {
 // Sniper scope sway (he asked): scoped in, the reticle drifts in a slow figure of eight; holding Shift (walk or sprint
 // key) steadies it within about a tenth of a second, for as long as you hold it (like the AWP), and slows the mouse by
 // Settings → Steady aim sensitivity. The sway turns your real aim, so a shot goes where the reticle is.
-const steadying = () => !!(st.me && st.me.ct === 'body' && st.me.a && sniperOn(st.me) && (mouse.r || gpk.ads) && (keys.has('walk') || keys.has('sprint') || gpk.walk));
+const adsHeld = () => mouse.r || !!st.adsTog; // right button held, or aimed in by the toggle (trackpad: aim-in key or a two-finger tap)
+const steadying = () => !!(st.me && st.me.ct === 'body' && st.me.a && sniperOn(st.me) && (adsHeld() || gpk.ads) && (keys.has('walk') || keys.has('sprint') || gpk.walk));
 function scopeSway(dt, me, now) {
   const on = me && me.ct === 'body' && me.a && !me.dn && sniperOn(me) && !st.tv ? Math.min(1, me.at || 0) : 0;
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
@@ -323,6 +324,38 @@ function screenToWorld(sx, sy) {
   return { x: dx * c + dy * s + st.cam.x, y: -dx * s + dy * c + st.cam.y };
 }
 // the point you aim at, in screen pixels (with the aim pad this sits ahead of your character)
+function toggleAds() {
+  if (!(st.me && st.me.a && st.me.ct === 'body')) return;
+  st.adsTog = !st.adsTog;
+  if (st.adsTog && aimMode === 'free' && padOn) adsReset();
+  if (!st.adsTog) st.faceC = null;
+}
+// Aim help for trackpad and phone players only, never a mouse (he chose: slow-down + a slight pull). While the
+// crosshair is close to an enemy you can see, the aim moves slower (mousemove above) and, while you are aiming,
+// firing or aimed in, it drifts gently onto them. Nothing changes on the server: the aim you send is just where it points.
+const ASSIST = { near: 0.9 * PX_PER_M, ang: 0.07, slow: 0.55, pull: 0.45, adsPull: 0.7, max: 0.2 };
+let assistTgt = null;
+const assistOn = () => isTrackpad || touchActive();
+function aimAssist(dt, view) {
+  assistTgt = null;
+  const me = st.me, s = st.last, stick = touchActive() && gpLastL > 0.05;
+  if (!assistOn() || !view || view.kind !== 'body' || !me || !me.a || me.dn || !s || s.ph !== PHASE.ACTION || !st.foesSeen) { if (st.asOff && !stick) { padAng = wrapAng(padAng + st.asOff); st.asOff = 0; } return; }
+  const c = cursor(), q = screenToWorld(c.x, c.y), a0 = Math.atan2(q.y - st.pred.y, q.x - st.pred.x);
+  let best = null, bs = 1;
+  for (const f of st.foesSeen) {
+    const d = Math.hypot(f.x - st.pred.x, f.y - st.pred.y); if (d < 12) continue;
+    const da = angDiff(Math.atan2(f.y - st.pred.y, f.x - st.pred.x), a0), lim = Math.min(0.35, Math.max(ASSIST.ang, ASSIST.near / d)), sc = Math.abs(da) / lim;
+    if (sc < bs) { bs = sc; best = { da, d }; }
+  }
+  if (!best) { if (st.asOff && !stick) { padAng = wrapAng(padAng + st.asOff); st.asOff = 0; } return; }
+  assistTgt = best;
+  const ads = adsHeld() || gpk.ads, aiming = performance.now() - (st.aimMoveT || -1e9) < 300 || stick || mouse.l || gpk.fire || keys.has('fire') || ads;
+  if (!aiming) return;
+  const step = Math.sign(best.da) * Math.min(Math.abs(best.da), (ads ? ASSIST.adsPull : ASSIST.pull) * dt);
+  if (freeAimOn() && !gpRecent()) { const l = Math.hypot(aimOff.x, aimOff.y), a = Math.atan2(aimOff.y, aimOff.x) + step; aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l }; }
+  else if (stick) st.asOff = Math.max(-ASSIST.max, Math.min(ASSIST.max, (st.asOff || 0) + step)); // the thumb holds the stick's angle: the pull rides on top of it
+  else padAng = wrapAng(padAng + step);
+}
 function cursor() {
   if (!padOn) { // Cursor aiming: the pointer itself, kept within the drone's ping reach while you drive one
     if (!(st.me && st.me.a && st.me.ct === 'drone')) return mouse;
@@ -331,7 +364,7 @@ function cursor() {
   }
   const z = st.zoom || 1, P0 = w2s(st.pred.x, st.pred.y), px = P0.x, py = P0.y;
   if (freeAimOn() && !gpRecent()) { const q = freeAimPoint(); return w2s(q.x, q.y); }
-  const cx = Math.cos(padAng + (st.rot || 0)), cy = Math.sin(padAng + (st.rot || 0)), m = 30 * DPR;
+  const cx = Math.cos(padAng + (st.asOff || 0) + (st.rot || 0)), cy = Math.sin(padAng + (st.asOff || 0) + (st.rot || 0)), m = 30 * DPR; // (asOff: the aim help's pull)
   const scoped = scopeOn(st.me);
   let d = VH * 0.07 + padReach * (VH * 0.36 + (scoped ? 0 : 4 * PX_PER_M * z)); // +4 m without a scope (he asked); shortened if it would leave the screen
   if (cx > 0.01) d = Math.min(d, (VW - m - px) / cx); else if (cx < -0.01) d = Math.min(d, (m - px) / cx);
@@ -410,7 +443,7 @@ function connect(mode = '', tvKey = null) { // '' = the shared match, 'tut' / 'f
         runLoading('LOADING MAP', [['Building the map', () => loadMap(m.mapVersion, m.tiles, m.hp, m.mapId, m.holes)], ['Getting every floor ready', () => frames(6)]], m.mapId).then(() => { st.mapLoading = false; });
       }
       st.token = m.token; st.profile = m.profile; updateCard();
-      if (m.profile.settings) applySettings(m.profile.settings); else saveSettings(); // first time: keep what this browser had
+      if (m.profile.settings) { applySettings(m.profile.settings); if (trackpadKeys()) saveSettings(); } else { trackpadKeys(); saveSettings(); } // first time: keep what this browser had
       try { localStorage.setItem('r62d-token', m.token); } catch {}
       $('join').classList.add('hidden'); $('room').classList.remove('hidden');
       if (st.wantTab) { const t = st.wantTab; st.wantTab = null; setTab(t); } // they picked a page before giving a name
@@ -814,6 +847,8 @@ function pressAction(a, e) {
       st.leanT = st.leanT === d ? 0 : d; break; }
     case 'settings': toggleSettings(); break;
     case 'pause': escape(); break;
+    case 'fire': mouse.wl++; break; // like a click (next teammate when dead, ping in a camera)
+    case 'aimIn': toggleAds(); break;
     case 'spot': st.spotReq = true; break;
     case 'wheel': openWheel(); break;
     case 'map': toggleMapV(); break;
@@ -865,12 +900,22 @@ function pollPad(dt, view) {
   for (let i = 0; i < gp.pressed.length; i++) {
     const a = PAD_ACTIONS[i]; if (!a) continue;
     if (gp.pressed[i]) {
-      if (a === 'crouch') { if (!(st.me && st.me.ct === 'drone')) gpk.crouch = gpk.crouch ? 0 : 1; } // on a drone B is sprint
+      if (a === 'crouch') { // on a drone B is sprint; sprinting: a power slide; held: lie down / get up (below)
+        if (st.me && st.me.ct === 'drone') {} else if (trySlide()) {} else if (st.prone) { st.prone = false; gpk.crouch = 1; } else { gpk.crouch = gpk.crouch ? 0 : 1; st.crouchHoldT = performance.now(); }
+      }
       else if (a === 'pause') escape();
       else pressAction(a);
     }
     if (gp.released[i] && a !== 'crouch') keys.delete(a);
   }
+  // hold crouch (B / the CROUCH button) half a second: lie down instead (he can't press C on a phone)
+  if (!gp.held[1]) st.crouchHoldT = 0;
+  else if (st.crouchHoldT && performance.now() - st.crouchHoldT > 450 && st.me && st.me.ct === 'body') { st.crouchHoldT = 0; gpk.crouch = 0; st.prone = true; }
+  // phone: the move thumb pushed past its ring sprints; with no thumb aiming you turn to run that way (sprinting needs you facing roughly where you go)
+  const spr = !!gp.sprint && !!st.me && st.me.ct === 'body';
+  if (spr && !gpk.sprint) { st.prone = false; gpk.crouch = 0; st.leanT = 0; }
+  gpk.sprint = spr ? 1 : 0;
+  if (spr && ls.l && rs.l < 0.05 && !(gp.rt > 0.35)) padAng = wrapAng(padAng + angDiff(Math.atan2(ls.y, ls.x) - (st.rot || 0), padAng) * Math.min(1, dt * 12));
   // left stick: 8 directions like WASD; a light push walks (silent)
   const nx = ls.l ? ls.x / ls.l : 0, ny = ls.l ? ls.y / ls.l : 0;
   gpk.right = ls.l && nx > 0.38 ? 1 : 0; gpk.left = ls.l && nx < -0.38 ? 1 : 0;
@@ -900,8 +945,9 @@ cv.addEventListener('mousemove', e => {
   if (st.mapV) { const V = st.mapV, c = 1.15 * DPR; V.cx = Math.max(0, Math.min(VW, V.cx + e.movementX * c)); V.cy = Math.max(0, Math.min(VH, V.cy + e.movementY * c)); return; }
   if (document.pointerLockElement === cv) {
     if (st.mDrag && st.camLock) { const z = st.zoom || 1; st.camLock.x -= e.movementX * DPR / z; st.camLock.y -= e.movementY * DPR / z; st.camLock.free = true; st.mDrag.d += Math.abs(e.movementX) + Math.abs(e.movementY); return; } // grab the map: your aim stays put
-    const ads = mouse.r && st.me && st.me.a && st.me.ct === 'body';
-    const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1) * DPR;
+    const ads = adsHeld() && st.me && st.me.a && st.me.ct === 'body';
+    st.aimMoveT = performance.now();
+    const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1) * DPR * (assistTgt ? ASSIST.slow : 1); // aim help: slower over an enemy
     if (padOn && freeAimOn()) { freeMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'pad') { padMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'face') { faceMove(e.movementX * k, e.movementY * k, ads); return; }
@@ -926,6 +972,7 @@ cv.addEventListener('mousedown', e => {
   if (st.wheel) { if (e.button === 2) closeWheel(true); return; }
   if (st.mapV) { if (e.button === 2) st.mapV = null; else if (e.button === 0) mapClick(); return; }
   if (e.button === 0) { mouse.l = true; mouse.wl++; }
+  if (e.button === 2 && isTrackpad) { toggleAds(); mouse.wr++; return; } // a trackpad can't hold a right click while it aims: a two-finger tap aims in, the next one out
   if (e.button === 2) { mouse.r = true; mouse.wr++; if (aimMode === 'free' && padOn && st.me && st.me.ct === 'body') adsReset(); } // (Classic: aiming in leaves the crosshair where it is)
 });
 addEventListener('mouseup', e => { if (e.button === 1 && st.mDrag) { if (st.mDrag.d < 6) st.spotReq = true; st.mDrag = null; } if (e.button === 0 && st.wheelMouse) closeWheel(); if (e.button === 0) mouse.l = false; if (e.button === 2) { mouse.r = false; st.faceC = null; } });
@@ -1001,7 +1048,7 @@ function renderSettings() {
 $('setReset').onclick = () => { resetBinds(); renderSettings(); };
 for (const [id, name] of PRESETS) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => { audio.ui(); applyPreset(id); renderSettings(); }; $('keyPresets').appendChild(b); }
 const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'sprint', 'walk', 'crouch', 'crouchTap', 'prone', 'vault', 'leanL', 'leanR']],
-  ['FIGHTING', ['primary', 'secondary', 'melee', 'reload', 'ability', 'gadget', 'interact']],
+  ['FIGHTING', ['fire', 'aimIn', 'primary', 'secondary', 'melee', 'reload', 'ability', 'gadget', 'interact']],
   ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'wheel', 'map', 'camLock', 'camCentre', 'chat', 'scoreboard']],
   ['MENUS & FREE PLAY', ['settings', 'pause', 'opNext', 'opPrev', 'opGrid']]];
 // crosshair: chosen in Settings, saved in your profile
@@ -1640,6 +1687,7 @@ function frame(nowMs) {
   if (st.tv && st.tv.overview) view = null; // the whole-map overview
   // --- input & prediction ---
   pollPad(dt, view);
+  aimAssist(dt, view);
   setTouchVisible(playing() && !st.tv && !menuOpen() && !!st.me && $('pause').classList.contains('hidden')); // phone controls only while playing
   if (sliding()) { padAng = wrapAng(slideAim(padAng)); const l = Math.hypot(aimOff.x, aimOff.y), a = slideAim(Math.atan2(aimOff.y, aimOff.x)); aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l }; }
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
@@ -1852,13 +1900,14 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
   const k = {
     up: keys.has('up') || gpk.up || sprintBack() ? 1 : 0, down: (keys.has('down') || gpk.down) && !sprintBack() ? 1 : 0, left: keys.has('left') || gpk.left ? 1 : 0, right: keys.has('right') || gpk.right ? 1 : 0,
-    walk: keys.has('walk') || gpk.walk ? 1 : 0, sprint: keys.has('sprint') && performance.now() >= (st.sprintHold || 0) ? 1 : 0, slide: performance.now() - (st.slideReq ?? -1e9) < 120 ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch || st.crouchT ? 1 : 0, prone: st.prone && me && me.a && !me.dn ? 1 : 0, fire: mouse.l || gpk.fire ? 1 : 0, ads: mouse.r || gpk.ads ? 1 : 0,
+    walk: keys.has('walk') || gpk.walk ? 1 : 0, sprint: (keys.has('sprint') || gpk.sprint) && performance.now() >= (st.sprintHold || 0) ? 1 : 0, slide: performance.now() - (st.slideReq ?? -1e9) < 120 ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch || st.crouchT ? 1 : 0, prone: st.prone && me && me.a && !me.dn ? 1 : 0, fire: mouse.l || gpk.fire || keys.has('fire') ? 1 : 0, ads: adsHeld() || gpk.ads ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
     lean: me && me.ct === 'body' ? leanNow() : 0, jump: performance.now() - (st.jumpReq || -1e9) < 120 ? 1 : 0,
   };
+  if (me && (!me.a || me.dn || me.ct !== 'body')) st.adsTog = false; // the aim-in toggle ends with death, going down or taking a drone or camera
   if (me && (!me.a || me.dn)) st.leanT = 0; // dead or downed: stand straight again
   if (!me || !me.a || me.dn || !s || (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION)) st.crouchT = false;
-  if (mouse.l || gpk.fire) st.sprintHold = performance.now() + 500; // shooting stops a sprint for a moment, so the shot gets out
+  if (mouse.l || gpk.fire || keys.has('fire')) st.sprintHold = performance.now() + 500; // shooting stops a sprint for a moment, so the shot gets out
   if (steadying()) k.sprint = 0; // scoped in, the sprint key only steadies the scope
   if (k.sprint) k.sa = Math.round(st.aim * 1000) / 1000; // what the server will go by for which way you sprint
   if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
@@ -2747,7 +2796,7 @@ function crosshair(me, now) {
   }
   const fq = freeAimOn() && padOn && !gpRecent() ? freeAimPoint() : null;
   wallHeld(fq, now);
-  if (sliding() || (aimMode === 'face' && padOn && !gpRecent() && mouse.r && me.ct === 'body')) { // aimed in (Face) or sliding: the narrow area you are locked to
+  if (sliding() || (aimMode === 'face' && padOn && !gpRecent() && adsHeld() && me.ct === 'body')) { // aimed in (Face) or sliding: the narrow area you are locked to
     const ca = sliding() ? st.pred.slA : st.faceC ?? padAng, R = Math.hypot(m.x - px, m.y - py);
     ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1 * DPR;
     ctx.beginPath(); ctx.arc(px, py, R, ca - FACE_ADS, ca + FACE_ADS); ctx.stroke();
@@ -2971,7 +3020,7 @@ function hud(s) {
     if (me.dn && me.su !== undefined) { setHTML('prompt', `GETTING BACK UP… ${Math.round(me.su * 100)}%`); } else // the health operators get up by themselves
     setHTML('prompt', isTouch ? pt.replace(/<b>([A-Z ]+)<\/b>\1(?![A-Z])/g, '<b>$1</b>') : pt); // phone: no "VAULT VAULT"
   }
-  if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone', badge: st.tBadge || {} }); }
+  if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone', body: me.ct === 'body' && !me.dn, lean: st.leanT || 0, badge: st.tBadge || {} }); }
 }
 function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!el) return; if (el.innerHTML !== h) el.innerHTML = h; }
 // (he said it got laggy: the HUD rewrote about a dozen elements ten times a second even when nothing had changed)
@@ -3505,14 +3554,19 @@ for (const id of ['opsPage', 'profilePage']) $(id).querySelector('.close').oncli
 
 // ---------------- title screen, main menu, little touches ----------------
 st.started = false;
+// trackpad chosen: its key layout whenever no key shoots (also after a profile's saved keys load) (Space shoots, E aims in); the keys can still be changed in Settings
+const trackpadKeys = () => { if (isTrackpad && !bindsFor('fire')[0]) { applyPreset('trackpad'); return true; } return false; };
+trackpadKeys();
+document.documentElement.classList.toggle('trackpad', isTrackpad);
 // phone or computer? asked on the title screen only when it can't be told (touch.js); changeable in Settings
 if (needsInputChoice) {
   $('inputChoice').classList.remove('hidden');
   for (const b of $('inputChoice').querySelectorAll('button')) b.addEventListener('click', e => { e.stopPropagation(); setInputChoice(b.dataset.c); });
 }
 for (const b of $('inputSeg').querySelectorAll('button')) {
-  b.classList.toggle('on', (b.dataset.c === 'touch') === isTouch);
-  b.onclick = () => { if ((b.dataset.c === 'touch') !== isTouch) setInputChoice(b.dataset.c); };
+  const cur = isTouch ? 'touch' : isTrackpad ? 'trackpad' : 'desk';
+  b.classList.toggle('on', b.dataset.c === cur);
+  b.onclick = () => { if (b.dataset.c !== cur) setInputChoice(b.dataset.c); };
 }
 { const u = $('uiScale'), v = $('viewMul'), show = () => { $('uiScaleVal').textContent = u.value + '%'; $('viewMulVal').textContent = v.value + '%'; };
   u.value = Math.round(uiScale() * 100); v.value = Math.round(viewMul() * 100); show();
@@ -3677,7 +3731,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
