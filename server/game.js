@@ -910,6 +910,11 @@ export class Game {
     (this.camBuf || (this.camBuf = [])).push({ t: this.time, ps });
     while (this.camBuf.length > 95) this.camBuf.shift();
   }
+  // blocked to every part of the body at b (its middle and both sides): a bullet clipping past a doorframe corner is fair
+  solidToBody(a, b, q) {
+    const d = Math.hypot(b.x - a.x, b.y - a.y) || 1, nx = -(b.y - a.y) / d, ny = (b.x - a.x) / d, r = hitR(q.op);
+    return [0, 1, -1].every(o => this.solidBetween(a, { x: b.x + nx * r * o, y: b.y + ny * r * o }));
+  }
   solidBetween(a, b) { // a bullet from a to b would have to cross concrete, furniture or a panel
     const d = Math.hypot(b.x - a.x, b.y - a.y); if (d < 2) return false;
     const dx = (b.x - a.x) / d, dy = (b.y - a.y) / d, sx = Math.floor(a.x / CELL), sy = Math.floor(a.y / CELL); let hit = false;
@@ -948,8 +953,8 @@ export class Game {
     // things that should never happen: a bug, saved for fixing
     if (gun) {
       if (!src.alive) bug.push('the shooter was already dead');
-      if (fl(src.x, src.y) === fl(q.x, q.y) && !(src.tracerUntil > this.time) && !(this.time - (src.pierceLast ?? -9) < 1) && this.solidBetween(leanPoint(this.map, src.x, src.y, src.aim, src.lo || 0), q.lo ? leanPoint(this.map, q.x, q.y, q.aim, q.lo) : q) && (src.viewTime === null || src.viewTime === undefined || this.solidBetween(leanPoint(this.map, src.x, src.y, src.aim, src.lo || 0), this.posAt(q, src.viewTime))) && !(src.lo || q.lo) /* a lean shoots from the tipped shoulder: measured from there */) bug.push('the bullet went through concrete or furniture');
-      if (Math.hypot(src.x - q.x, src.y - q.y) > 2200) bug.push('shot from further than any gun reaches');
+      if (fl(src.x, src.y) === fl(q.x, q.y) && !(src.tracerUntil > this.time) && !(this.time - (src.pierceLast ?? -9) < 1) && this.solidToBody(leanPoint(this.map, src.x, src.y, src.aim, src.lo || 0), q.lo ? leanPoint(this.map, q.x, q.y, q.aim, q.lo) : q, q) && (src.viewTime === null || src.viewTime === undefined || this.solidToBody(leanPoint(this.map, src.x, src.y, src.aim, src.lo || 0), this.posAt(q, src.viewTime), q)) && !(src.lo || q.lo) /* a lean shoots from the tipped shoulder: measured from there */) bug.push('the bullet went through concrete or furniture');
+      { const a = localPos(this.map, src.x, src.y), b = localPos(this.map, q.x, q.y); if (Math.hypot(a.x - b.x, a.y - b.y) > 2200) bug.push('shot from further than any gun reaches'); } // in the building (floors sit side by side on the map: a shot down the stairs or through a hole crosses them)
     }
     const st0 = tileAt(this.map, Math.floor(src.x / CELL), Math.floor(src.y / CELL));
     if (src.alive && !src.vault && !src.rope && (st0 === T.HARD || st0 === T.REINF || st0 === T.TALL || st0 === T.VOID) && pointSolid(this.map, src.x, src.y, t => t === st0)) bug.push('the shooter was standing inside a wall');
@@ -1817,7 +1822,7 @@ export class Game {
     const through = w => { const cx = (w.cx + 0.5) * CELL, cy = (w.cy + 0.5) * CELL, dx = Math.sign(Math.round(cx - w.x)), dy = Math.sign(Math.round(cy - w.y)); return { dx, dy, x: cx + dx * (CELL / 2 + 5), y: cy + dy * (CELL / 2 + 5) }; };
     const used = () => { p.abilityCount--; };
     if (id === 'cutter') {
-      const w = this.wallInFront(p, [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD]) || this.hatchSpot(p, [T.HATCH, T.HATCHR]) || this.floorCharge(p);
+      const w = this.wallInFront(p, [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD]) || this.hatchSpot(p, [T.HATCH, T.HATCHR]) || (!p.bot && this.floorCharge(p));
       if (!w) return;
       this.ents.push({ id: this.eid(), type: 'cutter', x: w.x, y: w.y, cell: w.k, hatch: w.hatch, floor: w.floor, team, owner: p.id, t: 5, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
@@ -2149,7 +2154,7 @@ export class Game {
       const n = this.throwNade(p, g); p.gadgetCount--;
       if (g === 'nitro') p.nitroId = n.id;
     } else if (g === 'breach') {
-      const w = this.wallInFront(p, [T.SOFT, T.BARRI]) || this.hatchSpot(p, [T.HATCH]) || this.floorCharge(p); // he asked: floors break too
+      const w = this.wallInFront(p, [T.SOFT, T.BARRI]) || this.hatchSpot(p, [T.HATCH]) || (!p.bot && this.floorCharge(p)); // he asked: floors break too (bots aim their charges at walls: a near miss used to land on the floor)
       if (!w) return;
       this.ents.push({ id: this.eid(), type: 'breach', x: w.x, y: w.y, cell: w.k, hatch: w.hatch, floor: w.floor, team, owner: p.id, t: 2.5, hp: 1 });
       p.gadgetCount--; this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });

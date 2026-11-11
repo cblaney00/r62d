@@ -21,3 +21,4 @@ on his to-do list unless he asks for it.
 - "bullet through concrete" reports still appear now and then (Heron, Ferret, Tandem); leaning shots are excluded now; the rest not yet explained.
 - HOIST: grapple used only ~3 times in 30 rounds (roof plays need a site under the roof). PERCH still sets the bipod ~5x a round.
 - Pro practice (600 rounds) ran on the version before these bot fixes; the game re-practises by itself on the next start.
+- 2026-11-10 later: fixed from the audit: bots see hidden traps only within 2 m like people (HIDDEN_TRAPS in bots.js; they used to clear every trap from 16 m), LOCKJAW rigs ~1 hatch a round, DEADFALL a hole most rounds, bots keep off hole rims (falls by accident now mostly in fights), bots never set breach charges on the floor, killcam judge: distance in the building frame and wall checks to the whole body (no false "bug" reports left in 4 audit runs).

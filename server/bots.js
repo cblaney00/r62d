@@ -359,8 +359,8 @@ export function botPrep(game, p) {
   // LOCKJAW (2026-11-10): rig the shut hatches nearest the objective (the site floor or the one above), from whichever side is on the site's floor
   if (id === 'htrap') {
     const lb = localPos(m, bomb.x, bomb.y), hs = m.hatches.filter(h => !h.peep && !h.dyn && (m.tiles[h.cells[0]] === T.HATCH || m.tiles[h.cells[0]] === T.HATCHR))
-      .map(h => { const a = localPos(m, h.bx, h.by); return { h, d: Math.hypot(a.x - lb.x, a.y - lb.y) + Math.abs(a.f - lb.f) * 6 * PX_PER_M, low: a.f === lb.f }; }).filter(q => q.d < 30 * PX_PER_M).sort((a, b) => a.d - b.d);
-    for (const { h, low } of hs.slice(0, p.abilityCount)) later(low ? h.bx + 22 : h.x - 22, low ? h.by : h.y, () => { if (p.abilityCount > 0 && !game.ents.some(e => e.type === 'htrap' && e.rig === h.id)) { game.ents.push({ id: game.eid(), type: 'htrap', x: h.x, y: h.y, rig: h.id, arm: DUR.trapArm, team: TEAM.DEF, owner: p.id, hp: 1 }); p.abilityCount--; } }, 1);
+      .map(h => { const a = localPos(m, h.bx, h.by); return { h, d: Math.hypot(a.x - lb.x, a.y - lb.y) + Math.abs(a.f - lb.f) * 6 * PX_PER_M, low: a.f === lb.f }; }).filter(q => q.d < 45 * PX_PER_M).sort((a, b) => a.d - b.d);
+    for (const { h, low } of hs.slice(0, p.abilityCount)) { const st = game.freeSpotNear(low ? h.bx + 24 : h.x - 24, low ? h.by : h.y, 30); later(st.x, st.y, () => { if (p.abilityCount > 0 && !game.ents.some(e => e.type === 'htrap' && e.rig === h.id)) { game.ents.push({ id: game.eid(), type: 'htrap', x: h.x, y: h.y, rig: h.id, arm: DUR.trapArm, team: TEAM.DEF, owner: p.id, hp: 1 }); p.abilityCount--; } }, 1, { r: 40 }); }
   }
   // DEADFALL: one drop hole from the floor above down into the objective's room (a way to shoot down and to rotate), the other kept for later
   if (id === 'dropcharge' && p.abilityCount > 0) tasks.push({ x: bomb.x, y: bomb.y, wait: 0.5, pick: () => { // (picked when it is her turn, so the stand spot is tested on the map as it is then)
@@ -446,7 +446,8 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside
     if ((bl(1, 0) && bl(-1, 0)) || (bl(0, 1) && bl(0, -1))) return 3; // a one-cell gap: a body just squeezes through
     let near = 0;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (blocksMove(tileAt(map, x + dx, y + dy)) && tileAt(map, x + dx, y + dy) !== T.BARRI) near++;
-    return 1 + near * 0.6;
+    let edge = 0; if (t !== T.HOLE) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (tileAt(map, x + dx, y + dy) === T.HOLE) edge = 2; // the rim of a hole: a corner cut there drops you (the audit: a third of falls were accidents)
+    return 1 + near * 0.6 + edge;
   };
   // a cell is looked at from up to 8 sides: its price is worked out once per search (this was a quarter of the server's work)
   const CC = B.cc, CS = B.cs;
@@ -1740,6 +1741,8 @@ export const feat = (p, k, n = 1) => { const f = p.feat || (p.feat = {}); f[k] =
 // a camera, trap or gadget of the other team this bot sees (or, knowing the map, knows is there) and would shoot.
 // Each thing is weighed once (KNOW.cams), so a Copper walks past most of them.
 const NO_SHOOT = new Set(['drone', 'bird', 'decoy', 'cover', 'dshield']);
+// hidden traps show to attackers only within TRAP_SEEN (main.js); bots used to see them from 16 m and shot LOCKJAW's hatch traps (and every other trap) before anyone could walk into them
+const HIDDEN_TRAPS = new Set(['clamp', 'prox', 'concuss', 'alarm', 'mine', 'htrap']), TRAP_SEEN = 2 * PX_PER_M;
 function gadgetShot(game, p) {
   const ai = p.ai, m = game.map, K = know(game, p), team = game.side(p), fl = floorAt(m, p.x, p.y), roll = ai.gRoll || (ai.gRoll = {});
   let best = null, bd = Infinity;
@@ -1747,7 +1750,7 @@ function gadgetShot(game, p) {
     if (!(e.hp > 0) || e.team === team || !e.team || NO_SHOOT.has(e.type) || e.tu) continue; // (a turret only breaks through its lens)
     const out = e.oc !== undefined, x = out ? e.gx : e.x, y = out ? e.gy : e.y; // an outside camera: shot at its spot on the wall from the ground
     if (out ? fl !== m.groundFloor : floorAt(m, x, y) !== fl) continue;
-    const d = Math.hypot(x - p.x, y - p.y); if (d > 16 * PX_PER_M || d >= bd) continue;
+    const d = Math.hypot(x - p.x, y - p.y); if (d > 16 * PX_PER_M || d >= bd || (HIDDEN_TRAPS.has(e.type) && d > TRAP_SEEN)) continue;
     const mapCam = e.type === 'cam' && !e.owner, facing = Math.abs(angDiff(Math.atan2(y - p.y, x - p.x), p.aim)) < 0.9;
     if (!facing && !(mapCam && d < 12 * PX_PER_M && (roll['m' + e.id] ??= Math.random() < K.memo))) continue; // behind them: only a camera they know hangs there
     if ((roll[e.id] ??= Math.random() < K.cams) === false || (ai.gGive && ai.gGive[e.id] > game.time)) continue;

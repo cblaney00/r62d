@@ -8,12 +8,13 @@ import { buildMap, MAP_LIST, floorAt } from '../shared/map.js';
 import { PHASE, T, CELL, PX_PER_M } from '../shared/constants.js';
 import { OPERATORS, WEAPONS } from '../shared/operators.js';
 import { pointSolid } from '../shared/physics.js';
+import { botPrep } from '../server/bots.js';
 import { store } from '../server/store.js';
 
 const lvl = +(process.argv[2] ?? 7), per = +process.argv[3] || 1, only = process.argv[4] || null;
 const NEW_OPS = { atk: ['perch', 'moss', 'osprey', 'nail', 'gimlet', 'hoist'], def: ['lockjaw', 'deadfall'] };
 const NEW_GUNS = new Set(['verdict', 'tandem', 'ferret', 'auger', 'quill', 'hedge', 'cyclone', 'trestle', 'ranger', 'mammoth', 'needle', 'couplet', 'whisper', 'hatchet'].map(w => WEAPONS[w].name));
-const A = { traps: new Map(), rounds: 0, uses: {}, denies: {}, kills: {}, gunKills: {}, stuck: [], inWall: [], holeFalls: 0, tk: {}, bugs: [], errors: [], grappleDone: 0, peeps: 0, floorHoles: 0, opRounds: {}, opWins: {}, opKills: {}, opDeaths: {} };
+const A = { fallBy: {}, traps: new Map(), rounds: 0, uses: {}, denies: {}, kills: {}, gunKills: {}, stuck: [], inWall: [], holeFalls: 0, tk: {}, bugs: [], errors: [], grappleDone: 0, peeps: 0, floorHoles: 0, opRounds: {}, opWins: {}, opKills: {}, opDeaths: {} };
 const inc = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
 store.saveBug = b => { A.bugs.push(`${b.map} ${b.weapon}: ${b.bug.join('; ')}`); return 'x'; };
 for (let n = 0; n < per; n++) for (const id of only ? [only] : MAP_LIST) {
@@ -37,7 +38,7 @@ for (let n = 0; n < per; n++) for (const id of only ? [only] : MAP_LIST) {
         lastRound = g.round; A.rounds++;
         for (const side of ['atk', 'def']) {
           const bots = [...g.players.values()].filter(p => g.side(p) === side).sort(() => Math.random() - 0.5), list = [...NEW_OPS[side]].sort(() => Math.random() - 0.5);
-          bots.slice(0, side === 'atk' ? 3 : 2).forEach((p, i) => { const keep = { staged: p.staged, x: p.x, y: p.y, spawn: p.spawn, ctrl: p.ctrl, droneId: p.droneId }; p.op = list[i % list.length]; g.equip(p); Object.assign(p, keep); }); // (equip resets the waiting state: keep it)
+          bots.slice(0, side === 'atk' ? 3 : 2).forEach((p, i) => { const keep = { staged: p.staged, x: p.x, y: p.y, spawn: p.spawn, ctrl: p.ctrl, droneId: p.droneId }; p.op = list[i % list.length]; g.equip(p); Object.assign(p, keep); if (side === 'def') botPrep(g, p); }); // (re-plan preparation for the new operator) // (equip resets the waiting state: keep it)
         }
         for (const p of g.players.values()) inc(A.opRounds, p.op);
         seen.clear();
@@ -47,11 +48,11 @@ for (let n = 0; n < per; n++) for (const id of only ? [only] : MAP_LIST) {
       for (const h of g.map.hatches.slice(hb)) if (h.dyn) A.floorHoles++;
       A.peeps += (g.map.peeps || []).length - pb;
       for (const e of g.ents) if (e.type === 'htrap' && !A.traps.has(e.id)) A.traps.set(e.id, { rig: e.rig, gone: false });
-      for (const [eid, tr] of A.traps) if (!tr.gone && !g.ents.some(e => e.id === eid)) { tr.gone = true; tr.open = g.map.hatches[tr.rig] && g.map.tiles[g.map.hatches[tr.rig].cells[0]] === T.HOLE; }
+      for (const [eid, tr] of A.traps) if (!tr.gone && !g.ents.some(e => e.id === eid)) { tr.gone = true; tr.end = g.phase !== PHASE.ACTION; tr.open = g.map.hatches[tr.rig] && g.map.tiles[g.map.hatches[tr.rig].cells[0]] === T.HOLE; }
       for (const p of g.players.values()) {
         if (!p.alive || p.staged || p.ctrl !== 'body') continue;
         const f1 = floorAt(g.map, p.x, p.y);
-        if (fl0.get(p.id) > f1 && g.map.hatches.some(h => !h.peep && Math.hypot(h.bx - p.x, h.by - p.y) < 40)) A.holeFalls++;
+        if (fl0.get(p.id) > f1 && g.map.hatches.some(h => !h.peep && Math.hypot(h.bx - p.x, h.by - p.y) < 40)) { A.holeFalls++; const pa = p.ai && p.ai.path, last = pa && pa.length ? pa[pa.length - 1] : -1, goal = last >= 0 && g.map.flAt[last] === f1 ? 'meant' : 'by accident'; inc(A.fallBy, `${g.side(p)} ${g.phase} ${goal}`); }
         if (fl0.get(p.id) < f1 && p.op === 'hoist') A.grappleDone++;
         const k = Math.floor(p.y / CELL) * g.map.W + Math.floor(p.x / CELL), tt = g.map.tiles[k];
         if (!p.vault && !p.rope && pointSolid(g.map, p.x, p.y, t => [T.HARD, T.REINF, T.TALL, T.VOID, T.SOFT].includes(t))) { const key = `${id} r${g.round} ${g.phase} ${p.op} in tile ${tt} at ${Math.round(p.x)},${Math.round(p.y)} (was ${p._lx},${p._ly})`; if (!A.inWall.includes(key)) A.inWall.push(key); }
@@ -73,7 +74,8 @@ console.log('\nrefusals (deny):'); for (const [k, v] of top(A.denies)) console.l
 console.log('\nnew operators: rounds / kills / deaths'); for (const op of [...NEW_OPS.atk, ...NEW_OPS.def]) console.log(`  ${op.padEnd(9)} ${A.opRounds[op] || 0} / ${A.opKills[op] || 0} / ${A.opDeaths[op] || 0}`);
 console.log('\nkills by new guns:'); for (const [k, v] of top(A.gunKills)) console.log(`  ${String(v).padStart(4)}  ${k}`);
 console.log('\nall kills by cause (top 25):'); for (const [k, v] of top(A.kills, 25)) console.log(`  ${String(v).padStart(4)}  ${k}`);
-console.log(`\nLOCKJAW traps: ${A.traps.size} set, ${[...A.traps.values()].filter(t => t.gone && t.open).length} went off (hatch open), ${[...A.traps.values()].filter(t => t.gone && !t.open).length} destroyed shut`);
+console.log(`\nLOCKJAW traps: ${A.traps.size} set, ${[...A.traps.values()].filter(t => t.gone && t.open).length} went off (hatch open), ${[...A.traps.values()].filter(t => t.gone && !t.open && !t.end).length} destroyed shut, the rest still waiting at the round's end`);
+console.log('falls by side / phase:', JSON.stringify(A.fallBy));
 console.log(`\nfloor holes blown: ${A.floorHoles}, peepholes: ${A.peeps}, HOIST climbs up: ${A.grappleDone}, falls through holes: ${A.holeFalls}`);
 console.log('\nteamkills:'); for (const [k, v] of top(A.tk, 20)) console.log(`  ${String(v).padStart(4)}  ${k}`);
 console.log(`\nstuck (${A.stuck.length}):`); for (const s of A.stuck.slice(0, 25)) console.log('  ' + s);
