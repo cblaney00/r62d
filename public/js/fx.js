@@ -4,9 +4,9 @@ const MAX = 1400;
 export const TRAIL_LIFE = 0.45;
 export function drawTrail(ctx, x, y, x2, y2, k) { // k: 1 fresh → 0 gone
   const g = ctx.createLinearGradient(x, y, x2, y2), a = k * k;
-  g.addColorStop(0, `rgba(255,214,140,${0.12 * a})`); g.addColorStop(0.5, `rgba(255,224,160,${0.45 * a})`); g.addColorStop(1, `rgba(255,240,200,${0.8 * a})`);
-  ctx.lineCap = 'round'; ctx.strokeStyle = `rgba(255,200,120,${0.13 * a})`; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
-  ctx.strokeStyle = g; ctx.lineWidth = 0.6 + 0.5 * k; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke(); ctx.lineCap = 'butt';
+  g.addColorStop(0, `rgba(255,214,140,${0.05 * a})`); g.addColorStop(0.5, `rgba(255,224,160,${0.22 * a})`); g.addColorStop(1, `rgba(255,240,200,${0.42 * a})`); // he asked: fainter, noticeable but not gigantic
+  ctx.lineCap = 'round'; ctx.strokeStyle = `rgba(255,200,120,${0.05 * a})`; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.strokeStyle = g; ctx.lineWidth = 0.4 + 0.2 * k; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke(); ctx.lineCap = 'butt';
 }
 export class FX {
   constructor() { this.parts = []; this.tracers = []; this.lights = []; this.rings = []; this.shake = 0; this.quality = 1; }
