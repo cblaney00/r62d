@@ -133,8 +133,8 @@ export const OPERATORS = {
   talon:   { team: 'atk', name: 'TALON',   role: 'Disruptor',     armor: 3, primary: 'sabre',      secondary: 'p10',
              ability: { id: 'emp', name: 'EMP Grenade', count: 3, desc: 'Throw an EMP that sticks where it hits. In a circle about a metre wide — right through the wall it is on — it destroys every enemy gadget, blinds cameras for 20 seconds, and fries the skill and gadget of any defender caught in it for 8 seconds.' },
              gadget: 'breach', gadgetCount: 2, color: '#a46ad6', helmet: '#4a5164', look: 'goggles' },
-  bulwark: { team: 'atk', name: 'BULWARK', role: 'Shield',        armor: 1, primary: 'p10',     secondary: null,
-             ability: { id: 'brace', name: 'Ballistic Shield', count: 0, desc: 'Shield up: bullets cannot get through the front, but you cannot shoot; melee is a shield bash that staggers (a miss leaves you open). Press to put the shield on your back and draw your pistol (takes a moment); it then guards your back.' },
+  bulwark: { team: 'atk', name: 'BULWARK', role: 'Shield',        armor: 1, primary: 'k4',      secondary: null,
+             ability: { id: 'brace', name: 'Ballistic Shield', count: 0, desc: 'Shield up: bullets cannot get through the front, but you cannot shoot; melee is a shield bash that staggers (a miss leaves you open). Press to put the shield on your back and bring up your K4 Carbine (takes a moment); it then guards your back.' },
              gadget: 'stun', gadgetCount: 2, color: '#d84a4a', helmet: '#46484c', look: 'visor' },
   rivet   : { team: 'atk', name: 'RIVET', role: 'Hard Breacher', armor: 2, primary: 'k4', secondary: 'p10',
              ability: {id: "lance",name: "Thermal Lance",count: 0,battery: 14,desc: "Hold facing any wall — even concrete, reinforced walls and steel panels — to burn a small hole you can see and shoot through; keep carving to widen it until the block falls out. Quiet, but the glow gives you away."},
@@ -326,7 +326,7 @@ export const LOADOUTS = {
   kestrel: { primaries: ['longbow', 'k4', 'pike', 'saker'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['frag', 'claymore'] },
   hammer:  { primaries: ['tusk', 'javelin', 'ferret', 'ram'], secondaries: ['p10', 'stub', 'hatchet'], gadgets: ['claymore', 'frag'] },
   talon:   { primaries: ['sabre', 'verdict', 'trident', 'heron'], secondaries: ['p10', 'stub', 'needle'], gadgets: ['breach', 'stun'] },
-  bulwark: { primaries: ['p10', 'bison', 'needle'], secondaries: [], gadgets: ['stun', 'smoke'] }, // one hand on the shield: pistols only
+  bulwark: { primaries: ['k4'], secondaries: [], gadgets: ['stun', 'smoke'] }, // he asked (2026-11-10): an automatic assault rifle, one choice only (was pistols: p10, bison, needle)
   rivet:   { primaries: ['k4', 'sabre', 'quill', 'longbow'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['stun', 'smoke'] },
   haze:    { primaries: ['verdict', 'javelin', 'trident', 'heron'], secondaries: ['p10', 'bison', 'needle'], gadgets: ['breach', 'frag'] },
   glint:   { primaries: ['javelin', 'longbow', 'heron'], secondaries: ['p10', 'bison', 'whisper'], gadgets: ['frag', 'claymore'] },

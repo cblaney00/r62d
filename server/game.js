@@ -700,7 +700,7 @@ export class Game {
 
     // held abilities
     const op = OPERATORS[p.op];
-    if (op.ability.id === 'brace') { // shield up (can't shoot) or pistol out (shield on the back); Q switches, which takes a moment
+    if (op.ability.id === 'brace') { // shield up (can't shoot) or rifle out (shield on the back); Q switches, which takes a moment
       if (p.shieldMode === undefined) p.shieldMode = 'shield';
       if (inp.ability && !prev.ability && p.ctrl === 'body' && !p.downed && !(p.switchUntil > this.time)) { p.switchUntil = this.time + 0.6; p.shieldMode = p.shieldMode === 'shield' ? 'gun' : 'shield'; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); }
       p.bracing = p.shieldMode === 'shield' && !(p.switchUntil > this.time);
