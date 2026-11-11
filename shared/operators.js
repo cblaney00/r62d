@@ -218,7 +218,7 @@ export const OPERATORS = {
              ability: { id: 'drill', name: 'Floor Drill', count: 3, desc: 'Drill a small peephole through the floor (crouched) or the ceiling (standing). It takes 3 seconds; then your team can look and shoot through it to the floor below or above. Nobody fits through it.' },
              gadget: 'breach', gadgetCount: 2, color: '#c8a050', helmet: '#4a4232', look: 'helmet' },
   hoist: { team: 'atk', name: 'HOIST', role: 'Grapple Entry', armor: 3, primary: 'ferret', secondary: 'p10',
-             ability: { id: 'grapple', name: 'Grapple Hook', count: 3, desc: 'Fire a grapple and climb: up through an open hatch above you (1.6 s), or from outside onto the roof right above the wall you face (3 s). You can\'t shoot while climbing.' },
+             ability: { id: 'grapple', name: 'Grapple Hook', count: 3, desc: 'Fire a grapple and climb: up through an open hatch above you (1.2 s), or from outside onto the roof right above the wall you face (2.2 s). You can\'t shoot while climbing.' },
              gadget: 'stun', gadgetCount: 2, color: '#5aa0d8', helmet: '#2e3e4e', look: 'goggles' },
   // ---------- Defence ----------
   lockjaw: { team: 'def', name: 'LOCKJAW', role: 'Hatch Trapper', armor: 2, primary: 'hedge', secondary: 'couplet',

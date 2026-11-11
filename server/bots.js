@@ -2475,6 +2475,7 @@ function proAct(game, p, inp, dt, team) {
     }
     if (!ai.utilDone) { // utility in first
       ai.utilDone = true; const tg = eff(st, j, 'target'), abId = OPERATORS[p.op].ability.id;
+      if (abId === 'sonar' && p.abilityCount > 0) { aimAt(p, tg.x, tg.y); game.event(p, { k: 'ability' }); } // GLINT: a pulse into the room before the push (the pros never threw it: 37% of rounds won)
       if (j.util === 'stun' && p.gadget === 'stun' && p.gadgetCount > 0) { aimAt(p, tg.x, tg.y); game.event(p, { k: 'gadget' }); talk(game, p, 'stun', {}, 'util'); }
       if (j.util === 'smoke') { aimAt(p, tg.x, tg.y); talk(game, p, 'smoke', {}, 'util'); if (abId === 'barrage' && p.abilityCount > 0) game.event(p, { k: 'ability' }); else if (p.gadget === 'smoke' && p.gadgetCount > 0) game.event(p, { k: 'gadget' }); }
     }

@@ -21,7 +21,8 @@ const r2 = v => Math.round(v * 100) / 100;
 // everyday bots: their own names, never a pro's (he asked) or a gun's
 const BOT_NAMES = ['Dusty', 'Pickles', 'Gerald', 'Noodle', 'Biscuit', 'Lenny', 'Toast', 'Wobbles', 'Mittens', 'Chonk', 'Sprout', 'Tumbleweed'];
 const HTRAP_R = 2.5 * PX_PER_M;
-const DRILL_T = 3, GRAPPLE_T = 1.6, GRAPPLE_ROOF = 3, GRAPPLE_REACH = 2.2 * PX_PER_M, DROP_T = 2; // GIMLET's drill, HOIST's climbs, DEADFALL's fuse (s)
+// HOIST's climbs were 1.6 / 3 s until Ball Knowledge 2026-11-10 (39% of rounds won)
+const DRILL_T = 3, GRAPPLE_T = 1.2, GRAPPLE_ROOF = 2.2, GRAPPLE_REACH = 2.2 * PX_PER_M, DROP_T = 2; // GIMLET's drill, HOIST's climbs, DEADFALL's fuse (s)
 const SPRINT_RAISE = 0.3, SPRINT_LOUD = 520; // seconds to get the gun back up after a sprint; how far sprinting steps carry (a jog is 320)
 const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, sprint: 0, sa: 0, crouch: 0, prone: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0 };
 const JAM_R = 90;
