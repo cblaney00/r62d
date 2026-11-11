@@ -77,3 +77,5 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
   skill (`ATK_SKILL_BONUS`), RIVET battery 18, FERRO swing 2 s, BULWARK bash stagger 1 s. Measured with trained pros: 41.7%
   attack (408 rounds), the same as before. Skills decide few pro rounds (skill kills are rare in practice); it should matter
   more for people, who use their skills more.
+- BULWARK: K4 Carbine as his only main gun (he asked; was pistols). Trained pros: attack 39.1% (402 rounds; same as before
+  within luck). BULWARK himself 43% won, K/D 1.06 over 47 rounds (was 41%, K/D 0.69 in practice).

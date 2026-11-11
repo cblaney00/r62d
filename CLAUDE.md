@@ -131,6 +131,8 @@ His wishes so far:
   - Breakable floors (all but the roof and floor 0): shared/map.js `cellBelow`/`floorSpot`/`addHatch` make a 2x2 dynamic hatch (`dyn`, `map.dyn` → snapshot `dh` → client `syncDyn`); server `blowFloor` (explode `floor: true`: breach charge set on the floor via `floorCharge`, nitro, cutter, drop charge), never under your own feet. `node tests/floors.js`.
   - Up-and-down operators: GIMLET `drill` (peephole = hatch with `peep: true`, `addPeep`/`cellAbove`/`peepOk`, `hatchOpen`, `PEEP_HALF`; `map.peeps` → `pp` → `syncPeeps`; drawn by `drawPeeps`), HOIST `grapple` (`grappleTarget`, `p.grapple`, `tickGrapple`), LOCKJAW `htrap` (ent `rig` = hatch id, not `hatch`: breakHatch clears ents with `hatch`), DEADFALL `dropcharge` (ent `dropch`). `node tests/vertical.js [map]`.
 
+- Ball Knowledge balance (he asked 2026-11-10): Patch Watch calls an operator broken over 60% and really bad under 40%, only after 500 rounds (`BROKEN`/`REALLY_BAD`/`SURE` in knowledge.js); 40-60% is fine (bans exist, a meta is OK). Changes so far: NAIL 4 piercing rounds at 55%, CROW lunge 1 s / 5 m, HOIST climbs 1.2 / 2.2 s, pros throw GLINT's sonar, every limited attacker skill +1 use (`ATK_SKILL_BONUS` in shared/operators.js), RIVET battery 18, FERRO swing 2 s, BULWARK bash 1 s and a K4 Carbine as his only gun. Trained pros still win ~40% on attack (untrained ~50%): see docs/balance.md.
+
 ## How it is built
 
 - **Language:** JavaScript. Node 22 server (no npm packages at all — a tiny hand-written
