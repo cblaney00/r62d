@@ -50,6 +50,7 @@ const BAN_GAP = 2.6; // seconds between Esports TV bans, long enough to read eac
 const SCAN_BEAT = 0.8, SCAN_BLUR = 1.5 * PX_PER_M; // WRAITH's scanner: a new blip per heartbeat, this far off the real spot at most
 // aimed in through the sniper scope (the Pike's and Saker's one-shot body kill needs it, he asked)
 const REINF_HALF = 1;
+const REINF_EACH = 7; // wall reinforcements a defending team gets each round (was 10; he chose fewer, 2026-11-10: attack won only 43-46% of pro rounds)
 const scopedIn = p => { const g = p && p.guns && p.guns[p.slot]; return !!(g && g.att && g.att.sight === 'sniper' && (p.adsT || 0) >= 0.6); };
 export class Game {
   // opts.tut: a private tutorial match for one player (see tutAction), with its timers held
@@ -79,7 +80,7 @@ export class Game {
     this.mapVersion = 0;
     this.site = 0; this.siteRevealed = false; this.planted = null;
     this.spots = { atk: new Map(), def: new Map() };
-    this.reinforce = 10;
+    this.reinforce = REINF_EACH;
     this.botLevel = DEFAULT_LEVEL; // bot skill = a rank (BOT_LEVELS), PRO_LEVEL = the pro teams
     this.winner = null; this.reason = '';
     this.revealCheck = 0;
@@ -333,7 +334,7 @@ export class Game {
     this.site = this.tut ? 0 : open[Math.floor(Math.random() * open.length)];
     this.siteRevealed = false;
     this.spots = { atk: new Map(), def: new Map() };
-    this.reinforce = 10;
+    this.reinforce = REINF_EACH;
     this.spawnName = this.map.atkSpawns[Math.floor(Math.random() * this.map.atkSpawns.length)].name;
     this.spawnPlan = this.makeSpawnPlan(); this.insideCache = null;
     for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; p.locked = false; p.spawn = null; p.staged = false; p.job = null; }

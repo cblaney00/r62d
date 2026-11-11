@@ -45,14 +45,14 @@ function tipsFor(op, s) {
   return t;
 }
 // operators, skills and plays that look broken (or useless), from enough rounds to mean something
-const BROKEN = 0.6, REALLY_BAD = 0.4;
+const BROKEN = 0.6, REALLY_BAD = 0.4, SURE = 500; // SURE: rounds before a verdict (he chose: with fewer, luck moves a win rate about 3%)
 function patchWatch() {
   const d = S.data || {}, out = [];
   for (const op of Object.keys(OPERATORS)) {
     const s = statsOf(op), o = OPERATORS[op];
     // he set the band (2026-11-10): 40-60% is fine (a meta and strong picks are OK, bans exist); above 60% is broken, below 40% really bad
-    if (s.r >= 30 && s.w / s.r > BROKEN) out.push({ hot: 1, sc: s.w / s.r, txt: `<b>${o.name}</b> wins ${pct(s.w, s.r)} of ${s.r} rounds: <b>broken</b> (over ${Math.round(BROKEN * 100)}%).` });
-    if (s.r >= 30 && s.w / s.r < REALLY_BAD) out.push({ hot: 0, sc: 1 - s.w / s.r, txt: `<b>${o.name}</b> wins only ${pct(s.w, s.r)} of ${s.r} rounds: <b>really bad</b> (under ${Math.round(REALLY_BAD * 100)}%).` });
+    if (s.r >= SURE && s.w / s.r > BROKEN) out.push({ hot: 1, sc: s.w / s.r, txt: `<b>${o.name}</b> wins ${pct(s.w, s.r)} of ${s.r} rounds: <b>broken</b> (over ${Math.round(BROKEN * 100)}%).` });
+    if (s.r >= SURE && s.w / s.r < REALLY_BAD) out.push({ hot: 0, sc: 1 - s.w / s.r, txt: `<b>${o.name}</b> wins only ${pct(s.w, s.r)} of ${s.r} rounds: <b>really bad</b> (under ${Math.round(REALLY_BAD * 100)}%).` });
     if (s.detail && s.k >= 15 && s.sk / s.k > 0.5) out.push({ hot: 1, sc: s.sk / s.k, txt: `<b>${o.name}</b>'s ${esc(o.ability.name)} (or gadget) gets ${pct(s.sk, s.k)} of their kills: check it.` });
   }
   for (const [k, r] of Object.entries(d.plans || {})) {
