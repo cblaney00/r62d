@@ -161,7 +161,7 @@ function trainCheck(force = false) {
   for (let i = 0; i < n; i++) { // the rounds shared out between the threads
     const w = new Worker(new URL('./train-worker.js', import.meta.url), { resourceLimits: { maxOldGenerationSizeMb: 512 }, workerData: { minutes: Number(process.env.R62D_TRAIN_MIN) || 60, rounds: Math.ceil((left - i) / n), duty: 1 } });
     me.list.push(w);
-    w.on('message', m => { if (trainer !== me) return; if (m.done) { if (--me.live === 0) { training.at = Date.now(); console.log(`Pro teams trained on version ${PLAY_VERSION}: ${training.rounds} practice rounds so far.`); } } else { addResults(m); me.rounds += m.rounds || 0; } saveTraining(); });
+    w.on('message', m => { if (trainer !== me) return; if (m.crash) { console.log('A practice match crashed on ' + m.map + ' (skipped):\n' + m.crash); return; } if (m.done) { if (--me.live === 0) { training.at = Date.now(); console.log(`Pro teams trained on version ${PLAY_VERSION}: ${training.rounds} practice rounds so far.`); } } else { addResults(m); me.rounds += m.rounds || 0; } saveTraining(); });
     w.on('error', e => console.log('Pro training stopped:', e.message));
     w.on('exit', () => { w.done = true; if (trainer === me && me.list.every(x => x.done)) trainer = null; });
   }

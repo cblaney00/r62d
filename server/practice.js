@@ -10,7 +10,7 @@ newVersion(playVersion());
 let got = 0, live = threads; const t0 = Date.now();
 for (let i = 0; i < threads; i++) {
   const w = new Worker(new URL('./train-worker.js', import.meta.url), { resourceLimits: { maxOldGenerationSizeMb: 512 }, workerData: { minutes: 120, rounds: Math.ceil((total - i) / threads), duty: 1 } });
-  w.on('message', m => { if (m.done) { if (--live === 0) { training.at = Date.now(); saveTraining(); console.log(`done: ${got} rounds in ${Math.round((Date.now() - t0) / 1000)} s, ${training.verRounds} on this version`); } return; }
+  w.on('message', m => { if (m.crash) { console.log('a practice match crashed on ' + m.map + ' (skipped):\n' + m.crash); return; } if (m.done) { if (--live === 0) { training.at = Date.now(); saveTraining(); console.log(`done: ${got} rounds in ${Math.round((Date.now() - t0) / 1000)} s, ${training.verRounds} on this version`); } return; }
     addResults(m); got += m.rounds || 0; if (got % 50 === 0) { saveTraining(); console.log(`${got} / ${total} rounds`); } });
-  w.on('error', e => console.log('practice thread stopped:', e.message));
+  w.on('error', e => console.log('practice thread stopped:', e.stack || e.message));
 }

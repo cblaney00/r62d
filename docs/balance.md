@@ -63,3 +63,13 @@ kicked too hard for bots: its spray kick 1.4→1.2.
 Before: Bastion K/r 0.79 D/r 0.55 (gun 0.41/0.77) — too strong: plant 1.45→1.3, arc 1.0→0.95. Aegis win 42% vs gun 54%:
 speed 0.74→0.78, aside 0.5→0.42. Thorn win 45% vs 56%: arc 0.86→0.92, recharge 2.2→1.6 s, speed 0.88→0.9, aside 0.25→0.22.
 Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glass fair. Ram: too few rounds to judge (Hammer rarely picked).
+
+## Ball Knowledge pass (2026-11-10/11, he set the band: 40-60% is fine, >60% broken, <40% really bad, verdict after 500 rounds)
+- NAIL 39%: 4 piercing rounds (was 3) at 55% (was 40%). CROW 40%: lunge ready after 1 s (was 1.5), reaches 5 m (was 4).
+  HOIST 39%: climbs 1.2 s hatch / 2.2 s roof (was 1.6 / 3). Pros now throw GLINT's sonar before the push (they never did).
+- Reinforcements 10 → 7 a round (he chose, to help attack). Measured side by side (`tests/probe.js 7 7 <map> --json` on all maps,
+  `R62D_REINF=10|7`, ~200 rounds each, ±3.5% luck): untrained pros 51% vs 48% attack, trained pros 41% vs 42%. So it makes
+  little difference.
+- The side gap comes from practice: untrained pros ~50% attack; trained 41%; trained without learned plans/site choice 47%;
+  without learned operator/gun picks 45%. What the pros learn helps defence more than attack, both ways.
+  Test with trained pros: `R62D_TEST_TRAINING=<copy of pro-training.json>` (tests/_tmpdata.js copies it in).

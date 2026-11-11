@@ -28,7 +28,8 @@ while (Date.now() < until && left > 0) {
   let t = 0, last = null, rs = null; // rs: this round's per-operator numbers (for BALL KNOWLEDGE)
   const GUNS = new Set(Object.values(WEAPONS).map(w => w.name).concat('Melee'));
   while (t < 60 * 30 && Date.now() < until && left > 0) {
-    g.tick(dt); t += dt; await breather();
+    try { g.tick(dt); } catch (e) { parentPort.postMessage({ crash: e.stack || String(e), map: g.map && g.map.id }); break; } // a bug in one match drops that match, not the whole practice
+    t += dt; await breather();
     if (rs) for (const e of g.events) if (e.e === 'kill' && e.killer && e.killer !== e.victim) {
       const k = g.players.get(e.killer), v = g.players.get(e.victim); if (!k || !v || !k.op || g.side(k) === g.side(v)) continue;
       const a = rs[k.id], b = rs[v.id]; if (a) { a.dist += Math.hypot(k.x - v.x, k.y - v.y); if (!rs.first && b) b.fd++; a.k++; if (a.g2 && e.w === a.g2n) a.k2++; if (!GUNS.has(e.w)) a.sk++; if (e.hs) a.hs++; if (!rs.first) { rs.first = 1; a.fk++; } } if (b) b.d++;
