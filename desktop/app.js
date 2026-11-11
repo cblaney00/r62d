@@ -89,6 +89,11 @@ export async function start({ app, win, dir }) {
   // JOIN one game (from the list, or a typed address)
   ipcMain.handle('join', async (_e, addr) => {
     let url;
+    if (!/[.:]/.test(addr)) { // a HOST code (shared/joincode.js) rather than an address
+      const { readCode } = await import(pathToFileURL(path.join(dir, 'shared', 'joincode.js')).href);
+      const r = readCode(addr); if (!r) return { error: 'That code isn\'t right. Check each letter with your friend.' };
+      addr = r.ip + ':' + r.port;
+    }
     try {
       url = new URL(/^https?:\/\//.test(addr) ? addr : 'http://' + addr);
       if (!url.port) url.port = String(PORT);

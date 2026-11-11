@@ -30,50 +30,48 @@
   </div>
 
   <!-- Main menu / lobby -->
-  <div id="lobby" class="screen hidden">
-    <header class="mtop">
-      <div class="mlogo">R62D<small>QUICK MATCH</small></div>
+  <div id="lobby" class="screen hidden home">
+    <div class="mshade"></div>
+    <!-- the home screen (he asked: like Risk of Rain 2's): big title and big choices over the drifting map; each opens a full page -->
+    <div id="home">
+      <div class="hLogo"><div class="hMark"><span>R</span><span>6</span><span>2</span><span>D</span></div><div class="hTag">TACTICAL BREACH · 5 VS 5</div></div>
+      <nav class="hnav" id="mnav">
+        <button data-tab="play"><b>QUICK MATCH</b><small>Five against five with friends and bots · host a game here</small></button>
+        <button data-tab="join"><b>JOIN A GAME</b><small>Type the code a friend is hosting</small></button>
+        <button data-tab="free"><b>FREE PLAY</b><small>Any map, any operator, no clock</small></button>
+        <button data-tab="tutorial"><b>TUTORIAL</b><small>Learn the round in four minutes</small></button>
+        <button data-tab="tv"><b>ESPORTS TV</b><small>Watch the pro teams play</small></button>
+        <button data-tab="intel"><b>INTEL</b><small>Operators, armory, maps, playbooks and stats</small></button>
+        <div class="hsmall"><button data-tab="profile">PROFILE</button><button data-tab="settings">SETTINGS</button><button data-tab="quit" class="quitNav">QUIT</button></div>
+      </nav>
+      <div id="join" class="joinCard">
+        <h2>WHO ARE YOU?</h2>
+        <p class="hint">Your name is how your friends will see you. Your stats and loadouts are saved to it.</p>
+        <div class="row"><input id="name" maxlength="16" placeholder="Your name" autocomplete="off"><button id="joinBtn" class="primary">ENTER</button></div>
+      </div>
+      <footer class="mfoot"><span class="tipLabel">TIP</span><span id="tip"></span><span class="hVer" id="homeVer"></span></footer>
+    </div>
+    <!-- every choice is its own full page: BACK (or Esc) returns home -->
+    <header class="mtop"><button id="backBtn" class="back">‹ BACK</button><div class="ptitle"><small id="pageKick"></small><b id="pageTitle"></b></div>
       <div class="pcard hidden" id="pcard"><div class="lv" id="pcLevel">1</div><div><div class="pn" id="pcName"></div><div class="xpbar"><i id="pcXp"></i></div><div class="pxp" id="pcXpText"></div></div></div>
     </header>
-    <nav class="mnav" id="mnav">
-      <div class="ngrp">PLAY</div>
-      <button data-tab="play" class="on">PLAY</button>
-      <button data-tab="tutorial">TUTORIAL</button>
-      <button data-tab="free">FREE PLAY</button>
-      <div class="ngrp">WATCH</div>
-      <button data-tab="tv">ESPORTS TV</button>
-      <div class="ngrp">LEARN</div>
-      <button data-tab="ops">OPERATORS</button>
-      <button data-tab="armory">ARMORY</button>
-      <button data-tab="maps">MAP KNOWLEDGE</button>
-      <button data-tab="playbook">PLAYBOOK</button>
-      <button data-tab="knowledge">BALL KNOWLEDGE</button>
-      <div class="ngrp">YOU</div>
-      <button data-tab="profile">PROFILE</button>
-      <button data-tab="settings">SETTINGS</button>
-      <button data-tab="controls">CONTROLS</button>
-      <button data-tab="quit" class="quitNav">QUIT</button>
-      <i class="ind" id="navInd"></i>
-    </nav>
     <main class="mbody">
-      <section class="tab on" id="tab-play">
-        <div id="join" class="joinCard">
-          <h2>WHO ARE YOU?</h2>
-          <p class="hint">Your name is how your friends will see you. Your stats and loadouts are saved to it on this computer.</p>
-          <div class="row"><input id="name" maxlength="16" placeholder="Your name" autocomplete="off"><button id="joinBtn" class="primary">ENTER</button></div>
-        </div>
+      <section class="tab" id="tab-play">
         <div id="room" class="hidden">
-          <div class="roomHead"><div><h2>LOBBY</h2><div class="hint" id="lobbyHint">First to 3 rounds · Sides swap every round</div><div class="hint addr" id="joinAddr"></div></div>
-            <div class="roomBtns"><button id="rankedBtn" class="big" title="Bots play at your lobby's average rank; winning raises your rank, losing lowers it">RANKED: OFF</button><button id="lanBtn" class="big">OPEN TO LAN</button><button id="startBtn" class="primary big">START MATCH</button></div></div>
+          <div class="roomHead"><div><div class="hint" id="lobbyHint">First to 3 rounds · Sides swap every round</div><div class="hint addr" id="joinAddr"></div></div>
+            <button id="lanBtn" class="hostBtn"><b>HOST</b><small id="hostCode">Let friends join</small></button></div>
           <div id="mapPick"></div>
           <div class="squads">
             <div class="squad" id="sq0"><h3>TEAM ALPHA</h3><ul></ul><div class="row"><button data-bot="0">+ Bot</button><button data-unbot="0">− Bot</button></div></div>
             <div class="vs">VS</div>
             <div class="squad" id="sq1"><h3>TEAM BRAVO</h3><ul></ul><div class="row"><button data-bot="1">+ Bot</button><button data-unbot="1">− Bot</button></div></div>
           </div>
-          <div class="row center botLv"><span class="hint">BOT RANK</span><div class="seg" id="botLevel"><button data-lv="0">Copper</button><button data-lv="1">Bronze</button><button data-lv="2">Silver</button><button data-lv="3">Gold</button><button data-lv="4">Platinum</button><button data-lv="5">Diamond</button><button data-lv="6">Champion</button><button data-lv="7" title="The pro teams: Northwind and Ironclad Collective">Pro</button></div></div>
-          <div class="row center"><button id="switchBtn">Switch team</button><button id="fillBtn">Fill empty slots with bots</button>
-            <button id="lobbyOpsBtn" class="hidden">Operators</button><button id="lobbyProfBtn" class="hidden">Profile</button></div>
+          <div class="roomFoot"><div class="rfLeft">
+          <div class="row botLv"><span class="hint">BOT RANK</span><div class="seg" id="botLevel"><button data-lv="0">Copper</button><button data-lv="1">Bronze</button><button data-lv="2">Silver</button><button data-lv="3">Gold</button><button data-lv="4">Platinum</button><button data-lv="5">Diamond</button><button data-lv="6">Champion</button><button data-lv="7" title="The pro teams: Northwind and Ironclad Collective">Pro</button></div></div>
+          <div class="row"><button id="switchBtn">Switch team</button><button id="fillBtn">Fill empty slots with bots</button>
+            <button id="rankedBtn" title="Bots play at your lobby's average rank; winning raises your rank, losing lowers it">RANKED: OFF</button>
+            <button id="lobbyOpsBtn" class="hidden">Operators</button><button id="lobbyProfBtn" class="hidden">Profile</button></div></div>
+          <button id="startBtn" class="primary startBig">START MATCH</button></div>
         </div>
       </section>
       <section class="tab" id="tab-tv">
@@ -111,7 +109,7 @@
             <div class="tutCard"><h3>HOW TO PLAY</h3><p>Rounds and roles, droning and pinging, moving and shooting, breaking in, rappelling and planting the defuser; then reinforcing, barricading, cameras and holding the objective.</p><button class="primary" data-lesson="all">START TUTORIAL</button></div>
           </div>
           <div class="tutInfo">
-            <div><h4>THE ROUND</h4><p><b>Operator select</b> — pick who you play; defenders choose the objective. <b>Preparation</b> (40 s) — attackers drone, defenders fortify. <b>Action</b> (3 min) — attackers break in and plant, defenders stop them. First to 3 rounds; sides swap every round.</p></div>
+            <div><h4>THE ROUND</h4><p><b>Operator select</b> — pick who you play; defenders choose the objective. <b>Preparation</b> (30 s) — attackers drone, defenders fortify. <b>Action</b> (2 min 40 s) — attackers break in and plant, defenders stop them. First to 3 rounds; sides swap every round.</p></div>
             <div><h4>ROLES</h4><p>Breachers open walls, intel finds enemies, support clears the way, entry goes in first, flankers come from behind. On defence anchors hold the objective, roamers slow the attack, trappers and intel make every door dangerous.</p></div>
             <div><h4>INFORMATION IS KEY</h4><p>Most rounds are won before the first shot. Drone before you walk in, check cameras before you peek, listen for footsteps and breaking walls, and tell your team everything you find.</p></div>
             <div><h4>PING ANYTHING</h4><p>Press your ping key (<kbd>T</kbd> unless you changed it) or middle-click (a click in a drone or camera) on an enemy, camera, trap, door, window, wall, drone hole, the objective or any spot. Your team sees a named marker and a line in team chat.</p></div>
@@ -119,11 +117,28 @@
         </div>
       </section>
       <section class="tab" id="tab-controls">
-        <div class="controls"><h4>CONTROLS</h4><div class="grid" id="ctlGrid"></div>
+        <div class="controls"><div class="grid" id="ctlGrid"></div>
           <div class="row center"><button id="lobbySetBtn">Change keys</button></div></div>
       </section>
+      <section class="tab" id="tab-join">
+        <div class="joinPage">
+          <p class="hint">Your friend clicks <b>HOST</b> in Quick Match and reads you their code. Type it here.</p>
+          <div class="codeRow"><input id="codeIn" maxlength="24" placeholder="CODE" autocomplete="off" spellcheck="false"><button id="codeGo" class="primary big">JOIN</button></div>
+          <div id="codeMsg" class="hint"></div>
+          <p class="hint small">Codes work on the homelab VPN and on your home network: both of you need to be on the same one. You can also type an address like 10.10.0.5.</p>
+        </div>
+      </section>
+      <section class="tab" id="tab-intel">
+        <div class="intelGrid">
+          <button class="icard" data-tab="ops" style="--ic:#3aa0ff"><i>OP</i><b>OPERATORS</b><small>Every operator, their skill and their loadouts. Change guns and attachments here.</small></button>
+          <button class="icard" data-tab="armory" style="--ic:#ff7a2a"><i>⌖</i><b>ARMORY</b><small>The shooting range: try every gun, sight and attachment.</small></button>
+          <button class="icard" data-tab="maps" style="--ic:#5fd08a"><i>▦</i><b>MAP KNOWLEDGE</b><small>Bomb sites, spawns, cameras, hatches and soft walls on every map.</small></button>
+          <button class="icard" data-tab="playbook" style="--ic:#f2c14e"><i>✎</i><b>PLAYBOOK</b><small>The pro teams, their players and their plays.</small></button>
+          <button class="icard" data-tab="knowledge" style="--ic:#c58bff"><i>%</i><b>BALL KNOWLEDGE</b><small>Which operators win, from the pros' practice.</small></button>
+          <button class="icard" data-tab="controls" style="--ic:#93a0ad"><i>⌨</i><b>CONTROLS</b><small>Every key at a glance.</small></button>
+        </div>
+      </section>
     </main>
-    <footer class="mfoot"><span class="tipLabel">TIP</span><span id="tip"></span></footer>
   </div>
 
   <!-- Operator select -->
@@ -225,9 +240,11 @@
   <div id="clickIn" class="hidden">CLICK TO TAKE CONTROL</div>
   <div id="pause" class="overlay hidden"><div class="menu"><h2>PAUSED</h2><p class="hint">The match keeps running for everyone else.</p>
     <button id="pResume" class="primary">Resume</button><button id="pOps">Operators &amp; loadouts</button><button id="pProf">Profile &amp; match history</button>
-    <button id="pSet">Settings &amp; keys</button><button id="pFs">Fullscreen / window</button><button id="pLan">Open to LAN</button><button id="pEnd">End match for everyone</button><button id="pQuit">Quit to desktop</button></div></div>
-  <div id="lanDlg" class="overlay hidden"><div class="menu lanMenu"><h2>OPEN TO LAN</h2>
-    <p class="hint">Your game is open to friends on the homelab VPN and to every phone and computer on your home network. On a phone, scan this with the camera, or type the address into the browser.</p>
+    <button id="pSet">Settings &amp; keys</button><button id="pFs">Fullscreen / window</button><button id="pLan">Host: invite friends</button><button id="pEnd">End match for everyone</button><button id="pQuit">Quit to desktop</button></div></div>
+  <div id="lanDlg" class="overlay hidden"><div class="menu lanMenu"><h2>HOSTING</h2>
+    <p class="hint">Read this code to your friends: they click <b>JOIN A GAME</b> and type it.</p>
+    <div id="lanCode" class="bigCode"></div>
+    <p class="hint">Or on a phone, scan this with the camera, or type the address into the browser.</p>
     <div class="lanBody"><canvas id="lanQr"></canvas><div><div id="lanUrl"></div><div id="lanOther"></div><div id="lanServer"></div></div></div>
     <button id="lanClose" class="primary">Done</button></div></div>
   <div id="quitDlg" class="overlay hidden"><div class="menu"><h2>QUIT?</h2><p class="hint">Close R62D and go back to the desktop.</p>

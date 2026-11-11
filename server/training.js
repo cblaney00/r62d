@@ -74,6 +74,6 @@ export const needsTraining = version => roundsLeft(version) > 0;
 const NOT_PLAY = new Set(['server.js', 'practice.js', 'training.js', 'train-worker.js', 'store.js', 'ws.js']);
 export function playVersion() {
   const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-  const h = crypto.createHash('sha1'), walk = d => { for (const f of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (f.name.endsWith('.js') && !(d.endsWith('server') && NOT_PLAY.has(f.name))) h.update(f.name).update(fs.readFileSync(p)); } };
+  const h = crypto.createHash('sha1'), walk = d => { for (const f of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (f.name.endsWith('.js') && !(d.endsWith('server') && NOT_PLAY.has(f.name)) && f.name !== 'joincode.js') h.update(f.name).update(fs.readFileSync(p)); } };
   try { for (const d of ['server', 'shared']) walk(path.join(ROOT, d)); return 'p' + h.digest('hex').slice(0, 7); } catch { return null; }
 }

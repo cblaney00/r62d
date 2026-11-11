@@ -14,6 +14,7 @@ import { Game } from './game.js';
 const perfLog = [];
 import { store, publicProfile } from './store.js';
 import { TICK_RATE, SNAP_RATE } from '../shared/constants.js';
+import { makeCode } from '../shared/joincode.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || 6262;
@@ -80,10 +81,11 @@ function api(req, res) {
     // VPN, then the home network (cable, then Wi-Fi). Virtual networks (containers, virtual machines) are left out.
     for (const [dev, list] of Object.entries(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal && !/^(docker|br-|veth|virbr|vboxnet|vmnet|lxc|podman|cni)/.test(dev)) {
       const homelab = dev === 'wg-homelab' || a.address.startsWith('10.10.0.'), vpn = homelab || /^(wg|tun|tap|tailscale|zt|nordlynx|proton|mullvad)/.test(dev), wifi = /^wl/.test(dev);
-      urls.push({ url: `http://${a.address}:${PORT}`, vpn, homelab, net: homelab ? 'homelab VPN' : vpn ? `VPN (${dev})` : wifi ? 'Wi-Fi' : 'cable' });
+      urls.push({ url: `http://${a.address}:${PORT}`, code: makeCode(a.address, PORT), vpn, homelab, net: homelab ? 'homelab VPN' : vpn ? `VPN (${dev})` : wifi ? 'Wi-Fi' : 'cable' });
     }
     const rank = u => (u.homelab ? 0 : u.vpn ? 1 : u.net === 'Wi-Fi' ? 3 : 2);
     urls.sort((a, b) => rank(a) - rank(b));
+    res.setHeader('Access-Control-Allow-Origin', '*'); // JOIN on a friend's copy checks this game is here before going to it
     return json(200, { urls, host: os.hostname(), version: VERSION, port: PORT, players: humans(), local: BIND === '127.0.0.1' });
   }
   if (u.pathname === '/api/perf') { // browsers report how smoothly they run (see perfRep in main.js)

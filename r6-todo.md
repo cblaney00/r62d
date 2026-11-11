@@ -6,9 +6,12 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-
+- [ ] a trackpad control set (one friend may only have a phone or a trackpad: give him the best chance with it), and double check the phone controls are as up to date as possible
 
 ## Done
+
+- [x] we need to overhaul the main menu, it feels outdated for the stage this game has gotten to, more full page screens, go ahead and make your own decisions, i think risk of rain 2 has a really good main menu screen if you want inspiration (DONE 2026-11-10: a home screen with a big title and big choices over the drifting map, each one a full page with BACK; INTEL page holds Operators, Armory, Map Knowledge, Playbook, Ball Knowledge and Controls; Quick Match page with a big START MATCH. Not yet seen by him)
+- [x] online should use HOST / JOIN, like my friends are used to (he chose: only the wording, still the VPN / home network, and a short code. DONE 2026-11-10: HOST shows a 5-letter code, JOIN A GAME takes it, in the browser and the Windows program. Not yet tried by him)
 
 - [x] more guns of each type, each one unique: better no gun than one that is a remake of another (he chose 2 per type. DONE: 14 guns, each with its own rule: Verdict, Tandem, Ferret, Auger, Quill, Hedge, Cyclone, Trestle, Ranger, Mammoth, Needle, Couplet, Whisper, Hatchet; tests/newguns.js. Not yet played by him)
 - [x] more characters that use the sniper rifle on attack (DONE: PERCH bipod sniper, MOSS ghillie sniper, OSPREY spotter sniper, NAIL piercing sniper, plus 19 of the attackers can now pick a marksman rifle. Not yet played by him. he chose all four: bipod sniper (lying down, no sway, faster bolt, barely moves), ghillie sniper (hides the scope glint for a while), spotter sniper (everyone seen through the scope is marked for the team for a few seconds), piercing sniper (a few rounds that go through a reinforced wall with much less damage). Also: most attackers should have a semi-automatic or bolt-action rifle to choose, not an overwhelming amount)

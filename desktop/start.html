@@ -57,23 +57,23 @@
     </div>
     <div class="card">
       <h2>HOST</h2>
-      <p>Start a game your friends can join, on your home network or on Lando's homelab. If Windows asks about the firewall, click <b>Allow</b>.</p>
+      <p>Start a game your friends can join, on your home network or on Lando's homelab: click HOST in the lobby to see your code. If Windows asks about the firewall, click <b>Allow</b>.</p>
       <button id="host">HOST</button>
     </div>
     <div class="card">
       <h2>JOIN</h2>
-      <p>Join a game: Lando's homelab first, or a friend who is hosting.</p>
+      <p>Type the code a friend is hosting, or pick a game found on Lando's homelab or your network.</p>
       <button class="blue" id="join">JOIN</button>
     </div>
   </div>
   <div id="msg"></div>
 </main>
 <div class="overlay hidden" id="pick"><div class="box">
-  <h2>CHOOSE A GAME</h2>
-  <p id="pickHint">More than one game is running. Pick one.</p>
+  <h2>JOIN A GAME</h2>
+  <p>Your friend's code:</p>
+  <div class="typed" id="typed"><input id="addr" placeholder="CODE (or an address)" spellcheck="false" style="text-transform:uppercase"><button class="blue" id="typedGo">JOIN</button></div>
+  <p id="pickHint"></p>
   <div id="games" style="display:flex;flex-direction:column;gap:8px"></div>
-  <a class="more" id="typeLink">TYPE AN ADDRESS INSTEAD</a>
-  <div class="typed hidden" id="typed" style="display:none"><input id="addr" placeholder="e.g. 192.168.1.20" spellcheck="false"><button class="blue" id="typedGo">JOIN</button></div>
   <button id="pickClose">BACK</button>
 </div></div>
 <footer><span id="ver"></span><a id="quit">QUIT</a></footer>
@@ -94,19 +94,17 @@
     busy(true); say('Looking for games…');
     const list = await A.find();
     busy(false);
-    if (list.length === 1) { say('Joining ' + list[0].name + '…'); return go('join', list[0].url); }
     say('');
-    $('pickHint').textContent = list.length ? 'More than one game is running. Pick one.'
-      : 'No games found. Lando\'s homelab needs the VPN switched on; a friend needs to click HOST first.';
+    $('pickHint').textContent = list.length ? 'Or pick a game that is running:'
+      : 'No other games found. Lando\'s homelab needs the VPN switched on.';
     $('games').innerHTML = list.map((g, i) => `<button class="game${g.homelab ? ' lab' : ''}" data-i="${i}"><b>${esc(g.name)}</b>
       <span>${g.players ? g.players + (g.players === 1 ? ' player' : ' players') + ' in the lobby' : 'Nobody in the lobby yet'}${g.version ? ' · version ' + esc(g.version) : ''}</span><i>JOIN</i></button>`).join('');
     for (const b of $('games').children) b.onclick = () => { $('pick').classList.add('hidden'); say('Joining ' + list[+b.dataset.i].name + '…'); go('join', list[+b.dataset.i].url); };
-    $('pick').classList.remove('hidden');
+    $('pick').classList.remove('hidden'); $('addr').focus();
   };
-  $('typeLink').onclick = () => { $('typed').style.display = 'flex'; $('typeLink').style.display = 'none'; $('addr').focus(); };
   const typedGo = async () => {
     const a = $('addr').value.trim(); if (!a) return;
-    $('pick').classList.add('hidden'); say('Looking for the game at ' + a + '…');
+    $('pick').classList.add('hidden'); say('Looking for the game…');
     if ((await go('join', a)).error) $('pick').classList.remove('hidden');
   };
   $('typedGo').onclick = typedGo; $('addr').onkeydown = e => { if (e.key === 'Enter') typedGo(); };

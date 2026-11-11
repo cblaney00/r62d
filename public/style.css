@@ -439,43 +439,92 @@ button.big { font-size: 22px; padding: 14px 34px; }
 #splash .tag { font: 600 20px var(--head); letter-spacing: 0.6em; color: var(--dim); animation: fadeIn 1s 0.8s both; }
 #splash .press { margin-top: 60px; font: 700 16px var(--head); letter-spacing: 0.4em; animation: fadeIn 0.6s 1.3s both, pulse 2s 1.9s infinite; }
 #splash.leaving { animation: fadeIn 0.5s reverse forwards; }
-
-/* main menu layout */
-#lobby { display: grid !important; grid-template-columns: 260px 1fr; grid-template-rows: auto 1fr auto; gap: 0; justify-content: stretch; align-items: stretch; padding: 0;
-  background: linear-gradient(90deg, rgba(5,7,10,0.94) 0%, rgba(5,7,10,0.72) 40%, rgba(5,7,10,0.5) 100%); animation: fadeIn 0.6s both; }
+/* main menu (he asked for an overhaul, Risk of Rain 2 style): home = big title + big choices over the drifting map;
+   each choice is a full page with BACK in its top bar (#lobby.home / #lobby.paged, setTab in main.js) */
+#lobby { display: flex !important; flex-direction: column; gap: 0; justify-content: stretch; align-items: stretch; padding: 0; background: none; animation: fadeIn 0.6s both; }
 #lobby.hidden { display: none !important; }
-.mtop { grid-column: 1 / 3; display: flex; justify-content: space-between; align-items: center; padding: 22px 36px; border-bottom: 1px solid var(--line); }
-.mlogo { font: 800 46px/1 var(--head); letter-spacing: 0.08em; } .mlogo small { margin-left: 14px; font: 600 14px var(--head); letter-spacing: 0.4em; color: var(--dim); vertical-align: middle; }
+.mshade { position: absolute; inset: 0; pointer-events: none; transition: background 0.4s;
+  background: linear-gradient(90deg, rgba(5,7,10,0.95) 0%, rgba(5,7,10,0.78) 32%, rgba(5,7,10,0.25) 70%, rgba(5,7,10,0.1) 100%), linear-gradient(0deg, rgba(5,7,10,0.9) 0%, transparent 28%); }
+#lobby.paged .mshade { background: linear-gradient(180deg, rgba(5,7,10,0.97) 0%, rgba(6,8,12,0.9) 30%, rgba(6,8,12,0.88) 100%); }
+#home { position: absolute; inset: 0; } #lobby.paged #home { display: none; }
+.hLogo { position: absolute; left: 6vw; top: 8vh; }
+.hMark span { display: inline-block; font: 800 128px/0.86 var(--head); letter-spacing: 0.03em; color: #f4f4f4; text-shadow: 0 8px 50px rgba(0,0,0,0.8); animation: letterIn 0.8s cubic-bezier(.2,.8,.2,1) both; }
+.hMark span:nth-child(2) { animation-delay: 0.08s; } .hMark span:nth-child(3) { animation-delay: 0.16s; } .hMark span:nth-child(4) { animation-delay: 0.24s; color: var(--ally); }
+.hTag { margin-top: 10px; font: 600 16px var(--head); letter-spacing: 0.55em; color: var(--dim); animation: fadeIn 0.8s 0.4s both; }
+.hnav { position: absolute; left: calc(6vw - 24px); top: calc(8vh + 190px); display: flex; flex-direction: column; gap: 2px; width: min(560px, 44vw); }
+.hnav > button { position: relative; display: block; text-align: left; background: none; border: none; border-left: 3px solid transparent; padding: 9px 24px 9px 21px;
+  transition: background 0.18s, border-color 0.18s, padding 0.18s; animation: slideL 0.45s both; }
+.hnav > button b { display: block; font: 800 38px/1.02 var(--head); letter-spacing: 0.06em; color: #d6dde3; transition: color 0.18s; }
+.hnav > button small { display: block; font: 500 14px var(--body); letter-spacing: 0.02em; text-transform: none; color: var(--dim); max-height: 0; opacity: 0; overflow: hidden; transition: max-height 0.2s, opacity 0.2s, margin 0.2s; }
+.hnav > button:hover, .hnav > button:focus-visible { background: linear-gradient(90deg, rgba(242,193,78,0.16), rgba(242,193,78,0) 85%); border-left-color: var(--gold); padding-left: 31px; outline: none; }
+.hnav > button:hover b { color: #fff; } .hnav > button:hover small { max-height: 22px; opacity: 1; margin-top: 3px; }
+.hnav > button:first-child b { color: #fff; }
+.hnav > button:nth-child(1) { animation-delay: 0.15s; } .hnav > button:nth-child(2) { animation-delay: 0.2s; } .hnav > button:nth-child(3) { animation-delay: 0.25s; }
+.hnav > button:nth-child(4) { animation-delay: 0.3s; } .hnav > button:nth-child(5) { animation-delay: 0.35s; } .hnav > button:nth-child(6) { animation-delay: 0.4s; }
+.hsmall { display: flex; gap: 4px; margin-top: 18px; padding-left: 14px; animation: fadeIn 0.6s 0.5s both; }
+.hsmall button { background: none; border: none; font: 700 17px var(--head); letter-spacing: 0.2em; color: var(--dim); padding: 6px 10px; }
+.hsmall button:hover { color: #fff; } .hsmall .quitNav { color: #b77; } .hsmall .quitNav:hover { color: #ff8a8a; }
+#home .joinCard { position: absolute; right: 6vw; bottom: 15vh; width: 470px; max-width: 40vw; animation: rise 0.5s 0.3s both; border-top: 3px solid var(--gold); }
+.joinCard h2 { margin: 0 0 6px; font: 800 36px var(--head); letter-spacing: 0.12em; }
+.joinCard .hint { text-align: left; } .joinCard .row { flex-wrap: nowrap; } .joinCard input { flex: 1; width: auto; min-width: 0; }
+.joinCard.nudge { animation: nudge 0.5s both; box-shadow: 0 0 0 2px var(--gold), 0 0 30px rgba(242,193,78,0.35); }
+@keyframes nudge { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(3px); } }
+.mfoot { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6vw; font: 500 14px var(--body); color: #c9d1d9; display: flex; gap: 14px; align-items: center; }
+.hVer { margin-left: auto; font: 600 12px var(--head); letter-spacing: 0.14em; color: var(--dim); white-space: nowrap; }
+.tipLabel { font: 800 12px var(--head); letter-spacing: 0.3em; color: #0b0d10; background: var(--gold); padding: 2px 8px; }
+#tip { animation: fadeIn 0.6s both; }
+/* the top bar: home shows only your card (top right); a page shows BACK and its title */
+.mtop { position: relative; z-index: 2; flex: none; display: flex; align-items: center; gap: 28px; padding: 22px 4vw; }
+#lobby.home .mtop { position: absolute; top: 0; right: 0; padding: 4vh 4vw; } #lobby.home .back, #lobby.home .ptitle { display: none; }
+#lobby.paged .mtop { border-bottom: 1px solid var(--line); background: rgba(5,7,10,0.55); animation: fadeIn 0.3s both; }
+.back { background: none; border: 1px solid var(--line); font: 700 17px var(--head); letter-spacing: 0.2em; padding: 10px 20px; color: var(--dim); }
+.back:hover { color: #fff; border-color: var(--gold); background: rgba(242,193,78,0.1); }
+.ptitle { flex: 1; min-width: 0; } .ptitle small { display: block; font: 700 13px var(--head); letter-spacing: 0.5em; color: var(--gold); }
+.ptitle b { display: block; font: 800 50px/1 var(--head); letter-spacing: 0.08em; animation: slideL 0.35s both; }
 .pcard { display: flex; align-items: center; gap: 14px; background: var(--panel); border: 1px solid var(--line); padding: 8px 16px 8px 8px; animation: slideL 0.5s both; }
 .lv { width: 46px; height: 46px; display: grid; place-items: center; font: 800 22px var(--head); color: #0b0d10; background: linear-gradient(135deg, #ffd56b, #e2a531); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
 .pn { font: 800 20px var(--head); letter-spacing: 0.06em; }
 .xpbar { width: 180px; height: 5px; background: rgba(255,255,255,0.12); margin-top: 4px; } .xpbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #e2a531, #ffd56b); transition: width 0.6s; }
 .xpbar.big { width: 100%; height: 10px; flex: 1; }
 .pxp { font: 600 11px var(--head); color: var(--dim); letter-spacing: 0.15em; margin-top: 3px; }
-.mnav { position: relative; display: flex; flex-direction: column; gap: 1px; padding: 18px 0 22px 24px; border-right: 1px solid var(--line); }
-.mnav button { background: none; border: none; text-align: left; font: 700 18px var(--head); letter-spacing: 0.12em; color: var(--dim); padding: 6px 18px; }
-/* menu groups (he asked: smaller buttons, grouped) */
-.mnav .ngrp { font: 600 11px var(--head); letter-spacing: 0.3em; color: rgba(147,160,173,0.55); padding: 16px 18px 4px; border-top: 1px solid var(--line); margin-right: 18px; }
-.mnav .ngrp:first-child { border-top: none; padding-top: 4px; }
-.mnav button:hover { color: #fff; background: rgba(255,255,255,0.04); }
-.mnav button.on { color: #fff; }
-.mnav .ind { position: absolute; left: 24px; width: 4px; background: var(--gold); transition: top 0.25s cubic-bezier(.2,.8,.2,1), height 0.25s; box-shadow: 0 0 12px var(--gold); }
-.mbody { position: relative; overflow: auto; padding: 30px 40px; }
+.mbody { position: relative; z-index: 1; flex: 1; min-height: 0; overflow: auto; padding: 28px 4vw 36px; }
+#lobby.home .mbody { display: none; }
 .tab { display: none; } .tab.on { display: block; animation: rise 0.35s both; }
-.joinCard { max-width: 560px; background: var(--panel); border: 1px solid var(--line); padding: 26px 30px; }
-.joinCard h2, .roomHead h2 { margin: 0 0 6px; font: 800 38px var(--head); letter-spacing: 0.12em; }
-.joinCard .hint, .roomHead .hint { text-align: left; }
-.joinCard input { width: 320px; }
-.roomHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; max-width: 900px; }
-.squads { align-items: center; max-width: 900px; }
-.squad { flex: 1; animation: rise 0.4s both; } .squad + .vs + .squad { animation-delay: 0.08s; }
-.vs { font: 800 30px var(--head); color: var(--dim); letter-spacing: 0.1em; }
-.squad li { animation: slideL 0.3s both; }
-#room > .row.center { justify-content: flex-start; max-width: 900px; }
-#tab-controls .controls { max-width: 900px; }
-.mfoot { grid-column: 1 / 3; padding: 12px 36px; border-top: 1px solid var(--line); font: 500 14px var(--body); color: #c9d1d9; display: flex; gap: 14px; align-items: center; }
-.tipLabel { font: 800 12px var(--head); letter-spacing: 0.3em; color: #0b0d10; background: var(--gold); padding: 2px 8px; }
-#tip { animation: fadeIn 0.6s both; }
+.tab .tutPage { max-width: 1500px; } .tab .tutPage > h2 { display: none; }
+/* QUICK MATCH page: maps across the top, both teams big, START MATCH bottom right */
+#room { display: flex; flex-direction: column; gap: 18px; min-height: 100%; }
+.roomHead { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.roomHead .hint { text-align: left; font-size: 15px; }
+.hostBtn { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding: 10px 22px; border-color: rgba(242,193,78,0.5); }
+.hostBtn b { font: 800 24px var(--head); letter-spacing: 0.16em; } .hostBtn small { font: 700 13px var(--head); letter-spacing: 0.2em; color: var(--gold); }
+#room #mapPick { margin: 0; }
+.squads { display: flex; align-items: center; gap: 24px; max-width: none; }
+.squad { flex: 1; width: auto; animation: rise 0.4s both; } .squad + .vs + .squad { animation-delay: 0.08s; }
+.squad h3 { font-size: 24px; } .squad li { font-size: 19px; padding: 7px 10px; animation: slideL 0.3s both; }
+.vs { font: 800 34px var(--head); color: var(--dim); letter-spacing: 0.1em; }
+.roomFoot { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-top: 8px; }
+.rfLeft { display: flex; flex-direction: column; gap: 10px; min-width: 0; } .rfLeft .row { margin: 0; justify-content: flex-start; flex-wrap: wrap; }
+.startBig { font: 800 32px var(--head); letter-spacing: 0.14em; padding: 20px 56px; background: var(--gold); border-color: #ffd97a; color: #0b0d10; box-shadow: 0 8px 30px rgba(242,193,78,0.25); flex: none; }
+.startBig:hover { background: #ffd56b; }
+/* JOIN A GAME page */
+.joinPage { max-width: 820px; }
+.joinPage .hint { text-align: left; font-size: 17px; } .joinPage .hint.small { font-size: 14px; margin-top: 26px; }
+.codeRow { display: flex; gap: 14px; margin: 22px 0 12px; }
+#codeIn { flex: 1; width: auto; font: 800 58px/1 var(--head); letter-spacing: 0.3em; text-align: center; text-transform: uppercase; padding: 16px 20px; border: 2px solid var(--line); }
+#codeIn:focus { border-color: var(--gold); }
+#codeGo { font-size: 30px; padding: 0 46px; }
+#codeMsg { min-height: 24px; color: var(--gold); }
+.bigCode { font: 800 88px/1 var(--head); letter-spacing: 0.22em; color: var(--gold); text-align: center; margin: 10px 0 18px; text-shadow: 0 0 40px rgba(242,193,78,0.3); }
+/* INTEL page: one big card per reference page */
+.intelGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; max-width: 1500px; }
+.icard { position: relative; overflow: hidden; height: 230px; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 8px; text-align: left; padding: 26px 28px;
+  background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); border: 1px solid var(--line); border-top: 4px solid var(--ic); transition: transform 0.18s, background 0.18s; animation: rise 0.4s both; }
+.icard:nth-child(2) { animation-delay: 0.04s; } .icard:nth-child(3) { animation-delay: 0.08s; } .icard:nth-child(4) { animation-delay: 0.12s; } .icard:nth-child(5) { animation-delay: 0.16s; } .icard:nth-child(6) { animation-delay: 0.2s; }
+.icard i { position: absolute; right: 22px; top: 8px; font: 800 110px/1 var(--head); font-style: normal; color: var(--ic); opacity: 0.22; transition: opacity 0.18s, transform 0.18s; }
+.icard b { font: 800 34px var(--head); letter-spacing: 0.08em; }
+.icard small { font: 500 15px var(--body); letter-spacing: 0; text-transform: none; color: #c9d1d9; max-width: 92%; }
+.icard:hover { transform: translateY(-4px); background: linear-gradient(160deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03)); } .icard:hover i { opacity: 0.45; transform: scale(1.06); }
+#tab-controls .controls { max-width: 1000px; }
 
 /* overlays and pages animate in */
 .overlay:not(.hidden) { animation: fadeIn 0.2s both; }
@@ -519,7 +568,6 @@ button.big { font-size: 22px; padding: 14px 34px; }
 #eXpText { font: 700 14px var(--head); color: var(--dim); min-width: 110px; text-align: right; }
 
 #splash .escq { position: absolute; bottom: 46px; font: 600 13px var(--head); letter-spacing: 0.35em; color: var(--dim); animation: fadeIn 0.6s 1.6s both; }
-.mnav .quitNav { margin-top: auto; color: #b77; } .mnav .quitNav:hover { color: #ff8a8a; }
 #quitDlg .menu { display: flex; flex-direction: column; gap: 8px; width: 340px; background: var(--panel); border: 1px solid var(--line); padding: 22px; }
 #quitDlg h2 { margin: 0; font: 800 44px var(--head); letter-spacing: 0.2em; }
 #quitDlg button { font-size: 18px; padding: 11px; text-align: left; }
@@ -667,8 +715,6 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 /* phone / tablet controls (touch.js; he asked: they pop up by themselves on mobile) */
 html.touch, html.touch body { touch-action: pan-x pan-y; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
 html.touchplay, html.touchplay body { touch-action: none; } /* menus scroll with a finger; only the match takes every touch */
-html.touch .mnav { overflow: auto; padding-top: 12px; padding-bottom: 12px; } html.touch .mnav button { padding: 8px 18px; }
-html.touch .mtop { padding: 12px 28px; }
 html.touch #freeMaps { scrollbar-width: thin; scrollbar-color: rgba(242,193,78,0.5) transparent; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; } html.touch #freeMaps button { flex: none; } /* phone: one row of maps you swipe through, so START is on screen */
 html.touch #tab-free .freeH { margin: 10px 0 6px; } html.touch #tab-free .hint { display: none; }
 html.touch #pause .menu, html.touch #quitDlg .menu { zoom: 1.15; }
@@ -958,18 +1004,22 @@ html.tv #tvHelp { bottom: 6px; }
 #killcam .kcBug { display: flex; gap: 14px; align-items: center; margin-top: 14px; padding: 10px; background: rgba(255,190,40,0.12); border: 1px solid rgba(255,190,40,0.5); }
 #killcam .kcBug > b { font: 900 44px var(--head); color: #ffbe28; width: 44px; height: 44px; border-radius: 50%; border: 3px solid #ffbe28; display: flex; align-items: center; justify-content: center; flex: none; }
 #killcam .kcBug small { display: block; opacity: 0.7; margin-top: 4px; font-size: 13px; }
-/* Phones (he asked: same game, same menus, but re-proportioned so everything fits): the tabs become a strip across the
-   top that scrolls sideways, and each page gets the whole width */
-html.touch #lobby { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; }
-html.touch #lobby > * { grid-column: 1 !important; }
-html.touch .mtop { padding: 6px 18px; }
-html.touch .mnav { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 2px 10px; gap: 2px; border-right: none; border-bottom: 1px solid var(--line); white-space: nowrap; scrollbar-width: none; }
-html.touch .mnav button { flex: none; font-size: 19px; padding: 9px 14px; letter-spacing: 0.1em; }
-html.touch .mnav button.on { box-shadow: inset 0 -3px 0 var(--gold); }
-html.touch .mnav .ind { display: none; }
-html.touch .mnav .ngrp { display: none; }
-html.touch .mnav .quitNav { margin-top: 0; }
+/* Phones (he asked: same game, same menus, but re-proportioned so everything fits): home = smaller title, the six big
+   choices in a 3 × 2 grid with their captions; pages get a slim top bar */
+html.touch .hLogo { left: 18px; top: 12px; } html.touch .hMark span { font-size: 54px; } html.touch .hTag { font-size: 11px; margin-top: 4px; letter-spacing: 0.4em; }
+html.touch .hnav { left: 18px; right: 18px; top: 96px; width: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+html.touch .hnav > button { background: rgba(10,13,18,0.72); border: 1px solid var(--line); border-left: 3px solid var(--gold); padding: 10px 12px; }
+html.touch .hnav > button b { font-size: 24px; } html.touch .hnav > button small { max-height: none; opacity: 1; margin-top: 2px; font-size: 12px; }
+html.touch .hsmall { grid-column: 1 / -1; margin-top: 2px; padding-left: 0; }
+html.touch #home .joinCard { right: 18px; top: 10px; bottom: auto; width: 420px; max-width: 55vw; padding: 12px 16px; z-index: 3; }
+html.touch #home .joinCard h2 { font-size: 22px; } html.touch #home .joinCard .hint { display: none; }
+html.touch .mfoot { display: none; }
+html.touch #lobby.home .mtop { padding: 10px 18px; } html.touch #lobby.home .pcard { transform: scale(0.85); transform-origin: top right; }
+html.touch .mtop { padding: 6px 18px; gap: 16px; } html.touch .ptitle small { display: none; } html.touch .ptitle b { font-size: 28px; }
+html.touch .back { padding: 8px 14px; } html.touch .pcard .xpbar { width: 110px; }
 html.touch .mbody { padding: 12px 18px; }
+html.touch .intelGrid { gap: 10px; } html.touch .icard { height: 130px; padding: 14px 16px; } html.touch .icard b { font-size: 24px; } html.touch .icard small { font-size: 12px; } html.touch .icard i { font-size: 70px; }
+html.touch #codeIn { font-size: 38px; padding: 10px; } html.touch .startBig { font-size: 24px; padding: 14px 32px; }
 html.touch #settings { width: 96vw; }
 html.touch #settings .seg { flex-wrap: wrap; } html.touch #settings { grid-template-columns: 150px 1fr; } html.touch #settings .setSide > button { padding: 12px 14px; font-size: 16px; }
 
@@ -1101,3 +1151,11 @@ html.tv canvas#game { cursor: default; }
 
 /* Settings → aiming styles, grouped (he asked) */
 .aimGroups { display: flex; flex-wrap: wrap; gap: 10px 18px; justify-content: flex-end; } .aimGrp { display: flex; flex-direction: column; gap: 4px; } .aimGrp small { font: 700 11px var(--head); letter-spacing: 0.14em; color: var(--dim); }
+/* menu overhaul fixes: the big gold buttons, left-aligned page text, no corner buttons over the menu (Settings has them) */
+#lobby button.startBig, .tab .tutPage button.primary.big, .tutCard button.primary { background: var(--gold); border-color: #ffd97a; color: #0b0d10; }
+#lobby button.startBig:hover, .tab .tutPage button.primary.big:hover, .tutCard button.primary:hover { background: #ffd56b; }
+.tab .tutPage button.primary.big { font-size: 24px; padding: 14px 40px; }
+.tab .tutPage > .hint { text-align: left; font-size: 15px; max-width: 1100px; }
+#codeIn { min-width: 0; }
+.bigCode.long { font-size: 54px; letter-spacing: 0.12em; }
+#lobby:not(.hidden) ~ #corner { display: none; }

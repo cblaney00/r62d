@@ -30,6 +30,7 @@ import { ACTIONS, PRESETS, applyPreset, actionFor, bindsFor, setBind, resetBinds
 import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
 import { drawQr } from './qr.js';
+import { readCode, showCode } from '/shared/joincode.js';
 import { touchPad, touchContext, touchActive, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
 
@@ -412,6 +413,7 @@ function connect(mode = '', tvKey = null) { // '' = the shared match, 'tut' / 'f
       if (m.profile.settings) applySettings(m.profile.settings); else saveSettings(); // first time: keep what this browser had
       try { localStorage.setItem('r62d-token', m.token); } catch {}
       $('join').classList.add('hidden'); $('room').classList.remove('hidden');
+      if (st.wantTab) { const t = st.wantTab; st.wantTab = null; setTab(t); } // they picked a page before giving a name
     } else if (m.t === 'snap') onSnap(m);
     else if (m.t === 'tvclip') { if (st.tv && ((m.big.length && !(st.tv.seen && st.tv.seen[m.victim])) || st.tvAllReplays)) TV.offerReplay(m); } // (tvAllReplays: screenshot tests) // a big moment the camera missed
     else if (m.t === 'killcam') { st.killcam = m; m.got = performance.now(); } // watched from the death screen (F or the button)
@@ -433,7 +435,7 @@ const coach = createCoach({ el: $('coach'), send, getMap: () => st.map, onExit: 
 $('coach').addEventListener('click', e => { if ((coach.blocking && !e.target.closest('button')) || e.target.closest('[data-skip]')) coach.space(st.last); }); // clicking the card itself (mouse not captured)
 // free = { map, bots } for a free-play match (see the FREE PLAY page below)
 function switchMatch(lesson, free = null, tv = null) {
-  if (!st.token) { setTab('play'); $('name').focus(); return; }
+  if (!st.token) { askName(); return; }
   if (tv && !TV) { loadTv().then(() => switchMatch(lesson, free, tv)); return; } // the Esports TV code only loads when it is opened (he asked)
   if (TV) TV.stopReplay();
   // leaving Esports TV: the server keeps that broadcast paused for 20 s; opening the same one again in that time resumes it
@@ -1172,7 +1174,8 @@ function renderLobby(s) {
   { const t = s.rk ? 'RANKED: ON' : 'RANKED: OFF'; if ($('rankedBtn').textContent !== t) { $('rankedBtn').textContent = t; $('rankedBtn').classList.toggle('primary', !!s.rk); } st.rk = !!s.rk; }
   // the address friends type to join (the first network card is the wired one)
   if (st.addr === undefined || (st.addrT && performance.now() - st.addrT > 3000)) { st.addr = st.addr || null; st.addrT = performance.now(); fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
-  const u = st.addr && !st.addr.local && st.addr.urls[0], jt = !u ? '' : `Friends join at ${u.url}${u.homelab ? ' (homelab VPN)' : ' · homelab VPN off'} · OPEN TO LAN shows a code to scan with a phone`;
+  const u = st.addr && !st.addr.local && st.addr.urls[0], jt = !u ? '' : `Hosting · code ${showCode(u.code)} · friends click JOIN A GAME and type it${u.homelab ? '' : ' · homelab VPN off: home network only'}`;
+  setText('hostCode', u ? 'CODE ' + showCode(u.code) : 'Let friends join');
   if ($('joinAddr').textContent !== jt) $('joinAddr').textContent = jt;
   for (const b of ['lanBtn', 'pLan']) $(b).classList.toggle('hidden', !!(st.addr && st.addr.local)); // the program's PLAY: this computer only, nobody to invite
   for (const sq of [0, 1]) {
@@ -3468,6 +3471,7 @@ function escape() {
     return;
   }
   if (!$('quitDlg').classList.contains('hidden')) { $('quitDlg').classList.add('hidden'); audio.ui('back'); return; }
+  if (curPage && !inMatch() && !$('lobby').classList.contains('hidden')) { pageBack(); return; } // a menu page: back, like its BACK button
   if (inMatch() || !$('pause').classList.contains('hidden')) $('pause').classList.toggle('hidden');
   else { $('quitDlg').classList.remove('hidden'); audio.ui('open'); } // title screen / menus: offer to quit
 }
@@ -3519,7 +3523,7 @@ for (const b of $('inputSeg').querySelectorAll('button')) {
   dz.value = tiltDead(); show();
   for (const b of seg.children) b.onclick = () => { audio.ui(); setTilt(b.dataset.t === '1'); show(); };
   dz.addEventListener('input', () => { setTiltDead(+dz.value); show(); }); }
-// ---- OPEN TO LAN (he asked, like Minecraft): the address and a QR code for phones, and which computer + version this is ----
+// ---- HOST (was OPEN TO LAN; he asked, like Minecraft, then for HOST / JOIN with a code): the address and a QR code for phones, and which computer + version this is ----
 const lanText = a => a ? `${a.host} · version ${a.version.id}${a.version.date ? ' (' + a.version.date + ')' : ''}` : '';
 // OPEN TO LAN (he asked: always current with the right VPN): the homelab VPN address is the main one (and the code)
 // whenever the VPN is on; the dialog asks again every 2 s while it is open, so turning the VPN on or off shows at once.
@@ -3527,12 +3531,12 @@ function lanFill() {
   fetch('/api/addr').then(r => r.json()).then(a => {
     st.addr = a; const main = a.urls[0], key = a.urls.map(u => u.url).join(' ');
     if (key === st.lanKey) return; st.lanKey = key;
-    if (!main) { $('lanUrl').textContent = 'No network found: is this computer connected?'; $('lanOther').innerHTML = ''; return; }
-    drawQr($('lanQr'), main.url, 7);
+    if (!main) { $('lanCode').textContent = '—'; $('lanUrl').textContent = 'No network found: is this computer connected?'; $('lanOther').innerHTML = ''; return; }
+    drawQr($('lanQr'), main.url, 7); $('lanCode').textContent = showCode(main.code); $('lanCode').classList.toggle('long', main.code.length > 5);
     const vpnOff = !a.urls.some(u => u.homelab);
     $('lanUrl').innerHTML = `<b>${esc(main.url)}</b><span>over ${esc(main.net)}${main.homelab ? ': friends on the VPN join here' : ''}</span>`;
     $('lanOther').innerHTML = (vpnOff ? '<div class="warn">The homelab VPN is off: only people on your home network can join. Turn it on and this updates by itself.</div>' : '')
-      + a.urls.filter(u => u !== main).map(u => `<div>${esc(u.url)} <span>(${esc(u.net)}${u.vpn ? '' : ', people on your home network'})</span></div>`).join('');
+      + a.urls.filter(u => u !== main).map(u => `<div><b>${esc(showCode(u.code))}</b> · ${esc(u.url)} <span>(${esc(u.net)}${u.vpn ? '' : ', people on your home network'})</span></div>`).join('');
     $('lanServer').textContent = 'Running on ' + lanText(a);
   }).catch(() => { st.lanKey = null; $('lanUrl').textContent = 'Could not reach the game server.'; });
 }
@@ -3543,7 +3547,7 @@ function openLan() {
 $('lanBtn').onclick = openLan; $('pLan').onclick = () => { $('pause').classList.add('hidden'); openLan(); };
 $('lanClose').onclick = () => { audio.ui('back'); $('lanDlg').classList.add('hidden'); };
 // the title screen says which computer and version you are connected to (a phone might be on someone else's server)
-fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; $('serverTag').textContent = 'Connected to ' + lanText(a); }).catch(() => {});
+fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; $('serverTag').textContent = 'Connected to ' + lanText(a); $('homeVer').textContent = lanText(a); }).catch(() => {});
 $('splash').addEventListener('click', () => {
   if (st.started) return;
   audio.initAudio(); audio.ui('open');
@@ -3554,8 +3558,27 @@ $('splash').addEventListener('click', () => {
   if (saved) { $('name').value = saved; setTimeout(() => $('joinBtn').click(), 250); } // returning player: straight in
   else setTimeout(() => $('name').focus(), 300);
 });
+// The main menu (he asked for an overhaul, Risk of Rain 2 style): a home screen of big choices; each opens a full
+// page (#lobby.paged) with BACK (Esc) in its top bar. Operators, Armory, Map Knowledge, Playbook, Ball Knowledge,
+// Profile and Settings are their own full-screen pages already and open over whichever menu page you are on.
+const PAGES = { play: ['PLAY', 'QUICK MATCH'], join: ['PLAY', 'JOIN A GAME'], free: ['PLAY', 'FREE PLAY'], tutorial: ['LEARN', 'TUTORIAL'],
+  tv: ['WATCH', 'ESPORTS TV'], intel: ['LEARN', 'INTEL'], controls: ['INTEL', 'CONTROLS'] };
+const PAGE_UP = { controls: 'intel' }; // BACK from these goes to that page, not home
+const NEEDS_NAME = new Set(['play', 'ops', 'profile']);
+let curPage = null;
+function askName(tab) { // no name yet: back home with the name box lit up; once entered, go on to that page
+  if (tab) st.wantTab = tab;
+  goHome(); audio.ui('back'); $('name').focus();
+  const j = $('join'); j.classList.remove('nudge'); void j.offsetWidth; j.classList.add('nudge');
+}
+function goHome() {
+  curPage = null;
+  $('lobby').classList.add('home'); $('lobby').classList.remove('paged');
+  for (const t of document.querySelectorAll('.tab')) t.classList.remove('on');
+}
+function pageBack() { audio.ui('back'); const up = PAGE_UP[curPage]; if (up) setTab(up); else goHome(); }
 function setTab(tab) {
-  if ((tab === 'ops' || tab === 'profile') && !st.token) { audio.ui('back'); $('name').focus(); tab = 'play'; }
+  if (NEEDS_NAME.has(tab) && !st.token) { askName(tab); return; }
   if (tab === 'ops') { showOps(); return; }
   if (tab === 'profile') { showProfile(); return; }
   if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR, steady: () => $('steadySens').value / 100, far: () => farSens(), low: () => gfxLevel() === 'low' }); return; }
@@ -3564,19 +3587,37 @@ function setTab(tab) {
   if (tab === 'playbook') { audio.ui('open'); trainInfo(); openPlaybook($('playbookPage')); return; }
   if (tab === 'settings') { toggleSettings(); return; }
   if (tab === 'quit') { $('quitDlg').classList.remove('hidden'); audio.ui('open'); return; }
-  for (const b of $('mnav').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);
+  if (!PAGES[tab]) return;
+  if (curPage !== tab) audio.ui('open');
+  curPage = tab;
+  $('lobby').classList.remove('home'); $('lobby').classList.add('paged');
+  $('pageKick').textContent = PAGES[tab][0]; $('pageTitle').textContent = PAGES[tab][1];
   for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t.id === 'tab-' + tab);
   if (tab === 'controls') renderControls();
   if (tab === 'free') renderFree();
   if (tab === 'tv') { renderTv(); trainInfo(); }
-  updateNav();
+  if (tab === 'join') { $('codeMsg').textContent = ''; setTimeout(() => $('codeIn').focus(), 50); }
 }
-function updateNav() {
-  const on = $('mnav').querySelector('button.on'), ind = $('navInd');
-  if (on) { ind.style.top = on.offsetTop + 8 + 'px'; ind.style.height = (on.offsetHeight - 16) + 'px'; }
+function updateNav() {}
+for (const b of $('lobby').querySelectorAll('[data-tab]')) b.onclick = () => setTab(b.dataset.tab);
+$('backBtn').onclick = pageBack;
+// JOIN A GAME: the code (or an address) → check a game answers there → go to it, keeping the app / touch flags
+async function joinByCode() {
+  const r = readCode($('codeIn').value), msg = t => { $('codeMsg').textContent = t; };
+  if (!r) { audio.ui('back'); msg($('codeIn').value.trim() ? "That code isn't right. Check each letter with your friend." : 'Type the code first.'); return; }
+  const base = `http://${r.ip}:${r.port}`;
+  msg('Looking for the game…'); audio.ui();
+  try {
+    const a = await (await fetch(base + '/api/addr', { signal: AbortSignal.timeout(5000) })).json();
+    if (!a || !a.urls) throw new Error();
+    msg('Found ' + (a.host || 'it') + '. Joining…');
+    const q = new URLSearchParams(location.search), keep = new URLSearchParams();
+    for (const k of ['app', 'touch']) if (q.has(k)) keep.set(k, q.get(k));
+    setTimeout(() => { location.href = base + '/' + (keep.toString() ? '?' + keep : ''); }, 400);
+  } catch { audio.ui('back'); msg('No game answered. Is your friend hosting, and are you both on the homelab VPN (or the same home network)?'); }
 }
-for (const b of $('mnav').querySelectorAll('button')) b.onclick = () => setTab(b.dataset.tab);
-addEventListener('resize', updateNav);
+$('codeGo').onclick = joinByCode;
+$('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); joinByCode(); } });
 function updateCard() {
   const p = st.profile; if (!p) return;
   const L = levelFor(p.xp || 0);
