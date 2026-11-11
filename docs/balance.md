@@ -73,3 +73,7 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
 - The side gap comes from practice: untrained pros ~50% attack; trained 41%; trained without learned plans/site choice 47%;
   without learned operator/gun picks 45%. What the pros learn helps defence more than attack, both ways.
   Test with trained pros: `R62D_TEST_TRAINING=<copy of pro-training.json>` (tests/_tmpdata.js copies it in).
+- Reinforcements back to 10 (he chose). Attackers' skills stronger as a whole (he chose): +1 use on every limited attacker
+  skill (`ATK_SKILL_BONUS`), RIVET battery 18, FERRO swing 2 s, BULWARK bash stagger 1 s. Measured with trained pros: 41.7%
+  attack (408 rounds), the same as before. Skills decide few pro rounds (skill kills are rare in practice); it should matter
+  more for people, who use their skills more.

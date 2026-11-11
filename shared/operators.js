@@ -307,6 +307,12 @@ export const OPERATORS = {
              ability: { id: 'swarm', name: 'Parasite Swarm', count: 3, desc: 'Release a parasite swarm at an attacker drone in sight (up to 12 m), from yourself or from your bird. It chases the drone; a drone that gets far enough away fast enough escapes, one it catches reshapes into a bird you fly over furniture and land on walls. A landed bird on AUTO pings the first attacker it sees, then flashes and destroys itself.' },
              gadget: 'nitro', gadgetCount: 1, color: '#3f9a6a', helmet: '#24322c', look: 'hood' },
 };
+// He asked (2026-11-10): attackers' skills stronger as a whole. Trained pros won only ~42% of rounds on attack (untrained ~50%:
+// what practice teaches helps defence more). Every attacker skill with limited uses gets one more a round; the unlimited
+// ones get their own boost (RIVET's battery here, FERRO's swing and BULWARK's bash in server/game.js).
+export const ATK_SKILL_BONUS = 1;
+for (const o of Object.values(OPERATORS)) if (o.team === 'atk' && o.ability.count > 0) o.ability.count += ATK_SKILL_BONUS;
+OPERATORS.rivet.ability.battery = 18; // was 14
 
 export const OP_LIST = Object.keys(OPERATORS);
 export const opsForTeam = team => OP_LIST.filter(k => OPERATORS[k].team === team);

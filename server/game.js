@@ -35,7 +35,7 @@ if (typeof process !== 'undefined' && process.env.R62D_FAST) { DUR.select = 3; D
 const THROW_K = 5; // drag on thrown things: they come to rest where you aimed
 const EMP_R = 36; // buffed (he asked: it was no better than ordinary utility): ~1 m, and it fries defenders' electronics too
 const LANCE_STEP = 0.5; // RIVET: seconds per burnt-through point (the first is a bullet-sized hole)
-const HAMMER_CD = 2.5; // was 4 (he asked: Ferro stronger, until the pros pick him)
+const HAMMER_CD = 2; // was 4, then 2.5 (he asked: Ferro stronger; 2026-11-10 attackers' skills stronger as a whole)
 const WINDUP_T = 0.5, SETUP_T = 1.2;
 const THROWN_G = new Set(['smoke', 'frag', 'stun', 'impact', 'nitro']), PLACED_G = new Set(['breach', 'claymore', 'wire', 'dshield']);
 const THROWN_AB = new Set(['emp', 'sonar', 'stickycam', 'gas', 'flare', 'medkit', 'echobox']);
@@ -50,7 +50,7 @@ const BAN_GAP = 2.6; // seconds between Esports TV bans, long enough to read eac
 const SCAN_BEAT = 0.8, SCAN_BLUR = 1.5 * PX_PER_M; // WRAITH's scanner: a new blip per heartbeat, this far off the real spot at most
 // aimed in through the sniper scope (the Pike's and Saker's one-shot body kill needs it, he asked)
 const REINF_HALF = 1;
-const REINF_EACH = +process.env.R62D_REINF || 7; // wall reinforcements a defending team gets each round (was 10; he chose fewer, 2026-11-10: attack won only 43-46% of pro rounds)
+const REINF_EACH = +process.env.R62D_REINF || 10; // wall reinforcements a defending team gets each round (7 was tried 2026-11-10 and made no measurable difference; he chose 10 again)
 const scopedIn = p => { const g = p && p.guns && p.guns[p.slot]; return !!(g && g.att && g.att.sight === 'sniper' && (p.adsT || 0) >= 0.6); };
 export class Game {
   // opts.tut: a private tutorial match for one player (see tutAction), with its timers held
@@ -1757,7 +1757,7 @@ export class Game {
     if (p.lungeUntil > this.time && this.time >= (p.lungeReady || 0) && !p.bracing && !p.rope) { this.lunge(p); return; }
     if (p.bracing) { // shield bash: staggers whoever it hits; a miss leaves the shield down for a while
       const q = [...this.players.values()].find(q => q.alive && q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 34 && Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.0);
-      const R = RIOT[p.riot] || { bash: 30, stagger: 0.7, miss: 1.2 };
+      const R = RIOT[p.riot] || { bash: 30, stagger: 1.0, miss: 1.2 }; // BULWARK (no riot shield): stagger was 0.7 (attackers' skills stronger, 2026-11-10)
       if (R.cd && this.time < (p.bashReady || 0)) { p.meleeCd = 0; return; } // THORN: the studs are still charging
       if (q) { this.damage(q, R.bash, p, 'Shield Bash', p.aim); q.staggerUntil = this.time + R.stagger; q.slowUntil = Math.max(q.slowUntil, this.time + 1); if (R.stun) q.stunUntil = Math.max(q.stunUntil || 0, this.time + R.stun); if (R.cd) p.bashReady = this.time + R.cd; p.meleeCd = 0.8; }
       else { // into a barricade or a wall: the shield's edge works like a swing (the RAM smashes a whole barricade at once)
