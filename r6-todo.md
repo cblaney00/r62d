@@ -6,6 +6,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] lets incorporate some changes that would get us more frames, we already did research on this so now we just need to implement a bit more, i only need about 35 more fps
 
 ## Done
 
