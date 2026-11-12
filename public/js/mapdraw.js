@@ -40,6 +40,7 @@ export class Tiled {
     }
     return t.bm || t.c;
   }
+  prime() { for (const t of this.tiles) this.src(t); } // every piece's bitmap made now (while loading), not on first sight mid-match
   free() { this.dead = true; for (const t of this.tiles) if (t.bm) { t.bm.close(); t.bm = null; } }
   // the pieces touching a rectangle (picture pixels)
   touching(x0, y0, x1, y1) { // (worked out from the grid: drawn many times a frame far out)

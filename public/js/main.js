@@ -2251,7 +2251,7 @@ function draw(s, view, now, dt) {
     st.warm--;
     const k = Math.min(innerWidth / (m.W * CELL * S), innerHeight / (m.H * CELL * S));
     mapLayer.style.opacity = st.warm > 0 ? '0.02' : '';
-    mapLayer.style.transform = st.warm > 0 ? `scale(${k})` : ''; if (st.warm > 0) st.rend.showFor(null); // (the smaller copies ready on the graphics card too)
+    mapLayer.style.transform = st.warm > 0 ? `scale(${k})` : ''; if (st.warm > 0) { st.rend.showFor(null); st.rend.c.prime(); for (const K in st.rend.copies) st.rend.copies[K].t.prime(); } // (the smaller copies and the bitmaps ready on the graphics card too)
   } else { st.rend.showFor(z); const q = S * DPR; mapLayer.style.transform = st.rot ? `matrix(${TA / q}, ${TB / q}, ${TC / q}, ${TD / q}, ${ox / DPR}, ${oy / DPR})` : `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / q})`; }
   // visible window of the map (for the grey remembered copy)
   const ex = st.rot ? Math.hypot(VW, VH) / 2 / z : VW / 2 / z, ey = st.rot ? ex : VH / 2 / z, fr = st.rot && st.floorRect; // a turned view reaches further across the map

@@ -1,4 +1,27 @@
-# Frame rate on his PC (measured 2026-11-09)
+# Frame rate: the big fix (2026-11-12)
+
+Measured in an invisible gamescope display on his graphics card (no window on his screen; he asked: don't pop test
+windows up): `gamescope --backend headless -W 1920 -H 1080 -r 240 -- firefox` as insideabush, X11 Firefox, then
+`tests/shoot.mjs` over `--remote-debugging-port`. Free play, Embassy, High, 1600x900 viewport.
+
+The real cost was not the effects: the map picture pieces (`Tiled` in mapdraw.js) are ordinary canvases, and every
+copy of them into a graphics-card canvas (the blackout's remembered map, car/crate tops) sent the whole 1024 px piece
+to the card again, every frame. Each piece now keeps an ImageBitmap (`Tiled.src`, remade ≤ every `BM_GAP` 100 ms
+after it changes, all made while loading by `prime`). Far out, the screen showed the full picture (~7x the pixels it
+could show) through the tilt: now `MapRenderer.showFor(z)` shows a half or quarter copy (`copyAt`, `picFor`) when
+that still has as many pixels as the screen.
+
+| | before | after |
+|---|---|---|
+| standing, all effects | 40 fps | 117–129 fps |
+| his stress test (walk, spin, swing out) | 35 fps (1% low 20) | 92–96 fps (1% low 43) |
+| locked camera 1500 world px tall | 51 fps | 168 fps |
+| locked camera 3000 world px tall | 31 fps | 167 fps |
+
+Layers themselves (fog filter, vignette, game, over) measured as nearly free. The remaining rare slow frames have
+little script time in them (the graphics card or memory clean-up).
+
+# Older notes: frame rate on his PC (measured 2026-11-09)
 
 How: Firefox as insideabush on his 120 Hz screen (DP-1, workspace 2, full screen 1920x1080), free play on The Embassy,
 High graphics, `__r62d.PF` per section plus an in-page rAF frame-gap log. Scripts: a `__stress(ms, label, lockH)` step
