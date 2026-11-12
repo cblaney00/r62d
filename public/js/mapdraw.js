@@ -13,14 +13,33 @@ const WALLISH = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.BARRI]);
 // copied it made Firefox duplicate the whole thing first (~85 MB on the bigger maps: a 60-120 ms freeze every time a
 // wall broke or a door was boarded, he noticed it as lag). Now only the pieces that change are touched.
 // The pieces overlap by 2 pixels so scaled copies never show a seam.
+const BM_GAP = 100; // ms between remade bitmaps of one piece (see Tiled.src)
 export class Tiled {
   constructor(w, h, ts = 1024) {
     this.width = w; this.height = h; this.ts = ts; this.tiles = []; this.cols = Math.ceil(w / ts);
     for (let y = 0; y < h; y += ts) for (let x = 0; x < w; x += ts) {
       const tw = Math.min(ts + 2, w - x), th = Math.min(ts + 2, h - y), c = canvas(tw, th);
-      this.tiles.push({ c, ctx: c.getContext('2d'), x, y, w: tw, h: th });
+      this.tiles.push({ c, ctx: c.getContext('2d'), x, y, w: tw, h: th, ver: 1, bmVer: 0 });
     }
   }
+  // The pieces are ordinary canvases, drawn into on the computer's side. Copying one into a canvas the graphics card
+  // draws (the blackout, raised walls) sent the whole piece to the card again on every copy: ~20 ms of a frame in
+  // Firefox (measured 2026-11-12, 40 fps → ~100 fps without it). So each piece keeps an ImageBitmap, which stays on the
+  // card, made again after the piece changes (at most every BM_GAP ms); copies read that. Until the new one is ready a
+  // changed piece shows its old bitmap for a frame or so: only copies use it (the greyed remembered map, car tops), the
+  // live map on screen is the canvases themselves (mount). Whoever draws into a piece bumps its ver.
+  src(t) {
+    if (t.bmVer !== t.ver && !t.busy && !this.noBm) {
+      const now = performance.now();
+      if (!t.bm || now - (t.bmT || 0) > BM_GAP) {
+        const v = t.ver; t.busy = true; t.bmT = now;
+        createImageBitmap(t.c).then(b => { t.busy = false; if (this.dead) { b.close(); return; } if (t.bm) t.bm.close(); t.bm = b; t.bmVer = v; },
+          () => { t.busy = false; this.noBm = true; }); // (no bitmaps here: plain copies as before)
+      }
+    }
+    return t.bm || t.c;
+  }
+  free() { this.dead = true; for (const t of this.tiles) if (t.bm) { t.bm.close(); t.bm = null; } }
   // the pieces touching a rectangle (picture pixels)
   touching(x0, y0, x1, y1) { // (worked out from the grid: drawn many times a frame far out)
     const ts = this.ts, out = [], c0 = Math.max(0, Math.floor((x0 - 2) / ts)), c1 = Math.min(this.cols - 1, Math.floor(x1 / ts));
@@ -35,7 +54,7 @@ export class Tiled {
       const a = Math.max(sx, t.x), c = Math.max(sy, t.y), b = Math.min(sx + sw, t.x + t.w), d = Math.min(sy + sh, t.y + t.h);
       const b2 = Math.min(b, t.x + ts + 1), d2 = Math.min(d, t.y + ts + 1); // own part plus a pixel of the overlap
       if (b2 <= a || d2 <= c) continue;
-      ctx.drawImage(t.c, a - t.x, c - t.y, b2 - a, d2 - c, dx + (a - sx) * kx, dy + (c - sy) * ky, (b2 - a) * kx, (d2 - c) * ky);
+      ctx.drawImage(this.src(t), a - t.x, c - t.y, b2 - a, d2 - c, dx + (a - sx) * kx, dy + (c - sy) * ky, (b2 - a) * kx, (d2 - c) * ky);
     }
   }
 }
@@ -99,17 +118,18 @@ export class MapRenderer {
     const col = new Int16Array(m.W).fill(-1), off = [];
     m.floors.forEach((F, i) => { if (i <= gi) return; off[i] = { x: ((F.x0 - F.gx) - (G.x0 - G.gx)) * CELL, y: (F.y0 - G.y0) * CELL }; for (let cx = F.gx; cx < F.gx + F.w && cx < m.W; cx++) col[cx] = i; });
     this.below = { c, K, G, col, off };
+    if (typeof createImageBitmap === 'function') createImageBitmap(c).then(bm => { if (this.below && this.below.c === c && !this.dead) this.below.bm = bm; else bm.close(); }, () => {}); // drawn every frame on upper floors: kept on the graphics card (Tiled.src)
   }
   // draw the view far below into world rect (x, y, w, h) of floor fi; the caller clips to where it shows
   drawBelow(ctx, fi, x, y, w, h) {
     const b = this.below, o = b && b.off[fi]; if (!o) return;
-    ctx.drawImage(b.c, (x + o.x - b.G.gx * CELL) * b.K, (y + o.y) * b.K, w * b.K, h * b.K, x, y, w, h);
+    ctx.drawImage(b.bm || b.c, (x + o.x - b.G.gx * CELL) * b.K, (y + o.y) * b.K, w * b.K, h * b.K, x, y, w, h);
   }
   // run fn once for every piece of the map picture that a world rectangle touches, with this.ctx drawing in world units there
   onTiles(x0, y0, x1, y1, fn) {
     const S = this.S;
     for (const t of this.c.touching(x0 * S, y0 * S, x1 * S, y1 * S)) {
-      this.ctx = this.dctx = t.ctx; t.ctx.setTransform(S, 0, 0, S, -t.x, -t.y); fn(t);
+      this.ctx = this.dctx = t.ctx; t.ctx.setTransform(S, 0, 0, S, -t.x, -t.y); fn(t); t.ver++;
     }
     if (this.lo) this.loDirty.push([x0, y0, x1, y1]);
   }
@@ -128,7 +148,7 @@ export class MapRenderer {
       for (const t of this.lo.touching(a, b, c, d)) {
         const p = Math.max(a, t.x), q = Math.max(b, t.y), r = Math.min(c, t.x + t.w), u = Math.min(d, t.y + t.h); if (r <= p || u <= q) continue;
         t.ctx.clearRect(p - t.x, q - t.y, r - p, u - q);
-        this.c.drawTo(t.ctx, p / K, q / K, (r - p) / K, (u - q) / K, p - t.x, q - t.y, r - p, u - q);
+        this.c.drawTo(t.ctx, p / K, q / K, (r - p) / K, (u - q) / K, p - t.x, q - t.y, r - p, u - q); t.ver++;
       }
     }
     return this.lo;
@@ -337,6 +357,8 @@ export class MapRenderer {
   // The map is shown by the browser itself as a stack of tiles that it moves and scales on the
   // graphics card, so the game never copies the whole picture each frame. Changed spots are
   // copied into the tiles once per frame (flush).
+  // let go of the bitmaps on the graphics card (Tiled.src) when this picture is replaced
+  free() { this.dead = true; this.c.free(); if (this.lo) this.lo.free(); if (this.below && this.below.bm) { this.below.bm.close(); this.below.bm = null; } }
   mount(el) {
     el.textContent = '';
     for (const t of this.c.tiles) { t.c.style.cssText = `position:absolute;left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px`; el.appendChild(t.c); }

@@ -92,7 +92,7 @@ function applyGfx() {
   resize(); renderGfx();
   if (S !== gq.map || old.grey !== gq.grey) { // redraw the map picture at the new detail
     setMapScale(gq.map);
-    if (st.rend) { st.rend = new MapRenderer(st.known, st.base); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); st.warm = 4; }
+    if (st.rend) { st.rend.free(); st.rend = new MapRenderer(st.known, st.base); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); st.warm = 4; }
   }
   perfWatch.skip = 2;
 }
@@ -574,6 +574,7 @@ function loadMap(mv, tiles, hp, id, holes) {
   // broken glass lies in and just around every window; splinters appear where barricades get smashed
   st.glass = new Set(); st.splinters = new Set();
   for (const o of st.map.openings) if (o.kind === 'window') for (const k of o.cells) for (const d of [0, 1, -1, st.map.W, -st.map.W]) st.glass.add(k + d);
+  if (st.rend) st.rend.free();
   st.rend = new MapRenderer(st.known, st.base); st.rend.mount(mapLayer); st.rend.lowCopy(); perfWatch.skip = 2; st.warm = 4;
   st.rend.splinters = st.splinters;
   st.corpses = []; fx.clear(); st.pending = [];
@@ -1025,7 +1026,7 @@ function renderFxList() {
 function applyFx() {
   const v = $('vignette'); if (v) v.style.display = fxOn('vignette') ? '' : 'none';
   tilt.on = fxOn('tilt'); tilt.lean = fxOn('lean');
-  if (looks.light !== fxOn('lights')) { looks.light = fxOn('lights'); if (st.rend) { st.rend = new MapRenderer(st.known, st.base); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); st.warm = 4; } }
+  if (looks.light !== fxOn('lights')) { looks.light = fxOn('lights'); if (st.rend) { st.rend.free(); st.rend = new MapRenderer(st.known, st.base); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); st.warm = 4; } }
 }
 applyFx();
 function renderSettings() {
