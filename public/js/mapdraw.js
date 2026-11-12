@@ -13,6 +13,7 @@ const WALLISH = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.BARRI]);
 // copied it made Firefox duplicate the whole thing first (~85 MB on the bigger maps: a 60-120 ms freeze every time a
 // wall broke or a door was boarded, he noticed it as lag). Now only the pieces that change are touched.
 // The pieces overlap by 2 pixels so scaled copies never show a seam.
+const COPIES = [0.25, 0.5]; // the smaller copies of the map picture (MapRenderer.copyAt), smallest first
 const BM_GAP = 100; // ms between remade bitmaps of one piece (see Tiled.src)
 export class Tiled {
   constructor(w, h, ts = 1024) {
@@ -48,13 +49,13 @@ export class Tiled {
     return out;
   }
   // like ctx.drawImage(picture, sx, sy, sw, sh, dx, dy, dw, dh)
-  drawTo(ctx, sx, sy, sw, sh, dx, dy, dw, dh) {
+  drawTo(ctx, sx, sy, sw, sh, dx, dy, dw, dh, live = false) { // live: read the pieces themselves, never a bitmap a moment old
     const kx = dw / sw, ky = dh / sh, ts = this.ts;
     for (const t of this.touching(sx, sy, sx + sw, sy + sh)) {
       const a = Math.max(sx, t.x), c = Math.max(sy, t.y), b = Math.min(sx + sw, t.x + t.w), d = Math.min(sy + sh, t.y + t.h);
       const b2 = Math.min(b, t.x + ts + 1), d2 = Math.min(d, t.y + ts + 1); // own part plus a pixel of the overlap
       if (b2 <= a || d2 <= c) continue;
-      ctx.drawImage(this.src(t), a - t.x, c - t.y, b2 - a, d2 - c, dx + (a - sx) * kx, dy + (c - sy) * ky, (b2 - a) * kx, (d2 - c) * ky);
+      ctx.drawImage(live ? t.c : this.src(t), a - t.x, c - t.y, b2 - a, d2 - c, dx + (a - sx) * kx, dy + (c - sy) * ky, (b2 - a) * kx, (d2 - c) * ky);
     }
   }
 }
@@ -131,28 +132,33 @@ export class MapRenderer {
     for (const t of this.c.touching(x0 * S, y0 * S, x1 * S, y1 * S)) {
       this.ctx = this.dctx = t.ctx; t.ctx.setTransform(S, 0, 0, S, -t.x, -t.y); fn(t); t.ver++;
     }
-    if (this.lo) this.loDirty.push([x0, y0, x1, y1]);
+    for (const K in this.copies) this.copies[K].dirty.push([x0, y0, x1, y1]);
   }
-  // A small copy of the picture (a quarter of its pixels each way), for a view far out: shrinking the whole picture
-  // into the fog layer and the wall tops every frame cost more the further out the view was (he noticed it as lag).
-  // Changed spots are copied over when it is next used.
-  lowCopy() {
-    const K = 0.25, S = this.S, k = S * K;
-    if (!this.lo) {
-      this.lo = new Tiled(Math.ceil(this.c.width * K), Math.ceil(this.c.height * K));
-      for (const t of this.lo.tiles) t.ctx.imageSmoothingQuality = 'high';
-      this.loDirty = [[0, 0, this.Wp, this.Hp]];
+  // Smaller copies of the picture (a half and a quarter of its pixels each way), for a view further out: shrinking the
+  // whole picture into the fog layer and the wall tops every frame cost more the further out the view was (he noticed it
+  // as lag), and the screen showing the full picture far out made the graphics card handle ~7 times the pixels it could
+  // show (31 fps at 3000 world px tall on his kind of card, 2026-11-12). Changed spots are copied over when it is next used.
+  copyAt(K) {
+    const C = this.copies || (this.copies = {}), S = this.S, k = S * K;
+    let cp = C[K];
+    if (!cp) {
+      cp = C[K] = { t: new Tiled(Math.ceil(this.c.width * K), Math.ceil(this.c.height * K)), dirty: [[0, 0, this.Wp, this.Hp]] };
+      for (const t of cp.t.tiles) t.ctx.imageSmoothingQuality = 'high';
     }
-    for (const [x0, y0, x1, y1] of this.loDirty.splice(0)) {
-      const a = Math.max(0, Math.floor(x0 * k) - 1), b = Math.max(0, Math.floor(y0 * k) - 1), c = Math.min(this.lo.width, Math.ceil(x1 * k) + 1), d = Math.min(this.lo.height, Math.ceil(y1 * k) + 1);
-      for (const t of this.lo.touching(a, b, c, d)) {
+    const lo = cp.t;
+    for (const [x0, y0, x1, y1] of cp.dirty.splice(0)) {
+      const a = Math.max(0, Math.floor(x0 * k) - 1), b = Math.max(0, Math.floor(y0 * k) - 1), c = Math.min(lo.width, Math.ceil(x1 * k) + 1), d = Math.min(lo.height, Math.ceil(y1 * k) + 1);
+      for (const t of lo.touching(a, b, c, d)) {
         const p = Math.max(a, t.x), q = Math.max(b, t.y), r = Math.min(c, t.x + t.w), u = Math.min(d, t.y + t.h); if (r <= p || u <= q) continue;
         t.ctx.clearRect(p - t.x, q - t.y, r - p, u - q);
-        this.c.drawTo(t.ctx, p / K, q / K, (r - p) / K, (u - q) / K, p - t.x, q - t.y, r - p, u - q); t.ver++;
+        this.c.drawTo(t.ctx, p / K, q / K, (r - p) / K, (u - q) / K, p - t.x, q - t.y, r - p, u - q, true); t.ver++;
       }
     }
-    return this.lo;
+    return lo;
   }
+  lowCopy() { return this.copyAt(0.25); }
+  // the smallest picture that still has at least k pixels per world px (the full one when none of the copies does)
+  picFor(k) { for (const K of COPIES) if (this.S * K >= k) return this.copyAt(K); return this.c; }
 
   t(x, y) { const m = this.map; return x < 0 || y < 0 || x >= m.W || y >= m.H ? T.HARD : m.tiles[y * m.W + x]; }
   // the solid parts of an angled/curved wall cell, if it is one (and still standing)
@@ -358,10 +364,30 @@ export class MapRenderer {
   // graphics card, so the game never copies the whole picture each frame. Changed spots are
   // copied into the tiles once per frame (flush).
   // let go of the bitmaps on the graphics card (Tiled.src) when this picture is replaced
-  free() { this.dead = true; this.c.free(); if (this.lo) this.lo.free(); if (this.below && this.below.bm) { this.below.bm.close(); this.below.bm = null; } }
+  free() { this.dead = true; this.c.free(); for (const K in this.copies || {}) this.copies[K].t.free(); if (this.below && this.below.bm) { this.below.bm.close(); this.below.bm = null; } }
   mount(el) {
-    el.textContent = '';
-    for (const t of this.c.tiles) { t.c.style.cssText = `position:absolute;left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px`; el.appendChild(t.c); }
+    el.textContent = ''; this.el = el; this.shownK = 1; this.layers = { 1: this.box(this.c, 1) };
+  }
+  box(T, K) { // a layer holding a picture's pieces, scaled back up to full-picture units (so #mapLayer's transform fits every one)
+    const d = document.createElement('div');
+    d.style.cssText = `position:absolute;left:0;top:0;transform-origin:0 0;${K === 1 ? '' : `transform:scale(${1 / K});display:none`}`;
+    for (const t of T.tiles) { t.c.style.cssText = `position:absolute;left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px`; d.appendChild(t.c); }
+    this.el.appendChild(d); return d;
+  }
+  // show the smallest picture with at least k pixels per world px on screen (z = screen px per world px): far out the
+  // screen can't show more anyway, so it looks the same for much less work (a little leeway so it doesn't flip back and forth)
+  showFor(z) {
+    if (!this.el) return;
+    if (z === null) { // all at once (just after loading, see st.warm in main.js: so the graphics card has them all ready)
+      for (const c of COPIES) if (!this.layers[c]) this.layers[c] = this.box(this.copyAt(c), c);
+      for (const K in this.layers) this.layers[K].style.display = ''; this.shownK = 0; return;
+    }
+    if (this.shownK === 0) { for (const K in this.layers) this.layers[K].style.display = 'none'; this.shownK = -1; }
+    let K = 1; for (const c of COPIES) if (this.S * c >= z * (c < this.shownK ? 1.08 : 1)) { K = c; break; }
+    if (K !== 1) this.copyAt(K); // (changed spots copied over)
+    if (K === this.shownK) return;
+    if (!this.layers[K]) this.layers[K] = this.box(this.copyAt(K), K);
+    if (this.layers[this.shownK]) this.layers[this.shownK].style.display = 'none'; this.layers[K].style.display = ''; this.shownK = K;
   }
   mark() {} // (the pieces shown are the ones drawn into)
   flush() {}

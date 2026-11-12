@@ -2251,8 +2251,8 @@ function draw(s, view, now, dt) {
     st.warm--;
     const k = Math.min(innerWidth / (m.W * CELL * S), innerHeight / (m.H * CELL * S));
     mapLayer.style.opacity = st.warm > 0 ? '0.02' : '';
-    mapLayer.style.transform = st.warm > 0 ? `scale(${k})` : '';
-  } else { const q = S * DPR; mapLayer.style.transform = st.rot ? `matrix(${TA / q}, ${TB / q}, ${TC / q}, ${TD / q}, ${ox / DPR}, ${oy / DPR})` : `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / q})`; }
+    mapLayer.style.transform = st.warm > 0 ? `scale(${k})` : ''; if (st.warm > 0) st.rend.showFor(null); // (the smaller copies ready on the graphics card too)
+  } else { st.rend.showFor(z); const q = S * DPR; mapLayer.style.transform = st.rot ? `matrix(${TA / q}, ${TB / q}, ${TC / q}, ${TD / q}, ${ox / DPR}, ${oy / DPR})` : `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / q})`; }
   // visible window of the map (for the grey remembered copy)
   const ex = st.rot ? Math.hypot(VW, VH) / 2 / z : VW / 2 / z, ey = st.rot ? ex : VH / 2 / z, fr = st.rot && st.floorRect; // a turned view reaches further across the map
   const wx0 = Math.max(fr ? fr[0] : 0, st.cam.x - ex - 20), wy0 = Math.max(fr ? fr[1] : 0, st.cam.y - ey - 20);
@@ -2448,7 +2448,7 @@ function draw(s, view, now, dt) {
       rf = raisedFrame(st.rend, rm, st.cam, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1);
     }
     // wall tops from the small copy of the map when the screen shows less than it holds (far out)
-    const pk = pass === 'fog' ? fog.width / VW * z : z, pic = pk <= st.rend.S * 0.25 ? st.rend.lowCopy() : st.rend.c;
+    const pk = pass === 'fog' ? fog.width / VW * z : z, pic = st.rend.picFor(pk);
     if (pass === 'fog' || !view) { drawRaised(c, st.rend, rf, [0, 1], pic); pfa('raise', t0); return; }
     // walls in colour exactly where your team's sight reaches (raised with them), like the floor: no cell-by-cell snapping
     c.save(); c.clip(sightClip(vpolys, vviews, st.cam, RH)); drawRaised(c, st.rend, rf, [0], pic); c.restore();
@@ -2464,7 +2464,7 @@ function draw(s, view, now, dt) {
     fctx.setTransform(TA * fk, TB * fk, TC * fk, TD * fk, ox * fk, oy * fk);
     // the remembered map: the colour picture, greyed by the browser (CSS filter on #fog), not a grey copy of our own
     // (far out, from its small copy: the fog layer has fewer pixels than that holds, and shrinking the whole picture each frame lagged)
-    const tb = performance.now(), pic = fk * z <= st.rend.S * 0.25 ? st.rend.lowCopy() : st.rend.c, G = pic.width / st.rend.Wp;
+    const tb = performance.now(), pic = st.rend.picFor(fk * z), G = pic.width / st.rend.Wp;
     if (wx1 > wx0 && wy1 > wy0) pic.drawTo(fctx, wx0 * G, wy0 * G, (wx1 - wx0) * G, (wy1 - wy0) * G, wx0, wy0, wx1 - wx0, wy1 - wy0);
     pfa('fogblit', tb);
     // cut out everything your team can see right now
