@@ -8,7 +8,7 @@ import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldP
 import { arenaThink, defSetup, botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { arenaStart, arenaTick, arenaKill, arenaDamage, arenaSpeed, arenaEndMatch, arenaPlayer, arenaInfo } from './arena.js';
-import { zbDev, ZB, zbDown, zbUp, zbReviveTime, zbSlideEnd, zbStart, zbTick, zombieThink, zbSpeed, zbDamage, zbKill, zbCanGoDown, zbReloadMul, zbBlocksVault, zbUse, zbEnd, zbPlayer, zbInfo } from './zombies.js';
+import { zbSurge, zbDev, ZB, zbDown, zbUp, zbReviveTime, zbSlideEnd, zbStart, zbTick, zombieThink, zbSpeed, zbDamage, zbKill, zbCanGoDown, zbReloadMul, zbBlocksVault, zbUse, zbEnd, zbPlayer, zbInfo } from './zombies.js';
 import { MODES, CLASSIC, DEFAULT_MODE, attackSquad, roundsToWin, inOvertime } from '../shared/modes.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
@@ -967,6 +967,7 @@ export class Game {
       if (into && end.k === 'none') this.shotThroughHatch(p, a, into, D, w.name, w.cls);
       else if (this.winCarry && end.k === 'none') end = this.shotOutWindow(p, eye, a, w.range, D, w.name, w.cls);
       this.winCarry = null;
+      if (w.surge && this.zb) zbSurge(this, p, end.x, end.y); // ZOMBIES: the wonder weapon bursts where it lands
       if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined, nt: m.notrail || undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });

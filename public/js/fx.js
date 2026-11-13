@@ -48,6 +48,12 @@ export class FX {
       this.rings.push({ x, y, r: 0, max: 120, life: 0.35, maxL: 0.35, col: '255,255,255' });
       return;
     }
+    if (kind === 'surge') { // the Surge Caster's green burst (zombies)
+      this.rings.push({ x, y, r: 0, max: r, life: 0.35, maxL: 0.35, col: '120,255,170' });
+      this.lights.push({ x, y, r: r * 2, life: 0.25, max: 0.25, col: '110,255,160', a: 0.7 });
+      for (let i = 0; i < 18; i++) { const a = Math.random() * 6.28; this.add({ type: 'spark', x, y, vx: Math.cos(a) * 180, vy: Math.sin(a) * 180, life: 0.3, max: 0.3, size: 1.2, col: '150,255,190', drag: 4 }); }
+      return;
+    }
     if (kind === 'emp') {
       this.rings.push({ x, y, r: 0, max: r, life: 0.5, maxL: 0.5, col: '180,120,255' });
       this.lights.push({ x, y, r: r, life: 0.3, max: 0.3, col: '170,110,255', a: 0.4 });

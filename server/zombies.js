@@ -43,6 +43,7 @@ export const PERKS = { // the six machines (our own names); prices and effects a
 };
 export const POWERUPS = ['ammo', 'insta', 'double', 'nuke', 'carpenter', 'firesale'];
 const START_GUN = 'p10';
+const CRATE_RARE = { surge: 0.06 }; // the wonder weapon turns up about one spin in seventeen
 const CRATE_GUNS = ['mule', 'ox', 'drummer', 'cyclone', 'trestle', 'pike', 'saker', 'heron', 'longbow', 'sabre', 'trident', 'verdict', 'tandem', 'ferret', 'auger', 'quill', 'hedge', 'anvil', 'mammoth', 'needle', 'vex50', 'bison', 'whisper', 'hatchet', 'gnat', 'lark', 'stub', 'k4', 'rook', 'wasp', 'marten', 'tusk', 'breaker', 'javelin', 'sentry'];
 const ZOMBIE_OPS = Object.keys(OPERATORS).filter(o => OPERATORS[o].armor === 2);
 
@@ -341,7 +342,8 @@ export function zbUse(game, p, dt, inp) {
       return true;
     }
     const own = new Set(p.guns.map(g => g.w)), pool = CRATE_GUNS.filter(w => WEAPONS[w] && !own.has(w));
-    C.roll = { by: p.id, w: pool[Math.floor(Math.random() * pool.length)], t: game.time + ZB.spin, ready: false, x: st.s.x, y: st.s.y };
+    const rare = Object.keys(CRATE_RARE).find(w => !own.has(w) && Math.random() < CRATE_RARE[w]);
+    C.roll = { by: p.id, w: rare || pool[Math.floor(Math.random() * pool.length)], t: game.time + ZB.spin, ready: false, x: st.s.x, y: st.s.y };
     game.events.push({ e: 'zbCrate', x: r1(st.s.x), y: r1(st.s.y), w: C.roll.w, t: ZB.spin });
     return true;
   }
@@ -509,4 +511,13 @@ export function zbDev(game, p, m) {
   if (m.a === 'power') Zs.power = true;
   if (m.a === 'down') { p.downed = true; p.downT = game.time; zbDown(game, p); }
   if (m.a === 'tp') { p.x = +m.x; p.y = +m.y; }
+}
+
+// the Surge Caster's burst where the bolt lands: zombies within 2.5 m take most of it (less further out), the shooter a
+// little if close (BLAST PROOF: nothing)
+export function zbSurge(game, p, x, y) {
+  const g = p.guns[p.slot], up = g && g.up, R = 2.5 * PX_PER_M, base = up ? 1600 : 800;
+  for (const z of zombies(game)) if (z.alive) { const d = Math.hypot(z.x - x, z.y - y); if (d < R && floorAt(game.map, z.x, z.y) === floorAt(game.map, x, y) && los(game.map, x, y, z.x, z.y)) game.damage(z, base * (1 - 0.6 * d / R), p, 'Surge Burst'); }
+  const dp = Math.hypot(p.x - x, p.y - y); if (dp < R && !p.zb.perks.includes('blast')) game.damage(p, 30 * (1 - dp / R), p, 'Surge Burst');
+  game.events.push({ e: 'boom', x: r1(x), y: r1(y), r: R, kind: 'surge' });
 }

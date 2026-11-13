@@ -54,6 +54,10 @@ export const WEAPONS = {
              adsMul: 0.85, fall: { from: 320, to: 620, min: 0.65 }, trait: 'The attackers\' SMG: quick to aim, steady, good on the move.' },
   sentry:  { name: 'Sentry Carbine', cls: 'AR', dmg: 33, rpm: 600, mag: 25, reserve: 125, reload: 2.3, spread: 0.058, ads: 0.016, bloom: 0.012, auto: true, pellets: 1, range: 900, len: 13,
              adsMul: 0.85, kickMul: 0.6, fall: { from: 260, to: 520, min: 0.65 }, trait: 'A slow, hard-hitting defender\'s carbine: very easy to control and quick to the shoulder, but only 25 rounds and it weakens down long halls.' },
+  // ZOMBIES only (zb: true, never in a loadout, the Armory or free play): the mystery crate's rare wonder weapon. An energy
+  // bolt that bursts where it lands (server/zombies.js zbSurge); a little of the burst stings you too
+  surge: { name: 'Surge Caster', cls: 'Pistol', dmg: 1000, rpm: 180, mag: 20, reserve: 160, reload: 2.6, spread: 0.02, ads: 0.01, bloom: 0.01, auto: false, pellets: 1, range: 1100, len: 7, zb: true, surge: true,
+             trait: 'Zombies only. A bolt of energy that bursts where it lands: kills a crowd, stings you up close.' },
   sparrow: { name: 'Sparrow Compact', cls: 'Pistol', dmg: 28, rpm: 520, mag: 17, reserve: 68, reload: 1.4, spread: 0.05, ads: 0.017, bloom: 0.018, auto: false, pellets: 1, range: 850, len: 6,
              trait: 'A light, quick pistol: fast to fire and reload, but hits softer.' },
   // He asked (2026-11-10): two more of every type, each one unique ("I would rather a gun not be in the game than be
@@ -765,6 +769,7 @@ export const SPRAY = {
   bison:   { pull: -1,   zig: 0.3, per: 2, flip: 0,  k: 2,   mx: 1.6 },  // a big kick left every shot
   javelin: { pull: 0.5,  zig: 0.6, per: 4, flip: 0,  k: 0.9, mx: 1 },
   sentry:  { pull: 0.2,  zig: 0.3, per: 6, flip: 0,  k: 0.8, mx: 0.8 },  // almost straight up, very calm
+  surge: { pull: 0,  zig: 0.3, per: 4, flip: 0,  k: 0.7, mx: 1 },
   sparrow: { pull: 0.5,  zig: 0.7, per: 3, flip: 0,  k: 0.9, mx: 1 },
   verdict: { pull: -0.5, zig: 0.7, per: 3, flip: 8,  k: 1.1, mx: 1.2 },  // left, then right: it was never meant to spray
   tandem:  { pull: 0.6,  zig: 0.5, per: 7, flip: 14, k: 1,   mx: 1 },    // a slow right drift that comes back the other way

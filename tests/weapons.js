@@ -12,7 +12,7 @@ for (const [op, L] of Object.entries(LOADOUTS)) for (const w of [...L.primaries,
   if (L.secondaries.includes(w) && !SIDEARMS.has(w)) fail(op, 'has', w, 'as a sidearm');
 }
 for (const [w, s] of Object.entries(sides)) if (s.size > 1) fail(WEAPONS[w].name, 'is carried by both sides');
-for (const w of Object.keys(WEAPONS)) {
+for (const w of Object.keys(WEAPONS).filter(k => !WEAPONS[k].zb)) {
   if (!sides[w]) fail(WEAPONS[w].name, 'is carried by nobody');
   if (!SPRAY[w]) fail(WEAPONS[w].name, 'has no spray pattern');
 }

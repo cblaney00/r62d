@@ -13,7 +13,7 @@ for (const [slot] of ATTACH_SLOTS) for (let [id, a] of Object.entries(ATTACH[slo
   if (!up || !down) bad(`${slot} ${id}: needs an upside and a downside`);
   if (!/^\+ .* − /.test(a.desc)) bad(`${slot} ${id}: description should say "+ ... − ..."`);
 }
-for (const w of Object.keys(WEAPONS)) {
+for (const w of Object.keys(WEAPONS).filter(k => !WEAPONS[k].zb)) {
   const opts = attachFor(w);
   for (const [slot] of ATTACH_SLOTS) {
     if (opts[slot].length < 3) bad(`${w}: only ${opts[slot].length} ${slot} choices`);

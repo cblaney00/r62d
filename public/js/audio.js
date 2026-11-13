@@ -491,6 +491,7 @@ export function explosion(x, y, kind) {
   const g = out(x, y, big ? 1.5 : 1.05, 2000, 0.6); if (!g) return;
   const t = ac.currentTime;
   duck(big ? 7 : 5, Math.min(1, g.gain.value / (MIX.explosions * 0.6)));
+  if (kind === 'surge') { tone(g, t, 0.35, 900, 120, 'sawtooth', 0.4); noise(g, t, 0.3, 'bandpass', 1800, 2, 0.6, 0.002, 400); return; } // the Surge Caster's burst
   if (kind === 'stun') { noise(g, t, 0.05, 'highpass', 3000, 0.7, 1); noise(g, t, 0.8, 'highpass', 6000, 0.5, 0.4, 0.002); tone(g, t, 0.3, 90, 40, 'sine', 0.6); return; }
   if (kind === 'emp') { tone(g, t, 0.6, 120, 40, 'sawtooth', 0.35); noise(g, t, 0.5, 'bandpass', 4000, 2, 0.4, 0.01); for (let i = 0; i < 8; i++) click(g, t + rnd(0, 0.5), rnd(3000, 6000), 0.3); return; }
   if (kind === 'cutter') { noise(g, t, 1.8, 'bandpass', 2600, 0.4, 0.5, 0.3); }

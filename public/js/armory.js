@@ -101,7 +101,7 @@ function renderList(el) {
   if (!S.open) S.open = new Set([WEAPONS[S.w].cls]);
   const gunBtn = k => `<button data-w="${k}" class="gun ${k === S.w ? 'on' : ''}"><i class="pic"></i><b>${esc(WEAPONS[k].name)}</b><span>${CLASS_NAME[WEAPONS[k].cls]} · <em class="${gunSide(k) === 'def' ? 'def' : 'atk'}">${gunSide(k) === 'def' ? 'DEFENCE' : 'ATTACK'}</em></span></button>`;
   el.querySelector('#armList').innerHTML = CLASS_ORDER.map(cls => {
-    const keys = Object.keys(WEAPONS).filter(k => WEAPONS[k].cls === cls).sort((a, b) => sideN(a) - sideN(b));
+    const keys = Object.keys(WEAPONS).filter(k => WEAPONS[k].cls === cls && !WEAPONS[k].zb).sort((a, b) => sideN(a) - sideN(b));
     if (!keys.length) return '';
     return `<div class="armFolder ${S.open.has(cls) ? 'open' : ''}" data-cls="${cls}"><button class="armFolderHead"><i></i>${esc(CLASS_NAME[cls])}s<small>${keys.length}</small></button><div class="armFolderBody">${keys.map(gunBtn).join('')}</div></div>`;
   }).join('');

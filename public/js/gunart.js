@@ -28,6 +28,7 @@ export const G = {
   gnat:    { body: '#2a2d31', furn: '#1f2124', stock: 'none', rec: [38, 72], bar: 76, guard: [72, 72], mag: 'gripLong', grip: 44, pistol: true },
   javelin: { body: '#2f3338', furn: '#3a3f45', stock: 'adjust', rec: [24, 54], bar: 82, guard: [54, 70], mag: 'curved', grip: 36, rail: true },
   sentry:  { body: '#34383d', furn: '#5b5546', stock: 'fold', rec: [24, 52], bar: 84, guard: [52, 72], mag: 'curved', grip: 34, rail: true },
+  surge: { body: '#2a5a48', furn: '#5fe0a0', stock: 'none', rec: [40, 74], bar: 80, guard: [70, 74], mag: 'grip', grip: 46, pistol: true, big: true },
   sparrow: { body: '#3a3d42', furn: '#26282b', stock: 'none', rec: [44, 70], bar: 72, guard: [70, 70], mag: 'grip', grip: 47, pistol: true },
   verdict: { body: '#3b3e3a', furn: '#2d302c', stock: 'cheek', rec: [26, 54], bar: 96, guard: [54, 80], mag: 'straight', grip: 34, rail: true, selector: true },
   tandem:  { body: '#40443a', furn: '#5c5a48', stock: 'fold', rec: [24, 52], bar: 86, guard: [52, 72], mag: 'curved', grip: 34, rail: true, taped: true },

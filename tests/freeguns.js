@@ -7,7 +7,7 @@ import { WEAPONS, SIDEARMS, attachFor } from '../shared/operators.js';
 let fails = 0; const ok = (c, ...a) => { if (!c) { fails++; console.log('FAIL', ...a); } };
 const g = new Game({ free: true }), p = g.addPlayer('Me', false); p.sock = { open: true, send() {} };
 g.mapId = 'harbor'; g.map = buildMap('harbor'); g.handle(p, { t: 'free', a: 'start', map: 'harbor', bots: 0 });
-for (const w of Object.keys(WEAPONS)) {
+for (const w of Object.keys(WEAPONS).filter(k => !WEAPONS[k].zb)) {
   g.handle(p, { t: 'free', a: 'gun', w }); g.tick(1 / 30);
   const i = p.guns.findIndex(q => q.w === w);
   ok(i >= 0 && p.slot === i, 'not in hand:', w, p.guns.map(q => q.w));

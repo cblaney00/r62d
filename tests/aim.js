@@ -18,7 +18,7 @@ g.hitscan = (src, x0, y0, a, ...r) => { if (src === p) shots.push(a); return hs(
 const tick = n => { for (let i = 0; i < n; i++) g.tick(1 / 30); };
 const near = (a, b) => Math.abs(a - b) < 1e-9;
 
-for (const [id, w] of Object.entries(WEAPONS)) {
+for (const [id, w] of Object.entries(WEAPONS).filter(([, w]) => !w.zb)) {
   const m = gunMods(id);
   for (const st of [{ ads: 0, run: 0 }, { ads: 1, run: 0 }, { ads: 0, run: 1 }, { ads: 1, run: 1 }]) {
     const gun = { w: id, ammo: w.mag, reserve: 999, att: {}, m };
@@ -61,7 +61,7 @@ for (const [id, w] of Object.entries(WEAPONS)) {
   if (shots.length !== 1) fail('quick click fired', shots.length, 'shots'); else if (Math.abs(shots[0] - 1.234) > spreadCone(w, gunMods('p10'), {}) + 1e-9) fail('quick click used aim', shots[0], 'not 1.234');
 }
 // holding the trigger fires at the gun's real rate (not rounded to whole server ticks); a pistol tapped a hair early still fires
-for (const [id, w] of Object.entries(WEAPONS)) {
+for (const [id, w] of Object.entries(WEAPONS).filter(([, w]) => !w.zb)) {
   if (!w.auto) continue;
   const gun = { w: id, ammo: 9999, reserve: 0, att: {}, m: gunMods(id) };
   p.guns = [gun]; p.slot = 0; p.input = {}; p.prevInput = {}; p.fireCd = 0; tick(30);
@@ -97,7 +97,7 @@ for (const [id, w] of Object.entries(WEAPONS)) {
 }
 // no gun leans to one side by itself (he found the Tusk always shot left: its pellet fan was lopsided). A shotgun's fan
 // is centred and as wide left as right; each gun's recoil drifts the way its SPRAY says (pull), never the other way.
-for (const [id, w] of Object.entries(WEAPONS)) {
+for (const [id, w] of Object.entries(WEAPONS).filter(([, w]) => !w.zb)) {
   const off = [...Array(w.pellets).keys()].map(i => shotOffset(w, 1, i, () => 0.5));
   if (Math.abs(off.reduce((a, b) => a + b, 0)) > 1e-9 || Math.abs(Math.min(...off) + Math.max(...off)) > 1e-9) fail(id, 'pellet fan is lopsided', off.map(o => o.toFixed(2)).join(' '));
   let r = 0; for (let n = 1; n <= 10; n++) r += recoilStep(w, { kick: 1, sway: 1, first: 1 }, n);

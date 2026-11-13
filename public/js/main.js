@@ -746,7 +746,7 @@ function onEvent(e, s, players) {
     case 'boom':
       fx.explosion(e.x, e.y, e.r, e.kind);
       if (st.tv && e.kind === 'stun') { fx.ping(e.x, e.y, '255,255,255'); fx.ping(e.x, e.y, '255,250,210'); } // TV: how far the flash reached (no white-out for viewers, he asked)
-      if (e.kind !== 'stun' && e.kind !== 'emp') st.rend.scorch(e.x, e.y, Math.min(40, e.r * 0.6));
+      if (e.kind !== 'stun' && e.kind !== 'emp' && e.kind !== 'surge') st.rend.scorch(e.x, e.y, Math.min(40, e.r * 0.6));
       audio.explosion(e.x, e.y, e.kind);
       break;
     case 'zbCrate': audio.play('crate', e.x, e.y); break;
@@ -1524,7 +1524,7 @@ function toggleFreeOps(force) {
   }
   { // he asked: change guns freely in free play. Every gun in the game, by type; a pistol goes in the sidearm slot
     const G = el.querySelector('.foGuns'), held = new Set(((st.me && st.me.ga) || []).map(x => x.split(':')[0]).concat(st.me && st.me.w ? [st.me.w] : []));
-    const by = {}; for (const [k, w] of Object.entries(WEAPONS)) (by[SIDEARMS.has(k) ? 'Sidearm' : CLASS_NAME[w.cls] || w.cls] ||= []).push(k);
+    const by = {}; for (const [k, w] of Object.entries(WEAPONS)) if (!w.zb) (by[SIDEARMS.has(k) ? 'Sidearm' : CLASS_NAME[w.cls] || w.cls] ||= []).push(k);
     G.innerHTML = '<h3>GUNS</h3>' + Object.entries(by).map(([c, ks]) => `<div class="foCls"><h4>${esc(c.toUpperCase())}</h4><div>` +
       ks.map(k => `<button data-gun="${k}" class="${held.has(k) ? 'on' : ''}"><b>${esc(WEAPONS[k].name)}</b></button>`).join('') + '</div></div>').join('');
     for (const b of G.querySelectorAll('button[data-gun]')) {
