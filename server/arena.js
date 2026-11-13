@@ -49,6 +49,7 @@ export function arenaStart(game) {
     if (first) infect(game, first, true);
   }
   game.phase = PHASE.ACTION; game.timer = R.time;
+  for (const p of ps) p.alive = false; // placed one at a time, each away from those already placed
   for (const p of ps) arenaSpawn(game, p);
   game.events.push({ e: 'newmap', v: game.mapVersion });
   game.events.push({ e: 'banner', text: ({ oitc: 'ONE IN THE CHAMBER', gungame: 'GUN GAME', infected: 'INFECTED' })[mode], sub: ({
@@ -78,7 +79,7 @@ function spawnCells(m) {
 
 // a spot away from enemies (and out of their sight if it can be)
 function spawnSpot(game, p) {
-  const m = game.map, W = m.W, A = game.arena, foes = alive(game).filter(q => q !== p && game.side(q) !== game.side(p));
+  const m = game.map, W = m.W, A = game.arena, foes = alive(game).filter(q => q !== p && q.x !== undefined && game.side(q) !== game.side(p));
   let best = null, bs = -Infinity;
   for (let i = 0; i < 40 && A.spots.length; i++) {
     const k = A.spots[Math.floor(Math.random() * A.spots.length)], x = (k % W + 0.5) * CELL, y = (Math.floor(k / W) + 0.5) * CELL;
@@ -88,7 +89,7 @@ function spawnSpot(game, p) {
       near = Math.min(near, d);
       if (d < 30 * PX_PER_M && floorAt(m, q.x, q.y) === floorAt(m, x, y) && los(m, x, y, q.x, q.y)) seen++;
     }
-    const s = Math.min(near, 25 * PX_PER_M) - seen * 20 * PX_PER_M + Math.random() * 3 * PX_PER_M;
+    const s = Math.min(near, 40 * PX_PER_M) - seen * 20 * PX_PER_M + Math.random() * 3 * PX_PER_M;
     if (s > bs) { bs = s; best = { x, y }; }
   }
   return best ? game.freeSpotNear(best.x, best.y, 6) : { x: m.atkSpawns[0].x, y: m.atkSpawns[0].y };

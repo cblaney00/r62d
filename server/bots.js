@@ -2532,6 +2532,7 @@ export function arenaThink(game, p, dt) {
       return;
     }
     if (gun.ammo === 0) { game.startReload(p); return; }
+    if (A.mode === 'oitc' && d > 10 * PX_PER_M) { moveTo(game, p, inp, enemy, dt); inp.walk = 1; return; } // one bullet: close in for the sure shot
     inp.ads = d > 90 ? 1 : 0;
     if (ai.react > 0 && Math.abs(angDiff(want, p.aim)) < S.tol) shootInput(inp, ai, gun);
     ai.strafeT = (ai.strafeT || 0) - dt;
@@ -2555,11 +2556,21 @@ export function arenaThink(game, p, dt) {
   }
   // where to go: something heard, else every ~8 s a fresh enemy to hunt (the nearest, sometimes another), else a wander
   if (ai.heard && game.time - ai.heard.t < 6) ai.hunt = { x: ai.heard.x, y: ai.heard.y };
+  // Infected survivors (not bots alone in zombies): find a room and hold it, facing the way in, like people do
+  if (A.mode === 'infected' && p.ar && !p.ar.infected) {
+    if (!ai.hold || ai.holdLife !== p.respawnAt) { const rs = game.map.rooms; ai.hold = roomPoint(game, rs[Math.floor(Math.random() * rs.length)]); ai.holdLife = p.respawnAt; }
+    if (ai.hold && Math.hypot(ai.hold.x - p.x, ai.hold.y - p.y) > 20) moveTo(game, p, inp, ai.hold, dt);
+    else { inp.crouch = 1; checkAngles(game, p, dt); }
+    return;
+  }
+  // where to go: something heard, else a room to look through (people don't know where everyone is); the infected,
+  // and now and then anyone, head for the area round an enemy (the infected hunt by instinct)
   if (!ai.hunt || game.time > (ai.huntT || 0) || Math.hypot(ai.hunt.x - p.x, ai.hunt.y - p.y) < 30) {
-    ai.huntT = game.time + 6 + Math.random() * 5;
+    ai.huntT = game.time + 8 + Math.random() * 8;
     const foes = [...game.players.values()].filter(q => q.alive && q !== p && game.side(q) !== team).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
-    const q = foes.length ? foes[Math.random() < 0.7 ? 0 : Math.floor(Math.random() * foes.length)] : null;
-    ai.hunt = q ? { x: q.x + (Math.random() - 0.5) * 120, y: q.y + (Math.random() - 0.5) * 120 } : roomPoint(game, game.map.rooms[Math.floor(Math.random() * game.map.rooms.length)]);
+    const sense = (p.ar && p.ar.infected) || game.zb ? 1 : 0.25;
+    const q = foes.length && Math.random() < sense ? foes[Math.random() < 0.7 ? 0 : Math.floor(Math.random() * foes.length)] : null;
+    ai.hunt = q ? { x: q.x + (Math.random() - 0.5) * 320, y: q.y + (Math.random() - 0.5) * 320 } : roomPoint(game, game.map.rooms[Math.floor(Math.random() * game.map.rooms.length)]);
   }
   if (ai.hunt) moveTo(game, p, inp, ai.hunt, dt);
 }
