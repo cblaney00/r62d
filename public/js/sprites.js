@@ -244,6 +244,7 @@ export function drawOperator(ctx, p, t) {
   ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.stroke();
   const sg = ctx.createRadialGradient(2, 3, 2, 2, 3, 14); sg.addColorStop(0, 'rgba(0,0,0,0.45)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(2, 3, 14, 0, 7); ctx.fill();
+  if (p.hang && p.wallA !== undefined) { drawHanging(ctx, p, t, u, skin, tc, acc); ctx.restore(); return; }
   ctx.rotate(p.aim);
 
   if (p.downed) {
@@ -925,4 +926,28 @@ export function drawZombie(ctx, p, t) {
   ctx.restore();
   if (p.hit) { ctx.globalAlpha = p.hit; ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
   ctx.restore();
+}
+
+// Hanging on a rope, seen from above (he asked 2026-11-13: defenders see what shows of a climber in 2D). p.wallA = the
+// way the wall is (they face it); p.hang 'up' = the right way up: helmet and shoulders, arms up the rope; 'inv' = head
+// down: their boots and legs show at the top, the rope from the harness. The gun turns to where they aim either way.
+function drawHanging(ctx, p, t, u, skin, tc, acc) {
+  ctx.save(); ctx.rotate(p.wallA);
+  const glove = acc.has('gloves') ? tc : '#222326';
+  if (p.hang === 'inv') {
+    limb(ctx, [-2, -3, 4, -3.5], 3.6, u.clothD); limb(ctx, [-2, 3, 4, 3.5], 3.6, u.clothD); // legs up the wall
+    ell(ctx, 5.5, -3.6, 2.4, 2.1, '#1d1e20'); ell(ctx, 5.5, 3.6, 2.4, 2.1, '#1d1e20'); // boots against it
+    ell(ctx, -3.5, 0, 5.2, 6, u.cloth); box(ctx, -6, -4.5, 5, 9, 2, u.vest); // the body, below
+    ctx.strokeStyle = '#c8b27a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-2, 0); ctx.lineTo(9, 0); ctx.stroke(); // rope from the harness
+  } else {
+    ell(ctx, -1.5, 0, 6, 7.2, u.cloth); box(ctx, -4.5, -5, 6.5, 10, 2.5, u.vest); // shoulders and pack
+    limb(ctx, [0, -5, 4.5, -2.2, 8, -0.8], 2.6, u.cloth); limb(ctx, [0, 5, 4.5, 2.2, 8, 0.8], 2.6, u.cloth); // arms up the rope
+    ell(ctx, 8.4, -0.8, 1.5, 1.5, glove); ell(ctx, 8.4, 0.8, 1.5, 1.5, glove);
+    ell(ctx, 1.5, 0, 4.2, 4.2, skin); ell(ctx, 1.2, 0, 4.3, 4.1, shade(u.vest, 0.7)); // the helmet from above
+    if (acc.has('band')) { ctx.fillStyle = tc; ctx.fillRect(-0.4, -4, 1.4, 8); }
+    ctx.strokeStyle = '#c8b27a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(8.6, 0); ctx.lineTo(11, 0); ctx.stroke();
+  }
+  ctx.restore();
+  // the gun where they aim (short, held in one hand off the rope)
+  ctx.save(); ctx.rotate(p.aim); ctx.translate(p.hang === 'inv' ? -1 : 1, 2.5); ctx.scale(0.8, 0.8); drawGun(ctx, p.w, p.recoil || 0); ctx.restore();
 }
