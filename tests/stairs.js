@@ -35,7 +35,7 @@ function open(m, k) {
   return k;
 }
 let fails = 0;
-for (const id of MAP_LIST) {
+for (const id of process.argv[2] ? [process.argv[2]] : MAP_LIST) {
   const m = buildMap(id);
   for (const st of m.stairs) {
     const [dx, dy] = D[st.dir], W = m.W;

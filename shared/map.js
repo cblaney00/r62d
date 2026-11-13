@@ -8,6 +8,7 @@ import { build as embassy } from './maps/embassy.js';
 import { build as lodge } from './maps/lodge.js';
 import { build as school } from './maps/school.js';
 import { build as dust } from './maps/dust.js';
+import { build as lantern } from './maps/lantern.js';
 
 export const MAPS = {
   harbor: { name: 'Harbor Office', floors: '1F · 2F', desc: 'Offices and a garage by the docks.', build: harbor },
@@ -16,9 +17,10 @@ export const MAPS = {
   embassy: { name: 'The Embassy', floors: 'B · 1F · 2F', desc: 'A consulate round an open courtyard, with a vault and cells below.', build: embassy },
   lodge: { name: 'Alpine Lodge', floors: '1F · 2F', desc: 'A timber mountain lodge with a great hall, bar and guest suites.', build: lodge },
   school: { name: 'Clocktower School', floors: '1F · 2F · 3F', desc: 'An old school with a gym, labs upstairs and a clock tower on top.', build: school },
+  lantern: { name: 'Lantern Point', floors: '1F · 2F · 3F', desc: 'A harbour town on the point, overrun. Zombies only.', build: lantern, zombie: true },
   dust: { name: 'Dust Town', floors: '1F · 2F', desc: 'A desert town laid out like a classic: a long road, a middle street and a tight tunnel to two sites.', build: dust },
 };
-export const MAP_LIST = Object.keys(MAPS);
+export const MAP_LIST = Object.keys(MAPS).filter(k => !MAPS[k].zombie); // (the zombies town is not a normal map)
 
 const cache = new Map();
 export function buildMap(id = 'harbor') {

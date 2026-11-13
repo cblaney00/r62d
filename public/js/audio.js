@@ -517,6 +517,18 @@ export function play(name, x, y) {
     case 'vault': { foley('cloth', x, y); const g = out(x, y, 0.35, 380, 0.12); if (!g) return; const t = ac.currentTime; noise(g, t + 0.05, 0.14, 'lowpass', 600, 0.9, 0.6); noise(g, t + 0.45, 0.12, 'lowpass', 500, 1, 0.5); return; } // a hand on the ledge, then the landing
     case 'clamp': impact('metal', x, y); return foley('hurt', x, y);
     case 'swap': return;
+    // ZOMBIES (2026-11-12): a board ripped off, gates, machines, the crate, the round bell and the dead groaning
+    case 'board': { const g = out(x, y, 0.7, 900, 0.2); if (!g) return; const t = ac.currentTime; noise(g, t, 0.06, 'bandpass', 900, 1.5, 1); noise(g, t + 0.04, 0.25, 'lowpass', 1600, 0.8, 0.7, 0.005, 400); return; }
+    case 'gate': { const g = out(x, y, 0.6, 1100, 0.3); if (!g) return; const t = ac.currentTime; noise(g, t, 0.9, 'lowpass', 500, 1, 0.8, 0.02, 160); ring(g, t + 0.1, 220, 0.3, 0.6); return; }
+    case 'deny': { const g = out(x, y, 0.3, 300, 0.05); if (!g) return; const t = ac.currentTime; tone(g, t, 0.12, 220, 200, 'square', 0.35); tone(g, t + 0.14, 0.16, 180, 160, 'square', 0.35); return; }
+    case 'perk': { const g = out(x, y, 0.45, 500, 0.15); if (!g) return; const t = ac.currentTime; ring(g, t, 1400, 0.2, 0.2); for (let i = 0; i < 4; i++) tone(g, t + 0.25 + i * 0.12, 0.14, [523, 659, 784, 1046][i], null, 'triangle', 0.4); noise(g, t + 0.8, 0.4, 'highpass', 3000, 1, 0.3); return; }
+    case 'powerOn': { const g = out(x, y, 0.9, 99999, 0.4); if (!g) return; const t = ac.currentTime; noise(g, t, 0.15, 'lowpass', 300, 1, 1); tone(g, t + 0.1, 2.2, 40, 120, 'sawtooth', 0.35, 0.4); tone(g, t + 0.3, 2, 80, 240, 'sawtooth', 0.2, 0.4); return; }
+    case 'forge': { const g = out(x, y, 0.7, 700, 0.3); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 3; i++) { ring(g, t + i * 0.35, 900 + i * 60, 0.45, 0.5); noise(g, t + i * 0.35, 0.05, 'bandpass', 3000, 2, 0.8); } noise(g, t + 1.1, 0.8, 'highpass', 1800, 0.7, 0.5, 0.05, 6000); return; }
+    case 'crate': { const g = out(x, y, 0.5, 700, 0.25); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 12; i++) ring(g, t + i * 0.2, 1500 + (i % 4) * 300, 0.12, 0.15); tone(g, t + 2.5, 0.5, 784, 1046, 'triangle', 0.4); return; }
+    case 'crateGone': { const g = out(x, y, 0.6, 1200, 0.3); if (!g) return; const t = ac.currentTime; for (let i = 0; i < 5; i++) tone(g, t + i * 0.09, 0.12, 1600 - i * 120, 2200 - i * 100, 'sine', 0.3); noise(g, t + 0.3, 1.2, 'bandpass', 2500, 1, 0.3, 0.1, 900); return; }
+    case 'zbRound': { const g = out(x, y, 0.7, 99999, 0.5); if (!g) return; const t = ac.currentTime; for (const [d, f0] of [[0, 110], [0.9, 104], [1.8, 98]]) { ring(g, t + d, f0 * 2, 0.5, 1.4); tone(g, t + d, 1.6, f0, f0 * 0.98, 'sine', 0.5, 0.01); } return; }
+    case 'zbRoundEnd': { const g = out(x, y, 0.55, 99999, 0.5); if (!g) return; const t = ac.currentTime; tone(g, t, 1.4, 196, 196, 'triangle', 0.4, 0.05); tone(g, t + 0.4, 1.4, 247, 247, 'triangle', 0.35, 0.05); tone(g, t + 0.8, 1.8, 294, 294, 'triangle', 0.35, 0.05); return; }
+    case 'groan': { const g = out(x, y, 0.4, 650, 0.25); if (!g) return; const t = ac.currentTime, f0 = 80 + Math.random() * 50, d = 0.6 + Math.random() * 0.6; tone(g, t, d, f0, f0 * (0.7 + Math.random() * 0.2), 'sawtooth', 0.35, 0.08); noise(g, t, d, 'bandpass', 400 + Math.random() * 300, 3, 0.25, 0.08); return; }
     case 'fakeStep': return step(x, y, 'concrete', 2, false); // RUSE's echo box
     case 'fakeShot': return gunshot('lark', x, y, false);
     case 'droneSprint': { const g = out(x, y, 0.5, 300, 0.12); if (!g) return; const t = ac.currentTime; tone(g, t, 0.35, 600, 1500, 'sawtooth', 0.08); return; } // the motor winding up

@@ -41,6 +41,22 @@ function star(c, cx, cy, r, n, col, inner = 0.55, rot = 0) {
 export function drawOutProp(c, p, X, Y, W, H, h) {
   const cx = X + W / 2, cy = Y + H / 2, R = Math.min(W, H) / 2;
   switch (p.kind) {
+    // Lantern Point (the zombies town, 2026-11-12): open sea, small boats, gravestones, lobster pots
+    case 'sea': {
+      const g = c.createLinearGradient(X, Y, X + W, Y + H); g.addColorStop(0, '#1d4f68'); g.addColorStop(1, '#163c52');
+      c.fillStyle = g; c.fillRect(X, Y, W, H);
+      c.strokeStyle = 'rgba(200,230,240,0.13)'; c.lineWidth = 0.8;
+      const n = Math.min(400, Math.round(W * H / 900));
+      for (let i = 0; i < n; i++) { const xx = X + h(i * 3) * W, yy = Y + h(i * 3 + 1) * H, l = 6 + h(i * 3 + 2) * 12; c.beginPath(); c.moveTo(xx, yy); c.quadraticCurveTo(xx + l / 2, yy - 2, xx + l, yy); c.stroke(); }
+      break;
+    }
+    case 'boat': shadow(c, X, Y, W, H, 4); long(c, X, Y, W, H, h, (L, B) => {
+      c.fillStyle = h(5) < 0.5 ? '#c9c2b2' : '#3f6a8a'; c.beginPath(); c.moveTo(0, -L / 2); c.quadraticCurveTo(B / 2, -L / 4, B / 2 - 1, L / 2); c.lineTo(-B / 2 + 1, L / 2); c.quadraticCurveTo(-B / 2, -L / 4, 0, -L / 2); c.fill();
+      c.fillStyle = '#7a5a3a'; c.fillRect(-B / 2 + 2.5, -L / 4, B - 5, L * 0.7);
+      c.fillStyle = '#5c4229'; for (let i = 0; i < 3; i++) c.fillRect(-B / 2 + 2.5, -L / 8 + i * L / 5, B - 5, 1.6);
+    }); break;
+    case 'grave': c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(X + 2, Y + 2, W - 2, H - 2); c.fillStyle = '#8d8f8c'; rr(c, X + 1, Y + 1, W - 3, H - 3, 2); c.fill(); c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(X + W * 0.3, Y + H * 0.35, W * 0.4, 1); break;
+    case 'pots': shadow(c, X, Y, W, H, 1); for (let i = 0; i < Math.max(1, Math.round(W * H / 120)); i++) { const xx = X + 2 + h(i) * (W - 10), yy = Y + 2 + h(i + 7) * (H - 10); c.fillStyle = '#6b4a2e'; c.fillRect(xx, yy, 8, 8); c.strokeStyle = '#c9b37a'; c.lineWidth = 0.6; c.strokeRect(xx + 1, yy + 1, 6, 6); c.beginPath(); c.moveTo(xx + 4, yy + 1); c.lineTo(xx + 4, yy + 7); c.stroke(); } break;
     case 'aircon': shadow(c, X, Y, W, H, 3); c.fillStyle = '#8a9096'; c.fillRect(X, Y, W, H); c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 1; c.strokeRect(X + 0.5, Y + 0.5, W - 1, H - 1); c.fillStyle = '#4b5056'; c.beginPath(); c.arc(cx, cy, R * 0.72, 0, 7); c.fill(); c.strokeStyle = '#b5bbc1'; for (let i = 0; i < 3; i++) { const a = i * 2.09; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * R * 0.66, cy + Math.sin(a) * R * 0.66); c.stroke(); } break;
     case 'truck': shadow(c, X, Y, W, H, 3); long(c, X, Y, W, H, h, (L, B) => {
       c.fillStyle = '#111'; for (const s of [-1, 1]) for (const t of [-0.36, 0.18, 0.36]) c.fillRect(s * B / 2 - 2, t * L - 4, 4, 8);

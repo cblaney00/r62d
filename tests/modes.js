@@ -71,8 +71,8 @@ if (roundsToWin(Q, [2, 2]) !== 3) fail('quick match has overtime');
   const g = new Game(), p = person(g, 'Mode Ranked');
   g.handle(p, { t: 'lobby', a: 'mode', id: 'ranked' });
   if (!g.ranked || !g.rules.bans || g.rules.winRounds !== 4) fail('ranked rules wrong');
-  g.handle(p, { t: 'lobby', a: 'mode', id: 'zombies' });
-  if (g.mode !== 'ranked') fail('a mode that is not ready could be chosen');
+  g.handle(p, { t: 'lobby', a: 'mode', id: 'nonsense' });
+  if (g.mode !== 'ranked') fail('an unknown mode could be chosen');
 }
 // tutorial / free / TV keep the classic rules
 {

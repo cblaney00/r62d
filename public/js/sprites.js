@@ -884,3 +884,45 @@ export function portrait(canvas, opKey) {
   drawOperator(ctx, { x: 21, y: 24, aim: -0.55, op: opKey, w: o.primary, ally: true, walk: 0.6 }, 0);
   ctx.restore();
 }
+
+// ZOMBIES (2026-11-12): the dead of Lantern Point, drawn in code like everyone else. Grey-green skin, torn work and
+// fishing clothes (six looks), arms reaching ahead, a lurching walk; runners lean in further. p: x, y, aim, walk
+// (step phase), legs (0-1 how much they step), look (0-5), run (0 shamble, 1 run, 2 sprint), dead, hit (recent hit).
+const ZB_CLOTH = [['#4f5a44', '#3a4232'], ['#4b4a5e', '#36364a'], ['#6a4f3c', '#4d392b'], ['#3f5a5a', '#2d4242'], ['#5c3f45', '#432e33'], ['#56585a', '#3e4042']];
+const ZB_SKIN = ['#8e9f78', '#97a083', '#879a7e', '#a0a487'];
+export function drawZombie(ctx, p, t) {
+  const [cloth, clothD] = ZB_CLOTH[(p.look || 0) % ZB_CLOTH.length], skin = ZB_SKIN[(p.look || 0) % ZB_SKIN.length];
+  ctx.save(); ctx.translate(p.x, p.y);
+  const sg = ctx.createRadialGradient(2, 3, 2, 2, 3, 13); sg.addColorStop(0, 'rgba(0,0,0,0.45)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(2, 3, 13, 0, 7); ctx.fill();
+  ctx.rotate(p.aim);
+  if (p.dead) {
+    ctx.rotate(Math.PI * 0.9);
+    ell(ctx, -1, 0, 7, 7.5, cloth); limb(ctx, [2, -5, 7, -9, 11, -8], 2.8, skin); limb(ctx, [2, 5, 7, 8, 12, 6], 2.8, skin);
+    ell(ctx, 8, 0, 4, 4, skin); ctx.fillStyle = 'rgba(110,10,10,0.55)'; ctx.beginPath(); ctx.ellipse(-3, 2, 9, 6, 0.4, 0, 7); ctx.fill();
+    ctx.restore(); return;
+  }
+  const ph = (p.walk || 0) * (p.run ? 1.4 : 1), st = Math.sin(ph) * 4.5 * (p.legs ?? 1), lurch = Math.sin(ph * 0.5) * 0.12;
+  ctx.rotate(lurch);
+  // legs
+  limb(ctx, [0, -3, st * 0.6, -3.6, st * 1.25, -3.9], 3.2, clothD);
+  limb(ctx, [0, 3, -st * 0.6, 3.6, -st * 1.25, 3.9], 3.2, clothD);
+  // body, hunched forward
+  ell(ctx, p.run ? 0.5 : -0.5, 0, 6.2, 7.6, cloth);
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(-3, -6, 1.2, 5); ctx.fillRect(1, 2, 3, 1.2); // rips
+  ctx.fillStyle = 'rgba(105,12,12,0.6)'; ctx.beginPath(); ctx.ellipse(1.5, -2.5, 2.6, 1.8, 0.6, 0, 7); ctx.fill();
+  // arms out in front, swaying
+  const sw = Math.sin(t * 3 + (p.look || 0)) * 1.4, reach = p.run ? 12 : 13;
+  limb(ctx, [1, -5.5, 7, -6.5 + sw, reach, -5 + sw], 2.6, skin);
+  limb(ctx, [1, 5.5, 7, 6.5 - sw, reach - 1, 5 - sw], 2.6, skin);
+  ell(ctx, reach + 0.6, -5 + sw, 1.6, 1.6, '#6e7a5d'); ell(ctx, reach - 0.4, 5 - sw, 1.6, 1.6, '#6e7a5d');
+  // head, tilted, dark eyes
+  ctx.save(); ctx.translate(p.run ? 5 : 4, 0.6);
+  ell(ctx, 0, 0, 4.2, 4.4, skin);
+  ctx.fillStyle = 'rgba(40,40,30,0.55)'; ctx.beginPath(); ctx.arc(-1.2, 0, 3.4, 1.6, 4.7); ctx.fill(); // patchy hair
+  ctx.fillStyle = '#1a1410'; ctx.fillRect(2, -2, 1.4, 1.2); ctx.fillRect(2, 0.8, 1.4, 1.2);
+  ctx.fillStyle = 'rgba(255,60,30,0.75)'; ctx.fillRect(2.5, -1.7, 0.6, 0.6); ctx.fillRect(2.5, 1.1, 0.6, 0.6);
+  ctx.restore();
+  if (p.hit) { ctx.globalAlpha = p.hit; ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+  ctx.restore();
+}

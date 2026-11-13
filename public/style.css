@@ -1204,3 +1204,15 @@ html.tv canvas#game { cursor: default; }
 
 /* FUN MODES: guns and knives only */
 html.arena #gadgets, html.arena #cambar, html.arena #allies, html.arena #compass { display: none !important; }
+
+/* ZOMBIES: the round number, everyone's points, your perks (bottom left, above health) */
+#zbHud { display: none; position: absolute; right: 150px; bottom: 118px; pointer-events: none; }
+html.zombies #zbHud { display: flex; flex-direction: row-reverse; align-items: flex-end; gap: 16px; }
+.zbRound { font: 800 76px/0.9 var(--head); color: #b3261e; text-shadow: 0 0 18px rgba(180,30,20,0.55), 0 2px 4px #000; }
+.zbPts { display: flex; flex-direction: column; gap: 2px; }
+.zbPts div { display: flex; gap: 10px; justify-content: space-between; min-width: 150px; font: 700 15px var(--head); color: #cfd6dc; text-shadow: 0 1px 3px #000; }
+.zbPts div b { color: #f2c14e; font-size: 18px; } .zbPts div.me span { color: #fff; } .zbPts div.me b { font-size: 24px; }
+.zbPerks { display: flex; gap: 4px; }
+.zbPerks i { width: 26px; height: 26px; display: grid; place-items: center; font: 800 15px var(--head); font-style: normal; color: #111; background: var(--pc); border: 2px solid rgba(0,0,0,0.6); box-shadow: 0 0 10px var(--pc); }
+#prompt i { font-style: normal; color: #f2c14e; } #prompt i.poor { color: #ff6a5a; }
+html.zombies #leftCount, html.zombies #tipNow { display: none !important; }

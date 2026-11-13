@@ -8,6 +8,7 @@ import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldP
 import { arenaThink, defSetup, botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { arenaStart, arenaTick, arenaKill, arenaDamage, arenaSpeed, arenaEndMatch, arenaPlayer, arenaInfo } from './arena.js';
+import { zbStart, zbTick, zombieThink, zbSpeed, zbDamage, zbKill, zbCanGoDown, zbReloadMul, zbBlocksVault, zbUse, zbEnd, zbPlayer, zbInfo } from './zombies.js';
 import { MODES, CLASSIC, DEFAULT_MODE, attackSquad, roundsToWin, inOvertime } from '../shared/modes.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
@@ -158,12 +159,12 @@ export class Game {
   humanCount() { let n = 0; for (const p of this.players.values()) if (!p.bot) n++; return n; }
 
   addPlayer(name, bot) {
-    if (this.players.size >= MAX_PLAYERS) {
-      const b = [...this.players.values()].find(q => q.bot); // a human bumps a bot
+    if ([...this.players.values()].filter(q => !q.zombie).length >= MAX_PLAYERS) {
+      const b = [...this.players.values()].find(q => q.bot && !q.zombie); // a human bumps a bot
       if (b && !bot) this.players.delete(b.id); else if (bot) return null;
     }
     const counts = [0, 0];
-    for (const q of this.players.values()) counts[q.squad]++;
+    for (const q of this.players.values()) if (!q.zombie && counts[q.squad] !== undefined) counts[q.squad]++;
     const p = this.blankPlayer(name, bot, counts[0] <= counts[1] ? 0 : 1);
     this.players.set(p.id, p);
     return p;
@@ -181,10 +182,11 @@ export class Game {
   get ranked() { return !!this.rules.ranked; }
   set ranked(v) { this.mode = v ? 'ranked' : DEFAULT_MODE; }
   atkSquad(r = this.round) { return attackSquad(this.rules, r); }
-  side(p) { if (this.arena) return this.arena.ffa ? 'f' + p.squad : p.squad === 0 ? TEAM.ATK : TEAM.DEF; return p.squad === this.atkSquad() ? TEAM.ATK : TEAM.DEF; } // fun modes: everyone for themselves = a side each (survivors attack, the infected defend)
+  side(p) { if (this.zb) return p.zombie ? TEAM.DEF : TEAM.ATK; if (this.arena) return this.arena.ffa ? 'f' + p.squad : p.squad === 0 ? TEAM.ATK : TEAM.DEF; return p.squad === this.atkSquad() ? TEAM.ATK : TEAM.DEF; } // fun modes: everyone for themselves = a side each (survivors attack, the infected defend)
 
   resetToLobby() {
     if (this.arena) arenaEndMatch(this);
+    if (this.zb) zbEnd(this);
     this.phase = PHASE.LOBBY; this.timer = 0; this.round = 0; this.score = [0, 0];
     this.ents = []; this.planted = null;
     for (const p of this.players.values()) { p.alive = false; p.op = null; }
@@ -357,7 +359,8 @@ export class Game {
   startMatch() {
     if (this.players.size === 0) return;
     if (this.randomMap) { const list = MAP_LIST.filter(k => k !== this.mapId); this.mapId = list[Math.floor(Math.random() * list.length)]; this.map = buildMap(this.mapId); }
-    if (this.rules.kind === 'arena') { arenaStart(this); return; } // FUN MODES: one match of respawning action
+    if (this.rules.kind === 'arena') { arenaStart(this); return; }
+    if (this.rules.kind === 'zombies') { zbStart(this); return; } // ZOMBIES: Lantern Point, round after round // FUN MODES: one match of respawning action
     if (this.ranked) { this.rankedLevel(); for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); } // empty slots on both teams: bots at that rank
     assignPros(this); this.proState = {}; this.proLast = {}; this.proLog = [];
     this.score = [0, 0]; this.round = 0; // round 1: squad 0 attacks (the tutorial: you attack, then defend)
@@ -592,9 +595,10 @@ export class Game {
     for (const p of this.players.values()) if (p.ms && p.alive) p.ms.playSeconds += dt;
     if (this.free) this.freeRespawns();
     if (this.arena) arenaTick(this, dt);
+    if (this.zb) zbTick(this, dt);
     for (const p of this.players.values()) {
       this.by = this.side(p); // a bot's own work (boards, reinforcing in preparation) is its side's
-      if (p.bot && !p.hold) { (this.arena ? arenaThink : botThink)(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
+      if (p.bot && !p.hold) { (p.zombie ? zombieThink : this.arena || this.zb ? arenaThink : botThink)(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
       this.tickPlayer(p, dt);
       p.prevInput = p.input;
     }
@@ -613,7 +617,7 @@ export class Game {
   allLocked() { for (const p of this.players.values()) if (!p.locked && (p.bot || (p.sock && p.sock.open))) return false; return true; }
 
   checkWin() {
-    if (this.arena) return; // fun modes end in arenaTick
+    if (this.arena || this.zb) return; // fun modes end in arenaTick / zbTick
     const up = { atk: 0, def: 0 };
     for (const p of this.players.values()) if (p.alive && !p.downed) up[this.side(p)]++;
     // anyone left downed with no standing teammates bleeds out at once
@@ -651,6 +655,7 @@ export class Game {
     if (p.scanning) mul *= 0.6;
     if (this.time < (p.boostUntil || 0)) mul *= 1.25; // Adrenal Shot
     if (this.arena) mul *= arenaSpeed(this, p); // the infected are quicker
+    if (this.zb) mul *= zbSpeed(this, p); // zombies shamble
     if (p.shrouded) mul *= 0.8;
     if (p.bipodSet) mul *= 0.15; // PERCH's bipod is down: you can only shuffle
     if (this.ghost(p)) mul *= 0.85; // STRIDER's Ghost Step: careful, slower steps (he asked: it was too strong)
@@ -693,7 +698,7 @@ export class Game {
     this.tickSnipers(p); this.tickGrapple(p, dt);
     // a defender outside the building (preparation or action): the attackers are warned at once, and after RUNOUT_SPOT
     // seconds outside in a row (R6's run-out rule, he chose it) the defender is spotted for them until back inside
-    if (p.alive && this.side(p) === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION) && !this.tut) {
+    if (p.alive && this.side(p) === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION) && !this.tut && !this.arena && !this.zb) {
       const k = Math.floor(p.y / CELL) * this.map.W + Math.floor(p.x / CELL), out = this.map.tiles[k] === T.GROUND;
       p.outside = out; // the attackers get a warning at the top of the screen while any defender is outside (snapshot `ou`)
       p.outT = out ? (p.outT || 0) + dt : 0;
@@ -847,8 +852,11 @@ export class Game {
 
     // interaction (hold E)
     if (inp.interact && p.ctrl === 'body' && !p.rope && !p.ropeHeld) {
+      if (this.zb && zbUse(this, p, dt, inp)) p.busy = null; // ZOMBIES: buying and boarding windows
+      else {
       if (!p.busy) p.busy = this.startInteract(p);
       if (p.busy) this.continueInteract(p, dt);
+      }
     } else p.busy = null;
 
     // a defender looking through a turret camera fires its laser
@@ -916,7 +924,7 @@ export class Game {
   startReload(p) {
     const gun = p.guns[p.slot];
     if (!gun || p.reloadT > 0 || gun.reserve <= 0 || gun.ammo >= WEAPONS[gun.w].mag) return;
-    const rw = WEAPONS[gun.w]; p.reloadT = p.reloadLen = reloadLen(rw, gun); if (rw.tandem) gun.tap = !gun.tap; // the Tandem: the taped magazine, then a full change
+    const rw = WEAPONS[gun.w]; p.reloadT = p.reloadLen = reloadLen(rw, gun) * (this.zb ? zbReloadMul(this, p) : 1); if (rw.tandem) gun.tap = !gun.tap; // the Tandem: the taped magazine, then a full change
     this.events.push({ e: 'snd', s: 'reload', x: r1(p.x), y: r1(p.y), id: p.id });
   }
 
@@ -931,6 +939,7 @@ export class Game {
     if (this.time - (p.lastShot ?? -9) > 0.25) p.spinFrom = this.time; // the Cyclone winds up from here (and down when you let go)
     const at0 = p.adsT || 0;
     gun.ammo--; p.fireCd = Math.max(p.fireCd, -1 / 30) + 60 / fireRpm(w, at0, this.time - p.spinFrom); // keep the leftover: guns fire at their real rate, not rounded up to whole ticks
+    if (this.zb && p.zb && p.zb.perks.includes('rapid')) p.fireCd -= 60 / fireRpm(w, at0, this.time - p.spinFrom) * 0.25; // DOUBLE BARREL
     if (p.ms) p.ms.shots += w.pellets;
     // hip fire is a loose cone that widens while moving; aimed fire is accurate even on the move (R6 rules)
     const run = Math.min(1, Math.hypot(p.vx || 0, p.vy || 0) / BASE_SPEED + (p.air > 0 ? 1.5 : 0)), at = p.adsT || 0; // mid-jump: wild
@@ -1390,6 +1399,7 @@ export class Game {
     if (this.phase === PHASE.PREP && src && this.side(src) === this.side(q)) return; // no friendly fire (or hurting yourself) while setting up (he asked)
     if (this.tut && src && src.bot && !q.bot) return; // tutorial bots never hurt you (he asked)
     if (this.arena) { amount = arenaDamage(this, q, amount, src, wname); if (amount <= 0) return; }
+    if (this.zb) { amount = zbDamage(this, q, amount, src, wname); if (amount <= 0) return; }
     amount = Math.round(amount);
     if (src && src.ms && src !== q && this.side(src) !== this.side(q)) src.ms.damage += Math.min(amount, Math.max(0, q.hp));
     if (src && src.sock) this.events.push({ e: 'hitmark', to: src.id, kill: false });
@@ -1399,7 +1409,8 @@ export class Game {
     q.hp -= amount;
     if (q.hp <= 0) {
       const up = [...this.players.values()].filter(o => o.alive && !o.downed && this.side(o) === this.side(q)).length;
-      if (!this.headshot && q.hp > -35 && up > 1 && this.phase === PHASE.ACTION && !this.arena) { // (fun modes: no going down, straight out)
+      if (this.zb ? zbCanGoDown(this, q) : !this.headshot && q.hp > -35 && up > 1 && this.phase === PHASE.ACTION && !this.arena) {
+        q.downT = this.time; // (fun modes: no going down, straight out)
         if (src && src.ms && src !== q) src.ms.downs++;
         if (src && src !== q && this.side(src) !== this.side(q)) this.pts(src, 50, 'ENEMY DOWNED');
         q.downed = true; q.selfUp = 0; q.hp = DUR.bleedout; q.downedBy = src ? src.id : null; q.busy = null; q.ctrl = 'body';
@@ -1415,7 +1426,7 @@ export class Game {
     this.ropeFall(q);
     if (src && src !== q) (this.lastDeath || (this.lastDeath = {}))[this.side(q)] = { x: q.x, y: q.y, t: this.time }; // defender bots rotate when someone falls on the site
     if (src && src !== q && src.squad !== q.squad) (this.proTrade || (this.proTrade = {}))[q.squad] = { x: q.x, y: q.y, from: { x: src.x, y: src.y }, t: this.time }; // the pros trade a teammate's death
-    if (src && src !== q && this.side(src) !== this.side(q)) { // what the pros say about it: the one who died says who and where, the one who got the kill says so
+    if (src && src !== q && this.side(src) !== this.side(q) && !q.zombie && !src.zombie) { // what the pros say about it: the one who died says who and where, the one who got the kill says so
       const nm = o => OPERATORS[o.op] ? OPERATORS[o.op].name[0] + OPERATORS[o.op].name.slice(1).toLowerCase() : 'someone', rm = (x, y) => (roomAt(this.map, x, y) || 'outside').replace(/^\dF /, '');
       const left = [...this.players.values()].filter(o => o.alive && o !== q && this.side(o) === this.side(q)).length;
       talk(this, q, 'dead', { op: nm(src), place: rm(src.x, src.y) });
@@ -1434,6 +1445,7 @@ export class Game {
     if (this.tv && this.tv.socks.size && src && src !== q) this.tvKill(q, src, wname);
     const d = this.ent(q.droneId); if (d && this.phase === PHASE.PREP) this.removeEnt(d);
     if (this.arena) arenaKill(this, q, src, wname);
+    if (this.zb) zbKill(this, q, src, wname);
   }
 
   // he asked: when the carrier goes down the defuser falls where everyone can tell; defenders are told too and see where
@@ -1601,6 +1613,7 @@ export class Game {
     if (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK) return false;
     const to = findVault(this.map, p.x, p.y, ang);
     if (!to) return false;
+    if (this.zb && zbBlocksVault(this, p, to)) return false; // ZOMBIES: people can't climb out of the windows
     const d = Math.hypot(to.x - p.x, to.y - p.y);
     p.vault = { x0: p.x, y0: p.y, x1: to.x, y1: to.y, t: 0, dur: VAULT_TIME * (0.8 + 0.2 * d / 40) };
     p.reloadT = 0; p.adsT = 0; p.scanning = false; p.bracing = false;
@@ -1647,6 +1660,7 @@ export class Game {
 
   // he asked: bullets wear a planked door or window right down: 320 damage of bullets in all breaks the whole board
   barriShot(k, dmg) {
+    if (this.zb) return; // ZOMBIES: the window boards only come off to zombies
     const id = this.map.openId[k]; if (id < 0 || id === undefined) return;
     const D = this.map.barriDmg || (this.map.barriDmg = {});
     if ((D[id] = (D[id] || 0) + dmg) >= BARRI_BULLET_HP) { delete D[id]; this.destroyCell(k); }
@@ -1669,6 +1683,7 @@ export class Game {
 
   // A melee hit on a barricade: three break it (the whole board across the doorway or window, like R6)
   barriHit(k) {
+    if (this.zb) return;
     const o = this.map.openings[this.map.openId[k]], cells = o ? o.cells.filter(c => this.map.tiles[c] === T.BARRI) : [k];
     for (const c of cells) { this.map.hp[c] -= CELL_HP[T.BARRI] / 3 + 0.01; this.changed.add(c); }
     if (cells.some(c => this.map.hp[c] <= 0)) for (const c of cells) this.destroyCell(c);
@@ -1702,7 +1717,7 @@ export class Game {
     const team = this.side(p);
     if (p.vault && e.k !== 'spot' && e.k !== 'view') return; // busy climbing
     if (p.staged && ['vault', 'melee', 'ability', 'gadget', 'reload'].includes(e.k)) return; // not on the map yet (he noticed shots before spawning)
-    if (this.arena && ['ability', 'gadget', 'drone', 'feeds', 'view', 'camNext', 'camPrev', 'camSet'].includes(e.k)) return; // fun modes: guns and knives only
+    if ((this.arena || this.zb) && ['ability', 'gadget', 'drone', 'feeds', 'view', 'camNext', 'camPrev', 'camSet'].includes(e.k)) return; // fun modes: guns and knives only
     switch (e.k) {
       case 'vault': this.startVault(p, typeof e.a === 'number' && isFinite(e.a) ? e.a : p.aim); break;
       case 'reload': if (!p.downed && p.ctrl === 'body') this.startReload(p); else this.birdAuto(p); break; // on a landed bird: AUTO on/off
@@ -3050,6 +3065,7 @@ export class Game {
   }
 
   checkReveal() {
+    if (this.arena || this.zb) return;
     if (this.siteRevealed || this.phase === PHASE.SELECT) return;
     const bombs = this.map.sites[this.site].bombs;
     const viewers = [];
@@ -3144,7 +3160,7 @@ export class Game {
     const players = [...this.players.values()].map(p => {
       const g = p.guns[p.slot];
       const o = {
-        id: p.id, n: p.name, b: p.bot ? 1 : 0, sq: p.squad, ar: this.arena ? arenaPlayer(this, p) : undefined, tm: this.round ? this.side(p) : (p.squad === 0 ? 'atk' : 'def'),
+        id: p.id, n: p.name, b: p.bot ? 1 : 0, sq: p.squad, ar: this.arena ? arenaPlayer(this, p) : undefined, zb: this.zb ? zbPlayer(this, p) : undefined, tm: this.round ? this.side(p) : (p.squad === 0 ? 'atk' : 'def'),
         op: p.op, a: p.alive ? 1 : 0, bt: p.bot ? 1 : undefined, rn: p.bot || !p.token ? undefined : rankOf(p.mmr), k: p.kills, d: p.deaths, sc: p.score || 0, ms: p.rtt,
       };
       if (p.alive) Object.assign(o, {
@@ -3198,7 +3214,7 @@ export class Game {
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, pp: this.map.peeps && this.map.peeps.length ? this.map.peeps : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
       site: this.site, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
-      tvl: this.tv ? this.botLevel : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ar: arenaInfo(this), ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
+      tvl: this.tv ? this.botLevel : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ar: arenaInfo(this), zb: zbInfo(this), ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
       bq: (this.tv || this.rules.bans) && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, (this.banRun.t ?? this.time) - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, cb, hb, ev: this.events, spots, time: r2(this.time),
     });

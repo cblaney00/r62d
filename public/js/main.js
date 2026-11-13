@@ -10,7 +10,7 @@ import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { tilt, raisedFrame, drawRaised, sightClip, looks } from './look.js';
 import { S, setMapScale } from './textures.js';
-import { drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
+import { drawZombie, drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
 import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
@@ -749,12 +749,14 @@ function onEvent(e, s, players) {
       if (e.kind !== 'stun' && e.kind !== 'emp') st.rend.scorch(e.x, e.y, Math.min(40, e.r * 0.6));
       audio.explosion(e.x, e.y, e.kind);
       break;
+    case 'zbCrate': st.zbCrate = { w: e.w, at: now + e.t, until: now + e.t + 2 }; audio.play('crate', e.x, e.y); break;
+    case 'zbRound': audio.play('zbRound', 0, 0); break;
     case 'kill': {
       const v = players.get(e.victim), k = e.killer ? players.get(e.killer) : null;
       const prev = st.snaps.length > 1 ? st.snaps[st.snaps.length - 2].players.get(e.victim) : null;
       const pos = prev && prev.x !== undefined ? prev : null;
-      if (pos && v && (v.tm === mySide() || teamSees(pos.x, pos.y))) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide(), ring: tvRing(v), n: v.n, t: performance.now() / 1000 }); st.rend.pool(pos.x, pos.y); }
-      addKill(k, v, e.w, e.hs, e.df);
+      if (pos && v && (v.tm === mySide() || teamSees(pos.x, pos.y))) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide(), ring: tvRing(v), n: v.n, t: performance.now() / 1000, zbc: !!(v.zb && v.zb[0] === 1), look: v.zb && v.zb[2] }); st.rend.pool(pos.x, pos.y); }
+      if (!(v && v.zb && v.zb[0] === 1)) addKill(k, v, e.w, e.hs, e.df); // (zombies: no kill feed for every one of them)
       if (e.hs && k && k.id === st.id) audio.ui('headshot');
       break;
     }
@@ -1215,7 +1217,7 @@ function renderMapPick(s) {
     b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'map', id }); };
     el.appendChild(b);
   }
-  $('lobbyHint').textContent = `${s.rm ? 'Random map: a surprise until the match starts · ' : MAPS[s.mp] ? MAPS[s.mp].name + ' · ' + MAPS[s.mp].desc + ' · ' : ''}${ruleLine(MODES[s.md] || MODES.quick)}`;
+  $('lobbyHint').textContent = `${s.md === 'zombies' ? 'Lantern Point · a harbour town on the point, overrun · ' : s.rm ? 'Random map: a surprise until the match starts · ' : MAPS[s.mp] ? MAPS[s.mp].name + ' · ' + MAPS[s.mp].desc + ' · ' : ''}${ruleLine(MODES[s.md] || MODES.quick)}`;
 }
 function renderLobby(s) {
   renderControls(); renderMapPick(s);
@@ -1230,7 +1232,7 @@ function renderLobby(s) {
   setText('hostCode', u ? 'CODE ' + showCode(u.code) : 'Let friends join');
   if ($('joinAddr').textContent !== jt) $('joinAddr').textContent = jt;
   for (const b of ['lanBtn', 'pLan']) $(b).classList.toggle('hidden', !!(st.addr && st.addr.local)); // the program's PLAY: this computer only, nobody to invite
-  { const ffa = MODES[s.md] && MODES[s.md].kind === 'arena'; // fun modes pick their own sides: the two lists are just players
+  { const ffa = MODES[s.md] && MODES[s.md].kind !== 'siege'; $('mapPick').classList.toggle('hidden', s.md === 'zombies'); document.querySelector('#room .vs').classList.toggle('hidden', s.md === 'zombies'); // fun modes pick their own sides: the two lists are just players
     setText(document.querySelector('#sq0 h3'), ffa ? 'PLAYERS' : 'TEAM ALPHA'); setText(document.querySelector('#sq1 h3'), ffa ? 'PLAYERS' : 'TEAM BRAVO'); }
   for (const sq of [0, 1]) {
     const ul = document.querySelector(`#sq${sq} ul`);
@@ -1567,10 +1569,10 @@ function addKill(k, v, w, hs, df) {
   while ($('killfeed').children.length > 6) $('killfeed').firstChild.remove();
 }
 function showEnd(squad) {
-  const me = st.me, won = me && me.sq === squad;
+  const me = st.me, won = me && me.sq === squad, zbEnd = st.last && st.last.zb;
   const e = $('endscreen'); e.classList.remove('hidden');
-  e.querySelector('.t').textContent = won ? 'VICTORY' : 'DEFEAT'; e.querySelector('.t').className = 't ' + (won ? 'win' : 'lose');
-  const sc = st.last.sc; e.querySelector('.s').textContent = st.last.ar && st.last.ar.m !== 'infected' ? arenaPlace(st.last, me) : me ? `${sc[me.sq]} — ${sc[1 - me.sq]}` : '';
+  e.querySelector('.t').textContent = zbEnd ? 'GAME OVER' : won ? 'VICTORY' : 'DEFEAT'; e.querySelector('.t').className = 't ' + (won ? 'win' : 'lose');
+  const sc = st.last.sc; e.querySelector('.s').textContent = zbEnd ? `YOU REACHED ROUND ${zbEnd.r}` : st.last.ar && st.last.ar.m !== 'infected' ? arenaPlace(st.last, me) : me ? `${sc[me.sq]} — ${sc[1 - me.sq]}` : '';
   e.querySelector('.board').innerHTML = scoreTable(st.last);
   audio.ui(won ? 'victory' : 'defeat');
   const mv = st.mvp;
@@ -1606,6 +1608,75 @@ async function playXp(m) {
   }
   updateCard();
 }
+// ZOMBIES on screen (server/zombies.js; players carry zb = [0, points, kills, perks, heads, revives], zombies [1, run, look];
+// the match carries zb = { r round, left, pw power, g gates open, c crate spot (-1 moving), cb rolling, b between, wb boards })
+const ZB_PERKS = { tough: ['IRON HIDE', '#d94a3a', 2500], reload: ['QUICK HANDS', '#5fd08a', 3000], revive: ['SECOND WIND', '#4fb3ff', 1500], rapid: ['DOUBLE BARREL', '#f2c14e', 2000] };
+function zbStationAt(s, me, x, y) { // the same rules as zbStation in server/zombies.js
+  const Z = st.map.zombies, Zs = s.zb, m = st.map, fl = floorAt(m, x, y), near = (p, r) => p && Math.hypot(p.x - x, p.y - y) < r && floorAt(m, p.x, p.y) === fl;
+  for (let i = 0; i < Z.gates.length; i++) if (!Zs.g[i] && near(Z.gates[i], 40)) return { k: 'gate', g: Z.gates[i] };
+  for (const g of Z.guns) if (near(g, 26)) return { k: 'gun', s: g };
+  for (const g of Z.perks) if (near(g, 26)) return { k: 'perk', s: g };
+  if (Zs.c >= 0 && near(Z.crates[Zs.c], 28)) return { k: 'crate', s: Z.crates[Zs.c] };
+  if (near(Z.power, 26)) return { k: 'power' };
+  if (near(Z.forge, 26)) return { k: 'forge' };
+  const W = m.W, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const k = (cy + dy) * W + cx + dx, oi = m.openId[k]; if (oi >= 0 && m.win[k] && Zs.wb[oi] !== undefined && Zs.wb[oi] < 6) return { k: 'window', oi }; }
+  return null;
+}
+function zbPrompt(s, me, x, y) {
+  const t = zbStationAt(s, me, x, y); if (!t) return null;
+  const E = `<b>${label('interact')}</b>`, pts = me.zb ? me.zb[1] : 0, $c = n => `<i class="${pts >= n ? '' : 'poor'}">${n}</i>`;
+  if (t.k === 'gate') return `${E}OPEN THE ${t.g.name.toUpperCase()} · ${$c(t.g.cost)}`;
+  if (t.k === 'gun') { const has = !!(me.zb && String(me.zb[6] || '').split(',').some(g => g.replace('*', '') === t.s.w)); return has ? `${E}AMMO FOR THE ${WEAPONS[t.s.w].name.toUpperCase()} · ${$c(t.s.cost / 2)}` : `${E}BUY THE ${WEAPONS[t.s.w].name.toUpperCase()} · ${$c(t.s.cost)}`; }
+  if (t.k === 'perk') { const P = ZB_PERKS[t.s.id]; return !s.zb.pw ? `${P[0]} · NEEDS THE POWER ON` : (me.zb && String(me.zb[3]).split(',').includes(t.s.id)) ? `${P[0]} · YOU HAVE IT` : `${E}${P[0]} · ${$c(P[2])}`; }
+  if (t.k === 'crate') return s.zb.cb ? 'THE CRATE IS PICKING…' : `${E}MYSTERY CRATE · A RANDOM GUN · ${$c(950)}`;
+  if (t.k === 'power') return s.zb.pw ? 'THE POWER IS ON' : `${E}TURN THE POWER ON`;
+  if (t.k === 'forge') return !s.zb.pw ? 'THE FORGE · NEEDS THE POWER ON' : `${E}FORGE THIS GUN: DOUBLE DAMAGE, MORE AMMO · ${$c(5000)}`;
+  if (t.k === 'window') return `HOLD ${E}PUT BOARDS BACK · +10 EACH`;
+  return null;
+}
+function zbObjective(s, me) {
+  const Z = s.zb;
+  if (Z.b) return [`ROUND ${Z.r + 1} IN ${Math.ceil(Z.b)}`, 'Board up the windows, buy what you need'];
+  return [`ROUND ${Z.r}`, `${Z.left} zombie${Z.left === 1 ? '' : 's'} left · ${Z.pw ? 'the power is on' : 'the power switch is at the lighthouse'}`];
+}
+function zbHud(s, me) {
+  const el = $('zbHud'); if (!el) return;
+  { const tn = performance.now() / 1000, G = st.zg || (st.zg = new Map()); // the dead groan now and then, heard through walls like anything else
+    for (const z of s.players) if (z.zb && z.zb[0] === 1 && z.a && z.x !== undefined) { const t0 = G.get(z.id); if (t0 === undefined) G.set(z.id, tn + 1 + Math.random() * 6); else if (tn > t0) { G.set(z.id, tn + 4 + Math.random() * 8); audio.play('groan', z.x, z.y); } } }
+  const ps = s.players.filter(p => !(p.zb && p.zb[0] === 1) && p.zb);
+  const perks = me && me.zb && me.zb[3] ? String(me.zb[3]).split(',').filter(Boolean) : [];
+  setHTML(el, `<div class="zbRound">${s.zb.r}</div><div class="zbPts">${ps.map(p => `<div class="${p.id === s.you ? 'me' : ''}"><span>${esc(p.n.replace(/^\[\w+\] /, ''))}</span><b>${p.zb[1]}</b></div>`).join('')}</div>` +
+    `<div class="zbPerks">${perks.map(k => `<i style="--pc:${ZB_PERKS[k][1]}" title="${ZB_PERKS[k][0]}">${ZB_PERKS[k][0][0]}</i>`).join('')}</div>`);
+}
+function zbTable(s) {
+  const me = st.me, rows = s.players.filter(p => p.zb && p.zb[0] === 0).sort((a, b) => b.zb[2] - a.zb[2]).map(p => `<tr class="ally ${me && p.id === me.id ? 'me' : ''} ${p.a ? '' : 'dead'}"><td>${esc(p.n)}</td><td>${p.zb[1]}</td><td>${p.zb[2]}</td><td>${p.zb[4]}</td><td>${p.d}</td><td>${p.b ? 'BOT' : p.ms != null ? p.ms + ' ms' : '…'}</td></tr>`).join('');
+  return `<table><tr><th>PLAYER</th><th>POINTS</th><th>KILLS</th><th>HEADSHOTS</th><th>DOWNS</th><th>PING</th></tr>${rows}</table>`;
+}
+// the town's stations, drawn on the map: gate signs, guns on the walls, perk machines, the crate, the power and the Forge
+function drawZbWorld(ctx, s, now) {
+  const Z = st.map.zombies, Zs = s.zb; if (!Z) return;
+  const plate = (x, y, w, h, fill, line) => { ctx.fillStyle = fill; ctx.fillRect(x - w / 2, y - h / 2, w, h); if (line) { ctx.strokeStyle = line; ctx.lineWidth = 0.8; ctx.strokeRect(x - w / 2, y - h / 2, w, h); } };
+  const text = (t, x, y, col, size = 5) => { ctx.font = `700 ${size}px Barlow Condensed, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(t, x, y); ctx.fillStyle = col; ctx.fillText(t, x, y); };
+  Z.gates.forEach((g, i) => { if (Zs.g[i]) return; plate(g.x, g.y, 30, 10, 'rgba(25,20,15,0.85)', '#c79a3e'); text(`${g.cost}`, g.x, g.y, '#f2c14e', 6); });
+  for (const g of Z.guns) { // a chalk outline of the gun on the wall, its price under it
+    ctx.save(); ctx.translate(g.x, g.y); ctx.strokeStyle = 'rgba(235,235,225,0.85)'; ctx.lineWidth = 0.7; ctx.setLineDash([1.2, 0.8]);
+    ctx.beginPath(); ctx.moveTo(-9, -1); ctx.lineTo(6, -1); ctx.lineTo(9, 0); ctx.lineTo(6, 1); ctx.lineTo(-2, 1); ctx.lineTo(-3, 4); ctx.lineTo(-5, 4); ctx.lineTo(-5, 1); ctx.lineTo(-9, 1.5); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+    text(`${WEAPONS[g.w].name} ${g.cost}`, g.x, g.y + 7, 'rgba(240,240,230,0.9)', 4);
+  }
+  for (const pk of Z.perks) { const P = ZB_PERKS[pk.id], on = Zs.pw;
+    if (on) { const gl = ctx.createRadialGradient(pk.x, pk.y, 2, pk.x, pk.y, 20); gl.addColorStop(0, P[1] + '66'); gl.addColorStop(1, P[1] + '00'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(pk.x, pk.y, 20, 0, 7); ctx.fill(); }
+    plate(pk.x, pk.y, 13, 9, on ? P[1] : '#4a4a4a', 'rgba(0,0,0,0.7)'); plate(pk.x, pk.y - 1, 9, 3, on ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.12)');
+    text(P[0], pk.x, pk.y + 8, on ? P[1] : '#9a9a9a', 4); }
+  if (Zs.c >= 0) { const c = Z.crates[Zs.c], fl = 0.5 + 0.5 * Math.sin(now * 3);
+    const gl = ctx.createRadialGradient(c.x, c.y, 2, c.x, c.y, 34); gl.addColorStop(0, `rgba(120,200,255,${0.25 + fl * 0.15})`); gl.addColorStop(1, 'rgba(120,200,255,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(c.x, c.y, 34, 0, 7); ctx.fill();
+    plate(c.x, c.y, 18, 10, '#6b4a2e', '#2b1d10'); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(c.x - 9, c.y - 0.5, 18, 1); text('?', c.x, c.y, '#bfe6ff', 8);
+    const R = st.zbCrate; if (R && now < R.until) text(now < R.at ? WEAPONS[CRATE_SHOW[Math.floor(now * 12) % CRATE_SHOW.length]].name : WEAPONS[R.w].name, c.x, c.y - 12, '#ffffff', 6); }
+  { const p = Z.power; plate(p.x, p.y, 10, 12, '#3a3f44', '#111'); ctx.fillStyle = Zs.pw ? '#5fd08a' : '#d94a3a'; ctx.fillRect(p.x - 1.5, p.y + (Zs.pw ? -5 : 1), 3, 4); text(Zs.pw ? 'POWER ON' : 'POWER', p.x, p.y + 10, Zs.pw ? '#5fd08a' : '#ddd', 4); }
+  { const f = Z.forge, gl = ctx.createRadialGradient(f.x, f.y, 1, f.x, f.y, 18); gl.addColorStop(0, Zs.pw ? 'rgba(255,140,40,0.5)' : 'rgba(120,120,120,0.2)'); gl.addColorStop(1, 'rgba(255,140,40,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(f.x, f.y, 18, 0, 7); ctx.fill();
+    plate(f.x, f.y, 14, 8, '#2e2e30', '#000'); plate(f.x, f.y, 8, 3, Zs.pw ? '#ff8a3d' : '#555'); text('THE FORGE', f.x, f.y + 8, Zs.pw ? '#ffb27a' : '#aaa', 4); }
+}
+const CRATE_SHOW = ['mule', 'ox', 'pike', 'saker', 'sabre', 'trident', 'ferret', 'quill', 'anvil', 'vex50', 'hatchet', 'cyclone'];
 // FUN MODES on screen (server/arena.js; players carry ar = [kills, lives, gun step, infected, out of lives])
 const AR_GUNS = ['k4', 'wasp', 'breaker', 'mule', 'longbow', 'rook', 'hornet', 'tusk', 'marten', 'ox', 'pike', 'sabre', 'javelin', 'anvil', 'vex50', 'p10']; // (the ladder in server/arena.js)
 function arenaRank(s) {
@@ -1636,6 +1707,7 @@ function arenaTable(s) {
 }
 function scoreTable(s) {
   const me = st.me;
+  if (s.zb) return zbTable(s);
   if (s.ar) return arenaTable(s);
   const rows = [...s.players].sort((a, b) => (a.sq - b.sq) || ((b.sc || 0) - (a.sc || 0)) || (b.k - a.k)).map(p =>
     `<tr class="${me && p.sq === me.sq ? 'ally' : 'enemy'} ${p.id === s.you ? 'me' : ''} ${p.a ? '' : 'dead'}"><td>${esc(p.n)}</td><td>${p.op ? OPERATORS[p.op].name : '—'}</td><td>${p.sc || 0}</td><td>${p.k}</td><td>${p.d}</td><td>${p.b ? 'BOT' : p.ms != null ? p.ms + ' ms' : '…'}</td></tr>`).join('');
@@ -2299,7 +2371,8 @@ function draw(s, view, now, dt) {
   // objective
   if (inGame) {
     const site = m.sites[s.site];
-    if (!s.ar && (side === 'def' || s.rev || !me)) for (const b of site.bombs) if (!s.pl || s.pl.b !== b.id) drawBomb(ctx, b, now);
+    if (s.zb) drawZbWorld(ctx, s, now);
+    if (!s.ar && !s.zb && (side === 'def' || s.rev || !me)) for (const b of site.bombs) if (!s.pl || s.pl.b !== b.id) drawBomb(ctx, b, now);
     if (s.pl) {
       ctx.save(); ctx.translate(s.pl.x, s.pl.y);
       const pulse = (now * 2) % 1;
@@ -2309,7 +2382,8 @@ function draw(s, view, now, dt) {
     }
   }
   // corpses
-  for (const c of st.corpses) drawOperator(ctx, { ...c, downed: true }, now);
+  if (st.corpses.length && st.corpses.some(c => c.zbc)) { const tn = performance.now() / 1000; st.corpses = st.corpses.filter(c => !c.zbc || tn - c.t < 10); } // zombie bodies go after a while
+  for (const c of st.corpses) if (c.zbc) drawZombie(ctx, { ...c, dead: true }, now); else drawOperator(ctx, { ...c, downed: true }, now);
   // rappel ropes: a coil on the ground under each stretch of wall you can climb (attackers), and the rope on anyone using one
   if (side === 'atk' && view) for (const r of st.map.ropes || []) {
     const bx = r.base.x, by = r.base.y; if (Math.abs(bx - view.x) > 700 || Math.abs(by - view.y) > 700) continue;
@@ -2391,6 +2465,12 @@ function draw(s, view, now, dt) {
     if (st.tv) (st.tvPos || (st.tvPos = new Map())).set(p.id, { x: p.x, y: p.y, p });
     if (!vis) { // ESPORTS TV (he asked): everyone's outline shows through walls; only the followed player's sight is live
       if (st.tv && !p.dn && p.x !== undefined) bodyOutline(p, p.sq ? '255,138,61' : '70,168,255', 0.9);
+      continue;
+    }
+    if (p.zb && p.zb[0] === 1) { // ZOMBIES: one of the dead
+      a.zhit = Math.max(0, (a.zhit || 0) - dt * 4); if (a.zhp !== undefined && p.hp < a.zhp) a.zhit = 0.6; a.zhp = p.hp;
+      drawZombie(ctx, { x: p.x, y: p.y, aim: p.ag, walk: a.walk, legs: Math.min(1.2, a.mvS || 0.6), look: p.zb[2], run: p.zb[1], hit: a.zhit }, now);
+      drawn.push(p); st.rings.push({ id: p.id, x: p.x, y: p.y }); st.heads.push({ x: p.x, y: p.y });
       continue;
     }
     // up on furniture or mid-jump (he asked: an obvious but tidy marker): a shadow below, a dashed ring, drawn a little bigger
@@ -2963,7 +3043,8 @@ function screens(s, phase, now) {
   countdown(s, phase);
   show('select', joined && phase === PHASE.SELECT && !st.tv);
   show('tvDraft', !!st.tv && joined && phase === PHASE.SELECT); document.documentElement.classList.toggle('tvsel', !!st.tv && phase === PHASE.SELECT);
-  document.documentElement.classList.toggle('arena', !!(s && s.ar)); // fun modes: no gadget slots, drone bar or team panel
+  document.documentElement.classList.toggle('arena', !!(s && (s.ar || s.zb)));
+  document.documentElement.classList.toggle('zombies', !!(s && s.zb)); if (s && s.zb) zbHud(s, st.me); // fun modes: no gadget slots, drone bar or team panel
   show('hud', joined && (phase === PHASE.PREP || phase === PHASE.ACTION || phase === PHASE.ROUND_END));
   show('endscreen', joined && (phase === PHASE.MATCH_END || st.forceEnd));
   show('leaveBtn', joined && phase !== PHASE.LOBBY);
@@ -3015,15 +3096,15 @@ function hud(s) {
     const cls = [ally ? 'ally' : 'enemy', p.a ? '' : 'dead', p.dn ? 'down' : '', known ? '' : 'unknown'].join(' ');
     return `<div class="${cls}" title="${esc(p.n)}">${known && p.op ? OPERATORS[p.op].name.slice(0, 3) : '?'}</div>`;
   }).join('');
-  const hs = st.tv ? 0 : me.sq, mine = s.players.filter(p => p.sq === hs), theirs = s.players.filter(p => p.sq !== hs);
+  const hs = st.tv ? 0 : me.sq, mine = s.players.filter(p => p.sq === hs), theirs = s.players.filter(p => p.sq !== hs && !(p.zb && p.zb[0] === 1));
   setHTML('tiL', icons(mine, true)); setHTML('tiR', icons(theirs, !!st.tv));
-  if (s.ar) { const [l, r] = arenaScores(s, me); setText('scL', l); setText('scR', r); } else { setText('scL', s.sc[hs]); setText('scR', s.sc[1 - hs]); }
+  if (s.zb) { setText('scL', s.zb.r); setText('scR', s.zb.left); } else if (s.ar) { const [l, r] = arenaScores(s, me); setText('scL', l); setText('scR', r); } else { setText('scL', s.sc[hs]); setText('scR', s.sc[1 - hs]); }
   if (st.tv) TV.tvHud(s);
   const t = s.pl ? s.pl.t : s.tm;
   setText('time', s.fp && !s.pl ? '∞' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`);
   setCls($('time'), 'planted', !!s.pl);
-  setText('phase', s.ar ? 'FUN MODE' : s.pl ? 'DEFUSER' : s.fp ? 'FREE PLAY' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER');
-  setText('roundNo', s.ar ? (MODES[s.ar.m] || {}).name : s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `${s.ot ? 'OVERTIME · ' : ''}ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`);
+  setText('phase', s.zb ? 'ZOMBIES' : s.ar ? 'FUN MODE' : s.pl ? 'DEFUSER' : s.fp ? 'FREE PLAY' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER');
+  setText('roundNo', s.zb ? `ROUND ${s.zb.r} · ZOMBIES LEFT ${s.zb.left}` : s.ar ? (MODES[s.ar.m] || {}).name : s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `${s.ot ? 'OVERTIME · ' : ''}ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`);
   beginnerHelp(s, me, mine, theirs);
   // free play: which keys switch operator, and who you'd get
   $('freeHint').classList.toggle('hidden', !s.fp);
@@ -3048,6 +3129,7 @@ function hud(s) {
     else { const c = s.players.find(p => p.df); sub = c ? `${c.n} has the defuser` : 'The defuser is on the ground'; }
   }
   if (s.ar) [obj, sub] = arenaObjective(s, me);
+  if (s.zb) [obj, sub] = zbObjective(s, me);
   const fi = me.a && me.x !== undefined ? floorAt(st.map, st.pred.x, st.pred.y) : -1;
   const flName = fi >= 0 && st.map.floors.length > 1 ? st.map.floors[fi].name : '';
   setHTML('objective', `${esc(obj)}<small>${flName ? '<b class="flr">' + esc(flName) + '</b> ' : ''}${esc(sub)}${where ? ' · ' + esc(where) : ''}</small>`);
@@ -3057,6 +3139,7 @@ function hud(s) {
     setText('status', 'ELIMINATED'); $('br').style.visibility = 'hidden';
     setHTML('prompt', ''); $('progress').style.display = 'none';
     const mates = s.players.filter(p => p.a && p.sq === me.sq);
+    if (s.zb) setText('viewlabel', 'YOU ARE OUT · BACK NEXT ROUND IF ANYONE SURVIVES'); else
     if (s.ar) setText('viewlabel', me.ar && me.ar[4] ? 'OUT OF LIVES · WATCHING' : 'BACK IN A MOMENT'); else
     setText('viewlabel', mates.length ? `SPECTATING ${mates[st.spect % mates.length].n.toUpperCase()} · CLICK TO SWITCH` : '');
     setCls($('kcBtn'), 'hidden', !st.killcam || !!st.tv); setHTML('kcBtn', `<b>${label('interact')}</b> WATCH KILLCAM`);
@@ -3139,6 +3222,7 @@ const RI = {
 const roleIcon = id => RI[id] ? `<svg class="rIcon" viewBox="0 0 24 24" aria-hidden="true">${RI[id]}</svg>` : '';
 function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;
+  if (s.zb && me.a && !me.dn) { const z = zbPrompt(s, me, x, y); if (z !== null) return z; }
   if (me.ro) { // on a rope
     if (!me.ro[0]) return me.ro[2] < 0 && !me.ro[4] ? 'LETTING GO…' : `CLIMBING ${Math.round(me.ro[3] * 100)}%`;
     const r = m.ropes[me.ro[1]], atW = r && ropeAtWindow(r, x, y), hop = (i, n) => n >= 0 ? m.floors[m.ropes[n].f].name : i;

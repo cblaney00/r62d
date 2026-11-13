@@ -2507,7 +2507,7 @@ export function arenaThink(game, p, dt) {
   const ai = p.ai, inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
   p.input = inp;
   if (!p.alive || p.ctrl !== 'body') return;
-  const S = skill(game, p), A = game.arena, gun = p.guns[p.slot];
+  const S = skill(game, p), A = game.arena || {}, gun = p.guns[p.slot]; // (also the bots helping in Zombies)
   const knifeOnly = !gun || (gun.ammo === 0 && gun.reserve === 0 && !(p.reloadT > 0)) || (p.ar && (p.ar.infected || p.ar.knife));
   // hearing: shots and footsteps of anyone not on our side
   const team = game.side(p);
@@ -2542,6 +2542,17 @@ export function arenaThink(game, p, dt) {
   }
   ai.seen = null;
   if (gun && gun.ammo < WEAPONS[gun.w].mag && gun.reserve > 0 && !(p.reloadT > 0)) game.startReload(p);
+  // Zombies: a teammate down nearby gets picked up (hold E beside them)
+  if (game.zb) {
+    const mate = [...game.players.values()].filter(q => q !== p && !q.zombie && q.alive && q.downed && q.squad === p.squad).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+    if (mate && Math.hypot(mate.x - p.x, mate.y - p.y) < 20 * PX_PER_M) {
+      if (Math.hypot(mate.x - p.x, mate.y - p.y) < 20) { p.aim = Math.atan2(mate.y - p.y, mate.x - p.x); inp.interact = 1; } else moveTo(game, p, inp, mate, dt);
+      return;
+    }
+    // otherwise stay with the people: not too far from the nearest person who isn't a bot
+    const lead = [...game.players.values()].find(q => !q.bot && q.alive);
+    if (lead && Math.hypot(lead.x - p.x, lead.y - p.y) > 6 * PX_PER_M) { moveTo(game, p, inp, lead, dt); return; }
+  }
   // where to go: something heard, else every ~8 s a fresh enemy to hunt (the nearest, sometimes another), else a wander
   if (ai.heard && game.time - ai.heard.t < 6) ai.hunt = { x: ai.heard.x, y: ai.heard.y };
   if (!ai.hunt || game.time > (ai.huntT || 0) || Math.hypot(ai.hunt.x - p.x, ai.hunt.y - p.y) < 30) {

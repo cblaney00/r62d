@@ -19,7 +19,7 @@ export const MODES = {
   infected: { name: 'INFECTED', blurb: 'One player starts infected. Whoever they kill joins them. Survive until the clock runs out',
     kind: 'arena', fun: true, ready: true },
   zombies: { name: 'ZOMBIES', blurb: 'Hold out against wave after wave in a harbour town. Earn points, open the town, find better guns',
-    kind: 'zombies', fun: true, ready: false },
+    kind: 'zombies', fun: true, ready: true },
 };
 export const MODE_LIST = Object.keys(MODES);
 export const DEFAULT_MODE = 'quick';
