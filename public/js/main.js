@@ -1597,7 +1597,7 @@ function rope3dFrame(s, me, now, dt) {
       const f = floorAt(m, p.x, p.y); if (f < 0) continue;
       const q = f !== r.f ? floorOff(m, f, r.f) : { x: 0, y: 0 }; if (Math.hypot(p.x + q.x - pred.x, p.y + q.y - pred.y) > 30 * PX_PER_M) continue;
       if (sp.sq !== me.sq && (sp.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue; // only who your side can see: the same lines both ways (HUSH's shroud: eyes only)
-      people.push({ id: sp.id, op: sp.op, x: p.x, y: p.y, f, ag: sp.rp ? hangWall(p) ?? (p.ag || 0) : p.ag || 0, ads: !!sp.ad, w: sp.w, onRope: !!sp.rp, pose: sp.dn || sp.pn ? 'down' : sp.rp === 3 ? 'hangInv' : sp.rp ? 'hang' : sp.cr ? 'crouch' : 'stand' });
+      people.push({ id: sp.id, op: sp.op, x: p.x, y: p.y, f, ag: sp.rp ? hangWall(p) ?? (p.ag || 0) : p.ag || 0, ads: !!sp.ad, lean: Math.max(-1, Math.min(1, (sp.le || 0) / LEAN_PX)), sprint: sp.mv >= 3 ? 1 : 0, w: sp.w, onRope: !!sp.rp, pose: sp.dn ? 'down' : sp.pn ? 'prone' : sp.rp === 3 ? 'hangInv' : sp.rp ? 'hang' : sp.cr ? 'crouch' : 'stand' });
     }
     const near = (x, y, f) => { const q = f !== r.f ? floorOff(m, f, r.f) : { x: 0, y: 0 }; return Math.hypot(x + q.x - pred.x, y + q.y - pred.y) < 30 * PX_PER_M; };
     const th = r3things(s, me, now, near); people.push(...th.decoys);

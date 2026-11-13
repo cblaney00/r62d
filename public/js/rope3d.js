@@ -263,8 +263,8 @@ export function frame(c) {
     let md = R.models.get(p.id);
     if (!md || md.key !== key) { if (md) R.people.remove(md.root); const root = makeOperator(p.op, p.w); root.scale.setScalar(M); md = { root, key, lx: px, lz: pz, mv: 0, t: 0 }; R.models.set(p.id, md); R.people.add(root); }
     // walking: how fast they move sets the stride
-    const spd = Math.hypot(px - md.lx, pz - md.lz) / Math.max(c.dt, 1e-3) / M; md.mv += (Math.min(1, spd / 1.6) - md.mv) * Math.min(1, c.dt * 8); md.lx = px; md.lz = pz; md.t += c.dt * (0.5 + md.mv * 0.6);
-    md.root.pose(p.pose, md.t, md.mv, p.ads ? 1 : 0);
+    const spd = Math.hypot(px - md.lx, pz - md.lz) / Math.max(c.dt, 1e-3) / M; md.mv += (Math.min(1, spd / 1.6) - md.mv) * Math.min(1, c.dt * 8); md.lx = px; md.lz = pz; md.t += c.dt;
+    md.root.pose(p.pose, md.t, md.mv, p.ads ? 1 : 0, p.lean || 0, p.sprint || 0);
     md.root.rotation.y = -p.ag; md.root.position.set(px, p.pose === 'hangInv' ? py + 1.3 * M : py, pz);
     Object.assign(md.root.userData, { id: p.id, x: p.x, y: p.y, f: p.f, base: py }); keep.add(p.id);
   }
@@ -299,7 +299,7 @@ export function frame(c) {
   // (close over the shoulder; aiming in: right at your eyes)
   // aiming in looks from where the game says your eyes are (your spot on the map, right at the wall), so what the 3D
   // view shows is what the sight rules let you see and shoot
-  const shoulder = me3.clone().lerp(new THREE.Vector3(c.pred.x, me3.y, c.pred.y), R.adsK).addScaledVector(new THREE.Vector3(n[0], 0, n[1]), 1.7 * (1 - R.adsK) * M).addScaledVector(right, (0.8 - 0.72 * R.adsK) * M * shSide()); shoulder.y = me3.y + BODY * (c.inv ? 0.4 : 1.02);
+  const shoulder = me3.clone().lerp(new THREE.Vector3(c.pred.x, me3.y, c.pred.y), R.adsK).addScaledVector(new THREE.Vector3(n[0], 0, n[1]), 2.3 * (1 - R.adsK) * M).addScaledVector(right, (0.9 - 0.82 * R.adsK) * M * shSide()); shoulder.y = me3.y + BODY * (c.inv ? 0.4 : 1.02);
   R.camera.fov += ((c.ads ? 52 : 70) - R.camera.fov) * Math.min(1, c.dt * 12); R.camera.updateProjectionMatrix();
   // gliding in (from above, looking down) and out (back up to the top-down view) so it never jars
   R.mix = Math.min(1, R.mix + c.dt / 0.45);

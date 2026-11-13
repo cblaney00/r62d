@@ -13,12 +13,12 @@ const sc = new THREE.Scene(); sc.background = new THREE.Color('#9fb6c8');
 sc.add(new THREE.HemisphereLight('#dfe9f2', '#4a4a40', 1.6)); const sun = new THREE.DirectionalLight('#fff3dc', 1.4); sun.position.set(0.4, 1, 0.3); sc.add(sun);
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: '#8a6a46', roughness: 0.9 })); floor.rotation.x = -Math.PI / 2; sc.add(floor);
 const cols = Math.min(ops.length, Q.get('cols') ? +Q.get('cols') : 4), rows = Math.ceil(ops.length / cols), models = [];
-ops.forEach((op, i) => { const m = makeOperator(op); m.pose(pose); const c = i % cols, rw = Math.floor(i / cols); m.position.set(0, 0, (c - (cols - 1) / 2) * 0.9); m.position.x = -rw * 1.4; m.rotation.y = view === 'back' ? Math.PI : view === 'side' ? -Math.PI / 2 : 0; sc.add(m); models.push(m); });
+ops.forEach((op, i) => { const m = makeOperator(op); m.pose(pose, +(Q.get('t') || 0), +(Q.get('mv') || 0), +(Q.get('aim') || 0), +(Q.get('lean') || 0), +(Q.get('sprint') || 0)); const c = i % cols, rw = Math.floor(i / cols); m.position.set(0, 0, (c - (cols - 1) / 2) * 0.9); m.position.x = -rw * 1.4; m.rotation.y = view === 'back' ? Math.PI : view === 'side' ? -Math.PI / 2 : view === 'quarter' ? -0.75 : view === 'quarterL' ? 0.75 : 0; sc.add(m); models.push(m); });
 document.getElementById('t').textContent = ops.join(' · ') + ' — ' + pose;
 const cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 100);
 const w = cols * 0.9, d = Math.max(w * 1.25, rows * 1.9 + 1.6); cam.position.set(d, 1.2 + rows * 0.55, 0); cam.lookAt(-(rows - 1) * 0.7, 0.95, 0);
 
 let t0 = performance.now();
-function frame(now) { const t = (now - t0) / 1000; if (view === 'turn') models.forEach(m => m.rotation.y = t * 0.8); if (Q.get('walk')) models.forEach(m => m.pose(pose, t, 1)); r.render(sc, cam); requestAnimationFrame(frame); }
+function frame(now) { const t = (now - t0) / 1000; if (view === 'turn') models.forEach(m => m.rotation.y = t * 0.8); if (Q.get('walk')) models.forEach(m => m.pose(pose, t, 1, +(Q.get('aim') || 0), 0, +(Q.get('sprint') || 0))); r.render(sc, cam); requestAnimationFrame(frame); }
 requestAnimationFrame(frame); window.__ready = true;
 </script></body></html>
