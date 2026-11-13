@@ -685,6 +685,7 @@ function onSnap(s) {
     (m.holes[k] || (m.holes[k] = [])).push(s.holes[i + 1], s.holes[i + 2]);
     if (s.hb && s.hb[i / 3] === ours) now0.push(k); else st.unseen.add(k);
   }
+  if (s.cells.length || (s.holes && s.holes.length)) m.cv = (m.cv || 0) + 1; // (the 3D rope view rebuilds only when the map changed)
   if (st.rend) for (const k of now0) { applyKnown(k); st.unseen.delete(k); }
   if (s.ph !== PHASE.PREP && s.ph !== PHASE.ACTION && s.ph !== PHASE.ROUND_END) revealAll();
   const players = new Map(s.players.map(p => [p.id, p]));
@@ -1575,6 +1576,7 @@ function r3overlay(me, now, show) {
   screenFx(c, me, now, st.hurtFrom - rope3d.facing() - Math.PI / 2); // (the arrow: which way it came from, as you face)
 }
 function rope3dFrame(s, me, now, dt) {
+  rope3d.noteFrame(dt);
   const m = st.map, on = r3on();
   if (!st.r3shots) { st.r3shots = []; st.r3booms = []; }
   if (!on && !st.r3last) { $('r3x').classList.add('hidden'); st.r3shots.length = 0; st.r3booms.length = 0; if (st.r3full) { st.r3full = false; r3overlay(me, now, false); } return; }
@@ -1601,7 +1603,7 @@ function rope3dFrame(s, me, now, dt) {
     }
     const near = (x, y, f) => { const q = f !== r.f ? floorOff(m, f, r.f) : { x: 0, y: 0 }; return Math.hypot(x + q.x - pred.x, y + q.y - pred.y) < 30 * PX_PER_M; };
     const th = r3things(s, me, now, near); people.push(...th.decoys);
-    c = { m, me, s, pred, rope: r, height: h, inv: !!ro[5], people, ents: th.ents, smoke: th.smoke, pic: r3pic, shots: st.r3shots, booms: st.r3booms, now, dt, ads: !!me.ad, shake: fx.shake || 0, leaving: null };
+    c = { m, me, s, pred, rope: r, height: h, inv: !!ro[5], people, ents: th.ents, smoke: th.smoke, pic: r3pic, gfx: LEVELS.indexOf(Object.keys(GFX).find(k => GFX[k] === gq)), shots: st.r3shots, booms: st.r3booms, now, dt, ads: !!me.ad, shake: fx.shake || 0, leaving: null };
     st.r3last = c; st.r3leaveT = null;
   } else { // gliding back out
     if (st.r3leaveT == null) { st.r3leaveT = now; const d = 3.5 * PX_PER_M; aimOff = { x: Math.cos(st.aim) * d, y: Math.sin(st.aim) * d }; st.r3aim = null; } // the top-down crosshair: a few metres ahead the way you faced
@@ -4101,7 +4103,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { r3: rope3d.debug, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.

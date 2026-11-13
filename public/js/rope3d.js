@@ -31,7 +31,7 @@ function surface(matId, frac) {
   const key = matId + '|' + frac.toFixed(2); if (surf.has(key)) return surf.get(key);
   let base = surf.get(matId + '|img');
   if (!base) {
-    const c = document.createElement('canvas'); c.width = 32; c.height = 232; const x = c.getContext('2d');
+    const c = document.createElement('canvas'); c.width = 128; c.height = 928; const x = c.getContext('2d'); x.scale(4, 4); // (drawn at 4x: sharp up close)
     if (matId === MAT.BRICK) {
       x.fillStyle = '#6f4636'; x.fillRect(0, 0, 32, 232);
       for (let r = 0; r < 29; r++) { const off = r % 2 ? -8 : 0; for (let b = -1; b < 3; b++) { const v = 0.85 + ((r * 7 + b * 13) % 9) / 30; x.fillStyle = `rgb(${Math.round(150 * v)},${Math.round(86 * v)},${Math.round(64 * v)})`; x.fillRect(b * 16 + off + 1, r * 8 + 1, 14, 6); } }
@@ -40,9 +40,12 @@ function surface(matId, frac) {
     } else {
       x.fillStyle = '#d6cdb9'; x.fillRect(0, 0, 32, 232); let sd = 11; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 220; i++) { x.fillStyle = rnd() < 0.6 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)'; x.fillRect(rnd() * 32, rnd() * 232, 3, 2); }
     }
+    // fine grain at full resolution (cast concrete gets formwork seams and tie holes), so walls hold up close up
+    x.setTransform(1, 0, 0, 1, 0, 0); { let sd = 29; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 9000; i++) { x.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)'; x.fillRect(rnd() * 128, rnd() * 928, 1, 1); }
+      if (matId === MAT.CONCRETE) { x.fillStyle = 'rgba(0,0,0,0.18)'; for (let y = 0; y < 928; y += 232) x.fillRect(0, y, 128, 2); x.fillRect(0, 0, 2, 928); for (let y = 58; y < 928; y += 116) for (const tx of [32, 96]) { x.beginPath(); x.arc(tx, y, 3, 0, 7); x.fill(); } } }
     base = c; surf.set(matId + '|img', base);
   }
-  const t = new THREE.CanvasTexture(base); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, frac);
+  const t = new THREE.CanvasTexture(base); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, frac); t.anisotropy = 8;
   const m = new THREE.MeshLambertMaterial({ map: t }); surf.set(key, m); return m;
 }
 
@@ -50,10 +53,15 @@ function init(host) {
   const canvas = document.createElement('canvas'); canvas.id = 'rope3d'; host.insertBefore(canvas, document.getElementById('ui')); // (under the HUD)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(1.5, devicePixelRatio || 1));
+  // the look (he asked 2026-11-13: it runs fast, so make it better; a steady 85 fps is all it needs): filmic colours,
+  // sun shadows, a sky that lights and reflects on the operators; quality() keeps the frame rate by the picture's sharpness
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene(); scene.background = new THREE.Color('#9fb6c8'); scene.fog = new THREE.Fog('#9fb6c8', 18 * M, 60 * M);
   const camera = new THREE.PerspectiveCamera(70, 1, 4, 120 * M);
   scene.add(new THREE.HemisphereLight('#dfe9f2', '#4a4a40', 1.6));
-  const sun = new THREE.DirectionalLight('#fff3dc', 1.4); sun.position.set(0.4, 1, 0.3); scene.add(sun);
+  const sun = new THREE.DirectionalLight('#fff1d6', 2.0); sun.position.set(0.4, 1, 0.3); scene.add(sun, sun.target);
+  sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -20 * M, right: 20 * M, top: 20 * M, bottom: -20 * M, near: 1, far: 90 * M }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 1.2; sun.shadow.mapSize.set(2048, 2048);
   const world = new THREE.Group(), people = new THREE.Group(), fx = new THREE.Group(), thingG = new THREE.Group(), smokeG = new THREE.Group(); scene.add(world, people, fx, thingG, smokeG);
   const boomL = new THREE.PointLight('#ffb04a', 0, 10 * M, 1.2); scene.add(boomL);
   const lamps = Array.from({ length: LAMPS }, () => { const L = new THREE.PointLight('#ffe8c8', 0, 10 * M, 1.4); scene.add(L); return L; });
@@ -61,7 +69,7 @@ function init(host) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat('#4f7a3a')); ground.rotation.x = -Math.PI / 2; ground.scale.set(200 * M, 200 * M, 1); scene.add(ground);
   const me = new THREE.Group(); scene.add(me); // (your own operator's model goes in here)
   const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1, 6), mat('#c8b27a')); scene.add(rope);
-  R = { renderer, scene, camera, canvas, world, people, fx, ground, me, rope, yaw: 0, pitch: 0, key: '', sig: '', mix: 0, on: false, out: 0, ray: new THREE.Raycaster(), models: new Map(), tracers: [], thingG, smokeG, things: new Map(), smoke: [], plane: new THREE.PlaneGeometry(1, 1), boomL, lamps, floorG, massG };
+  R = { renderer, scene, camera, canvas, world, people, fx, ground, me, rope, yaw: 0, pitch: 0, key: '', sig: '', mix: 0, on: false, out: 0, sun, pmrem: new THREE.PMREMGenerator(renderer), ray: new THREE.Raycaster(), models: new Map(), tracers: [], thingG, smokeG, things: new Map(), smoke: [], plane: new THREE.PlaneGeometry(1, 1), boomL, lamps, floorG, massG };
   addEventListener('resize', () => size());
   size();
 }
@@ -131,7 +139,7 @@ function build(c, line) {
   const mtx = new THREE.Matrix4(), q = new THREE.Quaternion();
   const up = new THREE.Group(); up.name = 'upper'; grp.add(up);
   for (const [G, into] of [[groups, grp], [upperG, up]]) for (const [mt, list] of G) { if (!list.length) continue; const im = new THREE.InstancedMesh(BOX, mt, list.length); list.forEach((b, i) => im.setMatrixAt(i, mtx.compose(new THREE.Vector3(b.x, b.y, b.z), q, new THREE.Vector3(b.sx, b.sy, b.sz)))); im.instanceMatrix.needsUpdate = true; into.add(im); }
-  R.upper = up;
+  R.upper = up; shadows(grp, true, true);
   // room lights (always the same number of lights: changing it makes the graphics card rebuild its shaders, a stutter)
   R.lamps.forEach((L, i) => { const p = lamps[i]; L.intensity = p ? 1.2 : 0; if (p) L.position.set(p[0], p[1], p[2]); });
   if (R.massKey !== R.key + '|' + R.groundKey) { R.massKey = R.key + '|' + R.groundKey; massing(c, line, span, roomSpan, inner); }
@@ -142,7 +150,7 @@ const LAMPS = 4;
 // Remade when the view is rebuilt for a new stretch of wall, and every 2 s (blood, scorch marks, holes).
 function floorPics(c, rooms, f) {
   const m = c.m, out = new Map();
-  const fresh = R.picKey !== R.key || c.now - (R.picT || 0) > 2;
+  const fresh = R.picKey !== R.key || R.picCv !== (m.cv || 0); R.picCv = m.cv || 0; // (a new stretch of wall, or the map changed)
   if (!c.pic) return out;
   if (fresh) { for (const o of [...R.floorG.children]) { R.floorG.remove(o); o.material.map.dispose(); o.material.dispose(); } R.picData = new Map(); R.picKey = R.key; R.picT = c.now; }
   for (const [g, L] of rooms) {
@@ -157,7 +165,7 @@ function floorPics(c, rooms, f) {
       x.globalCompositeOperation = 'destination-in'; x.drawImage(mk, 0, 0); x.globalCompositeOperation = 'source-over';
       const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
       const pl = new THREE.Mesh(R.plane, new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.5 }));
-      pl.userData.up = g > f; pl.rotation.x = -Math.PI / 2; pl.scale.set(w, h, 1); pl.position.set(x0 + w / 2, L.y0 + 2, y0 + h / 2); R.floorG.add(pl);
+      pl.userData.up = g > f; pl.receiveShadow = true; pl.rotation.x = -Math.PI / 2; pl.scale.set(w, h, 1); pl.position.set(x0 + w / 2, L.y0 + 2, y0 + h / 2); R.floorG.add(pl);
       D = { data, W: cv.width, H: cv.height, x0, y0 }; R.picData.set(g, D);
     }
     // a colour from the picture at a cell's middle (a wall's or a piece of furniture's top, as the map draws it)
@@ -174,7 +182,7 @@ function groundPic(c, cx, cy, f) {
   R.groundData = { data: cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data, W: cv.width, H: cv.height, x0: gx - side / 2, y0: gy - side / 2, k: cv.width / side };
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
   if (R.ground.material.map) R.ground.material.map.dispose();
-  R.ground.material = new THREE.MeshLambertMaterial({ map: tex }); R.ground.scale.set(side, side, 1); R.ground.position.set(gx, -0.5, gy);
+  R.ground.material = new THREE.MeshLambertMaterial({ map: tex }); R.ground.receiveShadow = true; R.ground.scale.set(side, side, 1); R.ground.position.set(gx, -0.5, gy);
 }
 // The rest of the building and the yard cover round you: plain blocks as tall as the floors stacked at each spot (so
 // the building isn't a single wall standing on a floor plan), vans, containers and crates in the yard as solid boxes in
@@ -218,10 +226,11 @@ function massing(c, line, span, roomSpan, inner) {
     blocks.forEach((b, i) => { const sx = Math.abs(b.X1 - b.X0) + CELL, sz = Math.abs(b.Y1 - b.Y0) + CELL; im.setMatrixAt(i, mtx.compose(V((b.X0 + b.X1) / 2, b.h / 2, (b.Y0 + b.Y1) / 2), q, V(sx, b.h, sz))); });
     im.instanceMatrix.needsUpdate = true; R.massG.add(im);
   }
+  shadows(R.massG, true, true);
   if (props.length) {
     const im = new THREE.InstancedMesh(BOX, mat('#ffffff'), props.length), col = new THREE.Color();
     props.forEach((p, i) => { im.setMatrixAt(i, mtx.compose(V(p[0], p[2] / 2, p[1]), q, V(CELL, p[2], CELL))); im.setColorAt(i, col.set(p[3])); });
-    im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; R.massG.add(im);
+    im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; R.massG.add(im); im.castShadow = im.receiveShadow = true;
   }
 }
 function shadeCol(hex) { const v = parseInt(hex.slice(1), 16), k = 0.7, c = s => Math.round(((v >> s) & 255) * k); return `rgb(${c(16)},${c(8)},${c(0)})`; }
@@ -237,19 +246,22 @@ export function frame(c) {
   const ax = Math.round((r.hang.x + r.tx * along) / CELL), ay = Math.round((r.hang.y + r.ty * along) / CELL);
   const key = f + '|' + r.out.toFixed(2) + '|' + (n[0] ? ax : Math.round(ax / 10)) + '|' + (n[1] ? ay : Math.round(ay / 10));
   const line = { f, n, t, cx: (Math.floor(c.pred.x / CELL) + 0.5) * CELL - (n[0] ? 0 : 0), cy: (Math.floor(c.pred.y / CELL) + 0.5) * CELL };
-  if (key !== R.key || c.now - (R.sigT || 0) > 0.5) {
+  if (key !== R.key || ((m.cv || 0) !== R.cv && c.now - (R.sigT || 0) > 0.25)) { // (only when it moved or the map changed: a rebuild every half second was a hitch)
+    R.cv = m.cv || 0;
     if (key !== R.key) { R.key = key; R.line = line; R.sig = build(c, line); }
     else { const s = build(c, R.line); R.sig = s; } // (boards coming off, windows opening)
     R.sigT = c.now;
   }
-  const sky = SKY[c.s && c.s.mp] || SKY.def; if (R.sky !== sky) { R.sky = sky; R.scene.background.set(sky); R.scene.fog.color.set(sky); }
+  const sky = SKY[c.s && c.s.mp] || SKY.def; if (R.sky !== sky) { R.sky = sky; skyLight(sky); }
+  graphics(c.gfx ?? 2);
+  { const sd = new THREE.Vector3(0.62, 0.62, 0.42).normalize(), at = new THREE.Vector3(c.pred.x, c.height, c.pred.y); R.sun.target.position.copy(at); R.sun.position.copy(at).addScaledVector(sd, 45 * M); } // (the sun's shadows follow you)
   if (!R.on) { R.on = true; R.yaw = 0; R.pitch = 0.05; R.mix = 0; R.canvas.style.display = 'block'; }
   // where you hang: just outside the wall, at window height (upside down: higher, head at the top of the window)
   const out = 0.35 * M, me3 = new THREE.Vector3(c.pred.x + n[0] * out, c.height + (c.inv ? 1.6 * M : 0.15 * M), c.pred.y + n[1] * out);
   const right = new THREE.Vector3(n[1], 0, -n[0]); // to your right as you face the wall
   // your operator from behind, holding the rope, facing the wall (a model of your own, so it can fade while you aim in)
   const meKey = c.me.op + '|' + (c.me.w || '');
-  if (R.meKey !== meKey) { for (const o of [...R.me.children]) R.me.remove(o); R.meModel = ownMaterials(makeOperator(c.me.op, c.me.w)); R.meModel.scale.setScalar(M); R.me.add(R.meModel); R.meKey = meKey; }
+  if (R.meKey !== meKey) { for (const o of [...R.me.children]) R.me.remove(o); R.meModel = ownMaterials(makeOperator(c.me.op, c.me.w)); R.meModel.scale.setScalar(M); shadows(R.meModel, true, true); R.me.add(R.meModel); R.meKey = meKey; }
   R.meModel.pose(c.inv ? 'hangInv' : 'hang', c.now, 0, c.ads ? 1 : 0);
   R.me.position.set(me3.x, c.inv ? c.height + 1.45 * M : me3.y, me3.z); R.me.rotation.y = -Math.atan2(-n[1], -n[0]);
   R.meA = (R.meA ?? 1) + ((c.ads ? 0.28 : 1) - (R.meA ?? 1)) * Math.min(1, c.dt * 10); // (aiming in: your own back fades so you can see past it)
@@ -261,7 +273,7 @@ export function frame(c) {
     const o = floorOff(m, p.f, f), px = p.x + o.x, pz = p.y + o.y, py = (p.f - m.groundFloor) * FH + (p.onRope ? 0.15 * M : 0);
     const key = p.op + '|' + (p.w || '');
     let md = R.models.get(p.id);
-    if (!md || md.key !== key) { if (md) R.people.remove(md.root); const root = makeOperator(p.op, p.w); root.scale.setScalar(M); md = { root, key, lx: px, lz: pz, mv: 0, t: 0 }; R.models.set(p.id, md); R.people.add(root); }
+    if (!md || md.key !== key) { if (md) R.people.remove(md.root); const root = makeOperator(p.op, p.w); root.scale.setScalar(M); shadows(root, true, true); md = { root, key, lx: px, lz: pz, mv: 0, t: 0 }; R.models.set(p.id, md); R.people.add(root); }
     // walking: how fast they move sets the stride
     const spd = Math.hypot(px - md.lx, pz - md.lz) / Math.max(c.dt, 1e-3) / M; md.mv += (Math.min(1, spd / 1.6) - md.mv) * Math.min(1, c.dt * 8); md.lx = px; md.lz = pz; md.t += c.dt;
     md.root.pose(p.pose, md.t, md.mv, p.ads ? 1 : 0, p.lean || 0, p.sprint || 0);
@@ -379,6 +391,45 @@ export function project(x, y, fl, hm = 1) {
 }
 // which way the view faces, as a map angle
 export const facing = () => R && R.dir ? Math.atan2(R.dir.z, R.dir.x) : 0;
+// The sky: a gradient from a deep top through the map's sky colour at the horizon to a dark ground, used as the
+// background and (blurred by PMREM) as the light the operators and props reflect
+function skyLight(col) {
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 256; const x = cv.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, shadeHex(col, 0.72)); g.addColorStop(0.46, shadeHex(col, 1.08)); g.addColorStop(0.5, shadeHex(col, 1.15)); g.addColorStop(0.53, '#6a675c'); g.addColorStop(1, '#3a3a34');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 256);
+  const t = new THREE.CanvasTexture(cv); t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
+  if (R.scene.background && R.scene.background.isTexture) R.scene.background.dispose();
+  R.scene.background = t; R.scene.fog.color.set(shadeHex(col, 1.1));
+  if (R.envRT) R.envRT.dispose(); R.envRT = R.pmrem.fromEquirectangular(t); R.scene.environment = R.envRT.texture; R.scene.environmentIntensity = 0.7;
+}
+const shadeHex = (hex, k) => { const n = parseInt(hex.slice(1), 16), c = v => Math.max(0, Math.min(255, Math.round(v * k))); return '#' + [c(n >> 16), c((n >> 8) & 255), c(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); };
+// graphics level (Settings: 0 low … 3 ultra): shadows and how sharp the picture may get
+const SHADOW = [0, 1024, 2048, 4096], MAXPR = [1, 1.25, 1.6, 2];
+function graphics(lv) {
+  if (R.gfx === lv) return; R.gfx = lv;
+  R.renderer.shadowMap.enabled = lv > 0; R.sun.castShadow = lv > 0;
+  if (lv > 0 && R.sun.shadow.mapSize.x !== SHADOW[lv]) { R.sun.shadow.mapSize.set(SHADOW[lv], SHADOW[lv]); if (R.sun.shadow.map) { R.sun.shadow.map.dispose(); R.sun.shadow.map = null; } }
+  Q.max = Math.min(MAXPR[lv], Math.max(1, (devicePixelRatio || 1) * 1.6)); Q.pr = Q.max; setPR(Q.pr);
+}
+// Keeping 85 fps (or the screen's own pace when that is slower): main.js reports every frame (noteFrame); while the
+// 3D view is up, if one frame in ten runs late the picture gets a little less sharp, and sharper again when there is room.
+const Q = { pr: 1, max: 1.6, best: 1, ts: [], seen: [] };
+function setPR(v) { if (!R) return; if (Math.abs(R.renderer.getPixelRatio() - v) > 0.01) { R.renderer.setPixelRatio(v); size(); } }
+export function noteFrame(dt) {
+  if (!(dt > 0 && dt < 0.5)) return;
+  Q.seen.push(dt); if (Q.seen.length >= 90) { const s = Q.seen.sort((a, b) => a - b); Q.best = Math.min(Q.best * 1.003, s[45]); Q.seen.length = 0; } // the fastest steady pace seen (the screen's refresh, at best)
+  if (!R || !R.on) return;
+  Q.ts.push(dt); if (Q.ts.length < 45) return;
+  const s = Q.ts.sort((a, b) => a - b), p90 = s[40]; Q.ts.length = 0;
+  const target = Math.max(1 / 85, Q.best);
+  if (Q.tried) { const t = Q.tried; Q.tried = null; if (t.down && p90 > t.p90 * 0.95) { Q.pr = t.pr; Q.floor = t.pr; setPR(Q.pr); return; } } // a step down that didn't help: undo it, and don't go that low again
+  if (p90 > target * 1.12 && Q.pr > Math.max(0.7, Q.floor || 0) + 0.01) { Q.tried = { down: true, pr: Q.pr, p90 }; Q.pr = Math.max(0.7, Q.floor || 0, Q.pr - 0.15); }
+  else if (p90 < target * 0.88 && Q.pr < Q.max) { Q.pr = Math.min(Q.max, Q.pr + 0.1); Q.floor = 0; }
+  setPR(Q.pr);
+}
+export const quality = (force) => { if (force) { Q.max = Q.pr = force; Q.floor = 0; setPR(force); } return { pr: Q.pr, max: Q.max, best: Q.best, gfx: R && R.gfx }; }; // (force: tests only)
+// shadows: what casts and what receives
+function shadows(o, cast, recv) { o.traverse(m => { if (m.isMesh) { m.castShadow = cast; m.receiveShadow = recv; } }); }
 export function stop() { if (!R || !R.on) return; R.on = false; R.canvas.style.display = 'none'; R.key = ''; }
 export const active = () => !!(R && R.on);
 
