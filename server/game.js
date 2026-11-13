@@ -1739,7 +1739,7 @@ export class Game {
       case 'melee': this.melee(p); break;
       case 'ability': if (!p.downed && p.ctrl === 'drone' && OPERATORS[p.op].ability.id === 'swarm') { const b = this.ent(p.droneId); if (b && b.type === 'bird') this.releaseSwarm(p, b); break; } // MAGPIE: a swarm from her bird
         if (!p.downed && p.ctrl === 'body' && !p.busy && !p.rope && !(this.time < (p.empUntil || 0))) this.startUse(p, 'ability'); break;
-      case 'gadget': if (!p.downed && p.ctrl === 'body' && !p.busy && !p.rope && !(this.time < (p.empUntil || 0))) this.startUse(p, 'gadget'); break;
+      case 'gadget': if (!p.downed && p.ctrl === 'body' && !p.busy && (!p.rope || (p.rope.st === 'hang' && (THROWN_G.has(p.gadget) || p.gadget === 'breach'))) && !(this.time < (p.empUntil || 0))) this.startUse(p, 'gadget'); break;
       case 'view': this.toggleView(p); break; // controller / touch: drone or cameras, one button
       case 'feeds': this.openFeeds(p); break; // 5
       case 'drone': this.droneKey(p); break; // 6
@@ -2236,7 +2236,7 @@ export class Game {
   }
   tickPrep(p) {
     if (!p.prep) return;
-    if (!p.alive || p.downed || p.ctrl !== 'body' || p.vault || p.rope) { p.prep = null; return; } // interrupted: nothing used up
+    if (!p.alive || p.downed || p.ctrl !== 'body' || p.vault || (p.rope && p.rope.st !== 'hang')) { p.prep = null; return; } // interrupted: nothing used up (hanging on a rope you can throw and place, R6's rules)
     if (this.time < p.prep.until) return;
     const k = p.prep.k; p.prep = null;
     if (k === 'gadget') this.useGadget(p); else this.useAbility(p);

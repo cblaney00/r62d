@@ -1219,3 +1219,12 @@ html.zombies #leftCount, html.zombies #tipNow, html.zombies #cambar, html.zombie
 .zbPows { display: flex; flex-direction: column; gap: 3px; align-self: flex-start; }
 .zbPows i { font: 800 15px var(--head); font-style: normal; color: var(--pc); text-shadow: 0 0 8px var(--pc), 0 1px 2px #000; letter-spacing: 0.08em; }
 .zbPows i.blink { animation: zbBlink 0.5s steps(2) infinite; } @keyframes zbBlink { 50% { opacity: 0.2; } }
+
+/* the 3D rope view (rope3d.js): its WebGL picture sits under the HUD; a plain crosshair in the middle */
+#rope3d { position: fixed; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; z-index: 0; }
+#r3x { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+#r3x.hidden { display: none; }
+#r3x i { position: absolute; background: #46ff6a; box-shadow: 0 0 0 1px #000; }
+#r3x i:nth-child(1) { left: -13px; top: -1px; width: 8px; height: 2px; } #r3x i:nth-child(2) { left: 5px; top: -1px; width: 8px; height: 2px; }
+#r3x i:nth-child(3) { left: -1px; top: -13px; width: 2px; height: 8px; } #r3x i:nth-child(4) { left: -1px; top: 5px; width: 2px; height: 8px; }
+#r3x b { position: absolute; left: -1px; top: -1px; width: 2px; height: 2px; background: #46ff6a; }

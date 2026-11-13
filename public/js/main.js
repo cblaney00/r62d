@@ -32,6 +32,7 @@ import { createCoach } from './tutorial.js';
 import { drawQr } from './qr.js';
 import { readCode, showCode } from '/shared/joincode.js';
 import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
+import * as rope3d from './rope3d.js';
 import { compassRoute as sharedRoute } from '/shared/compass.js';
 import { touchPad, touchContext, touchActive, isTrackpad, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
@@ -725,6 +726,7 @@ function onEvent(e, s, players) {
   const now = performance.now() / 1000;
   switch (e.e) {
     case 'shot': {
+      if (st.r3shots && st.map) st.r3shots.push({ f: floorAt(st.map, e.x, e.y), x: e.x, y: e.y, x2: e.x2, y2: e.y2 });
       const w = WEAPONS[e.w]; const a = Math.atan2(e.y2 - e.y, e.x2 - e.x);
       if (e.nt) fx.tracer(e.x, e.y, e.x2, e.y2); else fx.trail(e.x, e.y, e.x2, e.y2); // subsonic ammo: only the old brief streak
       const an = anim(e.id);
@@ -964,6 +966,7 @@ cv.addEventListener('mousemove', e => {
     const ads = adsHeld() && st.me && st.me.a && st.me.ct === 'body';
     st.aimMoveT = performance.now();
     const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1) * DPR * (assistTgt ? ASSIST.slow : 1); // aim help: slower over an enemy
+    if (r3on()) { rope3d.look(e.movementX * k / DPR, e.movementY * k / DPR); return; } // the 3D rope view turns instead
     if (padOn && freeAimOn()) { freeMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'pad') { padMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'face') { faceMove(e.movementX * k, e.movementY * k, ads); return; }
@@ -1448,6 +1451,50 @@ function siteFound(s) {
 // up or down it points to the stairs (or hatch) instead and says which way. The route is a breadth-first search over
 // what your team knows of the map (st.known), recomputed a few times a second.
 const WALKISH = new Set([T.FLOOR, T.GROUND, T.STAIR, T.OPEN, T.HATCH, T.HATCHR, T.HOLE, T.BARRI, T.RUBBLE]);
+// ---- the 3D rope view (rope3d.js) ----
+// On for an attacker hanging on (or climbing) a rope; leaving it glides the camera back up to the top-down view over
+// R3_OUT s (inside the climb-in), so you can shoot as soon as you're through.
+const R3_OUT = 0.45, FH3 = 3.2 * PX_PER_M;
+function r3on() { const me = st.me; return !!(me && me.ro && me.a && !me.dn && me.tm === 'atk' && me.ct === 'body' && !st.tv && st.map && st.map.ropes); }
+function rope3dFrame(s, me, now, dt) {
+  const m = st.map, on = r3on();
+  if (!on && !st.r3last) { $('r3x').classList.add('hidden'); return; }
+  if (!st.r3shots) st.r3shots = [];
+  let c;
+  if (on) {
+    const ro = me.ro, R = m.ropes, ease = q => q * q * (3 - 2 * q);
+    const ri = ro[0] ? ro[1] : ro[2] >= 0 ? ro[2] : ro[6] >= 0 ? ro[6] : st.r3rope; if (ri === undefined || !R[ri]) return;
+    const r = R[ri]; st.r3rope = ri;
+    const lvl = i => i >= 0 && R[i] ? R[i].lvl * FH3 : null, roofH = (m.floors.length - 1 - m.groundFloor) * FH3;
+    let h;
+    if (ro[0]) h = r.lvl * FH3;
+    else { const from = ro[6] === -1 ? 0 : lvl(ro[6]) ?? st.r3h ?? 0, to = ro[2] >= 0 ? lvl(ro[2]) : ro[4] ? roofH : 0; h = from + (to - from) * ease(Math.min(1, ro[3])); }
+    st.r3h = h;
+    const pf = floorAt(m, st.pred.x, st.pred.y), o = pf >= 0 && pf !== r.f ? floorOff(m, pf, r.f) : { x: 0, y: 0 };
+    const pred = { x: st.pred.x + o.x, y: st.pred.y + o.y };
+    const people = [];
+    for (const sp of s.players) {
+      if (sp.id === me.id || !sp.a || sp.sg) continue;
+      const p = interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
+      const f = floorAt(m, p.x, p.y); if (f < 0) continue;
+      const q = f !== r.f ? floorOff(m, f, r.f) : { x: 0, y: 0 }; if (Math.hypot(p.x + q.x - pred.x, p.y + q.y - pred.y) > 30 * PX_PER_M) continue;
+      if (sp.sq !== me.sq && !teamSees(p.x, p.y)) continue; // only who your side can see: the same lines both ways
+      people.push({ id: sp.id, op: sp.op, x: p.x, y: p.y, f, ag: p.ag || 0, w: sp.w, onRope: !!sp.rp, pose: sp.dn || sp.pn ? 'down' : sp.rp === 3 ? 'hangInv' : sp.rp ? 'hang' : sp.cr ? 'crouch' : 'stand' });
+    }
+    c = { m, me, s, pred, rope: r, height: h, inv: !!ro[5], people, shots: st.r3shots, now, dt, ads: !!me.ad, leaving: null };
+    st.r3last = c; st.r3leaveT = null;
+  } else { // gliding back out
+    if (st.r3leaveT == null) { st.r3leaveT = now; const d = 3.5 * PX_PER_M; aimOff = { x: Math.cos(st.aim) * d, y: Math.sin(st.aim) * d }; st.r3aim = null; } // the top-down crosshair: a few metres ahead the way you faced
+    const q = (now - st.r3leaveT) / R3_OUT;
+    if (q >= 1) { rope3d.stop(); st.r3last = null; st.r3leaveT = null; $('world').style.visibility = ''; $('r3x').classList.add('hidden'); return; }
+    c = { ...st.r3last, now, dt, shots: st.r3shots, leaving: q };
+  }
+  rope3d.frame(c); st.r3shots.length = 0;
+  const full = on && rope3d.active();
+  if (!on) st.r3start = null; else if (st.r3start == null) st.r3start = now;
+  $('world').style.visibility = full && now - st.r3start > 0.45 ? 'hidden' : ''; // (fully in the 3D view: the top-down picture needn't show)
+  $('r3x').classList.toggle('hidden', !full);
+}
 function compassRoute(s, from) { return sharedRoute(st.map, st.known, s.site, from, st); }
 // where your teammates are, in words (he asked): name, room and floor, updated a few times a second
 function drawAllies(s, me, now) {
@@ -1827,6 +1874,7 @@ function frame(nowMs) {
     const c = cursor(), mw = screenToWorld(c.x, c.y);
     st.aim = Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x);
     if (sliding()) st.aim = slideAim(st.aim);
+    if (r3on() && rope3d.active()) { const a = rope3d.aim(); if (a) { st.aim = a.ang; aimOff = { x: a.x - st.pred.x, y: a.y - st.pred.y }; st.r3aim = a; } } else st.r3aim = null; // the 3D rope view: where its crosshair is
     if (now < (st.dazeUntil || 0)) st.aim += Math.sin(now * 6.3) * 0.05 + Math.sin(now * 2.1) * 0.04; // dazed: the aim sways
   } else if (view && view.kind === 'cam') {
     if (st.lastCam !== view.cam.id) { // switching cameras: start from that camera's current direction
@@ -2003,6 +2051,7 @@ function frame(nowMs) {
   revealSeen(); t1 = pfa('viewers', t1);
   bodySounds(me, dt);
   draw(s, view, now, dt); ctx = ctx0;
+  rope3dFrame(s, me, now, dt);
   drawOutWarn(st.last, st.me); drawCompass(st.last, st.me, now); drawAllies(st.last, st.me, now);
   pfa('total', T0);
   watchPerf(rawGap, performance.now() - T0);
@@ -2043,6 +2092,12 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
   { const r = moveTurn(); if (r) k.rot = Math.round(r * 1000) / 1000; } // Rotate view, Face aiming, sprint + W: the keys turn with you
+  if (r3on() && me && me.ro) { // the 3D rope view (he asked, R6's keys): W/S up and down a floor, A/D along the wall as you face it, crouch upside down
+    const r = st.map.ropes[me.ro[1]];
+    k.rw = r ? ((k.right ? 1 : 0) - (k.left ? 1 : 0)) * rope3d.wallSign(r) : 0; k.rv = k.up ? 1 : k.down ? -1 : 0;
+    const cr = keys.has('crouch') || keys.has('crouchTap'); k.inv = cr && !st.r3cr ? 1 : 0; st.r3cr = cr;
+    k.up = k.down = k.left = k.right = 0; k.crouch = 0; k.sprint = 0; delete k.rot;
+  }
   // ping whatever is under your aim: an enemy you can see, else a gadget, camera or the objective, else the wall, door or floor you point at
   const trySpot = () => {
     if (!view || !me) return;
@@ -2082,6 +2137,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   }
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
   const c = cursor(), mw = freeAimOn() && padOn && !gpRecent() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
+  if (st.r3aim) { mw.x = st.r3aim.x; mw.y = st.r3aim.y; } // (the 3D rope view's crosshair)
   msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
   st.aimUp = ctrl === 'body' && me && me.a && !me.dn && !!aimUpHatch(st.map, st.pred.x, st.pred.y, mw.x, mw.y); // your own aim-up pose, without waiting for the server
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
@@ -3249,6 +3305,9 @@ const roleIcon = id => RI[id] ? `<svg class="rIcon" viewBox="0 0 24 24" aria-hid
 function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;
   if (s.zb && me.a && !me.dn) { const z = zbPrompt(s, me, x, y); if (z !== null) return z; }
+  if (me.ro && r3on() && me.ro[0]) { const r = m.ropes[me.ro[1]], atW = r && ropeAtWindow(r, x, y); // the 3D rope view's keys (R6's)
+    const inW = atW ? (ropeWindowOpen(m, r) ? `<b>${label('vault')}</b>CLIMB IN  ·  ` : ropeWindowBoarded(m, r) ? `<b>${label('vault')}</b>SMASH IN  ·  ` : '') : '';
+    return `${inW}<b>${label('up')}</b>/<b>${label('down')}</b>UP · DOWN  ·  <b>${label('left')}</b>/<b>${label('right')}</b>ALONG  ·  <b>${label('crouch')}</b>${me.ro[5] ? 'RIGHT WAY UP' : 'UPSIDE DOWN'}  ·  <b>${label('interact')}</b>LET GO`; }
   if (me.ro) { // on a rope
     if (!me.ro[0]) return me.ro[2] < 0 && !me.ro[4] ? 'LETTING GO…' : `CLIMBING ${Math.round(me.ro[3] * 100)}%`;
     const r = m.ropes[me.ro[1]], atW = r && ropeAtWindow(r, x, y), hop = (i, n) => n >= 0 ? m.floors[m.ropes[n].f].name : i;
@@ -3949,7 +4008,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { r3: rope3d.debug, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
