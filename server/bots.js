@@ -4,9 +4,9 @@
 // call out what they see, and react no faster than a fairly experienced player. The bot skill setting
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
-import { CELL, PLAYER_R, T, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
+import { CELL, PLAYER_R, T, FL, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked } from '../shared/physics.js';
-import { hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
+import { ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
 import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess } from './training.js';
@@ -585,7 +585,7 @@ function shotClear(game, p, q) {
   walkRay(p.x, p.y, dx, dy, d, (cx, cy) => {
     if (cx === sx && cy === sy) return false;
     const t = tileAt(m, cx, cy); if (q.win && t === T.VOID) return true; // out of a window: it carries on down there
-    if (!stopsBullet(t)) return false;
+    if (!stopsBullet(t) || (t === T.LOW && m.floor[cy * m.W + cx] === FL.VOID)) return false; // (a rope ledge is open air: someone hanging there can be shot)
     const sh = shapeAt(m, cx, cy); if (sh) { const h = rayShape(sh, p.x, p.y, dx, dy); if (h === null || h > d) return false; }
     ok = false; return true;
   });
@@ -839,6 +839,7 @@ export function botThink(game, p, dt) {
   if (!ai.role) ai.role = roleFor(game, p, team);
   const abId = OPERATORS[p.op].ability.id;
   const useAbility = () => game.event(p, { k: 'ability' });
+  if (action && team === TEAM.ATK && !p.downed && windowPlay(game, p, inp, dt)) { if (!ai.winF) { ai.winF = 1; feat(p, 'rappel'); } return; } // (he asked) R6's rappel: up to a site window, peek, in
   if (action && team === TEAM.ATK && !p.downed && roofPlay(game, p, inp, dt)) { if (!ai.roofF) { ai.roofF = 1; feat(p, 'roof'); } return; } // (he asked) up on the roof, in through a hatch
 
   // --- hearing: the most recent enemy noise this bot could hear ---
@@ -1361,6 +1362,85 @@ function roofPick(game, p) {
   }
   const plan = R.sq[p.squad];
   return plan && plan.ids.includes(p.id) ? plan : null;
+}
+// Rappelling to a window (he asked 2026-11-13: bots test the new rope play): once a round an attacking team may send one
+// player (two from Diamond up) up a rope to a window of a site room on an upper floor. They hang beside the window, not
+// in front of it, peek the tight angle now and then (sometimes upside down), shoot whoever they see through it, and when
+// the team goes (or after a while) they smash in through the window. game.windowChance forces the odds (tests).
+const WIN_CHANCE = [0.05, 0.08, 0.12, 0.16, 0.2, 0.24, 0.28, 0.3];
+function windowPick(game, p) {
+  const m = game.map, R = game._winP && game._winP.round === game.round ? game._winP : (game._winP = { round: game.round, sq: {} });
+  if (R.sq[p.squad] === undefined) {
+    let plan = null;
+    const site = m.sites[game.site], inSite = (x, y) => { const rn = roomAt(m, x, y); return rn && site.rooms.includes(rn); };
+    const cands = (m.ropes || []).filter(r => r.cells.length && r.inside && inSite(r.inside.x, r.inside.y));
+    const team = [...game.players.values()].filter(q => q.bot && q.alive && q.squad === p.squad && !q.hasDefuser);
+    const lvl = team.some(q => q.pro) ? 7 : lvlOf(game, p), odds = game.windowChance ?? WIN_CHANCE[lvl];
+    if (cands.length && team.length >= 2 && Math.random() < odds) {
+      const rope = cands[Math.floor(Math.random() * cands.length)];
+      const ids = team.sort(() => Math.random() - 0.5).slice(0, lvl >= 5 && team.length >= 4 ? 2 : 1).map(q => q.id);
+      plan = { rope, ids, goAt: 35 + Math.random() * 30 };
+      game.winLog && game.winLog.push({ e: 'plan', rope: rope.i, ids });
+    }
+    R.sq[p.squad] = plan;
+  }
+  const plan = R.sq[p.squad];
+  return plan && plan.ids.includes(p.id) ? plan : null;
+}
+function windowPlay(game, p, inp, dt) {
+  const ai = p.ai, m = game.map, plan = windowPick(game, p); if (!plan) return false;
+  const st = ai.winSt && ai.winSt.round === game.round ? ai.winSt : (ai.winSt = { round: game.round, s: 'go', t: game.time, side: Math.random() < 0.5 ? -1 : 1 });
+  if (st.s === 'done') return false;
+  const prev = p.prevInput || {}, press = k => { inp[k] = prev[k] ? 0 : 1; }, log = e => game.winLog && game.winLog.push({ ...e, id: p.id, t: Math.round(game.time) });
+  const late = game.planted || game.timer < 25 || game.time - st.t > 75;
+  if (!p.rope) {
+    if (st.s !== 'go') { st.s = 'done'; log({ e: p.alive ? 'off' : 'dead', fl: floorAt(m, p.x, p.y) }); return false; } // in through the window, let go, or shot off
+    if (late || p.hasDefuser || game.time - st.t > 45) { st.s = 'done'; log({ e: 'gaveUp', why: late ? 'late' : p.hasDefuser ? 'defuser' : 'far', d: Math.round(Math.hypot(plan.rope.base.x - p.x, plan.rope.base.y - p.y)) }); return false; }
+    const b = plan.rope.base; if (Math.hypot(b.x - p.x, b.y - p.y) > 9) { moveTo(game, p, inp, b, dt); return true; }
+    press('interact'); st.climbT = st.climbT || game.time; return true;
+  }
+  if (p.rope.st !== 'hang') return true; // climbing
+  if (st.s === 'go') { st.s = 'hang'; st.hangT = game.time; log({ e: 'hang', r: p.rope.r }); if (Math.random() < 0.35) { inp.inv = 1; st.inv = true; } }
+  const r = m.ropes[p.rope.r], s = ropeS(r, p.x, p.y), win = r.cells.length > 0;
+  // fight: whoever is in sight through the window
+  const S = skill(game, p), e = visibleEnemy(game, p, S.see);
+  if (e) {
+    // the same reaction and hands as every bot (not a perfect aim): an error that settles, somewhere across the body
+    if (ai.wSeen !== e.id) { ai.wSeen = e.id; ai.wReact = -S.react - Math.random() * S.reactX; ai.wErr = (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.4) * S.err; ai.wOs = (Math.random() - 0.5) * 2 * (Math.random() < S.head ? 1 : 4); log({ e: 'see', who: e.id }); }
+    ai.wReact += dt; ai.wErr *= Math.exp(-dt * S.settle); ai.wErr += (Math.random() - 0.5) * dt * 0.6 * (S.shake ?? 1);
+    const dd = Math.max(1, Math.hypot(e.x - p.x, e.y - p.y)), os = ai.wOs / dd, want = Math.atan2(e.y + (e.x - p.x) * os - p.y, e.x - (e.y - p.y) * os - p.x) + ai.wErr; turnTo(p, want, S.turn, dt);
+    p.aimX = p.x + Math.cos(p.aim) * dd; p.aimY = p.y + Math.sin(p.aim) * dd;
+    const gun = p.guns[p.slot]; if (gun && gun.ammo === 0) game.startReload(p);
+    else if (ai.wReact > 0 && Math.abs(angDiff(want, p.aim)) < S.tol) { shootInput(inp, ai, gun); if (!st.shot) { st.shot = true; log({ e: 'shoot' }); } }
+    return true;
+  }
+  ai.wSeen = null;
+  if (st.s === 'hang' && (late || elapsedAction(game) > plan.goAt)) { st.s = 'in'; log({ e: 'go' }); }
+  if (st.s === 'in') { // to the window's middle, then through it (smashing the boards)
+    if (!win) { press('interact'); return true; } // (a plain wall: let go)
+    if (st.inv) { inp.inv = prev.inv ? 0 : 1; st.inv = false; return true; }
+    if (Math.abs(s) > 3) { inp.rw = -Math.sign(s); return true; }
+    if (game.time - (st.vaultT || 0) > 0.6) { st.vaultT = game.time; game.event(p, { k: 'vault', a: r.out + Math.PI }); }
+    if (game.time - st.hangT > 100) press('interact'); // can't get in: let go
+    return true;
+  }
+  // boarded: shoot a few peep holes through the boards first (R6), from beside it
+  if (win && !st.holes && game.time - st.hangT > 1.5 && r.cells.some(k => m.tiles[k] === T.BARRI)) {
+    const k = r.cells[(st.holeN || 0) % r.cells.length], cx = (k % m.W + 0.5) * CELL, cy = (Math.floor(k / m.W) + 0.5) * CELL;
+    if (Math.abs(s - st.side * (r.half - 4)) > 2) { inp.rw = Math.sign(st.side * (r.half - 4) - s); return true; }
+    const want = Math.atan2(cy - p.y, cx - p.x); turnTo(p, want, S.turn, dt); p.aimX = cx; p.aimY = cy;
+    const gun = p.guns[p.slot];
+    if (gun && Math.abs(angDiff(want, p.aim)) < 0.08) { const am = gun.ammo; shootInput(inp, ai, gun); if (st.lastAmmo !== undefined && am < st.lastAmmo) st.holeN = (st.holeN || 0) + 1; st.lastAmmo = am; }
+    if ((st.holeN || 0) >= 4) { st.holes = true; log({ e: 'holes' }); }
+    return true;
+  }
+  // peek: sit beside the window, now and then slide to its edge to look in at an angle
+  const besideS = win ? st.side * (r.half + 10) : 0, edgeS = win ? st.side * Math.max(0, r.half - 6) : 0;
+  st.peekT = (st.peekT ?? 2) - dt; if (st.peekT <= 0) { st.peeking = !st.peeking; st.peekT = st.peeking ? 1.2 + Math.random() : 2 + Math.random() * 3; if (st.peeking) log({ e: 'peek' }); }
+  const goal = Math.max(r.a, Math.min(r.b, st.peeking ? edgeS : besideS));
+  if (Math.abs(s - goal) > 2) inp.rw = Math.sign(goal - s);
+  turnTo(p, r.out + Math.PI + (st.peeking ? -st.side * 0.5 : 0), S.turn * 0.6, dt); // looking in at an angle
+  return true;
 }
 function roofPlay(game, p, inp, dt) {
   const ai = p.ai, m = game.map, R = roofPick(game, p); if (!R) return false;
