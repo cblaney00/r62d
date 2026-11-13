@@ -6,6 +6,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] game modes and a division of game modes, in this order on the menu: quick match (simplified rules for beginners, more information, a couple of pre-barricaded walls in commonly barricaded areas, no bans), unranked (full ranked rules without the rank effect), ranked (full rules with rank effect), and a tab for fun game modes: one in the chamber, gun game, infected (he chose), and a zombie mode in the style of black ops 1 (he chose: our own map, a New England style town like Provincetown, MA, with water and docks and a few buildings with multiple levels, about as big as the biggest map). He chose: quick match = site shown to attackers, a tip of the moment, enemies left count; full rules = operator bans, first to 4 + overtime, sides swap at half, less help on screen, but a bomb site compass once the bomb has been found, and make sure the compass is intuitive and accurate
 
 ## Done
 
