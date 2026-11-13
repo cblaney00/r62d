@@ -50,10 +50,13 @@ if (!pts.some(n => n > 50)) fail('no points earned');
   const pk = M.perks[1]; press(pk.x, pk.y); if (p.zb.perks.length) fail('a perk worked without power');
   press(M.power.x, M.power.y); if (!Z2.power) fail('power did not come on');
   press(pk.x, pk.y); if (!p.zb.perks.includes(pk.id)) fail('perk not bought with power on');
-  const cr = M.crates[Z2.crate.at]; press(cr.x, cr.y); if (!Z2.crate.busy && !Z2.crate.moving) fail('crate did not roll');
-  for (let i = 0; i < 100; i++) g2.tick(1 / 30);
-  if (p.guns.length !== 2) fail('crate gun not given');
-  p.slot = 0; press(M.forge.x, M.forge.y); if (!p.guns[0].up) fail('forge did nothing');
+  const cr = M.crates[Z2.crate.at]; press(cr.x, cr.y); if (!Z2.crate.roll && !Z2.crate.moving) fail('crate did not roll');
+  for (let i = 0; i < 140; i++) g2.tick(1 / 30);
+  if (Z2.crate.roll) press(cr.x, cr.y);
+  if (p.guns.length !== 2 && !Z2.crate.moving) fail('crate gun not taken');
+  p.slot = 0; press(M.forge.x, M.forge.y); if (!Z2.forge) fail('forge did nothing');
+  for (let i = 0; i < 120; i++) g2.tick(1 / 30);
+  press(M.forge.x, M.forge.y); if (!p.guns.some(x => x.up)) fail('forged gun not taken back');
   // a window: take boards off and put them back
   const oi = +Object.keys(Z2.boards)[0], o = g2.map.openings[oi], k = o.cells[0], W = g2.map.W;
   g2.zb.boards[oi] = 2; const wx = (k % W + 0.5) * 16, wy = (Math.floor(k / W) + 0.5) * 16;

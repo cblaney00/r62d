@@ -8,7 +8,7 @@ import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldP
 import { arenaThink, defSetup, botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { arenaStart, arenaTick, arenaKill, arenaDamage, arenaSpeed, arenaEndMatch, arenaPlayer, arenaInfo } from './arena.js';
-import { zbStart, zbTick, zombieThink, zbSpeed, zbDamage, zbKill, zbCanGoDown, zbReloadMul, zbBlocksVault, zbUse, zbEnd, zbPlayer, zbInfo } from './zombies.js';
+import { ZB, zbDown, zbUp, zbReviveTime, zbSlideEnd, zbStart, zbTick, zombieThink, zbSpeed, zbDamage, zbKill, zbCanGoDown, zbReloadMul, zbBlocksVault, zbUse, zbEnd, zbPlayer, zbInfo } from './zombies.js';
 import { MODES, CLASSIC, DEFAULT_MODE, attackSquad, roundsToWin, inOvertime } from '../shared/modes.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
@@ -694,6 +694,7 @@ export class Game {
 
   tickPlayer(p, dt) {
     const RUNOUT_SPOT = 3;
+    if (this.zb && p.zb) { if (p.slT > 0) p.wasSl = true; else if (p.wasSl) { p.wasSl = false; zbSlideEnd(this, p); } } // BLAST PROOF: a slide ends in a blast
     this.tickPrep(p);
     this.tickSnipers(p); this.tickGrapple(p, dt);
     // a defender outside the building (preparation or action): the attackers are warned at once, and after RUNOUT_SPOT
@@ -742,11 +743,11 @@ export class Game {
     }
     if (p.downed) {
       p.hp -= dt; p.busy = null;
-      if (SELF_UP.has(p.op) && (p.selfUp = (p.selfUp || 0) + dt) >= SELF_UP_TIME) { // SOLACE / TONIC / RALLY: slowly back on their feet
+      if (!this.zb && SELF_UP.has(p.op) && (p.selfUp = (p.selfUp || 0) + dt) >= SELF_UP_TIME) { // SOLACE / TONIC / RALLY: slowly back on their feet
         p.downed = false; p.hp = 20; p.selfUp = 0; this.events.push({ e: 'snd', s: 'revive', x: r1(p.x), y: r1(p.y) }); return;
       }
       if (p.hp <= 0) this.kill(p, this.players.get(p.downedBy), 'Bled out');
-      return;
+      if (!this.zb || !p.alive) return; // (ZOMBIES: last stand, the pistol still shoots)
     }
 
     // defuser pickup
@@ -851,7 +852,7 @@ export class Game {
     }
 
     // interaction (hold E)
-    if (inp.interact && p.ctrl === 'body' && !p.rope && !p.ropeHeld) {
+    if (inp.interact && p.ctrl === 'body' && !p.rope && !p.ropeHeld && !p.downed) {
       if (this.zb && zbUse(this, p, dt, inp)) p.busy = null; // ZOMBIES: buying and boarding windows
       else {
       if (!p.busy) p.busy = this.startInteract(p);
@@ -1195,7 +1196,8 @@ export class Game {
       const sa = this.shotAim, head = miss < HEAD_R * small && (!sa || Math.hypot(sa.x - at.x, sa.y - at.y) <= HEAD_AIM * small);
       if (src && src.tracerUntil > this.time && this.side(q) !== this.side(src)) this.spot(this.side(src), q.id, 4); // MARK's tracer rounds
       this.shotPens = pens; // the death card says "through a wall"
-      if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
+      if (this.zb && q.zombie) { this.headshot = !!head; this.zbNeck = !head && miss < HEAD_R * 1.7; this.damage(q, dmg * mult * fall * (head ? ZB.headMul : this.zbNeck ? 1.5 : 1), src, wname, ang); this.headshot = false; this.zbNeck = false; } // ZOMBIES: the head takes more, never a one-shot
+      else if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
       else if (head && (pellet || pens)) this.damage(q, dmg * mult * fall * 1.8, src, wname, ang); // a shotgun pellet to the head hurts more, but each one alone can't one-tap
       else if (W && W.oneShot && !q.downed && scopedIn(src) && !this.pierceNow && (!pens && mult >= 1 || W.wallShot && pens <= W.wallShot)) // the Mammoth: through one soft wall too
         this.damage(q, 9999, src, wname, ang); // he asked: the big sniper rifles still drop anyone with one clean body shot; then (a prism made it too strong) only aimed in through the sniper scope
@@ -1414,6 +1416,7 @@ export class Game {
         if (src && src.ms && src !== q) src.ms.downs++;
         if (src && src !== q && this.side(src) !== this.side(q)) this.pts(src, 50, 'ENEMY DOWNED');
         q.downed = true; q.selfUp = 0; q.hp = DUR.bleedout; q.downedBy = src ? src.id : null; q.busy = null; q.ctrl = 'body';
+        if (this.zb) zbDown(this, q); // ZOMBIES: last stand with a pistol, perks gone
         q.scanning = false; q.bracing = false; q.reloadT = 0; this.ropeFall(q);
         this.events.push({ e: 'down', id: q.id, by: src ? src.id : null, df: q.hasDefuser ? 1 : undefined });
         if (q.hasDefuser) this.dropDefuser(q);
@@ -1493,7 +1496,7 @@ export class Game {
       return { k: 'defuse', t: 0, dur: DUR.defuse };
     for (const q of this.players.values())
       if (q !== p && q.alive && q.downed && this.side(q) === team && Math.hypot(q.x - p.x, q.y - p.y) < 26)
-        return { k: 'revive', t: 0, dur: DUR.revive, target: q.id };
+        return { k: 'revive', t: 0, dur: DUR.revive * (this.zb ? zbReviveTime(this, p) : 1), target: q.id };
     if (team === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION)) {
       const f = this.facingCell(p, 28); // the same reach as the on-screen prompt
       if (f && f.t === T.SOFT && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (p.op === 'girder' ? 0.5 : 1), cell: f.k };
@@ -1524,7 +1527,7 @@ export class Game {
       this.endRound(TEAM.DEF, 'Defuser disabled');
     } else if (b.k === 'revive') {
       const q = this.players.get(b.target);
-      q.downed = false; q.hp = 25; if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) });
+      q.downed = false; q.hp = 25; if (this.zb) zbUp(this, q); if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) });
     } else if (b.k === 'reinforce' && b.hatch !== undefined) {
       if (this.map.tiles[this.map.hatches[b.hatch].cells[0]] === T.HATCH && this.reinforce > 0) { this.reinforceHatch(b.hatch); this.reinforce--; this.pts(p, 15, 'HATCH REINFORCED'); }
     } else if (b.k === 'reinforce') {
@@ -1717,10 +1720,10 @@ export class Game {
     const team = this.side(p);
     if (p.vault && e.k !== 'spot' && e.k !== 'view') return; // busy climbing
     if (p.staged && ['vault', 'melee', 'ability', 'gadget', 'reload'].includes(e.k)) return; // not on the map yet (he noticed shots before spawning)
-    if ((this.arena || this.zb) && ['ability', 'gadget', 'drone', 'feeds', 'view', 'camNext', 'camPrev', 'camSet'].includes(e.k)) return; // fun modes: guns and knives only
+    if ((this.arena || this.zb) && !(this.zb && e.k === 'gadget' && p.gadget === 'frag') && ['ability', 'gadget', 'drone', 'feeds', 'view', 'camNext', 'camPrev', 'camSet'].includes(e.k)) return; // fun modes: guns and knives only
     switch (e.k) {
       case 'vault': this.startVault(p, typeof e.a === 'number' && isFinite(e.a) ? e.a : p.aim); break;
-      case 'reload': if (!p.downed && p.ctrl === 'body') this.startReload(p); else this.birdAuto(p); break; // on a landed bird: AUTO on/off
+      case 'reload': if ((!p.downed || this.zb) && p.ctrl === 'body') this.startReload(p); else this.birdAuto(p); break; // on a landed bird: AUTO on/off
       case 'slot': if (!p.downed && p.guns[e.n] && e.n !== p.slot) { p.slot = e.n; p.reloadT = 0; p.fireCd = 0.35; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); } break;
       case 'melee': this.melee(p); break;
       case 'ability': if (!p.downed && p.ctrl === 'drone' && OPERATORS[p.op].ability.id === 'swarm') { const b = this.ent(p.droneId); if (b && b.type === 'bird') this.releaseSwarm(p, b); break; } // MAGPIE: a swarm from her bird
@@ -3021,6 +3024,7 @@ export class Game {
   }
 
   explode(e, o) {
+    if (this.zb) o = { ...o, cells: [], cellR: 0, floor: false }; // ZOMBIES: grenades never open walls or gates
     const owner = this.players.get(e.owner);
     this.noise(e.x, e.y, e.team, 1100);
     let cx = e.x, cy = e.y;

@@ -749,7 +749,7 @@ function onEvent(e, s, players) {
       if (e.kind !== 'stun' && e.kind !== 'emp') st.rend.scorch(e.x, e.y, Math.min(40, e.r * 0.6));
       audio.explosion(e.x, e.y, e.kind);
       break;
-    case 'zbCrate': st.zbCrate = { w: e.w, at: now + e.t, until: now + e.t + 2 }; audio.play('crate', e.x, e.y); break;
+    case 'zbCrate': audio.play('crate', e.x, e.y); break;
     case 'zbRound': audio.play('zbRound', 0, 0); break;
     case 'kill': {
       const v = players.get(e.victim), k = e.killer ? players.get(e.killer) : null;
@@ -1610,13 +1610,15 @@ async function playXp(m) {
 }
 // ZOMBIES on screen (server/zombies.js; players carry zb = [0, points, kills, perks, heads, revives], zombies [1, run, look];
 // the match carries zb = { r round, left, pw power, g gates open, c crate spot (-1 moving), cb rolling, b between, wb boards })
-const ZB_PERKS = { tough: ['IRON HIDE', '#d94a3a', 2500], reload: ['QUICK HANDS', '#5fd08a', 3000], revive: ['SECOND WIND', '#4fb3ff', 1500], rapid: ['DOUBLE BARREL', '#f2c14e', 2000] };
+const ZB_PERKS = { tough: ['IRON HIDE', '#d94a3a', 2500], reload: ['QUICK HANDS', '#5fd08a', 3000], revive: ['SECOND WIND', '#4fb3ff', 1500], rapid: ['DOUBLE BARREL', '#f2c14e', 2000], stride: ['LONG STRIDE', '#e8e070', 2000], blast: ['BLAST PROOF', '#c58bff', 2000] };
+const ZB_POW = { ammo: ['MAX AMMO', '#f2c14e', '▤'], insta: ['INSTA-KILL', '#ff5a4a', '☠'], double: ['DOUBLE POINTS', '#5fd08a', '×2'], nuke: ['NUKE', '#ff9d3d', '✹'], carpenter: ['CARPENTER', '#c8a070', '⚒'], firesale: ['FIRE SALE', '#ff6ad5', '$'] };
+const zbSolo = s => s.players.filter(p => p.zb && p.zb[0] === 0).length === 1;
 function zbStationAt(s, me, x, y) { // the same rules as zbStation in server/zombies.js
   const Z = st.map.zombies, Zs = s.zb, m = st.map, fl = floorAt(m, x, y), near = (p, r) => p && Math.hypot(p.x - x, p.y - y) < r && floorAt(m, p.x, p.y) === fl;
   for (let i = 0; i < Z.gates.length; i++) if (!Zs.g[i] && near(Z.gates[i], 40)) return { k: 'gate', g: Z.gates[i] };
   for (const g of Z.guns) if (near(g, 26)) return { k: 'gun', s: g };
   for (const g of Z.perks) if (near(g, 26)) return { k: 'perk', s: g };
-  if (Zs.c >= 0 && near(Z.crates[Zs.c], 28)) return { k: 'crate', s: Z.crates[Zs.c] };
+  for (const cs of Zs.fs ? Z.crates : Zs.c >= 0 ? [Z.crates[Zs.c]] : []) if (near(cs, 28)) return { k: 'crate', s: cs };
   if (near(Z.power, 26)) return { k: 'power' };
   if (near(Z.forge, 26)) return { k: 'forge' };
   const W = m.W, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
@@ -1627,11 +1629,11 @@ function zbPrompt(s, me, x, y) {
   const t = zbStationAt(s, me, x, y); if (!t) return null;
   const E = `<b>${label('interact')}</b>`, pts = me.zb ? me.zb[1] : 0, $c = n => `<i class="${pts >= n ? '' : 'poor'}">${n}</i>`;
   if (t.k === 'gate') return `${E}OPEN THE ${t.g.name.toUpperCase()} · ${$c(t.g.cost)}`;
-  if (t.k === 'gun') { const has = !!(me.zb && String(me.zb[6] || '').split(',').some(g => g.replace('*', '') === t.s.w)); return has ? `${E}AMMO FOR THE ${WEAPONS[t.s.w].name.toUpperCase()} · ${$c(t.s.cost / 2)}` : `${E}BUY THE ${WEAPONS[t.s.w].name.toUpperCase()} · ${$c(t.s.cost)}`; }
-  if (t.k === 'perk') { const P = ZB_PERKS[t.s.id]; return !s.zb.pw ? `${P[0]} · NEEDS THE POWER ON` : (me.zb && String(me.zb[3]).split(',').includes(t.s.id)) ? `${P[0]} · YOU HAVE IT` : `${E}${P[0]} · ${$c(P[2])}`; }
-  if (t.k === 'crate') return s.zb.cb ? 'THE CRATE IS PICKING…' : `${E}MYSTERY CRATE · A RANDOM GUN · ${$c(950)}`;
+  if (t.k === 'gun') { const own = String(me.zb && me.zb[6] || '').split(',').find(g => g.replace('*', '') === t.s.w), has = !!own; return has ? `${E}AMMO FOR THE ${WEAPONS[t.s.w].name.toUpperCase()} · ${$c(own.endsWith('*') ? 4500 : t.s.cost / 2)}` : `${E}BUY THE ${WEAPONS[t.s.w].name.toUpperCase()} · ${$c(t.s.cost)}`; }
+  if (t.k === 'perk') { const P = ZB_PERKS[t.s.id], soloQr = t.s.id === 'revive' && zbSolo(s); if (soloQr && s.zb.qr >= 3) return `${P[0]} · USED UP`; if (soloQr && !(me.zb && String(me.zb[3]).split(',').includes('revive'))) return `${E}${P[0]} · ${$c(500)}`; return !s.zb.pw ? `${P[0]} · NEEDS THE POWER ON` : (me.zb && String(me.zb[3]).split(',').includes(t.s.id)) ? `${P[0]} · YOU HAVE IT` : `${E}${P[0]} · ${$c(P[2])}`; }
+  if (t.k === 'crate') { const R = s.zb.cr; if (R) return R[0] && R[2] === me.id ? `${E}TAKE THE ${WEAPONS[R[1]].name.toUpperCase()}` : R[0] ? 'SOMEONE ELSE\'S GUN' : 'THE CRATE IS PICKING…'; return `${E}MYSTERY CRATE · A RANDOM GUN · ${$c(s.zb.fs ? 10 : 950)}`; }
   if (t.k === 'power') return s.zb.pw ? 'THE POWER IS ON' : `${E}TURN THE POWER ON`;
-  if (t.k === 'forge') return !s.zb.pw ? 'THE FORGE · NEEDS THE POWER ON' : `${E}FORGE THIS GUN: DOUBLE DAMAGE, MORE AMMO · ${$c(5000)}`;
+  if (t.k === 'forge') { const F = s.zb.fo; if (F) return F[0] && F[2] === me.id ? `${E}TAKE THE FORGED ${WEAPONS[F[1]].name.toUpperCase()}` : 'THE FORGE IS WORKING…'; return !s.zb.pw ? 'THE FORGE · NEEDS THE POWER ON' : `${E}FORGE THIS GUN: DOUBLE DAMAGE, MORE AMMO · ${$c(5000)}`; }
   if (t.k === 'window') return `HOLD ${E}PUT BOARDS BACK · +10 EACH`;
   return null;
 }
@@ -1647,6 +1649,7 @@ function zbHud(s, me) {
   const ps = s.players.filter(p => !(p.zb && p.zb[0] === 1) && p.zb);
   const perks = me && me.zb && me.zb[3] ? String(me.zb[3]).split(',').filter(Boolean) : [];
   setHTML(el, `<div class="zbRound">${s.zb.r}</div><div class="zbPts">${ps.map(p => `<div class="${p.id === s.you ? 'me' : ''}"><span>${esc(p.n.replace(/^\[\w+\] /, ''))}</span><b>${p.zb[1]}</b></div>`).join('')}</div>` +
+    `<div class="zbPows">${[['ik', 'insta'], ['dp', 'double'], ['fs', 'firesale']].filter(([f]) => s.zb[f] > 0).map(([f, k]) => `<i style="--pc:${ZB_POW[k][1]}" class="${s.zb[f] < 6 ? 'blink' : ''}">${ZB_POW[k][0]} ${Math.ceil(s.zb[f])}</i>`).join('')}</div>` +
     `<div class="zbPerks">${perks.map(k => `<i style="--pc:${ZB_PERKS[k][1]}" title="${ZB_PERKS[k][0]}">${ZB_PERKS[k][0][0]}</i>`).join('')}</div>`);
 }
 function zbTable(s) {
@@ -1668,13 +1671,17 @@ function drawZbWorld(ctx, s, now) {
     if (on) { const gl = ctx.createRadialGradient(pk.x, pk.y, 2, pk.x, pk.y, 20); gl.addColorStop(0, P[1] + '66'); gl.addColorStop(1, P[1] + '00'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(pk.x, pk.y, 20, 0, 7); ctx.fill(); }
     plate(pk.x, pk.y, 13, 9, on ? P[1] : '#4a4a4a', 'rgba(0,0,0,0.7)'); plate(pk.x, pk.y - 1, 9, 3, on ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.12)');
     text(P[0], pk.x, pk.y + 8, on ? P[1] : '#9a9a9a', 4); }
-  if (Zs.c >= 0) { const c = Z.crates[Zs.c], fl = 0.5 + 0.5 * Math.sin(now * 3);
+  for (const u of Zs.pu || []) { const P = ZB_POW[u[1]]; if (!P || (u[4] < 6 && Math.floor(now * 4) % 2)) continue; // blinking at the end
+    const gl = ctx.createRadialGradient(u[2], u[3], 1, u[2], u[3], 16); gl.addColorStop(0, P[1] + 'aa'); gl.addColorStop(1, P[1] + '00'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(u[2], u[3], 16, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(10,10,10,0.8)'; ctx.beginPath(); ctx.arc(u[2], u[3], 6.5, 0, 7); ctx.fill(); ctx.strokeStyle = P[1]; ctx.lineWidth = 1; ctx.stroke(); text(P[2], u[2], u[3] + 0.4, P[1], 6); }
+  for (const [ci, c] of Z.crates.entries()) { if (!(ci === Zs.c || Zs.fs)) continue; const fl = 0.5 + 0.5 * Math.sin(now * 3);
     const gl = ctx.createRadialGradient(c.x, c.y, 2, c.x, c.y, 34); gl.addColorStop(0, `rgba(120,200,255,${0.25 + fl * 0.15})`); gl.addColorStop(1, 'rgba(120,200,255,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(c.x, c.y, 34, 0, 7); ctx.fill();
     plate(c.x, c.y, 18, 10, '#6b4a2e', '#2b1d10'); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(c.x - 9, c.y - 0.5, 18, 1); text('?', c.x, c.y, '#bfe6ff', 8);
-    const R = st.zbCrate; if (R && now < R.until) text(now < R.at ? WEAPONS[CRATE_SHOW[Math.floor(now * 12) % CRATE_SHOW.length]].name : WEAPONS[R.w].name, c.x, c.y - 12, '#ffffff', 6); }
+    const R = Zs.cr; if (R && ci === Zs.c) text(R[0] ? WEAPONS[R[1]].name : WEAPONS[CRATE_SHOW[Math.floor(now * 12) % CRATE_SHOW.length]].name, c.x, c.y - 12, R[0] ? '#ffe9a8' : '#ffffff', 6); }
   { const p = Z.power; plate(p.x, p.y, 10, 12, '#3a3f44', '#111'); ctx.fillStyle = Zs.pw ? '#5fd08a' : '#d94a3a'; ctx.fillRect(p.x - 1.5, p.y + (Zs.pw ? -5 : 1), 3, 4); text(Zs.pw ? 'POWER ON' : 'POWER', p.x, p.y + 10, Zs.pw ? '#5fd08a' : '#ddd', 4); }
   { const f = Z.forge, gl = ctx.createRadialGradient(f.x, f.y, 1, f.x, f.y, 18); gl.addColorStop(0, Zs.pw ? 'rgba(255,140,40,0.5)' : 'rgba(120,120,120,0.2)'); gl.addColorStop(1, 'rgba(255,140,40,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(f.x, f.y, 18, 0, 7); ctx.fill();
-    plate(f.x, f.y, 14, 8, '#2e2e30', '#000'); plate(f.x, f.y, 8, 3, Zs.pw ? '#ff8a3d' : '#555'); text('THE FORGE', f.x, f.y + 8, Zs.pw ? '#ffb27a' : '#aaa', 4); }
+    plate(f.x, f.y, 14, 8, '#2e2e30', '#000'); plate(f.x, f.y, 8, 3, Zs.pw ? '#ff8a3d' : '#555'); text('THE FORGE', f.x, f.y + 8, Zs.pw ? '#ffb27a' : '#aaa', 4);
+    if (Zs.fo) text(Zs.fo[0] ? '★ ' + WEAPONS[Zs.fo[1]].name : 'FORGING…', f.x, f.y - 11, '#ffb27a', 6); }
 }
 const CRATE_SHOW = ['mule', 'ox', 'pike', 'saker', 'sabre', 'trident', 'ferret', 'quill', 'anvil', 'vex50', 'hatchet', 'cyclone'];
 // FUN MODES on screen (server/arena.js; players carry ar = [kills, lives, gun step, infected, out of lives])
@@ -2758,7 +2765,7 @@ function draw(s, view, now, dt) {
 // can otherwise see. Off screen, the glint sits small at the screen edge in their direction.
 const GLARE_ANG = 0.14, GLARE_MAX = aimReach('sniper', true) * PX_PER_M;
 function scopeGlare(s, side, now) {
-  const me = st.me, v = st.pred; if (!me || !me.a || me.dn || me.ct !== 'body' || !st.map || !v) return;
+  const me = st.me, v = st.pred; if (!me || !me.a || (me.dn && !(st.last && st.last.zb)) || me.ct !== 'body' || !st.map || !v) return; // (ZOMBIES: last stand still aims)
   const m = st.map, fl = floorAt(m, v.x, v.y), t = performance.now() / 1000;
   for (const p of st.fakeGlare ? s.players.concat(st.fakeGlare) : s.players) { // (st.fakeGlare: screenshot tests)
     if (!p.a || p.tm === side || !p.ad || p.dn || p.ct !== 'body' || p.x == null || !String(p.aa || '').includes('sniper') || p.gh) continue; // MOSS's ghillie: no glint
@@ -3043,7 +3050,7 @@ function screens(s, phase, now) {
   countdown(s, phase);
   show('select', joined && phase === PHASE.SELECT && !st.tv);
   show('tvDraft', !!st.tv && joined && phase === PHASE.SELECT); document.documentElement.classList.toggle('tvsel', !!st.tv && phase === PHASE.SELECT);
-  document.documentElement.classList.toggle('arena', !!(s && (s.ar || s.zb)));
+  document.documentElement.classList.toggle('arena', !!(s && s.ar));
   document.documentElement.classList.toggle('zombies', !!(s && s.zb)); if (s && s.zb) zbHud(s, st.me); // fun modes: no gadget slots, drone bar or team panel
   show('hud', joined && (phase === PHASE.PREP || phase === PHASE.ACTION || phase === PHASE.ROUND_END));
   show('endscreen', joined && (phase === PHASE.MATCH_END || st.forceEnd));
@@ -3155,7 +3162,7 @@ function hud(s) {
   const barW = Math.min(100, me.hp / me.mhp * 100) + '%', barC = me.hp > me.mhp ? 'over' : me.hp < 35 || me.dn ? 'low' : '';
   if (bar.style.width !== barW) bar.style.width = barW;
   if (bar.className !== barC) bar.className = barC;
-  setText('status', me.dn ? `DOWNED — BLEEDING OUT · ${Math.ceil(me.hp)}s` : me.df ? 'DEFUSER CARRIER' : '');
+  setText('status', me.dn ? `${s.zb ? 'LAST STAND' : 'DOWNED'} — BLEEDING OUT · ${Math.ceil(me.hp)}s` : me.df ? 'DEFUSER CARRIER' : '');
   const w = WEAPONS[me.w];
   setText('wname', w ? `${w.name.toUpperCase()} · ${CLASS_NAME[w.cls].toUpperCase()}` : '');
   const pk = me.w + '|' + me.aa;

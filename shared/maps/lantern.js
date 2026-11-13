@@ -204,6 +204,7 @@ export function build() {
       ],
       perks: [
         { id: 'revive', ...g(47, 42) }, { id: 'reload', ...g(64, 44) }, { id: 'tough', ...g(78, 63) }, { id: 'rapid', ...g(28, 63) },
+        { id: 'stride', ...g(97, 72) }, { id: 'blast', ...g(106, 32) },
       ],
       crates: [g(20, 7), g(104, 20), u(20, 85), a(85, 82), g(108, 62)], // where the mystery crate can be
       power: g(106, 98),

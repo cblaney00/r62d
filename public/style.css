@@ -1215,4 +1215,7 @@ html.zombies #zbHud { display: flex; flex-direction: row-reverse; align-items: f
 .zbPerks { display: flex; gap: 4px; }
 .zbPerks i { width: 26px; height: 26px; display: grid; place-items: center; font: 800 15px var(--head); font-style: normal; color: #111; background: var(--pc); border: 2px solid rgba(0,0,0,0.6); box-shadow: 0 0 10px var(--pc); }
 #prompt i { font-style: normal; color: #f2c14e; } #prompt i.poor { color: #ff6a5a; }
-html.zombies #leftCount, html.zombies #tipNow { display: none !important; }
+html.zombies #leftCount, html.zombies #tipNow, html.zombies #cambar, html.zombies #compass { display: none !important; }
+.zbPows { display: flex; flex-direction: column; gap: 3px; align-self: flex-start; }
+.zbPows i { font: 800 15px var(--head); font-style: normal; color: var(--pc); text-shadow: 0 0 8px var(--pc), 0 1px 2px #000; letter-spacing: 0.08em; }
+.zbPows i.blink { animation: zbBlink 0.5s steps(2) infinite; } @keyframes zbBlink { 50% { opacity: 0.2; } }
