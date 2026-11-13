@@ -75,6 +75,56 @@ function addRopes(m) {
     const sa = -(half - CELL / 2) - nA * CELL, sb = (half - CELL / 2) + nB * CELL;
     ropes.push({ i: ropes.length, f, lvl: f - gi, cells: o.cells, ledge: [...ledge, ...ext], hang, base, inside, out: Math.atan2(out[1], out[0]), tx, ty, a: sa, b: sb, half, up: -1, down: -1 });
   }
+  // Every outside wall (he asked 2026-11-13: rappel up any outside wall of a building): each straight run of outside wall
+  // on a floor above the ground gets a drop ledge all along it. A window's rope widens to its share of the run (up to
+  // halfway to the next window); a run with no window gets plain wall ropes (cells: [], no window) of up to WALL_ROPE
+  // cells. Sliding sideways past the end of one stretch carries on along the next (r.left / r.right, game.tickRope).
+  const WALL_ROPE = 14, dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+  const isLedge = (k, f) => k >= 0 && k < m.tiles.length && m.flAt[k] === f && (m.tiles[k] === T.VOID || (m.tiles[k] === T.LOW && m.floor[k] === FL.VOID));
+  const solidWall = k => { const t = m.tiles[k]; return (t === T.HARD || t === T.SOFT || t === T.REINF || t === T.BARRI || (t === T.OPEN && m.win[k])) && !m.shape[k]; };
+  const indoor = (k, f) => m.flAt[k] === f && (m.tiles[k] === T.FLOOR || m.tiles[k] === T.STAIR || m.tiles[k] === T.LOW || m.tiles[k] === T.TALL || m.tiles[k] === T.OPEN || solidWall(k));
+  const cellAt = k => cc(k);
+  for (let f = gi + 1; f < m.floors.length; f++) {
+    if (f === m.roofFloor) continue;
+    const F = m.floors[f];
+    for (const [ox, oy] of dirs) {
+      const along = oy ? 1 : W, cand = new Set();
+      for (let y = 1; y < F.h - 1; y++) for (let x = F.gx + 1; x < F.gx + F.w - 1; x++) {
+        const k = y * W + x, wk = k - oy * W - ox, ik = wk - oy * W - ox;
+        if (isLedge(k, f) && solidWall(wk) && indoor(ik, f)) cand.add(k);
+      }
+      const seen = new Set();
+      for (const k0 of cand) {
+        if (seen.has(k0) || cand.has(k0 - along)) continue; // the start of a run
+        const run = []; for (let k = k0; cand.has(k); k += along) { run.push(k); seen.add(k); }
+        if (run.length < 2) continue;
+        for (const k of run) { m.tiles[k] = T.LOW; m.floor[k] = FL.VOID; }
+        const outA = Math.atan2(oy, ox), tx = Math.abs(oy), ty = Math.abs(ox);
+        const tOf = k => { const c = cellAt(k); return c.x * tx + c.y * ty; };
+        const t0 = tOf(run[0]) - CELL / 2, t1 = tOf(run[run.length - 1]) + CELL / 2;
+        const mine = ropes.filter(r => r.f === f && Math.abs(r.out - outA) < 0.01 && r.ledge.some(k => run.includes(k))).sort((a, b) => (a.hang.x * tx + a.hang.y * ty) - (b.hang.x * tx + b.hang.y * ty));
+        if (mine.length) { // windows on this wall: each takes the wall up to halfway to the next
+          for (let i = 0; i < mine.length; i++) {
+            const r = mine[i], h = r.hang.x * tx + r.hang.y * ty;
+            const lo = i ? ((mine[i - 1].hang.x * tx + mine[i - 1].hang.y * ty) + h) / 2 : t0, hi = i < mine.length - 1 ? (h + (mine[i + 1].hang.x * tx + mine[i + 1].hang.y * ty)) / 2 : t1;
+            r.a = Math.min(r.a, lo - h + CELL / 2); r.b = Math.max(r.b, hi - h - CELL / 2);
+            r.ledge = run.filter(k => { const t = tOf(k); return t >= lo && t < hi; });
+          }
+          continue;
+        }
+        for (let i = 0; i < run.length; i += WALL_ROPE) { // a plain wall: ropes along it
+          let part = run.slice(i, i + WALL_ROPE); if (run.length - i - WALL_ROPE > 0 && run.length - i - WALL_ROPE < 4) { part = run.slice(i); i = run.length; }
+          const A = cellAt(part[0]), B = cellAt(part[part.length - 1]), hang = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
+          const bx0 = hang.x + (F.x0 - F.gx) * CELL - (G.x0 - G.gx) * CELL, by0 = hang.y + (F.y0 - G.y0) * CELL;
+          let base = null;
+          for (const n of [0, 0.5, 1, 1.5]) { const x = bx0 + ox * CELL * n, y = by0 + oy * CELL * n; if (walk(x, y, gi)) { base = { x, y }; break; } }
+          if (!base) continue;
+          const half = (part.length - 1) * CELL / 2;
+          ropes.push({ i: ropes.length, f, lvl: f - gi, cells: [], hang, base, inside: null, out: outA, tx, ty, a: -half, b: half, half: 0, up: -1, down: -1, ledge: part, wall: true });
+        }
+      }
+    }
+  }
   // Each window is a stop (he asked): from one you go up or down to the next window on the same wall, or from the top one onto
   // the roof. pos = where along the wall (ax) and which wall line (ay), the same numbers on every floor.
   const pos = r => { const F = m.floors[r.f], x = r.hang.x / CELL - F.gx + F.x0, y = r.hang.y / CELL + F.y0; return { ax: x * r.tx + y * r.ty, ay: x * r.ty + y * r.tx }; };
@@ -87,6 +137,11 @@ function addRopes(m) {
     if (u || m.roofFloor === undefined) continue;
     const R = m.floors[m.roofFloor], F = m.floors[r.f], o = [Math.cos(r.out), Math.sin(r.out)]; // over the edge of the roof, a little way in
     for (const n of [2, 3, 4]) { const x = r.hang.x + ((R.gx - R.x0) - (F.gx - F.x0)) * CELL - o[0] * CELL * n, y = r.hang.y + (F.y0 - R.y0) * CELL - o[1] * CELL * n; if (walk(x, y, m.roofFloor)) { r.roof = { x, y }; break; } }
+  }
+  // sideways neighbours on the same wall line and floor
+  for (const r of ropes) for (const q of ropes) if (q !== r && q.f === r.f && q.out === r.out && Math.abs(q.ay - r.ay) < 0.75) {
+    if (Math.abs((r.ax * CELL + r.b) - (q.ax * CELL + q.a)) <= CELL * 1.01) r.right = q.i;
+    if (Math.abs((r.ax * CELL + r.a) - (q.ax * CELL + q.b)) <= CELL * 1.01) r.left = q.i;
   }
   m.groundFloor = gi;
 }
@@ -115,9 +170,9 @@ export function ropeGround(m, r, s) {
 }
 // How far along the wall (px from the window's middle) someone at (x, y) hangs, and are they in front of the window?
 export const ropeS = (r, x, y) => (x - r.hang.x) * r.tx + (y - r.hang.y) * r.ty;
-export const ropeAtWindow = (r, x, y) => Math.abs(ropeS(r, x, y)) <= r.half - 4;
+export const ropeAtWindow = (r, x, y) => r.cells.length > 0 && Math.abs(ropeS(r, x, y)) <= r.half - 4;
 // Is this rope's window open enough to climb in (not boarded, reinforced or blocked)?
-export function ropeWindowOpen(m, r) { return r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE); }
+export function ropeWindowOpen(m, r) { return r.cells.length > 0 && r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE); }
 // ...or only wooden boards in the way: a swing in smashes through them (he chose, like Rainbow Six); reinforced stops you
 export function ropeWindowBoarded(m, r) { return r.cells.some(k => m.tiles[k] === T.BARRI) && r.cells.every(k => m.tiles[k] === T.BARRI || m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE); }
 
@@ -477,6 +532,7 @@ export function windowState(m, r) {
 // The ground-floor spot just outside the wall under rope r's window (where the view down starts).
 export function windowFoot(m, r) {
   if (r._foot !== undefined) return r._foot;
+  if (!r.edge && !(r.cells && r.cells.length)) return (r._foot = null); // a plain wall rope: no window to look out of
   const gi = m.groundFloor, ox = Math.cos(r.out), oy = Math.sin(r.out), o = floorOff(m, r.f, gi);
   const cx = r.hang.x - ox * CELL, cy = r.hang.y - oy * CELL; // the window's middle
   r._foot = null;

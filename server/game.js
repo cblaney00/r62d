@@ -27,7 +27,7 @@ const HTRAP_R = 2.5 * PX_PER_M;
 // HOIST's climbs were 1.6 / 3 s until Ball Knowledge 2026-11-10 (39% of rounds won)
 const DRILL_T = 3, GRAPPLE_T = 1.2, GRAPPLE_ROOF = 2.2, GRAPPLE_REACH = 2.2 * PX_PER_M, DROP_T = 2; // GIMLET's drill, HOIST's climbs, DEADFALL's fuse (s)
 const SPRINT_RAISE = 0.3, SPRINT_LOUD = 520; // seconds to get the gun back up after a sprint; how far sprinting steps carry (a jog is 320)
-const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, sprint: 0, sa: 0, crouch: 0, prone: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0 };
+const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, sprint: 0, sa: 0, crouch: 0, prone: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0, rw: 0, rv: 0, inv: 0 }; // rw / rv / inv: the 3D rope view's along-the-wall, up/down and upside-down keys
 const JAM_R = 90;
 const VAULT_TIME = 0.6, VAULT_RECOVER = 0.35; // climbing over (no shooting, gun down), then a moment before you can aim again
 const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free play's switching order
@@ -1148,7 +1148,7 @@ export class Game {
       if (up) { // out of an upper window: the rest of the shot carries on down on the ground floor (shotOutWindow)
         if (this.map.win[k] || (this.map.roofEdgeAt && this.map.roofEdgeAt.has(k))) winK = k; // (or over the roof's edge)
         else if (winK >= 0 && !this.winCarry && (tile === T.VOID || (tile === T.LOW && this.map.floor[k] === FL.VOID))) this.winCarry = { t, mult, k: winK };
-        if (tile === T.VOID && this.winCarry) { stopT = t; kind = 'none'; best = null; return true; }
+        if (this.winCarry && (tile === T.VOID || t > this.winCarry.t + CELL * 1.5)) { stopT = t; kind = 'none'; best = null; return true; } // (out past the rope ledge along the wall: on down)
       }
       const sh = (stopsBullet(tile) || penBullet(tile)) && shapeAt(this.map, cx, cy);
       if (sh) { const h = rayShape(sh, x0, y0, dx, dy); if (h === null || h > bestT) return false; t = h; } // angled/curved wall: only its solid part
@@ -1563,7 +1563,16 @@ export class Game {
     if (p.ctrl !== 'body') p.ctrl = 'body';
     const o = p.rope, at = i => i === -2 ? o.top : i < 0 ? o.base : { x: R[i].hang.x + R[i].tx * (o.s || 0), y: R[i].hang.y + R[i].ty * (o.s || 0) };
     if (o.st === 'hang') {
-      const r = R[o.r];
+      let r = R[o.r];
+      { // sliding past the end of this stretch of wall carries on along the next (he asked: any outside wall)
+        const mx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), my = (inp.down ? 1 : 0) - (inp.up ? 1 : 0), c = Math.cos(inp.rot || 0), sn = Math.sin(inp.rot || 0);
+        const along = isFinite(inp.rw) && inp.rw ? Math.sign(inp.rw) : (mx * c - my * sn) * r.tx + (mx * sn + my * c) * r.ty, s = ropeS(r, p.x, p.y);
+        const q = along > 0 && s >= r.b - 1.5 && r.right !== undefined ? R[r.right] : along < 0 && s <= r.a + 1.5 && r.left !== undefined ? R[r.left] : null;
+        if (q) { const s2 = Math.max(q.a, Math.min(q.b, r.ax * CELL + s - q.ax * CELL)); p.x = q.hang.x + q.tx * s2; p.y = q.hang.y + q.ty * s2; o.r = q.i; r = q; }
+      }
+      if (edge('inv')) { o.inv = !o.inv; this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id }); } // upside down (R6: peek over the top of a window)
+      if (inp.rv > 0 && !(prev.rv > 0)) { o.inv = false; this.ropeUp(p, r); return; } // the 3D view's W: up a floor (or onto the roof)
+      if (inp.rv < 0 && !(prev.rv < 0) && r.down >= 0) { o.inv = false; this.ropeHop(p, r, R[r.down], ROPE_DROP); return; } // S: down a floor
       if (edge('sprint')) { this.ropeUp(p, r); return; }
       if (edge('interact') && r.down >= 0) { this.ropeHop(p, r, R[r.down], ROPE_DROP); p.ropeHeld = true; return; } // down to the window below
       if (edge('interact')) { // let go: slide back down to the ground below you
@@ -3171,7 +3180,7 @@ export class Game {
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
-        el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? 1 : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadLen || WEAPONS[g.w].reload)) : 0, rq: p.reloadT > 0 && p.reloadLen && p.reloadLen !== WEAPONS[g.w].reload ? r2(p.reloadLen) : undefined,
+        el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? (p.rope.inv ? 3 : 1) : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadLen || WEAPONS[g.w].reload)) : 0, rq: p.reloadT > 0 && p.reloadLen && p.reloadLen !== WEAPONS[g.w].reload ? r2(p.reloadLen) : undefined,
         ct: p.ctrl, cf: this.tv && p.ctrl === 'cam' ? p.feedId : undefined, // ESPORTS TV: which camera they are looking through
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : p.grapple ? { k: 'grapple', p: r2(p.grapple.t / p.grapple.dur) } : null, df: p.hasDefuser ? 1 : 0,
         gh: p.ghillieUntil > this.time ? 1 : undefined, bp: p.bipodSet ? 1 : undefined, // MOSS's ghillie (no glint), PERCH's bipod
@@ -3187,7 +3196,7 @@ export class Game {
         ga: this.free ? p.guns.map(q => q.w + ':' + attCode(q.att)) : undefined, // free play's gun menu shows what each held gun carries
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, ap: p.pierceShot ? 1 : undefined, su2: p.spotterUntil > this.time ? r1(p.spotterUntil - this.time) : undefined, gw2: p.ghillieUntil > this.time ? r1(p.ghillieUntil - this.time) : undefined, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
-        bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur), p.rope.climb ? 1 : 0] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
+        bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur), p.rope.climb ? 1 : 0, p.rope.inv ? 1 : 0, p.rope.from ?? -1] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
         pp: p.prep ? [p.prep.mode === 'throw' ? 1 : 2, r2(Math.max(0, p.prep.until - this.time)), p.prep.dur] : undefined, m: this.mods(p), jp: [r2(p.air || 0), p.up ? 1 : 0, r2(p.jcd || 0), r1(p.lo || 0), r2(p.pr || 0), r2(p.slT || 0), r2(p.slR || 0), r2(p.slA || 0), r2(p.scd || 0)], vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined, df: p.deafUntil > this.time ? 1 : undefined, su: p.downed && SELF_UP.has(p.op) ? r2(p.selfUp / SELF_UP_TIME) : undefined, scd: p.shroudCd > this.time ? r1(p.shroudCd - this.time) : undefined,
       }));

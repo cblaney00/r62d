@@ -162,7 +162,8 @@ export function stepMove(map, o, input, dt, mods) {
   if (mods.frozen) { o.vx = 0; o.vy = 0; return false; }
   if (mods.rope) { // hanging on a rope outside a window: slide along the wall (he asked: outside-the-window play matters)
     const R = mods.rope; let s = (o.x - R.x) * R.tx + (o.y - R.y) * R.ty;
-    s = Math.max(R.a, Math.min(R.b, s + (mx * R.tx + my * R.ty) * M_S.rope * PX_PER_M * dt));
+    const along = isFinite(input.rw) && input.rw ? Math.sign(input.rw) : mx * R.tx + my * R.ty; // rw: the 3D rope view's A/D (left/right along the wall as you face it)
+    s = Math.max(R.a, Math.min(R.b, s + along * M_S.rope * PX_PER_M * dt));
     o.x = R.x + R.tx * s; o.y = R.y + R.ty * s; o.vx = 0; o.vy = 0; return false;
   }
   const accel = o.slT > 0 ? 3000 : mods.drone ? (mods.sprint ? 1100 : 800) : len > 0 ? 500 : 760; // eased down with the slower speeds: same sense of weight

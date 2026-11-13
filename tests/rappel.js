@@ -4,7 +4,7 @@
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { MAP_LIST, buildMap, floorAt, ropeS } from '../shared/map.js';
-import { T, TEAM } from '../shared/constants.js';
+import { T, TEAM, CELL } from '../shared/constants.js';
 import { canSee } from '../shared/physics.js';
 
 let fails = 0, n = 0;
@@ -16,6 +16,7 @@ for (const id of MAP_LIST) {
   const m = g.map;
   if (!m.ropes.length) { fail(id, 'no ropes'); continue; }
   const tick = (s, inp = {}) => { for (let i = 0; i < s * 30; i++) { a.prevInput = a.input; a.input = { ...inp }; g.applyMove(a, 1 / 30); g.tickPlayer(a, 1 / 30); g.time += 1 / 30; } };
+  let walls = 0;
   for (const r of m.ropes) {
     if (r.down >= 0) continue; // (reached from the stop below it: tests/roof.js)
     n++;
@@ -25,12 +26,17 @@ for (const id of MAP_LIST) {
     if (!a.rope) { fail(id, 'rope', r.i, 'E did not start the climb'); continue; }
     tick(2 * r.lvl + 0.2);
     if (!a.rope || a.rope.st !== 'hang' || floorAt(m, a.x, a.y) !== r.f) { fail(id, 'rope', r.i, 'not hanging on the right floor', a.rope && a.rope.st); continue; }
+    if (a.rope.r !== r.i) { const q = m.ropes[a.rope.r]; if (q.f !== r.f || Math.abs(q.ax - r.ax) * CELL > Math.max(r.b - r.a, q.b - q.a) + 40) fail(id, 'rope', r.i, 'climbed a rope somewhere else', q.i); Object.assign(a, { rope: null }); continue; } // (two stretches start from the same spot on the ground: the nearer one)
     // slide both ways along the wall
-    const s0 = ropeS(r, a.x, a.y);
-    tick(3, { right: 1 }); tick(3, { down: 1 }); const s1 = ropeS(r, a.x, a.y);
-    tick(6, { left: 1 }); tick(6, { up: 1 }); const s2 = ropeS(r, a.x, a.y);
+    const along = () => { const q = m.ropes[a.rope.r]; return q.ax * CELL + ropeS(q, a.x, a.y) - r.ax * CELL; }; // (sliding can carry on onto the next stretch of wall)
+    const s0 = along();
+    tick(3, { right: 1 }); tick(3, { down: 1 }); const s1 = along(), on1 = a.rope.r;
+    tick(6, { left: 1 }); tick(6, { up: 1 }); const s2 = along(), on2 = a.rope.r;
+    a.rope.r = r.i;
     if (r.b - r.a > 20 && !(s1 > s0 + 4 || s2 < s0 - 4)) fail(id, 'rope', r.i, 'could not slide along the wall', s0, s1, s2);
-    if (s2 < r.a - 0.5 || s1 > r.b + 0.5) fail(id, 'rope', r.i, 'slid past the end');
+    if ((on2 === r.i && s2 < r.a - 0.5) || (on1 === r.i && s1 > r.b + 0.5)) fail(id, 'rope', r.i, 'slid past the end');
+    if ((on1 !== r.i && r.right === undefined && r.left === undefined) || (on2 !== r.i && r.left === undefined && r.right === undefined)) fail(id, 'rope', r.i, 'ended up on another rope with no neighbour');
+    if (!r.cells.length) { walls++; Object.assign(a, { x: r.base.x, y: r.base.y, rope: null, vault: null }); continue; } // a plain wall: no window to go in through (climbing and sliding checked above)
     // back to the window: blocked = no way in and Space never goes up; boarded = Space swings in through the boards (he chose)
     a.x = r.hang.x; a.y = r.hang.y; tick(0.1);
     const hang = { ...a.rope }, cells0 = r.cells.map(k => m.tiles[k]);
@@ -61,7 +67,7 @@ for (const id of MAP_LIST) {
     tick(0.1, { interact: 1 }); tick(2 * r.lvl + 0.3); tick(0.1, { interact: 1 }); tick(0.1); tick(r.lvl + 0.3);
     if (a.rope || floorAt(m, a.x, a.y) !== m.groundFloor) fail(id, 'rope', r.i, 'letting go did not bring you down');
   }
-  console.log(`${id}: ${m.ropes.length} ropes checked`);
+  console.log(`${id}: ${m.ropes.length} ropes checked (${walls} on plain walls)`);
 }
 console.log(fails ? `${fails} failure(s)` : `PASS rappel (${n} ropes)`);
 process.exit(fails ? 1 : 0);
