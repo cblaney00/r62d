@@ -1982,7 +1982,7 @@ function frame(nowMs) {
   if (sliding()) { padAng = wrapAng(slideAim(padAng)); const l = Math.hypot(aimOff.x, aimOff.y), a = slideAim(Math.atan2(aimOff.y, aimOff.x)); aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l }; }
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
   st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
-  audio.setListenerRot(st.rot);
+  audio.setListenerRot(st.r3full && rope3d.active() ? -Math.PI / 2 - rope3d.facing() : st.rot); // (the 3D rope view: sounds pan the way the 3D camera faces)
   // he asked: no click needed to take the mouse when a match starts. Browsers only allow it soon after a click (any menu
   // click counts; the desktop app's Firefox remembers it for the day, play.sh) or in full screen; else CLICK TO TAKE CONTROL shows
   if (playing() && !st.tv && !isTouch && !menuOpen() && $('pause').classList.contains('hidden') && document.pointerLockElement !== cv && !gpRecent() &&
@@ -2216,7 +2216,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (r3on() && me && me.ro) { // the 3D rope view (he asked, R6's keys): W/S up and down a floor, A/D along the wall as you face it, crouch upside down
     const r = st.map.ropes[me.ro[1]];
     k.rw = r ? ((k.right ? 1 : 0) - (k.left ? 1 : 0)) * rope3d.wallSign(r) : 0; k.rv = k.up ? 1 : k.down ? -1 : 0;
-    const cr = keys.has('crouch') || keys.has('crouchTap'); k.inv = cr && !st.r3cr ? 1 : 0; st.r3cr = cr;
+    const cr = keys.has('crouch') || keys.has('crouchTap'), tn = performance.now() / 1000; if (cr && !st.r3cr) st.r3invT = tn; st.r3cr = cr; k.inv = tn - (st.r3invT ?? -9) < 0.1 ? 1 : 0; // (held a tenth of a second: a single frame could fall between two server ticks)
     k.up = k.down = k.left = k.right = 0; k.crouch = 0; k.sprint = 0; delete k.rot;
   }
   // ping whatever is under your aim: an enemy you can see, else a gadget, camera or the objective, else the wall, door or floor you point at

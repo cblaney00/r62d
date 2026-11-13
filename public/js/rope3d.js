@@ -290,7 +290,16 @@ export function frame(c) {
   // the camera: over your right shoulder, a little back from the wall; aim with the mouse (limited, you face the wall)
   const face = new THREE.Vector3(-n[0], 0, -n[1]);
   const dir = face.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -R.yaw); dir.y = Math.tan(R.pitch); dir.normalize();
-  const shoulder = me3.clone().addScaledVector(new THREE.Vector3(n[0], 0, n[1]), 3.1 * M).addScaledVector(right, 1.05 * M); shoulder.y = me3.y + BODY * (c.inv ? 0.4 : 1.02);
+  // which shoulder (R6): the camera goes over the shoulder on the side of the nearest window or doorway along the wall,
+  // so peeking in from beside it your own back isn't in the way; it glides across
+  const winSide = () => { for (let s2 = 0; s2 <= 5; s2++) for (const d of s2 ? [1, -1] : [1]) { const X = c.pred.x + t[0] * d * s2 * CELL - n[0] * CELL, Y = c.pred.y + t[1] * d * s2 * CELL - n[1] * CELL, gx = Math.floor(X / CELL), gy = Math.floor(Y / CELL), k = gy * m.W + gx; if (gx < 0 || gy < 0 || gx >= m.W || gy >= m.H) continue; if (m.win[k] || m.tiles[k] === T.BARRI || (m.openId[k] >= 0 && !SOLID.has(m.tiles[k]))) return s2 === 0 ? R.shW || 1 : Math.sign(t[0] * d * right.x + t[1] * d * right.z) || 1; } return R.shW || 1; };
+  R.adsK = (R.adsK || 0) + ((c.ads ? 1 : 0) - (R.adsK || 0)) * Math.min(1, c.dt * 12);
+  R.shW = winSide(); R.sh = (R.sh ?? R.shW) + (R.shW - (R.sh ?? R.shW)) * Math.min(1, c.dt * 5);
+  const shSide = () => R.sh;
+  // (close over the shoulder; aiming in: right at your eyes)
+  // aiming in looks from where the game says your eyes are (your spot on the map, right at the wall), so what the 3D
+  // view shows is what the sight rules let you see and shoot
+  const shoulder = me3.clone().lerp(new THREE.Vector3(c.pred.x, me3.y, c.pred.y), R.adsK).addScaledVector(new THREE.Vector3(n[0], 0, n[1]), 1.7 * (1 - R.adsK) * M).addScaledVector(right, (0.8 - 0.72 * R.adsK) * M * shSide()); shoulder.y = me3.y + BODY * (c.inv ? 0.4 : 1.02);
   R.camera.fov += ((c.ads ? 52 : 70) - R.camera.fov) * Math.min(1, c.dt * 12); R.camera.updateProjectionMatrix();
   // gliding in (from above, looking down) and out (back up to the top-down view) so it never jars
   R.mix = Math.min(1, R.mix + c.dt / 0.45);
@@ -302,7 +311,8 @@ export function frame(c) {
   const look = R.camera.position.clone().add(dir.clone().multiplyScalar(10 * M)), down = me3.clone();
   R.camera.lookAt(new THREE.Vector3().lerpVectors(down, look, e));
   R.canvas.style.opacity = String(Math.min(1, e * 1.4));
-  R.me.visible = e > 0.3; if (R.upper) R.upper.visible = e > 0.8; for (const pl of R.floorG.children) pl.visible = !pl.userData.up || e > 0.8;
+  R.me.visible = e > 0.3;
+  { const v = R.me.position.clone().project(R.camera); if (Math.abs(v.x) < 0.16 && v.z < 1) R.me.material.opacity = Math.min(R.me.material.opacity, 0.35); } // your body over the crosshair: see through it if (R.upper) R.upper.visible = e > 0.8; for (const pl of R.floorG.children) pl.visible = !pl.userData.up || e > 0.8;
   R.renderer.render(R.scene, R.camera);
   R.dir = dir; R.line = R.line || line; R.m = m; R.f = f; R.n = n; R.meXY = { x: c.pred.x, y: c.pred.y }; R.level = c.height + 1.2 * M;
 }
