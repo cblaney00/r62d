@@ -451,14 +451,16 @@ button.big { font-size: 22px; padding: 14px 34px; }
 .hMark span { display: inline-block; font: 800 128px/0.86 var(--head); letter-spacing: 0.03em; color: #f4f4f4; text-shadow: 0 8px 50px rgba(0,0,0,0.8); animation: letterIn 0.8s cubic-bezier(.2,.8,.2,1) both; }
 .hMark span:nth-child(2) { animation-delay: 0.08s; } .hMark span:nth-child(3) { animation-delay: 0.16s; } .hMark span:nth-child(4) { animation-delay: 0.24s; color: var(--ally); }
 .hTag { margin-top: 10px; font: 600 16px var(--head); letter-spacing: 0.55em; color: var(--dim); animation: fadeIn 0.8s 0.4s both; }
-.hnav { position: absolute; left: calc(6vw - 24px); top: calc(8vh + 190px); display: flex; flex-direction: column; gap: 2px; width: min(560px, 44vw); }
-.hnav > button { position: relative; display: block; text-align: left; background: none; border: none; border-left: 3px solid transparent; padding: 9px 24px 9px 21px;
+.hnav { position: absolute; left: calc(6vw - 24px); top: calc(6vh + 180px); display: flex; flex-direction: column; gap: 2px; width: min(560px, 44vw); }
+.hnav > button { position: relative; display: block; text-align: left; background: none; border: none; border-left: 3px solid transparent; padding: 6px 24px 6px 21px;
   transition: background 0.18s, border-color 0.18s, padding 0.18s; animation: slideL 0.45s both; }
-.hnav > button b { display: block; font: 800 38px/1.02 var(--head); letter-spacing: 0.06em; color: #d6dde3; transition: color 0.18s; }
+.hnav > button b { display: block; font: 800 32px/1.02 var(--head); letter-spacing: 0.06em; color: #d6dde3; transition: color 0.18s; }
 .hnav > button small { display: block; font: 500 14px var(--body); letter-spacing: 0.02em; text-transform: none; color: var(--dim); max-height: 0; opacity: 0; overflow: hidden; transition: max-height 0.2s, opacity 0.2s, margin 0.2s; }
 .hnav > button:hover, .hnav > button:focus-visible { background: linear-gradient(90deg, rgba(242,193,78,0.16), rgba(242,193,78,0) 85%); border-left-color: var(--gold); padding-left: 31px; outline: none; }
 .hnav > button:hover b { color: #fff; } .hnav > button:hover small { max-height: 22px; opacity: 1; margin-top: 3px; }
-.hnav > button:first-child b { color: #fff; }
+.hnav > button:nth-child(-n+4) b { color: #fff; }
+.hnav > button:nth-child(4) { margin-bottom: 12px; } /* the match modes, then the rest */
+.hnav > button:nth-child(7) { animation-delay: 0.45s; } .hnav > button:nth-child(8) { animation-delay: 0.5s; } .hnav > button:nth-child(9) { animation-delay: 0.55s; }
 .hnav > button:nth-child(1) { animation-delay: 0.15s; } .hnav > button:nth-child(2) { animation-delay: 0.2s; } .hnav > button:nth-child(3) { animation-delay: 0.25s; }
 .hnav > button:nth-child(4) { animation-delay: 0.3s; } .hnav > button:nth-child(5) { animation-delay: 0.35s; } .hnav > button:nth-child(6) { animation-delay: 0.4s; }
 .hsmall { display: flex; gap: 4px; margin-top: 18px; padding-left: 14px; animation: fadeIn 0.6s 0.5s both; }
@@ -1164,3 +1166,38 @@ html.tv canvas#game { cursor: default; }
 .bigCode.long { font-size: 54px; letter-spacing: 0.12em; }
 #lobby:not(.hidden) ~ #corner { display: none; }
 #settings .srow.tpOnly { display: none; } html.trackpad #settings .srow.tpOnly { display: flex; } /* laptop trackpad tip (Settings → Mouse & Aim) */
+
+/* FUN MODES cards (2026-11-12): modes not built yet are dimmed with a COMING NEXT tag */
+.icard.soon { opacity: 0.55; cursor: default; }
+.icard.soon:hover { transform: none; }
+.icard em { position: absolute; left: 28px; top: 22px; font: 800 14px var(--head); font-style: normal; letter-spacing: 0.2em; color: var(--ic); border: 1px solid var(--ic); padding: 3px 8px; }
+
+/* Unranked / Ranked ban phase (over the operator select screen) */
+#banPick { position: absolute; inset: 0; z-index: 30; background: rgba(8,11,15,0.985); display: flex; flex-direction: column; align-items: center; padding: 4vh 4vw; gap: 14px; overflow-y: auto; animation: fadeIn 0.25s both; }
+#banPick.hidden { display: none; }
+.bpTop { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bpTop small { font: 700 15px var(--head); letter-spacing: 0.3em; color: var(--dim); }
+.bpTop b { font: 800 46px var(--head); letter-spacing: 0.08em; color: #ff9d6a; } .bpTop b.ours { color: var(--gold); }
+.bpTime { font: 800 30px var(--head); color: #fff; }
+.bpGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; width: min(1300px, 100%); }
+.bpGrid button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+.bpGrid button:hover { border-color: #ff5a4a; background: rgba(255,90,74,0.14); }
+.bpGrid canvas { width: 84px; height: 84px; } .bpGrid b { font: 800 17px var(--head); letter-spacing: 0.06em; } .bpGrid span { font: 500 12px var(--body); color: var(--dim); text-transform: none; }
+.bpRows { display: flex; gap: 6vw; margin-top: auto; } .bpRows h4 { margin: 0 0 6px; font: 700 14px var(--head); letter-spacing: 0.25em; color: var(--dim); text-align: center; }
+.bpRow { display: flex; gap: 10px; justify-content: center; min-height: 40px; }
+.bpBan { position: relative; display: flex; flex-direction: column; align-items: center; } .bpBan canvas { width: 64px; height: 64px; filter: grayscale(1) brightness(0.7); }
+.bpBan b { font: 800 14px var(--head); } .bpBan span { font: 600 11px var(--head); letter-spacing: 0.15em; color: var(--dim); }
+.bpBan::after { content: 'BANNED'; position: absolute; top: 22px; transform: rotate(-14deg); font: 800 13px var(--head); letter-spacing: 0.12em; color: #ff5a4a; border: 2px solid #ff5a4a; padding: 0 4px; background: rgba(0,0,0,0.5); }
+.bpWait { font-size: 20px; margin: 6vh 0; }
+#opgrid .op.banned { opacity: 0.3; pointer-events: none; filter: grayscale(1); }
+#opgrid .op.banned::after { content: 'BANNED'; position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%) rotate(-14deg); font: 800 20px var(--head); color: #ff5a4a; border: 2px solid #ff5a4a; padding: 0 6px; }
+
+/* Quick Match help: who's left, and what to do now */
+#leftCount { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: min(980px, 92vw); display: flex; justify-content: space-between; pointer-events: none; }
+#leftCount.hidden { display: none; }
+#leftCount > div { display: flex; flex-direction: column; align-items: center; } #leftCount b { font: 800 40px/1 var(--head); text-shadow: 0 2px 6px #000; }
+#leftCount span { font: 700 11px var(--head); letter-spacing: 0.2em; color: #cfd6dc; text-shadow: 0 1px 3px #000; }
+#leftCount .lcA b { color: #6cc0ff; } #leftCount .lcE b { color: #ff9d5c; }
+#tipNow { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); max-width: min(760px, 80vw); text-align: center; pointer-events: none;
+  font: 600 16px var(--body); color: #f4e6bf; background: rgba(10,12,16,0.62); border-left: 3px solid var(--gold); padding: 7px 14px; text-shadow: 0 1px 2px #000; }
+#tipNow.hidden { display: none; } #tipNow kbd { font: 700 13px var(--head); background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); padding: 0 5px; margin: 0 2px; color: #fff; }

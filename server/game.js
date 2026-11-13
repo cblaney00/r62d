@@ -5,8 +5,9 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatch
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
-import { botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
+import { defSetup, botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
+import { MODES, CLASSIC, DEFAULT_MODE, attackSquad, roundsToWin, inOvertime } from '../shared/modes.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
 const PING_KINDS = new Set(['go', 'omw', 'watch', 'hold', 'danger', 'help', 'enemy', 'open']); // the ping wheel (public/js/pingwheel.js)
@@ -46,7 +47,8 @@ const LUNGE_WIND = 1; // CROW: seconds from drawing the blade to the lunge being
 const PIERCE_DMG = 0.55; // NAIL: damage a piercing round keeps through the wall (was 0.4)
 const SHIELD_ASIDE = 0.45; // BULWARK: seconds to swing the shield out of the way when aiming in // FERRO: seconds between hammer swings // TALON's EMP: a circle about a door wide (he asked), centred inside the wall it stuck to
 const MAX_BANS = 8; // he asked: at most 8 banned operators in a match
-const BAN_GAP = 2.6; // seconds between Esports TV bans, long enough to read each one
+const BAN_GAP = 2.6;
+const BAN_TURN = 15; // Unranked / Ranked: seconds a team with people on it gets for each ban // seconds between Esports TV bans, long enough to read each one
 
 const SCAN_BEAT = 0.8, SCAN_BLUR = 1.5 * PX_PER_M; // WRAITH's scanner: a new blip per heartbeat, this far off the real spot at most
 // aimed in through the sniper scope (the Pike's and Saker's one-shot body kill needs it, he asked)
@@ -80,6 +82,7 @@ export class Game {
     this.randomMap = false; // RANDOM in the lobby (he asked): a surprise map rolled when the match starts
     this.mapVersion = 0;
     this.site = 0; this.siteRevealed = false; this.planted = null;
+    this.mode = DEFAULT_MODE; // the lobby's game mode (shared/modes.js; tutorial, free play and TV play CLASSIC rules)
     this.spots = { atk: new Map(), def: new Map() };
     this.reinforce = REINF_EACH;
     this.botLevel = DEFAULT_LEVEL; // bot skill = a rank (BOT_LEVELS), PRO_LEVEL = the pro teams
@@ -173,7 +176,11 @@ export class Game {
       meleeCd: 0, kills: 0, deaths: 0, downedBy: null, moving: 0, lastShot: 0, nitroId: null, ai: {} };
   }
 
-  side(p) { return (p.squad === 0) === (this.round % 2 === 1) ? TEAM.ATK : TEAM.DEF; }
+  get rules() { return this.tut || this.free || this.tv ? CLASSIC : MODES[this.mode] || MODES[DEFAULT_MODE]; }
+  get ranked() { return !!this.rules.ranked; }
+  set ranked(v) { this.mode = v ? 'ranked' : DEFAULT_MODE; }
+  atkSquad(r = this.round) { return attackSquad(this.rules, r); }
+  side(p) { return p.squad === this.atkSquad() ? TEAM.ATK : TEAM.DEF; }
 
   resetToLobby() {
     this.phase = PHASE.LOBBY; this.timer = 0; this.round = 0; this.score = [0, 0];
@@ -198,13 +205,15 @@ export class Game {
     } else if (m.t === 'ping') {
       if (p.sock && p.sock.open) p.sock.send(JSON.stringify({ t: 'pong', c: m.c }));
       if (typeof m.rtt === 'number' && isFinite(m.rtt)) p.rtt = Math.max(0, Math.min(9999, Math.round(m.rtt)));
-    } else if (m.t === 'tut') { if (this.tut) this.tutAction(p, m); }
+    } else if (m.t === 'ban') { this.playerBan(p, m.op); }
+    else if (m.t === 'tut') { if (this.tut) this.tutAction(p, m); }
     else if (m.t === 'free') { if (this.free) this.freeAction(p, m); }
     else if (m.t === 'lobby' && !this.tut && !this.free) {
       if (m.a === 'addBot') this.addBot(m.squad);
       else if (m.a === 'removeBot') this.removeBot(m.squad);
       else if (m.a === 'fillBots') { for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); }
       else if (m.a === 'switch') this.switchSquad(p);
+      else if (m.a === 'mode' && this.phase === PHASE.LOBBY && MODES[m.id] && MODES[m.id].ready && m.id !== this.mode) { this.mode = m.id; if (this.ranked) this.rankedLevel(); this.msg(`${p.name} chose ${MODES[m.id].name}${this.ranked ? `: bots play at the lobby's rank (${BOT_LEVELS[this.botLevel]})` : ''}`); }
       else if (m.a === 'ranked' && this.phase === PHASE.LOBBY) { this.ranked = !!m.on; if (this.ranked) this.rankedLevel(); this.msg(this.ranked ? `${p.name} switched on RANKED: bots play at the lobby's rank (${BOT_LEVELS[this.botLevel]})` : `${p.name} switched ranked off`); }
       else if (m.a === 'botLevel' && !this.ranked && BOT_LEVELS[m.lv] && m.lv !== this.botLevel) { this.botLevel = m.lv; assignPros(this); this.msg(m.lv === PRO_LEVEL ? `${p.name} brought in the pro teams: Northwind and Ironclad Collective` : `${p.name} set the bot skill to ${BOT_LEVELS[m.lv]}`); }
       else if (m.a === 'map' && this.phase === PHASE.LOBBY && m.id === 'random') {
@@ -274,6 +283,7 @@ export class Game {
 
   pickOp(p, op) {
     if (this.phase !== PHASE.SELECT || !OPERATORS[op] || p.locked) return; // locked in: no changing
+    if (this.banning()) return; // the ban phase comes first
     if (OPERATORS[op].team !== this.side(p)) return;
     if (p.job && jobOf(op) !== p.job) return; // only your role's operators
     if (this.isBanned(op)) return;
@@ -304,6 +314,35 @@ export class Game {
       return true;
     }
     return this.time < B.t - BAN_GAP + 1.5; // the last stamp stays a moment before the picks start
+  }
+
+  // Operator bans in Unranked / Ranked (he asked, R6's rule): before round 1 each team bans one attacker and one
+  // defender, taking turns (BLUE attacker, ORANGE attacker, ORANGE defender, BLUE defender). A team with a person on it
+  // gets BAN_TURN seconds and any of its people can click the ban (the first click counts); time up = no ban. A bot-only
+  // team bans like the Esports TV bots (tvBanPick). Banned operators stay banned for the whole match.
+  banning() { const B = this.banRun; return !!(this.rules.bans && !this.tv && this.phase === PHASE.SELECT && B && B.round === this.round && B.i < B.order.length); }
+  playerBanStep() {
+    if (this.round !== 1) return false;
+    if (!this.bans) this.bans = [];
+    let B = this.banRun;
+    if (!B || B.round !== this.round) B = this.banRun = { round: this.round, order: [[0, 'atk'], [1, 'atk'], [1, 'def'], [0, 'def']], i: 0, t: null };
+    if (B.i >= B.order.length) return false;
+    const [sq, sd] = B.order[B.i], people = [...this.players.values()].some(q => !q.bot && q.sock && q.squad === sq);
+    if (B.t === null) { B.t = this.time + (people ? BAN_TURN : 2.5); B.people = people; }
+    if (this.time >= B.t) {
+      const op = B.people ? null : tvBanPick(this, sq, sd);
+      if (op) { this.bans.push({ op, sq, rd: this.round }); this.events.push({ e: 'ban', op, sq }); this.msg(`${sq ? 'BRAVO' : 'ALPHA'} banned ${OPERATORS[op].name}`); }
+      else this.msg(`${sq ? 'BRAVO' : 'ALPHA'} didn't ban ${sd === 'atk' ? 'an attacker' : 'a defender'}`);
+      B.i++; B.t = null;
+    }
+    return B.i < B.order.length;
+  }
+  playerBan(p, op) {
+    if (!this.banning() || !OPERATORS[op] || this.isBanned(op)) return;
+    const B = this.banRun, [sq, sd] = B.order[B.i];
+    if (p.squad !== sq || OPERATORS[op].team !== sd) return;
+    this.bans.push({ op, sq, rd: this.round }); this.events.push({ e: 'ban', op, sq }); this.msg(`${p.name} banned ${OPERATORS[op].name}`);
+    B.i++; B.t = null;
   }
 
   // ---------------- match flow ----------------
@@ -341,7 +380,8 @@ export class Game {
     for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; p.locked = false; p.spawn = null; p.staged = false; p.job = null; }
     this.phase = PHASE.SELECT; this.timer = DUR.select;
     this.events.push({ e: 'newmap', v: this.mapVersion });
-    this.events.push({ e: 'banner', text: `ROUND ${this.round}`, sub: 'Choose your operator' });
+    const swapped = this.rules.swap === 'half' && this.round > 1 && this.atkSquad(this.round) !== this.atkSquad(this.round - 1) && !inOvertime(this.rules, this.score);
+    this.events.push({ e: 'banner', text: inOvertime(this.rules, this.score) ? `OVERTIME · ROUND ${this.round}` : `ROUND ${this.round}`, sub: inOvertime(this.rules, this.score) ? `First to ${roundsToWin(this.rules, this.score)} · sides swap every round` : swapped ? 'Half time: sides swapped' : 'Choose your operator' });
     if (!this.tut && !this.free) siteVote(this); // the defending bots vote on the site (a person on the team can still change it)
   }
 
@@ -391,9 +431,24 @@ export class Game {
       }
     }
     if (atkers.length) atkers[Math.floor(Math.random() * atkers.length)].hasDefuser = true;
+    if (this.rules.preBoards) this.preBarricade(this.rules.preBoards);
     for (const p of this.players.values()) if (p.bot) botPrep(this, p);
     this.phase = PHASE.PREP; this.timer = DUR.prep;
+    if (this.rules.help) { this.siteRevealed = true; this.events.push({ e: 'found', team: TEAM.ATK }); } // Quick Match: the attackers are shown the site from the start
     this.events.push({ e: 'banner', text: 'PREPARATION PHASE', sub: '' });
+  }
+
+  // Quick Match (he asked): a couple of the doorways defenders usually board are boarded already, so beginners see
+  // barricades without having to build them (the site's doors that don't lead to a room defenders hold, as bots pick)
+  preBarricade(n) {
+    const ds = defSetup(this), done = [];
+    for (const id of [...ds.siteBoards, ...ds.outerBoards]) {
+      if (done.length >= n) break;
+      const o = this.map.openings[id]; if (!o || this.map.tiles[o.cells[0]] !== T.OPEN) continue;
+      if (this.map.win && o.cells.some(c => this.map.win[c])) continue; // windows are boarded anyway
+      if (this.barricade(id, T.BARRI, true)) done.push(id);
+    }
+    return done;
   }
 
   // the spawn an attacker chose, or (RANDOM, the default) where the team's spawn plan puts them
@@ -465,7 +520,7 @@ export class Game {
     for (const p of this.players.values()) { p.busy = null; if (p.ctrl !== 'body') p.ctrl = 'body'; }
   }
 
-  squadOfSide(team) { return (this.round % 2 === 1) === (team === TEAM.ATK) ? 0 : 1; }
+  squadOfSide(team) { return team === TEAM.ATK ? this.atkSquad() : 1 - this.atkSquad(); }
 
   equip(p) {
     const o = OPERATORS[p.op];
@@ -497,6 +552,7 @@ export class Game {
     if (!held) this.timer -= dt;
     if (this.phase === PHASE.SELECT) {
       if (this.tv) { if (this.tvBanStep()) return; tvTalk(this); if (this.allLocked()) this.beginPrep(); return; } // ESPORTS TV: bans, 15 s of team talk, then go
+      if (this.rules.bans && this.playerBanStep()) return; // Unranked / Ranked: bans before round 1's picks
       // he asked: bots never pick before you. They wait until every person on their team has locked in.
       for (const p of this.players.values()) if (p.bot && !p.op && (this.tut || this.humansLocked(p.squad)) && Math.random() < dt * 2.5) botPickOp(this, p);
       for (const p of this.players.values()) if (p.bot && p.op && !p.locked) {
@@ -513,7 +569,7 @@ export class Game {
         return;
       }
       if (this.timer <= 0) {
-        if (Math.max(...this.score) >= WIN_ROUNDS) {
+        if (Math.max(...this.score) >= roundsToWin(this.rules, this.score)) {
           this.phase = PHASE.MATCH_END; this.timer = DUR.matchEnd;
           const win = this.score[0] > this.score[1] ? 0 : 1;
           const mvp = [...this.players.values()].map(p => ({ p, sc: (p.ms && p.ms.score) || matchScore(p.ms || {}) })).sort((a, b) => b.sc - a.sc)[0]; // the MVP is the top score
@@ -3062,7 +3118,7 @@ export class Game {
     return store.recordMatch({ strength: this.ranked ? strength : null,
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: Date.now(),
       duration: Math.round((Date.now() - (this.matchStart || Date.now())) / 1000),
-      map: this.map.name, mode: this.ranked ? 'Ranked' : 'Quick Match', score: [...this.score], winner, rounds: this.roundLog || [], players,
+      map: this.map.name, mode: ({ quick: 'Quick Match', unranked: 'Unranked', ranked: 'Ranked' })[this.mode] || 'Quick Match', score: [...this.score], winner, rounds: this.roundLog || [], players,
     });
   }
 
@@ -3132,8 +3188,8 @@ export class Game {
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, pp: this.map.peeps && this.map.peeps.length ? this.map.peeps : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
       site: this.site, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
-      tvl: this.tv ? this.botLevel : undefined, bn: this.tv && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
-      bq: this.tv && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, this.banRun.t - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
+      tvl: this.tv ? this.botLevel : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
+      bq: (this.tv || this.rules.bans) && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, (this.banRun.t ?? this.time) - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, cb, hb, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];

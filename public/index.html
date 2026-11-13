@@ -36,7 +36,10 @@
     <div id="home">
       <div class="hLogo"><div class="hMark"><span>R</span><span>6</span><span>2</span><span>D</span></div><div class="hTag">TACTICAL BREACH · 5 VS 5</div></div>
       <nav class="hnav" id="mnav">
-        <button data-tab="play"><b>QUICK MATCH</b><small>Five against five with friends and bots · host a game here</small></button>
+        <button data-tab="play"><b>QUICK MATCH</b><small>Easier rules for learning · five against five with friends and bots</small></button>
+        <button data-tab="unranked"><b>UNRANKED</b><small>Full rules: bans, first to 4, overtime · your rank stays put</small></button>
+        <button data-tab="ranked"><b>RANKED</b><small>Full rules with your rank on the line</small></button>
+        <button data-tab="fun"><b>FUN MODES</b><small>One in the Chamber, Gun Game, Infected, Zombies</small></button>
         <button data-tab="join"><b>JOIN A GAME</b><small>Type the code a friend is hosting</small></button>
         <button data-tab="free"><b>FREE PLAY</b><small>Any map, any operator, no clock</small></button>
         <button data-tab="tutorial"><b>TUTORIAL</b><small>Learn the round in four minutes</small></button>
@@ -69,7 +72,6 @@
           <div class="roomFoot"><div class="rfLeft">
           <div class="row botLv"><span class="hint">BOT RANK</span><div class="seg" id="botLevel"><button data-lv="0">Copper</button><button data-lv="1">Bronze</button><button data-lv="2">Silver</button><button data-lv="3">Gold</button><button data-lv="4">Platinum</button><button data-lv="5">Diamond</button><button data-lv="6">Champion</button><button data-lv="7" title="The pro teams: Northwind and Ironclad Collective">Pro</button></div></div>
           <div class="row"><button id="switchBtn">Switch team</button><button id="fillBtn">Fill empty slots with bots</button>
-            <button id="rankedBtn" title="Bots play at your lobby's average rank; winning raises your rank, losing lowers it">RANKED: OFF</button>
             <button id="lobbyOpsBtn" class="hidden">Operators</button><button id="lobbyProfBtn" class="hidden">Profile</button></div></div>
           <button id="startBtn" class="primary startBig">START MATCH</button></div>
         </div>
@@ -128,6 +130,9 @@
           <p class="hint small">Codes work on the homelab VPN and on your home network: both of you need to be on the same one. You can also type an address like 10.10.0.5.</p>
         </div>
       </section>
+      <section class="tab" id="tab-fun">
+        <div class="intelGrid" id="funGrid"></div>
+      </section>
       <section class="tab" id="tab-intel">
         <div class="intelGrid">
           <button class="icard" data-tab="ops" style="--ic:#3aa0ff"><i>OP</i><b>OPERATORS</b><small>Every operator, their skill and their loadouts. Change guns and attachments here.</small></button>
@@ -146,6 +151,7 @@
     <div class="selhead"><div><div id="selSide"></div><div id="selInfo"></div><div id="siteChoice"></div></div><canvas id="spawnMap" class="hidden" width="560" height="300"></canvas><div class="selRight"><div id="selTime"></div><button id="lockBtn" class="primary big">LOCK IN</button></div></div>
     <div class="selBody"><div class="selLeft"><div id="roleBar"></div><div id="opgrid"></div></div><div id="selLo"><div class="loHead">LOADOUT<span id="loNote"></span></div><div id="selLoBody"></div></div></div>
     <div id="picks"></div>
+    <div id="banPick" class="hidden"></div>
   </div>
 
   <!-- In-game HUD -->
@@ -156,6 +162,8 @@
       <div class="sc enemy" id="scR">0</div><div class="icons" id="tiR"></div>
     </div>
     <div id="objective"></div>
+    <div id="leftCount" class="hidden"><div class="lcA"><b></b><span>TEAMMATES LEFT</span></div><div class="lcE"><b></b><span>ENEMIES LEFT</span></div></div>
+    <div id="tipNow" class="hidden"></div>
     <div id="outWarn" class="hidden"></div>
     <div id="compass" class="hidden"><canvas width="96" height="96"></canvas><b></b></div>
     <div id="killfeed"></div>

@@ -31,6 +31,8 @@ import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX } from '/shar
 import { createCoach } from './tutorial.js';
 import { drawQr } from './qr.js';
 import { readCode, showCode } from '/shared/joincode.js';
+import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
+import { compassRoute as sharedRoute } from '/shared/compass.js';
 import { touchPad, touchContext, touchActive, isTrackpad, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
 
@@ -1155,7 +1157,6 @@ document.querySelectorAll('[data-bot]').forEach(b => b.onclick = () => { send({ 
 document.querySelectorAll('[data-unbot]').forEach(b => b.onclick = () => { send({ t: 'lobby', a: 'removeBot', squad: +b.dataset.unbot }); });
 $('switchBtn').onclick = () => { send({ t: 'lobby', a: 'switch' }); };
 $('fillBtn').onclick = () => { send({ t: 'lobby', a: 'fillBots' }); };
-$('rankedBtn').onclick = () => { audio.ui(); send({ t: 'lobby', a: 'ranked', on: !st.rk }); };
 for (const b of $('botLevel').children) b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'botLevel', lv: +b.dataset.lv }); };
 $('startBtn').onclick = () => { send({ t: 'lobby', a: 'start' }); };
 $('leaveBtn').onclick = () => { if (st.tutorial || st.free) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
@@ -1199,7 +1200,7 @@ function mapThumb(id) {
 mapThumbs.set(id, c); return c;
 }
 function renderMapPick(s) {
-  const el = $('mapPick'), key = s.mp + ':' + (s.ph === PHASE.LOBBY) + ':' + s.rm;
+  const el = $('mapPick'), key = s.mp + ':' + (s.ph === PHASE.LOBBY) + ':' + s.rm + ':' + s.md;
   if (el.dataset.k === key) return;
   el.dataset.k = key; el.innerHTML = '';
   const rnd = document.createElement('button');
@@ -1214,13 +1215,15 @@ function renderMapPick(s) {
     b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'map', id }); };
     el.appendChild(b);
   }
-  $('lobbyHint').textContent = `${s.rm ? 'Random map: a surprise until the match starts · ' : MAPS[s.mp] ? MAPS[s.mp].name + ' · ' + MAPS[s.mp].desc + ' · ' : ''}First to 3 rounds · Sides swap every round`;
+  $('lobbyHint').textContent = `${s.rm ? 'Random map: a surprise until the match starts · ' : MAPS[s.mp] ? MAPS[s.mp].name + ' · ' + MAPS[s.mp].desc + ' · ' : ''}${ruleLine(MODES[s.md] || MODES.quick)}`;
 }
 function renderLobby(s) {
   renderControls(); renderMapPick(s);
   for (const b of $('botLevel').children) b.classList.toggle('on', +b.dataset.lv === (s.bl ?? 2));
   $('botLevel').classList.toggle('locked', !!s.rk); // ranked: the lobby's rank decides
-  { const t = s.rk ? 'RANKED: ON' : 'RANKED: OFF'; if ($('rankedBtn').textContent !== t) { $('rankedBtn').textContent = t; $('rankedBtn').classList.toggle('primary', !!s.rk); } st.rk = !!s.rk; }
+  st.rk = !!s.rk;
+  // the game mode (he asked: Quick Match, Unranked, Ranked on the menu): a friend can change it, so the page title follows the lobby
+  if (s.md && MODE_TAB[curPage]) { if (st.wantMode && s.md !== st.wantMode && s.ph === PHASE.LOBBY && !st.modeSent) { st.modeSent = 1; send({ t: 'lobby', a: 'mode', id: st.wantMode }); } else if (s.md === st.wantMode) st.wantMode = null; /* done: after this a friend may change it */ setText('pageTitle', (MODES[s.md] || MODES.quick).name); st.lastMode = s.md; }
   // the address friends type to join (the first network card is the wired one)
   if (st.addr === undefined || (st.addrT && performance.now() - st.addrT > 3000)) { st.addr = st.addr || null; st.addrT = performance.now(); fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; }).catch(() => { setTimeout(() => { st.addr = undefined; }, 3000); }); }
   const u = st.addr && !st.addr.local && st.addr.urls[0], jt = !u ? '' : `Hosting · code ${showCode(u.code)} · friends click JOIN A GAME and type it${u.homelab ? '' : ' · homelab VPN off: home network only'}`;
@@ -1243,6 +1246,28 @@ function showSelLoadout(op, mine) {
   if (st.loShown === op && !st.loDirty) return;
   st.loShown = op; st.loDirty = false;
   showLoadout($('selLoBody'), { profile: st.profile, send, op });
+}
+// Unranked / Ranked bans (he asked, like R6): before round 1 the teams take turns banning an attacker or a defender.
+// On your team's turn you see every operator of that side and click one to ban it (the first click on the team counts);
+// otherwise you see who is banning. Banned operators are shown in two rows the whole time.
+function banPick(s) {
+  const el = $('banPick'), me = st.me, q = s.bq, bans = s.bn || [];
+  el.classList.toggle('hidden', !q || !me);
+  if (!q || !me) return;
+  const [sq, sd, left, i, n] = q, ours = sq === me.sq, team = x => x === me.sq ? 'YOUR TEAM' : 'THE ENEMY', banned = new Set(bans.map(b => b[0]));
+  const key = [i, ours, bans.map(b => b[0]).join()].join('|');
+  if (el.dataset.k !== key) {
+    el.dataset.k = key;
+    const row = side => bans.filter(b => OPERATORS[b[0]] && OPERATORS[b[0]].team === side).map(b => `<div class="bpBan"><canvas width="90" height="90" data-op="${b[0]}"></canvas><b>${esc(OPERATORS[b[0]].name)}</b><span>${b[1] === me.sq ? 'YOURS' : 'THEIRS'}</span></div>`).join('') || '<span class="hint">none yet</span>';
+    el.innerHTML = `<div class="bpTop"><small>BAN PHASE · ${i + 1} / ${n}</small><b class="${ours ? 'ours' : ''}">${ours ? 'YOUR TEAM: BAN' : 'THE ENEMY IS BANNING'} ${sd === 'atk' ? 'AN ATTACKER' : 'A DEFENDER'}</b><span class="bpTime"></span></div>` +
+      (ours ? `<p class="hint">Click the operator you don't want anyone to play this match. If nobody on your team picks before the clock runs out, there is no ban.</p><div class="bpGrid">${opsForTeam(sd).filter(o => !banned.has(o)).map(o => `<button data-op="${o}"><canvas width="120" height="120" data-op="${o}"></canvas><b>${esc(OPERATORS[o].name)}</b><span>${esc(OPERATORS[o].role)}</span></button>`).join('')}</div>`
+        : `<p class="hint bpWait">Waiting for the enemy team to choose…</p>`) +
+      `<div class="bpRows"><div><h4>ATTACKERS BANNED</h4><div class="bpRow">${row('atk')}</div></div><div><h4>DEFENDERS BANNED</h4><div class="bpRow">${row('def')}</div></div></div>`;
+    for (const c of el.querySelectorAll('canvas')) portraitCached(c, c.dataset.op);
+    for (const b of el.querySelectorAll('.bpGrid button')) b.onclick = () => { audio.ui('lock'); send({ t: 'ban', op: b.dataset.op }); };
+    if (i > 0) audio.ui('lock');
+  }
+  setText(el.querySelector('.bpTime'), String(Math.ceil(left)));
 }
 function buildSelect(s) {
   const me = st.me; if (!me) return;
@@ -1269,13 +1294,13 @@ function buildSelect(s) {
   const mates = s.players.filter(p => p.sq === me.sq);
   // roles (he asked; a small icon left of each name, he asked too): choose one first, then only its operators are shown. Counts show how many teammates took each.
   const jobs = JOBS[side], myJob = me.jb, rb = $('roleBar');
-  const rk = [s.rd, side, myJob, me.lk, ...mates.map(p => p.jb)].join(':');
+  const rk = [s.rd, side, myJob, me.lk, ...mates.map(p => p.jb), (s.bn || []).length].join(':'), isBan = o => !!(s.bn && s.bn.some(b => b[0] === o));
   if (rb.dataset.k !== rk) {
     rb.dataset.k = rk; rb.classList.toggle('choose', !myJob);
     rb.innerHTML = (myJob ? '' : '<div class="rbHead">CHOOSE YOUR ROLE</div>') + jobs.map(j => {
       const n = mates.filter(p => p.jb === j.id).length;
       return `<button data-r="${j.id}" class="${myJob === j.id ? 'on' : ''}" title="${esc(j.desc)}"><b>${roleIcon(j.id)}${j.name.toUpperCase()}</b>${n ? `<i>${n}</i>` : ''}`
-        + (myJob ? '' : `<span>${esc(j.desc)}</span><small>${j.ops.map(o => OPERATORS[o].name.toUpperCase()).join(' · ')}</small>`) + '</button>';
+        + (myJob ? '' : `<span>${esc(j.desc)}</span><small>${j.ops.map(o => isBan(o) ? `<s>${OPERATORS[o].name.toUpperCase()}</s>` : OPERATORS[o].name.toUpperCase()).join(' · ')}</small>`) + '</button>';
     }).join('');
     for (const b of rb.querySelectorAll('button')) b.onclick = () => { if (st.me && st.me.lk) return; audio.ui(); send({ t: 'role', r: b.dataset.r }); };
   }
@@ -1288,6 +1313,7 @@ function buildSelect(s) {
     d.classList.toggle('mine', mineNow);
     if (mineNow) showSelLoadout(d.dataset.op, true);
     d.classList.toggle('taken', !!who && who.id !== me.id);
+    d.classList.toggle('banned', !!(s.bn && s.bn.some(b => b[0] === d.dataset.op)));
     d.querySelector('.who').textContent = who ? who.n : '';
     d.querySelector('.who').style.display = who ? '' : 'none';
   }
@@ -1408,35 +1434,7 @@ function siteFound(s) {
 // up or down it points to the stairs (or hatch) instead and says which way. The route is a breadth-first search over
 // what your team knows of the map (st.known), recomputed a few times a second.
 const WALKISH = new Set([T.FLOOR, T.GROUND, T.STAIR, T.OPEN, T.HATCH, T.HATCHR, T.HOLE, T.BARRI, T.RUBBLE]);
-function compassRoute(s, from) {
-  const m = st.map, K = st.known || m, site = m.sites[s.site], W = m.W, N = W * m.H;
-  const start = Math.floor(from.y / CELL) * W + Math.floor(from.x / CELL);
-  if (start < 0 || start >= N) return null;
-  const inSite = k => { const x = k % W, y = (k / W) | 0; return m.rooms.some(r => site.rooms.includes(r.name) && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h); };
-  if (inSite(start)) return { here: true };
-  const prev = st.cmpPrev && st.cmpPrev.length === N ? st.cmpPrev.fill(-2) : (st.cmpPrev = new Int32Array(N).fill(-2));
-  const q = st.cmpQ && st.cmpQ.length === N ? st.cmpQ : (st.cmpQ = new Int32Array(N));
-  let h = 0, t = 0, goal = -1; q[t++] = start; prev[start] = -1;
-  while (h < t) {
-    const k = q[h++];
-    if (inSite(k)) { goal = k; break; }
-    const x = k % W, nb = [x > 0 ? k - 1 : -1, x < W - 1 ? k + 1 : -1, k - W, k + W, m.portal ? m.portal[k] : -1];
-    for (const n of nb) {
-      if (n < 0 || n >= N || prev[n] !== -2) continue;
-      if (!WALKISH.has(K.tiles[n]) && !(m.portal && m.portal[k] === n)) continue;
-      prev[n] = k; q[t++] = n;
-    }
-  }
-  if (goal < 0) return null;
-  const path = []; for (let k = goal; k >= 0; k = prev[k]) path.push(k); path.reverse();
-  // first floor change along the route: point at the stairs (or hatch) and say up or down
-  const flOf = k => m.flAt[k];
-  for (let i = 1; i < path.length; i++) if (flOf(path[i]) !== flOf(path[i - 1])) {
-    const up = flOf(path[i]) > flOf(path[i - 1]), aim = path[Math.max(0, i - 1)];
-    return { cell: path[Math.min(i - 1, 10)], aim, cells: i, stairs: up ? '▲' : '▼', to: m.floors[flOf(path[i])].name };
-  }
-  return { cell: path[Math.min(path.length - 1, 10)], cells: path.length };
-}
+function compassRoute(s, from) { return sharedRoute(st.map, st.known, s.site, from, st); }
 // where your teammates are, in words (he asked): name, room and floor, updated a few times a second
 function drawAllies(s, me, now) {
   const box = $('allies'), show = s && me && st.id && !st.tv && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION) && st.map;
@@ -1476,17 +1474,19 @@ function drawCompass(s, me, now) {
   g.strokeStyle = 'rgba(242,193,78,0.55)'; g.lineWidth = 2; g.stroke();
   for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(48 + Math.cos(a) * 36, 48 + Math.sin(a) * 36); g.lineTo(48 + Math.cos(a) * 41, 48 + Math.sin(a) * 41); g.stroke(); }
   let text = '';
-  if (!r) text = 'NO ROUTE KNOWN';
+  if (!r) { text = 'NO ROUTE KNOWN'; st.cmpNoRoute = true; }
   else if (r.here) { text = 'ON SITE'; g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(48, 48, 9, 0, 7); g.fill(); }
   else {
-    const k = r.aim ?? r.cell, tx = (k % st.map.W + 0.5) * CELL, ty = (Math.floor(k / st.map.W) + 0.5) * CELL;
-    const a = Math.atan2(ty - from.y, tx - from.x) + (st.rot || 0); st.cmpDir = a - (st.rot || 0); // also a small arrow by your character (he asked)
+    const k = r.aim, tx = (k % st.map.W + 0.5) * CELL, ty = (Math.floor(k / st.map.W) + 0.5) * CELL;
+    const want = Math.atan2(ty - from.y, tx - from.x); // glide the needle so it doesn't jump when the route is worked out again
+    st.cmpA = st.cmpA == null || st.cmpNoRoute ? want : st.cmpA + angDiff(want, st.cmpA) * Math.min(1, (now - (st.cmpT || now)) * 10); st.cmpT = now; st.cmpNoRoute = false;
+    const a = st.cmpA + (st.rot || 0); st.cmpDir = st.cmpA; // also a small arrow by your character (he asked)
     g.save(); g.translate(48, 48); g.rotate(a);
     g.fillStyle = '#f2c14e'; g.strokeStyle = '#000'; g.lineWidth = 2.5;
     g.beginPath(); g.moveTo(34, 0); g.lineTo(-10, -15); g.lineTo(-3, 0); g.lineTo(-10, 15); g.closePath(); g.stroke(); g.fill();
     g.restore();
-    const m = Math.round(r.cells * CELL / PX_PER_M);
-    text = r.stairs ? `STAIRS ${r.stairs} ${r.to} · ${m} m` : `BOMB SITE · ${m} m`;
+    const m = Math.round(r.cells * CELL / PX_PER_M), ms = Math.round((r.toStairs || 0) * CELL / PX_PER_M);
+    text = r.stairs ? `${r.stairs} STAIRS TO ${r.to} · ${ms} m · SITE ${m} m` : `${r.site} · ${m} m`;
   }
   if (label.textContent !== text) label.textContent = text;
 }
@@ -2939,12 +2939,41 @@ function screens(s, phase, now) {
   if (!s || now - st.lastHud < 0.08) return;
   st.lastHud = now;
   if (phase === PHASE.LOBBY) renderLobby(s);
-  else if (phase === PHASE.SELECT) { if (st.tv) TV.tvDraft(s); else buildSelect(s); }
+  else if (phase === PHASE.SELECT) { if (st.tv) TV.tvDraft(s); else { buildSelect(s); banPick(s); } }
   else if (phase !== PHASE.MATCH_END) hud(s);
   $('scoreboard').classList.toggle('hidden', !keys.has('scoreboard'));
   if (keys.has('scoreboard')) $('scoreboard').innerHTML = scoreTable(s);
 }
 
+// Quick Match's beginner help (he asked): big TEAMMATES LEFT / ENEMIES LEFT numbers and one line saying what to do now.
+// Only in Quick Match (s.md 'quick'); Unranked and Ranked show less.
+function beginnerHelp(s, me, mine, theirs) {
+  const on = s.md === 'quick' && !st.tv && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION);
+  setCls($('leftCount'), 'hidden', !on); setCls($('tipNow'), 'hidden', !on);
+  if (!on) return;
+  const up = l => l.filter(p => p.a).length;
+  setText($('leftCount').querySelector('.lcA b'), String(up(mine))); setText($('leftCount').querySelector('.lcE b'), String(up(theirs)));
+  setHTML('tipNow', esc(tipNow(s, me, mine)).replace(/\[([^\]]+)\]/g, '<kbd>$1</kbd>'));
+}
+function tipNow(s, me, mine) {
+  const K = id => '[' + label(id) + ']', side = me.tm, site = st.map.sites[s.site], prep = s.ph === PHASE.PREP;
+  if (!me.a) return 'You are out this round. Watch your team, and mark enemies on the cameras to help them';
+  if (me.dn) return 'You are down: crawl into cover. A teammate can pick you up';
+  const p = st.pred || me, downMate = mine.find(q => q.id !== st.id && q.a && q.dn && q.x !== undefined && Math.hypot(q.x - p.x, q.y - p.y) < 400);
+  if (downMate) return `${downMate.n.replace(/^\[\w+\] /, '')} is down nearby: go to them and hold ${K('interact')} to pick them up`;
+  const inSite = site && site.rooms.includes(roomAt(st.map, p.x, p.y));
+  if (side === 'atk') {
+    if (prep) return me.ct === 'drone' ? `Drive your drone into the building and look at the gold site. Press ${K('spot')} on defenders you see to mark them for your team` : `Press ${K('drone')} to drive your drone and scout the site before the round starts`;
+    if (me.ct === 'drone') return `Press ${K('drone')} to go back to your body`;
+    if (s.pl) return 'The defuser is planted: stay out of sight and shoot anyone who comes to disable it';
+    if (me.df) return inSite ? `You are in the site: hold ${K('interact')} to plant the defuser` : 'You carry the defuser: follow the compass to the site, then plant it there';
+    return `Follow the compass to ${site ? site.name : 'the site'}. Shoot through soft walls, or open them with explosives (${K('gadget')})`;
+  }
+  if (prep) return s.rf > 0 ? `Hold ${K('interact')} on the site's walls to make them bulletproof (${s.rf} left). Doors and windows get boards the same way` : 'Find a spot near the site that covers a door, and wait there';
+  if (s.pl) return `The defuser is planted! Find it (red on your screen) and hold ${K('interact')} on it to disable it`;
+  if (me.ct === 'cam') return `Press ${K('spot')} to mark attackers you see. ${K('view')} goes back to your body`;
+  return `Stay close to ${site ? site.name : 'the site'} and listen. Press ${K('view')} to watch the cameras`;
+}
 function hud(s) {
   const me = st.me; if (!me) return;
   const side = me.tm, site = st.map.sites[s.site];
@@ -2962,7 +2991,8 @@ function hud(s) {
   setText('time', s.fp && !s.pl ? '∞' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`);
   setCls($('time'), 'planted', !!s.pl);
   setText('phase', s.pl ? 'DEFUSER' : s.fp ? 'FREE PLAY' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER');
-  setText('roundNo', s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`);
+  setText('roundNo', s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `${s.ot ? 'OVERTIME · ' : ''}ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`);
+  beginnerHelp(s, me, mine, theirs);
   // free play: which keys switch operator, and who you'd get
   $('freeHint').classList.toggle('hidden', !s.fp);
   if (!playing() || (!st.camLock && !flashCamTag.t)) setCls($('camTag'), 'hidden', true); else if (st.camLock) setCls($('camTag'), 'hidden', false);
@@ -3056,7 +3086,7 @@ function hud(s) {
 }
 function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!el) return; if (el.innerHTML !== h) el.innerHTML = h; }
 // (he said it got laggy: the HUD rewrote about a dozen elements ten times a second even when nothing had changed)
-function setText(id, v) { const el = $(id), t = String(v); if (el && el.textContent !== t) el.textContent = t; }
+function setText(id, v) { const el = typeof id === 'string' ? $(id) : id, t = String(v); if (el && el.textContent !== t) el.textContent = t; }
 function setCls(el, c, on) { if (el.classList.contains(c) !== on) el.classList.toggle(c, on); }
 
 // Esports TV (he asked): rings by side, defenders blue and attackers orange, whoever the camera rides with
@@ -3647,10 +3677,19 @@ $('splash').addEventListener('click', () => {
 // The main menu (he asked for an overhaul, Risk of Rain 2 style): a home screen of big choices; each opens a full
 // page (#lobby.paged) with BACK (Esc) in its top bar. Operators, Armory, Map Knowledge, Playbook, Ball Knowledge,
 // Profile and Settings are their own full-screen pages already and open over whichever menu page you are on.
-const PAGES = { play: ['PLAY', 'QUICK MATCH'], join: ['PLAY', 'JOIN A GAME'], free: ['PLAY', 'FREE PLAY'], tutorial: ['LEARN', 'TUTORIAL'],
+const PAGES = { play: ['PLAY', 'QUICK MATCH'], unranked: ['PLAY', 'UNRANKED'], ranked: ['PLAY', 'RANKED'], fun: ['PLAY', 'FUN MODES'], join: ['PLAY', 'JOIN A GAME'], free: ['PLAY', 'FREE PLAY'], tutorial: ['LEARN', 'TUTORIAL'],
   tv: ['WATCH', 'ESPORTS TV'], intel: ['LEARN', 'INTEL'], controls: ['INTEL', 'CONTROLS'] };
 const PAGE_UP = { controls: 'intel' }; // BACK from these goes to that page, not home
-const NEEDS_NAME = new Set(['play', 'ops', 'profile']);
+const NEEDS_NAME = new Set(['play', 'unranked', 'ranked', 'ops', 'profile']);
+const MODE_TAB = { play: 'quick', unranked: 'unranked', ranked: 'ranked' }; // these pages are the one lobby, set to that mode
+// FUN MODES page (he asked): one card per fun mode; the ones not built yet say so
+const FUN_LOOK = { oitc: ['#ff7a2a', '1'], gungame: ['#f2c14e', '▲'], infected: ['#5fd08a', '☣'], zombies: ['#c0503a', '☠'] };
+function renderFun() {
+  const el = $('funGrid'); if (el.dataset.k) return; el.dataset.k = 1;
+  el.innerHTML = MODE_LIST.filter(id => MODES[id].fun).map(id => { const M = MODES[id], [c, i] = FUN_LOOK[id] || ['#93a0ad', '?'];
+    return `<button class="icard${M.ready ? '' : ' soon'}" data-mode="${id}" style="--ic:${c}"><i>${i}</i><b>${esc(M.name)}</b><small>${esc(M.blurb)}</small>${M.ready ? '' : '<em>COMING NEXT</em>'}</button>`; }).join('');
+  for (const b of el.querySelectorAll('button')) b.onclick = () => { const M = MODES[b.dataset.mode]; if (!M.ready) { audio.ui('back'); return; } st.wantMode = b.dataset.mode; setTab('play'); };
+}
 let curPage = null;
 function askName(tab) { // no name yet: back home with the name box lit up; once entered, go on to that page
   if (tab) st.wantTab = tab;
@@ -3662,7 +3701,7 @@ function goHome() {
   $('lobby').classList.add('home'); $('lobby').classList.remove('paged');
   for (const t of document.querySelectorAll('.tab')) t.classList.remove('on');
 }
-function pageBack() { audio.ui('back'); const up = PAGE_UP[curPage]; if (up) setTab(up); else goHome(); }
+function pageBack() { audio.ui('back'); const up = curPage === 'play' && MODES[st.lastMode]?.fun ? 'fun' : PAGE_UP[curPage]; if (up) setTab(up); else goHome(); }
 function setTab(tab) {
   if (NEEDS_NAME.has(tab) && !st.token) { askName(tab); return; }
   if (tab === 'ops') { showOps(); return; }
@@ -3676,10 +3715,13 @@ function setTab(tab) {
   if (!PAGES[tab]) return;
   if (curPage !== tab) audio.ui('open');
   curPage = tab;
+  const section = MODE_TAB[tab] ? 'play' : tab;
+  if (MODE_TAB[tab]) { if (tab !== 'play' || !MODES[st.wantMode]?.fun) st.wantMode = MODE_TAB[tab]; st.modeSent = 0; send({ t: 'lobby', a: 'mode', id: st.wantMode }); }
   $('lobby').classList.remove('home'); $('lobby').classList.add('paged');
   $('pageKick').textContent = PAGES[tab][0]; $('pageTitle').textContent = PAGES[tab][1];
-  for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t.id === 'tab-' + tab);
+  for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t.id === 'tab-' + section);
   if (tab === 'controls') renderControls();
+  if (tab === 'fun') renderFun();
   if (tab === 'free') renderFree();
   if (tab === 'tv') { renderTv(); trainInfo(); }
   if (tab === 'join') { $('codeMsg').textContent = ''; setTimeout(() => $('codeIn').focus(), 50); }

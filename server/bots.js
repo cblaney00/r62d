@@ -180,7 +180,7 @@ export function botPickOp(game, p) {
 // Worked out once a round for the defending team: which rooms beside the site are held, which site walls become
 // rotation holes (left soft, knocked open in preparation), which openings get boarded and where the traps go.
 const WALLISH = [T.SOFT, T.REINF, T.HARD];
-function defSetup(game) {
+export function defSetup(game) {
   const m = game.map;
   if (game._ds && game._ds.m === m && game._ds.si === game.site) return game._ds;
   const site = m.sites[game.site], W = m.W, I = intelOf(game);
