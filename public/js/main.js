@@ -225,6 +225,15 @@ function lockedTarget(dt, view) {
 // to hold you and the crosshair (he asked: zoom, never let it leave the screen), up to FIT_MAX world px tall; only past
 // that does it slide along.
 const DRONE_PING_R = 10 * PX_PER_M, FIT_MAX = 2000;
+// A sightline for the camera's lead that stops where the floor you stand on ends (he asked: on a roof the open air past
+// the edge counted as a long view, so turning swung the camera out over nothing and back)
+function edgeSight(x, y, a, L) {
+  const m = st.map, d = castSight(m, x, y, a, L, null), f = floorAt(m, x, y);
+  if (f === m.groundFloor) return d;
+  const c = Math.cos(a), s = Math.sin(a);
+  for (let t = 8; t < d; t += 8) { const k = Math.floor((y + s * t) / CELL) * m.W + Math.floor((x + c * t) / CELL); if (m.flAt[k] !== f || m.tiles[k] === T.VOID || (m.tiles[k] === T.LOW && m.floor[k] === FL.VOID)) return t; }
+  return d;
+}
 // how far the crosshair can sit along angle a before the edge of your floor (the camera can't follow it there)
 function floorLim(a, l) {
   const c = Math.cos(a), s = Math.sin(a), F = st.map.floors[Math.max(0, floorAt(st.map, st.pred.x, st.pred.y))], m = 10, x0 = F.gx * CELL + m, x1 = (F.gx + F.w) * CELL - m, y1 = F.h * CELL - m;
@@ -411,10 +420,11 @@ function freeAimPoint() {
 }
 // is this aim (from where you stand) out through one of the windows you are looking down from?
 function winAimed(a) {
+  const was = st.winAimedT && performance.now() - st.winAimedT < 400; // (a dead zone: no flicking on and off at the cone's edge)
   for (const v of st.viewers || []) if (v.kind === 'window' && !v.oc) {
     const r = viewSrc(st.map, v), ft = r && windowFoot(st.map, r); if (!ft) continue;
-    const wa = Math.atan2(ft.cy - st.pred.y, ft.cx - st.pred.x), half = Math.atan2(r.half + 6, Math.max(8, Math.hypot(ft.cx - st.pred.x, ft.cy - st.pred.y)));
-    if (Math.abs(angDiff(a, wa)) < half) return true;
+    const wa = Math.atan2(ft.cy - st.pred.y, ft.cx - st.pred.x), half = Math.atan2(r.half + (was ? 14 : 6), Math.max(8, Math.hypot(ft.cx - st.pred.x, ft.cy - st.pred.y)));
+    if (Math.abs(angDiff(a, wa)) < half) { st.winAimedT = performance.now(); return true; }
   }
   return false;
 }
@@ -1886,7 +1896,7 @@ function frame(nowMs) {
   if (view && (view.kind === 'drone' || view.dr)) want = 240;
   else if (view) {
     let sum = 0;
-    for (let i = 0; i < 24; i++) sum += castSight(st.map, view.x, view.y, i / 24 * Math.PI * 2, 700, null);
+    for (let i = 0; i < 24; i++) sum += view.kind === 'body' ? edgeSight(view.x, view.y, i / 24 * Math.PI * 2, 700) : castSight(st.map, view.x, view.y, i / 24 * Math.PI * 2, 700, null);
     const avg = sum / 24, aimD = castSight(st.map, view.x, view.y, view.ang, 900, null);
     want = Math.max(240, Math.min(470, avg * 1.15 + 110));
     if (view.kind !== 'body') want = Math.max(want, Math.min(view.kind === 'cam' ? 580 : 520, aimD * (view.kind === 'cam' ? 0.75 : 0.6))); // (a body: farS below, steadier)
@@ -1894,7 +1904,7 @@ function frame(nowMs) {
       // how far you can be seen (and so shot) from in the way you face: the 80th-percentile sightline across your
       // view cone, so one sliver through a doorway doesn't count. It grows quickly and shrinks slowly (no jumpy camera).
       const n = 15, fov = Math.min(view.fov || 1.8, 1.9), ds = [];
-      for (let i = 0; i < n; i++) ds.push(castSight(st.map, view.x, view.y, view.ang - fov / 2 + fov * i / (n - 1), LONG_R, null));
+      for (let i = 0; i < n; i++) ds.push(edgeSight(view.x, view.y, view.ang - fov / 2 + fov * i / (n - 1), LONG_R));
       ds.sort((a, b) => a - b);
       const far = ds[Math.floor(n * 0.8)];
       st.farS = st.farS === undefined ? far : st.farS + (far - st.farS) * (1 - Math.exp(-dt * (far > st.farS ? 1.2 : 0.6))); // calm outdoors, where sightlines change a lot as you turn
@@ -1933,7 +1943,10 @@ function frame(nowMs) {
     st.reachW = dr ? DRONE_PING_R : reachOf(me);
     { const l = Math.hypot(aimOff.x, aimOff.y); if (l > st.reachW) { const k = (st.reachW + (dr ? 0 : (l - st.reachW) * Math.exp(-dt * 10))) / l; aimOff = { x: aimOff.x * k, y: aimOff.y * k }; } } // stopped aiming in: it glides back inside (onto a drone: at once)
     const need = Math.min(FIT_MAX, fitBoth(q.ax - st.pred.x, q.ay - st.pred.y));
-    st.fitH = st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : need;
+    // out quickly; back in only once the smaller size has held for 0.5 s, and gently (he asked: on roofs the view pumped
+    // in and out as the crosshair passed the edge, which threw the crosshair about on screen)
+    st.fitDown = need < (st.fitH || need) * 0.97 ? (st.fitDown || 0) + dt : 0;
+    st.fitH = !st.fitH ? need : need > st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : st.fitDown > 0.5 ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 1.5)) : st.fitH;
     if (!locked) st.viewH = Math.max(st.viewH, st.fitH);
   } else st.fitH = 0;
   st.viewH *= viewMul(); // Settings: how much of the map you see (phones start further out)
@@ -1962,7 +1975,12 @@ function frame(nowMs) {
     if (!st.rot) st.cam.y = mh > hh * 2 ? Math.max(hh, Math.min(mh - hh, st.cam.y)) : mh / 2;
     }
     st.floorRect = [x0, 0, x0 + mw, mh];
-    const wb = st.winViewsOn && st.winBox; // looking down out of a window: the view may go out over the ground below
+    if (st.winViewsOn && st.winBox) { st.winBoxKeep = st.winBox; st.winBoxT = now; } // kept a moment after it ends
+    const wb0 = st.winBoxKeep && now - (st.winBoxT || 0) < 0.6 ? st.winBoxKeep : null; // looking down out of a window: the view may go out over the ground below
+    const tgt = wb0 ? [Math.min(x0, wb0[0]), Math.min(0, wb0[1]), Math.max(x0 + mw, wb0[2]), Math.max(mh, wb0[3])] : [x0, 0, x0 + mw, mh];
+    if (!st.camBox || st.camBoxF !== x0) { st.camBox = tgt.slice(); st.camBoxF = x0; }
+    for (let i = 0; i < 4; i++) st.camBox[i] += (tgt[i] - st.camBox[i]) * (1 - Math.exp(-dt * 5)); // glides, never jumps
+    const wb = st.camBox[0] < x0 - 1 || st.camBox[1] < -1 || st.camBox[2] > x0 + mw + 1 || st.camBox[3] > mh + 1 ? [st.camBox[0], st.camBox[1], st.camBox[2], st.camBox[3]] : null;
     if (wb && !st.rot) {
       const lo = Math.min(x0, wb[0]) + hw, hi = Math.max(x0 + mw, wb[2]) - hw, tp = Math.min(0, wb[1]) + hh, bt = Math.max(mh, wb[3]) - hh;
       st.cam.x = lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, camPre.x));
