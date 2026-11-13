@@ -10,7 +10,7 @@
 import * as THREE from './vendor/three.module.min.js';
 import { CELL, T, FL, MAT, PX_PER_M } from '/shared/constants.js';
 import { floorAt, floorOff } from '/shared/map.js';
-import { opSprite, W as SW, H as SH } from './opart3d.js';
+import { makeOperator, ownMaterials, setOpacity } from './opmodel3d.js'; // (operators as real 3D models)
 import { riseOf } from './look.js'; // (only boxy things stand up: the top-down view's rule)
 
 const M = PX_PER_M, FH = 3.2 * M, BODY = 1.85 * M;
@@ -45,11 +45,6 @@ function surface(matId, frac) {
   const t = new THREE.CanvasTexture(base); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, frac);
   const m = new THREE.MeshLambertMaterial({ map: t }); surf.set(key, m); return m;
 }
-function spriteMat(op, view, pose, gun, own) {
-  const k = op + view + pose + gun + (own ? '|me' : ''); if (texCache.has(k)) return texCache.get(k);
-  const t = new THREE.CanvasTexture(opSprite(op, view, pose, gun)); t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.LinearFilter;
-  const m = new THREE.SpriteMaterial({ map: t, transparent: true, alphaTest: 0.2 }); texCache.set(k, m); return m;
-}
 
 function init(host) {
   const canvas = document.createElement('canvas'); canvas.id = 'rope3d'; host.insertBefore(canvas, document.getElementById('ui')); // (under the HUD)
@@ -64,9 +59,9 @@ function init(host) {
   const lamps = Array.from({ length: LAMPS }, () => { const L = new THREE.PointLight('#ffe8c8', 0, 10 * M, 1.4); scene.add(L); return L; });
   const floorG = new THREE.Group(), massG = new THREE.Group(); scene.add(floorG, massG);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat('#4f7a3a')); ground.rotation.x = -Math.PI / 2; ground.scale.set(200 * M, 200 * M, 1); scene.add(ground);
-  const me = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true })); me.renderOrder = 2; scene.add(me);
+  const me = new THREE.Group(); scene.add(me); // (your own operator's model goes in here)
   const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1, 6), mat('#c8b27a')); scene.add(rope);
-  R = { renderer, scene, camera, canvas, world, people, fx, ground, me, rope, yaw: 0, pitch: 0, key: '', sig: '', mix: 0, on: false, out: 0, ray: new THREE.Raycaster(), sprites: new Map(), tracers: [], thingG, smokeG, things: new Map(), smoke: [], plane: new THREE.PlaneGeometry(1, 1), boomL, lamps, floorG, massG };
+  R = { renderer, scene, camera, canvas, world, people, fx, ground, me, rope, yaw: 0, pitch: 0, key: '', sig: '', mix: 0, on: false, out: 0, ray: new THREE.Raycaster(), models: new Map(), tracers: [], thingG, smokeG, things: new Map(), smoke: [], plane: new THREE.PlaneGeometry(1, 1), boomL, lamps, floorG, massG };
   addEventListener('resize', () => size());
   size();
 }
@@ -252,23 +247,28 @@ export function frame(c) {
   // where you hang: just outside the wall, at window height (upside down: higher, head at the top of the window)
   const out = 0.35 * M, me3 = new THREE.Vector3(c.pred.x + n[0] * out, c.height + (c.inv ? 1.6 * M : 0.15 * M), c.pred.y + n[1] * out);
   const right = new THREE.Vector3(n[1], 0, -n[0]); // to your right as you face the wall
-  // your operator from behind, the rope up to the roof
-  // (aiming in: your own back fades so you can see past it)
-  R.me.material = spriteMat(c.me.op, 'back', c.inv ? 'hangInv' : 'hang', c.me.w || '', true); R.meA = (R.meA ?? 1) + ((c.ads ? 0.28 : 1) - (R.meA ?? 1)) * Math.min(1, c.dt * 10); R.me.material.opacity = R.meA; R.me.material.alphaTest = c.ads ? 0.02 : 0.2; R.me.scale.set(BODY * SW / SH, BODY, 1);
-  R.me.position.set(me3.x, me3.y + BODY / 2, me3.z);
+  // your operator from behind, holding the rope, facing the wall (a model of your own, so it can fade while you aim in)
+  const meKey = c.me.op + '|' + (c.me.w || '');
+  if (R.meKey !== meKey) { for (const o of [...R.me.children]) R.me.remove(o); R.meModel = ownMaterials(makeOperator(c.me.op, c.me.w)); R.meModel.scale.setScalar(M); R.me.add(R.meModel); R.meKey = meKey; }
+  R.meModel.pose(c.inv ? 'hangInv' : 'hang', c.now, 0, c.ads ? 1 : 0);
+  R.me.position.set(me3.x, c.inv ? c.height + 1.45 * M : me3.y, me3.z); R.me.rotation.y = -Math.atan2(-n[1], -n[0]);
+  R.meA = (R.meA ?? 1) + ((c.ads ? 0.28 : 1) - (R.meA ?? 1)) * Math.min(1, c.dt * 10); // (aiming in: your own back fades so you can see past it)
   const roofY = (m.floors.length - 1 - m.groundFloor) * FH + 0.6 * M, ropeTop = Math.max(me3.y + BODY, roofY);
-  R.rope.position.set(me3.x, (me3.y + BODY * 0.75 + ropeTop) / 2, me3.z); R.rope.scale.set(1, ropeTop - me3.y - BODY * 0.75, 1);
+  R.rope.position.set(me3.x - n[0] * 0.12 * M, (me3.y + BODY * 0.75 + ropeTop) / 2, me3.z - n[1] * 0.12 * M); // (in the hand) R.rope.scale.set(1, ropeTop - me3.y - BODY * 0.75, 1);
   // the people you can see (the same sight lines as the top-down view)
   const keep = new Set();
   for (const p of c.people) {
     const o = floorOff(m, p.f, f), px = p.x + o.x, pz = p.y + o.y, py = (p.f - m.groundFloor) * FH + (p.onRope ? 0.15 * M : 0);
-    const toCam = Math.atan2(R.camera.position.z - pz, R.camera.position.x - px), rel = Math.atan2(Math.sin(toCam - p.ag), Math.cos(toCam - p.ag));
-    const view = p.onRope ? 'back' : Math.abs(rel) < 0.8 ? 'front' : Math.abs(rel) > 2.35 ? 'back' : rel > 0 ? 'right' : 'left';
-    let sp = R.sprites.get(p.id); if (!sp) { sp = new THREE.Sprite(); R.sprites.set(p.id, sp); R.people.add(sp); }
-    sp.material = spriteMat(p.op, view, p.pose, p.w || ''); sp.scale.set(BODY * SW / SH, BODY, 1); sp.position.set(px, py + BODY / 2, pz);
-    sp.userData = { id: p.id, x: p.x, y: p.y, f: p.f, base: py }; keep.add(p.id);
+    const key = p.op + '|' + (p.w || '');
+    let md = R.models.get(p.id);
+    if (!md || md.key !== key) { if (md) R.people.remove(md.root); const root = makeOperator(p.op, p.w); root.scale.setScalar(M); md = { root, key, lx: px, lz: pz, mv: 0, t: 0 }; R.models.set(p.id, md); R.people.add(root); }
+    // walking: how fast they move sets the stride
+    const spd = Math.hypot(px - md.lx, pz - md.lz) / Math.max(c.dt, 1e-3) / M; md.mv += (Math.min(1, spd / 1.6) - md.mv) * Math.min(1, c.dt * 8); md.lx = px; md.lz = pz; md.t += c.dt * (0.5 + md.mv * 0.6);
+    md.root.pose(p.pose, md.t, md.mv, p.ads ? 1 : 0);
+    md.root.rotation.y = -p.ag; md.root.position.set(px, p.pose === 'hangInv' ? py + 1.3 * M : py, pz);
+    Object.assign(md.root.userData, { id: p.id, x: p.x, y: p.y, f: p.f, base: py }); keep.add(p.id);
   }
-  for (const [id, sp] of R.sprites) if (!keep.has(id)) { R.people.remove(sp); R.sprites.delete(id); }
+  for (const [id, md] of R.models) if (!keep.has(id)) { R.people.remove(md.root); R.models.delete(id); }
   things(c, f);
   // shots seen: a short bright streak at chest height, a spark where it hits
   for (const s of c.shots || []) {
@@ -312,7 +312,8 @@ export function frame(c) {
   R.camera.lookAt(new THREE.Vector3().lerpVectors(down, look, e));
   R.canvas.style.opacity = String(Math.min(1, e * 1.4));
   R.me.visible = e > 0.3;
-  { const v = R.me.position.clone().project(R.camera); if (Math.abs(v.x) < 0.16 && v.z < 1) R.me.material.opacity = Math.min(R.me.material.opacity, 0.35); } // your body over the crosshair: see through it if (R.upper) R.upper.visible = e > 0.8; for (const pl of R.floorG.children) pl.visible = !pl.userData.up || e > 0.8;
+  { let a = R.meA; const v = R.me.position.clone().add(new THREE.Vector3(0, 1.2 * M, 0)).project(R.camera); if (Math.abs(v.x) < 0.16 && v.z < 1) a = Math.min(a, 0.35); if (R.meModel) setOpacity(R.meModel, a); } // (your body over the crosshair: see through it)
+  if (R.upper) R.upper.visible = e > 0.8; for (const pl of R.floorG.children) pl.visible = !pl.userData.up || e > 0.8;
   R.renderer.render(R.scene, R.camera);
   R.dir = dir; R.line = R.line || line; R.m = m; R.f = f; R.n = n; R.meXY = { x: c.pred.x, y: c.pred.y }; R.level = c.height + 1.2 * M;
 }
@@ -391,10 +392,11 @@ export function wallSign(r) { const n = [Math.round(Math.cos(r.out)), Math.round
 export function aim() {
   if (!R || !R.on) return null;
   R.ray.setFromCamera(new THREE.Vector2(0, 0), R.camera);
-  const hits = R.ray.intersectObjects([R.world, R.people], true).filter(h => h.object !== R.me);
+  const hits = R.ray.intersectObjects([R.world, R.people], true);
   const me = R.meXY; let px, pz, person = null, head = false;
   const h = hits[0];
-  if (h && h.object.isSprite) { const u = h.object.userData; person = u.id; px = h.point.x; pz = h.point.z; head = h.point.y > u.base + BODY * 0.8; if (u.f === R.f) { px = u.x; pz = u.y; } }
+  let who = h && h.object; while (who && !(who.userData && who.userData.base !== undefined)) who = who.parent; // (the model the hit part belongs to)
+  if (who) { const u = who.userData; person = u.id; px = h.point.x; pz = h.point.z; head = h.object.userData.part === 'head' || h.point.y > u.base + BODY * 0.82; if (u.f === R.f) { px = u.x; pz = u.y; } }
   else if (h && Math.abs(h.point.y - R.level) < FH * 0.95 && Math.hypot(h.point.x - me.x, h.point.z - me.y) > 1.6 * M) { px = h.point.x; pz = h.point.z; }
   else { px = me.x + R.dir.x * 400; pz = me.y + R.dir.z * 400; }
   const ang = Math.atan2(pz - me.y, px - me.x);
