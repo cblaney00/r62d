@@ -1545,6 +1545,15 @@ function r3things(s, me, now, near) {
   for (const id of pics.keys()) if (!keep.has(id)) pics.delete(id);
   return { ents: out, smoke, decoys };
 }
+// a piece of the map picture (world px x, y, w, h) on a new W × H canvas: the 3D rope view's floors and ground are the
+// same picture as the top-down map
+function r3pic(x, y, w, h, W, H) {
+  const R = st.rend; if (!R || !R.c) return null;
+  const k = R.c.width / R.Wp, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const c = cv.getContext('2d', { willReadFrequently: true }); c.fillStyle = '#4f6a3e'; c.fillRect(0, 0, W, H); // (off the map's edge: grass)
+  R.c.drawTo(c, x * k, y * k, w * k, h * k, 0, 0, W, H);
+  return cv;
+}
 // the 3D rope view's own layer over the 3D picture: pings, hit marker, points, screen effects (hurt, flash, daze)
 function r3overlay(me, now, show) {
   let cv = $('r3fx');
@@ -1592,7 +1601,7 @@ function rope3dFrame(s, me, now, dt) {
     }
     const near = (x, y, f) => { const q = f !== r.f ? floorOff(m, f, r.f) : { x: 0, y: 0 }; return Math.hypot(x + q.x - pred.x, y + q.y - pred.y) < 30 * PX_PER_M; };
     const th = r3things(s, me, now, near); people.push(...th.decoys);
-    c = { m, me, s, pred, rope: r, height: h, inv: !!ro[5], people, ents: th.ents, smoke: th.smoke, shots: st.r3shots, booms: st.r3booms, now, dt, ads: !!me.ad, shake: fx.shake || 0, leaving: null };
+    c = { m, me, s, pred, rope: r, height: h, inv: !!ro[5], people, ents: th.ents, smoke: th.smoke, pic: r3pic, shots: st.r3shots, booms: st.r3booms, now, dt, ads: !!me.ad, shake: fx.shake || 0, leaving: null };
     st.r3last = c; st.r3leaveT = null;
   } else { // gliding back out
     if (st.r3leaveT == null) { st.r3leaveT = now; const d = 3.5 * PX_PER_M; aimOff = { x: Math.cos(st.aim) * d, y: Math.sin(st.aim) * d }; st.r3aim = null; } // the top-down crosshair: a few metres ahead the way you faced

@@ -71,7 +71,7 @@ const BRICK = [125, 68, 52];
 // showed a square slab of grass round it (he saw it as strange shapes)
 const BOXY = new Set(['crates', 'wall', 'car', 'dumpster', 'rack', 'shelf', 'container', 'cabinet', 'bookshelf', 'pillar', 'van', 'locker', 'train', 'fridge', 'truck', 'booth', 'schoolbus', 'bus', 'gatehouse', 'lifthut', 'signalbox', 'tankcar', 'counter', 'forklift', 'snowcat', 'stall', 'cart']);
 const RISE = new WeakMap(); // map → per cell: 1 where a tall cell belongs to a boxy thing
-function riseOf(m) {
+export function riseOf(m) {
   let r = RISE.get(m); if (r) return r;
   RISE.set(m, r = new Uint8Array(m.W * m.H));
   for (const p of m.props || []) if (BOXY.has(p.kind)) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) r[y * m.W + x] = 1;
