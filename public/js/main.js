@@ -726,7 +726,7 @@ function onEvent(e, s, players) {
   const now = performance.now() / 1000;
   switch (e.e) {
     case 'shot': {
-      if (st.r3shots && st.map) st.r3shots.push({ f: floorAt(st.map, e.x, e.y), x: e.x, y: e.y, x2: e.x2, y2: e.y2 });
+      if (st.r3shots && st.map && r3sees(players.get(e.id), e.x, e.y, e.x2, e.y2)) st.r3shots.push({ f: floorAt(st.map, e.x, e.y), x: e.x, y: e.y, x2: e.x2, y2: e.y2, k: e.k }); // (the 3D rope view: only shots your side could see, like the top-down streaks under the blackout)
       const w = WEAPONS[e.w]; const a = Math.atan2(e.y2 - e.y, e.x2 - e.x);
       if (e.nt) fx.tracer(e.x, e.y, e.x2, e.y2); else fx.trail(e.x, e.y, e.x2, e.y2); // subsonic ammo: only the old brief streak
       const an = anim(e.id);
@@ -749,6 +749,7 @@ function onEvent(e, s, players) {
     }
     case 'hit':
       fx.impact(e.x, e.y, e.k, e.a || 0);
+      if (st.r3shots && st.map && r3sees(null, e.x, e.y)) st.r3shots.push({ f: floorAt(st.map, e.x, e.y), x: e.x, y: e.y, hit: e.k });
       if (e.k === 'blood') { st.rend.blood(e.x, e.y, e.a || 0); audio.impact('flesh', e.x, e.y); }
       else if (e.k === 'spark') audio.impact('electronic', e.x, e.y);
       else if (e.k === 'wall') audio.impact(wallMat(e.x, e.y, e.a), e.x, e.y);
@@ -757,6 +758,7 @@ function onEvent(e, s, players) {
       break;
     case 'boom':
       fx.explosion(e.x, e.y, e.r, e.kind);
+      if (st.r3booms && st.map && r3sees(null, e.x, e.y)) st.r3booms.push({ f: floorAt(st.map, e.x, e.y), x: e.x, y: e.y, r: e.r, kind: e.kind, t: now });
       if (st.tv && e.kind === 'stun') { fx.ping(e.x, e.y, '255,255,255'); fx.ping(e.x, e.y, '255,250,210'); } // TV: how far the flash reached (no white-out for viewers, he asked)
       if (e.kind !== 'stun' && e.kind !== 'emp' && e.kind !== 'surge') st.rend.scorch(e.x, e.y, Math.min(40, e.r * 0.6));
       audio.explosion(e.x, e.y, e.kind);
@@ -1451,6 +1453,48 @@ function siteFound(s) {
 // up or down it points to the stairs (or hatch) instead and says which way. The route is a breadth-first search over
 // what your team knows of the map (st.known), recomputed a few times a second.
 const WALKISH = new Set([T.FLOOR, T.GROUND, T.STAIR, T.OPEN, T.HATCH, T.HATCHR, T.HOLE, T.BARRI, T.RUBBLE]);
+// screen effects over the whole view: being scanned, hurt (with the direction it came from, `from` = angle on screen),
+// dazed, down, flashed. Drawn on #over, or on the 3D rope view's own layer (#r3fx) while that view is up.
+function screenFx(c, me, now, from) {
+  const W = c.canvas.width, H = c.canvas.height;
+  if (me && me.a && me.sc) { c.fillStyle = 'rgba(70,90,255,0.12)'; c.fillRect(0, 0, W, H); }
+  const hurtK = Math.max(0, 1 - (now - st.hurtT) / 0.8);
+  if (hurtK > 0 && fxOn('hurt')) {
+    const g = c.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.8);
+    g.addColorStop(0, 'rgba(160,0,0,0)'); g.addColorStop(1, `rgba(160,0,0,${0.45 * hurtK})`);
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.save(); c.translate(W / 2, H / 2); c.rotate(from);
+    c.fillStyle = `rgba(255,40,40,${0.8 * hurtK})`; c.beginPath(); c.moveTo(H * 0.2, -22 * DPR); c.lineTo(H * 0.24, 0); c.lineTo(H * 0.2, 22 * DPR); c.closePath(); c.fill();
+    c.restore();
+  }
+  if (now < (st.dazeUntil || 0)) { const k = Math.min(1, st.dazeUntil - now); c.fillStyle = `rgba(210,190,140,${0.12 * k})`; c.fillRect(0, 0, W, H); fx.shake = Math.max(fx.shake, 1.2 * k); }
+  if (me && me.a && me.dn) { c.fillStyle = 'rgba(90,0,0,0.25)'; c.fillRect(0, 0, W, H); }
+  const fl = st.flashUntil - now;
+  if (fl > 0) { c.fillStyle = `rgba(255,255,255,${Math.min(1, fl / 1.2)})`; c.fillRect(0, 0, W, H); }
+}
+// the hit marker (an X round the crosshair, red for a kill) and the points popups under it, at (x, y) on canvas c
+function hitMark(c, x, y, now) {
+  const hk = 1 - (now - st.hitT) / 0.18;
+  if (!(hk > 0 && fxOn('hit'))) return;
+  c.strokeStyle = st.hitKill ? `rgba(255,60,60,${hk})` : `rgba(255,255,255,${hk})`; c.lineWidth = 2 * DPR;
+  c.beginPath();
+  for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { c.moveTo(x + dx * 5 * DPR, y + dy * 5 * DPR); c.lineTo(x + dx * 11 * DPR, y + dy * 11 * DPR); }
+  c.stroke();
+}
+function ptsPopups(c, x, y, now) {
+  if (!(st.ptsPops && st.ptsPops.length && fxOn('pts'))) return;
+  st.ptsPops = st.ptsPops.filter(q => now - q.t < 2.4);
+  c.textAlign = 'center'; c.textBaseline = 'top';
+  st.ptsPops.slice().reverse().forEach((q, i) => {
+    const age = now - q.t, a = Math.min(1, age * 6) * Math.min(1, (2.4 - age) / 0.5), yy = y + (34 + i * 17) * DPR - Math.max(0, 0.15 - age) * 60 * DPR;
+    c.globalAlpha = a; c.font = `700 ${(i ? 13 : 15) * DPR}px Barlow Condensed, sans-serif`;
+    const t = q.n ? `${q.n > 0 ? '+' : ''}${q.n}  ${q.w}` : q.w; // n 0: a note (fun modes: NEXT GUN, +1 BULLET)
+    c.lineWidth = 3 * DPR; c.strokeStyle = 'rgba(0,0,0,0.75)'; c.strokeText(t, x, yy);
+    c.fillStyle = q.n >= 0 ? '#f2c14e' : '#ff5a5a'; c.fillText(t, x, yy);
+  });
+  c.globalAlpha = 1; c.textBaseline = 'alphabetic';
+}
+
 // ---- the 3D rope view (rope3d.js) ----
 // On for an attacker hanging on (or climbing) a rope; leaving it glides the camera back up to the top-down view over
 // R3_OUT s (inside the climb-in), so you can shoot as soon as you're through.
@@ -1458,10 +1502,73 @@ const R3_OUT = 0.45, FH3 = 3.2 * PX_PER_M;
 // which way the wall is for someone hanging at (p.x, p.y): the rope stretch they are on, facing it
 function hangWall(p) { for (const q of st.map.ropes || []) { const sx = Math.max(q.a, Math.min(q.b, (p.x - q.hang.x) * q.tx + (p.y - q.hang.y) * q.ty)); if (Math.hypot(q.hang.x + q.tx * sx - p.x, q.hang.y + q.ty * sx - p.y) < 4 && floorAt(st.map, p.x, p.y) === q.f) return q.out + Math.PI; } return undefined; }
 function r3on() { const me = st.me; return !!(me && me.ro && me.a && !me.dn && me.tm === 'atk' && me.ct === 'body' && !st.tv && st.map && st.map.ropes); }
+// Does your side see this (the 3D rope view shows only what the top-down view would show you)? Own side's shots always.
+function r3sees(shooter, x, y, x2, y2) {
+  if (!st.r3last && !r3on()) return false;
+  if (shooter && st.me && shooter.tm === st.me.tm) return true;
+  return teamSees(x, y) || (x2 !== undefined && teamSees(x2, y2));
+}
+// What the 3D rope view needs of the gadgets, drones, cameras, smoke and decoys: the same ones the top-down view would
+// draw for you (your side's always, the other side's only where your side sees them, hidden traps only within 2 m).
+// Each gadget comes with a little top-down picture of it (drawn by the same code as the map), redrawn ten times a second.
+const R3_PIC = 64, R3_PIC_W = 40; // canvas px, world px across
+function r3things(s, me, now, near) {
+  const m = st.map, side = me.tm, out = [], smoke = [], decoys = [], pics = st.r3pics || (st.r3pics = new Map()), keep = new Set();
+  for (const e0 of s.ents) {
+    const e = interp(e0.id, 'ents') || e0, ally = e.tm === side, f = floorAt(m, e.x, e.y); if (f < 0) continue;
+    if (!near(e.x, e.y, f)) continue;
+    if (e.ty === 'smoke' || e.ty === 'gascloud') {
+      if (e.ty === 'gascloud' && !ally && !teamSees(e.x, e.y)) continue;
+      const col = e.ty === 'gascloud' ? '#96c846' : '#cdcdc8';
+      if (e.pf) for (let i = 0; i < e.pf.length; i += 2) smoke.push({ x: e.pf[i], y: e.pf[i + 1], r: e.r, f, col, id: e.id + ':' + i, l: e.l });
+      else smoke.push({ x: e.x, y: e.y, r: e.r, f, col, id: e.id, l: e.l });
+      continue;
+    }
+    if (e.ty === 'swarm' || (e.ty === 'drone' && e.id === me.did)) continue;
+    if (e.ty === 'decoy') { if (ally || teamSees(e.x, e.y)) decoys.push({ id: 'd' + e.id, op: e.op, x: e.x, y: e.y, f, ag: e.ag || 0, w: e.w, pose: 'stand' }); continue; }
+    if (TRAPS.has(e.ty) && !ally && Math.hypot(e.x - st.pred.x, e.y - st.pred.y) >= TRAP_SEEN) continue;
+    if (!ally && !teamSees(e.x, e.y)) continue;
+    let P = pics.get(e.id);
+    if (!P) { const cv = document.createElement('canvas'); cv.width = cv.height = R3_PIC; P = { cv, t: -9 }; pics.set(e.id, P); }
+    if (now - P.t > 0.1) { // (the picture: blinking lights, turning drones)
+      const c = P.cv.getContext('2d'), k = R3_PIC / R3_PIC_W; c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, R3_PIC, R3_PIC);
+      c.setTransform(k, 0, 0, k, R3_PIC / 2 - e.x * k, R3_PIC / 2 - e.y * k);
+      if (e.ty === 'drone') drawDrone(c, { ...e, ag: e.ag || 0, wheel: 0, spd: 0, mvAng: e.ag || 0, sway: 0 }, now, ally);
+      else if (e.ty === 'bird') drawBird(c, { ...e, ag: e.ag || 0, fl: 0 }, now, ally);
+      else if (e.ty === 'cam') drawCam(c, e, now, ally);
+      else drawGadget(c, e, now, ally);
+      P.t = now; P.dirty = true;
+    }
+    keep.add(e.id);
+    out.push({ id: e.id, ty: e.ty, x: e.x, y: e.y, f, ally, pic: P, wall: e.ty === 'cam' || e.ty === 'scope' || (e.ty === 'bird' && !!e.pe), fly: e.ty === 'bird' && !e.pe });
+  }
+  for (const id of pics.keys()) if (!keep.has(id)) pics.delete(id);
+  return { ents: out, smoke, decoys };
+}
+// the 3D rope view's own layer over the 3D picture: pings, hit marker, points, screen effects (hurt, flash, daze)
+function r3overlay(me, now, show) {
+  let cv = $('r3fx');
+  if (!cv) { if (!show) return; cv = document.createElement('canvas'); cv.id = 'r3fx'; document.body.insertBefore(cv, $('ui')); }
+  cv.style.display = show ? 'block' : 'none'; if (!show) return;
+  const W = Math.round(innerWidth * DPR), H = Math.round(innerHeight * DPR);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const c = cv.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, H);
+  // pings: where they are in the 3D view, kept inside the screen edge
+  const m = st.map, pad = 46 * DPR;
+  if (st.marks) for (const k of st.marks) {
+    if (now - k.t >= 6) continue;
+    const P = rope3d.project(k.x, k.y, floorAt(m, k.x, k.y), 1.0); if (!P) continue;
+    let x = P.x * DPR, y = P.y * DPR; if (P.behind) { x = W - x; y = H - pad; }
+    x = Math.max(pad, Math.min(W - pad, x)); y = Math.max(pad + 60 * DPR, Math.min(H - pad - 60 * DPR, y));
+    drawPing(c, k, x, y, now - k.t, DPR, k.by + ' · ' + Math.round(Math.hypot(k.x - st.pred.x, k.y - st.pred.y) / PX_PER_M) + ' m');
+  }
+  hitMark(c, W / 2, H / 2, now); ptsPopups(c, W / 2, H / 2, now);
+  screenFx(c, me, now, st.hurtFrom - rope3d.facing() - Math.PI / 2); // (the arrow: which way it came from, as you face)
+}
 function rope3dFrame(s, me, now, dt) {
   const m = st.map, on = r3on();
-  if (!on && !st.r3last) { $('r3x').classList.add('hidden'); return; }
-  if (!st.r3shots) st.r3shots = [];
+  if (!st.r3shots) { st.r3shots = []; st.r3booms = []; }
+  if (!on && !st.r3last) { $('r3x').classList.add('hidden'); st.r3shots.length = 0; st.r3booms.length = 0; if (st.r3full) { st.r3full = false; r3overlay(me, now, false); } return; }
   let c;
   if (on) {
     const ro = me.ro, R = m.ropes, ease = q => q * q * (3 - 2 * q);
@@ -1480,19 +1587,22 @@ function rope3dFrame(s, me, now, dt) {
       const p = interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
       const f = floorAt(m, p.x, p.y); if (f < 0) continue;
       const q = f !== r.f ? floorOff(m, f, r.f) : { x: 0, y: 0 }; if (Math.hypot(p.x + q.x - pred.x, p.y + q.y - pred.y) > 30 * PX_PER_M) continue;
-      if (sp.sq !== me.sq && !teamSees(p.x, p.y)) continue; // only who your side can see: the same lines both ways
+      if (sp.sq !== me.sq && (sp.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue; // only who your side can see: the same lines both ways (HUSH's shroud: eyes only)
       people.push({ id: sp.id, op: sp.op, x: p.x, y: p.y, f, ag: p.ag || 0, w: sp.w, onRope: !!sp.rp, pose: sp.dn || sp.pn ? 'down' : sp.rp === 3 ? 'hangInv' : sp.rp ? 'hang' : sp.cr ? 'crouch' : 'stand' });
     }
-    c = { m, me, s, pred, rope: r, height: h, inv: !!ro[5], people, shots: st.r3shots, now, dt, ads: !!me.ad, leaving: null };
+    const near = (x, y, f) => { const q = f !== r.f ? floorOff(m, f, r.f) : { x: 0, y: 0 }; return Math.hypot(x + q.x - pred.x, y + q.y - pred.y) < 30 * PX_PER_M; };
+    const th = r3things(s, me, now, near); people.push(...th.decoys);
+    c = { m, me, s, pred, rope: r, height: h, inv: !!ro[5], people, ents: th.ents, smoke: th.smoke, shots: st.r3shots, booms: st.r3booms, now, dt, ads: !!me.ad, shake: fx.shake || 0, leaving: null };
     st.r3last = c; st.r3leaveT = null;
   } else { // gliding back out
     if (st.r3leaveT == null) { st.r3leaveT = now; const d = 3.5 * PX_PER_M; aimOff = { x: Math.cos(st.aim) * d, y: Math.sin(st.aim) * d }; st.r3aim = null; } // the top-down crosshair: a few metres ahead the way you faced
     const q = (now - st.r3leaveT) / R3_OUT;
-    if (q >= 1) { rope3d.stop(); st.r3last = null; st.r3leaveT = null; $('world').style.visibility = ''; $('r3x').classList.add('hidden'); return; }
-    c = { ...st.r3last, now, dt, shots: st.r3shots, leaving: q };
+    if (q >= 1) { rope3d.stop(); st.r3last = null; st.r3leaveT = null; st.r3full = false; r3overlay(me, now, false); $('world').style.visibility = ''; $('r3x').classList.add('hidden'); return; }
+    c = { ...st.r3last, now, dt, shots: st.r3shots, booms: st.r3booms, shake: fx.shake || 0, leaving: q };
   }
-  rope3d.frame(c); st.r3shots.length = 0;
+  rope3d.frame(c); st.r3shots.length = 0; st.r3booms.length = 0;
   const full = on && rope3d.active();
+  st.r3full = full && now - (st.r3start ?? now) > 0.2; r3overlay(me, now, st.r3full);
   if (!on) st.r3start = null; else if (st.r3start == null) st.r3start = now;
   $('world').style.visibility = full && now - st.r3start > 0.45 ? 'hidden' : ''; // (fully in the 3D view: the top-down picture needn't show)
   $('r3x').classList.toggle('hidden', !full);
@@ -2802,20 +2912,7 @@ function draw(s, view, now, dt) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (view && view.kind === 'drone') droneOverlay(now, ents);
   if (view && view.kind === 'cam') { if (view.dr) droneOverlay(now, ents, view.cam); else camOverlay(view, now); }
-  if (me && me.a && me.sc) { ctx.fillStyle = 'rgba(70,90,255,0.12)'; ctx.fillRect(0, 0, VW, VH); }
-  const hurtK = Math.max(0, 1 - (now - st.hurtT) / 0.8);
-  if (hurtK > 0 && fxOn('hurt')) {
-    const g = ctx.createRadialGradient(VW / 2, VH / 2, VH * 0.3, VW / 2, VH / 2, VH * 0.8);
-    g.addColorStop(0, 'rgba(160,0,0,0)'); g.addColorStop(1, `rgba(160,0,0,${0.45 * hurtK})`);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
-    ctx.save(); ctx.translate(VW / 2, VH / 2); ctx.rotate(st.hurtFrom);
-    ctx.fillStyle = `rgba(255,40,40,${0.8 * hurtK})`; ctx.beginPath(); ctx.moveTo(VH * 0.2, -22 * DPR); ctx.lineTo(VH * 0.24, 0); ctx.lineTo(VH * 0.2, 22 * DPR); ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
-  if (now < (st.dazeUntil || 0)) { const k = Math.min(1, st.dazeUntil - now); ctx.fillStyle = `rgba(210,190,140,${0.12 * k})`; ctx.fillRect(0, 0, VW, VH); fx.shake = Math.max(fx.shake, 1.2 * k); }
-  if (me && me.a && me.dn) { ctx.fillStyle = 'rgba(90,0,0,0.25)'; ctx.fillRect(0, 0, VW, VH); }
-  const fl = st.flashUntil - now;
-  if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(1, fl / 1.2)})`; ctx.fillRect(0, 0, VW, VH); }
+  if (!st.r3full) screenFx(ctx, me, now, st.hurtFrom); // (in the 3D rope view they go on its own layer, #r3fx)
   if (st.tv && inGame) TV.tvBubbles(now);
   if (inGame) drawMarks(view, now);
   if (inGame && me && !menuOpen() && !st.tv) { if (st.mapV) drawMapV(s, me, now); } else if (st.mapV || st.wheel) { st.mapV = null; closeWheel(true); }
@@ -3040,18 +3137,7 @@ function crosshair(me, now) {
   if (!(sniperOn(me) && me.at > 0.6 && me.ct === 'body')) drawXhair(ctx, x, y, xh, spread, DPR); // (the sniper reticle takes over)
   ctx.globalAlpha = 1;
   // points popups under the crosshair (he asked, R6-style): newest at the top, each fades after a couple of seconds
-  if (st.ptsPops && st.ptsPops.length && fxOn('pts')) {
-    st.ptsPops = st.ptsPops.filter(q => now - q.t < 2.4);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    st.ptsPops.slice().reverse().forEach((q, i) => {
-      const age = now - q.t, a = Math.min(1, age * 6) * Math.min(1, (2.4 - age) / 0.5), yy = y + (34 + i * 17) * DPR - Math.max(0, 0.15 - age) * 60 * DPR;
-      ctx.globalAlpha = a; ctx.font = `700 ${(i ? 13 : 15) * DPR}px Barlow Condensed, sans-serif`;
-      const t = q.n ? `${q.n > 0 ? '+' : ''}${q.n}  ${q.w}` : q.w; // n 0: a note (fun modes: NEXT GUN, +1 BULLET)
-      ctx.lineWidth = 3 * DPR; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(t, x, yy);
-      ctx.fillStyle = q.n >= 0 ? '#f2c14e' : '#ff5a5a'; ctx.fillText(t, x, yy);
-    });
-    ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic';
-  }
+  ptsPopups(ctx, x, y, now);
   // far out: how far away the crosshair is (it can go anywhere you can see)
   if (fq) {
     const q = fq, dm = q.ad / PX_PER_M;
@@ -3084,13 +3170,7 @@ function crosshair(me, now) {
       ctx.textBaseline = 'alphabetic';
     }
   }
-  const hk = 1 - (now - st.hitT) / 0.18;
-  if (hk > 0 && fxOn('hit')) {
-    ctx.strokeStyle = st.hitKill ? `rgba(255,60,60,${hk})` : `rgba(255,255,255,${hk})`; ctx.lineWidth = 2 * DPR;
-    ctx.beginPath();
-    for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { ctx.moveTo(x + dx * 5 * DPR, y + dy * 5 * DPR); ctx.lineTo(x + dx * 11 * DPR, y + dy * 11 * DPR); }
-    ctx.stroke();
-  }
+  hitMark(ctx, x, y, now);
 }
 
 function droneOverlay(now, ents, d = ents.find(e => st.me && e.id === st.me.did)) {

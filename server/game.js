@@ -2459,6 +2459,12 @@ export class Game {
       return;
     }
     if (m.a === 'ef' && process.env.R62D_FAST) { const q = this.players.get(m.id); if (q && EF_FIELD[m.k]) this.effect(q, m.k, +m.dur || 4, p); return; } // screenshot tests only: a status effect caused by you
+    if (m.a === 'ent' && process.env.R62D_FAST && isFinite(m.x) && isFinite(m.y)) { // screenshot tests only: a gadget (ty), or a grenade going off (boom: its kind), at x, y
+      const team = m.team || this.side(p);
+      if (m.boom) this.detonate({ id: -1, type: 'nade', kind: m.boom, x: m.x, y: m.y, team, owner: p.id });
+      else this.ents.push({ id: this.eid(), type: m.ty, x: m.x, y: m.y, team, owner: p.id, ang: +m.ang || 0, hp: 1, life: 99, r: m.r || undefined, t: 99 });
+      return;
+    }
     if (m.a === 'tile' && process.env.R62D_FAST && Array.isArray(m.ks)) { // screenshot tests only: set map cells (open a window)
       for (const k of m.ks) if (this.map.tiles[k] !== undefined) { this.map.tiles[k] = m.v | 0; this.map.hp[k] = m.v === T.BARRI ? CELL_HP[T.BARRI] : 0; delete this.map.holes[k]; if (m.holes) { this.map.holes[k] = m.holes.slice(0, 2); this.addHole(k, m.holes[0], m.holes[1]); } this.changed.add(k); }
       return;

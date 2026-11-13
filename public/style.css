@@ -1228,3 +1228,4 @@ html.zombies #leftCount, html.zombies #tipNow, html.zombies #cambar, html.zombie
 #r3x i:nth-child(1) { left: -13px; top: -1px; width: 8px; height: 2px; } #r3x i:nth-child(2) { left: 5px; top: -1px; width: 8px; height: 2px; }
 #r3x i:nth-child(3) { left: -1px; top: -13px; width: 2px; height: 8px; } #r3x i:nth-child(4) { left: -1px; top: 5px; width: 2px; height: 8px; }
 #r3x b { position: absolute; left: -1px; top: -1px; width: 2px; height: 2px; background: #46ff6a; }
+#r3fx { position: fixed; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; z-index: 0; }

@@ -16,6 +16,7 @@ const M = PX_PER_M, FH = 3.2 * M, BODY = 1.85 * M;
 const FLOOR_COL = { [FL.GRASS]: '#4f7a3a', [FL.ASPHALT]: '#3b3d40', [FL.WOOD]: '#8a6a46', [FL.TILE]: '#b9b4a8', [FL.CARPET]: '#6b4b55', [FL.CONCRETE]: '#8f8f8a', [FL.MARBLE]: '#d8d4cc', [FL.SERVER]: '#2c3238', [FL.SAND]: '#c9b27a', [FL.SNOW]: '#e8eef2', [FL.ROOF]: '#55585c' };
 const WALL_COL = { [MAT.BRICK]: '#8a5a44', [MAT.DRYWALL]: '#cfc6b4', [MAT.CONCRETE]: '#8d9196' };
 const SOLID = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL]);
+const PIC_W = 40; // world px across a gadget picture (main.js R3_PIC_W)
 
 let R = null; // { renderer, scene, camera, canvas, ... } made on first use
 const mats = new Map();
@@ -56,11 +57,12 @@ function init(host) {
   const camera = new THREE.PerspectiveCamera(70, 1, 4, 120 * M);
   scene.add(new THREE.HemisphereLight('#dfe9f2', '#4a4a40', 1.6));
   const sun = new THREE.DirectionalLight('#fff3dc', 1.4); sun.position.set(0.4, 1, 0.3); scene.add(sun);
-  const world = new THREE.Group(), people = new THREE.Group(), fx = new THREE.Group(); scene.add(world, people, fx);
+  const world = new THREE.Group(), people = new THREE.Group(), fx = new THREE.Group(), thingG = new THREE.Group(), smokeG = new THREE.Group(); scene.add(world, people, fx, thingG, smokeG);
+  const boomL = new THREE.PointLight('#ffb04a', 0, 10 * M, 1.2); scene.add(boomL);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat('#4f7a3a')); ground.rotation.x = -Math.PI / 2; ground.scale.set(200 * M, 200 * M, 1); scene.add(ground);
   const me = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true })); me.renderOrder = 2; scene.add(me);
   const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1, 6), mat('#c8b27a')); scene.add(rope);
-  R = { renderer, scene, camera, canvas, world, people, fx, ground, me, rope, yaw: 0, pitch: 0, key: '', sig: '', mix: 0, on: false, out: 0, ray: new THREE.Raycaster(), sprites: new Map(), tracers: [] };
+  R = { renderer, scene, camera, canvas, world, people, fx, ground, me, rope, yaw: 0, pitch: 0, key: '', sig: '', mix: 0, on: false, out: 0, ray: new THREE.Raycaster(), sprites: new Map(), tracers: [], thingG, smokeG, things: new Map(), smoke: [], plane: new THREE.PlaneGeometry(1, 1), boomL };
   addEventListener('resize', () => size());
   size();
 }
@@ -162,9 +164,24 @@ export function frame(c) {
     sp.userData = { id: p.id, x: p.x, y: p.y, f: p.f, base: py }; keep.add(p.id);
   }
   for (const [id, sp] of R.sprites) if (!keep.has(id)) { R.people.remove(sp); R.sprites.delete(id); }
-  // shots seen: a short bright streak at chest height
-  for (const s of c.shots || []) { const o = floorOff(m, s.f, f), y = (s.f - m.groundFloor) * FH + 1.3 * M; const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(s.x + o.x, y, s.y + o.y), new THREE.Vector3(s.x2 + o.x, y, s.y2 + o.y)]); const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#fff2b0', transparent: true, opacity: 0.9 })); l.userData.t = c.now; R.fx.add(l); }
-  for (const l of [...R.fx.children]) { const a = c.now - l.userData.t; if (a > 0.08) { R.fx.remove(l); l.geometry.dispose(); } else l.material.opacity = 0.9 * (1 - a / 0.08); }
+  things(c, f);
+  // shots seen: a short bright streak at chest height, a spark where it hits
+  for (const s of c.shots || []) {
+    const o = floorOff(m, s.f, f), y = (s.f - m.groundFloor) * FH + 1.3 * M;
+    if (s.hit) { spark(c.now, s.x + o.x, y, s.y + o.y, s.hit === 'blood' ? '#c0201a' : s.hit === 'spark' ? '#9fd4ff' : '#ffe6a0', s.hit === 'blood' ? 9 : 6); continue; }
+    const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(s.x + o.x, y, s.y + o.y), new THREE.Vector3(s.x2 + o.x, y, s.y2 + o.y)]); const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#fff2b0', transparent: true, opacity: 0.9 })); l.userData.t = c.now; l.userData.life = 0.08; R.fx.add(l);
+    if (s.k === 'hard' || s.k === 'prop') spark(c.now, s.x2 + o.x, y, s.y2 + o.y, '#ffe6a0', 6);
+  }
+  for (const l of [...R.fx.children]) { const a = c.now - l.userData.t, life = l.userData.life; if (a > life) { R.fx.remove(l); if (l.isLine) l.geometry.dispose(); l.material.dispose(); } else { l.material.opacity = (l.userData.a0 || 0.9) * (1 - a / life); if (l.userData.grow) l.scale.setScalar(l.userData.s0 * (1 + a / life * l.userData.grow)); } }
+  // explosions seen: a flash that swells and fades, lighting the wall and the room for a moment
+  for (const b of c.booms || []) {
+    const o = floorOff(m, b.f, f), y = (b.f - m.groundFloor) * FH + 1.0 * M, col = b.kind === 'stun' || b.kind === 'flare' ? '#ffffff' : b.kind === 'emp' ? '#8fd0ff' : '#ffb04a';
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const s0 = Math.max(24, b.r * 0.9); sp.scale.setScalar(s0); sp.position.set(b.x + o.x, y, b.y + o.y); Object.assign(sp.userData, { t: c.now, life: 0.5, a0: 1, s0, grow: 1.4 }); R.fx.add(sp);
+    R.boom = { t: c.now, col, x: b.x + o.x, y, z: b.y + o.y, r: b.r };
+    R.kick = Math.max(R.kick || 0, Math.min(1, b.r / 120) * 6 / (1 + Math.hypot(b.x + o.x - c.pred.x, b.y + o.y - c.pred.y) / (8 * M)));
+  }
+  if (R.boom) { const a = (c.now - R.boom.t) / 0.4; if (a >= 1) { R.boomL.intensity = 0; R.boom = null; } else { R.boomL.color.set(R.boom.col); R.boomL.position.set(R.boom.x, R.boom.y + 0.5 * M, R.boom.z); R.boomL.distance = Math.max(8 * M, R.boom.r * 4); R.boomL.intensity = 8 * (1 - a); } }
   // the camera: over your right shoulder, a little back from the wall; aim with the mouse (limited, you face the wall)
   const face = new THREE.Vector3(-n[0], 0, -n[1]);
   const dir = face.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -R.yaw); dir.y = Math.tan(R.pitch); dir.normalize();
@@ -175,13 +192,77 @@ export function frame(c) {
   const glide = c.leaving != null ? 1 - c.leaving : R.mix, e = glide * glide * (3 - 2 * glide);
   const above = me3.clone(); above.y += 14 * M; above.addScaledVector(new THREE.Vector3(n[0], 0, n[1]), 0.5 * M);
   R.camera.position.lerpVectors(above, shoulder, e);
+  const kick = Math.max(R.kick || 0, (c.shake || 0) * 0.5); R.kick = Math.max(0, (R.kick || 0) - c.dt * 18); // (a blast nearby, the same shake as the top-down view)
+  if (kick > 0.05) R.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * kick, (Math.random() - 0.5) * kick, (Math.random() - 0.5) * kick));
   const look = R.camera.position.clone().add(dir.clone().multiplyScalar(10 * M)), down = me3.clone();
   R.camera.lookAt(new THREE.Vector3().lerpVectors(down, look, e));
   R.canvas.style.opacity = String(Math.min(1, e * 1.4));
   R.me.visible = e > 0.3; if (R.upper) R.upper.visible = e > 0.8;
   R.renderer.render(R.scene, R.camera);
-  R.dir = dir; R.line = R.line || line; R.f = f; R.n = n; R.meXY = { x: c.pred.x, y: c.pred.y }; R.level = c.height + 1.2 * M;
+  R.dir = dir; R.line = R.line || line; R.m = m; R.f = f; R.n = n; R.meXY = { x: c.pred.x, y: c.pred.y }; R.level = c.height + 1.2 * M;
 }
+// a soft round glow picture (smoke puffs, flashes, sparks), made once
+let glowT = null, smokeT = null;
+function glowTex() {
+  if (glowT) return glowT;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  glowT = new THREE.CanvasTexture(cv); return glowT;
+}
+// a smoke puff: lumpy, soft at the edge (several blobs, like the top-down drawSmoke)
+function smokeTex() {
+  if (smokeT) return smokeT;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d'); let sd = 5; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 26; i++) { const a = rnd() * 7, d = rnd() * 30, r = 18 + rnd() * 22, cx = 64 + Math.cos(a) * d, cy = 64 + Math.sin(a) * d, g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, `rgba(255,255,255,${0.3 + rnd() * 0.2})`); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); }
+  smokeT = new THREE.CanvasTexture(cv); smokeT.colorSpace = THREE.SRGBColorSpace; return smokeT;
+}
+function spark(now, x, y, z, col, size) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: col, transparent: true, blending: col === '#c0201a' ? THREE.NormalBlending : THREE.AdditiveBlending, depthWrite: false }));
+  sp.scale.setScalar(size); sp.position.set(x, y, z); Object.assign(sp.userData, { t: now, life: 0.14, a0: 1, s0: size, grow: 0.6 }); R.fx.add(sp);
+}
+// gadgets, drones, cameras and smoke your side sees (main.js r3things decides which): each gadget is its top-down picture
+// lying on the floor (cameras and perched birds on a sprite up on the wall), smoke is a stack of soft puffs
+function things(c, f) {
+  const m = c.m, keep = new Set();
+  for (const e of c.ents || []) {
+    const o = floorOff(m, e.f, f), y0 = (e.f - m.groundFloor) * FH;
+    let g = R.things.get(e.id);
+    if (!g || g.userData.wall !== (e.wall || e.fly)) {
+      if (g) { R.thingG.remove(g); g.material.map.dispose(); g.material.dispose(); }
+      const tex = new THREE.CanvasTexture(e.pic.cv); tex.colorSpace = THREE.SRGBColorSpace;
+      if (e.wall || e.fly) g = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
+      else { g = new THREE.Mesh(R.plane, new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.1, depthWrite: false })); g.rotation.x = -Math.PI / 2; g.renderOrder = 1; }
+      g.userData.wall = !!(e.wall || e.fly); R.things.set(e.id, g); R.thingG.add(g);
+    }
+    if (e.pic.dirty) { g.material.map.needsUpdate = true; e.pic.dirty = false; }
+    const w = PIC_W * (g.userData.wall ? 0.7 : 1);
+    g.scale.set(w, w, 1);
+    g.position.set(e.x + o.x, y0 + (e.wall ? 2.5 * M : e.fly ? 1.8 * M : 3), e.y + o.y);
+    keep.add(e.id);
+  }
+  for (const [id, g] of R.things) if (!keep.has(id)) { R.thingG.remove(g); g.material.map.dispose(); g.material.dispose(); R.things.delete(id); }
+  // smoke: puffs from the pool, three heights each, fading out as the cloud ends
+  let n = 0;
+  for (const s of c.smoke || []) {
+    const o = floorOff(m, s.f, f), y0 = (s.f - m.groundFloor) * FH, fade = s.l === undefined ? 1 : Math.min(1, s.l / 2);
+    for (let j = 0; j < 3; j++) {
+      let sp = R.smoke[n]; if (!sp) { sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex(), transparent: true, depthWrite: false })); R.smoke.push(sp); R.smokeG.add(sp); }
+      const wob = Math.sin(c.now * 0.6 + n * 1.7) * 0.06;
+      sp.visible = true; sp.material.color.set(s.col); sp.material.opacity = 0.82 * fade * (j === 2 ? 0.7 : 1); sp.material.rotation = n * 0.9 + c.now * 0.05;
+      sp.scale.setScalar(s.r * (2.3 - j * 0.25) * (1 + wob)); sp.position.set(s.x + o.x, y0 + (0.6 + j * 0.85) * M, s.y + o.y); n++;
+    }
+  }
+  for (let i = n; i < R.smoke.length; i++) R.smoke[i].visible = false;
+}
+// where a map point (on floor fl, hm metres up) is on the screen, in CSS px; behind = it's behind you
+export function project(x, y, fl, hm = 1) {
+  if (!R || !R.on || fl < 0 || !R.m) return null;
+  const o = floorOff(R.m, fl, R.f), v = new THREE.Vector3(x + o.x, (fl - R.m.groundFloor) * FH + hm * M, y + o.y);
+  const d = v.clone().sub(R.camera.position), behind = d.dot(R.camera.getWorldDirection(new THREE.Vector3())) < 0;
+  v.project(R.camera); return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight, behind };
+}
+// which way the view faces, as a map angle
+export const facing = () => R && R.dir ? Math.atan2(R.dir.z, R.dir.x) : 0;
 export function stop() { if (!R || !R.on) return; R.on = false; R.canvas.style.display = 'none'; R.key = ''; }
 export const active = () => !!(R && R.on);
 
