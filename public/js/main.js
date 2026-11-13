@@ -3174,6 +3174,7 @@ function hud(s) {
   const viewName = side === 'atk' ? `Drone${s.ph === PHASE.ACTION ? ' ×' + me.dr : ''}` : 'Cameras';
   const salvoWait = ab.id === 'sticky' ? s.ents.filter(e => e.ty === 'sticky' && e.ow === me.id && e.st).length : 0; // SALVO: rounds waiting for her
   st.tBadge = { skill: me.gi || salvoWait || me.lu ? '!' : String(abCount), gadget: me.ni ? '!' : String(me.gc ?? ''), view: side === 'atk' && s.ph === PHASE.ACTION ? String(me.dr ?? '') : '' };
+  if (s.zb) setHTML('gadgets', `<div class="${me.gc <= 0 ? 'out' : ''}"><b>${label('gadget')}</b>${g.name}<em>${me.gc}</em></div>`); else // ZOMBIES: grenades only
   setHTML('gadgets',
     `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : me.scd ? `${ab.name} ready in ${Math.ceil(me.scd)}s` : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : me.ap ? 'Piercing round loaded' : me.bp ? 'Bipod down · press to lift' : me.su2 ? `Spotting ${Math.ceil(me.su2)}s · aim in` : me.gw2 ? `Ghillie ${Math.ceil(me.gw2)}s` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
     `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>${label('gadget')}</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +

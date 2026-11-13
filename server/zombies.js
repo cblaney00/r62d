@@ -47,7 +47,8 @@ const CRATE_GUNS = ['mule', 'ox', 'drummer', 'cyclone', 'trestle', 'pike', 'sake
 const ZOMBIE_OPS = Object.keys(OPERATORS).filter(o => OPERATORS[o].armor === 2);
 
 const r1 = v => Math.round(v * 10) / 10;
-const people = game => [...game.players.values()].filter(p => !p.zombie);
+const people = game => [...game.players.values()].filter(p => !p.zombie && p.zb); // (someone who joined mid-game has no p.zb until the next round: see nextRound)
+const everyone = game => [...game.players.values()].filter(p => !p.zombie);
 const zombies = game => [...game.players.values()].filter(p => p.zombie);
 const note = (game, p, text) => { if (p && p.sock) game.events.push({ e: 'pts', to: p.id, n: 0, w: text }); };
 // points in (double points doubles them) or out
@@ -87,7 +88,7 @@ export function zbStart(game) {
   for (const g of game.zb.gates) for (const k of g.cells) { m.tiles[k] = T.BEAM; m.hp[k] = 99999; game.changed.add(k); }
   // every ground-floor window starts with all its boards
   for (const o of m.openings) if (o.cells.some(k => m.win[k]) && m.flAt[o.cells[0]] === m.groundFloor) { game.zb.boards[o.id] = ZB.boardsMax; for (const k of o.cells) { m.tiles[k] = T.BARRI; m.hp[k] = 100; game.changed.add(k); } }
-  const ps = people(game);
+  const ps = everyone(game);
   ps.forEach((p, i) => {
     p.lobbySq = p.squad; p.squad = 0; p.kills = 0; p.deaths = 0; p.ms = game.blankMatchStats(); p.locked = true;
     p.zb = { pts: ZB.start, earned: 0, kills: 0, heads: 0, downs: 0, revives: 0, perks: [], boardPts: 0 };
@@ -133,7 +134,7 @@ function field(game) {
 export function zbTick(game, dt) {
   const Zs = game.zb; if (!Zs || game.phase !== PHASE.ACTION || Zs.over) return;
   if (game.time - Zs.fieldT > 0.4) field(game);
-  const ps = people(game), zs = zombies(game);
+  const ps = people(game).filter(p => p.zb), zs = zombies(game);
   // health comes back after a few quiet seconds
   for (const p of ps) if (p.alive && !p.downed && p.hp < p.maxHp && game.time - (p.lastHurt || 0) > ZB.regen) p.hp = Math.min(p.maxHp, p.hp + ZB.regenRate * dt);
   // SECOND WIND alone: back up by yourself after a moment
@@ -167,9 +168,10 @@ export function zbTick(game, dt) {
 
 function nextRound(game) {
   const Zs = game.zb; Zs.round++; game.round = Zs.round;
-  const ps = people(game);
+  const ps = everyone(game);
   Zs.left = roundSize(Zs.round, ps.length); Zs.spawnT = 2; Zs.drops = 0;
-  for (const p of ps) p.zb.boardPts = 0;
+  for (const p of ps) if (p.zb) p.zb.boardPts = 0;
+  for (const [i, p] of ps.entries()) if (!p.zb) { p.lobbySq = p.squad; p.squad = 0; p.ms = game.blankMatchStats(); p.zb = { pts: ZB.start, earned: 0, kills: 0, heads: 0, downs: 0, revives: 0, perks: [], boardPts: 0 }; zbSpawnPerson(game, p, i); game.msg(`${p.name} joins the fight`); } // joined mid-game
   for (const [i, p] of ps.entries()) if (!p.alive) { zbSpawnPerson(game, p, i); game.msg(`${p.name} is back`); }
   for (const p of ps) if (p.alive && p.downed) zbUp(game, p);
   if (Zs.round > 1) for (const p of ps) if (p.alive) p.gadgetCount = Math.min(ZB.nadesMax, (p.gadgetCount || 0) + 2);
@@ -199,6 +201,13 @@ function spawnZombie(game) {
   return true;
 }
 
+function respawnZombie(game, z) {
+  const m = game.map, list = m.zombies.spawns.filter(s => s.wake.some(w => game.zb.open.has(w)));
+  const ps = people(game).filter(p => p.alive);
+  const ok = list.filter(s => !ps.some(p => floorAt(m, s.x, s.y) === floorAt(m, p.x, p.y) && Math.hypot(s.x - p.x, s.y - p.y) < 500 && los(m, s.x, s.y, p.x, p.y)));
+  const s = (ok.length ? ok : list)[Math.floor(Math.random() * (ok.length || list.length))]; if (!s) return;
+  const pos = game.freeSpotNear(s.x, s.y, 30); z.x = pos.x; z.y = pos.y; z.vx = z.vy = 0; z.vault = null;
+}
 // ---------------- a zombie's brain ----------------
 export function zombieThink(game, z, dt) {
   const inp = { up: 0, down: 0, left: 0, right: 0, walk: z.zspeed === 'walk' ? 1 : 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0, sprint: 0 };
@@ -216,7 +225,9 @@ export function zombieThink(game, z, dt) {
     }
     go(inp, z.aim, z); return;
   }
-  if (!d || d[k] >= 1e9) { ai.wT = (ai.wT || 0) - dt; if (ai.wT <= 0) { ai.wT = 2; ai.wa = Math.random() * 6.28; } go(inp, ai.wa, z); inp.walk = 1; return; }
+  // stuck (no closer for 20 s, nobody in sight of it): it comes back in at a spawn, as in that game
+  if (d && d[k] < 1e9) { if (!(d[k] >= (ai.bestD ?? 1e9))) { ai.bestD = d[k]; ai.bestT = game.time; } else if (game.time - (ai.bestT ?? game.time) > 20) { ai.bestD = 1e9; ai.bestT = game.time; respawnZombie(game, z); return; } }
+  if (!d || d[k] >= 1e9) { ai.wT = (ai.wT || 0) - dt; ai.lostT = (ai.lostT || 0) + dt; if (ai.lostT > 20) { ai.lostT = 0; respawnZombie(game, z); return; } if (ai.wT <= 0) { ai.wT = 2; ai.wa = Math.random() * 6.28; } go(inp, ai.wa, z); inp.walk = 1; return; }
   let best = -1, bd = d[k];
   const x = k % W;
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
@@ -488,4 +499,14 @@ export function zbInfo(game) {
     fo: F ? [F.ready ? 1 : 0, F.w, F.by, r1((F.ready ? F.until : F.t) - t)] : undefined,
     b: Zs.betweenT > 0 ? r1(Zs.betweenT) : 0, wb: Zs.boards, pu: Zs.pows.map(u => [u.id, u.k, r1(u.x), r1(u.y), r1(u.until - t)]),
     ik: left(Zs.insta), dp: left(Zs.double), fs: left(Zs.firesale), qr: Zs.qrUses };
+}
+
+// screenshot tests only (server started with R62D_FAST): points, a power-up at your feet, power on, go down, move
+export function zbDev(game, p, m) {
+  const Zs = game.zb; if (!Zs || !p.zb) return;
+  if (m.a === 'pts') p.zb.pts += +m.n || 0;
+  if (m.a === 'pow' && POWERUPS.includes(m.k)) Zs.pows.push({ id: Zs.nid++, k: m.k, x: p.x + 30, y: p.y, until: game.time + ZB.dropLife });
+  if (m.a === 'power') Zs.power = true;
+  if (m.a === 'down') { p.downed = true; p.downT = game.time; zbDown(game, p); }
+  if (m.a === 'tp') { p.x = +m.x; p.y = +m.y; }
 }
