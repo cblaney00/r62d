@@ -2499,3 +2499,56 @@ function proAct(game, p, inp, dt, team) {
   if (!roaming && !rot && !ai.offF) { ai.offF = 1; feat(p, 'offAngle'); } // the plan's holds are the off-angles on the ways in (siteIntel)
   watch(rot ? rot.w.pos : j.watch, !roaming); return true;
 }
+
+// FUN MODES (server/arena.js): bots hunt. They fight whoever they see (same reaction and aim as their rank), knife when
+// that's all they have (or the target is close in One in the Chamber), otherwise head for the nearest enemy they
+// heard or, now and then, any enemy on the map (people in these modes come to the fight), and wander when alone.
+export function arenaThink(game, p, dt) {
+  const ai = p.ai, inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
+  p.input = inp;
+  if (!p.alive || p.ctrl !== 'body') return;
+  const S = skill(game, p), A = game.arena, gun = p.guns[p.slot];
+  const knifeOnly = !gun || (gun.ammo === 0 && gun.reserve === 0 && !(p.reloadT > 0)) || (p.ar && (p.ar.infected || p.ar.knife));
+  // hearing: shots and footsteps of anyone not on our side
+  const team = game.side(p);
+  for (const n of game.noises || []) {
+    if (n.team === team || game.time - n.t > 1.5 || (ai.heard && ai.heard.t >= n.t)) continue;
+    if (Math.hypot(n.x - p.x, n.y - p.y) < n.r * EAR[lvlOf(game, p)] && floorAt(game.map, n.x, n.y) === floorAt(game.map, p.x, p.y)) ai.heard = { x: n.x, y: n.y, t: game.time };
+  }
+  const enemy = visibleEnemy(game, p, S.see);
+  if (enemy) {
+    const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
+    if (ai.seen !== enemy.id) { ai.seen = enemy.id; ai.seenT = game.time; ai.react = -S.react - Math.random() * S.reactX; ai.err = (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.4) * S.err; }
+    ai.react += dt; ai.err *= Math.exp(-dt * S.settle); ai.err += (Math.random() - 0.5) * dt * 0.6 * (S.shake ?? 1);
+    const want = Math.atan2(enemy.y - p.y, enemy.x - p.x) + ai.err;
+    turnTo(p, want, S.turn, dt);
+    p.aimX = p.x + Math.cos(p.aim) * d; p.aimY = p.y + Math.sin(p.aim) * d;
+    ai.hunt = { x: enemy.x, y: enemy.y };
+    const close = d < 26;
+    if (knifeOnly || (A.mode === 'oitc' && d < 60)) { // run them down and swing
+      if (close) { p.aim = Math.atan2(enemy.y - p.y, enemy.x - p.x); game.event(p, { k: 'melee' }); }
+      else moveTo(game, p, inp, enemy, dt);
+      if (!knifeOnly && d > 40) inp.walk = 0;
+      return;
+    }
+    if (gun.ammo === 0) { game.startReload(p); return; }
+    inp.ads = d > 90 ? 1 : 0;
+    if (ai.react > 0 && Math.abs(angDiff(want, p.aim)) < S.tol) shootInput(inp, ai, gun);
+    ai.strafeT = (ai.strafeT || 0) - dt;
+    if (ai.strafeT <= 0) { ai.strafeT = 0.5 + Math.random(); ai.strafe = Math.random() < 0.5 ? (Math.random() < 0.5 ? -1 : 1) : 0; }
+    if (ai.strafe) { const sa = p.aim + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); inp.walk = 1; }
+    else if (d > 200) { setDir(inp, Math.cos(p.aim), Math.sin(p.aim)); inp.walk = 1; }
+    return;
+  }
+  ai.seen = null;
+  if (gun && gun.ammo < WEAPONS[gun.w].mag && gun.reserve > 0 && !(p.reloadT > 0)) game.startReload(p);
+  // where to go: something heard, else every ~8 s a fresh enemy to hunt (the nearest, sometimes another), else a wander
+  if (ai.heard && game.time - ai.heard.t < 6) ai.hunt = { x: ai.heard.x, y: ai.heard.y };
+  if (!ai.hunt || game.time > (ai.huntT || 0) || Math.hypot(ai.hunt.x - p.x, ai.hunt.y - p.y) < 30) {
+    ai.huntT = game.time + 6 + Math.random() * 5;
+    const foes = [...game.players.values()].filter(q => q.alive && q !== p && game.side(q) !== team).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+    const q = foes.length ? foes[Math.random() < 0.7 ? 0 : Math.floor(Math.random() * foes.length)] : null;
+    ai.hunt = q ? { x: q.x + (Math.random() - 0.5) * 120, y: q.y + (Math.random() - 0.5) * 120 } : roomPoint(game, game.map.rooms[Math.floor(Math.random() * game.map.rooms.length)]);
+  }
+  if (ai.hunt) moveTo(game, p, inp, ai.hunt, dt);
+}

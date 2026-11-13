@@ -1201,3 +1201,6 @@ html.tv canvas#game { cursor: default; }
 #tipNow { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); max-width: min(760px, 80vw); text-align: center; pointer-events: none;
   font: 600 16px var(--body); color: #f4e6bf; background: rgba(10,12,16,0.62); border-left: 3px solid var(--gold); padding: 7px 14px; text-shadow: 0 1px 2px #000; }
 #tipNow.hidden { display: none; } #tipNow kbd { font: 700 13px var(--head); background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); padding: 0 5px; margin: 0 2px; color: #fff; }
+
+/* FUN MODES: guns and knives only */
+html.arena #gadgets, html.arena #cambar, html.arena #allies, html.arena #compass { display: none !important; }

@@ -1230,6 +1230,8 @@ function renderLobby(s) {
   setText('hostCode', u ? 'CODE ' + showCode(u.code) : 'Let friends join');
   if ($('joinAddr').textContent !== jt) $('joinAddr').textContent = jt;
   for (const b of ['lanBtn', 'pLan']) $(b).classList.toggle('hidden', !!(st.addr && st.addr.local)); // the program's PLAY: this computer only, nobody to invite
+  { const ffa = MODES[s.md] && MODES[s.md].kind === 'arena'; // fun modes pick their own sides: the two lists are just players
+    setText(document.querySelector('#sq0 h3'), ffa ? 'PLAYERS' : 'TEAM ALPHA'); setText(document.querySelector('#sq1 h3'), ffa ? 'PLAYERS' : 'TEAM BRAVO'); }
   for (const sq of [0, 1]) {
     const ul = document.querySelector(`#sq${sq} ul`);
     const list = s.players.filter(p => p.sq === sq);
@@ -1462,7 +1464,7 @@ function drawOutWarn(s, me) {
 }
 function drawCompass(s, me, now) {
   const box = $('compass');
-  const show = fxOn('compass') && s && me && me.a && s.ph === PHASE.ACTION && (me.tm === 'def' || s.rev) && !st.tutorialHideCompass && st.map && st.map.sites[s.site];
+  const show = fxOn('compass') && s && !s.ar && me && me.a && s.ph === PHASE.ACTION && (me.tm === 'def' || s.rev) && !st.tutorialHideCompass && st.map && st.map.sites[s.site];
   box.classList.toggle('hidden', !show);
   st.cmpDir = null;
   if (!show) return;
@@ -1568,7 +1570,7 @@ function showEnd(squad) {
   const me = st.me, won = me && me.sq === squad;
   const e = $('endscreen'); e.classList.remove('hidden');
   e.querySelector('.t').textContent = won ? 'VICTORY' : 'DEFEAT'; e.querySelector('.t').className = 't ' + (won ? 'win' : 'lose');
-  const sc = st.last.sc; e.querySelector('.s').textContent = me ? `${sc[me.sq]} — ${sc[1 - me.sq]}` : '';
+  const sc = st.last.sc; e.querySelector('.s').textContent = st.last.ar && st.last.ar.m !== 'infected' ? arenaPlace(st.last, me) : me ? `${sc[me.sq]} — ${sc[1 - me.sq]}` : '';
   e.querySelector('.board').innerHTML = scoreTable(st.last);
   audio.ui(won ? 'victory' : 'defeat');
   const mv = st.mvp;
@@ -1604,8 +1606,37 @@ async function playXp(m) {
   }
   updateCard();
 }
+// FUN MODES on screen (server/arena.js; players carry ar = [kills, lives, gun step, infected, out of lives])
+const AR_GUNS = ['k4', 'wasp', 'breaker', 'mule', 'longbow', 'rook', 'hornet', 'tusk', 'marten', 'ox', 'pike', 'sabre', 'javelin', 'anvil', 'vex50', 'p10']; // (the ladder in server/arena.js)
+function arenaRank(s) {
+  const m = s.ar.m, k = p => p.ar || [0, 0, 0, 0, 0];
+  const key = p => m === 'oitc' ? [k(p)[4] ? 0 : 1, k(p)[1], k(p)[0]] : m === 'gungame' ? [k(p)[2], k(p)[0], -p.d] : [k(p)[3] ? 0 : 1, k(p)[0], 0];
+  return [...s.players].sort((a, b) => { const x = key(a), y = key(b); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return y[i] - x[i]; return 0; });
+}
+function arenaPlace(s, me) { const r = arenaRank(s), i = me ? r.findIndex(p => p.id === me.id) : -1, n = ['1ST', '2ND', '3RD']; return i < 0 ? '' : `${n[i] || (i + 1) + 'TH'} OF ${r.length}`; }
+function arenaGun(lv) { const w = AR_GUNS[lv]; return w ? WEAPONS[w].name : 'KNIFE'; }
+function arenaObjective(s, me) {
+  const a = me.ar || [0, 0, 0, 0, 0], r = arenaRank(s), lead = r[0], m = s.ar.m;
+  if (m === 'oitc') return ['ONE IN THE CHAMBER', `Lives ${a[1]} · Kills ${a[0]} · ${s.players.filter(p => !(p.ar && p.ar[4])).length} still in · a hit or a knife kills, a kill gives a bullet`];
+  if (m === 'gungame') return [`GUN ${a[2] + 1} OF ${AR_GUNS.length + 1}: ${arenaGun(a[2]).toUpperCase()}`, `Kills ${a[0]} · Leader ${lead ? lead.n.replace(/^\[\w+\] /, '') + ' on gun ' + ((lead.ar || [0, 0, 0])[2] + 1) : '—'} · a knife kill sends them back a gun`];
+  const clean = s.players.filter(p => !(p.ar && p.ar[3])).length;
+  return a[3] ? ['INFECTED: CATCH THE SURVIVORS', `${clean} survivor${clean === 1 ? '' : 's'} left · knife them and they join you`] : ['SURVIVE', `${clean} survivor${clean === 1 ? '' : 's'} left · don't let the infected reach you`];
+}
+function arenaScores(s, me) {
+  const m = s.ar.m, a = me.ar || [0, 0, 0, 0, 0];
+  if (m === 'infected') { const inf = s.players.filter(p => p.ar && p.ar[3]).length; return [s.players.length - inf, inf]; }
+  const v = p => m === 'gungame' ? (p.ar || [0, 0, 0])[2] + 1 : (p.ar || [0])[0];
+  return [v(me), Math.max(0, ...s.players.filter(p => p.id !== me.id).map(v))];
+}
+function arenaTable(s) {
+  const me = st.me, m = s.ar.m, col = m === 'oitc' ? 'LIVES' : m === 'gungame' ? 'GUN' : 'STATUS';
+  const rows = arenaRank(s).map((p, i) => { const a = p.ar || [0, 0, 0, 0, 0], v = m === 'oitc' ? (a[4] ? 'OUT' : a[1]) : m === 'gungame' ? `${a[2] + 1} · ${esc(arenaGun(a[2]))}` : a[3] ? 'INFECTED' : 'SURVIVOR';
+    return `<tr class="${me && p.id === me.id ? 'ally me' : 'enemy'} ${p.a ? '' : 'dead'}"><td>${i + 1}. ${esc(p.n)}</td><td>${v}</td><td>${a[0]}</td><td>${p.d}</td><td>${p.b ? 'BOT' : p.ms != null ? p.ms + ' ms' : '…'}</td></tr>`; }).join('');
+  return `<table><tr><th>PLAYER</th><th>${col}</th><th>KILLS</th><th>DEATHS</th><th>PING</th></tr>${rows}</table>`;
+}
 function scoreTable(s) {
   const me = st.me;
+  if (s.ar) return arenaTable(s);
   const rows = [...s.players].sort((a, b) => (a.sq - b.sq) || ((b.sc || 0) - (a.sc || 0)) || (b.k - a.k)).map(p =>
     `<tr class="${me && p.sq === me.sq ? 'ally' : 'enemy'} ${p.id === s.you ? 'me' : ''} ${p.a ? '' : 'dead'}"><td>${esc(p.n)}</td><td>${p.op ? OPERATORS[p.op].name : '—'}</td><td>${p.sc || 0}</td><td>${p.k}</td><td>${p.d}</td><td>${p.b ? 'BOT' : p.ms != null ? p.ms + ' ms' : '…'}</td></tr>`).join('');
   return `<table><tr><th>PLAYER</th><th>OPERATOR</th><th>SCORE</th><th>KILLS</th><th>DEATHS</th><th>PING</th></tr>${rows}</table>`;
@@ -2268,7 +2299,7 @@ function draw(s, view, now, dt) {
   // objective
   if (inGame) {
     const site = m.sites[s.site];
-    if (side === 'def' || s.rev || !me) for (const b of site.bombs) if (!s.pl || s.pl.b !== b.id) drawBomb(ctx, b, now);
+    if (!s.ar && (side === 'def' || s.rev || !me)) for (const b of site.bombs) if (!s.pl || s.pl.b !== b.id) drawBomb(ctx, b, now);
     if (s.pl) {
       ctx.save(); ctx.translate(s.pl.x, s.pl.y);
       const pulse = (now * 2) % 1;
@@ -2561,7 +2592,7 @@ function draw(s, view, now, dt) {
       marker(e.x, e.y, 'D', '#f2c14e', view, 'DEFUSER', age < 4 ? 1.8 + 0.35 * Math.abs(Math.sin(age * 5)) : 1.2);
     }
     drawScanBlips(now);
-    if (!st.tv) deathMarks(view, now); // TV: the cards and kill feed already say who is down; no big marks over the action
+    if (!st.tv && !(st.last && st.last.ar)) deathMarks(view, now); // TV: the cards and kill feed already say who is down; no big marks over the action
     if (!st.tv) scopeGlare(s, side, now);
     st.foesSeen = drawn.filter(p => p.tm !== side); // (the red ! at the screen edge for off-screen enemies is gone: he asked for fewer alert marks)
     // Sounds you can't see (he asked: hearing someone must not tell you exactly where to shoot blindly): no arrows
@@ -2850,9 +2881,9 @@ function crosshair(me, now) {
     st.ptsPops.slice().reverse().forEach((q, i) => {
       const age = now - q.t, a = Math.min(1, age * 6) * Math.min(1, (2.4 - age) / 0.5), yy = y + (34 + i * 17) * DPR - Math.max(0, 0.15 - age) * 60 * DPR;
       ctx.globalAlpha = a; ctx.font = `700 ${(i ? 13 : 15) * DPR}px Barlow Condensed, sans-serif`;
-      const t = `${q.n > 0 ? '+' : ''}${q.n}  ${q.w}`;
+      const t = q.n ? `${q.n > 0 ? '+' : ''}${q.n}  ${q.w}` : q.w; // n 0: a note (fun modes: NEXT GUN, +1 BULLET)
       ctx.lineWidth = 3 * DPR; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(t, x, yy);
-      ctx.fillStyle = q.n > 0 ? '#f2c14e' : '#ff5a5a'; ctx.fillText(t, x, yy);
+      ctx.fillStyle = q.n >= 0 ? '#f2c14e' : '#ff5a5a'; ctx.fillText(t, x, yy);
     });
     ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic';
   }
@@ -2932,6 +2963,7 @@ function screens(s, phase, now) {
   countdown(s, phase);
   show('select', joined && phase === PHASE.SELECT && !st.tv);
   show('tvDraft', !!st.tv && joined && phase === PHASE.SELECT); document.documentElement.classList.toggle('tvsel', !!st.tv && phase === PHASE.SELECT);
+  document.documentElement.classList.toggle('arena', !!(s && s.ar)); // fun modes: no gadget slots, drone bar or team panel
   show('hud', joined && (phase === PHASE.PREP || phase === PHASE.ACTION || phase === PHASE.ROUND_END));
   show('endscreen', joined && (phase === PHASE.MATCH_END || st.forceEnd));
   show('leaveBtn', joined && phase !== PHASE.LOBBY);
@@ -2985,13 +3017,13 @@ function hud(s) {
   }).join('');
   const hs = st.tv ? 0 : me.sq, mine = s.players.filter(p => p.sq === hs), theirs = s.players.filter(p => p.sq !== hs);
   setHTML('tiL', icons(mine, true)); setHTML('tiR', icons(theirs, !!st.tv));
-  setText('scL', s.sc[hs]); setText('scR', s.sc[1 - hs]);
+  if (s.ar) { const [l, r] = arenaScores(s, me); setText('scL', l); setText('scR', r); } else { setText('scL', s.sc[hs]); setText('scR', s.sc[1 - hs]); }
   if (st.tv) TV.tvHud(s);
   const t = s.pl ? s.pl.t : s.tm;
   setText('time', s.fp && !s.pl ? '∞' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`);
   setCls($('time'), 'planted', !!s.pl);
-  setText('phase', s.pl ? 'DEFUSER' : s.fp ? 'FREE PLAY' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER');
-  setText('roundNo', s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `${s.ot ? 'OVERTIME · ' : ''}ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`);
+  setText('phase', s.ar ? 'FUN MODE' : s.pl ? 'DEFUSER' : s.fp ? 'FREE PLAY' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER');
+  setText('roundNo', s.ar ? (MODES[s.ar.m] || {}).name : s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `${s.ot ? 'OVERTIME · ' : ''}ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`);
   beginnerHelp(s, me, mine, theirs);
   // free play: which keys switch operator, and who you'd get
   $('freeHint').classList.toggle('hidden', !s.fp);
@@ -3015,6 +3047,7 @@ function hud(s) {
     if (me.df) sub = 'You are carrying the defuser';
     else { const c = s.players.find(p => p.df); sub = c ? `${c.n} has the defuser` : 'The defuser is on the ground'; }
   }
+  if (s.ar) [obj, sub] = arenaObjective(s, me);
   const fi = me.a && me.x !== undefined ? floorAt(st.map, st.pred.x, st.pred.y) : -1;
   const flName = fi >= 0 && st.map.floors.length > 1 ? st.map.floors[fi].name : '';
   setHTML('objective', `${esc(obj)}<small>${flName ? '<b class="flr">' + esc(flName) + '</b> ' : ''}${esc(sub)}${where ? ' · ' + esc(where) : ''}</small>`);
@@ -3024,6 +3057,7 @@ function hud(s) {
     setText('status', 'ELIMINATED'); $('br').style.visibility = 'hidden';
     setHTML('prompt', ''); $('progress').style.display = 'none';
     const mates = s.players.filter(p => p.a && p.sq === me.sq);
+    if (s.ar) setText('viewlabel', me.ar && me.ar[4] ? 'OUT OF LIVES · WATCHING' : 'BACK IN A MOMENT'); else
     setText('viewlabel', mates.length ? `SPECTATING ${mates[st.spect % mates.length].n.toUpperCase()} · CLICK TO SWITCH` : '');
     setCls($('kcBtn'), 'hidden', !st.killcam || !!st.tv); setHTML('kcBtn', `<b>${label('interact')}</b> WATCH KILLCAM`);
     const kc = st.killcam && !st.tv ? st.killcam : null;

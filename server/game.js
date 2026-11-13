@@ -5,8 +5,9 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatch
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
-import { defSetup, botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
+import { arenaThink, defSetup, botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
+import { arenaStart, arenaTick, arenaKill, arenaDamage, arenaSpeed, arenaEndMatch, arenaPlayer, arenaInfo } from './arena.js';
 import { MODES, CLASSIC, DEFAULT_MODE, attackSquad, roundsToWin, inOvertime } from '../shared/modes.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
@@ -180,9 +181,10 @@ export class Game {
   get ranked() { return !!this.rules.ranked; }
   set ranked(v) { this.mode = v ? 'ranked' : DEFAULT_MODE; }
   atkSquad(r = this.round) { return attackSquad(this.rules, r); }
-  side(p) { return p.squad === this.atkSquad() ? TEAM.ATK : TEAM.DEF; }
+  side(p) { if (this.arena) return this.arena.ffa ? 'f' + p.squad : p.squad === 0 ? TEAM.ATK : TEAM.DEF; return p.squad === this.atkSquad() ? TEAM.ATK : TEAM.DEF; } // fun modes: everyone for themselves = a side each (survivors attack, the infected defend)
 
   resetToLobby() {
+    if (this.arena) arenaEndMatch(this);
     this.phase = PHASE.LOBBY; this.timer = 0; this.round = 0; this.score = [0, 0];
     this.ents = []; this.planted = null;
     for (const p of this.players.values()) { p.alive = false; p.op = null; }
@@ -355,6 +357,7 @@ export class Game {
   startMatch() {
     if (this.players.size === 0) return;
     if (this.randomMap) { const list = MAP_LIST.filter(k => k !== this.mapId); this.mapId = list[Math.floor(Math.random() * list.length)]; this.map = buildMap(this.mapId); }
+    if (this.rules.kind === 'arena') { arenaStart(this); return; } // FUN MODES: one match of respawning action
     if (this.ranked) { this.rankedLevel(); for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); } // empty slots on both teams: bots at that rank
     assignPros(this); this.proState = {}; this.proLast = {}; this.proLog = [];
     this.score = [0, 0]; this.round = 0; // round 1: squad 0 attacks (the tutorial: you attack, then defend)
@@ -588,9 +591,10 @@ export class Game {
     // PREP / ACTION
     for (const p of this.players.values()) if (p.ms && p.alive) p.ms.playSeconds += dt;
     if (this.free) this.freeRespawns();
+    if (this.arena) arenaTick(this, dt);
     for (const p of this.players.values()) {
       this.by = this.side(p); // a bot's own work (boards, reinforcing in preparation) is its side's
-      if (p.bot && !p.hold) { botThink(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
+      if (p.bot && !p.hold) { (this.arena ? arenaThink : botThink)(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
       this.tickPlayer(p, dt);
       p.prevInput = p.input;
     }
@@ -609,6 +613,7 @@ export class Game {
   allLocked() { for (const p of this.players.values()) if (!p.locked && (p.bot || (p.sock && p.sock.open))) return false; return true; }
 
   checkWin() {
+    if (this.arena) return; // fun modes end in arenaTick
     const up = { atk: 0, def: 0 };
     for (const p of this.players.values()) if (p.alive && !p.downed) up[this.side(p)]++;
     // anyone left downed with no standing teammates bleeds out at once
@@ -645,6 +650,7 @@ export class Game {
     if (p.prep) mul *= p.prep.mode === 'place' ? 0 : 0.6; // setting something down: still; winding up a throw: slowed
     if (p.scanning) mul *= 0.6;
     if (this.time < (p.boostUntil || 0)) mul *= 1.25; // Adrenal Shot
+    if (this.arena) mul *= arenaSpeed(this, p); // the infected are quicker
     if (p.shrouded) mul *= 0.8;
     if (p.bipodSet) mul *= 0.15; // PERCH's bipod is down: you can only shuffle
     if (this.ghost(p)) mul *= 0.85; // STRIDER's Ghost Step: careful, slower steps (he asked: it was too strong)
@@ -1383,6 +1389,7 @@ export class Game {
     if (this.free && !q.bot && q.sock) return; // free play: god mode, nothing hurts you
     if (this.phase === PHASE.PREP && src && this.side(src) === this.side(q)) return; // no friendly fire (or hurting yourself) while setting up (he asked)
     if (this.tut && src && src.bot && !q.bot) return; // tutorial bots never hurt you (he asked)
+    if (this.arena) { amount = arenaDamage(this, q, amount, src, wname); if (amount <= 0) return; }
     amount = Math.round(amount);
     if (src && src.ms && src !== q && this.side(src) !== this.side(q)) src.ms.damage += Math.min(amount, Math.max(0, q.hp));
     if (src && src.sock) this.events.push({ e: 'hitmark', to: src.id, kill: false });
@@ -1392,7 +1399,7 @@ export class Game {
     q.hp -= amount;
     if (q.hp <= 0) {
       const up = [...this.players.values()].filter(o => o.alive && !o.downed && this.side(o) === this.side(q)).length;
-      if (!this.headshot && q.hp > -35 && up > 1 && this.phase === PHASE.ACTION) {
+      if (!this.headshot && q.hp > -35 && up > 1 && this.phase === PHASE.ACTION && !this.arena) { // (fun modes: no going down, straight out)
         if (src && src.ms && src !== q) src.ms.downs++;
         if (src && src !== q && this.side(src) !== this.side(q)) this.pts(src, 50, 'ENEMY DOWNED');
         q.downed = true; q.selfUp = 0; q.hp = DUR.bleedout; q.downedBy = src ? src.id : null; q.busy = null; q.ctrl = 'body';
@@ -1426,6 +1433,7 @@ export class Game {
     if (q.sock && q.sock.open && !this.tv) try { this.sendKillcam(q, src, wname); } catch (err) { console.log('killcam:', err.message); }
     if (this.tv && this.tv.socks.size && src && src !== q) this.tvKill(q, src, wname);
     const d = this.ent(q.droneId); if (d && this.phase === PHASE.PREP) this.removeEnt(d);
+    if (this.arena) arenaKill(this, q, src, wname);
   }
 
   // he asked: when the carrier goes down the defuser falls where everyone can tell; defenders are told too and see where
@@ -1694,6 +1702,7 @@ export class Game {
     const team = this.side(p);
     if (p.vault && e.k !== 'spot' && e.k !== 'view') return; // busy climbing
     if (p.staged && ['vault', 'melee', 'ability', 'gadget', 'reload'].includes(e.k)) return; // not on the map yet (he noticed shots before spawning)
+    if (this.arena && ['ability', 'gadget', 'drone', 'feeds', 'view', 'camNext', 'camPrev', 'camSet'].includes(e.k)) return; // fun modes: guns and knives only
     switch (e.k) {
       case 'vault': this.startVault(p, typeof e.a === 'number' && isFinite(e.a) ? e.a : p.aim); break;
       case 'reload': if (!p.downed && p.ctrl === 'body') this.startReload(p); else this.birdAuto(p); break; // on a landed bird: AUTO on/off
@@ -2560,6 +2569,7 @@ export class Game {
   }
   spot(team, id, dur) {
     const until = this.time + dur;
+    if (!this.spots[team]) return; // (fun modes: everyone for themselves has no team to tell)
     if ((this.spots[team].get(id) || 0) < until) this.spots[team].set(id, until);
   }
 
@@ -3134,7 +3144,7 @@ export class Game {
     const players = [...this.players.values()].map(p => {
       const g = p.guns[p.slot];
       const o = {
-        id: p.id, n: p.name, b: p.bot ? 1 : 0, sq: p.squad, tm: this.round ? this.side(p) : (p.squad === 0 ? 'atk' : 'def'),
+        id: p.id, n: p.name, b: p.bot ? 1 : 0, sq: p.squad, ar: this.arena ? arenaPlayer(this, p) : undefined, tm: this.round ? this.side(p) : (p.squad === 0 ? 'atk' : 'def'),
         op: p.op, a: p.alive ? 1 : 0, bt: p.bot ? 1 : undefined, rn: p.bot || !p.token ? undefined : rankOf(p.mmr), k: p.kills, d: p.deaths, sc: p.score || 0, ms: p.rtt,
       };
       if (p.alive) Object.assign(o, {
@@ -3188,7 +3198,7 @@ export class Game {
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, pp: this.map.peeps && this.map.peeps.length ? this.map.peeps : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
       site: this.site, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
-      tvl: this.tv ? this.botLevel : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
+      tvl: this.tv ? this.botLevel : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ar: arenaInfo(this), ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
       bq: (this.tv || this.rules.bans) && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, (this.banRun.t ?? this.time) - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, cb, hb, ev: this.events, spots, time: r2(this.time),
     });
