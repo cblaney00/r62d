@@ -779,6 +779,7 @@ function onEvent(e, s, players) {
       if (pos && v && (v.tm === mySide() || teamSees(pos.x, pos.y))) { st.corpses.push({ x: pos.x, y: pos.y, aim: pos.ag, op: v.op, w: pos.w, ally: v.tm === mySide(), ring: tvRing(v), n: v.n, t: performance.now() / 1000, zbc: !!(v.zb && v.zb[0] === 1), look: v.zb && v.zb[2] }); st.rend.pool(pos.x, pos.y); }
       if (!(v && v.zb && v.zb[0] === 1)) addKill(k, v, e.w, e.hs, e.df); // (zombies: no kill feed for every one of them)
       if (e.hs && k && k.id === st.id) audio.ui('headshot');
+      if (e.victim === st.id) st.killedBy = e.killer || null; // (free-for-all fun modes: who you watch while you wait to come back)
       break;
     }
     case 'down': { const v = players.get(e.id); if (v) addFeed(`${v.n} is down${e.df ? ' · DEFUSER DROPPED' : ''}`); break; }
@@ -1994,12 +1995,16 @@ function frame(nowMs) {
     else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: st.longV ? LONG_R : 1100, near: 26, kind: 'body', low: (st.pred.pr || 0) >= 1 }; } // you see from your (leaning) head
     if (view && view.kind === 'body' && me.ro && me.ro[0] && !me.ro[8] && st.map.ropes[me.ro[1]]) { const r = st.map.ropes[me.ro[1]]; view.ang = r.out; view.fov = Math.PI * 0.98; view.near = 6; } // on a rope, not level with a window: you see out, not in (he chose R6's rule)
   } else if (inGame && me) {
-    const mates = s.players.filter(p => p.a && p.sq === me.sq && p.id !== me.id);
+    let mates = s.players.filter(p => p.a && p.sq === me.sq && p.id !== me.id);
+    // free-for-all fun modes (One in the Chamber, Gun Game) have no teammates: watch whoever got you, else anyone still up,
+    // through their own eyes (with nobody to watch the whole map used to show, lit and far out: people looked tiny, he saw it)
+    if (!mates.length && s.ar) { const alive = s.players.filter(p => p.a && p.id !== me.id), k = alive.find(p => p.id === st.killedBy); mates = k ? [k] : alive; }
     if (mouse.wl > 0) { st.spect++; mouse.wl = 0; }
     if (mates.length) {
       const m = interp(mates[st.spect % mates.length].id, 'players');
       if (m) view = { x: m.x, y: m.y, ang: st.spAimS = smoothAng(st.spAimS, m.ag, dt), fov: fovFor(m), range: 1100, near: 26, kind: 'spect', name: m.n };
     }
+    if (!view && s.ar) view = { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: fovFor(me), range: 1100, near: 26, kind: 'spect' }; // nobody else up: your own eyes where you fell
   }
 
   if (st.tv && st.tv.overview) view = null; // the whole-map overview

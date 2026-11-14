@@ -213,6 +213,7 @@ export class Game {
       if (typeof m.rtt === 'number' && isFinite(m.rtt)) p.rtt = Math.max(0, Math.min(9999, Math.round(m.rtt)));
     } else if (m.t === 'ban') { this.playerBan(p, m.op); }
     else if (m.t === 'zbdev' && process.env.R62D_FAST) zbDev(this, p, m);
+    else if (m.t === 'dev' && m.a === 'die' && process.env.R62D_FAST && p.alive) this.kill(p, null, 'test'); // screenshot tests only: you die (fun-mode respawn checks)
     else if (m.t === 'tut') { if (this.tut) this.tutAction(p, m); }
     else if (m.t === 'free') { if (this.free) this.freeAction(p, m); }
     else if (m.t === 'lobby' && !this.tut && !this.free) {
