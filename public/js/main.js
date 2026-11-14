@@ -187,6 +187,7 @@ function wallHeld(q, now) {
   st.wallHold = { set, t: 0, at: now, pop: 0 };
 }
 const wallBlue = () => !!(st.wallHold && st.wallHold.t >= WALL_HOLD);
+const smokeCv = document.createElement('canvas'), SMOKE_DIV = 3, SMOKE_COL = '196,198,200'; // smoke grey // the smoke layer (draw)
 const GHOST_A = 0.38; // how strongly the people you see show through raised walls
 const BODY_CAP = 300; // world px: people stand up at most as tall as this far from the eye (he saw long stretched legs zoomed out)
 const EYE_BACK = 0.75, RAISE_H = 0.06; // RAISE_H: how much a wall (1 = 3.2 m) stands up per world px from the eye; // how far below the middle of the screen the eye sits, in view heights (draw())
@@ -2901,8 +2902,6 @@ function draw(s, view, now, dt) {
     drawOperator(ctx, { x: e.x, y: e.y, aim: e.ag, op: e.op, w: e.w, ally, ring: tvRing(e), walk: a.walk, legs: 1 }, now);
     ctx.globalAlpha = 1;
   }
-  for (const e of ents) if (e.ty === 'smoke') drawSmoke(ctx, e, now, gq.smoke);
-  for (const e of ents) if (e.ty === 'gascloud' && (e.tm === side || seen(e.x, e.y))) drawSmoke(ctx, { ...e, l: Math.min(e.l * 1.5, 12) }, now, Math.ceil(gq.smoke * 0.6), '150,200,70');
   fx.drawLights(ctx); tq = pfa('fx', tq);
 
   // --- line-of-sight blackout ---
@@ -2996,6 +2995,20 @@ function draw(s, view, now, dt) {
   // everything from here on goes on the top layer, above the blackout
   ctx = octx; overDirty = true;
   ctx.setTransform(TA, TB, TC, TD, ox, oy);
+  // smoke and gas, over the blackout (he said you couldn't see smoke at all: it blocks sight, so it always sat in the dark):
+  // every cloud you have a clear line to (walls block it, smoke doesn't), on your floor. All of it into one small layer
+  // (SMOKE_DIV smaller each way: many smokes lagged the game, each is ~50 big soft blobs) stretched on once.
+  if (inGame) { const vx = view ? view.x : st.cam.x, vy = view ? view.y : st.cam.y, vf = floorAt(st.map, vx, vy);
+    const clear = e => { if (st.tv || !view) return true; if (floorAt(st.map, e.x, e.y) !== vf) return false; const d = Math.hypot(e.x - vx, e.y - vy); return d < (e.r || 60) + 20 || castSight(st.map, vx, vy, Math.atan2(e.y - vy, e.x - vx), d, null) >= d - (e.r || 60) * 0.8; };
+    const sm = ents.filter(e => (e.ty === 'smoke' || (e.ty === 'gascloud' && (e.tm === side || seen(e.x, e.y)))) && clear(e));
+    if (sm.length) {
+      const D = SMOKE_DIV, w = Math.ceil(VW / D), h = Math.ceil(VH / D);
+      if (smokeCv.width !== w || smokeCv.height !== h) { smokeCv.width = w; smokeCv.height = h; }
+      const sc = smokeCv.getContext('2d'); sc.setTransform(1, 0, 0, 1, 0, 0); sc.clearRect(0, 0, w, h); sc.globalAlpha = 1;
+      sc.setTransform(TA / D, TB / D, TC / D, TD / D, ox / D, oy / D);
+      for (const e of sm) if (e.ty === 'smoke') drawSmoke(sc, e, now, gq.smoke, SMOKE_COL); else drawSmoke(sc, { ...e, l: Math.min(e.l * 1.5, 12) }, now, Math.ceil(gq.smoke * 0.6), '150,200,70');
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(smokeCv, 0, 0, w * D, h * D); ctx.restore();
+    } }
   if (st.floorRect && !st.belowOut) { // hide the neighbouring floors that sit beside this one in the map grid (the fog step covers them with the ground below)
     const [a, b, c, d] = st.floorRect;
     ctx.fillStyle = '#050607';
