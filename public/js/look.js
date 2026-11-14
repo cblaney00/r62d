@@ -3,7 +3,7 @@
 // camera (parallax), and a camera tilt — a slight fixed angle plus a lean with your movement and a kick on shots/blasts.
 // Everything here is cheap for the graphics card: the light is drawn once with the map, the walls are plain canvas
 // fills and copies of the map picture, and the tilt is one CSS transform the browser applies to the world layers.
-import { CELL, T, MAT, FL } from '/shared/constants.js';
+import { CELL, T, MAT, FL, CELL_HP } from '/shared/constants.js';
 import { cellBelow, cellAbove } from '/shared/map.js';
 
 export const looks = { light: true }; // switched by Settings → Screen → Room lighting (main.js)
@@ -189,6 +189,17 @@ function topColour(m, k) {
   return mat === MAT.BRICK ? '#93503b' : '#d8d2c4';
 }
 const CH = 16;
+// Boards seen from the side (he asked 2026-11-14: in every view the boards show their three damage stages and the bullet
+// holes you can see through, like the map from above): the stage from the board's health (the map's own rule: whole,
+// cracked, splitting) and each hole in the cell as a point along the face, at a height of its own (from where it is)
+function boardLook(m, k, X, Y, dx, dy, f0, f) {
+  const hpF = m.hp ? m.hp[k] / CELL_HP[T.BARRI] : 1, st = hpF > 0.95 ? 0 : hpF > 0.5 ? 1 : 2, H = m.holes && m.holes[k], hl = [];
+  if (H) for (let i = 0; i < H.length; i += 2) {
+    const t = dx ? (H[i + 1] - Y) / CELL : (H[i] - X) / CELL, fr = Math.abs(Math.sin(H[i] * 12.9898 + H[i + 1] * 78.233) * 43758.5453) % 1;
+    hl.push([Math.max(0.06, Math.min(0.94, t)), f0 + (f - f0) * (0.2 + 0.6 * fr)]);
+  }
+  return { st, hl: hl.length ? hl : null };
+}
 // a table, desk, bench or railing on legs (FURN 'legs'): a soft shadow on the floor under it (it covers the flat picture of
 // it there), a leg at each corner up to the underside of the top, and the top's thin edge; the top itself is the picture
 function legsOf(P, f, G, x, y) {
@@ -281,10 +292,12 @@ function block(R, m, bx, by) {
         if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f || (m.openId[n] === oi && oi >= 0)) continue; // against the wall, or more of the same opening
         const ins = thinOpen(m, n) ? WALL_INS : 0, ex = dx > 0 ? X + CELL - ins : X + ins, ey = dy > 0 ? Y + CELL - ins : Y + ins; // (as thin as the wall)
         const d = base === BRICK ? 'b' : base[0] === 122 ? 'w' : base[0] === 176 ? 's' : 'p';
-        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0, x, y, c: col(lt), d, e: isOut(m, n) });
-        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0, x, y, c: col(lt), d, e: isOut(m, n) });
+        const bd = d === 'w' ? boardLook(m, k, X, Y, dx, dy, f0, f) : null; // (boards: their damage stage and bullet holes, as on the map)
+        const lt2 = bd ? lt * (1 - 0.12 * bd.st) : lt; // (cracked boards a little darker)
+        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0, x, y, c: col(lt2), d, e: isOut(m, n), st: bd && bd.st, hl: bd && bd.hl });
+        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0, x, y, c: col(lt2), d, e: isOut(m, n), st: bd && bd.st, hl: bd && bd.hl });
       }
-      if (!tc && base[0] === 122 && !door) { out[0].tops.push({ x, y, n: 1, f, g: 0 }); continue; } // window boards: their top from the map picture (planks, cracks, holes), so a boarded window shows from anywhere (he saw them only close up)
+      if (!tc && base[0] === 122) { out[0].tops.push({ x, y, n: 1, f, g: 0, under: true }); continue; } // boards (window or doorway): their top from the map picture (planks, cracks, holes), drawn under the see-through wall above, so they show from anywhere (he saw window boards only close up)
       if (tc) { const iN = thinOpen(m, k - W) ? WALL_INS : 0, iS = thinOpen(m, k + W) ? WALL_INS : 0, iW = thinOpen(m, k - 1) ? WALL_INS : 0, iE = thinOpen(m, k + 1) ? WALL_INS : 0;
         out[0].tops.push({ x, y, n: 1, f, g: 0, tc: lintel ? hexA(tc, DOOR_TOP_A) : tc, low: f < 0.99, iN, iS, iW, iE }); }
     }
@@ -379,7 +392,7 @@ export function seenGrid(polys, m, spots = []) {
 // distance from the eye (BAND world px), each with its tall things and its walls; the storeys below (fac) and above (up)
 // apart. Each holds everything (for the greyed copy) and, when seen is given, only the pieces whose own spot is seen.
 const BAND = 48;
-const coll = () => ({ paths: new Map(), lowTops: new Map(), topPaths: new Map(), tops: [], dark: null, light: null, glint: null, n: 0 });
+const coll = () => ({ paths: new Map(), lowTops: new Map(), topPaths: new Map(), tops: [], under: [], holes: null, dark: null, light: null, glint: null, n: 0 });
 export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false, seen = null, spots = null) { // spots: round areas (world px) whose outside wall pieces show whole (the wall a climber hangs on) // above: also the storeys over this floor (rope camera)
   const K = kept(R, m), cx = cam.x, cy = cam.y, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
   x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W - 1, x1); y1 = Math.min(m.H - 1, y1);
@@ -395,9 +408,10 @@ export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false, seen = 
     const [ux, uy] = up(F.ax, F.ay, F.f), [vx, vy] = up(F.bx, F.by, F.f);
     if (F.f0) { const [a1, b1] = up(F.ax, F.ay, F.f0), [a2, b2] = up(F.bx, F.by, F.f0); p.moveTo(a1, b1); p.lineTo(a2, b2); } else { p.moveTo(F.ax, F.ay); p.lineTo(F.bx, F.by); } p.lineTo(vx, vy); p.lineTo(ux, uy); p.closePath(); // (a piece off the floor, like a window's lintel, starts at f0)
     if (F.d) deco(G, F, up); G.n++;
+    if (F.hl) { const P = G.holes || (G.holes = new Path2D()); for (const [t, z] of F.hl) { const [hx, hy] = up(F.ax + (F.bx - F.ax) * t, F.ay + (F.by - F.ay) * t, z); P.moveTo(hx + 0.9, hy); P.arc(hx, hy, 0.9, 0, 6.3); } }
   };
   const addTop = (G, r) => {
-    if (!r.tc) { G.tops.push(r); G.n++; return; }
+    if (!r.tc) { (r.under ? G.under : G.tops).push(r); G.n++; return; } // (under: below the wall tops, e.g. boards under a window's see-through lintel)
     const TP = r.low ? G.lowTops : G.topPaths; // a sill's top: under the faces of what stands above it
     let T2 = TP.get(r.tc); if (!T2) TP.set(r.tc, T2 = { p: null, r: [] });
     const sc = 1 + h * r.f;
@@ -459,6 +473,11 @@ function deco(G, F, up) {
     line(G.dark, 0.5, z0, 0.5, z1); line(G.glint, 0.15, z0 + (z1 - z0) * 0.2, 0.55, z0 + (z1 - z0) * 0.9);
   } else if (F.d === 'w') { // boards across a window or door: the gaps between them
     const n = Math.min(4, Math.floor(tall / 3)); for (let i = 1; i < n; i++) { const z = z0 + (z1 - z0) * i / n; line(G.dark, 0, z, 1, z); }
+    if (F.st && tall > 4) { // cracked (stage 1) or splitting (stage 2), as on the map: cracks from the middle, longer and branching
+      const zm = (z0 + z1) / 2, hz = (z1 - z0) / 2, k = F.st === 1 ? [[0.5, 0, 0.3, 0.6], [0.5, 0, 0.68, -0.5]] : [[0.5, 0, 0.12, 0.9], [0.5, 0, 0.86, -0.85], [0.5, 0, 0.3, -0.7], [0.5, 0, 0.75, 0.75], [0.3, 0.6, 0.18, 0.95]];
+      for (const [t0, a0, t1, a1] of k) line(G.dark, t0, zm + hz * a0, t1, zm + hz * a1);
+      if (F.st === 2) { line(G.dark, 0.46, zm - hz * 0.15, 0.54, zm + hz * 0.15); line(G.dark, 0.54, zm - hz * 0.15, 0.46, zm + hz * 0.15); } // the snapped middle
+    }
   } else if (F.d === 'o' && tall > 4) { line(G.light, 0.04, z0, 0.04, z1); line(G.light, 0.96, z0, 0.96, z1); line(G.light, 0.04, z1, 0.96, z1); } // a doorway: its frame
 }
 // Draw a raisedFrame. which: 'all' (everything, the greyed copy), 'lit' (the seen pieces of this floor, far to near;
@@ -470,6 +489,9 @@ function drawColl(ctx, G, pic, R, h, up, plain) {
   for (const [c, T2] of G.lowTops) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); }
   for (const [c, p] of G.paths) { ctx.fillStyle = c; ctx.fill(p); }
   if (G.dark && !plain) { ctx.lineWidth = 0.6; ctx.strokeStyle = 'rgba(20,16,14,0.32)'; ctx.stroke(G.dark); ctx.strokeStyle = 'rgba(235,228,214,0.32)'; ctx.stroke(G.light); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(210,230,250,0.22)'; ctx.stroke(G.glint); }
+  if (G.holes) { ctx.fillStyle = 'rgba(9,7,5,0.95)'; ctx.fill(G.holes); if (!plain) { ctx.lineWidth = 0.4; ctx.strokeStyle = 'rgba(230,190,130,0.55)'; ctx.stroke(G.holes); } } // bullet holes in boards: dark punctures with a splintered light rim (you see and shoot through them, as on the map)
+  const picTop = r => { const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f; pic.drawTo(ctx, X * S, Y * S, w * S, CELL * S, tx, ty, w * s, CELL * s); };
+  for (const r of G.under) picTop(r); // boards in windows and doorways: under the (see-through) wall above them
   for (const [c, T2] of G.topPaths) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); } // wall tops: plain colour
   for (const r of G.tops) { // cars, crates, shelves: their tops from the map picture
     const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f;
