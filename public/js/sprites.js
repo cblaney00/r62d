@@ -272,8 +272,15 @@ function pantsOf(op, u) {
 }
 // Stacked from the floor (z 0) to the hips (z 0.29): at the bottom two soft blobs at the feet, which slide in and swell
 // into one wide hip shape higher up. Walking only rocks the feet blobs gently forward and back (no knees, no kick).
+// how far the hips sit to the side (body frame, + right): leaning, they shift the other way to keep the weight over the
+// feet; walking, they sway over the foot that carries the weight (he asked 2026-11-14: real biomechanics, even for these legs)
+export function hipShift(p) {
+  if (p.prone || p.slide || p.downed) return 0;
+  const L = Math.max(-1, Math.min(1, p.lean || 0)), mv = Math.min(1.1, p.legs ?? 1);
+  return -L * 1.5 + (p.hang ? 0 : -Math.sin(p.walk || 0) * 0.6 * mv * (p.crouch ? 0.5 : 1));
+}
 function lowerBody(ctx, p, col, LZ, bw) {
-  const walk = p.walk || 0, mv = Math.min(1.1, p.legs ?? 1), cr = !!p.crouch && !p.prone, sw = Math.sin(walk);
+  const walk = p.walk || 0, mv = Math.min(1.1, p.legs ?? 1), cr = !!p.crouch && !p.prone, sw = Math.sin(walk), L = Math.max(-1, Math.min(1, p.lean || 0)), hs = hipShift(p);
   if (p.prone || p.slide) { // lying (or sliding feet first): one long low shape
     const dir = p.slide ? 1 : -1, len = p.slide ? 14 : 15, k = p.prone ? Math.sin(walk) * 1.2 * mv : 0;
     for (let i = 0; i < 3; i++) { const [lx, ly] = LZ(i * 0.03); ctx.fillStyle = shade(col, 0.75 + i * 0.12); ctx.beginPath(); ctx.ellipse(dir * len * 0.5 + lx + k * 0.3, ly / bw, len * 0.62, 4.6, 0, 0, 7); ctx.fill(); }
@@ -282,6 +289,8 @@ function lowerBody(ctx, p, col, LZ, bw) {
   }
   const stride = sw * (cr ? 1.8 : 3.4) * mv, side = cr ? 4.4 : 4.2;
   const feet = p.hang ? [[3.6, 3.4], [3.2, -3.6]] : cr ? [[4.5 + stride * 0.4, side], [1.5 - stride * 0.4, -side]] : [[stride, side], [-stride, -side]];
+  if (L && !p.hang) for (const ft of feet) { if (Math.sign(ft[1]) === Math.sign(L)) { ft[1] += L * 2.4; ft[0] += Math.abs(L) * 1.2; } else ft[1] += L * 0.5; } // leaning: step out that way, push off the other foot
+  else if (L && p.hang) for (const ft of feet) ft[1] -= L * 1.5; // on a rope: the feet walk the wall the other way to push the body out
   const lift = (x, y, z) => { const [lx, ly] = LZ(z); return [x + lx, y + ly / bw]; };
   // the leg further from the eye first, so the nearer one covers it
   const away = LZ(1); feet.sort((a, b) => (b[0] * away[0] + b[1] * away[1]) - (a[0] * away[0] + a[1] * away[1]));
@@ -289,10 +298,10 @@ function lowerBody(ctx, p, col, LZ, bw) {
     const lift2 = p.hang ? (fy > 0 ? 0.07 : 0.03) : cr ? 0.06 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) : 0.035 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) * mv; // the stepping foot comes off the floor a little
     const [bx0, by0] = lift(fx + 1, fy, lift2), [bx1, by1] = lift(fx + 1, fy, lift2 + 0.04);
     column(ctx, bx0, by0, 3, 2.2, bx1, by1, 2.8, 2.1, '#1c1b1a'); // boot
-    const hy = fy > 0 ? 2.6 : -2.6, [lx0, ly0] = lift(fx + 0.4, fy, lift2 + 0.035), [lx1, ly1] = lift(-1, hy, 0.27);
+    const hy = (fy > 0 ? 2.6 : -2.6) + hs, [lx0, ly0] = lift(fx + 0.4, fy, lift2 + 0.035), [lx1, ly1] = lift(-1, hy, 0.27);
     column(ctx, lx0, ly0, 2.3, 2.2, lx1, ly1, 3.2, 3, col); // trouser leg, baggy at the top
   }
-  const [hx0, hy0] = lift(-1, 0, 0.23), [hx1, hy1] = lift(-1, 0, 0.31);
+  const [hx0, hy0] = lift(-1, hs, 0.23), [hx1, hy1] = lift(-1, hs, 0.31);
   column(ctx, hx0, hy0, 4.4, 6.4, hx1, hy1, 5.2, 7.4, col); // hips and seat
 }
 export function drawOperator(ctx, p, t) {
@@ -339,12 +348,13 @@ export function drawOperator(ctx, p, t) {
   const sh = cr ? 0.93 : 1;
   if (persp.h) { // the body between the hips and the shoulders (what a tilted camera sees): belt, jacket, plate carrier
     const lift = (x, y, z) => { const [lx, ly] = LZ(z); return [x + lx, y + ly / bw]; };
-    let [a0, a1] = lift(-1, 0, 0.3), [b0, b1] = lift(-1, 0, 0.33);
+    const hs = hipShift(p), ls = Math.max(-1, Math.min(1, p.lean || 0)) * 5.5 / bw, at = z => hs + (ls - hs) * Math.max(0, (z - 0.31) / 0.14); // the spine bends from the hips to the leaning shoulders
+    let [a0, a1] = lift(-1, at(0.3), 0.3), [b0, b1] = lift(-1, at(0.33), 0.33);
     column(ctx, a0, a1, 5.2, 7.4, b0, b1, 5.3, 7.5, u.strap || '#2a2a2a'); // belt
-    [a0, a1] = lift(-1, 0, 0.32); [b0, b1] = lift(-1, 0, 0.44);
+    [a0, a1] = lift(-1, at(0.32), 0.32); [b0, b1] = lift(-1, at(0.44), 0.44);
     column(ctx, a0, a1, 5.4 * sh, 7.6 * sh, b0, b1, 6.6 * sh, 9.2 * sh, u.cloth); // jacket, wider at the shoulders
     if (VEST[p.op] === undefined || /carrier|heavy|medic|police|bomb/.test(String(VEST[p.op]))) {
-      [a0, a1] = lift(-0.8, 0, 0.335); [b0, b1] = lift(-0.8, 0, 0.43);
+      [a0, a1] = lift(-0.8, at(0.335), 0.335); [b0, b1] = lift(-0.8, at(0.43), 0.43);
       column(ctx, a0, a1, 5.7 * sh, 6.6 * sh, b0, b1, 5.9 * sh, 6.9 * sh, u.vest); // plate carrier
     }
     const [lx, ly] = LZ(0.45); ctx.translate(lx, ly / bw); // the top of the body at shoulder height
@@ -352,7 +362,7 @@ export function drawOperator(ctx, p, t) {
   if (p.slide) ctx.translate(-3, 0); // sliding: the body leans back behind the legs
   // ---- leaning (he asked): the legs stay planted, everything from the hips up tips to the side ----
   if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean));
-    ctx.fillStyle = u.cloth || '#333'; ctx.beginPath(); ctx.ellipse(0, L * 2.2, 3.2, 4 + Math.abs(L) * 2, 0, 0, 7); ctx.fill(); // the hips bend toward the lean
+    if (!persp.h) { ctx.fillStyle = u.cloth || '#333'; ctx.beginPath(); ctx.ellipse(0, L * 2.2, 3.2, 4 + Math.abs(L) * 2, 0, 0, 7); ctx.fill(); } // the hips bend toward the lean (straight down; tilted, the body columns bend)
     ctx.translate(0, L * 5.5 / bw); ctx.rotate(L * 0.14); }
   // ---- back gear ----
   const id = o.ability.id;
