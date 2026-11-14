@@ -4,7 +4,7 @@ import { MAPS, buildMap } from '../shared/map.js';
 import { T } from '../shared/constants.js';
 
 let bad = 0;
-for (const id of Object.keys(MAPS)) {
+for (const id of Object.keys(MAPS).filter(k => !MAPS[k].drill)) { // (the Drill Hall has no breakable walls on purpose)
   const m = buildMap(id);
   let soft = 0, hard = 0, holes = 0;
   for (let k = 0; k < m.W * m.H; k++) { if (m.tiles[k] === T.SOFT) soft++; if (m.hardened[k]) hard++; if (m.dhole[k]) holes++; }

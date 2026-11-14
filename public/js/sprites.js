@@ -4,7 +4,7 @@ import { shade } from './textures.js';
 import { COLS, rgba } from './teamcol.js';
 import { G } from './gunart.js';
 import { HEADGEAR, PACK, VEST } from './headgear.js';
-import { persp, liftOf, showcase } from './look.js';
+import { persp, liftOf, liftBody, showcase } from './look.js';
 const HAIR = ['#1b1512', '#3a2618', '#5a3a22', '#8a6a3a', '#c9a060', '#2a2a2a', '#6a2a1a', '#d8d2c4'];
 const hairOf = op => HAIR[(op.charCodeAt(0) * 7 + op.charCodeAt(op.length - 1) * 3 + op.length) % HAIR.length];
 
@@ -305,6 +305,7 @@ function lowerBody(ctx, p, col, LZ, bw) {
   const [hx0, hy0] = lift(-1, hs, 0.23), [hx1, hy1] = lift(-1, hs, 0.31);
   column(ctx, hx0, hy0, 4.4, 6.4, hx1, hy1, 5.2, 7.4, col); // hips and seat
 }
+const TILT = 0.42; // rad: a full lean on a rope turns the upper body this far round the hips
 export function drawOperator(ctx, p, t) {
   const o = OPERATORS[p.op]; if (!o) return;
   const u = curU = uniformOf(p.op, o.team), tc = SIDE_COL[o.team] || SIDE_COL.atk, acc = accentsOf(p.op);
@@ -326,8 +327,12 @@ export function drawOperator(ctx, p, t) {
   // Perspective (he asked 2026-11-14): the body is built in height layers that each show where their height puts them,
   // the walls' own rule (look.js persp), so it looks solid when the camera tilts. LZ(z): that lift in the body's frame.
   const zk = p.prone || p.slide || p.downed ? 0.18 : p.crouch && !hang ? 0.66 : 1, cA = Math.cos(bodyA), sA = Math.sin(bodyA);
-  const LZ = z => { if (!persp.h) return [0, 0]; const [wx, wy] = liftOf(p.x, p.y, (inv ? 0.6 - z : z) * zk + (p.zb || 0)); return [wx * cA + wy * sA, -wx * sA + wy * cA]; };
+  const LZ = z => { if (!persp.h) return [0, 0]; const [bx, by] = liftOf(p.x, p.y, p.zb || 0), [ux, uy] = liftBody(p.x, p.y, (inv ? 0.6 - z : z) * zk), wx = bx + ux, wy = by + uy; return [wx * cA + wy * sA, -wx * sA + wy * cA]; }; // (where they hang by the wall rule, their own height capped: liftBody)
   const pants = pantsOf(p.op, u);
+  // leaning on a rope (he asked 2026-11-14): seen from behind, the body tilts from the hips; it used to slide sideways off
+  // the legs. TILT: how far everything above the hips turns round the hip point at a full lean.
+  const Lr = Math.max(-1, Math.min(1, p.lean || 0)), tilt = hang && persp.h ? Lr * TILT : 0, tc0 = Math.cos(tilt), ts0 = Math.sin(tilt);
+  const hipOf = () => LZ(0.31), tiltPt = (x, y, hx, hy) => [hx + (x - hx) * tc0 - (y - hy) * ts0, hy + (x - hx) * ts0 + (y - hy) * tc0];
 
   if (p.downed) {
     { const [dx, dy] = LZ(0.3); ctx.translate(dx, dy); }
@@ -348,8 +353,9 @@ export function drawOperator(ctx, p, t) {
   lowerBody(ctx, p, pants, LZ, bw); // baggy dark trousers, stacked from the floor up to the hips
   const sh = cr ? 0.93 : 1;
   if (persp.h) { // the body between the hips and the shoulders (what a tilted camera sees): belt, jacket, plate carrier
-    const lift = (x, y, z) => { const [lx, ly] = LZ(z); return [x + lx, y + ly / bw]; };
-    const hs = hipShift(p), ls = Math.max(-1, Math.min(1, p.lean || 0)) * 5.5 / bw, at = z => hs + (ls - hs) * Math.max(0, (z - 0.31) / 0.14); // the spine bends from the hips to the leaning shoulders
+    const [hpx, hpy] = hipOf(), hip = [-1 + hpx, hpy / bw];
+    const lift = (x, y, z) => { const [lx, ly] = LZ(z), pt = [x + lx, y + ly / bw]; return tilt && z > 0.31 ? tiltPt(pt[0], pt[1], hip[0], hip[1]) : pt; };
+    const hs = tilt ? 0 : hipShift(p), ls = tilt ? 0 : Math.max(-1, Math.min(1, p.lean || 0)) * 5.5 / bw, at = z => hs + (ls - hs) * Math.max(0, (z - 0.31) / 0.14); // the spine bends from the hips to the leaning shoulders (on a rope: tilts, above)
     let [a0, a1] = lift(-1, at(0.3), 0.3), [b0, b1] = lift(-1, at(0.33), 0.33);
     column(ctx, a0, a1, 5.2, 7.4, b0, b1, 5.3, 7.5, u.strap || '#2a2a2a'); // belt
     [a0, a1] = lift(-1, at(0.32), 0.32); [b0, b1] = lift(-1, at(0.44), 0.44);
@@ -358,11 +364,12 @@ export function drawOperator(ctx, p, t) {
       [a0, a1] = lift(-0.8, at(0.335), 0.335); [b0, b1] = lift(-0.8, at(0.43), 0.43);
       column(ctx, a0, a1, 5.7 * sh, 6.6 * sh, b0, b1, 5.9 * sh, 6.9 * sh, u.vest); // plate carrier
     }
-    const [lx, ly] = LZ(0.45); ctx.translate(lx, ly / bw); // the top of the body at shoulder height
+    const [lx, ly] = LZ(0.45), [tx, ty] = tilt ? tiltPt(lx, ly / bw, hip[0] + 1, hip[1]) : [lx, ly / bw]; ctx.translate(tx, ty); // the top of the body at shoulder height
   }
   if (p.slide) ctx.translate(-3, 0); // sliding: the body leans back behind the legs
   // ---- leaning (he asked): the legs stay planted, everything from the hips up tips to the side ----
-  if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean));
+  if (tilt) ctx.rotate(tilt);
+  else if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean));
     if (!persp.h) { ctx.fillStyle = u.cloth || '#333'; ctx.beginPath(); ctx.ellipse(0, L * 2.2, 3.2, 4 + Math.abs(L) * 2, 0, 0, 7); ctx.fill(); } // the hips bend toward the lean (straight down; tilted, the body columns bend)
     ctx.translate(0, L * 5.5 / bw); ctx.rotate(L * 0.14); }
   // ---- back gear ----
@@ -393,9 +400,10 @@ export function drawOperator(ctx, p, t) {
 
   ctx.restore();
   if (p.slide) ctx.translate(-3, 0);
-  if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean)); ctx.translate(0, L * 5.5); ctx.rotate(L * 0.14); } // arms, gun and head lean with the torso
+  if (p.lean && !tilt) { const L = Math.max(-1, Math.min(1, p.lean)); ctx.translate(0, L * 5.5); ctx.rotate(L * 0.14); } // arms, gun and head lean with the torso
 
-  { const [lx, ly] = LZ(0.42); ctx.translate(lx, ly); } // arms and gun at chest height
+  if (tilt) { const [hx, hy] = hipOf(), [lx, ly] = LZ(0.42), [cx, cy] = tiltPt(lx, ly, hx, hy); ctx.translate(cx, cy); ctx.rotate(tilt); } // (on a rope: turned round the hips with the torso)
+  else { const [lx, ly] = LZ(0.42); ctx.translate(lx, ly); } // arms and gun at chest height
   if (hang) { // on a rope the harness takes the weight at the hip (he asked: no hands on the rope): a tether from a clip
     // at the front of the hips to the rope on the wall, then both hands on the gun, turned to the aim
     const [ax, ay] = LZ(0.42), [hx, hy] = LZ(inv ? 0.31 : 0.29), [wx, wy] = LZ(inv ? 0.1 : 0.62);

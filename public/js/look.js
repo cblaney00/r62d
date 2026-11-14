@@ -15,9 +15,15 @@ export const looks = { light: true }; // switched by Settings → Screen → Roo
 export const persp = { x: 0, y: 0, h: 0 };
 export function setPersp(eye, h) { persp.x = eye.x; persp.y = eye.y; persp.h = h; }
 export const liftOf = (x, y, z) => [(x - persp.x) * persp.h * z, (y - persp.y) * persp.h * z];
+// a body's own height (legs, torso, head): the same rule, but never as if further than persp.cap from the eye. Far from
+// the eye (zoomed out outside, or the camera leading ahead while you sprint toward the bottom of the screen) people
+// stood up two or three times taller than indoors: long, stretched legs (he saw it 2026-11-14). Walls, and things on
+// them, keep the full rule; main.js lifts the cap in the rope camera, where bodies standing tall is the point.
+persp.cap = Infinity;
+export function liftBody(x, y, z) { const dx = x - persp.x, dy = y - persp.y, d = Math.hypot(dx, dy), k = d > persp.cap ? persp.cap / d : 1; return [dx * persp.h * z * k, dy * persp.h * z * k]; }
 // draw something standing at (x, y) at height z: fn() in the world frame, moved where its height shows it
 // draw with a perspective of its own (menus, killcam, Armory: they must never take the match's leftover one), put back after
-export function withPersp(eye, h, fn) { const s = { x: persp.x, y: persp.y, h: persp.h }; setPersp(eye, h); try { return fn(); } finally { setPersp(s, s.h); } }
+export function withPersp(eye, h, fn) { const s = { x: persp.x, y: persp.y, h: persp.h }, cap = persp.cap; setPersp(eye, h); persp.cap = Infinity; try { return fn(); } finally { setPersp(s, s.h); persp.cap = cap; } } // (their own perspective: no body cap)
 // a showcase picture: seen from a little in front, so the body shows its height (Operators page, select cards)
 export const showcase = (x, y, fn) => withPersp({ x, y: y + 140 }, 0.055, fn);
 export function lifted(ctx, x, y, z, fn) { if (!persp.h || !z) { fn(); return; } const [dx, dy] = liftOf(x, y, z); ctx.save(); ctx.translate(dx, dy); fn(); ctx.restore(); }

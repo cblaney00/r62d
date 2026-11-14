@@ -1250,3 +1250,11 @@ html.tv .sc[data-tc] { background: var(--tc); color: #0b0e12; } /* TV: each team
 #bkPage .bkLog li { font-size: 13px; color: #b9c3cf; } #bkPage .bkLog small { color: var(--dim); margin-right: 6px; }
 #bkPage .bkPatch small { color: var(--dim); margin-right: 4px; }
 #playbookPage .pbTake { font-size: 17px; line-height: 1.4; font-style: italic; margin: 6px 0 10px; }
+
+/* the window helper (he asked 2026-11-14, in every mode, Ranked too): when Space takes you in through the window from a
+   rope (or out onto the rope from inside), a big gold badge says so; a grey one when you are close but not there yet */
+#winGo { position: absolute; left: 50%; top: 54%; transform: translateX(-50%); font: 800 22px var(--head); letter-spacing: 0.14em; padding: 8px 18px; border: 2px solid #f2c14e; color: #f2c14e; background: rgba(10,12,16,0.72); text-shadow: 0 2px 6px #000; pointer-events: none; white-space: nowrap; animation: winGoPulse 0.9s ease-in-out infinite alternate; }
+#winGo b { background: #f2c14e; color: #000; padding: 0 8px; margin-right: 10px; }
+#winGo.wait { border-color: rgba(255,255,255,0.35); color: #cfd6df; font-size: 16px; animation: none; }
+#winGo.wait b { background: rgba(255,255,255,0.8); }
+@keyframes winGoPulse { from { box-shadow: 0 0 0 rgba(242,193,78,0); } to { box-shadow: 0 0 22px rgba(242,193,78,0.55); } }

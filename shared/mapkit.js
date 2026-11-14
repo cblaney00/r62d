@@ -251,6 +251,20 @@ export function makeMap({ id, name, floors }) {
     }
   };
 
+  // No breakable wall beside a window (he asked 2026-11-14: cheesy wallbangs round the window's edge, from a rope or
+  // from inside): the JAMB wall cells along the wall on each side of every window become concrete, on every map.
+  const JAMB = 2;
+  const windowJambs = () => {
+    const make = k => { tiles[k] = T.HARD; mat[k] = MAT.CONCRETE; hp[k] = 0; hardened[k] = 1; };
+    for (let k = 0; k < N; k++) {
+      if (!win[k]) continue;
+      for (const d of [1, -1, W, -W]) {
+        let j = k + d; while (j >= 0 && j < N && win[j]) j += d;
+        for (let n = 0; n < JAMB && j >= 0 && j < N; n++, j += d) { if (tiles[j] === T.SOFT) make(j); else if (tiles[j] !== T.HARD && tiles[j] !== T.REINF) break; }
+      }
+    }
+  };
+
   // More windows into sites (he asked): every site room above the ground gets windows in its outside walls until it has
   // two (where a 2-cell window fits: a straight wall, clear floor inside, open ground / air / a balcony outside, away from
   // other doors, windows, stairs and corners). Basements have no outside. Same spots every round.
@@ -508,6 +522,7 @@ export function makeMap({ id, name, floors }) {
     }
     siteWindows(extra && extra.sites);
     hardenWalls(extra && extra.sites);
+    windowJambs();
     droneHoles();
     buildRoof();
     placeHatches(extra && extra.sites);

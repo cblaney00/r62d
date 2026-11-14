@@ -1,7 +1,7 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
 import { floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
-import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
+import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
@@ -717,7 +717,8 @@ export class Game {
       const v = p.vault; v.t += dt;
       const f = Math.min(1, v.t / v.dur), e = f * f * (3 - 2 * f);
       p.x = v.x0 + (v.x1 - v.x0) * e; p.y = v.y0 + (v.y1 - v.y0) * e; p.vx = p.vy = 0;
-      if (f >= 1 || p.downed) { p.vault = null; p.recoverUntil = this.time + VAULT_RECOVER; }
+      if (f >= 1 && v.rope !== undefined && !p.downed && this.map.ropes[v.rope]) { p.vault = null; p.rope = { st: 'hang', r: v.rope, h: 0.5 }; p.ropeHeld = true; this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id }); } // climbed out onto the rope, level with the window
+      else if (f >= 1 || p.downed) { p.vault = null; p.recoverUntil = this.time + VAULT_RECOVER; }
     }
     const team = this.side(p);
     const inp = p.input, prev = p.prevInput;
@@ -1661,6 +1662,17 @@ export class Game {
     }
     if (p.vault || p.downed || p.ctrl !== 'body' || p.busy || this.time < p.stunUntil || this.time < (p.clampUntil || 0)) return false;
     if (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK) return false;
+    { // an attacker just inside an upper window, facing out: out onto its rope, level with the window (boards smashed on the way)
+      const r = this.phase === PHASE.ACTION && this.side(p) === TEAM.ATK && !this.zb && !this.arena && ropeOutAt(this.map, p.x, p.y, ang);
+      if (r) {
+        if (r.cells.some(k => this.map.tiles[k] === T.BARRI)) { for (const k of r.cells) if (this.map.tiles[k] === T.BARRI) this.destroyCell(k); this.noise(p.x, p.y, this.side(p), 700); }
+        p.vault = { x0: p.x, y0: p.y, x1: r.hang.x, y1: r.hang.y, t: 0, dur: VAULT_TIME * 1.3, rope: r.i };
+        p.reloadT = 0; p.adsT = 0; p.scanning = false; p.bracing = false;
+        this.noise(p.x, p.y, this.side(p), 320);
+        this.events.push({ e: 'snd', s: 'vault', x: r1(p.x), y: r1(p.y), id: p.id });
+        return true;
+      }
+    }
     const to = findVault(this.map, p.x, p.y, ang);
     if (!to) return false;
     if (this.zb && zbBlocksVault(this, p, to)) return false; // ZOMBIES: people can't climb out of the windows

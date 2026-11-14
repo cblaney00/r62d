@@ -163,7 +163,7 @@ export function stepMove(map, o, input, dt, mods) {
   if (mods.rope) { // hanging on a rope outside a window: slide along the wall (he asked: outside-the-window play matters)
     const R = mods.rope; let s = (o.x - R.x) * R.tx + (o.y - R.y) * R.ty;
     const along = isFinite(input.rw) && input.rw ? Math.sign(input.rw) : mx * R.tx + my * R.ty; // rw: the 3D rope view's A/D (left/right along the wall as you face it)
-    s = Math.max(R.a, Math.min(R.b, s + along * M_S.rope * PX_PER_M * dt));
+    s = Math.max(R.a, Math.min(R.b, s + along * M_S.rope * PX_PER_M * dt * (input.sprint ? 1.6 : 1))); // (sprint: faster along the wall too, he asked)
     o.x = R.x + R.tx * s; o.y = R.y + R.ty * s; o.vx = 0; o.vy = 0;
     { const want = (input.lean | 0) * LEAN_PX; o.lo = o.lo || 0; o.lo += Math.max(-LEAN_SPEED * dt, Math.min(LEAN_SPEED * dt, want - o.lo)); } // leaning works on a rope too (he asked): peek round a window's edge
     return false;

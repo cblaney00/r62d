@@ -175,6 +175,19 @@ export const ropeS = (r, x, y) => (x - r.hang.x) * r.tx + (y - r.hang.y) * r.ty;
 export const ropeAtWindow = (r, x, y) => r.cells.length > 0 && Math.abs(ropeS(r, x, y)) <= r.half - 4;
 // where Space can take you in through a window (he asked 2026-11-14): only a narrow area right in front of it, so going in
 // without setting it up first is dangerous
+// Climbing OUT of an upper window onto its rope (he asked 2026-11-14: attackers plant, then get outside to some safety
+// and play by the window): standing just inside an open (or only boarded) window that has a rope, facing out of it.
+export function ropeOutAt(m, x, y, ang) {
+  let best = null, bd = CELL * 1.7;
+  for (const r of m.ropes || []) {
+    if (r.wall || !r.inside || !r.cells.length) continue;
+    const d = Math.hypot(r.inside.x - x, r.inside.y - y); if (d >= bd) continue;
+    if (Math.abs(angDiff(ang, r.out)) > 1.15) continue;
+    if (!r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE || m.tiles[k] === T.BARRI)) continue; // (not reinforced)
+    bd = d; best = r;
+  }
+  return best;
+}
 export const ropeVaultZone = (r, x, y) => r.cells.length > 0 && Math.abs(ropeS(r, x, y)) <= Math.min(r.half - 4, Math.max(5, r.half * 0.35));
 // Is this rope's window open enough to climb in (not boarded, reinforced or blocked)?
 export function ropeWindowOpen(m, r) { return r.cells.length > 0 && r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE); }

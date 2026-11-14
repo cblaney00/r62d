@@ -3,12 +3,13 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, persp, lifted, withPersp } from './look.js';
+import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, liftBody, persp, lifted, withPersp } from './look.js';
+const addL = (a, b) => [a[0] + b[0], a[1] + b[1]];
 import { S, setMapScale } from './textures.js';
 import { COLS, rgba, lighten, squadCol, setCols, SWATCHES, okHex, DEFAULT_COLS } from './teamcol.js';
 import { column, drawZombie, drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
@@ -186,6 +187,7 @@ function wallHeld(q, now) {
   st.wallHold = { set, t: 0, at: now, pop: 0 };
 }
 const wallBlue = () => !!(st.wallHold && st.wallHold.t >= WALL_HOLD);
+const BODY_CAP = 300; // world px: people stand up at most as tall as this far from the eye (he saw long stretched legs zoomed out)
 const EYE_BACK = 0.75, RAISE_H = 0.06; // RAISE_H: how much a wall (1 = 3.2 m) stands up per world px from the eye; // how far below the middle of the screen the eye sits, in view heights (draw())
 const RAISE_FULL = 760, RAISE_NONE = 1150; // raised walls sink flat between these view heights (world px), see draw()
 const farSens = () => { const v = +($('farSens') || {}).value; return v > 0 ? v / 100 : 0.5; };
@@ -265,6 +267,7 @@ function freeMove(dx, dy) {
 }
 // aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked; never nearer than 2 m), else to its sight's distance
 function adsReset() {
+  if (st.me && st.me.ro && st.me.ro[0]) return; // on a rope: aiming in leaves the crosshair where it is (no snapping onto walls)
   const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l; let d = adsStart(st.me && st.me.aa ? attFromCode(st.me.aa).sight : 'iron', st.me && st.me.w) * PX_PER_M; // gun first, then sight (he asked)
   // a set distance per sight, whatever distance you were at (he asked); a nearer wall stops it, but not the edge of a
   // doorway: if 2 of 5 lines spread over ±2.5° get through, it goes the full distance (no jumping onto door frames)
@@ -410,10 +413,11 @@ function freeAimPoint() {
     const vx = st.pred.x + c * (see + 3), vy = st.pred.y + s * (see + 3), k = Math.floor(vy / CELL) * st.map.W + Math.floor(vx / CELL);
     if (st.map.tiles[k] === T.VOID) { see = l; if (shot >= see - 40 || st.map.tiles[Math.floor((st.pred.y + s * (shot + 3)) / CELL) * st.map.W + Math.floor((st.pred.x + c * (shot + 3)) / CELL)] === T.VOID) shot = l; }
   }
-  { // on a rope and not level with a window: shots into the building stop at the wall (the server's rule, ropeLevel)
-    const me = st.me, r = me && me.ro && me.ro[0] && !me.ro[8] && st.map && st.map.ropes[me.ro[1]];
-    if (r && -(c * Math.cos(r.out) + s * Math.sin(r.out)) > 0.15) { const cap = CELL * 1.2; see = Math.min(see, cap); shot = Math.min(shot, cap); }
-  }
+  // on a rope (he asked 2026-11-14): no reason to shoot the wall you hang on, so the crosshair never stops, marks or snaps
+  // on walls there (the marker on the wall right in front made his view jump while he peeked a sliver); bullets still
+  // stop at whatever really is in the way (the server decides, ropeLevel)
+  const onRope = !!(st.me && st.me.ro && st.me.ro[0]);
+  if (onRope) { see = l; shot = l; }
   const x = st.pred.x + c * l, y = st.pred.y + s * l;
   // someone in the way (he asked): the marker stops on their team-coloured circle, unless the crosshair is on them
   let person = null;
@@ -424,7 +428,7 @@ function freeAimPoint() {
     if (edge > 4 && edge < see - 2 && edge < shot - 2 && edge < l - 4 && (!person || edge < person.d)) person = { id: r.id, x: r.x, y: r.y, d: edge };
   }
   if (person) see = shot = person.d;
-  return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, person, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
+  return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, person, rope: onRope, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
 }
 // is this aim (from where you stand) out through one of the windows you are looking down from?
 function winAimed(a) {
@@ -889,6 +893,7 @@ function pressAction(a, e) {
     case 'vault': { // Space: vault a window or wall stub in front of you, otherwise jump (he asked)
       const p = st.pred, m = st.map, me = st.me;
       if (me && me.ro) { if (me.ro[0]) ev.push({ k: 'vault', a: st.aim }); break; } // on a rope: climb in at the window (the server checks it is open)
+      if (p && m && me && me.tm === 'atk' && ropeOutAt(m, p.x, p.y, st.aim)) { ev.push({ k: 'vault', a: st.aim }); break; } // just inside an upper window, facing out: out onto its rope
       const v = p && m && me && !(me.jp && me.jp[1]) ? findVault(m, p.x, p.y, vaultDir()) : null;
       if (v && !standable(m, v.k)) ev.push({ k: 'vault', a: Math.round(vaultDir() * 1000) / 1000 });
       else if (st.prone) st.prone = false; else st.jumpReq = performance.now();
@@ -1507,8 +1512,9 @@ function ptsPopups(c, x, y, now) {
 // ---- the 3D rope view (rope3d.js) ----
 // On for an attacker hanging on (or climbing) a rope; leaving it glides the camera back up to the top-down view over
 // R3_OUT s (inside the climb-in), so you can shoot as soon as you're through.
+const ROPE_ENV = 420; // world px: the rope camera's size before its zooms (fixed: nothing you look at changes it)
 const ROPE_ZOOM = 0.38, ROPE_ZOOM_NAV = 0.12, ROPE_SIDE = 0.12, ROPE_ADS = 0.1; // ROPE_ADS: how much tighter aiming in on a rope comes in; // ROPE_ZOOM peeking into a window, ROPE_ZOOM_NAV the rest of the time; // how much closer the rope camera comes in, how far it sits to your right (view heights)
-const ROPE_TILT = 34, ROPE_TILT_WIN = 22, ROPE_RAISE = 0.1, ROPE_EYE = 1.6; // ROPE_EYE: how far behind you the rope camera's eye sits, in view heights (with ROPE_RAISE, a low over-the-shoulder angle: people on the wall stand up) // the rope camera's extra tilt (degrees) and how tall walls stand
+const ROPE_TILT = 34, ROPE_TILT_WIN = 0, ROPE_RAISE = 0.1, ROPE_EYE = 1.6; // ROPE_EYE: how far behind you the rope camera's eye sits, in view heights (with ROPE_RAISE, a low over-the-shoulder angle: people on the wall stand up) // the rope camera's extra tilt (degrees) and how tall walls stand
 const R3_OUT = 0.45, FH3 = 3.2 * PX_PER_M;
 // which way the wall is for someone hanging at (p.x, p.y): the rope stretch they are on, facing it
 function hangWall(p) { for (const q of st.map.ropes || []) { const sx = Math.max(q.a, Math.min(q.b, (p.x - q.hang.x) * q.tx + (p.y - q.hang.y) * q.ty)); if (Math.hypot(q.hang.x + q.tx * sx - p.x, q.hang.y + q.ty * sx - p.y) < 4 && floorAt(st.map, p.x, p.y) === q.f) return q.out + Math.PI; } return undefined; }
@@ -2126,6 +2132,9 @@ function frame(nowMs) {
       st.sightLead = Math.max(0, Math.min(reach - m1, st.farS - (reach - m2)));
     } else st.sightLead = 0;
   }
+  // on a rope (he asked 2026-11-14: he still zoomed out aiming a room or two deep): the framing is a fixed size, not the
+  // room / sightline size, so looking or aiming deep into the building never widens it (blended in with the rope camera)
+  if (view && view.kind === 'body' && (st.rt || 0) > 0) { const r = Math.min(1, st.rt); want += (ROPE_ENV - want) * r; if (r > 0.5) st.longV = false; }
   // the room-size zoom only moves for a real change (a new room, a long corridor), not every small turn of
   // your aim, and then settles quickly, so the view isn't always slowly drifting in and out (he asked for less slow panning)
   // A body's view only takes a new size once it has held for ENV_HOLD s (he asked: sweeping your aim past a doorway made the
@@ -2160,10 +2169,11 @@ function frame(nowMs) {
     const q = freeAimPoint(), dr = view.kind === 'drone';
     st.reachW = dr ? DRONE_PING_R : reachOf(me);
     { const l = Math.hypot(aimOff.x, aimOff.y); if (l > st.reachW) { const k = (st.reachW + (dr ? 0 : (l - st.reachW) * Math.exp(-dt * 10))) / l; aimOff = { x: aimOff.x * k, y: aimOff.y * k }; } } // stopped aiming in: it glides back inside (onto a drone: at once)
-    // (on a rope: you low, the crosshair ahead in the upper half; the steep tilt crops the edges.) Blended by how far the
-    // rope camera is in, not switched at halfway: switching made the view pump in and out going over onto a roof
-    const rtw = Math.min(1, st.rt || 0), fb = fitBoth(q.ax - st.pred.x, q.ay - st.pred.y), rn = Math.hypot(q.ax - st.pred.x, q.ay - st.pred.y) * (2.6 - 1.25 * (st.rpk || 0));
-    const need = Math.min(FIT_MAX, rtw > 0 ? fb + (rn - fb) * rtw : fb); // (on a rope: you low, the crosshair ahead in the upper half; the steep tilt crops the edges)
+    // on a rope (he asked 2026-11-14, twice): where you aim never makes the view bigger, hip or aimed in, however deep
+    // into the building; the over-the-shoulder framing stays and the crosshair stays inside it (below). Blended by how far
+    // the rope camera is in (switching at halfway made the view pump going over onto a roof)
+    const rtw = Math.min(1, st.rt || 0), fb = fitBoth(q.ax - st.pred.x, q.ay - st.pred.y);
+    const need = Math.min(FIT_MAX, fb * (1 - rtw));
     // out quickly; back in only once the smaller size has held for 0.5 s, and gently (he asked: on roofs the view pumped
     // in and out as the crosshair passed the edge, which threw the crosshair about on screen)
     st.fitDown = need < (st.fitH || need) * 0.97 && !((st.rt || 0) > 0.02 && (st.rt || 0) < 0.98) ? (st.fitDown || 0) + dt : 0; // (never shrinks while the rope camera glides in or out)
@@ -2172,7 +2182,7 @@ function frame(nowMs) {
     if (!locked) st.viewH = Math.max(st.viewH, st.fitH * (1 - ROPE_ADS * (st.rads || 0)));
   } else st.fitH = 0;
   st.viewH *= viewMul(); // Settings: how much of the map you see (phones start further out)
-  if (freeAim && (st.rads || 0) > 0.05) { const L = st.viewH * (1.6 - 0.75 * st.rads), l = Math.hypot(aimOff.x, aimOff.y); if (l > L) aimOff = { x: aimOff.x * L / l, y: aimOff.y * L / l }; } // (aimed in on a rope: the crosshair stays in the tight view)
+  if (freeAim && (st.rt || 0) > 0.05) { const L = st.viewH * (0.82 - 0.07 * (st.rads || 0) + (1 - Math.min(1, st.rt)) * 3), l = Math.hypot(aimOff.x, aimOff.y); if (l > L) aimOff = { x: aimOff.x * L / l, y: aimOff.y * L / l }; } // (aimed in on a rope: the crosshair stays in the tight view)
   st.zoom = VH / st.viewH;
   if (freeAim && !locked) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
@@ -2315,7 +2325,9 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
   const c = cursor(), mw = freeAimOn() && padOn && !gpRecent() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
   if (st.r3aim) { mw.x = st.r3aim.x; mw.y = st.r3aim.y; } // (the 3D rope view's crosshair)
-  if (persp.h) { const k = 1 + persp.h * 0.5; mw.x = persp.x + (mw.x - persp.x) / k; mw.y = persp.y + (mw.y - persp.y) / k; } // a head is drawn where its height shows it (look.js persp): back to where it really is
+  if (persp.h) { // (bodies stand up at most as if persp.cap from the eye: liftBody)
+    const hh = persp.h * 0.5, dx = mw.x - persp.x, dy = mw.y - persp.y, d = Math.hypot(dx, dy), k = d / (1 + hh) <= persp.cap ? 1 / (1 + hh) : Math.max(0, d - persp.cap * hh) / Math.max(1e-6, d);
+    mw.x = persp.x + dx * k; mw.y = persp.y + dy * k; } // a head is drawn where its height shows it (look.js persp): back to where it really is
   if (st.winKp && st.winKp < 1 && st.winViewsOn && st.map && winAimed(st.aim)) { mw.x = st.pred.x + (mw.x - st.pred.x) / st.winKp; mw.y = st.pred.y + (mw.y - st.pred.y) / st.winKp; } // aiming down out of a window: the ground there is drawn shrunk toward you (drawWindowView)
   for (const H of st.hatchKp || []) if (H.kp !== 1 && mw.x >= H.x0 && mw.x <= H.x1 && mw.y >= H.y0 && mw.y <= H.y1) { mw.x = H.ex + (mw.x - H.ex) / H.kp; mw.y = H.ey + (mw.y - H.ey) / H.kp; break; } // aiming into a hatch view (drawHatchView): back to the real spot
   msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
@@ -2653,6 +2665,7 @@ function draw(s, view, now, dt) {
   let eye = { x: st.cam.x - U0.x * OB, y: st.cam.y - U0.y * OB };
   if (st.rt > 0 && st.rtFace != null) { const E = (st.ropeBaseH || st.viewH || 400) * ROPE_EYE, k = st.rt; eye = { x: eye.x + (st.cam.x - Math.cos(st.rtFace) * E - eye.x) * k, y: eye.y + (st.cam.y - Math.sin(st.rtFace) * E - eye.y) * k }; /* (glides from the usual eye to the one behind you) */ RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, st.ropeH ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.2 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
   setPersp(eye, gq.raised !== false && fxOn('walls3d') ? RH : 0); // everything else stands up by the same rule (people, gadgets: look.js persp)
+  persp.cap = BODY_CAP + (st.rt || 0) * 4000; // bodies never stand up more than at this distance from the eye (look.js liftBody); none in the rope camera
   const shake = fxOn('shake') ? fx.shake : 0;
   const cr = Math.cos(st.rot || 0), sr = Math.sin(st.rot || 0), TA = z * cr, TB = z * sr, TC = -z * sr, TD = z * cr; // world -> screen (turned with Rotate aiming)
   const ox = VW / 2 - (TA * st.cam.x + TC * st.cam.y) + (Math.random() - 0.5) * shake * DPR, oy = VH / 2 - (TB * st.cam.x + TD * st.cam.y) + (Math.random() - 0.5) * shake * DPR;
@@ -2828,7 +2841,7 @@ function draw(s, view, now, dt) {
     }, now);
       if (elv) c.restore(); }); };
     upDraw(ctx); if ((elv || hangW !== undefined) && persp.h) (st.upDraws || (st.upDraws = [])).push(upDraw);
-    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? 0.28 : 0, lb = liftOf(p.x, p.y, 0.4 * zk + ez0), lh = liftOf(p.x, p.y, 0.53 * zk + ez0); // (drawn standing up: rings and head zones where they show)
+    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? 0.28 : 0, lb = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.4 * zk)), lh = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.53 * zk)); // (drawn standing up: rings and head zones where they show)
     drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x + lb[0], y: p.y + lb[1] });
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x + lh[0], y: p.y + lh[1] });
     if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see
@@ -2996,11 +3009,12 @@ function draw(s, view, now, dt) {
     const p = st.pred, lp = st.tiltLast || p, k = dt > 0 ? 1 / dt : 0, vx = p && lp ? (p.x - lp.x) * k : 0, vy = p && lp ? (p.y - lp.y) * k : 0;
     st.tiltLast = p ? { x: p.x, y: p.y } : null;
     const jump = Math.hypot(vx, vy) > 600; // a floor change or respawn: no lean
-    { const me2 = st.me, r = me2 && me2.ro && me2.ro[0] && st.map.ropes[me2.ro[1]], win = !!(r && me2.ro[8] && Math.abs(ropeS(r, st.pred.x, st.pred.y)) < r.half + 14); st.rtW = (st.rtW || 0) + ((win ? 1 : 0) - (st.rtW || 0)) * (1 - Math.exp(-dt * 4)); tilt.extra = (ROPE_TILT + ROPE_TILT_WIN * st.rtW) * (st.rt || 0); } // very steep when level with a window (he chose)
+    { const me2 = st.me, r = me2 && me2.ro && me2.ro[0] && st.map.ropes[me2.ro[1]], win = !!(r && me2.ro[8] && Math.abs(ropeS(r, st.pred.x, st.pred.y)) < r.half + 14); st.rtW = (st.rtW || 0) + ((win ? 1 : 0) - (st.rtW || 0)) * (1 - Math.exp(-dt * 4)); tilt.extra = (ROPE_TILT + ROPE_TILT_WIN * st.rtW) * (st.rt || 0); } // (the extra tilt level with a window is off: ROPE_TILT_WIN 0, he said 2026-11-14 it squeezed the whole picture)
     tilt.update(dt, jump ? 0 : (vx * cr - vy * sr) * z, jump ? 0 : (vx * sr + vy * cr) * z, shake, innerWidth, innerHeight);
     const de = document.documentElement; de.classList.toggle('tilt3d', tilt.on === true); de.classList.toggle('edgeblur', fxOn('blur') && gq.blur === true);
   }
   if (inGame && view) drawPeeps(); // GIMLET's peepholes, where you can see them
+  if (inGame && view && st.winGoR) drawWinGo(st.winGoR, now); // the window helper's frame (winGo)
   if (inGame && view) { drawStairView(s, st.me, now); drawHatchView(s, st.me, now); drawWindowView(s, st.me, now, view); drawWindowMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
   if (st.tv && inGame) { // each team's sight, faintly in its own colour (pro team colours, else blue / orange)
     const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
@@ -3557,6 +3571,7 @@ function hud(s) {
     if (me.dn && me.su !== undefined) { setHTML('prompt', `GETTING BACK UP… ${Math.round(me.su * 100)}%`); } else // the health operators get up by themselves
     setHTML('prompt', isTouch ? pt.replace(/<b>([A-Z ]+)<\/b>\1(?![A-Z])/g, '<b>$1</b>') : pt); // phone: no "VAULT VAULT"
   }
+  { const g = winGo(me), wg = $('winGo'), wc = g ? (g.ok ? '' : 'wait') : 'hidden'; if (wg.className !== wc) wg.className = wc; if (g) setHTML('winGo', g.ok ? `<b>${label('vault')}</b>${g.txt}` : g.txt); st.winGoR = g && g.ok ? g.r : null; }
   if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone', body: me.ct === 'body' && !me.dn, lean: st.leanT || 0, badge: st.tBadge || {} }); }
 }
 function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!el) return; if (el.innerHTML !== h) el.innerHTML = h; }
@@ -3578,6 +3593,38 @@ const RI = {
   roamer: '<path d="M8 3c2 0 2.5 3 2 5s-1 3-3 3-2.5-2-2.5-4S6 3 8 3z"/><path d="M16 10c2 0 2.5 3 2 5s-1 3-3 3-2.5-2-2.5-4 1.5-4 3.5-4z"/><path d="M6 13.5h3M14 20.5h3"/>',
 };
 const roleIcon = id => RI[id] ? `<svg class="rIcon" viewBox="0 0 24 24" aria-hidden="true">${RI[id]}</svg>` : '';
+// The window helper (he asked: obvious, in every mode): can Space take you in through the window you hang at, or out
+// onto the rope of the window you stand in? { ok, txt, r } or null; st.winGoR = the window to frame in the world (draw)
+function winGo(me) {
+  const m = st.map, p = st.pred; if (!me || !m || !p || !me.a || me.dn || me.ct !== 'body' || st.tv) return null;
+  if (me.ro) {
+    if (!me.ro[0]) return null;
+    const r = m.ropes[me.ro[1]]; if (!r || !r.cells.length) return null;
+    const open = ropeWindowOpen(m, r), boards = !open && ropeWindowBoarded(m, r); if (!open && !boards) return null;
+    const lvl = !!me.ro[8], zone = ropeVaultZone(r, p.x, p.y);
+    if (lvl && zone) return { ok: true, txt: boards ? 'SMASH IN THROUGH THE WINDOW' : 'GO IN THROUGH THE WINDOW', r };
+    if (ropeAtWindow(r, p.x, p.y)) return { ok: false, txt: !lvl ? 'CLIMB LEVEL WITH THE WINDOW TO GO IN' : 'MOVE IN FRONT OF THE WINDOW TO GO IN' };
+    return null;
+  }
+  if (me.tm !== 'atk' || (st.last && st.last.ph !== PHASE.ACTION)) return null;
+  const r = ropeOutAt(m, p.x, p.y, st.aim);
+  return r ? { ok: true, txt: 'CLIMB OUT ONTO THE ROPE', r } : null;
+}
+// a pulsing gold frame on the window (at the opening's middle height, where the raised wall shows it) with arrows the
+// way Space takes you: in from a rope, out from inside
+function drawWinGo(r, now) {
+  const W = st.map.W; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const k of r.cells) { const x = (k % W) * CELL, y = Math.floor(k / W) * CELL; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + CELL); y1 = Math.max(y1, y + CELL); }
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, [lx, ly] = liftOf(cx, cy, 0.48), pulse = 0.55 + 0.45 * Math.sin(now * 7);
+  const out = !(st.me && st.me.ro), dir = out ? r.out : r.out + Math.PI; // the way you'd go
+  ctx.save(); ctx.translate(lx, ly);
+  ctx.strokeStyle = `rgba(242,193,78,${0.6 + 0.4 * pulse})`; ctx.lineWidth = 1.6; ctx.shadowColor = '#f2c14e'; ctx.shadowBlur = 8 * pulse;
+  ctx.strokeRect(x0 - 2, y0 - 2, x1 - x0 + 4, y1 - y0 + 4);
+  ctx.fillStyle = `rgba(242,193,78,${0.85 * pulse + 0.15})`; ctx.shadowBlur = 0;
+  for (const k of [-1, 0, 1]) { const d = 10 + k * 7 + ((now * 14) % 7), px = cx + Math.cos(dir) * (d - 10), py = cy + Math.sin(dir) * (d - 10);
+    ctx.save(); ctx.translate(px, py); ctx.rotate(dir); ctx.beginPath(); ctx.moveTo(3, 0); ctx.lineTo(-2, -3.2); ctx.lineTo(-0.6, 0); ctx.lineTo(-2, 3.2); ctx.closePath(); ctx.fill(); ctx.restore(); }
+  ctx.restore();
+}
 function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;
   if (s.zb && me.a && !me.dn) { const z = zbPrompt(s, me, x, y); if (z !== null) return z; }
