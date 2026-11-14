@@ -28,6 +28,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 - [ ] (he asked 2026-11-14, "its getting better ... good work") the head turns with the gun (on a rope too); the orange/blue marker must work looking into windows from the outside, upper floors on a rope and ground floor windows too
 
+- [ ] (he asked 2026-11-14, watched on his screen) make sure the proper assets obscure the proper assets and vice versa; more responsive view: he had no view inside the building until he vaulted in; no automatic detach from a rope, only F and Space take you off it; Space vaults in only from a certain area directly in front of the window (vaulting in is dangerous without setup)
+
 ## Done
 
 - [x] lets incorporate some changes that would get us more frames, we already did research on this so now we just need to implement a bit more, i only need about 35 more fps (then he added: find more ways that don't change how the game looks or feels. DONE 2026-11-12: the map picture now stays on the graphics card instead of being sent to it again every frame, and zoomed out the screen shows a smaller copy of the map that still has every pixel the screen can show. Nothing looks different. Measured on his kind of graphics card in a hidden display: standing about 40 → 120 fps, his walk-spin-zoom test 35 → about 94 fps, zoomed far out 31 → 167 fps. Not yet played by him)
