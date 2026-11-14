@@ -8,6 +8,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] (he asked 2026-11-14) torso rotation on a rope: the upper arms came away from the shoulders when turning (DONE 2026-11-14: on a rope the upper body (shoulders, back plate, pack) turns with the aim, so the arms stay on the shoulders; hips and legs stay square to the wall; the aim limit of about 110° each way stays. Checked in a test browser. Not yet played by him)
+
 - [x] (he asked 2026-11-14) the screen shakes when sprinting sideways along the side of the building (DONE 2026-11-14: the tilted view picks how much to enlarge itself so it fills the screen, in 5% steps; the sideways sway while sprinting flipped it between two steps every frame. Now it is worked out exactly and glides (grows at once, shrinks slowly), and on a rope the sway is mostly damped. Measured sprinting along a wall: 3 jumps in 2 s before, none after. Not yet played by him)
 - [x] (he asked 2026-11-14) on a rope the operator's torso spins round like a pinwheel, 360°, with no change to the body or legs (DONE 2026-11-14: on a rope your aim stays on the wall's side, up to about 110° either way from facing the wall (a little past along the wall), never out behind you; the same rule on the server. Not yet played by him)
 

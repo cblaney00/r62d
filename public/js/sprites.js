@@ -372,6 +372,9 @@ export function drawOperator(ctx, p, t) {
   else if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean));
     if (!persp.h) { ctx.fillStyle = u.cloth || '#333'; ctx.beginPath(); ctx.ellipse(0, L * 2.2, 3.2, 4 + Math.abs(L) * 2, 0, 0, 7); ctx.fill(); } // the hips bend toward the lean (straight down; tilted, the body columns bend)
     ctx.translate(0, L * 5.5 / bw); ctx.rotate(L * 0.14); }
+  // on a rope the upper body turns with the aim (he asked 2026-11-14: the upper arms came away from the shoulders when
+  // turning); the hips and legs stay square to the wall, and the aim is held within ROPE_AIM of facing it
+  if (hang) ctx.rotate(Math.atan2(Math.sin(p.aim - bodyA), Math.cos(p.aim - bodyA)));
   // ---- back gear ----
   const id = o.ability.id;
   if (hang && persp.h) { // on a rope, seen from behind: the pack is a block on the back, not a picture from above

@@ -420,3 +420,4 @@ His wishes so far:
   - Window boards: their top comes from the map picture (look.js pieces, `base[0] === 122`), and window lintels are half see-through like doorways (`lintel`, `DOOR_TOP_A`).
   - Boards seen from the side: look.js `boardLook` (stage from `m.hp`, holes from `m.holes` placed along the face), deco 'w' cracks by `F.st`, `G.holes` dark punctures; board tops in `G.under` (drawn before the wall tops). The drawn map is `st.rend.map` (st.known), not st.map.
   - Tilt zoom: look.js tilt.update finds the covering scale exactly (`fits`, bisection) and glides `this.sc`; sway `calm` on a rope. Rope aim: shared/map.js `ROPE_AIM`/`ropeAimLimit` (server input handler, client `ropeOf` in main.js).
+  - On a rope the upper body turns with the aim (sprites.js: `ctx.rotate(aim - bodyA)` before the back gear when `hang`), hips and legs stay to the wall.
