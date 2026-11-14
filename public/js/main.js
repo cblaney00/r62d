@@ -2575,6 +2575,7 @@ function gadgetZ(e) { if (e.ty === 'cam' && (e.tu || e.oc !== undefined)) return
 function liftDraw(x, y, z, fn) {
   if (persp.h && z > 0.08) { const r = 4 + z * 5; ctx.fillStyle = `rgba(0,0,0,${Math.min(0.3, 0.12 + z * 0.2)})`; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.8, 0, 0, 7); ctx.fill(); }
   lifted(ctx, x, y, z, fn);
+  if (persp.h && z >= 0.25) (st.upDraws || (st.upDraws = [])).push(() => lifted(ctx, x, y, z, fn)); // up a wall: drawn again over the raised walls (it hangs on their face)
 }
 function draw(s, view, now, dt) {
   const z = st.zoom, m = st.map; let tq = performance.now();
