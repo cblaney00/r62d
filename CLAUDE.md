@@ -413,3 +413,6 @@ His wishes so far:
   - mapkit.js `windowJambs`: `JAMB` 2 wall cells each side of every window are concrete.
   - Thinner-looking walls: look.js `WALL_INS` (0.2 cell), `thinOpen`/`wallIns`; faces, tops (runs carry `iN/iS/iW/iE`), doorway tops (`DOOR_TOP_A` 0.5 see-through) inset; mapdraw.js `thinStrips` paints the neighbouring floor into the strips; lightMap gives wall cells the darkest neighbouring room's light. `st.ghostDraws` + `GHOST_A` 0.38: people you see redrawn faintly over the raised walls.
   - `tests/spawnsafe.js` fails on Dust Town (defender bots outside in preparation) since before this session; not looked into.
+  - Defenders' preparation area: shared/map.js `prepBox(m, site)` (`PREP_PAD` 12 cells round the site rooms, every floor but the roof) → `game.prepBox` (beginPrep), `mods.box` for defenders in PREP; physics `stepMove` wraps `stepMoveFree` and slides along the box edge (`inBox`: also no T.GROUND); bots `boxGoal`; client draws PREPARATION AREA from `me.m.box`.
+  - Rope reach: `ROPE_REACH_X` 8 m added to the rope crosshair cap and to `st.trackHH`; on a rope the camera keeps the crosshair (not you) inside, `onScreen` margin 0.28 of the screen height.
+  - Smoke: drawn on #over (after the blackout) when you have a line to the cloud (`clear`), into `smokeCv` at 1/`SMOKE_DIV` size, `SMOKE_COL`.
