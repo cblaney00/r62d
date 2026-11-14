@@ -2720,8 +2720,15 @@ function draw(s, view, now, dt) {
   } else { st.rend.showFor(z); const q = S * DPR; mapLayer.style.transform = st.rot ? `matrix(${TA / q}, ${TB / q}, ${TC / q}, ${TD / q}, ${ox / DPR}, ${oy / DPR})` : `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / q})`; }
   // visible window of the map (for the grey remembered copy)
   const ex = st.rot ? Math.hypot(VW, VH) / 2 / z : VW / 2 / z, ey = st.rot ? ex : VH / 2 / z, fr = st.rot && st.floorRect; // a turned view reaches further across the map
-  const wx0 = Math.max(fr ? fr[0] : 0, st.cam.x - ex - 20), wy0 = Math.max(fr ? fr[1] : 0, st.cam.y - ey - 20);
-  const wx1 = Math.min(fr ? fr[2] : m.W * CELL, st.cam.x + ex + 20), wy1 = Math.min(fr ? fr[3] : m.H * CELL, st.cam.y + ey + 20);
+  // what the screen really shows, through the tilt (he saw walls left flat, see-through, toward the far edge of the steep
+  // rope view as he moved along the wall: the area worked on was the straight-down one): the screen's corners taken back
+  // onto the map, at least the straight-down box, at most 4 times it
+  let vx0 = st.cam.x - ex, vy0 = st.cam.y - ey, vx1 = st.cam.x + ex, vy1 = st.cam.y + ey;
+  if (tilt.M) for (const [sx, sy] of [[0, 0], [VW, 0], [0, VH], [VW, VH], [VW / 2, 0]]) { const u = tilt.untilt(sx / DPR, sy / DPR), w = screenToWorld(u.x * DPR, u.y * DPR);
+    if (!isFinite(w.x) || !isFinite(w.y)) continue; vx0 = Math.min(vx0, w.x); vy0 = Math.min(vy0, w.y); vx1 = Math.max(vx1, w.x); vy1 = Math.max(vy1, w.y); }
+  vx0 = Math.max(vx0, st.cam.x - ex * 4); vy0 = Math.max(vy0, st.cam.y - ey * 4); vx1 = Math.min(vx1, st.cam.x + ex * 4); vy1 = Math.min(vy1, st.cam.y + ey * 4);
+  const wx0 = Math.max(fr ? fr[0] : 0, vx0 - 20), wy0 = Math.max(fr ? fr[1] : 0, vy0 - 20);
+  const wx1 = Math.min(fr ? fr[2] : m.W * CELL, vx1 + 20), wy1 = Math.min(fr ? fr[3] : m.H * CELL, vy1 + 20);
   tq = pfa('mapblit', tq);
   if (!s) { showFog(false); tilt.flat(); return; }
   const me = st.me, side = me ? me.tm : null;

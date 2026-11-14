@@ -286,7 +286,8 @@ function block(R, m, bx, by) {
     const X = x * CELL, Y = y * CELL, faces = out[0].faces;
     for (const [f0, f, base, tc] of pieces) {
       const lintel = (door && f0 >= 0.7) || (win && f0 >= 0.68); // the wall over a doorway or window: half see-through (he chose 2026-11-14: nobody hides under it; and the boards in a window always show)
-      const col = lt => lintel ? `rgba(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0},${DOOR_TOP_A})` : `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`;
+      const seeFace = lintel && door; // (over a window only the top is see-through, so the boards show from above; its side stays solid: from a rope it looked like a hole in the wall, he saw)
+      const col = lt => seeFace ? `rgba(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0},${DOOR_TOP_A})` : `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`;
       for (const [dx, dy, lt] of FACES) {
         const n = k + dy * W + dx, nx = x + dx, ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f || (m.openId[n] === oi && oi >= 0)) continue; // against the wall, or more of the same opening
@@ -487,11 +488,11 @@ function drawColl(ctx, G, pic, R, h, up, plain) {
   if (!G.n) return;
   const S = pic.width / R.Wp;
   for (const [c, T2] of G.lowTops) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); }
+  const picTop = r => { const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f; pic.drawTo(ctx, X * S, Y * S, w * S, CELL * S, tx, ty, w * s, CELL * s); };
+  for (const r of G.under) picTop(r); // boards in windows and doorways: before the faces, so the wall above them covers them from the side
   for (const [c, p] of G.paths) { ctx.fillStyle = c; ctx.fill(p); }
   if (G.dark && !plain) { ctx.lineWidth = 0.6; ctx.strokeStyle = 'rgba(20,16,14,0.32)'; ctx.stroke(G.dark); ctx.strokeStyle = 'rgba(235,228,214,0.32)'; ctx.stroke(G.light); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(210,230,250,0.22)'; ctx.stroke(G.glint); }
   if (G.holes) { ctx.fillStyle = 'rgba(9,7,5,0.95)'; ctx.fill(G.holes); if (!plain) { ctx.lineWidth = 0.4; ctx.strokeStyle = 'rgba(230,190,130,0.55)'; ctx.stroke(G.holes); } } // bullet holes in boards: dark punctures with a splintered light rim (you see and shoot through them, as on the map)
-  const picTop = r => { const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f; pic.drawTo(ctx, X * S, Y * S, w * S, CELL * S, tx, ty, w * s, CELL * s); };
-  for (const r of G.under) picTop(r); // boards in windows and doorways: under the (see-through) wall above them
   for (const [c, T2] of G.topPaths) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); } // wall tops: plain colour
   for (const r of G.tops) { // cars, crates, shelves: their tops from the map picture
     const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f;
