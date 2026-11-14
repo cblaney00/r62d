@@ -1501,7 +1501,7 @@ function ptsPopups(c, x, y, now) {
 // ---- the 3D rope view (rope3d.js) ----
 // On for an attacker hanging on (or climbing) a rope; leaving it glides the camera back up to the top-down view over
 // R3_OUT s (inside the climb-in), so you can shoot as soon as you're through.
-const ROPE_TILT = 34, ROPE_TILT_WIN = 22, ROPE_RAISE = 0.07; // the rope camera's extra tilt (degrees) and how tall walls stand
+const ROPE_TILT = 34, ROPE_TILT_WIN = 22, ROPE_RAISE = 0.13, ROPE_EYE = 1.9; // ROPE_EYE: how far behind you the rope camera's eye sits, in view heights (with ROPE_RAISE, a low over-the-shoulder angle: people on the wall stand up) // the rope camera's extra tilt (degrees) and how tall walls stand
 const R3_OUT = 0.45, FH3 = 3.2 * PX_PER_M;
 // which way the wall is for someone hanging at (p.x, p.y): the rope stretch they are on, facing it
 function hangWall(p) { for (const q of st.map.ropes || []) { const sx = Math.max(q.a, Math.min(q.b, (p.x - q.hang.x) * q.tx + (p.y - q.hang.y) * q.ty)); if (Math.hypot(q.hang.x + q.tx * sx - p.x, q.hang.y + q.ty * sx - p.y) < 4 && floorAt(st.map, p.x, p.y) === q.f) return q.out + Math.PI; } return undefined; }
@@ -1518,7 +1518,7 @@ function ropeFace() { // which way you face on a rope (into the wall), or null
 function ropeCam(dt) {
   const f = ropeFace(); if (f != null) st.rtFace = f;
   const want = f != null ? 1 : 0; st.rt = st.rt || 0;
-  st.rt += (want - st.rt) * (1 - Math.exp(-dt * 4.5)); if (st.rt < 0.002 && !want) st.rt = 0;
+  st.rt += (want - st.rt) * (1 - Math.exp(-dt * (want ? 4.5 : 1.9))); if (st.rt < 0.002 && !want) st.rt = 0; // (letting go, or climbing in at a window, glides back slowly: he asked for smooth transitions in)
   return st.rt;
 }
 function r3on() { if (!ROPE_3D) return false; const me = st.me; return !!(me && me.ro && me.a && !me.dn && me.tm === 'atk' && me.ct === 'body' && !st.tv && st.map && st.map.ropes); }
@@ -2590,7 +2590,7 @@ function draw(s, view, now, dt) {
   // see it (he asked 2026-11-14: more volume): everything, you in the middle too, shows its front and its height
   const OB = (st.viewH || 400) * EYE_BACK, U0 = UP();
   let eye = { x: st.cam.x - U0.x * OB, y: st.cam.y - U0.y * OB };
-  if (st.rt > 0 && st.rtFace != null) { const E = (st.viewH || 400) * 1.3, k = st.rt; eye = { x: eye.x + (st.cam.x - Math.cos(st.rtFace) * E - eye.x) * k, y: eye.y + (st.cam.y - Math.sin(st.rtFace) * E - eye.y) * k }; /* (glides from the usual eye to the one behind you) */ RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, st.ropeH ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.5 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
+  if (st.rt > 0 && st.rtFace != null) { const E = (st.viewH || 400) * ROPE_EYE, k = st.rt; eye = { x: eye.x + (st.cam.x - Math.cos(st.rtFace) * E - eye.x) * k, y: eye.y + (st.cam.y - Math.sin(st.rtFace) * E - eye.y) * k }; /* (glides from the usual eye to the one behind you) */ RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, st.ropeH ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.5 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
   setPersp(eye, gq.raised !== false && fxOn('walls3d') ? RH : 0); // everything else stands up by the same rule (people, gadgets: look.js persp)
   const shake = fxOn('shake') ? fx.shake : 0;
   const cr = Math.cos(st.rot || 0), sr = Math.sin(st.rot || 0), TA = z * cr, TB = z * sr, TC = -z * sr, TD = z * cr; // world -> screen (turned with Rotate aiming)
@@ -2838,7 +2838,7 @@ function draw(s, view, now, dt) {
     // wall tops from the small copy of the map when the screen shows less than it holds (far out)
     const pk = pass === 'fog' ? fog.width / VW * z : z, pic = st.rend.picFor(pk);
     const up2 = (st.rt || 0) > 0.01 ? () => { c.save(); c.globalAlpha = Math.min(1, st.rt * 1.4); drawRaised(c, st.rend, rf, [2], pic); c.restore(); } : null; // on a rope: the storeys above you, faded in with the rope camera
-    if (pass === 'fog' || !view) { if (up2) up2(); drawRaised(c, st.rend, rf, [0, 1], pic); pfa('raise', t0); return; }
+    if (pass === 'fog' || !view) { drawRaised(c, st.rend, rf, [0, 1], pic, !!view); pfa('raise', t0); return; } // (out of sight: greyed, no surface lines, not the storeys above)
     // walls in colour exactly where your team's sight reaches (raised with them), like the floor: no cell-by-cell snapping
     const fi = view ? floorAt(m, view.x, view.y) : -1, fl = fi >= 0 && m.floors[fi] ? m.floors[fi] : null, below = fl && !fl.roof ? fl.i : fl ? fl.i - 1 : 0;
     const ab = up2 ? 2 : 0, sc = sightClip(vpolys, vviews, eye, RH, null, below, ab), mr = st.me && st.me.ro && st.me.ro[0] && st.pred; // on a rope: the wall in front of you is always in sight

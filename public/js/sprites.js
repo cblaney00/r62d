@@ -354,14 +354,20 @@ export function drawOperator(ctx, p, t) {
     ctx.translate(0, L * 5.5 / bw); ctx.rotate(L * 0.14); }
   // ---- back gear ----
   const id = o.ability.id;
-  if (id === 'cutter') { box(ctx, -12.5, -4.5, 5.5, 9, 2.6, '#c8601f'); ctx.fillStyle = '#222'; ctx.fillRect(-12, -1, 4.5, 2); cap(ctx, -9, 3.5, -3, 8, 0.8, '#222'); }
+  if (hang && persp.h) { // on a rope, seen from behind: the pack is a block on the back, not a picture from above
+    const [l0x, l0y] = LZ(0.45), at = z => { const [x, y] = LZ(z); return [x - l0x, (y - l0y) / bw]; };
+    const [a0, a1] = at(0.31), [b0, b1] = at(0.44), pk = String(PACK[p.op] || '');
+    if (pk !== 'none' && !pk.startsWith('cloak') && !pk.startsWith('sling')) column(ctx, a0 - 8.6, a1, 2.6, 4.8, b0 - 8.6, b1, 2.8, 5, u.dark, true);
+  } 
+  else if (id === 'cutter') { box(ctx, -12.5, -4.5, 5.5, 9, 2.6, '#c8601f'); ctx.fillStyle = '#222'; ctx.fillRect(-12, -1, 4.5, 2); cap(ctx, -9, 3.5, -3, 8, 0.8, '#222'); }
   else if (id === 'panel') { box(ctx, -12.5, -6, 4.5, 12, 1, '#59626b'); ctx.fillStyle = '#d9b02a'; for (let i = 0; i < 3; i++) ctx.fillRect(-12.3, -5 + i * 4, 4, 1); }
   else if (id === 'jammer') { box(ctx, -11.5, -4, 4.5, 8, 1.2, '#2b2f36'); ctx.fillStyle = '#55c1e8'; ctx.fillRect(-10.5, -2.5, 1.2, 1.2); cap(ctx, -9, -3, -14, -9, 0.6, '#999'); }
   else drawPack(ctx, PACK[p.op], o, u); // every operator carries something of their own
   if (acc.has('pack') && PACK[p.op] !== 'none') { box(ctx, -12, -1.6, 2.6, 3.2, 0.6, tc, false); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.3; ctx.strokeRect(-12, -1.6, 2.6, 3.2); }
 
   // ---- torso & plate carrier ----
-  drawTorso(ctx, p.op, o, u, sh);
+  if (hang && persp.h) { ell(ctx, -1, 0, 5.8, 8.6, u.cloth); box(ctx, -5.8, -5.4, 9, 10.8, 2.6, u.vest); } // the shoulders and back plate from behind
+  else drawTorso(ctx, p.op, o, u, sh);
   { // side trim (he asked): a wide armband on each shoulder, attackers orange and defenders blue, plus this operator's own accents
     if (acc.has('vest')) { ctx.fillStyle = tc; ctx.fillRect(-5.4, -5.6 * sh, 1.7, 11.2 * sh); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-3.7, -5.6 * sh, 0.35, 11.2 * sh); }
     for (const s of [-1, 1]) { ctx.fillStyle = tc; ctx.beginPath(); ctx.ellipse(-1, s * 7.9 * sh, 2.7, 1.7, 0, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 0.35; ctx.stroke(); } }

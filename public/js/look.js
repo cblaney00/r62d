@@ -159,7 +159,11 @@ function block(R, m, bx, by) {
     const k = y * W + x; if (hg(k) > 0 || !m.openId) continue;
     const oi = m.openId[k], win = !!(m.win && m.win[k]), op = oi >= 0 && m.openings && m.openings[oi], door = !win && op && op.kind === 'door';
     if (!win && !door) continue;
-    let wk = -1; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = k + dy * W + dx; if (hg(n) >= 1) { wk = n; break; } }
+    // the wall it sits in: along the wall's own line (the side where the cells across are not wall), up to 8 cells away
+    let wk = -1; const solidAt = n => n >= 0 && n < m.tiles.length && hg(n) >= 1 && m.tiles[n] !== T.TALL && m.tiles[n] !== T.LOW;
+    const alongX = !solidAt(k - W) && !solidAt(k + W);
+    for (let i = 1; i <= 8 && wk < 0; i++) for (const s of [1, -1]) { const n = alongX ? k + s * i : k + s * i * W; if (solidAt(n)) { wk = n; break; } }
+    if (wk < 0) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = k + dy * W + dx; if (hg(n) >= 1) { wk = n; break; } }
     const wb = wk >= 0 ? (m.tiles[wk] === T.SOFT && m.mat && m.mat[wk] === MAT.BRICK ? BRICK : SIDE[m.tiles[wk]] || SIDE[T.HARD]) : SIDE[T.SOFT], wtc = wk >= 0 ? topColour(m, wk) : '#d8d2c4';
     const pieces = win ? [[0, 0.28, [176, 170, 158], '#b9b2a2'], [0.69, 1, wb, wtc]] : [[0.72, 1, wb, wtc]];
     if (m.tiles[k] === T.BARRI) pieces.push(win ? [0.28, 0.69, [122, 92, 58], null] : [0.06, 0.72, [122, 92, 58], null]); // (boards are thin: no top)
@@ -296,13 +300,13 @@ function deco(G, F, up) {
   } else if (F.d === 'o' && tall > 4) { line(G.light, 0.04, z0, 0.04, z1); line(G.light, 0.96, z0, 0.96, z1); line(G.light, 0.04, z1, 0.96, z1); } // a doorway: its frame
 }
 // draw groups of a raisedFrame (0 walls, 1 tall things); the tops come from pic (the map picture, or its small copy far out)
-export function drawRaised(ctx, R, fr, which, pic = R.c) {
+export function drawRaised(ctx, R, fr, which, pic = R.c, plain = false) { // plain: no surface lines (the greyed copy out of sight)
   const cx = fr.cam.x, cy = fr.cam.y, h = fr.h, G = pic.width / R.Wp, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
   for (const g of which) {
     const grp = fr.groups[g];
     if (grp.lowTops) for (const [c, T2] of grp.lowTops) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); }
     for (const [c, p] of grp.paths) { ctx.fillStyle = c; ctx.fill(p); }
-    if (grp.dark) { ctx.lineWidth = 0.6; ctx.strokeStyle = 'rgba(20,16,14,0.32)'; ctx.stroke(grp.dark); ctx.strokeStyle = 'rgba(235,228,214,0.32)'; ctx.stroke(grp.light); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(210,230,250,0.22)'; ctx.stroke(grp.glint); }
+    if (grp.dark && !plain) { ctx.lineWidth = 0.6; ctx.strokeStyle = 'rgba(20,16,14,0.32)'; ctx.stroke(grp.dark); ctx.strokeStyle = 'rgba(235,228,214,0.32)'; ctx.stroke(grp.light); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(210,230,250,0.22)'; ctx.stroke(grp.glint); }
     for (const [c, T2] of grp.topPaths) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); } // wall tops: plain colour
     for (const r of grp.tops) {
       const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f;
@@ -366,6 +370,17 @@ export function addSpots(p, spots, cam, h, below = 0, above = 0) {
   for (const s of spots) for (const f of (below ? HTS[Math.min(4, below)] : HTS[0]).concat(above ? [1.5, 2, 2.5, 3].filter(f => f <= 1 + above) : [])) { const x = s.x + (s.x - cam.x) * h * f, y = s.y + (s.y - cam.y) * h * f; p.moveTo(x + s.r, y); p.arc(x, y, s.r, 0, Math.PI * 2); }
   return p;
 }
+// drop the points of a closed outline that lie (within tol px) on the straight line between their neighbours
+function thin(a, tol = 0.8) {
+  if (a.length < 12) return;
+  const out = [a[0], a[1]]; let px = a[0], py = a[1];
+  for (let i = 2; i < a.length; i += 2) {
+    const x = a[i], y = a[i + 1], nx = a[(i + 2) % a.length], ny = a[(i + 3) % a.length], dx = nx - px, dy = ny - py, L = Math.hypot(dx, dy);
+    if (L > 0.01 && Math.abs((x - px) * dy - (y - py) * dx) / L < tol && (x - px) * dx + (y - py) * dy > 0 && (nx - x) * dx + (ny - y) * dy > 0) continue;
+    out.push(x, y); px = x; py = y;
+  }
+  a.length = 0; for (const v of out) a.push(v);
+}
 export function sightClip(polys, views, cam, h, m, below = 0, above = 0) { // below: storeys under this floor (their outside walls are drawn too)
   const p = new Path2D(), tall = (x, y) => m.tiles[Math.floor(y / CELL) * m.W + Math.floor(x / CELL)] === T.TALL;
   polys.forEach((pts, j) => {
@@ -380,6 +395,7 @@ export function sightClip(polys, views, cam, h, m, below = 0, above = 0) { // be
     }
     // the sight shape swept from the lowest height drawn to the highest (a straight sweep, as the lift grows evenly
     // with height): the shape at both ends plus each edge's band between them, all wound the same way so they add up
+    thin(far); // (most points lie along the same wall: dropping them makes the shape far cheaper for the graphics card)
     const f0 = below ? -Math.min(4, below) : 0, f1 = 1 + above, n = far.length;
     if (n < 6) return;
     const at = (i, f) => [far[i] + (far[i] - cam.x) * h * f, far[i + 1] + (far[i + 1] - cam.y) * h * f];
