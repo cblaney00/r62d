@@ -54,6 +54,7 @@ for (const id of process.argv[2] ? [process.argv[2]] : MAP_LIST) {
     if (!a.rope) { hangOn(r); }
     tick(0.1, { inv: 0 }); if (a.rope && a.rope.inv) { tick(0.05, { inv: 1 }); tick(0.05); }
     tick(2.4, { rc: 1 });
+    if (r.up < 0 && r.roof && a.rope) { tick(1.2, { rc: 1 }); g.event(a, { k: 'vault' }); tick(1.5); } // at the top: Space takes you over (2026-11-14: only Space or F take you off a rope)
     const up = a.rope ? m.ropes[a.rope.r] : null;
     if (r.up >= 0 && !(up && up.lvl > r.lvl)) fail(id, 'rope', r.i, 'climbing did not reach the floor above', a.rope && a.rope.st);
     if (r.up < 0 && r.roof && (a.rope || floorAt(m, a.x, a.y) !== m.roofFloor)) fail(id, 'rope', r.i, 'climbing did not get onto the roof', JSON.stringify(a.rope));

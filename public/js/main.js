@@ -2160,10 +2160,13 @@ function frame(nowMs) {
     const q = freeAimPoint(), dr = view.kind === 'drone';
     st.reachW = dr ? DRONE_PING_R : reachOf(me);
     { const l = Math.hypot(aimOff.x, aimOff.y); if (l > st.reachW) { const k = (st.reachW + (dr ? 0 : (l - st.reachW) * Math.exp(-dt * 10))) / l; aimOff = { x: aimOff.x * k, y: aimOff.y * k }; } } // stopped aiming in: it glides back inside (onto a drone: at once)
-    const roped = (st.rt || 0) > 0.5, need = Math.min(FIT_MAX, roped ? Math.hypot(q.ax - st.pred.x, q.ay - st.pred.y) * (2.6 - 1.25 * (st.rpk || 0)) : fitBoth(q.ax - st.pred.x, q.ay - st.pred.y)); // (on a rope: you low, the crosshair ahead in the upper half; the steep tilt crops the edges)
+    // (on a rope: you low, the crosshair ahead in the upper half; the steep tilt crops the edges.) Blended by how far the
+    // rope camera is in, not switched at halfway: switching made the view pump in and out going over onto a roof
+    const rtw = Math.min(1, st.rt || 0), fb = fitBoth(q.ax - st.pred.x, q.ay - st.pred.y), rn = Math.hypot(q.ax - st.pred.x, q.ay - st.pred.y) * (2.6 - 1.25 * (st.rpk || 0));
+    const need = Math.min(FIT_MAX, rtw > 0 ? fb + (rn - fb) * rtw : fb); // (on a rope: you low, the crosshair ahead in the upper half; the steep tilt crops the edges)
     // out quickly; back in only once the smaller size has held for 0.5 s, and gently (he asked: on roofs the view pumped
     // in and out as the crosshair passed the edge, which threw the crosshair about on screen)
-    st.fitDown = need < (st.fitH || need) * 0.97 ? (st.fitDown || 0) + dt : 0;
+    st.fitDown = need < (st.fitH || need) * 0.97 && !((st.rt || 0) > 0.02 && (st.rt || 0) < 0.98) ? (st.fitDown || 0) + dt : 0; // (never shrinks while the rope camera glides in or out)
     if ((st.rads || 0) > 0.05 && st.fitH) {} else // (aimed in on a rope: the size you had stays; aiming in never pulls the view back)
     st.fitH = !st.fitH ? need : need > st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : st.fitDown > 0.5 ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 1.5)) : st.fitH;
     if (!locked) st.viewH = Math.max(st.viewH, st.fitH * (1 - ROPE_ADS * (st.rads || 0)));
@@ -2314,6 +2317,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (st.r3aim) { mw.x = st.r3aim.x; mw.y = st.r3aim.y; } // (the 3D rope view's crosshair)
   if (persp.h) { const k = 1 + persp.h * 0.5; mw.x = persp.x + (mw.x - persp.x) / k; mw.y = persp.y + (mw.y - persp.y) / k; } // a head is drawn where its height shows it (look.js persp): back to where it really is
   if (st.winKp && st.winKp < 1 && st.winViewsOn && st.map && winAimed(st.aim)) { mw.x = st.pred.x + (mw.x - st.pred.x) / st.winKp; mw.y = st.pred.y + (mw.y - st.pred.y) / st.winKp; } // aiming down out of a window: the ground there is drawn shrunk toward you (drawWindowView)
+  for (const H of st.hatchKp || []) if (H.kp !== 1 && mw.x >= H.x0 && mw.x <= H.x1 && mw.y >= H.y0 && mw.y <= H.y1) { mw.x = H.ex + (mw.x - H.ex) / H.kp; mw.y = H.ey + (mw.y - H.ey) / H.kp; break; } // aiming into a hatch view (drawHatchView): back to the real spot
   msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
   st.aimUp = ctrl === 'body' && me && me.a && !me.dn && !!aimUpHatch(st.map, st.pred.x, st.pred.y, mw.x, mw.y); // your own aim-up pose, without waiting for the server
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
@@ -2903,21 +2907,40 @@ function draw(s, view, now, dt) {
     }
     // wall tops from the small copy of the map when the screen shows less than it holds (far out)
     const pk = pass === 'fog' ? fog.width / VW * z : z, pic = st.rend.picFor(pk), upA = Math.min(1, (st.rt || 0) * 1.4);
-    groundBelow(c, rf.ground[pass === 'fog' || !view ? 'all' : 'lit'], pic);
+    const sc0 = pass === 'fog' || !view ? null : sightClip(vpolys, vviews, eye, RH, rm);
+    groundBelow(c, rf.ground[pass === 'fog' || !view ? 'all' : 'lit'], pic, sc0);
     if (pass === 'fog' || !view) { drawRaised(c, st.rend, rf, 'all', pic, !!view, upA); pfa('raise', t0); return; } // (out of sight: greyed, no surface lines)
     // in colour: only pieces whose own spot your team sees (he asked: not deep in the building, nothing through solid
     // things), the storeys below/above by that alone, this floor's also clipped to the sight shapes for a smooth edge
     drawRaised(c, st.rend, rf, 'out', pic, false, upA);
-    const sc = sightClip(vpolys, vviews, eye, RH, rm);
+    const sc = sc0;
     c.save(); c.clip(sc); drawRaised(c, st.rend, rf, 'lit', pic); c.restore();
     pfa('raise', t0);
   } : null;
+  // every cell of a floor that is not open air, as one path of row runs (kept per floor; the ground below is drawn round them)
+  function solidRuns(fi) {
+    const C = st.solidRuns || (st.solidRuns = { m: null, p: [] }); if (C.m !== m) { C.m = m; C.p = []; }
+    if (C.p[fi]) return C.p[fi];
+    const F = m.floors[fi], p = new Path2D(), W = m.W;
+    for (let y = F.gy || 0; y < (F.gy || 0) + F.h; y++) { let a = -1; for (let x = F.gx; x <= F.gx + F.w; x++) { const solid = x < F.gx + F.w && m.floor[y * W + x] !== FL.VOID; if (solid && a < 0) a = x; else if (!solid && a >= 0) { p.rect(a * CELL, y * CELL, (x - a) * CELL, CELL); a = -1; } } }
+    return (C.p[fi] = p);
+  }
   // the ground at the foot of an upper floor's outside walls (he saw a black strip there when starting a rappel): the
   // ground floor's own picture, moved toward the eye by the storeys between, as the walls going down are
-  function groundBelow(c, quads, pic) {
+  function groundBelow(c, quads, pic, sc) {
     const fi = floorAt(m, st.cam.x, st.cam.y), fl = fi >= 0 ? m.floors[fi] : null, o = fl && st.rend.below && st.rend.below.off[fi];
-    if (!quads.length || !o || !fl.i) return;
-    const k = 1 - RH * fl.i; if (k <= 0.05) return;
+    const storeys = fl ? fl.i - (m.groundFloor || 0) : 0; // (storeys above the ground: a basement makes the floor's number one more)
+    if (!o || storeys <= 0) return;
+    const k = 1 - RH * storeys; if (k <= 0.05) return;
+    { // all the open air round this floor (not only at the foot of its walls; he saw a dull flat strip below him on a rope):
+      // the ground far below in the same perspective, in colour where you see it (sc), greyed in the blackout otherwise
+      const ext = Math.max(VW, VH) / z * 1.6, L = st.cam.x - ext, Tp = st.cam.y - ext, p = new Path2D();
+      p.rect(L, Tp, ext * 2, ext * 2); p.addPath(solidRuns(fi));
+      c.save(); if (sc) c.clip(sc); c.clip(p, 'evenodd'); c.translate(eye.x, eye.y); c.scale(k, k); c.translate(-eye.x, -eye.y);
+      const X = eye.x + (L - eye.x) / k, Y = eye.y + (Tp - eye.y) / k;
+      st.rend.drawBelow(c, fi, X, Y, ext * 2 / k, ext * 2 / k); c.restore();
+    }
+    if (!quads.length) return;
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; const p = new Path2D();
     for (const q of quads) { p.moveTo(q[0], q[1]); for (let i = 2; i < 8; i += 2) p.lineTo(q[i], q[i + 1]); p.closePath(); for (let i = 0; i < 8; i += 2) { x0 = Math.min(x0, q[i]); x1 = Math.max(x1, q[i]); y0 = Math.min(y0, q[i + 1]); y1 = Math.max(y1, q[i + 1]); } }
     const X = eye.x + (x0 - eye.x) / k, Y = eye.y + (y0 - eye.y) / k, W2 = (x1 - x0) / k, H2 = (y1 - y0) / k, S = pic.width / st.rend.Wp;
@@ -3004,14 +3027,15 @@ function draw(s, view, now, dt) {
   tq = pfa('fog', tq);
   // --- markers drawn above the blackout ---
   if (inGame && me) {
-    ctx.font = '600 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
+    const nk = Math.min(1, (VH / 400) / (st.zoom || 1)); // names never bigger on screen than at a normal view (close rope views made them huge)
+    ctx.font = `600 ${(6 * nk).toFixed(2)}px Barlow Condensed, sans-serif`; ctx.textAlign = 'center';
     for (const sp of s.players) {
       if (!sp.a || sp.id === me.id) continue;
       const p = interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
       if (p.tm === side) {
         if (!sp.sg && !seen(p.x, p.y)) bodyOutline(p, p.dn ? '#ff5050' : COLS.ally, 0.75); // a teammate out of your sight (he asked): an outline, not their view
         const u = UP();
-        ctx.fillStyle = p.dn ? '#ff5050' : '#3aa0ff'; ctx.beginPath(); ctx.arc(p.x + u.x * 17, p.y + u.y * 17, 2, 0, 7); ctx.fill();
+        ctx.fillStyle = p.dn ? '#ff5050' : COLS.ally; ctx.beginPath(); ctx.arc(p.x + u.x * 17, p.y + u.y * 17, 2 * nk, 0, 7); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(p.n + (p.dn ? ' ▼' : ''), p.x + u.x * 21, p.y + u.y * 21);
       }
       if (sp.ef && (p.tm === side || seen(p.x, p.y))) {
@@ -3812,12 +3836,13 @@ function drawStairView(s, me, now) {
   gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
   c.fillStyle = gr; c.fillRect(0, 0, px, px); c.globalCompositeOperation = 'source-over';
   // onto the top layer, where the steps lead on this floor
-  const P = w2s(cx + offX, cy + offY);
+  const kp = persp.h ? (pv.up ? 1 + persp.h : Math.max(0.05, 1 - persp.h)) : 1, ex = st.pred.x, ey = st.pred.y; // a storey up drawn grown toward you, down shrunk (like the walls)
+  const P = w2s(ex + (cx + offX - ex) * kp, ey + (cy + offY - ey) * kp), pk = px * kp;
   octx.save(); octx.setTransform(1, 0, 0, 1, 0, 0);
-  octx.drawImage(stairCv, P.x - px / 2, P.y - px / 2);
+  octx.drawImage(stairCv, P.x - pk / 2, P.y - pk / 2, pk, pk);
   octx.font = `700 ${Math.round(12 * DPR)}px Barlow, sans-serif`; octx.textAlign = 'center';
   octx.fillStyle = 'rgba(255,255,255,0.7)'; octx.strokeStyle = 'rgba(0,0,0,0.8)'; octx.lineWidth = 3 * DPR;
-  const L = pv.up ? '▲ UPSTAIRS' : '▼ DOWNSTAIRS', ly = P.y - px * 0.36;
+  const L = pv.up ? '▲ UPSTAIRS' : '▼ DOWNSTAIRS', ly = P.y - pk * 0.36;
   octx.strokeText(L, P.x, ly); octx.fillText(L, P.x, ly);
   octx.restore();
 }
@@ -3896,6 +3921,7 @@ function drawWindowView(s, me, now, view) {
 // people and gadgets there your team sees. Your crosshair on it shoots through the hatch (server holeAim).
 function drawHatchView(s, me, now) {
   const hs = (st.viewers || []).filter(v => v.mask);
+  st.hatchKp = [];
   if (!hs.length || !me) return;
   const m = st.map, sm = smokes(s), R = st.rend, k = R.c.width / R.Wp, c = octx, side = me.tm;
   for (const v of hs) {
@@ -3906,7 +3932,12 @@ function drawHatchView(s, me, now) {
     if (K.lim) { x0 = Math.max(x0, K.lim.x0); y0 = Math.max(y0, K.lim.y0); x1 = Math.min(x1, K.lim.x1); y1 = Math.min(y1, K.lim.y1); } // from below: only a small ring round the hole
     x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W * CELL, x1); y1 = Math.min(m.H * CELL, y1);
     if (x1 <= x0 || y1 <= y0) continue;
-    c.save(); c.translate(-o.x, -o.y);
+    // a storey down is drawn shrunk toward you and a storey up grown, like the walls going down / up (look.js persp;
+    // he asked everything to line up in perspective); the crosshair on it is turned back to the real spot (sendInput)
+    const kp = persp.h ? (v.up ? Math.max(0.05, 1 - persp.h) : 1 + persp.h) : 1, ex = st.pred.x, ey = st.pred.y;
+    const toScr = (x, y) => ({ x: ex + (x - o.x - ex) * kp, y: ey + (y - o.y - ey) * kp });
+    { const a = toScr(x0, y0), b = toScr(x1, y1); st.hatchKp.push({ ex, ey, kp, x0: Math.min(a.x, b.x), y0: Math.min(a.y, b.y), x1: Math.max(a.x, b.x), y1: Math.max(a.y, b.y) }); }
+    c.save(); c.translate(ex, ey); c.scale(kp, kp); c.translate(-ex, -ey); c.translate(-o.x, -o.y);
     c.beginPath(); c.moveTo(P[0], P[1]); for (let i = 2; i < P.length; i += 2) c.lineTo(P[i], P[i + 1]); c.closePath(); c.clip();
     c.beginPath(); c.moveTo(Q[0][0], Q[0][1]); for (const [x, y] of Q.slice(1)) c.lineTo(x, y); c.closePath(); c.clip();
     if (K.lim) { c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip(); }
@@ -3927,7 +3958,7 @@ function drawHatchView(s, me, now) {
       if (!ally && (p.sh ? !teamSeesBody(p.x, p.y) : !teamSees(p.x, p.y))) continue;
       const a = anim(p.id);
       drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
-      if (!ally && !p.dn) st.heads.push({ x: p.x - o.x, y: p.y - o.y });
+      if (!ally && !p.dn) st.heads.push(toScr(p.x, p.y));
     }
     c.fillStyle = 'rgba(8,10,14,0.32)'; c.fillRect(x0, y0, x1 - x0, y1 - y0); // a floor away: a little darker
     c.restore();

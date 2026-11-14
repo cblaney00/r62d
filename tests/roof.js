@@ -23,9 +23,13 @@ for (const id of MAP_LIST) {
     let first = r0; while (first.down >= 0) first = m.ropes[first.down];
     reset(); a.x = first.base.x; a.y = first.base.y; tick(0.1); tick(0.1, { interact: 1 }); tick(0.1);
     if (!a.rope) continue;
-    for (let i = 0; i < 6 && a.rope; i++) {
-      tick(ROPE_T(a) + 0.1);
-      if (a.rope && a.rope.st === 'hang') { stops++; if (m.ropes[a.rope.r].f !== floorAt(m, a.x, a.y)) fail(id, 'hanging on the wrong floor'); tick(0.1); tick(0.1, { sprint: 1 }); tick(0.05); }
+    // free climbing (2026-11-14): push toward the wall (rc) all the way up, counting each window stretch passed; at the
+    // top Space takes you over onto the roof (only Space or F take you off a rope)
+    let lastR = -1;
+    for (let i = 0; i < 120 && a.rope; i++) {
+      tick(0.1, { rc: 1 });
+      if (a.rope && a.rope.st === 'hang' && a.rope.r !== lastR) { lastR = a.rope.r; stops++; if (m.ropes[a.rope.r].f !== floorAt(m, a.x, a.y)) fail(id, 'hanging on the wrong floor'); }
+      const R = a.rope && m.ropes[a.rope.r]; if (R && R.roof && R.up < 0 && (a.rope.h ?? 0) > 0.9) { g.event(a, { k: 'vault' }); tick(1.5); }
     }
     if (!a.rope && floorAt(m, a.x, a.y) === RF) got++;
   }
