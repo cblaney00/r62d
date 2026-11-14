@@ -43,6 +43,10 @@ export function buildMap(id = 'harbor') {
 // (he asked: outside-the-window play matters). map.ropes[i] = { f, lvl, cells, hang (by the window's middle), base,
 // inside, out, tx, ty (along the wall), a, b (how far you can slide each way, px), up, down }.
 export const ROPE_CLIMB = 2, ROPE_DROP = 0.8, ROPE_REACH = 20, ROPE_SPAN = 5;
+// on a rope you face the wall: your aim stays within ROPE_AIM of facing it (he saw the body spin round like a pinwheel);
+// a little past each side along the wall, never out behind you
+export const ROPE_AIM = 1.92;
+export const ropeAimLimit = (r, a) => { const w = r.out + Math.PI; return w + Math.max(-ROPE_AIM, Math.min(ROPE_AIM, angDiff(a, w))); };
 function addRopes(m) {
   const W = m.W, ropes = [];
   let gi = -1; for (let k = 0; k < m.tiles.length && gi < 0; k++) if (m.tiles[k] === T.GROUND) gi = m.flAt[k];

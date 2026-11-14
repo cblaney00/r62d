@@ -1,7 +1,7 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
 import { floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
-import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
+import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ropeAimLimit, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
@@ -200,6 +200,7 @@ export class Game {
     if (m.t === 'input') {
       p.input = { ...EMPTY_INPUT, ...m.k };
       if (typeof m.a === 'number' && isFinite(m.a)) p.aim = m.a;
+      if (p.rope && p.rope.st === 'hang' && p.ctrl === 'body' && this.map.ropes[p.rope.r]) p.aim = ropeAimLimit(this.map.ropes[p.rope.r], p.aim); // on a rope: facing the wall (shared/map.js)
       if ((p.slT > 0 || p.slR > 0) && p.ctrl === 'body') p.aim = p.slA + Math.max(-SLIDE.lock, Math.min(SLIDE.lock, angDiff(p.aim, p.slA))); // power slide: you can only aim forward until you are back up
       p.input.sa = p.aim; // sprinting goes by the aim the server knows
       if (p.ctrl === 'cam') { const c = this.feed(p); if (c && this.operates(p, c)) c.ang = c.wn === null || c.wn === undefined ? p.aim : c.wn + Math.max(-c.ws, Math.min(c.ws, angDiff(p.aim, c.wn))); } // a wall camera can't look into its wall

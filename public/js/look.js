@@ -520,7 +520,8 @@ export const tilt = {
   update(dt, vx, vy, shake, W, H) {
     if (!this.el) this.el = document.getElementById('world');
     if (!this.on) { if (this.M) { this.el.style.transform = ''; this.M = null; } return; }
-    const tx = this.lean ? Math.max(-1, Math.min(1, -vy / 140)) * 1.1 : 0, ty = this.lean ? Math.max(-1, Math.min(1, vx / 140)) * 1.3 : 0;
+    const calm = 1 - Math.min(1, this.extra / 34) * 0.85; // (on a rope the camera slides along the wall: little lean, it made the steep view sway)
+    const tx = this.lean ? Math.max(-1, Math.min(1, -vy / 140)) * 1.1 * calm : 0, ty = this.lean ? Math.max(-1, Math.min(1, vx / 140)) * 1.3 * calm : 0;
     const g = Math.min(1, dt * 3.5); this.ax += (tx - this.ax) * g; this.ay += (ty - this.ay) * g;
     // the kick is a spring: pushed by shots and blasts, it swings back and settles
     const sk = this.lean ? Math.min(6, shake) : 0;
@@ -531,13 +532,13 @@ export const tilt = {
       .rotateSelf(11 + this.extra + this.ax + this.kx, this.ay + this.ky, 0).scaleSelf(s, s).translateSelf(-W / 2, -H / 2 - H * 0.01 - H * this.extra * 0.006);
     // the layers must always fill the screen (he saw a lit sliver above the steep rope view): grow until all four
     // corners of the layer are off screen
-    let s = 1.1 + this.extra * 0.012, M = make(s);
-    for (let i = 0; i < 8; i++) {
-      this.M = M; const a = this.project(0, 0), b = this.project(W, 0), c = this.project(0, H), d = this.project(W, H);
-      if (a.y <= 0 && b.y <= 0 && a.x <= 0 && b.x >= W && c.y >= H && d.y >= H && c.x <= 0 && d.x >= W) break;
-      s *= 1.05; M = make(s);
-    }
-    this.M = M; this.el.style.transform = M.toString();
+    // the smallest size that still covers the screen, found exactly (it used to step by 5%, and a small sway flipped it
+    // between two steps every frame: he saw the screen shake sprinting along a wall), then glided: grows at once, shrinks slowly
+    const fits = sc => { this.M = make(sc); const a = this.project(0, 0), b = this.project(W, 0), c = this.project(0, H), d = this.project(W, H); return a.y <= 0 && b.y <= 0 && a.x <= 0 && b.x >= W && c.y >= H && d.y >= H && c.x <= 0 && d.x >= W; };
+    let lo = 1.1 + this.extra * 0.012, need = lo;
+    if (!fits(lo)) { let hi = lo * 1.1; while (!fits(hi) && hi < lo * 3) hi *= 1.15; for (let i = 0; i < 9; i++) { const mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid; } need = hi * 1.004; }
+    this.sc = !this.sc || need > this.sc ? need : this.sc + (need - this.sc) * Math.min(1, dt * 1.5);
+    const M = make(this.sc); this.M = M; this.el.style.transform = M.toString();
   },
   kick(k = 1) { if (this.lean && this.on) this.kvx -= 9 * k; },
   flat() { if (this.M) { this.el.style.transform = ''; this.M = null; document.documentElement.classList.remove('tilt3d', 'edgeblur'); } }, // menus: straight down

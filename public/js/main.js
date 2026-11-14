@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -906,6 +906,7 @@ function pressAction(a, e) {
   }
 }
 // Power slide: crouching while sprinting; until you are back up you can only aim within SLIDE.lock of the way you slide
+const ropeOf = () => { const me = st.me; return me && me.ro && me.ro[0] && me.ct === 'body' && !st.tv && st.map ? st.map.ropes[me.ro[1]] || null : null; }; // the rope you hang on (aim limited: ropeAimLimit)
 const sliding = () => st.pred && (st.pred.slT > 0 || st.pred.slR > 0) && st.me && st.me.ct === 'body' && !st.tv;
 const slideAim = a => st.pred.slA + Math.max(-SLIDE.lock, Math.min(SLIDE.lock, angDiff(a, st.pred.slA)));
 function trySlide() { if (!st.pred || !st.pred.spr || st.pred.scd > 0 || !st.me || st.me.ct !== 'body') return false; st.slideReq = performance.now(); return true; }
@@ -2021,6 +2022,7 @@ function frame(nowMs) {
   pollPad(dt, view);
   aimAssist(dt, view);
   setTouchVisible(playing() && !st.tv && !menuOpen() && !!st.me && $('pause').classList.contains('hidden')); // phone controls only while playing
+  { const R = ropeOf(); if (R) { padAng = wrapAng(ropeAimLimit(R, padAng)); const l = Math.hypot(aimOff.x, aimOff.y), a = ropeAimLimit(R, Math.atan2(aimOff.y, aimOff.x)); if (l > 0.01) aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l }; } } // on a rope: facing the wall
   if (sliding()) { padAng = wrapAng(slideAim(padAng)); const l = Math.hypot(aimOff.x, aimOff.y), a = slideAim(Math.atan2(aimOff.y, aimOff.x)); aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l }; }
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
   st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
@@ -2038,6 +2040,7 @@ function frame(nowMs) {
     const c = cursor(), mw = screenToWorld(c.x, c.y);
     st.aim = Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x);
     if (sliding()) st.aim = slideAim(st.aim);
+    { const R = ropeOf(); if (R) st.aim = ropeAimLimit(R, st.aim); }
     if (r3on() && rope3d.active()) { const a = rope3d.aim(); if (a) { st.aim = a.ang; aimOff = { x: a.x - st.pred.x, y: a.y - st.pred.y }; st.r3aim = a; } } else st.r3aim = null; // the 3D rope view: where its crosshair is
     if (now < (st.dazeUntil || 0)) st.aim += Math.sin(now * 6.3) * 0.05 + Math.sin(now * 2.1) * 0.04; // dazed: the aim sways
   } else if (view && view.kind === 'cam') {
