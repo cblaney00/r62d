@@ -437,8 +437,9 @@ function freeAimPoint() {
     const R = Math.max(l + 40, st.me ? reachOf(st.me, true) : 0), d0 = onRope ? CELL * 2 : 0;
     let bd = d0 + castSight(st.map, st.pred.x + c * d0, st.pred.y + s * d0, a, R - d0, null, true) + 2, bp = null;
     if (bd >= R - 2) bd = Infinity;
-    if (st.rings) for (const r of st.rings) { const ox = r.x - st.pred.x, oy = r.y - st.pred.y, along = ox * c + oy * s, perp = Math.abs(oy * c - ox * s); if (along <= l - 4 || perp > RING_R) continue; const e = along - Math.sqrt(RING_R * RING_R - perp * perp); if (e < bd) { bd = e; bp = { id: r.id, x: r.x, y: r.y, d: e }; } }
+    if (st.rings) for (const r of st.rings) { const ox = r.x - st.pred.x, oy = r.y - st.pred.y, along = ox * c + oy * s, perp = Math.abs(oy * c - ox * s); if ((!onRope && along <= l - 4) || along <= d0 || perp > RING_R) continue; const e = along - Math.sqrt(RING_R * RING_R - perp * perp); if (e < bd) { bd = e; bp = { id: r.id, x: r.x, y: r.y, d: e }; } }
     if (bd < Infinity && bd > l - 4) mk = { d: bd, person: bp, beyond: true, x: st.pred.x + c * bd, y: st.pred.y + s * bd };
+    else if (onRope && bd < l - 4) { see = shot = bd; mk = { d: bd, person: bp, x: st.pred.x + c * bd, y: st.pred.y + s * bd }; } // on a rope: a wall between you and the crosshair (past the one you hang on) gets it as on the ground
   }
   return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, person, rope: onRope, mk, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
 }
