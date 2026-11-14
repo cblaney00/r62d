@@ -2331,7 +2331,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const c = cursor(), mw = freeAimOn() && padOn && !gpRecent() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
   if (st.r3aim) { mw.x = st.r3aim.x; mw.y = st.r3aim.y; } // (the 3D rope view's crosshair)
   if (persp.h) { // (bodies stand up at most as if persp.cap from the eye: liftBody)
-    const hh = persp.h * 0.5, dx = mw.x - persp.x, dy = mw.y - persp.y, d = Math.hypot(dx, dy), k = d / (1 + hh) <= persp.cap ? 1 / (1 + hh) : Math.max(0, d - persp.cap * hh) / Math.max(1e-6, d);
+    const hh = persp.h * 0.46, dx = mw.x - persp.x, dy = mw.y - persp.y, d = Math.hypot(dx, dy), k = d / (1 + hh) <= persp.cap ? 1 / (1 + hh) : Math.max(0, d - persp.cap * hh) / Math.max(1e-6, d);
     mw.x = persp.x + dx * k; mw.y = persp.y + dy * k; } // a head is drawn where its height shows it (look.js persp): back to where it really is
   if (st.winKp && st.winKp < 1 && st.winViewsOn && st.map && winAimed(st.aim)) { mw.x = st.pred.x + (mw.x - st.pred.x) / st.winKp; mw.y = st.pred.y + (mw.y - st.pred.y) / st.winKp; } // aiming down out of a window: the ground there is drawn shrunk toward you (drawWindowView)
   for (const H of st.hatchKp || []) if (H.kp !== 1 && mw.x >= H.x0 && mw.x <= H.x1 && mw.y >= H.y0 && mw.y <= H.y1) { mw.x = H.ex + (mw.x - H.ex) / H.kp; mw.y = H.ey + (mw.y - H.ey) / H.kp; break; } // aiming into a hatch view (drawHatchView): back to the real spot
@@ -2848,7 +2848,7 @@ function draw(s, view, now, dt) {
       if (elv) c.restore(); }); };
     upDraw(ctx); if ((elv || hangW !== undefined) && persp.h) (st.upDraws || (st.upDraws = [])).push(upDraw);
     else if (persp.h) (st.ghostDraws || (st.ghostDraws = [])).push(upDraw); // (shown faintly again over the raised walls)
-    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? fTop : 0, lb = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.4 * zk)), lh = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.53 * zk)); // (drawn standing up: rings and head zones where they show)
+    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? fTop : 0, lb = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.37 * zk)), lh = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.49 * zk)); // (drawn standing up: rings and head zones where they show)
     drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x + lb[0], y: p.y + lb[1] });
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x + lh[0], y: p.y + lh[1] });
     if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see
@@ -2919,9 +2919,9 @@ function draw(s, view, now, dt) {
     if (!rf) {
       const fr = st.floorRect;
       const X0 = Math.max(fr ? fr[0] : 0, wx0 - 40), Y0 = Math.max(fr ? fr[1] : 0, wy0 - 40), X1 = Math.min(fr ? fr[2] : m.W * CELL, wx1 + 40), Y1 = Math.min(fr ? fr[3] : m.H * CELL, wy1 + 40);
-      const mr0 = st.me && st.me.ro && st.me.ro[0] && st.pred; // on a rope: the wall in front of you always counts as seen
-      const seenG = view && vpolys.length ? seenGrid(vpolys, rm, mr0 ? [{ x: mr0.x, y: mr0.y, r: CELL * 4 }] : []) : null;
-      rf = raisedFrame(st.rend, rm, eye, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1, (st.rt || 0) > 0.01, seenG, mr0 ? [{ x: mr0.x, y: mr0.y, r: CELL * 4 }] : null);
+      const mr0 = st.me && st.me.ro && st.me.ro[0] && st.pred, wallSp = mr0 ? ropeWallSpots(st.me.ro[1], mr0) : null; // on a rope: the whole wall you hang on counts as seen
+      const seenG = view && vpolys.length ? seenGrid(vpolys, rm, wallSp || []) : null;
+      rf = raisedFrame(st.rend, rm, eye, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1, (st.rt || 0) > 0.01, seenG, wallSp);
     }
     // wall tops from the small copy of the map when the screen shows less than it holds (far out)
     const pk = pass === 'fog' ? fog.width / VW * z : z, pic = st.rend.picFor(pk), upA = Math.min(1, (st.rt || 0) * 1.4);
@@ -3655,6 +3655,20 @@ function drawWinGo(r, now) {
   for (const k of [-1, 0, 1]) { const d = 10 + k * 7 + ((now * 14) % 7), px = cx + Math.cos(dir) * (d - 10), py = cy + Math.sin(dir) * (d - 10);
     ctx.save(); ctx.translate(px, py); ctx.rotate(dir); ctx.beginPath(); ctx.moveTo(3, 0); ctx.lineTo(-2, -3.2); ctx.lineTo(-0.6, 0); ctx.lineTo(-2, 3.2); ctx.closePath(); ctx.fill(); ctx.restore(); }
   ctx.restore();
+}
+// The wall a climber hangs on, whole (he asked 2026-11-14: only the bit round you showed, the rest of the wall was a dark
+// grid depending on where you were): round spots along the rope's stretch and the stretches beside it (r.left / r.right),
+// plus the old circle round you. Kept per rope, so it is only worked out when you move onto another stretch.
+function ropeWallSpots(ri, me) {
+  const C = st.wallSpots; if (C && C.ri === ri && C.m === st.map) return [{ x: me.x, y: me.y, r: CELL * 4 }, ...C.sp];
+  const R = st.map.ropes, sp = [], seen = new Set(), add = r => {
+    if (!r || seen.has(r.i)) return; seen.add(r.i);
+    for (let t = r.a; t <= r.b + CELL; t += CELL * 2) sp.push({ x: r.hang.x + r.tx * Math.min(t, r.b), y: r.hang.y + r.ty * Math.min(t, r.b), r: CELL * 2.1 }); // (just the wall and its face: not the room behind)
+  };
+  let r = R[ri]; add(r);
+  for (const dir of ['left', 'right']) { let q = r, n = 0; while (q && q[dir] !== undefined && n++ < 6) { q = R[q[dir]]; add(q); } }
+  st.wallSpots = { ri, m: st.map, sp };
+  return [{ x: me.x, y: me.y, r: CELL * 4 }, ...sp];
 }
 function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;

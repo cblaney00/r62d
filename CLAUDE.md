@@ -421,3 +421,4 @@ His wishes so far:
   - Boards seen from the side: look.js `boardLook` (stage from `m.hp`, holes from `m.holes` placed along the face), deco 'w' cracks by `F.st`, `G.holes` dark punctures; board tops in `G.under` (drawn before the wall tops). The drawn map is `st.rend.map` (st.known), not st.map.
   - Tilt zoom: look.js tilt.update finds the covering scale exactly (`fits`, bisection) and glides `this.sc`; sway `calm` on a rope. Rope aim: shared/map.js `ROPE_AIM`/`ropeAimLimit` (server input handler, client `ropeOf` in main.js).
   - On a rope the upper body turns with the aim (sprites.js: `ctx.rotate(aim - bodyA)` before the back gear when `hang`), hips and legs stay to the wall.
+  - Body heights (sprites.js): shoulders/torso art 0.41, jacket top 0.40, arms 0.38, neck 0.40-0.45, head 0.44-0.49 (was 0.45/0.44/0.42/0.44-0.49/0.48-0.53); main.js rings 0.37, heads 0.49, sendInput 0.46. Rope wall: main.js `ropeWallSpots` (whole stretch + neighbours as seen spots).

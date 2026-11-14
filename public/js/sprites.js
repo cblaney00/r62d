@@ -355,16 +355,16 @@ export function drawOperator(ctx, p, t) {
   if (persp.h) { // the body between the hips and the shoulders (what a tilted camera sees): belt, jacket, plate carrier
     const [hpx, hpy] = hipOf(), hip = [-1 + hpx, hpy / bw];
     const lift = (x, y, z) => { const [lx, ly] = LZ(z), pt = [x + lx, y + ly / bw]; return tilt && z > 0.31 ? tiltPt(pt[0], pt[1], hip[0], hip[1]) : pt; };
-    const hs = tilt ? 0 : hipShift(p), ls = tilt ? 0 : Math.max(-1, Math.min(1, p.lean || 0)) * 5.5 / bw, at = z => hs + (ls - hs) * Math.max(0, (z - 0.31) / 0.14); // the spine bends from the hips to the leaning shoulders (on a rope: tilts, above)
+    const hs = tilt ? 0 : hipShift(p), ls = tilt ? 0 : Math.max(-1, Math.min(1, p.lean || 0)) * 5.5 / bw, at = z => hs + (ls - hs) * Math.max(0, (z - 0.31) / 0.1); // the spine bends from the hips to the leaning shoulders (on a rope: tilts, above)
     let [a0, a1] = lift(-1, at(0.3), 0.3), [b0, b1] = lift(-1, at(0.33), 0.33);
     column(ctx, a0, a1, 5.2, 7.4, b0, b1, 5.3, 7.5, u.strap || '#2a2a2a'); // belt
-    [a0, a1] = lift(-1, at(0.32), 0.32); [b0, b1] = lift(-1, at(0.44), 0.44);
+    [a0, a1] = lift(-1, at(0.32), 0.32); [b0, b1] = lift(-1, at(0.40), 0.40);
     column(ctx, a0, a1, 5.4 * sh, 7.6 * sh, b0, b1, 6.6 * sh, 9.2 * sh, u.cloth); // jacket, wider at the shoulders
     if (VEST[p.op] === undefined || /carrier|heavy|medic|police|bomb/.test(String(VEST[p.op]))) {
-      [a0, a1] = lift(-0.8, at(0.335), 0.335); [b0, b1] = lift(-0.8, at(0.43), 0.43);
+      [a0, a1] = lift(-0.8, at(0.335), 0.335); [b0, b1] = lift(-0.8, at(0.395), 0.395);
       column(ctx, a0, a1, 5.7 * sh, 6.6 * sh, b0, b1, 5.9 * sh, 6.9 * sh, u.vest); // plate carrier
     }
-    const [lx, ly] = LZ(0.45), [tx, ty] = tilt ? tiltPt(lx, ly / bw, hip[0] + 1, hip[1]) : [lx, ly / bw]; ctx.translate(tx, ty); // the top of the body at shoulder height
+    const [lx, ly] = LZ(0.41), [tx, ty] = tilt ? tiltPt(lx, ly / bw, hip[0] + 1, hip[1]) : [lx, ly / bw]; ctx.translate(tx, ty); // the top of the body at shoulder height
   }
   if (p.slide) ctx.translate(-3, 0); // sliding: the body leans back behind the legs
   // ---- leaning (he asked): the legs stay planted, everything from the hips up tips to the side ----
@@ -378,8 +378,8 @@ export function drawOperator(ctx, p, t) {
   // ---- back gear ----
   const id = o.ability.id;
   if (hang && persp.h) { // on a rope, seen from behind: the pack is a block on the back, not a picture from above
-    const [l0x, l0y] = LZ(0.45), at = z => { const [x, y] = LZ(z); return [x - l0x, (y - l0y) / bw]; };
-    const [a0, a1] = at(0.31), [b0, b1] = at(0.44), pk = String(PACK[p.op] || '');
+    const [l0x, l0y] = LZ(0.41), at = z => { const [x, y] = LZ(z); return [x - l0x, (y - l0y) / bw]; };
+    const [a0, a1] = at(0.31), [b0, b1] = at(0.40), pk = String(PACK[p.op] || '');
     if (pk !== 'none' && !pk.startsWith('cloak') && !pk.startsWith('sling')) column(ctx, a0 - 8.6, a1, 2.6, 4.8, b0 - 8.6, b1, 2.8, 5, u.dark, true);
   } 
   else if (id === 'cutter') { box(ctx, -12.5, -4.5, 5.5, 9, 2.6, '#c8601f'); ctx.fillStyle = '#222'; ctx.fillRect(-12, -1, 4.5, 2); cap(ctx, -9, 3.5, -3, 8, 0.8, '#222'); }
@@ -405,11 +405,11 @@ export function drawOperator(ctx, p, t) {
   if (p.slide) ctx.translate(-3, 0);
   if (p.lean && !tilt) { const L = Math.max(-1, Math.min(1, p.lean)); ctx.translate(0, L * 5.5); ctx.rotate(L * 0.14); } // arms, gun and head lean with the torso
 
-  if (tilt) { const [hx, hy] = hipOf(), [lx, ly] = LZ(0.42), [cx, cy] = tiltPt(lx, ly, hx, hy); ctx.translate(cx, cy); ctx.rotate(tilt); } // (on a rope: turned round the hips with the torso)
-  else { const [lx, ly] = LZ(0.42); ctx.translate(lx, ly); } // arms and gun at chest height
+  if (tilt) { const [hx, hy] = hipOf(), [lx, ly] = LZ(0.38), [cx, cy] = tiltPt(lx, ly, hx, hy); ctx.translate(cx, cy); ctx.rotate(tilt); } // (on a rope: turned round the hips with the torso)
+  else { const [lx, ly] = LZ(0.38); ctx.translate(lx, ly); } // arms and gun at chest height
   if (hang) { // on a rope the harness takes the weight at the hip (he asked: no hands on the rope): a tether from a clip
     // at the front of the hips to the rope on the wall, then both hands on the gun, turned to the aim
-    const [ax, ay] = LZ(0.42), [hx, hy] = LZ(inv ? 0.31 : 0.29), [wx, wy] = LZ(inv ? 0.1 : 0.62);
+    const [ax, ay] = LZ(0.38), [hx, hy] = LZ(inv ? 0.31 : 0.29), [wx, wy] = LZ(inv ? 0.1 : 0.62);
     const cx = 3.2 + hx - ax, cy = hy - ay, tx = 6 + wx - ax, ty = wy - ay;
     ctx.strokeStyle = '#c8b27a'; ctx.lineWidth = 0.9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.quadraticCurveTo((cx + tx) / 2 + 1, (cy + ty) / 2, tx, ty); ctx.stroke();
     ell(ctx, cx, cy, 1, 1, '#b8bcc2'); // the carabiner
@@ -477,14 +477,14 @@ export function drawOperator(ctx, p, t) {
   }
 
   if (p.slide) { ctx.translate(3.4, 0.5); ctx.rotate(0.14); } // sliding (he asked): the head leans down onto the gun, as when aiming in
-  { const [ax, ay] = LZ(0.42), [hx, hy] = LZ(0.53);
-    if (persp.h) { // neck and the sides of the head, from where the arms are drawn (0.42) up to the headgear
+  { const [ax, ay] = LZ(0.38), [hx, hy] = LZ(0.49);
+    if (persp.h) { // neck and the sides of the head, from where the arms are drawn (0.38) up to the headgear
       const at = z => { const [x, y] = LZ(z); return [x - ax, y - ay]; };
-      let [n0, n1] = at(0.44), [m0, m1] = at(0.49);
+      let [n0, n1] = at(0.40), [m0, m1] = at(0.45);
       column(ctx, n0 + 0.3, n1, 2.6, 2.8, m0 + 0.5, m1, 2.6, 2.8, skin); // neck
-      [n0, n1] = at(0.48); [m0, m1] = at(0.53);
+      [n0, n1] = at(0.44); [m0, m1] = at(0.49);
       column(ctx, n0 + 0.8, n1, 4, 4, m0 + 0.6, m1, 4.9, 4.9, o.helmet || skin); // head and headgear sides
-      const [f0, f1] = at(0.495); ell(ctx, f0 + 3.6, f1, 1.6, 2.6, skin, false); // the face under the brim
+      const [f0, f1] = at(0.455); ell(ctx, f0 + 3.6, f1, 1.6, 2.6, skin, false); // the face under the brim
     }
     ctx.translate(hx - ax, hy - ay); } // the head on top
   // ---- head & headgear ----
