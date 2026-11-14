@@ -48,9 +48,11 @@ for (const id of MAP_LIST) {
     a.rope.h = 0.95; a.rope.inv = true;
     if (!g.ropeLevel(a)) fail(id, r.i, 'upside down from above was not level with the window');
     a.rope.inv = false; a.rope.h = 0.5; d.x = -9000;
-    // climbing down to the ground takes you off the rope
+    // climbing down to the ground keeps you clipped in (he asked: only F or Space take you off a rope); F slides you off
     tick(5, { rc: -1 });
-    if (a.rope) fail(id, r.i, 'climbing all the way down did not put you on the ground', JSON.stringify(a.rope));
+    if (!a.rope) fail(id, r.i, 'climbing all the way down took you off the rope by itself');
+    tick(0.1); tick(0.1, { interact: 1 }); tick(2);
+    if (a.rope) fail(id, r.i, 'F at the bottom did not put you on the ground', JSON.stringify(a.rope));
   }
   console.log(`${id}: done`);
 }

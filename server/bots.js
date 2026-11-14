@@ -1453,7 +1453,13 @@ function roofPlay(game, p, inp, dt) {
   const st = ai.roofSt && ai.roofSt.round === game.round ? ai.roofSt : (ai.roofSt = { round: game.round, s: 'go', t: game.time });
   if (st.s === 'done') return false;
   const fl = floorAt(m, p.x, p.y), prev = p.prevInput || {}, press = k => { inp[k] = prev[k] ? 0 : 1; }, h = R.h;
-  if (p.rope) { if (p.rope.st === 'hang') { inp.rc = st.s === 'leave' ? -1 : 1; inp.sprint = 1; } return true; } // up the wall to the roof (or back down to the ground)
+  if (p.rope) { // up the wall to the roof (Space over the top), or F to slide back down (only F or Space take you off a rope)
+    if (p.rope.st === 'hang') {
+      if (st.s === 'leave') press('interact');
+      else { inp.rc = 1; inp.sprint = 1; if ((p.rope.h ?? 0) > 0.9 && game.time - (st.overT || 0) > 0.5) { st.overT = game.time; game.event(p, { k: 'vault', a: p.aim }); } }
+    }
+    return true;
+  }
   if (st.s !== 'leave' && st.s !== 'go' && (game.planted || game.timer < 30 || game.time - st.t > 70)) st.s = 'leave';
   if (st.s === 'go') {
     if (fl === m.roofFloor) { st.s = 'open'; st.t = game.time; if (!ai.roofSaid) { ai.roofSaid = true; teamSay(game, p, 'On the roof.', 'roof'); } }

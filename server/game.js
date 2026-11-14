@@ -1,7 +1,7 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
 import { floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
-import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
+import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
@@ -1582,11 +1582,9 @@ export class Game {
         if (Math.abs(climb) < 0.25) climb = 0;
         if (o.h === undefined) o.h = 0.5;
         o.h += Math.sign(climb) * dt / ROPE_CLIMB * (inp.sprint ? 1.6 : 1); o.cl = climb ? Math.sign(climb) : 0;
-        if (o.h >= 1) { if (r.up >= 0) { const q = R[r.up]; this.ropeShift(p, r, q); o.h -= q.lvl - r.lvl; r = q; } else if (r.roof && climb > 0) { o.inv = false; this.ropeUp(p, r); return; } else o.h = 0.98; }
+        if (o.h >= 1) { if (r.up >= 0) { const q = R[r.up]; this.ropeShift(p, r, q); o.h -= q.lvl - r.lvl; r = q; } else o.h = 0.98; } // (only F or Space take you off a rope, he asked: at the top you stay on the wall until Space)
         if (o.h < 0 && r.down >= 0) { const q = R[r.down]; this.ropeShift(p, r, q); o.h += r.lvl - q.lvl; r = q; }
-        if (r.down < 0 && o.h + r.lvl < ROPE_HEAD0 - 0.04) { // down at the ground: off the rope
-          const g = ropeGround(this.map, r, ropeS(r, p.x, p.y)); p.x = g.x; p.y = g.y; p.vx = p.vy = 0; p.rope = null; return;
-        }
+        if (r.down < 0 && o.h + r.lvl < ROPE_HEAD0) o.h = ROPE_HEAD0 - r.lvl; // down at the ground you stay clipped in (F unclips)
       }
       if (edge('interact')) { // let go (he asked: F slides you down quickly and unclips; Space climbs in): down to the ground below you
         p.rope = { st: 'move', r: -1, from: -2, to: -1, t: 0, dur: ROPE_SLIDE * Math.max(0.3, o.h + r.lvl), base: ropeGround(this.map, r, ropeS(r, p.x, p.y)), top: { x: p.x, y: p.y } };
@@ -1648,7 +1646,8 @@ export class Game {
   startVault(p, ang) {
     if (p.rope) { // hanging outside a window: climb in, swinging through wooden boards (he chose); never up to the roof
       const r = p.rope.st === 'hang' && this.map.ropes[p.rope.r];
-      if (!r || p.downed || !ropeAtWindow(r, p.x, p.y) || !this.ropeLevel(p)) return false; // (level with it, like R6)
+      if (r && !p.downed && r.roof && r.up < 0 && (p.rope.h ?? 0.5) > 0.85 && !this.ropeLevel(p)) { p.rope.inv = false; this.ropeUp(p, r); return true; } // at the top of the wall: Space takes you over onto the roof
+      if (!r || p.downed || !ropeVaultZone(r, p.x, p.y) || !this.ropeLevel(p)) return false; // (level with it, like R6, and right in front of it)
       const smash = !ropeWindowOpen(this.map, r);
       if (smash && !ropeWindowBoarded(this.map, r)) return false; // reinforced or blocked: no way in here
       if (smash) { for (const k of r.cells) if (this.map.tiles[k] === T.BARRI) this.destroyCell(k); this.noise(p.x, p.y, this.side(p), 700); }

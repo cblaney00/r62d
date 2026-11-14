@@ -3,12 +3,12 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, persp, lifted } from './look.js';
+import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, persp, lifted, withPersp } from './look.js';
 import { S, setMapScale } from './textures.js';
 import { column, drawZombie, drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
@@ -2301,6 +2301,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const c = cursor(), mw = freeAimOn() && padOn && !gpRecent() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
   if (st.r3aim) { mw.x = st.r3aim.x; mw.y = st.r3aim.y; } // (the 3D rope view's crosshair)
   if (persp.h) { const k = 1 + persp.h * 0.5; mw.x = persp.x + (mw.x - persp.x) / k; mw.y = persp.y + (mw.y - persp.y) / k; } // a head is drawn where its height shows it (look.js persp): back to where it really is
+  if (st.winKp && st.winKp < 1 && st.winViewsOn && st.map && winAimed(st.aim)) { mw.x = st.pred.x + (mw.x - st.pred.x) / st.winKp; mw.y = st.pred.y + (mw.y - st.pred.y) / st.winKp; } // aiming down out of a window: the ground there is drawn shrunk toward you (drawWindowView)
   msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
   st.aimUp = ctrl === 'body' && me && me.a && !me.dn && !!aimUpHatch(st.map, st.pred.x, st.pred.y, mw.x, mw.y); // your own aim-up pose, without waiting for the server
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
@@ -2909,7 +2910,7 @@ function draw(s, view, now, dt) {
     for (const q of quads) { p.moveTo(q[0], q[1]); for (let i = 2; i < 8; i += 2) p.lineTo(q[i], q[i + 1]); p.closePath(); for (let i = 0; i < 8; i += 2) { x0 = Math.min(x0, q[i]); x1 = Math.max(x1, q[i]); y0 = Math.min(y0, q[i + 1]); y1 = Math.max(y1, q[i + 1]); } }
     const X = eye.x + (x0 - eye.x) / k, Y = eye.y + (y0 - eye.y) / k, W2 = (x1 - x0) / k, H2 = (y1 - y0) / k, S = pic.width / st.rend.Wp;
     c.save(); c.clip(p); c.translate(eye.x, eye.y); c.scale(k, k); c.translate(-eye.x, -eye.y);
-    pic.drawTo(c, (X + o.x) * S, (Y + o.y) * S, W2 * S, H2 * S, X, Y, W2, H2);
+    st.rend.drawBelow(c, fi, X, Y, W2, H2); // the view far below (buildings as roofs, never their rooms: he saw desks through the roof)
     c.restore();
   }
   showFog(!!(view && inGame));
@@ -3550,10 +3551,11 @@ function promptText(s, me) {
   if (me.ro) { // on a rope (he asked: climb freely)
     if (!me.ro[0]) return me.ro[2] < 0 && !me.ro[4] ? 'LETTING GO…' : 'CLIMBING…';
     const r = m.ropes[me.ro[1]]; if (!r) return '';
-    const head = (me.ro[7] ?? 0.5) - (me.ro[5] ? 0.45 : 0), fl = m.floors[r.f].name, atW = ropeAtWindow(r, x, y), lvl = !!me.ro[8];
+    const head = (me.ro[7] ?? 0.5) - (me.ro[5] ? 0.45 : 0), fl = m.floors[r.f].name, atW = ropeVaultZone(r, x, y), lvl = !!me.ro[8], nearW = ropeAtWindow(r, x, y);
     const where = !r.cells.length ? (head > 0 ? 'WALL · ' + fl : 'WALL') : lvl ? `LEVEL WITH THE ${fl} WINDOW` : head < 0.5 ? `BELOW THE ${fl} WINDOW` : `ABOVE THE ${fl} WINDOW`;
-    const inKey = atW && lvl ? (ropeWindowOpen(m, r) ? `  ·  <b>${label('vault')}</b>CLIMB IN` : ropeWindowBoarded(m, r) ? `  ·  <b>${label('vault')}</b>SWING IN THROUGH THE BOARDS` : '  ·  WINDOW BLOCKED') : '';
-    return `${where}${inKey}  ·  <b>${label('up')}</b>/<b>${label('down')}</b>CLIMB  ·  <b>${label('left')}</b>/<b>${label('right')}</b>ALONG  ·  <b>${label('crouch')}</b>${me.ro[5] ? 'RIGHT WAY UP' : 'UPSIDE DOWN'}  ·  <b>${label('interact')}</b>SLIDE DOWN`;
+    const inKey = atW && lvl ? (ropeWindowOpen(m, r) ? `  ·  <b>${label('vault')}</b>CLIMB IN` : ropeWindowBoarded(m, r) ? `  ·  <b>${label('vault')}</b>SWING IN THROUGH THE BOARDS` : '  ·  WINDOW BLOCKED') : nearW && lvl ? '  ·  MOVE IN FRONT OF THE WINDOW TO GO IN' : '';
+    const top = r.roof && r.up < 0 && head > 0.85 && !lvl ? `  ·  <b>${label('vault')}</b>ONTO THE ROOF` : ''; // (only Space or F take you off a rope)
+    return `${where}${inKey}${top}  ·  <b>${label('up')}</b>/<b>${label('down')}</b>CLIMB  ·  <b>${label('left')}</b>/<b>${label('right')}</b>ALONG  ·  <b>${label('crouch')}</b>${me.ro[5] ? 'RIGHT WAY UP' : 'UPSIDE DOWN'}  ·  <b>${label('interact')}</b>SLIDE DOWN`;
   }
   const down = s.players.find(p => p.a && p.dn && p.tm === side && p.id !== me.id && Math.hypot(p.x - x, p.y - y) < 26);
   if (down && !me.dn && me.ct === 'body') return `<b>${label('interact')}</b>HOLD TO REVIVE ${esc(down.n.toUpperCase())}`; // before ropes (the server puts reviving first too)
@@ -3832,7 +3834,12 @@ function drawWindowView(s, me, now, view) {
   if (x1 <= x0 || y1 <= y0) return;
   st.winBox = [x0 + o.x, y0 + o.y, x1 + o.x, y1 + o.y]; // the camera may show this past the floor's edge
   const R = st.rend, k = R.c.width / R.Wp, c = octx;
-  c.save(); c.translate(o.x, o.y); // the top layer is in world units here (as for the stairs view)
+  // the ground is storeys below you: drawn shrunk toward the eye like the walls going down to it (look.js persp), so it
+  // lines up with them and with the ground drawn round the building (he saw the two out of line)
+  const Lst = Math.max(0, (m.floors[f] ? m.floors[f].i : 0) - gi), kp = persp.h ? Math.max(0.05, 1 - persp.h * Lst) : 1, ex = view.x, ey = view.y; // (shrunk toward you: every direction from you stays true, so shots go where they look)
+  st.winKp = kp;
+  const toScr = (x, y) => ({ x: ex + (x + o.x - ex) * kp, y: ey + (y + o.y - ey) * kp }), eyeG = { x: ex - o.x, y: ey - o.y };
+  c.save(); c.translate(ex, ey); c.scale(kp, kp); c.translate(-ex, -ey); c.translate(o.x, o.y); // the top layer is in world units here (as for the stairs view)
   c.beginPath(); for (const P of polys) { c.moveTo(P[0], P[1]); for (let i = 2; i < P.length; i += 2) c.lineTo(P[i], P[i + 1]); c.closePath(); }
   c.clip('nonzero');
   R.c.drawTo(c, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0);
@@ -3854,8 +3861,8 @@ function drawWindowView(s, me, now, view) {
     const ally = p.tm === side;
     if (!ally && (p.sh ? !teamSeesBody(at.x, at.y) : !teamSees(at.x, at.y))) continue;
     const a = anim(p.id);
-    drawOperator(c, { x: at.x, y: at.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
-    if (!ally && !p.dn) st.heads.push({ x: at.x + o.x, y: at.y + o.y });
+    withPersp(eyeG, persp.h, () => drawOperator(c, { x: at.x, y: at.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now));
+    if (!ally && !p.dn) st.heads.push(toScr(at.x, at.y));
   }
   // darker with distance from the wall: a floor or more down, and it fades out at the end of what you can see
   for (const v of ws) {
@@ -3864,7 +3871,7 @@ function drawWindowView(s, me, now, view) {
     c.fillStyle = gr; c.fillRect(x0, y0, x1 - x0, y1 - y0); break;
   }
   c.restore();
-  const v0 = ws[0], P = w2s(v0.x + o.x + Math.cos(v0.ang) * 26, v0.y + o.y + Math.sin(v0.ang) * 26);
+  const v0 = ws[0], q0 = toScr(v0.x + Math.cos(v0.ang) * 26, v0.y + Math.sin(v0.ang) * 26), P = w2s(q0.x, q0.y);
   octx.save(); octx.setTransform(1, 0, 0, 1, 0, 0);
   octx.font = `700 ${Math.round(11 * DPR)}px Barlow, sans-serif`; octx.textAlign = 'center';
   octx.fillStyle = 'rgba(255,255,255,0.7)'; octx.strokeStyle = 'rgba(0,0,0,0.8)'; octx.lineWidth = 3 * DPR;

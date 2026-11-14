@@ -171,6 +171,9 @@ export function ropeGround(m, r, s) {
 // How far along the wall (px from the window's middle) someone at (x, y) hangs, and are they in front of the window?
 export const ropeS = (r, x, y) => (x - r.hang.x) * r.tx + (y - r.hang.y) * r.ty;
 export const ropeAtWindow = (r, x, y) => r.cells.length > 0 && Math.abs(ropeS(r, x, y)) <= r.half - 4;
+// where Space can take you in through a window (he asked 2026-11-14): only a narrow area right in front of it, so going in
+// without setting it up first is dangerous
+export const ropeVaultZone = (r, x, y) => r.cells.length > 0 && Math.abs(ropeS(r, x, y)) <= Math.min(r.half - 4, Math.max(5, r.half * 0.35));
 // Is this rope's window open enough to climb in (not boarded, reinforced or blocked)?
 export function ropeWindowOpen(m, r) { return r.cells.length > 0 && r.cells.every(k => m.tiles[k] === T.OPEN || m.tiles[k] === T.FLOOR || m.tiles[k] === T.RUBBLE); }
 // ...or only wooden boards in the way: a swing in smashes through them (he chose, like Rainbow Six); reinforced stops you
