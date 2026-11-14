@@ -187,6 +187,7 @@ function wallHeld(q, now) {
   st.wallHold = { set, t: 0, at: now, pop: 0 };
 }
 const wallBlue = () => !!(st.wallHold && st.wallHold.t >= WALL_HOLD);
+const GHOST_A = 0.38; // how strongly the people you see show through raised walls
 const BODY_CAP = 300; // world px: people stand up at most as tall as this far from the eye (he saw long stretched legs zoomed out)
 const EYE_BACK = 0.75, RAISE_H = 0.06; // RAISE_H: how much a wall (1 = 3.2 m) stands up per world px from the eye; // how far below the middle of the screen the eye sits, in view heights (draw())
 const RAISE_FULL = 760, RAISE_NONE = 1150; // raised walls sink flat between these view heights (world px), see draw()
@@ -2841,6 +2842,7 @@ function draw(s, view, now, dt) {
     }, now);
       if (elv) c.restore(); }); };
     upDraw(ctx); if ((elv || hangW !== undefined) && persp.h) (st.upDraws || (st.upDraws = [])).push(upDraw);
+    else if (persp.h) (st.ghostDraws || (st.ghostDraws = [])).push(upDraw); // (shown faintly again over the raised walls)
     const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? 0.28 : 0, lb = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.4 * zk)), lh = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.53 * zk)); // (drawn standing up: rings and head zones where they show)
     drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x + lb[0], y: p.y + lb[1] });
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x + lh[0], y: p.y + lh[1] });
@@ -3003,7 +3005,9 @@ function draw(s, view, now, dt) {
     if (B > d) ctx.fillRect(a, d, c - a, B - d);
   }
   if (raise) raise(ctx, 'lit'); // raised walls in sight (look.js), above the blackout
-  if (st.upDraws && st.upDraws.length) { if (raise) for (const fn of st.upDraws) fn(ctx); st.upDraws.length = 0; } // people up on furniture stand above its raised top
+  if (st.upDraws && st.upDraws.length) { if (raise) for (const fn of st.upDraws) fn(ctx); st.upDraws.length = 0; }
+  // everyone you see, faintly over the raised walls and doorframes (he chose 2026-11-14: nobody hides under a raised wall)
+  if (st.ghostDraws && st.ghostDraws.length) { if (raise) { ctx.save(); ctx.globalAlpha = GHOST_A; for (const fn of st.ghostDraws) fn(ctx); ctx.restore(); } st.ghostDraws.length = 0; } // people up on furniture stand above its raised top
   if (inGame && view) winAimMarks(view);
   { // the camera tilt follows your movement across the screen
     const p = st.pred, lp = st.tiltLast || p, k = dt > 0 ? 1 / dt : 0, vx = p && lp ? (p.x - lp.x) * k : 0, vy = p && lp ? (p.y - lp.y) * k : 0;

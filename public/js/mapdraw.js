@@ -4,7 +4,7 @@ import { CELL, T, FL, MAT, CELL_HP } from '/shared/constants.js';
 import { S, floorPatterns, hash, shade, canvas } from './textures.js';
 import { polyIn } from '/shared/physics.js';
 import { drawOutProp } from './outprops.js';
-import { lightMap, applyLight, looks } from './look.js';
+import { lightMap, applyLight, looks, wallIns, thinOpen, WALL_INS } from './look.js';
 
 const SOLID = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL]);
 const WALLISH = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.BARRI]);
@@ -528,6 +528,21 @@ export class MapRenderer {
       return;
     }
     this.wallFill(x, y, k, t);
+    this.thinStrips(x, y, k);
+  }
+  // thinner-looking walls (look.js WALL_INS): the floor beside a plain wall carried in over its edge, a soft line at the
+  // new foot of the wall, and the little square of floor in an inside corner
+  thinStrips(x, y, k) {
+    const m = this.map, wi = wallIns(m, k); if (!wi) return;
+    const ctx = this.ctx, X = x * CELL, Y = y * CELL, I = WALL_INS, W = m.W, pat = n => this.pat[m.floor[n]];
+    const strip = (n, rx, ry, rw, rh) => { ctx.fillStyle = pat(n); ctx.fillRect(rx, ry, rw, rh); };
+    if (wi.n) strip(k - W, X, Y, CELL, I); if (wi.s) strip(k + W, X, Y + CELL - I, CELL, I);
+    if (wi.w) strip(k - 1, X, Y, I, CELL); if (wi.e) strip(k + 1, X + CELL - I, Y, I, CELL);
+    const solid = q => SOLID.has(m.tiles[q]) && !(m.shape && m.shape[q]);
+    for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const d = k + dy * W + dx; if (thinOpen(m, d) && solid(k + dx) && solid(k + dy * W)) strip(d, dx > 0 ? X + CELL - I : X, dy > 0 ? Y + CELL - I : Y, I, I); }
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    if (wi.n) ctx.fillRect(X + wi.w, Y + I - 0.6, CELL - wi.w - wi.e, 0.6); if (wi.s) ctx.fillRect(X + wi.w, Y + CELL - I, CELL - wi.w - wi.e, 0.6);
+    if (wi.w) ctx.fillRect(X + I - 0.6, Y + wi.n, 0.6, CELL - wi.n - wi.s); if (wi.e) ctx.fillRect(X + CELL - I, Y + wi.n, 0.6, CELL - wi.n - wi.s);
   }
   solidAt(px, py) {
     const cx = Math.floor(px / CELL), cy = Math.floor(py / CELL), t = this.t(cx, cy);

@@ -29,6 +29,25 @@ export const showcase = (x, y, fn) => withPersp({ x, y: y + 140 }, 0.055, fn);
 export function lifted(ctx, x, y, z, fn) { if (!persp.h || !z) { fn(); return; } const [dx, dy] = liftOf(x, y, z); ctx.save(); ctx.translate(dx, dy); fn(); ctx.restore(); }
 
 const SOLID = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL]);
+// Thinner-looking walls (he asked 2026-11-14: walls are a full cell thick, so people hid under the raised walls and the
+// doorframes; he chose: draw them thinner, movement and shooting unchanged). A plain wall is drawn WALL_INS in from each
+// side that faces open floor (so a wall between two rooms looks 60% as thick); toward more wall, a doorway or window, air,
+// stairs or furniture it keeps its full edge. The flat map picture (mapdraw wall) paints the floor into those strips.
+export const WALL_INS = CELL * 0.2, DOOR_TOP_A = 0.5;
+const hexA = (h, a) => { const v = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return `rgba(${v[0]},${v[1]},${v[2]},${a})`; };
+export function thinOpen(m, n) {
+  if (n < 0 || n >= m.tiles.length) return false;
+  const t = m.tiles[n];
+  if (SOLID.has(t) || t === T.VOID || t === T.TALL || t === T.LOW || t === T.DSHIELD || t === T.STAIR || t === T.BARRI || t === T.BEAM) return false;
+  if (m.floor[n] === FL.VOID || (m.openId && m.openId[n] >= 0) || (m.shape && m.shape[n])) return false;
+  return true;
+}
+// the insets of plain wall cell k (n, s, w, e) in world px; all 0 for anything else
+export function wallIns(m, k) {
+  if (!SOLID.has(m.tiles[k]) || (m.shape && m.shape[k])) return null;
+  const W = m.W, i = n => thinOpen(m, n) ? WALL_INS : 0, r = { n: i(k - W), s: i(k + W), w: i(k - 1), e: i(k + 1) };
+  return r.n || r.s || r.w || r.e ? r : null;
+}
 
 // ---------------------------------------------------------------- lighting
 // One value per cell: how lit it is (1 = daylight). Rooms get a dim ambient light, ceiling lamps spread round the room
@@ -78,6 +97,11 @@ export function lightMap(map) {
   dark.width = warm.width = W; dark.height = warm.height = H;
   const dc = dark.getContext('2d'), wc = warm.getContext('2d'), di = dc.createImageData(W, H), wi = wc.createImageData(W, H);
   for (let k = 0; k < N; k++) {
+    if (room[k] < 0 && SOLID.has(tile(k))) { // a wall: the darkest room beside it (its edges show that room's floor: WALL_INS)
+      let l = 9; for (const n of [k - 1, k + 1, k - W, k + W]) if (n >= 0 && n < N && room[n] >= 0) l = Math.min(l, Math.min(1.2, L[n] + lamp[n]));
+      if (l < 9) { const j = k * 4; di.data[j] = 18; di.data[j + 1] = 18; di.data[j + 2] = 24; di.data[j + 3] = Math.max(0, Math.min(1, 1 - l)) * 0.5 * 255; }
+      continue;
+    }
     if (room[k] < 0 || tile(k) === T.VOID) continue;
     const l = Math.min(1.2, L[k] + lamp[k]), j = k * 4;
     di.data[j] = 18; di.data[j + 1] = 18; di.data[j + 2] = 24; di.data[j + 3] = Math.min(1, Math.max(0, Math.min(1, 1 - l)) * 0.5 + shadow[k]) * 255;
@@ -151,7 +175,8 @@ function block(R, m, bx, by) {
     for (let x = x0; x <= x1 + 1; x++) {
       const k = y * W + x, f = x <= x1 ? hg(k) : 0, on = f > 0, g = on && (m.tiles[k] === T.TALL || m.tiles[k] === T.LOW) ? 1 : 0;
       const sh = on && m.shape && m.shape[k], tc = on && !g ? topColour(m, k) : '';
-      if (run && (!on || f !== run.f || g !== run.g || sh || tc !== run.tc)) { out[run.g].tops.push(run); run = null; }
+      const wi = on && !g && !sh ? wallIns(m, k) : null, iN = wi ? wi.n : 0, iS = wi ? wi.s : 0;
+      if (run && (!on || f !== run.f || g !== run.g || sh || tc !== run.tc || iN !== (run.iN || 0) || iS !== (run.iS || 0) || run.iE)) { out[run.g].tops.push(run); run = null; }
       if (!on) continue;
       const t = m.tiles[k], base = t === T.SOFT && m.mat && m.mat[k] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.HARD], X = x * CELL, Y = y * CELL;
       const col = lt => `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`, faces = out[g].faces;
@@ -170,16 +195,22 @@ function block(R, m, bx, by) {
         out[g].tops.push({ x, y, n: 1, f, sh, tc });
         continue;
       }
+      const solidW = q => q >= 0 && q < m.tiles.length && SOLID.has(m.tiles[q]) && !(m.shape && m.shape[q]);
       for (const [dx, dy, lt] of FACES) {
         const n = k + dy * W + dx, nx = x + dx, ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f && !(m.shape && m.shape[n])) continue;
-        const ex = dx > 0 ? X + CELL : X, ey = dy > 0 ? Y + CELL : Y; // seen when the camera is on its side of it
+        const ins = !g && wi && thinOpen(m, n) ? WALL_INS : 0; // (drawn thinner: in from open floor)
+        const ex = dx > 0 ? X + CELL - ins : X + ins, ey = dy > 0 ? Y + CELL - ins : Y + ins; // seen when the camera is on its side of it
+        // the face's two ends: in from open floor at that end too; out into the next wall cell when that one has no face on
+        // this side (an inside corner), so the corner closes
+        const endIns = (ax, ay) => { const q = k + ay * W + ax; if (!wi || g) return 0; if (thinOpen(m, q)) return WALL_INS; return ins && solidW(q) && solidW(q + dy * W + dx) ? -WALL_INS : 0; };
+        const e0 = dx ? endIns(0, -1) : endIns(-1, 0), e1 = dx ? endIns(0, 1) : endIns(1, 0);
         const d = g ? 0 : base === BRICK ? 'b' : t === T.HARD && !(m.mat && m.mat[k] === MAT.DRYWALL) ? 'c' : 'p', e = isOut(m, n);
         const L2 = Math.min(1, lt * (e ? 1 : faceLight(R.lm, n, dx, dy))); // (inside: shaded by the room's light)
-        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, x, y, c: col(L2), d, e });
-        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, x, y, c: col(L2), d, e });
+        if (dx) faces.push({ ax: ex, ay: Y + e0, bx: ex, by: Y + CELL - e1, nx: dx, ny: 0, px: ex, py: Y + e0, f, x, y, c: col(L2), d, e });
+        else faces.push({ ax: X + e0, ay: ey, bx: X + CELL - e1, by: ey, nx: 0, ny: dy, px: X + e0, py: ey, f, x, y, c: col(L2), d, e });
       }
-      if (!run) run = { x, y, n: 0, f, g, tc }; run.n++;
+      if (!run) run = { x, y, n: 0, f, g, tc, iN, iS, iW: wi ? wi.w : 0 }; run.n++; run.iE = wi ? wi.e : 0;
     }
   }
   // windows and doorways (he asked: see a window from another angle as you climb past it): a sill and the wall above
@@ -198,16 +229,18 @@ function block(R, m, bx, by) {
     if (m.tiles[k] === T.BARRI) pieces.push(win ? [0.28, 0.69, [122, 92, 58], null] : [0.06, 0.72, [122, 92, 58], null]); // (boards are thin: no top)
     const X = x * CELL, Y = y * CELL, faces = out[0].faces;
     for (const [f0, f, base, tc] of pieces) {
-      const col = lt => `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`;
+      const lintel = door && f0 >= 0.7; // the top of a doorway: half see-through (he chose 2026-11-14: nobody hides under it)
+      const col = lt => lintel ? `rgba(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0},${DOOR_TOP_A})` : `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`;
       for (const [dx, dy, lt] of FACES) {
         const n = k + dy * W + dx, nx = x + dx, ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f || (m.openId[n] === oi && oi >= 0)) continue; // against the wall, or more of the same opening
-        const ex = dx > 0 ? X + CELL : X, ey = dy > 0 ? Y + CELL : Y;
+        const ins = thinOpen(m, n) ? WALL_INS : 0, ex = dx > 0 ? X + CELL - ins : X + ins, ey = dy > 0 ? Y + CELL - ins : Y + ins; // (as thin as the wall)
         const d = base === BRICK ? 'b' : base[0] === 122 ? 'w' : base[0] === 176 ? 's' : 'p';
         if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0, x, y, c: col(lt), d, e: isOut(m, n) });
         else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0, x, y, c: col(lt), d, e: isOut(m, n) });
       }
-      if (tc) out[0].tops.push({ x, y, n: 1, f, g: 0, tc, low: f < 0.99 });
+      if (tc) { const iN = thinOpen(m, k - W) ? WALL_INS : 0, iS = thinOpen(m, k + W) ? WALL_INS : 0, iW = thinOpen(m, k - 1) ? WALL_INS : 0, iE = thinOpen(m, k + 1) ? WALL_INS : 0;
+        out[0].tops.push({ x, y, n: 1, f, g: 0, tc: lintel ? hexA(tc, DOOR_TOP_A) : tc, low: f < 0.99, iN, iS, iW, iE }); }
     }
   }
   facade(m, x0, y0, x1, y1, hg, out[0].faces, under, -1);
@@ -323,7 +356,7 @@ export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false, seen = 
     let T2 = TP.get(r.tc); if (!T2) TP.set(r.tc, T2 = { p: null, r: [] });
     const sc = 1 + h * r.f;
     if (r.sh) { const p = T2.p || (T2.p = new Path2D()); for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? p.lineTo(a, b) : p.moveTo(a, b); } p.closePath(); } }
-    else { const [tx, ty] = up(r.x * CELL, r.y * CELL, r.f); T2.r.push(tx, ty, r.n * CELL * sc, CELL * sc); } // plain rectangles: far cheaper on the graphics card than one big shape
+    else { const iW = r.iW || 0, iN = r.iN || 0, [tx, ty] = up(r.x * CELL + iW, r.y * CELL + iN, r.f); T2.r.push(tx, ty, (r.n * CELL - iW - (r.iE || 0)) * sc, (CELL - iN - (r.iS || 0)) * sc); } // plain rectangles (in from open floor: WALL_INS): far cheaper on the graphics card than one big shape
     G.n++;
   };
   const seenAt = (x, y) => !!seen && seen.at(x, y);
