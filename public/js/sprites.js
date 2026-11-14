@@ -302,6 +302,7 @@ export function drawOperator(ctx, p, t) {
   const ca = Math.cos(-p.aim), sa = Math.sin(-p.aim);
   LX = -0.6 * ca + 0.8 * sa; LY = -0.6 * sa - 0.8 * ca;
   ctx.save(); ctx.translate(p.x, p.y);
+  if (p.hang && p.wallA !== undefined && persp.h) { const [dx, dy] = liftOf(p.x, p.y, (p.zb || 0) + 0.02); ctx.translate(dx, dy); } // on a rope: the ring and shadow at their feet, up the wall
   ctx.strokeStyle = (p.ring ?? p.ally) ? 'rgba(70,170,255,0.7)' : 'rgba(255,120,40,0.75)'; ctx.lineWidth = 0.9;
   ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.stroke();
   const sg = ctx.createRadialGradient(2, 3, 2, 2, 3, 14); sg.addColorStop(0, 'rgba(0,0,0,0.45)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
@@ -309,6 +310,7 @@ export function drawOperator(ctx, p, t) {
   // on a rope (he asked 2026-11-14: climbers solid like everyone): the same body, upright against the wall and facing it,
   // one hand up the rope and the gun in the other turned to where they aim; upside down = the heights turned over
   const hang = !!(p.hang && p.wallA !== undefined), inv = hang && p.hang === 'inv', bodyA = hang ? p.wallA : p.aim;
+  if (hang && persp.h) { const [dx, dy] = liftOf(p.x, p.y, (p.zb || 0) + 0.02); ctx.translate(-dx, -dy); }
   if (hang && !persp.h) { drawHanging(ctx, p, t, u, skin, tc, acc); ctx.restore(); return; } // (straight down: the old picture from above)
   ctx.rotate(bodyA);
   // Perspective (he asked 2026-11-14): the body is built in height layers that each show where their height puts them,
@@ -383,9 +385,12 @@ export function drawOperator(ctx, p, t) {
   if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean)); ctx.translate(0, L * 5.5); ctx.rotate(L * 0.14); } // arms, gun and head lean with the torso
 
   { const [lx, ly] = LZ(0.42); ctx.translate(lx, ly); } // arms and gun at chest height
-  if (hang) { // the free hand up the rope, then turn to the aim for the gun
-    const [ax, ay] = LZ(0.42), [rx, ry] = LZ(inv ? 0.2 : 0.66), gx = 4.5 + rx - ax, gy = ry - ay;
-    limb(ctx, [-0.5, -6.5, 2 + (rx - ax) * 0.5, -5 + (ry - ay) * 0.5, gx, gy - 0.8], 3, u.cloth); ell(ctx, gx, gy - 0.8, 1.7, 1.6, acc.has('gloves') ? tc : '#1f1f20');
+  if (hang) { // on a rope the harness takes the weight at the hip (he asked: no hands on the rope): a tether from a clip
+    // at the front of the hips to the rope on the wall, then both hands on the gun, turned to the aim
+    const [ax, ay] = LZ(0.42), [hx, hy] = LZ(inv ? 0.31 : 0.29), [wx, wy] = LZ(inv ? 0.1 : 0.62);
+    const cx = 3.2 + hx - ax, cy = hy - ay, tx = 6 + wx - ax, ty = wy - ay;
+    ctx.strokeStyle = '#c8b27a'; ctx.lineWidth = 0.9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.quadraticCurveTo((cx + tx) / 2 + 1, (cy + ty) / 2, tx, ty); ctx.stroke();
+    ell(ctx, cx, cy, 1, 1, '#b8bcc2'); // the carabiner
     ctx.rotate(p.aim - bodyA);
   }
   // ---- weapon & arms ----

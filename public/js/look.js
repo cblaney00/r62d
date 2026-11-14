@@ -175,8 +175,8 @@ function block(R, m, bx, by) {
         if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f || (m.openId[n] === oi && oi >= 0)) continue; // against the wall, or more of the same opening
         const ex = dx > 0 ? X + CELL : X, ey = dy > 0 ? Y + CELL : Y;
         const d = base === BRICK ? 'b' : base[0] === 122 ? 'w' : base[0] === 176 ? 's' : 'p';
-        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0, x, y, c: col(lt), d });
-        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0, x, y, c: col(lt), d });
+        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0, x, y, c: col(lt), d, e: isOut(m, n) });
+        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0, x, y, c: col(lt), d, e: isOut(m, n) });
       }
       if (tc) out[0].tops.push({ x, y, n: 1, f, g: 0, tc, low: f < 0.99 });
     }
@@ -221,8 +221,9 @@ function facade(m, x0, y0, x1, y1, hg, faces, next, dir) { // next: cellBelow (d
         const low = dir < 0 ? 1 - 0.05 * s : 1; // a little darker toward the ground
         for (const [a, b, base, d] of pieces) {
           const c = `rgb(${base[0] * lt * low | 0},${base[1] * lt * low | 0},${base[2] * lt * low | 0})`, f0 = a + s * dir, f = b + s * dir;
-          if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0: f0 || -1e-6, x, y, c, d, s, e: 1 });
-          else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0: f0 || -1e-6, x, y, c, d, s, e: 1 });
+          const gnd = dir < 0 && a === 0 && next(m, kb) < 0; // standing on the ground: the ground is drawn out from its foot
+          if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0: f0 || -1e-6, x, y, c, d, s, e: 1, gnd });
+          else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0: f0 || -1e-6, x, y, c, d, s, e: 1, gnd });
         }
       }
     }
@@ -241,40 +242,93 @@ function kept(R, m) {
   return K;
 }
 // this frame's raised walls in cells x0..y1 (inclusive), seen from cam: per group, a path per colour and the tops
-export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false) { // above: also the storeys over this floor (rope camera)
+// Which map cells your team sees this frame (he asked 2026-11-14: colour only where you really see, not deep in the
+// building): the sight shapes filled cell by cell, grown by one cell (a wall's face is the cell beside what you see).
+// spots: round areas always counted as seen (the wall in front of a climber).
+export function seenGrid(polys, m, spots = []) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const P of polys) for (let i = 0; i < P.length; i += 2) { if (P[i] < x0) x0 = P[i]; if (P[i] > x1) x1 = P[i]; if (P[i + 1] < y0) y0 = P[i + 1]; if (P[i + 1] > y1) y1 = P[i + 1]; }
+  for (const q of spots) { x0 = Math.min(x0, q.x - q.r); x1 = Math.max(x1, q.x + q.r); y0 = Math.min(y0, q.y - q.r); y1 = Math.max(y1, q.y + q.r); }
+  if (x1 < x0) return null;
+  const gx = Math.max(0, Math.floor(x0 / CELL) - 1), gy = Math.max(0, Math.floor(y0 / CELL) - 1), w = Math.min(m.W, Math.ceil(x1 / CELL) + 2) - gx, hh = Math.min(m.H, Math.ceil(y1 / CELL) + 2) - gy;
+  if (w <= 0 || hh <= 0) return null;
+  const a = new Uint8Array(w * hh), xs = [];
+  for (const P of polys) { // scanline: each row's middle against the outline's edges
+    const n = P.length; if (n < 6) continue;
+    for (let r = 0; r < hh; r++) {
+      const yy = (gy + r + 0.5) * CELL; xs.length = 0;
+      for (let i = 0; i < n; i += 2) { const ax = P[i], ay = P[i + 1], bx = P[(i + 2) % n], by = P[(i + 3) % n]; if ((ay <= yy) !== (by <= yy)) xs.push(ax + (yy - ay) / (by - ay) * (bx - ax)); }
+      xs.sort((p, q) => p - q);
+      for (let j = 0; j + 1 < xs.length; j += 2) { const c0 = Math.max(0, Math.floor(xs[j] / CELL) - gx), c1 = Math.min(w - 1, Math.floor(xs[j + 1] / CELL) - gx); for (let cc = c0; cc <= c1; cc++) a[r * w + cc] = 1; }
+    }
+  }
+  for (const q of spots) { const R2 = (q.r / CELL) ** 2, cx = q.x / CELL - gx, cy = q.y / CELL - gy; for (let r = Math.max(0, Math.floor(cy - q.r / CELL)); r <= Math.min(hh - 1, Math.ceil(cy + q.r / CELL)); r++) for (let cc = Math.max(0, Math.floor(cx - q.r / CELL)); cc <= Math.min(w - 1, Math.ceil(cx + q.r / CELL)); cc++) if ((cc + 0.5 - cx) ** 2 + (r + 0.5 - cy) ** 2 <= R2) a[r * w + cc] = 1; }
+  const g = new Uint8Array(w * hh); // grown by one cell
+  for (let r = 0; r < hh; r++) for (let cc = 0; cc < w; cc++) if (a[r * w + cc]) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const rr = r + dy, c2 = cc + dx; if (rr >= 0 && c2 >= 0 && rr < hh && c2 < w) g[rr * w + c2] = 1; }
+  return { gx, gy, w, h: hh, a: g, at(x, y) { x -= this.gx; y -= this.gy; return x >= 0 && y >= 0 && x < this.w && y < this.h && this.a[y * this.w + x] === 1; } };
+}
+// One frame's raised pieces, sorted back to front (he asked: a wall in front must cover the furniture behind it): bands by
+// distance from the eye (BAND world px), each with its tall things and its walls; the storeys below (fac) and above (up)
+// apart. Each holds everything (for the greyed copy) and, when seen is given, only the pieces whose own spot is seen.
+const BAND = 48;
+const coll = () => ({ paths: new Map(), lowTops: new Map(), topPaths: new Map(), tops: [], dark: null, light: null, glint: null, n: 0 });
+export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false, seen = null, spots = null) { // spots: round areas (world px) whose outside wall pieces show whole (the wall a climber hangs on) // above: also the storeys over this floor (rope camera)
   const K = kept(R, m), cx = cam.x, cy = cam.y, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
   x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W - 1, x1); y1 = Math.min(m.H - 1, y1);
-  const groups = [{ paths: new Map(), tops: [], topPaths: new Map(), lowTops: new Map(), dark: new Path2D(), light: new Path2D(), glint: new Path2D() }, { paths: new Map(), tops: [], topPaths: new Map() }, { paths: new Map(), tops: [], topPaths: new Map(), dark: new Path2D(), light: new Path2D(), glint: new Path2D() }];
+  const bands = new Map(), fac = { all: coll(), lit: coll() }, upS = { all: coll(), lit: coll() }, ground = { all: [], lit: [] };
+  const GD = CELL * 40, gq = (F, L) => { // a strip of ground from the foot of the building out toward the eye (8 numbers), wound one way
+    const a = up(F.ax, F.ay, F.f0), b = up(F.bx, F.by, F.f0), c = up(F.bx + F.nx * GD, F.by + F.ny * GD, F.f0), d = up(F.ax + F.nx * GD, F.ay + F.ny * GD, F.f0);
+    const q = [a[0], a[1], b[0], b[1], c[0], c[1], d[0], d[1]]; let ar = 0; for (let i = 0; i < 8; i += 2) { const j = (i + 2) % 8; ar += q[i] * q[j + 1] - q[j] * q[i + 1]; }
+    if (ar < 0) { const r = [q[6], q[7], q[4], q[5], q[2], q[3], q[0], q[1]]; L.push(r); } else L.push(q);
+  };
+  const band = (x, y) => { const i = Math.floor(Math.hypot(x - cx, y - cy) / BAND); let B = bands.get(i); if (!B) bands.set(i, B = { all: [coll(), coll()], lit: [coll(), coll()] }); return B; };
+  const addFace = (G, F) => {
+    let p = G.paths.get(F.c); if (!p) G.paths.set(F.c, p = new Path2D());
+    const [ux, uy] = up(F.ax, F.ay, F.f), [vx, vy] = up(F.bx, F.by, F.f);
+    if (F.f0) { const [a1, b1] = up(F.ax, F.ay, F.f0), [a2, b2] = up(F.bx, F.by, F.f0); p.moveTo(a1, b1); p.lineTo(a2, b2); } else { p.moveTo(F.ax, F.ay); p.lineTo(F.bx, F.by); } p.lineTo(vx, vy); p.lineTo(ux, uy); p.closePath(); // (a piece off the floor, like a window's lintel, starts at f0)
+    if (F.d) deco(G, F, up); G.n++;
+  };
+  const addTop = (G, r) => {
+    if (!r.tc) { G.tops.push(r); G.n++; return; }
+    const TP = r.low ? G.lowTops : G.topPaths; // a sill's top: under the faces of what stands above it
+    let T2 = TP.get(r.tc); if (!T2) TP.set(r.tc, T2 = { p: null, r: [] });
+    const sc = 1 + h * r.f;
+    if (r.sh) { const p = T2.p || (T2.p = new Path2D()); for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? p.lineTo(a, b) : p.moveTo(a, b); } p.closePath(); } }
+    else { const [tx, ty] = up(r.x * CELL, r.y * CELL, r.f); T2.r.push(tx, ty, r.n * CELL * sc, CELL * sc); } // plain rectangles: far cheaper on the graphics card than one big shape
+    G.n++;
+  };
+  const seenAt = (x, y) => !!seen && seen.at(x, y);
+  const inSpot = (x, y) => { if (!spots) return false; for (const q of spots) if (Math.hypot((x + 0.5) * CELL - q.x, (y + 0.5) * CELL - q.y) < q.r) return true; return false; };
+  const airBy = k => m.floor[k - 1] === FL.VOID || m.floor[k + 1] === FL.VOID || m.floor[k - m.W] === FL.VOID || m.floor[k + m.W] === FL.VOID;
   for (let by = Math.floor(y0 / CH); by <= Math.floor(y1 / CH); by++) for (let bx = Math.floor(x0 / CH); bx <= Math.floor(x1 / CH); bx++) {
     const i = by * K.cw + bx, B = K.blocks[i] || (K.blocks[i] = block(R, m, bx, by));
     const whole = bx * CH >= x0 && by * CH >= y0 && bx * CH + CH - 1 <= x1 && by * CH + CH - 1 <= y1; // else: check each piece is in range
     for (let g = 0; g < 3; g++) {
-      const G = groups[g]; if (g === 2 && !above) continue;
+      if (g === 2 && !above) continue;
       for (const F of B[g].faces) {
         if (F.nx * (cx - F.px) + F.ny * (cy - F.py) <= 0) continue; // turned away from the camera
         if (!whole && (F.x < x0 || F.x > x1 || F.y < y0 || F.y > y1)) continue;
-        let p = G.paths.get(F.c); if (!p) G.paths.set(F.c, p = new Path2D());
-        const [ux, uy] = up(F.ax, F.ay, F.f), [vx, vy] = up(F.bx, F.by, F.f);
-        if (F.f0) { const [a1, b1] = up(F.ax, F.ay, F.f0), [a2, b2] = up(F.bx, F.by, F.f0); p.moveTo(a1, b1); p.lineTo(a2, b2); } else { p.moveTo(F.ax, F.ay); p.lineTo(F.bx, F.by); } p.lineTo(vx, vy); p.lineTo(ux, uy); p.closePath(); // (a piece off the floor, like a window's lintel, starts at f0)
-        if (F.d) deco(G, F, up);
+        const lit = seenAt(F.x + Math.sign(F.nx), F.y + Math.sign(F.ny)); // the cell this face looks onto
+        if (g === 2 || F.s || (F.e && g === 0 && inSpot(F.x, F.y))) { const S = g === 2 ? upS : fac; addFace(S.all, F); if (lit) addFace(S.lit, F); if (F.gnd) { gq(F, ground.all); if (lit) gq(F, ground.lit); } continue; }
+        const Bd = band((F.ax + F.bx) / 2, (F.ay + F.by) / 2); addFace(Bd.all[g === 1 ? 0 : 1], F); if (lit) addFace(Bd.lit[g === 1 ? 0 : 1], F);
       }
+      if (g === 2) continue;
       for (const r of B[g].tops) {
         if (!whole && (r.y < y0 || r.y > y1 || r.x + r.n - 1 < x0 || r.x > x1)) continue;
-        if (!r.tc) { G.tops.push(r); continue; }
-        const TP = r.low && G.lowTops ? G.lowTops : G.topPaths; // a sill's top: under the faces of what stands above it
-        let T2 = TP.get(r.tc); if (!T2) TP.set(r.tc, T2 = { p: null, r: [] });
-        const sc = 1 + h * r.f;
-        if (r.sh) { const p = T2.p || (T2.p = new Path2D()); for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? p.lineTo(a, b) : p.moveTo(a, b); } p.closePath(); } }
-        else { const [tx, ty] = up(r.x * CELL, r.y * CELL, r.f); T2.r.push(tx, ty, r.n * CELL * sc, CELL * sc); } // plain rectangles: far cheaper on the graphics card than one big shape
+        let lit = false; if (seen) for (let q = 0; q < r.n && !lit; q++) lit = seen.at(r.x + q, r.y);
+        if (g === 0 && spots && inSpot(r.x, r.y) && airBy(r.y * m.W + r.x)) { addTop(fac.all, r); if (lit) addTop(fac.lit, r); continue; }
+        const Bd = band((r.x + r.n / 2) * CELL, (r.y + 0.5) * CELL); addTop(Bd.all[g === 1 ? 0 : 1], r); if (lit) addTop(Bd.lit[g === 1 ? 0 : 1], r);
       }
     }
   }
-  return { groups, cam: { x: cx, y: cy }, h };
+  const order = [...bands.keys()].sort((p, q) => q - p).map(k => bands.get(k)); // far first
+  return { order, fac, up: upS, ground, cam: { x: cx, y: cy }, h };
 }
 // The surface of a wall face (he asked 2026-11-14: walls, doors and windows with a lot more detail): brick courses with
 // staggered joints, a skirting line inside, a band at each storey outside, window panes with a frame, a bar and a glint,
 // boards with their gaps. As lines, only as many as the face is tall on the screen (never closer than 2.6 world px).
 function deco(G, F, up) {
+  if (!G.dark) { G.dark = new Path2D(); G.light = new Path2D(); G.glint = new Path2D(); }
   const z0 = F.f0 || 0, z1 = F.f, [pax, pay] = up(F.ax, F.ay, z0), [pux, puy] = up(F.ax, F.ay, z1), tall = Math.hypot(pux - pax, puy - pay);
   const line = (P, t0, za, t1, zb) => { const ax = F.ax + (F.bx - F.ax) * t0, ay = F.ay + (F.by - F.ay) * t0, bx = F.ax + (F.bx - F.ax) * t1, by = F.ay + (F.by - F.ay) * t1, [a, b] = up(ax, ay, za), [c, d] = up(bx, by, zb); P.moveTo(a, b); P.lineTo(c, d); };
   if (F.d === 'b') { // brick: courses of about 23 cm, the joints half a brick apart
@@ -299,26 +353,32 @@ function deco(G, F, up) {
     const n = Math.min(4, Math.floor(tall / 3)); for (let i = 1; i < n; i++) { const z = z0 + (z1 - z0) * i / n; line(G.dark, 0, z, 1, z); }
   } else if (F.d === 'o' && tall > 4) { line(G.light, 0.04, z0, 0.04, z1); line(G.light, 0.96, z0, 0.96, z1); line(G.light, 0.04, z1, 0.96, z1); } // a doorway: its frame
 }
-// draw groups of a raisedFrame (0 walls, 1 tall things); the tops come from pic (the map picture, or its small copy far out)
-export function drawRaised(ctx, R, fr, which, pic = R.c, plain = false) { // plain: no surface lines (the greyed copy out of sight)
-  const cx = fr.cam.x, cy = fr.cam.y, h = fr.h, G = pic.width / R.Wp, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
-  for (const g of which) {
-    const grp = fr.groups[g];
-    if (grp.lowTops) for (const [c, T2] of grp.lowTops) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); }
-    for (const [c, p] of grp.paths) { ctx.fillStyle = c; ctx.fill(p); }
-    if (grp.dark && !plain) { ctx.lineWidth = 0.6; ctx.strokeStyle = 'rgba(20,16,14,0.32)'; ctx.stroke(grp.dark); ctx.strokeStyle = 'rgba(235,228,214,0.32)'; ctx.stroke(grp.light); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(210,230,250,0.22)'; ctx.stroke(grp.glint); }
-    for (const [c, T2] of grp.topPaths) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); } // wall tops: plain colour
-    for (const r of grp.tops) {
-      const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f;
-      if (r.sh) {
-        ctx.save(); ctx.beginPath();
-        for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); } ctx.closePath(); }
-        ctx.clip();
-      }
-      pic.drawTo(ctx, X * G, Y * G, w * G, CELL * G, tx, ty, w * s, CELL * s);
-      if (r.sh) ctx.restore();
-    }
+// Draw a raisedFrame. which: 'all' (everything, the greyed copy), 'lit' (the seen pieces of this floor, far to near;
+// the caller clips to the sight shapes for a smooth edge) or 'out' (the seen storeys below and above). The tops come from
+// pic (the map picture, or its small copy far out); upA: how much the storeys above show (the rope camera fades them in).
+function drawColl(ctx, G, pic, R, h, up, plain) {
+  if (!G.n) return;
+  const S = pic.width / R.Wp;
+  for (const [c, T2] of G.lowTops) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); }
+  for (const [c, p] of G.paths) { ctx.fillStyle = c; ctx.fill(p); }
+  if (G.dark && !plain) { ctx.lineWidth = 0.6; ctx.strokeStyle = 'rgba(20,16,14,0.32)'; ctx.stroke(G.dark); ctx.strokeStyle = 'rgba(235,228,214,0.32)'; ctx.stroke(G.light); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(210,230,250,0.22)'; ctx.stroke(G.glint); }
+  for (const [c, T2] of G.topPaths) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); } // wall tops: plain colour
+  for (const r of G.tops) { // cars, crates, shelves: their tops from the map picture
+    const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f;
+    if (r.sh) { ctx.save(); ctx.beginPath(); for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); } ctx.closePath(); } ctx.clip(); }
+    pic.drawTo(ctx, X * S, Y * S, w * S, CELL * S, tx, ty, w * s, CELL * s);
+    if (r.sh) ctx.restore();
   }
+}
+export function drawRaised(ctx, R, fr, which, pic = R.c, plain = false, upA = 1) { // plain: no surface lines (the greyed copy out of sight)
+  const cx = fr.cam.x, cy = fr.cam.y, h = fr.h, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
+  const k = which === 'all' ? 'all' : 'lit';
+  if (which !== 'lit') {
+    drawColl(ctx, fr.fac[k], pic, R, h, up, plain);
+    if (fr.up[k].n && upA > 0.01) { ctx.save(); ctx.globalAlpha *= upA; drawColl(ctx, fr.up[k], pic, R, h, up, plain); ctx.restore(); }
+    if (which === 'out') return;
+  }
+  for (const B of fr.order) { drawColl(ctx, B[k][0], pic, R, h, up, plain); drawColl(ctx, B[k][1], pic, R, h, up, plain); } // far to near; in each band the furniture, then the walls in front of it
 }
 // ---------------------------------------------------------------- camera tilt
 // The world layers (#world) are turned in 3D: a fixed angle (11°, he asked for more than the first 7°; the top of the screen a little further away) plus a lean
@@ -337,8 +397,16 @@ export const tilt = {
     this.kvx += (-this.kx * 160 - this.kvx * 16) * dt + (Math.random() - 0.5) * sk * 9; this.kvy += (-this.ky * 160 - this.kvy * 16) * dt + (Math.random() - 0.5) * sk * 9;
     this.kx += this.kvx * dt; this.ky += this.kvy * dt;
     const P = new DOMMatrix(); P.m34 = -1 / Math.max(W, H) / 1.25;
-    const M = new DOMMatrix().translateSelf(W / 2, H / 2).multiplySelf(P)
-      .rotateSelf(11 + this.extra + this.ax + this.kx, this.ay + this.ky, 0).scaleSelf(1.1 + this.extra * 0.012, 1.1 + this.extra * 0.012).translateSelf(-W / 2, -H / 2 - H * 0.01 - H * this.extra * 0.006);
+    const make = s => new DOMMatrix().translateSelf(W / 2, H / 2).multiplySelf(P)
+      .rotateSelf(11 + this.extra + this.ax + this.kx, this.ay + this.ky, 0).scaleSelf(s, s).translateSelf(-W / 2, -H / 2 - H * 0.01 - H * this.extra * 0.006);
+    // the layers must always fill the screen (he saw a lit sliver above the steep rope view): grow until all four
+    // corners of the layer are off screen
+    let s = 1.1 + this.extra * 0.012, M = make(s);
+    for (let i = 0; i < 8; i++) {
+      this.M = M; const a = this.project(0, 0), b = this.project(W, 0), c = this.project(0, H), d = this.project(W, H);
+      if (a.y <= 0 && b.y <= 0 && a.x <= 0 && b.x >= W && c.y >= H && d.y >= H && c.x <= 0 && d.x >= W) break;
+      s *= 1.05; M = make(s);
+    }
     this.M = M; this.el.style.transform = M.toString();
   },
   kick(k = 1) { if (this.lean && this.on) this.kvx -= 9 * k; },
