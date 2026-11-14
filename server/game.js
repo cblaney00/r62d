@@ -447,7 +447,7 @@ export class Game {
       }
     }
     if (atkers.length) atkers[Math.floor(Math.random() * atkers.length)].hasDefuser = true;
-    if (this.rules.preBoards) this.preBarricade(this.rules.preBoards);
+    if (this.rules.preBoards) { this.by = TEAM.DEF; this.preBarricade(this.rules.preBoards); this.by = null; } // (the defenders' boards: their map shows them at once)
     for (const p of this.players.values()) if (p.bot) botPrep(this, p);
     this.phase = PHASE.PREP; this.timer = DUR.prep;
     if (this.rules.help) { this.siteRevealed = true; this.events.push({ e: 'found', team: TEAM.ATK }); } // Quick Match: the attackers are shown the site from the start

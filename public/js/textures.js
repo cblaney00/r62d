@@ -143,7 +143,7 @@ function concrete(P) {
     const bx = r() * P, by = r() * P, br = 8 + r() * 26, dark = r() < 0.5;
     wrap(P, (ox, oy) => {
       const g = x.createRadialGradient(bx + ox, by + oy, 0, bx + ox, by + oy, br);
-      g.addColorStop(0, dark ? 'rgba(40,40,36,0.12)' : 'rgba(255,255,250,0.08)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      g.addColorStop(0, dark ? 'rgba(40,40,36,0.12)' : 'rgba(255,255,250,0.08)'); g.addColorStop(1, dark ? 'rgba(40,40,36,0)' : 'rgba(255,255,250,0)'); // (to its own colour, not black)
       x.fillStyle = g; x.fillRect(bx + ox - br, by + oy - br, br * 2, br * 2);
     });
   }
@@ -166,7 +166,7 @@ function grass(P) {
     const bx = r() * P, by = r() * P, br = 10 + r() * 30, dark = r() < 0.6;
     wrap(P, (ox, oy) => {
       const g = x.createRadialGradient(bx + ox, by + oy, 0, bx + ox, by + oy, br);
-      g.addColorStop(0, dark ? 'rgba(20,40,10,0.25)' : 'rgba(150,170,80,0.18)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      g.addColorStop(0, dark ? 'rgba(20,40,10,0.25)' : 'rgba(150,170,80,0.18)'); g.addColorStop(1, dark ? 'rgba(20,40,10,0)' : 'rgba(150,170,80,0)'); // (to its own colour, not black)
       x.fillStyle = g; x.fillRect(bx + ox - br, by + oy - br, br * 2, br * 2);
     });
   }
@@ -193,7 +193,7 @@ function snow(P) {
     const bx = r() * P, by = r() * P, br = 12 + r() * 30, blue = r() < 0.6;
     wrap(P, (ox, oy) => {
       const g = x.createRadialGradient(bx + ox, by + oy, 0, bx + ox, by + oy, br);
-      g.addColorStop(0, blue ? 'rgba(150,175,200,0.2)' : 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      g.addColorStop(0, blue ? 'rgba(150,175,200,0.18)' : 'rgba(255,255,255,0.4)'); g.addColorStop(1, blue ? 'rgba(150,175,200,0)' : 'rgba(255,255,255,0)'); // (fading to its own colour: fading to black left grey rings on the snow)
       x.fillStyle = g; x.fillRect(bx + ox - br, by + oy - br, br * 2, br * 2);
     });
   }
@@ -208,7 +208,7 @@ function sand(P) {
     const bx = r() * P, by = r() * P, br = 12 + r() * 34, dark = r() < 0.5;
     wrap(P, (ox, oy) => {
       const g = x.createRadialGradient(bx + ox, by + oy, 0, bx + ox, by + oy, br);
-      g.addColorStop(0, dark ? 'rgba(120,85,40,0.16)' : 'rgba(255,235,190,0.14)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      g.addColorStop(0, dark ? 'rgba(120,85,40,0.16)' : 'rgba(255,235,190,0.14)'); g.addColorStop(1, dark ? 'rgba(120,85,40,0)' : 'rgba(255,235,190,0)'); // (to its own colour, not black)
       x.fillStyle = g; x.fillRect(bx + ox - br, by + oy - br, br * 2, br * 2);
     });
   }

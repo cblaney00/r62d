@@ -462,6 +462,14 @@ function deco(G, F, up) {
     const sb = Math.floor(z0 + 1e-6), full = z1 - z0 > 0.9; // the storey this face belongs to (0 = this floor, -1 the one below...)
     if (F.e) { // outside: a plinth at the foot of each storey, a cornice line under its top
       if (full && tall > 5) { line(G.dark, 0, sb + 0.06, 1, sb + 0.06); line(G.light, 0, sb + 0.94, 1, sb + 0.94); line(G.dark, 0, sb + 0.97, 1, sb + 0.97); }
+      if (full && tall > 7) { // character (he asked 2026-11-14): grime at the foot, and now and then a drainpipe, a vent, a wall lamp or a sign
+        const hh = ((F.x * 73856093) ^ (F.y * 19349663) ^ (sb * 83492791)) >>> 0, kd = hh % 23;
+        if (sb === 0 || F.f0 < 0) { line(G.dark, 0, sb + 0.02, 1, sb + 0.02); line(G.dark, 0, sb + 0.035, 1, sb + 0.035); }
+        if (kd === 0) { line(G.dark, 0.46, sb + 0.02, 0.46, sb + 0.98); line(G.dark, 0.56, sb + 0.02, 0.56, sb + 0.98); line(G.light, 0.51, sb + 0.05, 0.51, sb + 0.95); for (const z of [0.25, 0.55, 0.85]) line(G.dark, 0.42, sb + z, 0.6, sb + z); } // a drainpipe with brackets
+        else if (kd === 5) { line(G.dark, 0.3, sb + 0.62, 0.7, sb + 0.62); line(G.dark, 0.3, sb + 0.78, 0.7, sb + 0.78); line(G.dark, 0.3, sb + 0.62, 0.3, sb + 0.78); line(G.dark, 0.7, sb + 0.62, 0.7, sb + 0.78); for (const z of [0.66, 0.7, 0.74]) line(G.light, 0.34, sb + z, 0.66, sb + z); } // a vent grille
+        else if (kd === 11) { line(G.dark, 0.45, sb + 0.8, 0.55, sb + 0.8); line(G.dark, 0.5, sb + 0.8, 0.5, sb + 0.86); line(G.glint, 0.44, sb + 0.77, 0.56, sb + 0.77); } // a wall lamp
+        else if (kd === 17) { line(G.dark, 0.15, sb + 0.5, 0.85, sb + 0.5); line(G.dark, 0.15, sb + 0.66, 0.85, sb + 0.66); line(G.dark, 0.15, sb + 0.5, 0.15, sb + 0.66); line(G.dark, 0.85, sb + 0.5, 0.85, sb + 0.66); line(G.light, 0.22, sb + 0.58, 0.78, sb + 0.58); } // a sign
+      }
     } else if (z0 >= 0 && z1 >= 0.9 && tall > 6) { line(G.dark, 0, 0.035, 1, 0.035); line(G.light, 0, 0.05, 1, 0.05); } // inside: a skirting board
     if (F.d === 'c' && full && tall > 9) { // concrete: formwork panels and the round tie holes left in them
       line(G.dark, 0, sb + 0.36, 1, sb + 0.36); line(G.dark, 0, sb + 0.68, 1, sb + 0.68);

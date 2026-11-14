@@ -191,6 +191,7 @@ export class MapRenderer {
       if (g(-1, 0)) x.fillRect(cx * CELL, cy * CELL, 1.2, CELL);
       if (g(1, 0)) x.fillRect(cx * CELL + CELL - 1.2, cy * CELL, 1.2, CELL);
     }
+    this.groundDetail(x0, y0, x1, y1);
     // the map's own painted details (road lines, mats, stains)
     for (const fn of m.decor || []) fn(x);
     // void: open air beside upper floors (the ground far below shows through it: makeBelow), earth around basements
@@ -227,6 +228,50 @@ export class MapRenderer {
       }
     }
     this.drawStairs(x0, y0, x1, y1);
+  }
+
+  // The outdoors with some life (he asked 2026-11-14: more detail outside): per open-ground cell, from a fixed hash so it is
+  // the same every time: broad light and dark patches that break the repeating texture, and small marks by ground kind:
+  // grass tufts, flowers and worn spots; cracks, oil stains, patched tarmac, puddles and the odd drain cover on roads;
+  // stains and cracks on concrete; pebbles, ripples and dry scrub on sand; drift shadows, prints and rocks in snow.
+  groundDetail(x0, y0, x1, y1) {
+    const m = this.map, x = this.ctx, W = m.W;
+    // broad, soft light and dark blotches (one per 4 x 4 cells, round, overlapping), only over open ground
+    x.save(); x.beginPath(); let any = false;
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) if (m.tiles[cy * W + cx] === T.GROUND) { x.rect(cx * CELL, cy * CELL, CELL, CELL); any = true; }
+    if (any) { x.clip();
+      for (let by = Math.floor(y0 / 4) - 1; by <= Math.floor(y1 / 4) + 1; by++) for (let bx = Math.floor(x0 / 4) - 1; bx <= Math.floor(x1 / 4) + 1; bx++) {
+        const v = hash(bx, by, 61) - 0.5, cxw = (bx * 4 + 2 + (hash(bx, by, 62) - 0.5) * 5) * CELL, cyw = (by * 4 + 2 + (hash(bx, by, 63) - 0.5) * 5) * CELL, R = CELL * (1.8 + hash(bx, by, 64) * 3);
+        if (hash(bx, by, 65) < 0.3) continue; // (not every block: no grid of blobs)
+        const ck = Math.max(0, Math.min(m.H - 1, Math.round(cyw / CELL))) * W + Math.max(0, Math.min(W - 1, Math.round(cxw / CELL))), fl = m.floor[ck], soft = fl === FL.SNOW ? 0.3 : fl === FL.SAND ? 0.55 : 1; // (pale ground: much fainter)
+        const g = x.createRadialGradient(cxw, cyw, 0, cxw, cyw, R), col = v > 0 ? '255,250,235' : fl === FL.SNOW ? '90,110,140' : '0,0,0', al = (v > 0 ? v * 0.11 : -v * 0.16) * soft;
+        g.addColorStop(0, `rgba(${col},${al.toFixed(3)})`); g.addColorStop(1, `rgba(${col},0)`); x.fillStyle = g; x.fillRect(cxw - R, cyw - R, R * 2, R * 2);
+      } }
+    x.restore();
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+      const k = cy * W + cx; if (m.tiles[k] !== T.GROUND) continue;
+      const f = m.floor[k], X = cx * CELL, Y = cy * CELL, h = s => hash(cx, cy, 70 + s), same = (dx, dy) => m.tiles[k + dy * W + dx] === T.GROUND && m.floor[k + dy * W + dx] === f;
+      const r = h(1);
+      if (f === FL.GRASS) {
+        if (r < 0.3) { x.fillStyle = h(2) < 0.5 ? 'rgba(20,40,10,0.13)' : 'rgba(190,210,120,0.09)'; x.beginPath(); x.ellipse(X + 4 + h(3) * 8, Y + 4 + h(4) * 8, 3 + h(5) * 5, 2 + h(6) * 4, h(7) * 3, 0, 7); x.fill(); }
+        if (r > 0.82) { x.strokeStyle = 'rgba(30,60,18,0.5)'; x.lineWidth = 0.5; x.beginPath(); for (let i = 0; i < 5; i++) { const tx = X + 2 + h(10 + i) * 12, ty = Y + 3 + h(20 + i) * 11; x.moveTo(tx, ty); x.lineTo(tx + (h(30 + i) - 0.5) * 2, ty - 1.6 - h(40 + i) * 1.4); } x.stroke(); }
+        if (r > 0.965) { for (let i = 0; i < 3; i++) { x.fillStyle = h(50 + i) < 0.5 ? '#f3efd8' : '#f2d04a'; x.beginPath(); x.arc(X + 3 + h(60 + i) * 10, Y + 3 + h(70 + i) * 10, 0.55, 0, 7); x.fill(); } }
+      } else if (f === FL.ASPHALT || f === FL.CONCRETE) {
+        if (r < 0.07) { x.strokeStyle = 'rgba(10,10,12,0.4)'; x.lineWidth = 0.45; x.beginPath(); let px = X + h(2) * CELL, py = Y + h(3) * CELL; x.moveTo(px, py); for (let i = 0; i < 4; i++) { px += (h(4 + i) - 0.5) * 7; py += (h(9 + i) - 0.5) * 7; x.lineTo(px, py); } x.stroke(); }
+        else if (r < 0.13) { x.fillStyle = 'rgba(8,8,10,0.16)'; x.beginPath(); x.ellipse(X + 8, Y + 8, 3 + h(5) * 4, 2 + h(6) * 3, h(7) * 3, 0, 7); x.fill(); } // an oil stain
+        else if (f === FL.ASPHALT && r < 0.165 && same(1, 0) && same(0, 1)) { x.fillStyle = 'rgba(0,0,0,0.14)'; x.fillRect(X + 2, Y + 3, 9 + h(8) * 10, 6 + h(9) * 8); } // patched tarmac
+        else if (f === FL.ASPHALT && r < 0.19 && same(1, 0) && same(-1, 0)) { x.fillStyle = 'rgba(40,52,62,0.35)'; x.beginPath(); x.ellipse(X + 8, Y + 8, 5 + h(5) * 4, 3 + h(6) * 2, h(7) * 3, 0, 7); x.fill(); x.strokeStyle = 'rgba(200,215,230,0.18)'; x.lineWidth = 0.5; x.beginPath(); x.ellipse(X + 7, Y + 7, 3, 1.4, h(7) * 3, 3.6, 5.2); x.stroke(); } // a puddle
+        else if (r > 0.993 && same(1, 0) && same(-1, 0) && same(0, 1) && same(0, -1)) { x.fillStyle = '#26282b'; x.beginPath(); x.arc(X + 8, Y + 8, 4.2, 0, 7); x.fill(); x.strokeStyle = '#4a4d51'; x.lineWidth = 0.6; x.stroke(); x.beginPath(); for (let i = -2; i <= 2; i++) { x.moveTo(X + 5, Y + 8 + i * 1.3); x.lineTo(X + 11, Y + 8 + i * 1.3); } x.strokeStyle = 'rgba(0,0,0,0.5)'; x.lineWidth = 0.4; x.stroke(); } // a drain cover
+      } else if (f === FL.SAND) {
+        if (r < 0.18) for (let i = 0; i < 3; i++) { x.fillStyle = h(80 + i) < 0.5 ? 'rgba(120,100,70,0.55)' : 'rgba(230,215,180,0.6)'; x.beginPath(); x.arc(X + 2 + h(90 + i) * 12, Y + 2 + h(95 + i) * 12, 0.5 + h(99 + i) * 0.6, 0, 7); x.fill(); }
+        else if (r < 0.28) { x.strokeStyle = 'rgba(255,240,210,0.22)'; x.lineWidth = 0.5; x.beginPath(); x.arc(X + 8, Y + 12, 6, 3.6, 5.8); x.stroke(); x.strokeStyle = 'rgba(120,95,60,0.18)'; x.beginPath(); x.arc(X + 8, Y + 13, 6, 3.6, 5.8); x.stroke(); } // a ripple
+        else if (r > 0.975) { x.strokeStyle = 'rgba(95,90,45,0.7)'; x.lineWidth = 0.5; x.beginPath(); for (let i = 0; i < 7; i++) { const a2 = i / 7 * 6.28; x.moveTo(X + 8, Y + 8); x.lineTo(X + 8 + Math.cos(a2) * 2.6, Y + 8 + Math.sin(a2) * 2.6); } x.stroke(); } // dry scrub
+      } else if (f === FL.SNOW) {
+        if (r < 0.14) { x.fillStyle = 'rgba(120,140,170,0.1)'; x.beginPath(); x.ellipse(X + 8, Y + 8, 5 + h(5) * 5, 3 + h(6) * 3, h(7) * 3, 0, 7); x.fill(); } // drift shadow
+        else if (r < 0.18) { x.fillStyle = 'rgba(110,125,150,0.25)'; for (let i = 0; i < 3; i++) { x.beginPath(); x.ellipse(X + 3 + i * 4, Y + 5 + (i % 2) * 4, 0.9, 1.4, 0.4, 0, 7); x.fill(); } } // prints
+        else if (r > 0.98) { x.fillStyle = '#5c6066'; x.beginPath(); x.ellipse(X + 8, Y + 8, 1.8, 1.2, h(5) * 3, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,0.8)'; x.beginPath(); x.ellipse(X + 7.6, Y + 7.4, 1.4, 0.5, 0, 0, 7); x.fill(); } // a rock with snow on it
+      }
+    }
   }
 
   // Staircases: steps across the direction of travel, darker as they go down, with an arrow.

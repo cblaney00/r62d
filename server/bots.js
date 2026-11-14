@@ -820,7 +820,7 @@ function roamSpot(game, p) {
 // the hand is never perfectly steady (he asked 2026-11-14: much less aim jitter): a slow drift that changes direction a few
 // times a second, not a new random twitch every tick (that made bots' guns shake); about the same wander over a second
 function handDrift(ai, S, dt) {
-  if ((ai.hdT = (ai.hdT ?? 0) - dt) <= 0) { ai.hdT = 0.25 + Math.random() * 0.2; ai.hdV = (Math.random() - 0.5) * 0.18 * (S.shake ?? 1); }
+  if ((ai.hdT = (ai.hdT ?? 0) - dt) <= 0) { ai.hdT = 0.1 + Math.random() * 0.08; ai.hdV = (Math.random() - 0.5) * 0.29 * (S.shake ?? 1); } // (the same wander per second as the old per-tick steps)
   return ai.hdV * dt;
 }
 export function botThink(game, p, dt) {
