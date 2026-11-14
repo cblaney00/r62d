@@ -1239,3 +1239,14 @@ html.zombies #leftCount, html.zombies #tipNow, html.zombies #cambar, html.zombie
 #settings .swatches .cust.on { background: var(--c); }
 #settings .swatches .cust input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; border: 0; }
 html.tv .sc[data-tc] { background: var(--tc); color: #0b0e12; } /* TV: each team's score box in its own colour */
+
+/* Ball Knowledge sections (GUNS, ATTACHMENTS, MAPS, DRILLS, PRO TAKES) */
+#bkPage .bkTabs { display: flex; gap: 2px; flex-wrap: nowrap; flex-shrink: 0; } #bkPage .bkTabs button { padding: 6px 12px; font: 700 13px var(--head); letter-spacing: 0.1em; } #bkPage .bkTabs button.on { background: var(--gold, #f2c14e); color: #000; }
+#bkPage.bkWide .bkGrid { grid-auto-rows: auto; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+#bkPage .bkInfoCard { cursor: default; overflow: visible; } #bkPage .bkInfoCard ul { mask-image: none !important; -webkit-mask-image: none !important; overflow: visible; flex-shrink: 0; }
+#bkPage.bkWide .bkGrid .bkCard { display: block; height: auto; align-self: start; } #bkPage.bkWide .bkGrid .bkHead { margin-bottom: 6px; }
+#bkPage .bkInfoCard .bkBar { grid-template-columns: 70px 1fr 50px; margin: 2px 0 6px; }
+#bkPage .bkTake { font-size: 16px; line-height: 1.4; margin: 4px 0 8px; color: #eef2f5; font-style: italic; }
+#bkPage .bkLog li { font-size: 13px; color: #b9c3cf; } #bkPage .bkLog small { color: var(--dim); margin-right: 6px; }
+#bkPage .bkPatch small { color: var(--dim); margin-right: 4px; }
+#playbookPage .pbTake { font-size: 17px; line-height: 1.4; font-style: italic; margin: 6px 0 10px; }

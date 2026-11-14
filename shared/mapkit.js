@@ -42,8 +42,9 @@ export function makeMap({ id, name, floors }) {
   let gx = 0;
   floors = floors.map(f => f.ground ? { ...f, x0: f.x0 - PAD, y0: f.y0 - PAD, w: f.w + 2 * PAD, h: f.h + 2 * PAD, pad: PAD } : f);
   { // he asked: every map has a roof (buildRoof). One flat floor over everything above the ground (School: over the 2F and its 3F tower)
-    const up = floors.slice(floors.findIndex(f => f.ground) + 1), x0 = Math.min(...up.map(f => f.x0)), y0 = Math.min(...up.map(f => f.y0));
-    floors = [...floors, { name: 'RF', x0, y0, w: Math.max(...up.map(f => f.x0 + f.w)) - x0, h: Math.max(...up.map(f => f.y0 + f.h)) - y0, roof: true }];
+    const up = floors.slice(floors.findIndex(f => f.ground) + 1);
+    if (up.length) { const x0 = Math.min(...up.map(f => f.x0)), y0 = Math.min(...up.map(f => f.y0));
+    floors = [...floors, { name: 'RF', x0, y0, w: Math.max(...up.map(f => f.x0 + f.w)) - x0, h: Math.max(...up.map(f => f.y0 + f.h)) - y0, roof: true }]; } // (the drill hall in shared/maps/drill.js has no upstairs: no roof)
   }
   const fl = floors.map((f, i) => { const o = { ...f, i, gx, gy: 0 }; gx += f.w + GAP; return o; });
   const W = gx - GAP, H = Math.max(...floors.map(f => f.h)), N = W * H;

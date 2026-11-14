@@ -9,7 +9,7 @@ import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, r
 import { ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
-import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess } from './training.js';
+import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess, DRILL_STYLE, drillMul } from './training.js';
 import { compose, LINES, FUN, WAYS } from '../shared/comms.js';
 import { parseCommand } from '../shared/commands.js';
 
@@ -934,7 +934,7 @@ export function botThink(game, p, dt) {
     ai.strafeT = (ai.strafeT || 0) - dt;
     if (ai.strafeT <= 0) { ai.strafeT = 0.6 + Math.random(); ai.strafe = Math.random() < peekSkill(game, p) ? (Math.random() < 0.5 ? -1 : 1) : 0; }
     { const lu = linedUp(game, p, enemy); if (lu) { ai.strafe = lu; ai.strafeT = 0.5; } } // a teammate on the same line from the enemy: step off it // he asked: strafe-peeking in a fight is a hard skill, used now and then by a few, not by everyone all the time
-    if (ai.leanE !== enemy.id) { ai.leanE = enemy.id; ai.leanF = Math.random() < know(game, p).lean ? leanSide(game, p, want, enemy) : 0; if (ai.leanF) feat(p, 'lean'); }
+    if (ai.leanE !== enemy.id) { ai.leanE = enemy.id; ai.leanF = Math.random() < know(game, p).lean * (p.pro ? drillMul(p.pro.pl.name, 'lean') : 1) ? leanSide(game, p, want, enemy) : 0; if (ai.leanF) feat(p, 'lean'); }
     if (ai.leanF && !ai.strafe) inp.lean = ai.leanF; // leaning out from the corner to take the fight
     if (ai.strafe) { const sa = p.aim + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); inp.walk = 1; }
     if ((p.pro || lvlOf(game, p) >= 4) && p.hp < p.maxHp * 0.4 && enemy.hp > p.hp && !game.planted) { const ba = Math.atan2(p.y - enemy.y, p.x - enemy.x); setDir(inp, Math.cos(ba), Math.sin(ba)); inp.walk = 1; } // Platinum up: losing the fight, back out of it while shooting
@@ -2036,7 +2036,7 @@ export const __findPath = (...a) => findPath(...a); // for tests
 // ======================================================================================================================
 // how often someone strafe-peeks in a fight (he asked: a hard skill, not something everyone does all the time)
 const PEEK = PRO_PEEK, PEEK_LVL = [0.02, 0.03, 0.06, 0.09, 0.12, 0.18, 0.22];
-function peekSkill(game, p) { return p.pro ? (PEEK[p.pro.pl.name] ?? 0.06) : PEEK_LVL[lvlOf(game, p)]; }
+function peekSkill(game, p) { return p.pro ? (PEEK[p.pro.pl.name] ?? 0.06) * drillMul(p.pro.pl.name, 'strafe') : PEEK_LVL[lvlOf(game, p)]; } // (pros: their drill style moves it)
 const PERSONA = PRO_PERSONA, TIMING = PRO_TIMING, ROTATE_DELAY = PRO_ROTATE; // (in shared/pros.js: the PLAYBOOK shows them)
 // The pros talk (he asked: you can see what they say, an insight into their thoughts; not everything is said, but a
 // change of plan always is, and specific information has to be spoken because pings are limited). A line goes to their
@@ -2305,6 +2305,11 @@ export function proSay(game, p, text, key, prio = false) {
   (game.proLog || (game.proLog = [])).push({ round: game.round, squad: p.squad, team: p.pro.tag, text, who: p.pro.pl.name });
   game.chat(p, { text: text.slice(0, 140), team: true });
 }
+// make bot b the pro at PRO_TEAMS[t].players[i] (assignPros; the drills put any pro on either side)
+export function setPro(b, t, i) {
+  const team = PRO_TEAMS[t], pl = team.players[i]; if (!b.baseName) b.baseName = b.name;
+  b.pro = { team: team.id, tag: team.tag, i, pl }; b.name = `[${team.tag}] ${pl.name}`; const pp = PERSONA[pl.name]; b.persona = { aggr: pp[0], patience: pp[1] };
+}
 export function assignPros(game) {
   const on = game.botLevel === PRO_LEVEL && !game.tut;
   for (const squad of [0, 1]) {
@@ -2312,7 +2317,7 @@ export function assignPros(game) {
     const team = PRO_TEAMS[squad];
     bots.forEach((b, i) => {
       if (!b.baseName) b.baseName = b.name;
-      if (on && i < team.players.length) { const pl = team.players[i]; b.pro = { team: team.id, tag: team.tag, i, pl }; b.name = `[${team.tag}] ${pl.name}`; const pp = PERSONA[pl.name]; b.persona = { aggr: pp[0], patience: pp[1] }; }
+      if (on && i < team.players.length) setPro(b, squad, i);
       else if (b.pro) { b.pro = null; b.name = b.baseName; b.persona = null; }
     });
   }
@@ -2526,7 +2531,7 @@ function proAct(game, p, inp, dt, team) {
     pt = angleOn(game, p, pt); if (pt) turnTo(p, Math.atan2(pt.y - p.y, pt.x - p.x), S.turn * 0.6, dt); inp.crouch = crouch ? 1 : 0; // he asked: crosshair placement matters most — held still on the spot, no drifting
     // map knowledge: each new spot held leaning out from the cover beside it, or (defence) lying down at a deep angle
     const K = know(game, p), at = Math.round(p.x / 24) + ',' + Math.round(p.y / 24);
-    if (ai.poseAt !== at) { ai.poseAt = at; ai.leanS = Math.random() < K.lean ? leanSide(game, p, pt ? Math.atan2(pt.y - p.y, pt.x - p.x) : p.aim, pt) : 0; ai.proneH = side === 'def' && crouch && !ai.leanS && Math.random() < K.prone * 1.5; if (ai.leanS) feat(p, 'lean'); if (ai.proneH) feat(p, 'prone'); }
+    if (ai.poseAt !== at) { ai.poseAt = at; ai.leanS = Math.random() < K.lean * drillMul(p.pro.pl.name, 'lean') ? leanSide(game, p, pt ? Math.atan2(pt.y - p.y, pt.x - p.x) : p.aim, pt) : 0; ai.proneH = side === 'def' && crouch && !ai.leanS && Math.random() < K.prone * 1.5; if (ai.leanS) feat(p, 'lean'); if (ai.proneH) feat(p, 'prone'); }
     if (ai.leanS) inp.lean = ai.leanS;
     if (ai.proneH) { inp.prone = 1; inp.crouch = 0; }
   };
@@ -2673,4 +2678,68 @@ export function arenaThink(game, p, dt) {
     ai.hunt = q ? { x: q.x + (Math.random() - 0.5) * 320, y: q.y + (Math.random() - 0.5) * 320 } : roomPoint(game, game.map.rooms[Math.floor(Math.random() * game.map.rooms.length)]);
   }
   if (ai.hunt) moveTo(game, p, inp, ai.hunt, dt);
+}
+
+// PRO DRILLS (he asked 2026-11-14; server/drills.js runs them): a closed hall, each side kept to its half by a steel line,
+// two bulletproof blocks in the middle, no skills or gadgets, a one-minute clock. The pros fight like in a match (same
+// reaction, mouse hand, head or body, leaning past cover) and between sightings hold an edge of cover or swing to another
+// one. How long they hold before swinging, how often they lean, crouch or jiggle, whether they swing at once to trade a
+// teammate and whether they walk (silent) is each pro's drill style (p.drillStyle), which the drills teach: styles that
+// score keep, styles that lose fade. Patience shrinks as the clock runs out (a draw is a loss for both: urgency).
+export function drillThink(game, p, dt) {
+  const ai = p.ai, inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
+  p.input = inp;
+  if (!p.alive || p.ctrl !== 'body') return;
+  const D = game.drill, S = skill(game, p), sty = p.drillStyle || DRILL_STYLE, gun = p.guns[p.slot], team = game.side(p);
+  const urgency = Math.max(0, Math.min(1, 1 - game.timer / D.time));
+  for (const n of game.noises || []) {
+    if (n.team === team || game.time - n.t > 1.5 || (ai.heard && ai.heard.t >= n.t)) continue;
+    if (Math.hypot(n.x - p.x, n.y - p.y) < n.r * EAR[EAR.length - 1]) ai.heard = { x: n.x, y: n.y, t: game.time };
+  }
+  const enemy = visibleEnemy(game, p, S.see);
+  if (enemy) {
+    const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
+    if (ai.seen !== enemy.id) {
+      const expected = ai.heard && game.time - ai.heard.t < 2 && Math.hypot(ai.heard.x - enemy.x, ai.heard.y - enemy.y) < 200;
+      ai.seen = enemy.id; ai.seenT = game.time; ai.oh = Math.random() < S.head; ai.os = ai.oh ? (Math.random() - 0.5) * 2 : (Math.random() < 0.5 ? -1 : 1) * (3 + Math.random() * Math.max(1.5, S.body / 2 - 3));
+      ai.react = -(expected ? S.expect : S.react) - Math.random() * S.reactX * (expected ? 0.6 : 1);
+      ai.err = p.pro ? (Math.random() < 0.5 ? -1 : 1) * 0.02 * (1 + S.err) : (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.4) * S.err;
+      ai.leanF = Math.random() < sty.lean ? leanSide(game, p, Math.atan2(enemy.y - p.y, enemy.x - p.x), enemy) : 0;
+      ai.crF = Math.random() < sty.crouch; ai.strafe = 0; ai.strafeT = 0;
+      p.drillFight = { lean: !!ai.leanF, crouch: ai.crF, held: (ai.stillT || 0) > 0.8, seenT: game.time, heard: !!expected };
+      if (D.onSee) D.onSee(p, enemy);
+    }
+    ai.react += dt; ai.err *= Math.exp(-dt * S.settle); ai.err += (Math.random() - 0.5) * dt * 0.6 * (S.shake ?? 1);
+    const os = (ai.os || 0) / Math.max(1, d), want = Math.atan2(enemy.y + (enemy.x - p.x) * os - p.y, enemy.x - (enemy.y - p.y) * os - p.x) + ai.err;
+    turnTo(p, want, S.turn, dt);
+    p.aimX = p.x + Math.cos(p.aim) * d; p.aimY = p.y + Math.sin(p.aim) * d;
+    if (!ai.oh) { const hx = p.aimX - enemy.x, hy = p.aimY - enemy.y, hd = Math.hypot(hx, hy); if (hd < HEAD_AIM + 0.5) { const k = (HEAD_AIM + 0.5) / Math.max(0.01, hd); p.aimX = enemy.x + (hd > 0.01 ? hx * k : HEAD_AIM + 0.5); p.aimY = enemy.y + (hd > 0.01 ? hy * k : 0); } }
+    inp.ads = 1;
+    if (gun && gun.ammo === 0) { game.startReload(p); return; }
+    if (ai.react > 0 && Math.abs(angDiff(want, p.aim)) < S.tol && shotClear(game, p, enemy)) shootInput(inp, ai, gun);
+    if (ai.leanF) inp.lean = ai.leanF;
+    inp.crouch = ai.crF ? 1 : 0;
+    if ((ai.strafeT -= dt) <= 0) { ai.strafeT = 0.35 + Math.random() * 0.5; ai.strafe = Math.random() < sty.strafe ? (Math.random() < 0.5 ? -1 : 1) : 0; if (ai.strafe) p.drillFight.strafe = true; }
+    if (ai.strafe && !ai.leanF) { const sa = p.aim + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); inp.walk = 1; }
+    return;
+  }
+  ai.seen = null; p.drillFight = null;
+  if (gun && gun.ammo < WEAPONS[gun.w].mag * 0.6 && gun.reserve > 0 && !(p.reloadT > 0)) game.startReload(p);
+  // a teammate just went down: swing now to trade (if that's their style), toward where it came from
+  const lost = D.lastDeath[p.squad], trade = lost && game.time - lost.t < 3 && lost.by && Math.random() < sty.trade * dt * 6;
+  const spots = D.spots[p.squad];
+  if (!ai.dspot) { ai.dspot = spots[Math.floor(Math.random() * spots.length)]; ai.holdT = 0; }
+  const there = Math.hypot(ai.dspot.x - p.x, ai.dspot.y - p.y) < 10;
+  if (there) { ai.holdT += dt; ai.stillT = (ai.stillT || 0) + dt; } else ai.stillT = 0;
+  const patience = D.kind === 'hold' && p.squad === 1 ? Infinity : sty.patience * (1 - 0.8 * urgency) * (0.7 + Math.random() * 0.6); // (Hold or swing: the holder only holds)
+  if (trade || (there && ai.holdT > patience)) { // swing: to another edge, the nearest ones first (a short wide swing), sooner as the clock runs down
+    const opts = spots.filter(s => s !== ai.dspot).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+    ai.dspot = opts[Math.min(opts.length - 1, Math.floor(Math.random() * Math.min(3, opts.length)))] || ai.dspot; ai.holdT = 0;
+    if (trade) { ai.dspot = opts[0] || ai.dspot; lost.by = null; }
+    p.feat = p.feat || {}; p.feat.swing = (p.feat.swing || 0) + 1;
+  }
+  if (!there) { moveTo(game, p, inp, ai.dspot, dt); inp.walk = Math.random() < sty.walk ? 1 : 0; }
+  // the angle to hold: a noise heard, else the enemy side's edge of cover nearest where we already look
+  const look = ai.heard && game.time - ai.heard.t < 2.5 ? ai.heard : D.angles[p.squad].reduce((b, a) => !b || Math.abs(angDiff(Math.atan2(a.y - p.y, a.x - p.x), p.aim)) < Math.abs(angDiff(Math.atan2(b.y - p.y, b.x - p.x), p.aim)) ? a : b, null);
+  if (look) turnTo(p, Math.atan2(look.y - p.y, look.x - p.x), S.turn * 0.6, dt);
 }

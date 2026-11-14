@@ -5,7 +5,7 @@ import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatch
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
-import { arenaThink, defSetup, botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
+import { arenaThink, drillThink, defSetup, botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { arenaStart, arenaTick, arenaKill, arenaDamage, arenaSpeed, arenaEndMatch, arenaPlayer, arenaInfo } from './arena.js';
 import { zbSurge, zbDev, ZB, zbDown, zbUp, zbReviveTime, zbSlideEnd, zbStart, zbTick, zombieThink, zbSpeed, zbDamage, zbKill, zbCanGoDown, zbReloadMul, zbBlocksVault, zbUse, zbEnd, zbPlayer, zbInfo } from './zombies.js';
@@ -603,7 +603,7 @@ export class Game {
     if (this.zb) zbTick(this, dt);
     for (const p of this.players.values()) {
       this.by = this.side(p); // a bot's own work (boards, reinforcing in preparation) is its side's
-      if (p.bot && !p.hold) { (p.zombie ? zombieThink : this.arena || this.zb ? arenaThink : botThink)(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
+      if (p.bot && !p.hold) { (p.zombie ? zombieThink : this.drill ? drillThink : this.arena || this.zb ? arenaThink : botThink)(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
       this.tickPlayer(p, dt);
       p.prevInput = p.input;
     }

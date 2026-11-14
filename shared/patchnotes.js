@@ -1,0 +1,53 @@
+// PATCH NOTES (he asked 2026-11-14: the pros should know every change we've made, as if they had played since the
+// beginning, and have a view of the game). The game's changes that matter to how it plays, oldest first, from the
+// project's history. k: what kind of thing (mech = a game rule, op = an operator, gun, att = attachments, map); id: the
+// operator / gun / map it is about when it is about one; t: what changed, in plain words; v: how a player would feel
+// it (+1 a buff / something new to use, -1 a nerf / a new limit, 0 neither). server/opinions.js reads these: each pro
+// weighs the changes that touch their game when forming their view of the worst thing in the game.
+// Add a line here whenever a change to how the game plays goes in.
+export const PATCH_NOTES = [
+  { d: '2026-10-28', k: 'mech', id: 'speed', t: 'Movement slowed to real-world speeds: jog 2.6 m/s, walk 1.4, crouch 0.9.', v: -1 },
+  { d: '2026-10-28', k: 'mech', id: 'fog', t: 'You only see what you look through yourself: no more shared team vision.', v: -1 },
+  { d: '2026-10-30', k: 'mech', id: 'walls', t: 'Bullets go through soft walls; rifles and SMGs only leave small see-through holes.', v: 1 },
+  { d: '2026-10-30', k: 'mech', id: 'barricades', t: 'Barricades work like the classic: 2.5 s to put up, three melee hits break a whole board.', v: 0 },
+  { d: '2026-10-31', k: 'mech', id: 'drones', t: 'Drones break from one bullet, melee, blast or zap.', v: -1 },
+  { d: '2026-10-31', k: 'mech', id: 'cams', t: 'Map cameras hang on walls only, turn ±83°, and break like drones.', v: 0 },
+  { d: '2026-11-02', k: 'mech', id: 'riot', t: 'Riot shields added (Aegis, Visor, Ram, Bastion, Glass, Thorn).', v: 1 },
+  { d: '2026-11-02', k: 'map', id: 'all', t: 'Every map about 1.5 times bigger, with new wings and fewer rectangles.', v: 0 },
+  { d: '2026-11-02', k: 'mech', id: 'softwalls', t: 'Fewer breakable walls: most become concrete; site rooms keep a couple.', v: -1 },
+  { d: '2026-11-03', k: 'mech', id: 'reinforce', t: 'One reinforcement covers 3 cells, not 5.', v: -1 },
+  { d: '2026-11-03', k: 'mech', id: 'windows', t: 'Upper windows look down onto the ground floor, both ways: peekers can be shot from below.', v: 0 },
+  { d: '2026-11-03', k: 'mech', id: 'runout', t: 'Run-outs: a defender outside is shown at once and spotted after 3 s.', v: -1 },
+  { d: '2026-11-03', k: 'mech', id: 'round', t: 'Action phase cut to 2:40, 5 s between rounds.', v: 0 },
+  { d: '2026-11-03', k: 'mech', id: 'spawns', t: 'Safe spawns: attack spawns pushed back behind cover.', v: 1 },
+  { d: '2026-11-04', k: 'gun', id: 'sniper', t: 'Sniper scope for the Longbow and Pike; scope glare gives a sniper away.', v: 0 },
+  { d: '2026-11-04', k: 'mech', id: 'reach', t: 'Every sight has a reach circle; aim-in distance set per sight.', v: 0 },
+  { d: '2026-11-05', k: 'mech', id: 'hp', t: 'Health up 20% (150 / 132 / 120).', v: 0 },
+  { d: '2026-11-05', k: 'gun', id: 'pike', t: 'Pike and Saker one-shot a body only when scoped in, nothing in between.', v: -1 },
+  { d: '2026-11-05', k: 'mech', id: 'headaim', t: 'Headshots need the crosshair on the middle of the head (3 px, was 4.5).', v: -1 },
+  { d: '2026-11-05', k: 'mech', id: 'sitevote', t: 'Sites reopen once every one was played; defending bots vote on the site.', v: 0 },
+  { d: '2026-11-06', k: 'mech', id: 'hitbox', t: 'Bodies skinnier: bullets hit within 6.6 / 6.0 / 5.5 px.', v: -1 },
+  { d: '2026-11-06', k: 'mech', id: 'look', t: 'Raised walls and a tilted camera: more depth, sightlines read differently.', v: 0 },
+  { d: '2026-11-09', k: 'mech', id: 'sound', t: 'Sounds through walls and floors come from a blurred spot: no pinpointing slow walkers.', v: -1 },
+  { d: '2026-11-09', k: 'mech', id: 'defuser', t: 'A dropped defuser is announced to both sides and marked for both.', v: -1 },
+  { d: '2026-11-09', k: 'op', id: 'kestrel', t: 'Kestrel\'s dart is thrown (a little off) and only pings what it can really see.', v: -1 },
+  { d: '2026-11-10', k: 'gun', id: 'new14', t: '14 new guns, each with its own rule (Verdict, Tandem, Ferret, Auger, Quill, Hedge, Cyclone, Trestle, Ranger, Mammoth, Needle, Couplet, Whisper, Hatchet).', v: 1 },
+  { d: '2026-11-10', k: 'op', id: 'perch', t: 'Sniper attackers added: Perch, Moss, Osprey, Nail; 19 attackers can pick a marksman rifle.', v: 1 },
+  { d: '2026-11-10', k: 'mech', id: 'floors', t: 'Every floor but the roof and the lowest can be blown open.', v: 1 },
+  { d: '2026-11-10', k: 'op', id: 'gimlet', t: 'Vertical operators added: Gimlet, Hoist, Lockjaw, Deadfall.', v: 1 },
+  { d: '2026-11-10', k: 'op', id: 'nail', t: 'Nail: 4 piercing rounds at 55%.', v: -1 },
+  { d: '2026-11-10', k: 'op', id: 'crow', t: 'Crow\'s lunge: 1 s, 5 m.', v: 0 },
+  { d: '2026-11-10', k: 'op', id: 'hoist', t: 'Hoist climbs faster (1.2 / 2.2 s).', v: 1 },
+  { d: '2026-11-10', k: 'op', id: 'all-atk', t: 'Every limited attacker skill gets one more use.', v: 1 },
+  { d: '2026-11-10', k: 'op', id: 'rivet', t: 'Rivet\'s battery 18.', v: 0 },
+  { d: '2026-11-10', k: 'op', id: 'ferro', t: 'Ferro\'s swing every 2 s.', v: -1 },
+  { d: '2026-11-10', k: 'op', id: 'bulwark', t: 'Bulwark: bash every 1 s, the K4 Carbine as his only gun.', v: -1 },
+  { d: '2026-11-11', k: 'att', id: 'ammo', t: 'New Ammo slot: Standard leaves a trail, Subsonic hides it (less range), Hot loads hit harder (more kick).', v: 0 },
+  { d: '2026-11-11', k: 'mech', id: 'trails', t: 'Bullet trails show where shots come from.', v: -1 },
+  { d: '2026-11-11', k: 'mech', id: 'status', t: 'Blind, stun, slow and snare icons over heads (for the side that caused them).', v: 0 },
+  { d: '2026-11-12', k: 'mech', id: 'modes', t: 'Unranked and Ranked: operator bans, first to 4 with overtime, sides swap at half.', v: 0 },
+  { d: '2026-11-13', k: 'mech', id: 'ropes', t: 'Ropes on every outside wall; free climbing; you see in only level with a window, and are seen.', v: 1 },
+  { d: '2026-11-14', k: 'mech', id: 'ropeexit', t: 'Off a rope only by sliding down (F) or swinging in (Space) from right in front of the window.', v: -1 },
+  { d: '2026-11-14', k: 'mech', id: 'colours', t: 'Each team in its own colour on broadcasts; players choose their own team colours.', v: 0 },
+  { d: '2026-11-14', k: 'mech', id: 'lean', t: 'Leaning works on ropes; bodies bend with the lean.', v: 1 },
+];

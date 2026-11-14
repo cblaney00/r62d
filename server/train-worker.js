@@ -5,7 +5,8 @@ import { Game } from './game.js';
 import { buildMap, MAP_LIST } from '../shared/map.js';
 import { OPERATORS, WEAPONS } from '../shared/operators.js';
 import { PHASE, TEAM } from '../shared/constants.js';
-import { planKey, opKey, gunKey, attKey } from './training.js';
+import { planKey, opKey, gunKey, attKey, training } from './training.js';
+import { drillSession } from './drills.js';
 
 const PTS_FEAT = { 'DEFUSER PLANTED': 'plant', 'DEFUSER DISABLED': 'defuse', 'REVIVE': 'revive', 'ENEMY SPOTTED': 'spot', 'DRONE DESTROYED': 'droneKill', 'CAMERA DESTROYED': 'camKill', 'GADGET DESTROYED': 'gadgetKill', 'DRONE CAPTURED': 'droneKill', 'WALL REINFORCED': 'reinforce', 'HATCH REINFORCED': 'reinforce' };
 const until = Date.now() + (workerData.minutes || 15) * 60 * 1000, dt = 1 / 30;
@@ -74,4 +75,6 @@ while (Date.now() < until && left > 0) {
     if (g.phase === PHASE.LOBBY && t > 5) break;
   }
 }
+// the drills (he asked 2026-11-14): one-minute constrained gunfights, with this session's styles
+if (workerData.drills !== 0) { const D = drillSession(workerData.drills || 60, training.drills.style); if (D.crash) parentPort.postMessage({ crash: D.crash, map: 'drill' }); delete D.crash; parentPort.postMessage({ drills: D }); }
 parentPort.postMessage({ done: true });

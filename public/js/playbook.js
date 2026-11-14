@@ -10,6 +10,7 @@ import { PRO_TEAMS, playbook, ATK_JOBS, DEF_JOBS, JOB_NAME, PRO_PEEK, PRO_PERSON
 import { MapRenderer } from './mapdraw.js';
 import { drawWebcam } from './webcam.js';
 import * as audio from './audio.js';
+import { drillSkills } from './knowledge.js';
 
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const JOB_COL = { breach: '#ff7a3d', entry: '#ff4f6a', intel: '#5ec8ff', support: '#8be38b', flank: '#d79bff', anchor: '#ffcf5a', trapper: '#ff7a3d', roamer: '#d79bff' };
@@ -100,6 +101,19 @@ function watchFor(pl) {
   }
   return out.sort((a, b) => a[0] - b[0]).slice(0, 6).map(x => x[1]);
 }
+// their view of the game (server/opinions.js) and how it moved; their drill skills against the other nine (server/drills.js)
+function takeOf(pl) {
+  const log = (S.train && S.train.opinions && S.train.opinions[pl.name]) || [], cur = log[log.length - 1];
+  if (!cur) return '<p class="dim">They make up their mind after the next practice session.</p>';
+  const moved = log.filter(x => x.changed).slice(-4, -1).reverse();
+  return `<blockquote class="pbTake">“${esc(cur.text)}”</blockquote>` + (moved.length ? `<p class="pbNote">Before that they said:</p><ul class="pbWatch">${moved.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul>` : `<p class="pbNote">Held this view for ${log.length} practice session${log.length === 1 ? '' : 's'}.</p>`);
+}
+function drillsOf(pl) {
+  const D = S.train && S.train.drills, mine = drillSkills(D, pl.name); if (!mine.length) return '<p class="dim">No drills yet: press TRAIN THE PROS.</p>';
+  const all = PRO_TEAMS.flatMap(t => t.players).map(p => drillSkills(D, p.name));
+  const place = i => { const v = mine[i].v; if (v === null) return ''; const vs = all.map(s => s[i] && s[i].v).filter(x => x !== null && x !== undefined).sort((a, b) => b - a), r = vs.indexOf(v); return r === 0 ? ' · <b>best</b>' : r === vs.length - 1 ? ' · worst' : ` · ${r + 1} of ${vs.length}`; };
+  return `<ul class="pbWatch">${mine.map((s, i) => `<li>${esc(s.n)}: <b>${s.f}</b>${place(i)}</li>`).join('')}</ul>`;
+}
 function playerPage(T, pl) {
   const b = pl.bio || {}, [aggr, patience] = PRO_PERSONA[pl.name] || [0.5, 0.5], peek = PRO_PEEK[pl.name] ?? 0.06, timing = PRO_TIMING[pl.name] || 0, rot = PRO_ROTATE[pl.name] || 0;
   const m = pl.mouse || {}, t = tendOf(pl.name), side = S.pside;
@@ -122,6 +136,8 @@ function playerPage(T, pl) {
         <ul class="pbTraits">${pl.traits.slice(0, -1).map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>
       <section><h4>WATCH FOR</h4>${watch.length ? `<ul class="pbWatch">${watch.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="dim">Not enough practice on this patch yet: press TRAIN THE PROS.</p>'}
         ${t ? `<div class="pbNums">${num(f1(per(t, 'fk') * 10), 'opening kills / 10 rounds')}${num(t.cl || 0, 'clutches won')}${num(t.k ? f1(t.dist / t.k / PX_PER_M) + ' m' : '–', 'average kill distance')}${num(f1(per(t, 'cams') + per(t, 'gadgets')), 'cameras + gadgets shot a round')}${num(f1(per(t, 'lean')), 'leans a round')}${num(t.plant || 0, 'plants')}</div>` : ''}</section>
+      <section><h4>THE WORST THING IN THE GAME</h4>${takeOf(pl)}</section>
+      <section><h4>IN THE DRILLS</h4>${drillsOf(pl)}</section>
       <section class="wide"><h4>THIS PATCH <span class="seg pbPs">${['atk', 'def'].map(s => `<button data-ps="${s}" class="${s === side ? 'on' : ''}">${s === 'atk' ? 'ATTACK' : 'DEFENCE'}</button>`).join('')}</span></h4>${patchCard(pl, side)}</section>
     </div>`;
 }

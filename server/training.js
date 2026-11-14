@@ -11,7 +11,8 @@ const FILE = path.join(DIR, 'pro-training.json');
 export const training = { version: null, at: 0, rounds: 0, verRounds: 0, plans: {}, ops: {}, opx: {}, guns: {}, att: {}, pro: {} }; // opx: per operator, all maps (BALL KNOWLEDGE)
 export const ROUNDS_PER_VERSION = 200; // he asked: 200 practice rounds per update is enough
 try { Object.assign(training, JSON.parse(fs.readFileSync(FILE, 'utf8'))); } catch {}
-for (const k of ['guns', 'att', 'pro']) if (!training[k]) training[k] = {};
+for (const k of ['guns', 'att', 'pro', 'opinions']) if (!training[k]) training[k] = {};
+if (!training.drills) training.drills = { n: 0, kinds: {}, pro: {}, feats: {}, style: {} };
 // skill uses were counted wrong before (defender bots set their traps before the count started, and bots never
 // headshot): those two numbers start again from zero; x[8] = rounds the uses were counted in
 for (const x of Object.values(training.opx || {})) if (x.length < 9) { x[5] = 0; x[6] = 0; x[8] = 0; }
@@ -55,6 +56,30 @@ export function addResults(res) {
     for (const [side, t] of Object.entries(P.tend || {})) { const x = (T.tend || (T.tend = {}))[side] || (T.tend[side] = {}); for (const [k, v] of Object.entries(t)) x[k] = (x[k] || 0) + v; } } // tendencies (PLAYBOOK player pages): plain counts per side
   training.rounds += res.rounds || 0; training.verRounds = (training.verRounds || 0) + (res.rounds || 0);
 }
+// PRO DRILLS (server/drills.js): a session's drills added up (per pro: points, kills, shots, reactions...; per fight
+// habit: [won, fights]), and each pro's drill style moved a little toward the habits that won them fights
+export const DRILL_STYLE = { lean: 0.5, crouch: 0.3, strafe: 0.3, patience: 6, trade: 0.6, walk: 0.5 };
+export function addDrills(D) {
+  const T = training.drills; T.n += D.n || 0; T.at = Date.now();
+  for (const [k, v] of Object.entries(D.kinds || {})) { const x = T.kinds[k] || (T.kinds[k] = { n: 0, draws: 0, time: 0 }); for (const f in v) x[f] = (x[f] || 0) + v[f]; }
+  for (const [name, s] of Object.entries(D.pro || {})) { const x = T.pro[name] || (T.pro[name] = {}); for (const f in s) x[f] = (x[f] || 0) + s[f]; }
+  for (const [h, [w, n]] of Object.entries(D.feats || {})) { const x = T.feats[h] || (T.feats[h] = [0, 0]); x[0] += w; x[1] += n; }
+  learnStyles(T.style, D.styleRec);
+}
+export function learnStyles(styles, styleRec) {
+  for (const [name, R] of Object.entries(styleRec || {})) {
+    const S = styles[name] || (styles[name] = { ...DRILL_STYLE });
+    for (const [h, knob, lo, hi, step] of [['lean', 'lean', 0.05, 0.95, 0.08], ['crouch', 'crouch', 0.05, 0.9, 0.08], ['strafe', 'strafe', 0.05, 0.9, 0.08], ['held', 'patience', 2, 12, 1.2]]) {
+      const x = R[h]; if (!x || x.on[1] < 4 || x.off[1] < 4) continue;
+      const d = x.on[0] / x.on[1] - x.off[0] / x.off[1]; // fights won minus lost, per fight, with the habit vs without
+      S[knob] = Math.max(lo, Math.min(hi, (S[knob] ?? DRILL_STYLE[knob]) + Math.sign(d) * Math.min(1, Math.abs(d)) * step));
+    }
+  }
+  return styles;
+}
+// a pro's drill style moves their match play a little (he asked the drills to make them better at the real thing):
+// how often they lean past cover and peek, against the starting style (0.5x to 1.5x)
+export function drillMul(name, knob) { const S = training.drills.style[name]; if (!S || S[knob] === undefined) return 1; return Math.max(0.5, Math.min(1.5, S[knob] / DRILL_STYLE[knob])); }
 // a new version of the game makes the old lessons less sure: keep them, but at half weight
 export function newVersion(version) {
   if (training.version === version) return;
@@ -63,6 +88,7 @@ export function newVersion(version) {
   const half = x => x.forEach((v, i) => { x[i] = Math.round(v / 2); });
   for (const x of Object.values(training.opx || {})) half(x);
   for (const kind of ['guns', 'att']) for (const x of Object.values(training[kind])) half(x);
+  { const T = training.drills; T.n = Math.round(T.n / 2); for (const p of Object.values(T.pro)) for (const k in p) p[k] = Math.round(p[k] / 2); for (const x of Object.values(T.feats)) half(x); for (const x of Object.values(T.kinds)) for (const k in x) x[k] = Math.round(x[k] / 2); }
   for (const P of Object.values(training.pro)) { for (const kind of ['ops', 'guns', 'att']) for (const x of Object.values(P[kind] || {})) half(x); for (const t of Object.values(P.tend || {})) for (const k of Object.keys(t)) t[k] = Math.round(t[k] / 2); }
 }
 export const roundsLeft = version => training.version !== version ? ROUNDS_PER_VERSION : Math.max(0, ROUNDS_PER_VERSION - (training.verRounds || 0));
@@ -71,7 +97,7 @@ export const needsTraining = version => roundsLeft(version) > 0;
 // The practice version: a fingerprint of every .js in server/ and shared/ (gameplay code), so menu/art/sound changes
 // don't start a new practice. The server's plumbing (web server, saving, practice itself) is left out: changing it
 // doesn't change how a match plays. null if the files can't be read.
-const NOT_PLAY = new Set(['server.js', 'practice.js', 'training.js', 'train-worker.js', 'store.js', 'ws.js']);
+const NOT_PLAY = new Set(['server.js', 'practice.js', 'training.js', 'train-worker.js', 'store.js', 'ws.js', 'opinions.js', 'drills.js']);
 export function playVersion() {
   const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const h = crypto.createHash('sha1'), walk = d => { for (const f of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (f.name.endsWith('.js') && !(d.endsWith('server') && NOT_PLAY.has(f.name)) && f.name !== 'joincode.js') h.update(f.name).update(fs.readFileSync(p)); } };

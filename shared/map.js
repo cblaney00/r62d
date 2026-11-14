@@ -9,6 +9,7 @@ import { build as lodge } from './maps/lodge.js';
 import { build as school } from './maps/school.js';
 import { build as dust } from './maps/dust.js';
 import { build as lantern } from './maps/lantern.js';
+import { build as drill } from './maps/drill.js';
 
 export const MAPS = {
   harbor: { name: 'Harbor Office', floors: '1F · 2F', desc: 'Offices and a garage by the docks.', build: harbor },
@@ -19,6 +20,7 @@ export const MAPS = {
   school: { name: 'Clocktower School', floors: '1F · 2F · 3F', desc: 'An old school with a gym, labs upstairs and a clock tower on top.', build: school },
   lantern: { name: 'Lantern Point', floors: '1F · 2F · 3F', desc: 'A harbour town on the point, overrun. Zombies only.', build: lantern, zombie: true },
   dust: { name: 'Dust Town', floors: '1F · 2F', desc: 'A desert town laid out like a classic: a long road, a middle street and a tight tunnel to two sites.', build: dust },
+  drill: { name: 'Drill Hall', floors: '1F', desc: 'The pros\' practice room.', build: drill, zombie: true, drill: true }, // (pro drills only: server/drills.js)
 };
 export const MAP_LIST = Object.keys(MAPS).filter(k => !MAPS[k].zombie); // (the zombies town is not a normal map)
 
