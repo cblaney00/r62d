@@ -2736,17 +2736,21 @@ function draw(s, view, now, dt) {
     }
     // up on furniture or mid-jump (he asked: an obvious but tidy marker): a shadow below, a dashed ring, drawn a little bigger
     const elv = isMe ? (st.pred.air > 0 ? 2 : st.pred.up ? 1 : 0) : p.el || 0;
-    if (elv) { ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 5, 11, 9, 0, 0, 7); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]); ctx.beginPath(); ctx.arc(p.x, p.y, 15.5, 0, 7); ctx.stroke(); ctx.restore();
-      ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     const hangW = p.rp === 1 || p.rp === 3 ? hangWall(p) : undefined; // on a rope: drawn hanging against the wall
-    drawOperator(ctx, {
+    // up on furniture: standing on its top (0.28 of a wall up, like the raised desk under them), drawn again above the raised furniture later
+    const upDraw = c => { const ez = elv ? 0.28 + (elv > 1 ? 0.1 : 0) : 0;
+      if (elv) { c.save(); c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.ellipse(p.x + 3, p.y + 5, 11, 9, 0, 0, 7); c.fill(); c.restore(); }
+      lifted(c, p.x, p.y, ez, () => {
+      if (elv) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1; c.setLineDash([3, 2]); c.beginPath(); c.arc(p.x, p.y, 15.5, 0, 7); c.stroke(); c.restore();
+        c.save(); c.translate(p.x, p.y); c.scale(1.12, 1.12); c.translate(-p.x, -p.y); }
+    drawOperator(c, {
       hang: hangW !== undefined ? (p.rp === 3 ? 'inv' : 'up') : null, wallA: hangW, zb: hangW !== undefined ? ((isMe ? me.ro && me.ro[7] : sp.rz) ?? 0.5) - 0.55 : 0,
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, slide: p.sd, downed: p.dn,
       sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
-    if (elv) ctx.restore();
-    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, lb = liftOf(p.x, p.y, 0.4 * zk), lh = liftOf(p.x, p.y, 0.53 * zk); // (drawn standing up: rings and head zones where they show)
+      if (elv) c.restore(); }); };
+    upDraw(ctx); if (elv && persp.h) (st.upDraws || (st.upDraws = [])).push(upDraw);
+    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? 0.28 : 0, lb = liftOf(p.x, p.y, 0.4 * zk + ez0), lh = liftOf(p.x, p.y, 0.53 * zk + ez0); // (drawn standing up: rings and head zones where they show)
     drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x + lb[0], y: p.y + lb[1] });
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x + lh[0], y: p.y + lh[1] });
     if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see
@@ -2871,6 +2875,7 @@ function draw(s, view, now, dt) {
     if (B > d) ctx.fillRect(a, d, c - a, B - d);
   }
   if (raise) raise(ctx, 'lit'); // raised walls in sight (look.js), above the blackout
+  if (st.upDraws && st.upDraws.length) { if (raise) for (const fn of st.upDraws) fn(ctx); st.upDraws.length = 0; } // people up on furniture stand above its raised top
   { // the camera tilt follows your movement across the screen
     const p = st.pred, lp = st.tiltLast || p, k = dt > 0 ? 1 / dt : 0, vx = p && lp ? (p.x - lp.x) * k : 0, vy = p && lp ? (p.y - lp.y) * k : 0;
     st.tiltLast = p ? { x: p.x, y: p.y } : null;
