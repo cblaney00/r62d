@@ -38,6 +38,7 @@ import * as rope3d from './rope3d.js';
 import { compassRoute as sharedRoute } from '/shared/compass.js';
 import { touchPad, touchContext, touchActive, isTrackpad, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
+import { EYE_H } from '/shared/map.js';
 
 const $ = id => document.getElementById(id);
 // Stacked layers: the map (moved and scaled by the browser, see MapRenderer.mount), the people and effects, the line-of-sight blackout (drawn small and stretched by
@@ -173,7 +174,7 @@ const ADS_SNAP_MIN = 2 * PX_PER_M;
 // or anything joined to it for WALL_HOLD s and it turns blue; while it stays blue, aiming in snaps the crosshair
 // onto the bracket (the wall), however far away it is (he asked). Looking off it (or the marker going away) starts over.
 const RING_R = 13; // the team-coloured circle round each person (drawOperator)
-const WALL_HOLD = 1.5, WALL_TILES = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.TALL, T.DSHIELD]);
+const WALL_HOLD = 1.5, WALL_TILES = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.TALL, T.DSHIELD, T.BARRI, T.BEAM, T.LOW]);
 function wallHeld(q, now) {
   const H = st.wallHold, dt = H ? Math.min(0.1, now - H.at) : 0; // (now: seconds)
   if (!q || !q.mk || !st.map || !st.pred) { st.wallHold = null; return; }
@@ -430,13 +431,36 @@ function freeAimPoint() {
     if (edge > 4 && edge < see - 2 && edge < shot - 2 && edge < l - 4 && (!person || edge < person.d)) person = { id: r.id, x: r.x, y: r.y, d: edge };
   }
   if (person) see = shot = person.d;
-  // the marker sits on the wall (or person) between you and the crosshair where the bullets stop (he asked 2026-11-14: before
-  // the crosshair, not past it); on a rope the wall you hang on never gets it, but a wall further in does
-  if (onRope && st.map) {
-    const d0 = CELL * 2, bd = d0 + castSight(st.map, st.pred.x + c * d0, st.pred.y + s * d0, a, Math.max(1, l - d0), null, true) + 2;
-    if (bd < l - 4 && !person) { see = shot = bd; }
+  // The marker (he asked 2026-11-14): on the first barrier between you and the crosshair, whatever it is: any wall (soft
+  // ones too: bullets go through them, so it used to vanish there), boards, tall things, a person, and low furniture you
+  // can't see over from your pose (standing: none; crouched: the taller pieces; lying down: all of it but tables and desks
+  // you can see under). On a rope the wall you hang on never gets it. It lies along the barrier's face (it used to turn
+  // with your aim round the barrier).
+  let mk = null;
+  if (st.map && !outWin) {
+    const m = st.map, d0 = onRope ? CELL * 2 : 0, pr = (st.pred.pr || 0) >= 1, cr = !pr && !!(st.me && st.me.cr);
+    let B = d0 + castSight(m, st.pred.x + c * d0, st.pred.y + s * d0, a, Math.max(1, l - d0), null, false, pr) + 2;
+    const eyeZ = (pr ? EYE_H.prone : cr ? EYE_H.crouch : EYE_H.stand) / 3.2;
+    for (let d = d0 + 3; d < Math.min(B, l); d += 3) {
+      const k = Math.floor((st.pred.y + s * d) / CELL) * m.W + Math.floor((st.pred.x + c * d) / CELL);
+      if (m.tiles[k] === T.LOW && furnTop(m, st.pred.x + c * d, st.pred.y + s * d) > eyeZ && !(pr && underAt(m, k, T.LOW))) { // its exact edge (so the bracket lies along it)
+        let lo = d - 3, hi = d; const cellAt = t => Math.floor((st.pred.y + s * t) / CELL) * m.W + Math.floor((st.pred.x + c * t) / CELL);
+        for (let i = 0; i < 7; i++) { const mid = (lo + hi) / 2; if (cellAt(mid) === k) hi = mid; else lo = mid; }
+        B = hi + 0.3; break; }
+    }
+    let who = null; if (person && person.d < B) { B = person.d; who = person; }
+    if (B < l - 4) {
+      const hx = st.pred.x + c * B, hy = st.pred.y + s * B;
+      let nx = -c, ny = -s; // which face it hit (a person or a sloped wall: square to your aim)
+      if (!who && !(m.shape && m.shape[Math.floor((hy + s * 2) / CELL) * m.W + Math.floor((hx + c * 2) / CELL)])) {
+        const ax0 = Math.floor((hx - c * 4.5) / CELL), ay0 = Math.floor((hy - s * 4.5) / CELL), ax1 = Math.floor((hx + c) / CELL), ay1 = Math.floor((hy + s) / CELL); // (just outside and just inside the face)
+        if (ax0 !== ax1 && ay0 === ay1) { nx = -Math.sign(c); ny = 0; } else if (ay0 !== ay1 && ax0 === ax1) { nx = 0; ny = -Math.sign(s); }
+        else if (ax0 !== ax1) { const bx = hx - c * 2, by = hy - s * 2, fx = Math.abs(bx / CELL - Math.round(bx / CELL)), fy = Math.abs(by / CELL - Math.round(by / CELL)); if (fx < fy) { nx = -Math.sign(c); ny = 0; } else { nx = 0; ny = -Math.sign(s); } }
+      }
+      mk = { d: B, person: who, x: hx, y: hy, nx, ny };
+      see = Math.min(see, B); if (onRope) shot = Math.min(shot, B);
+    }
   }
-  const mk = shot < l - 4 ? { d: shot, person, x: st.pred.x + c * shot, y: st.pred.y + s * shot } : null;
   return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, person, rope: onRope, mk, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
 }
 // is this aim (from where you stand) out through one of the windows you are looking down from?
@@ -3391,18 +3415,16 @@ function crosshair(me, now) {
       ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
       const na = Math.atan2(y - gy, x - gx) + Math.PI / 2, tl = 5 * DPR;
       ctx.lineCap = 'round';
-      if (q.stopped) { // bullets stop here: a bracket hugging the wall, orange; held on the same wall 1.5 s it turns blue (aiming in then ignores it)
-        drawBracket(ctx, gx, gy, x, y, na, now);
+      if (q.mk) { // the barrier: a bracket lying along its face, orange; held on the same thing 1.5 s it turns blue (aiming in then goes onto it)
+        const M = q.mk, P = (wx, wy) => { const [lx, ly] = M.person ? [0, 0] : liftOf(wx, wy, 0.45), Q = w2s(wx + lx, wy + ly); return [px + (Q.x - px) * c - (Q.y - py) * s2, py + (Q.x - px) * s2 + (Q.y - py) * c]; };
+        const [ax, ay] = P(M.x - M.ny * 4, M.y + M.nx * 4), [bx2, by2] = P(M.x + M.ny * 4, M.y - M.nx * 4), [ox, oy] = P(M.x + M.nx * 4, M.y + M.ny * 4);
+        const ul = Math.hypot(bx2 - ax, by2 - ay) || 1, nl = Math.hypot(ox - gx, oy - gy) || 1;
+        drawBracket(ctx, gx, gy, (bx2 - ax) / ul, (by2 - ay) / ul, -(ox - gx) / nl, -(oy - gy) / nl, now);
       } else {
         ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 4 * DPR; ctx.beginPath(); ctx.moveTo(gx - Math.cos(na) * tl, gy - Math.sin(na) * tl); ctx.lineTo(gx + Math.cos(na) * tl, gy + Math.sin(na) * tl); ctx.stroke();
         ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2 * DPR; ctx.beginPath(); ctx.moveTo(gx - Math.cos(na) * tl, gy - Math.sin(na) * tl); ctx.lineTo(gx + Math.cos(na) * tl, gy + Math.sin(na) * tl); ctx.stroke();
       }
       ctx.lineCap = 'butt';
-    } else if (q.mk && q.mk.beyond) { // past the crosshair (he asked 2026-11-14): the bracket on the first wall or person the bullets reach, a faint dotted line out to it
-      const [lwx, lwy] = q.mk.person ? [0, 0] : liftOf(q.mk.x, q.mk.y, 0.45);
-      const G = w2s(q.mk.x + lwx, q.mk.y + lwy), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
-      ctx.setLineDash([2 * DPR, 4 * DPR]); ctx.lineWidth = 1 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(gx, gy); ctx.stroke(); ctx.setLineDash([]);
-      ctx.lineCap = 'round'; drawBracket(ctx, gx, gy, x, y, Math.atan2(y - gy, x - gx) + Math.PI / 2, now); ctx.lineCap = 'butt';
     }
     if (dm >= 8) {
       ctx.font = `700 ${12 * DPR}px Barlow Condensed, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
@@ -3675,9 +3697,8 @@ function ropeWallSpots(ri, me) {
   return [{ x: me.x, y: me.y, r: CELL * 4 }, ...sp];
 }
 // the orange / blue bracket hugging a wall (or a person's ring) where the bullets stop; blue once held 1.5 s (wallHeld)
-function drawBracket(ctx, gx, gy, x, y, na, now) {
+function drawBracket(ctx, gx, gy, ux, uy, tx, ty, now) { // (ux, uy: along the face on screen; tx, ty: into it, away from you)
     const blue = wallBlue(), H = st.wallHold, pk = blue && H.pop ? Math.max(0, 1 - (now - H.pop) / 0.25) : 0, k = (1 + 0.35 * pk) * DPR;
-    const ux = Math.cos(na), uy = Math.sin(na), bx = (x - gx), by = (y - gy), bl = Math.hypot(bx, by) || 1, tx = bx / bl, ty = by / bl; // along the wall / back toward the crosshair
     const W = 8.5 * k, A = -6 * k, cx = gx - tx * 2 * DPR, cy = gy - ty * 2 * DPR; // (A < 0: the arms point back toward you)
     const path = () => { ctx.beginPath(); ctx.moveTo(cx - ux * W + tx * A, cy - uy * W + ty * A); ctx.lineTo(cx - ux * W, cy - uy * W); ctx.lineTo(cx + ux * W, cy + uy * W); ctx.lineTo(cx + ux * W + tx * A, cy + uy * W + ty * A); };
     const col = blue ? '79,179,255' : '255,138,61';

@@ -8,6 +8,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] (he asked 2026-11-14) the orange/blue marker shouldn't rotate around barriers; it is sometimes invisible: every barrier should trigger it; crouching and lying down are different heights, so some furniture can't be seen past depending on the pose (DONE 2026-11-14: the bracket now lies along the face of what it marks, the same on that face however you aim; it shows on every barrier between you and the crosshair: all walls (it used to skip soft walls and boards, because bullets go through them), boards, tall furniture, people, and low furniture by your pose: standing you see over it, crouched the taller pieces (counters, reception desks) block, lying down all of it blocks except tables and desks you can see under; holding on boards and furniture turns it blue too. Checked in a test browser. Not yet played by him)
+
 - [x] (he asked 2026-11-14) the orange/blue marker should always snap to the nearest wall or shootable thing behind the reticle; keep the change for having it right in front of you (he meant: the wall before the crosshair, on the operator's side, not past it. DONE 2026-11-14: the bracket sits on the wall or person between you and the crosshair where the bullets stop, as before; on a rope too now, looking in through a window (it was switched off there), only the wall you hang on never gets it; nothing is marked past the crosshair. Checked in a test browser. Not yet played by him)
 
 - [x] (he asked 2026-11-14) the legs can be a bit shorter while rappelling (DONE 2026-11-14: hanging on a rope the feet sit about 20 cm higher under the body, hips unchanged; on the ground the legs are as before. Checked in a test browser. Not yet played by him)
