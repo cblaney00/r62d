@@ -405,3 +405,11 @@ His wishes so far:
 - Light shading: look.js `lightMap` returns `lv`/`grad`; `faceLight` shades raised faces by where the light comes from; a soft contact shadow on the floor away from the light (in the `dark` canvas).
 - Names over teammates never bigger on screen than at a normal zoom (`nk` in draw).
 - tests/roof.js and tests/rope3d.js climb the current way (rc up, `vault` event at the top).
+- Later the same evening (his live notes while playing):
+  - Bodies: look.js `liftBody` caps a body's own height at `persp.cap` (main.js `BODY_CAP` 300 world px from the eye, lifted in the rope camera); sprites.js `LZ` = wall-rule base (rope height `zb`) + capped body; head zones and the sent head point use the same (`sendInput`).
+  - Rope camera: `ROPE_ENV` fixed framing size (no room/sightline zoom on a rope), the crosshair fit never grows on a rope (`need = fb * (1 - rtw)`), `aimOff` capped to the view; `freeAimPoint` on a rope: no wall stops (`see = shot = l`), `adsReset` does nothing on a rope; `ROPE_TILT_WIN` 0 (he said the extra tilt squeezed the picture).
+  - Lean on a rope: sprites.js `TILT` 0.42 rad round the hip point (`tiltPt`), no sideways shift.
+  - Climbing out: shared/map.js `ropeOutAt` (attacker just inside an upper window with a rope, facing out) → server `startVault` vault with `rope` → hang level at the end; client Space sends it. Window helper `winGo`/`drawWinGo` in main.js, `#winGo` (gold = Space works, grey `.wait` = what is missing). Sprint ×1.6 along the wall (physics rope branch). `node tests/ropeout.js`.
+  - mapkit.js `windowJambs`: `JAMB` 2 wall cells each side of every window are concrete.
+  - Thinner-looking walls: look.js `WALL_INS` (0.2 cell), `thinOpen`/`wallIns`; faces, tops (runs carry `iN/iS/iW/iE`), doorway tops (`DOOR_TOP_A` 0.5 see-through) inset; mapdraw.js `thinStrips` paints the neighbouring floor into the strips; lightMap gives wall cells the darkest neighbouring room's light. `st.ghostDraws` + `GHOST_A` 0.38: people you see redrawn faintly over the raised walls.
+  - `tests/spawnsafe.js` fails on Dust Town (defender bots outside in preparation) since before this session; not looked into.
