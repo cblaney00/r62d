@@ -183,7 +183,7 @@ input { font: 600 20px var(--head); padding: 10px 14px; background: rgba(0,0,0,0
 #objective small { display: block; color: var(--dim); font-size: 13px; margin-top: 2px; }
 #killfeed { position: absolute; top: 16px; right: 18px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; margin-top: 44px; }
 #killfeed div { background: var(--panel); padding: 4px 10px; font: 600 15px var(--head); letter-spacing: 0.03em; animation: fadeout 6s forwards; }
-#killfeed .a { color: #8fc8ff; } #killfeed .e { color: #ffb27a; } #killfeed .w { color: var(--dim); margin: 0 8px; font-size: 12px; letter-spacing: 0.1em; }
+#killfeed .a { color: var(--allyL, #8fc8ff); } #killfeed .e { color: var(--enemyL, #ffb27a); } #killfeed .w { color: var(--dim); margin: 0 8px; font-size: 12px; letter-spacing: 0.1em; }
 #feed { position: absolute; left: 18px; bottom: 140px; display: flex; flex-direction: column; gap: 3px; font: 600 14px var(--head); }
 #feed div { background: rgba(0,0,0,0.5); padding: 3px 8px; animation: fadeout 7s forwards; }
 @keyframes fadeout { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
@@ -349,7 +349,7 @@ body:has(#freeHint:not(.hidden)) #cambar { bottom: 48px; } /* free play: above i
 .ophero { display: flex; gap: 26px; }
 .ophero canvas { width: 340px; height: 340px; border: 1px solid var(--line); flex-shrink: 0; }
 .opinfo h1 { margin: 2px 0 0; font: 800 72px/0.95 var(--head); letter-spacing: 0.06em; color: #fff; }
-.opinfo .side { font: 700 13px var(--head); letter-spacing: 0.35em; } .opinfo .side.atk { color: #ffb27a; } .opinfo .side.def { color: #8fc8ff; }
+.opinfo .side { font: 700 13px var(--head); letter-spacing: 0.35em; } .opinfo .side.atk { color: var(--atkL, #ffb27a); } .opinfo .side.def { color: var(--defL, #8fc8ff); }
 .opinfo .role { font: 600 18px var(--head); letter-spacing: 0.25em; color: var(--c); text-transform: uppercase; }
 .opinfo .real { color: var(--dim); font: 600 15px var(--head); letter-spacing: 0.1em; margin-top: 6px; }
 .opinfo .bio { max-width: 640px; line-height: 1.5; color: #d2d9e0; }
@@ -405,7 +405,7 @@ tr.link { cursor: pointer; } tr.link:hover { background: rgba(255,255,255,0.06);
 .rounds div { width: 52px; text-align: center; padding: 6px 0; font: 800 16px var(--head); background: rgba(255,255,255,0.06); }
 .rounds div.w { border-bottom: 3px solid var(--ally); } .rounds div.l { border-bottom: 3px solid var(--enemy); }
 .rounds small { display: block; font-size: 10px; color: var(--dim); letter-spacing: 0.15em; }
-h4.ally { color: #8fc8ff; } h4.enemy { color: #ffb27a; } h4 { font: 700 16px var(--head); letter-spacing: 0.2em; margin: 10px 0 4px; }
+h4.ally { color: var(--allyL, #8fc8ff); } h4.enemy { color: var(--enemyL, #ffb27a); } h4 { font: 700 16px var(--head); letter-spacing: 0.2em; margin: 10px 0 4px; }
 .op button.lo { font-size: 11px; padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
 .profhead .hint { text-align: left; } #opsDetail .hint { text-align: left; }
 
@@ -588,7 +588,7 @@ button.big { font-size: 22px; padding: 14px 34px; }
 #chatLog div.old { opacity: 0; } #chat.open #chatLog div.old { opacity: 0.85; }
 #chatLog .tag { font: 800 11px var(--head); letter-spacing: 0.15em; padding: 0 5px; margin-right: 6px; }
 #chatLog .tag.team, #chatMode.team { background: var(--ally); color: #fff; } #chatLog .tag.all, #chatMode.all { background: #d9d9d9; color: #111; }
-#chatLog b.a { color: #8fc8ff; } #chatLog b.e { color: #ffb27a; } #chatLog .dead { color: var(--dim); font-size: 12px; }
+#chatLog b.a { color: var(--allyL, #8fc8ff); } #chatLog b.e { color: var(--enemyL, #ffb27a); } #chatLog .dead { color: var(--dim); font-size: 12px; }
 #chatBar { display: flex; margin-top: 4px; pointer-events: auto; animation: rise 0.15s both; }
 #chatMode { font: 800 13px var(--head); letter-spacing: 0.15em; padding: 8px 10px; }
 #chatIn { flex: 1; width: auto; font: 500 15px var(--body); padding: 7px 10px; background: rgba(0,0,0,0.75); }
@@ -645,7 +645,7 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 #armStats .spray p { margin: 0; color: var(--dim); font-size: 13px; }
 #clickIn { position: fixed; left: 50%; top: 62%; transform: translateX(-50%); pointer-events: none; z-index: 30; font: 700 20px var(--head); letter-spacing: 0.3em; color: #fff; background: rgba(5,7,10,0.7); border: 1px solid var(--gold); padding: 10px 22px; animation: clickPulse 1.6s ease-in-out infinite; }
 @keyframes clickPulse { 50% { opacity: 0.55; } }
-#armList span em { font-style: normal; } #armList span em.atk { color: #ffb27a; } #armList span em.def { color: #8fc8ff; }
+#armList span em { font-style: normal; } #armList span em.atk { color: var(--atkL, #ffb27a); } #armList span em.def { color: var(--defL, #8fc8ff); }
 #loading.hidden .lshine, #loading.hidden #loadBg { animation-play-state: paused; }
 /* stairs preview: a live corner window onto the other end of the stairs you are close to */
 #stairPip { position: absolute; top: 84px; left: 18px; width: 260px; height: 260px; border: 2px solid rgba(255,255,255,0.25); border-radius: 6px; overflow: hidden; background: #050607; box-shadow: 0 6px 24px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.25s; pointer-events: none; }
@@ -936,7 +936,7 @@ html.tv #tvHelp { opacity: 0.55; font-size: 12px; }
 #tvCommsL { left: 14px; } #tvCommsR { right: 14px; text-align: right; }
 .tvComms div { background: rgba(6,8,12,0.9); padding: 3px 7px; color: #e8edf2; animation: rise 0.2s both; transition: opacity 1s; text-shadow: 0 1px 2px #000; }
 .tvComms div.old { opacity: 0; }
-#tvCommsL b { color: #5ec8ff; } #tvCommsR b { color: #f2a65a; }
+#tvCommsL b { color: var(--tc, #dde5ee); } #tvCommsR b { color: var(--tc, #e8b445); }
 html.tv #chat { display: none; }
 
 /* ranked (he asked): rank badges in the lobby, profile card and end screen */
@@ -1229,3 +1229,13 @@ html.zombies #leftCount, html.zombies #tipNow, html.zombies #cambar, html.zombie
 #r3x i:nth-child(3) { left: -1px; top: -13px; width: 2px; height: 8px; } #r3x i:nth-child(4) { left: -1px; top: 5px; width: 2px; height: 8px; }
 #r3x b { position: absolute; left: -1px; top: -1px; width: 2px; height: 2px; background: #46ff6a; }
 #r3fx { position: fixed; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; z-index: 0; }
+
+/* Settings → COLOURS: a row of ready colours + a custom one (teamcol.js) */
+#settings .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+#settings .swatches .sw { width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,0.18); background: var(--c); cursor: pointer; position: relative; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.35); }
+#settings .swatches .sw:hover { border-color: rgba(255,255,255,0.6); }
+#settings .swatches .sw.on { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold), inset 0 0 0 2px rgba(0,0,0,0.35); }
+#settings .swatches .cust { display: inline-flex; align-items: center; justify-content: center; font: 700 16px var(--head); color: #fff; text-shadow: 0 1px 2px #000; background: conic-gradient(#ff5050, #ffd23f, #5fd06a, #36d0c4, #46a8ff, #a98cff, #ff6fb5, #ff5050); }
+#settings .swatches .cust.on { background: var(--c); }
+#settings .swatches .cust input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; border: 0; }
+html.tv .sc[data-tc] { background: var(--tc); color: #0b0e12; } /* TV: each team's score box in its own colour */

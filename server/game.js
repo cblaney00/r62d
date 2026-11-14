@@ -146,7 +146,8 @@ export class Game {
     });
     sock.on('close', () => { this.tv.socks.delete(sock); if (!this.tv.socks.size && this.onEmpty) this.onEmpty(); });
   }
-  tvStart(want, level) { // level: PRO_LEVEL = the pro league; a rank 0-6 = AMATEUR HOUR at that rank (he asked)
+  tvStart(want, level) {
+    this.colPair = Math.floor(Math.random() * 4); // ordinary bot teams' colour pair this match (public/js/teamcol.js BOT_PAIRS) // level: PRO_LEVEL = the pro league; a rank 0-6 = AMATEUR HOUR at that rank (he asked)
     if (BOT_LEVELS[level] !== undefined) this.tv.level = level;
     const list = MAP_LIST.filter(k => k !== this.mapId);
     const id = MAPS[want] ? want : list[Math.floor(Math.random() * list.length)];
@@ -3275,7 +3276,7 @@ export class Game {
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, pp: this.map.peeps && this.map.peeps.length ? this.map.peeps : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
       site: this.site, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
-      tvl: this.tv ? this.botLevel : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ar: arenaInfo(this), zb: zbInfo(this), ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
+      tvl: this.tv ? this.botLevel : undefined, cp: this.tv ? this.colPair : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ar: arenaInfo(this), zb: zbInfo(this), ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
       bq: (this.tv || this.rules.bans) && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, (this.banRun.t ?? this.time) - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, cb, hb, ev: this.events, spots, time: r2(this.time),
     });

@@ -201,7 +201,7 @@
   <div id="help" class="hidden"></div>
   <div id="settings" class="hidden">
     <nav class="setSide"><h2>SETTINGS</h2>
-      <button data-p="sound">SOUND</button><button data-p="aim">MOUSE &amp; AIM</button><button data-p="keys">KEYS</button><button data-p="screen">SCREEN</button><button data-p="xhair">CROSSHAIR</button>
+      <button data-p="sound">SOUND</button><button data-p="aim">MOUSE &amp; AIM</button><button data-p="keys">KEYS</button><button data-p="screen">SCREEN</button><button data-p="cols">COLOURS</button><button data-p="xhair">CROSSHAIR</button>
       <div class="setFoot"><button id="setClose" class="primary">Done</button></div></nav>
     <div class="setBody">
     <section class="setPage" data-p="sound"><h3>SOUND</h3>
@@ -233,6 +233,14 @@
       <div class="srow"><div class="sl"><b>Text size</b><small>How big the menus and match text are (menus stop growing when they fill your screen)</small></div><div class="sctl"><input type="range" id="uiScale" min="70" max="160" value="100"> <b id="uiScaleVal"></b></div></div>
       <div class="srow"><div class="sl"><b>How much of the map you see</b><small>Higher shows more around you, smaller</small></div><div class="sctl"><input type="range" id="viewMul" min="80" max="200" value="100"> <b id="viewMulVal"></b></div></div>
       <h4>SCREEN EFFECTS <small>click one to switch it off or on</small></h4><div id="fxList"></div>
+    </section>
+    <section class="setPage" data-p="cols"><h3>COLOURS</h3>
+      <p class="hint">Pick the colours that feel natural to you. They only change your own screen. (The crosshair colour is on the CROSSHAIR page; Esports TV keeps each team's own colours.)</p>
+      <div class="srow wide"><div class="sl"><b>Your team</b><small>Rings round your teammates, their outlines through walls, the kill feed and chat</small></div><div class="sctl"><div class="swatches" data-k="ally"></div></div></div>
+      <div class="srow wide"><div class="sl"><b>Enemies</b><small>Rings round enemies, their marks and labels, the kill feed and chat</small></div><div class="sctl"><div class="swatches" data-k="enemy"></div></div></div>
+      <div class="srow wide"><div class="sl"><b>Attackers' clothing</b><small>Armbands and trim on the attacking side, whichever team you are on</small></div><div class="sctl"><div class="swatches" data-k="atk"></div></div></div>
+      <div class="srow wide"><div class="sl"><b>Defenders' clothing</b><small>Armbands and trim on the defending side</small></div><div class="sctl"><div class="swatches" data-k="def"></div></div></div>
+      <div class="row"><button id="colsReset">Put the colours back to normal</button></div>
     </section>
     <section class="setPage" data-p="xhair"><h3>CROSSHAIR</h3>
     <div class="xh"><canvas id="xhPreview" width="150" height="150"></canvas>

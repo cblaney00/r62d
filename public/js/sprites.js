@@ -1,6 +1,7 @@
 // Top-down drawings of operators, drones, gadgets and the objective.
 import { OPERATORS, WEAPONS, bodyW, RIOT } from '/shared/operators.js';
 import { shade } from './textures.js';
+import { COLS, rgba } from './teamcol.js';
 import { G } from './gunart.js';
 import { HEADGEAR, PACK, VEST } from './headgear.js';
 import { persp, liftOf, showcase } from './look.js';
@@ -121,7 +122,7 @@ const UNI = {
 // side colours on the clothing (he asked: every attacker wears some orange, every defender some blue, placed differently
 // per operator so each one stays easy to tell apart): bigger armbands for all, plus a mix of helmet band, vest stripe,
 // gloves and a patch on the back gear. Fixed by side, not by your team (the ring round the feet still is).
-export const SIDE_COL = { atk: '#ff7a1f', def: '#2f93ff' };
+export const SIDE_COL = { get atk() { return COLS.atk; }, get def() { return COLS.def; } }; // (a setting: teamcol.js)
 const ACC_SETS = [['band', 'gloves'], ['vest'], ['gloves', 'pack'], ['band', 'vest'], ['vest', 'gloves'], ['band'], ['pack', 'vest'], ['band', 'pack']];
 const accCache = {};
 export function accentsOf(op) {
@@ -312,7 +313,7 @@ export function drawOperator(ctx, p, t) {
   LX = -0.6 * ca + 0.8 * sa; LY = -0.6 * sa - 0.8 * ca;
   ctx.save(); ctx.translate(p.x, p.y);
   if (p.hang && p.wallA !== undefined && persp.h) { const [dx, dy] = liftOf(p.x, p.y, (p.zb || 0) + 0.02); ctx.translate(dx, dy); } // on a rope: the ring and shadow at their feet, up the wall
-  ctx.strokeStyle = (p.ring ?? p.ally) ? 'rgba(70,170,255,0.7)' : 'rgba(255,120,40,0.75)'; ctx.lineWidth = 0.9;
+  ctx.strokeStyle = typeof p.ring === 'string' ? rgba(p.ring, 0.8) : (p.ring ?? p.ally) ? rgba(COLS.ally, 0.7) : rgba(COLS.enemy, 0.75); ctx.lineWidth = 0.9;
   ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.stroke();
   const sg = ctx.createRadialGradient(2, 3, 2, 2, 3, 14); sg.addColorStop(0, 'rgba(0,0,0,0.45)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(2, 3, 14, 0, 7); ctx.fill();
@@ -536,7 +537,7 @@ export function drawDrone(ctx, d, t, ally) {
   ctx.save(); ctx.translate(d.x, d.y);
   ctx.rotate(d.ag || 0); ctx.scale(0.7, 0.7); // 30% smaller (he asked)
   // about a foot long (10 px, 1 m = 36 px) and half as wide: a low rectangle on four little wheels
-  if (ally) { ctx.strokeStyle = 'rgba(70,170,255,0.45)'; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.roundRect(-5.8, -3.5, 11.6, 7, 2); ctx.stroke(); }
+  if (ally) { ctx.strokeStyle = rgba(COLS.ally, 0.45); ctx.lineWidth = 0.4; ctx.beginPath(); ctx.roundRect(-5.8, -3.5, 11.6, 7, 2); ctx.stroke(); }
   ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(0.5, 0.8, 5.2, 2.9, 0, 0, 7); ctx.fill();
   for (const [wx, wy] of [[-3.1, -2.1], [3.1, -2.1], [-3.1, 2.1], [3.1, 2.1]]) {
     ctx.fillStyle = '#121314'; ctx.beginPath(); ctx.roundRect(wx - 1.3, wy - 0.55, 2.6, 1.1, 0.5); ctx.fill();
@@ -633,7 +634,7 @@ function parasiteVeins(ctx, t, r) {
 export function drawBird(ctx, b, t, ally) {
   const fl = b.pe ? 0 : (b.fl ?? 0.5), beat = b.pe ? 0 : Math.sin(t * (10 + fl * 10)) * (0.4 + fl * 0.6);
   ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.ag || 0); ctx.scale(0.75, 0.75);
-  if (ally) { ctx.strokeStyle = 'rgba(70,170,255,0.45)'; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 7); ctx.stroke(); }
+  if (ally) { ctx.strokeStyle = rgba(COLS.ally, 0.45); ctx.lineWidth = 0.4; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 7); ctx.stroke(); }
   if (!b.pe) { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.ellipse(-1, 3.5, 4.5, 2.2, 0, 0, 7); ctx.fill(); } // shadow on the floor below: it is in the air
   const body = ctx.createLinearGradient(-5, -2, 5, 2); body.addColorStop(0, '#50565c'); body.addColorStop(1, '#2a2d31');
   for (const s of [-1, 1]) { // wing: three overlapping plates (the old wheels and side panels), tips forward
@@ -705,7 +706,7 @@ function badge(ctx, e, ally) {
   const f = GLYPH[e.ty]; if (!f || NO_BADGE.has(e.ty)) return;
   ctx.save(); ctx.translate(e.x + 6.5, e.y - 6.5);
   ctx.fillStyle = 'rgba(10,12,16,0.85)'; ctx.beginPath(); ctx.arc(0, 0, 3.9, 0, 7); ctx.fill();
-  ctx.strokeStyle = ally ? '#46a8ff' : '#ff8a3d'; ctx.lineWidth = 0.7; ctx.stroke();
+  ctx.strokeStyle = ally ? COLS.ally : COLS.enemy; ctx.lineWidth = 0.7; ctx.stroke();
   ctx.scale(0.95, 0.95); ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); f(ctx); ctx.stroke();
   ctx.restore();
 }
@@ -737,7 +738,7 @@ function drawGadgetBody(ctx, e, t, ally) {
       const h = e.hl || 17; ctx.rotate(e.ag || 0);
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(-h + 1, -1, h * 2, 4.5);
       ctx.fillStyle = '#4b535c'; ctx.fillRect(-h, -2, h * 2, 4); ctx.fillStyle = '#6d7782'; ctx.fillRect(-h, -2, h * 2, 1.2);
-      ctx.fillStyle = '#1b1e22'; ctx.fillRect(-4, -0.6, 8, 1.2); ctx.fillStyle = ally ? '#46a8ff' : '#ff8a3d'; ctx.fillRect(-h, 1.2, h * 2, 0.8);
+      ctx.fillStyle = '#1b1e22'; ctx.fillRect(-4, -0.6, 8, 1.2); ctx.fillStyle = ally ? COLS.ally : COLS.enemy; ctx.fillRect(-h, 1.2, h * 2, 0.8);
       for (const s of [-1, 1]) { ctx.fillStyle = '#2a2e33'; ctx.fillRect(s * (h - 4) - 1.5, 2, 3, 2.5); }
       break; }
     case 'jammer': // VEIL's jammer: a ribbed box with three antennas fanned out and a running LED bar

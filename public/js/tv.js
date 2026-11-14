@@ -7,6 +7,7 @@ import { PRO_TEAMS } from '/shared/pros.js';
 import { RANKS } from '/shared/progress.js';
 import * as audio from './audio.js';
 import { drawWebcam } from './webcam.js';
+import { squadCol, squadName } from './teamcol.js';
 import { castEvent, castPhase, castTick, castReset } from './casters.js';
 export { offerReplay, tickReplay, stopReplay } from './tvreplay.js';
 
@@ -156,7 +157,8 @@ export function tvCasters(s, players) {
 export function tvHud(s) {
   const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL, now = performance.now() / 1000;
   for (const sq of [0, 1]) { const T = PRO_TEAMS[sq], el = $(sq ? 'tvR' : 'tvL');
-    const name = pro ? `[${T.tag}] ${esc(T.name)}` : `${sq ? 'ORANGE' : 'BLUE'} · ${esc(RANKS[s.tvl] || '').toUpperCase()} LOBBY`, colour = pro ? T.colour : sq ? '#ff8a3d' : '#46a8ff';
+    const name = pro ? `[${T.tag}] ${esc(T.name)}` : `${squadName(s.cp, sq)} · ${esc(RANKS[s.tvl] || '').toUpperCase()} LOBBY`, colour = squadCol(pro, s.cp, sq, PRO_TEAMS);
+    for (const id of [sq ? 'scR' : 'scL', sq ? 'tvCommsR' : 'tvCommsL']) { const e = $(id); if (e && e.dataset.tc !== colour) { e.dataset.tc = colour; e.style.setProperty('--tc', colour); } } // (score box and team talk in the team's colour)
     const head = `<div class="tvTeam" style="--tc:${colour}">${name}<small>${s.sc[sq]} · ${s.round || s.rd ? (s.players.find(p => p.sq === sq)?.tm === 'atk' ? 'ATTACK' : 'DEFENCE') : ''}</small></div>`;
     const list = s.players.filter(p => p.sq === sq), key = list.map(p => p.id).join(',') + pro;
     if (el.dataset.k !== key) { // build the cards once per line-up; after that only their contents change (the webcams keep running)
@@ -179,7 +181,7 @@ export function tvHud(s) {
 // Built once per round; after that only what changed is touched. Team talk shows in the comms boxes under each side.
 export function tvDraft(s) {
   const el = $('tvDraft'), pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
-  const team = sq => { const T = PRO_TEAMS[sq]; return pro && T ? { name: T.name, tag: T.tag, col: T.colour } : { name: sq ? 'ORANGE' : 'BLUE', tag: sq ? 'ORG' : 'BLU', col: sq ? '#ff8a3d' : '#46a8ff' }; };
+  const team = sq => { const T = PRO_TEAMS[sq]; return pro && T ? { name: T.name, tag: T.tag, col: T.colour } : { name: squadName(s.cp, sq), tag: squadName(s.cp, sq).slice(0, 3), col: squadCol(false, s.cp, sq) }; };
   const sideOf = sq => (s.players.find(p => p.sq === sq) || {}).tm;
   const key = s.rd + '|' + s.players.map(p => p.id).join(',') + pro;
   if (el.dataset.k !== key) {

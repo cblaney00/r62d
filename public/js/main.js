@@ -10,6 +10,7 @@ import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, persp, lifted, withPersp } from './look.js';
 import { S, setMapScale } from './textures.js';
+import { COLS, rgba, lighten, squadCol, setCols, SWATCHES, okHex, DEFAULT_COLS } from './teamcol.js';
 import { column, drawZombie, drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
 import { FX, drawSmoke } from './fx.js';
@@ -1346,7 +1347,7 @@ function buildSelect(s) {
   }
   if (st.loDirty && st.loShown && !document.querySelector('#opgrid .op.mine')) showSelLoadout(st.loShown, false);
   $('selSide').textContent = `ROUND ${s.rd} — ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`;
-  $('selSide').style.color = side === 'atk' ? '#ffb27a' : '#8fc8ff';
+  $('selSide').style.color = lighten(side === 'atk' ? COLS.atk : COLS.def);
   const site = st.map.sites[s.site];
   const spawns = st.map.atkSpawns, mySpawn = spawns[me.spn] || spawns[0];
   const sc = $('siteChoice'), used = s.su || [], sk = side === 'def' ? s.rd + ':' + s.site + ':' + used.join() : 'atk:' + s.rd + ':' + me.spn + ':' + (me.sr ? 1 : 0);
@@ -2447,7 +2448,7 @@ function drawMapV(s, me, now) {
   m.floors.forEach((F, i) => { const w = 54 * D, h = 26 * D, x = B.px + i * w, y = B.py - h - 4 * D, cur = i === V.f; c.fillStyle = cur ? '#f2c14e' : 'rgba(6,9,14,0.86)'; c.fillRect(x, y, w - 3 * D, h); c.fillStyle = cur ? '#10131a' : '#d8dde4'; c.font = `800 ${14 * D}px Barlow Condensed, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(F.name, x + (w - 3 * D) / 2, y + h / 2 + D); });
   c.save(); c.beginPath(); c.rect(B.px, B.py, B.pw, B.ph); c.clip();
   const site = m.sites[s.site]; if (site && me && (me.tm === 'def' || s.rev)) for (const b of site.bombs) if (on(b.x, b.y)) { const q = P(b.x, b.y); c.fillStyle = '#f2c14e'; c.beginPath(); c.arc(q.x, q.y, 8 * D, 0, 7); c.fill(); c.fillStyle = '#000'; c.font = `800 ${11 * D}px Barlow Condensed, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(b.id, q.x, q.y + D * 0.5); }
-  for (const p of s.players) if (me && p.tm === me.tm && p.a && p.id !== st.id && p.x !== undefined && !p.sg && on(p.x, p.y)) { const q = P(p.x, p.y); c.fillStyle = '#4fb3ff'; c.strokeStyle = '#000'; c.lineWidth = 1.5 * D; c.beginPath(); c.arc(q.x, q.y, 5 * D, 0, 7); c.fill(); c.stroke(); }
+  for (const p of s.players) if (me && p.tm === me.tm && p.a && p.id !== st.id && p.x !== undefined && !p.sg && on(p.x, p.y)) { const q = P(p.x, p.y); c.fillStyle = COLS.ally; c.strokeStyle = '#000'; c.lineWidth = 1.5 * D; c.beginPath(); c.arc(q.x, q.y, 5 * D, 0, 7); c.fill(); c.stroke(); }
   for (const p of st.foesSeen || []) if (on(p.x, p.y)) { const q = P(p.x, p.y); c.fillStyle = '#ff4646'; c.strokeStyle = '#000'; c.lineWidth = 1.5 * D; c.beginPath(); c.arc(q.x, q.y, 5.5 * D, 0, 7); c.fill(); c.stroke(); }
   if (me && me.a && st.pred && on(st.pred.x, st.pred.y)) { const q = P(st.pred.x, st.pred.y); c.save(); c.translate(q.x, q.y); c.rotate(st.aim + Math.PI / 2); c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 1.5 * D; c.beginPath(); c.moveTo(0, -9 * D); c.lineTo(6 * D, 7 * D); c.lineTo(0, 3.5 * D); c.lineTo(-6 * D, 7 * D); c.closePath(); c.fill(); c.stroke(); c.restore(); }
   for (const k of st.marks || []) if (on(k.x, k.y)) { const q = P(k.x, k.y), age = now - k.t, al = age > 5 ? 6 - age : 1, rp = (age % 1.4) / 1.4, col = pingOf(k.pk).col; c.strokeStyle = `rgba(${col},${0.8 * (1 - rp) * al})`; c.lineWidth = 2 * D; c.beginPath(); c.arc(q.x, q.y, (10 + rp * 18) * D, 0, 7); c.stroke(); drawBadge(c, k.pk, q.x, q.y, 10 * D, al); }
@@ -2712,7 +2713,7 @@ function draw(s, view, now, dt) {
         if (floorAt(st.map, x, y) === cf && (ally || teamSees(x, y)) && !(first && me && sp.id === me.id)) {
           ctx.strokeStyle = '#b08a55'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x - q.tx * 0.6, y - q.ty * 0.6); ctx.lineTo(x + Math.cos(q.out) * 2, y + Math.sin(q.out) * 2); ctx.stroke(); // the taut rope against the wall
           ctx.fillStyle = '#d8b878'; ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 7); ctx.fill();
-          if (!ally && !(first && sp.ry)) { ctx.font = '700 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a3d'; const u = UP(); ctx.fillText('ROPE', x + u.x * 8, y + u.y * 8); }
+          if (!ally && !(first && sp.ry)) { ctx.font = '700 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = COLS.enemy; const u = UP(); ctx.fillText('ROPE', x + u.x * 8, y + u.y * 8); }
         }
       }
       q = q.up >= 0 ? R[q.up] : null;
@@ -2742,7 +2743,7 @@ function draw(s, view, now, dt) {
     const oc = e.ty === 'cam' && e.oc !== undefined && st.map.outCams && st.map.outCams[e.oc];
     if (!oc || !(e.tm === side || seen(oc.gx, oc.gy))) continue;
     drawCam(ctx, { ...e, x: oc.gx, y: oc.gy }, now, e.tm === side);
-    ctx.font = '700 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = e.tm === side ? '#8fc8ff' : '#ff8a3d';
+    ctx.font = '700 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = e.tm === side ? lighten(COLS.ally) : COLS.enemy;
     ctx.fillText('▲ CAMERA', oc.gx + Math.cos(oc.n) * 10, oc.gy + Math.sin(oc.n) * 10 + 2); // (out in the yard, not on the wall)
   }
 
@@ -2769,7 +2770,7 @@ function draw(s, view, now, dt) {
       drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x + u.x * 15, gh.y + u.y * 15);
+      ctx.fillStyle = ally ? lighten(COLS.ally) : COLS.enemy; const u = UP(); ctx.fillText(gh.below ? '▼ BELOW' : '▲ ABOVE', gh.x + u.x * 15, gh.y + u.y * 15);
       if (!ally && !p.dn) st.heads.push({ x: gh.x, y: gh.y });
     }
     // at an upper window or on a rope (he asked): they also show on the ground just outside the wall, to anyone below
@@ -2784,7 +2785,7 @@ function draw(s, view, now, dt) {
       ctx.globalAlpha = 1;
       ctx.font = '700 7px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
       const F = st.map.floors[Math.max(0, floorAt(st.map, p.x, p.y))];
-      ctx.fillStyle = ally ? '#8fc8ff' : '#ff8a3d'; const u = UP(); ctx.fillText(wg.rope ? '▲ ON THE WALL' : wg.views[0].e !== undefined ? '▲ ON THE ROOF' : `▲ ${F.name} WINDOW`, wg.x + u.x * 15, wg.y + u.y * 15);
+      ctx.fillStyle = ally ? lighten(COLS.ally) : COLS.enemy; const u = UP(); ctx.fillText(wg.rope ? '▲ ON THE WALL' : wg.views[0].e !== undefined ? '▲ ON THE ROOF' : `▲ ${F.name} WINDOW`, wg.x + u.x * 15, wg.y + u.y * 15);
       if (!ally && !p.dn) st.heads.push({ x: wg.x, y: wg.y });
     }
     // Silent Shroud: drones and cameras can't see her, only eyes can
@@ -2792,7 +2793,7 @@ function draw(s, view, now, dt) {
     if (vis && !ally && !isMe && p.rp && !p.ry && view && p.rr !== undefined && st.map.ropes[p.rr]) { const r = st.map.ropes[p.rr]; if ((view.x - p.x) * -Math.cos(r.out) + (view.y - p.y) * -Math.sin(r.out) > 6 && floorAt(st.map, view.x, view.y) === r.f) vis = false; } // off-level on a rope: hidden from inside (only the rope gives them away)
     if (st.tv) (st.tvPos || (st.tvPos = new Map())).set(p.id, { x: p.x, y: p.y, p });
     if (!vis) { // ESPORTS TV (he asked): everyone's outline shows through walls; only the followed player's sight is live
-      if (st.tv && !p.dn && p.x !== undefined) bodyOutline(p, p.sq ? '255,138,61' : '70,168,255', 0.9);
+      if (st.tv && !p.dn && p.x !== undefined) bodyOutline(p, tvRing(p), 0.9);
       continue;
     }
     if (p.zb && p.zb[0] === 1) { // ZOMBIES: one of the dead
@@ -2975,7 +2976,7 @@ function draw(s, view, now, dt) {
   if (st.tv && inGame) { // each team's sight, faintly in its own colour (pro team colours, else blue / orange)
     const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
     for (const sq of [0, 1]) {
-      const col = pro && PRO_TEAMS[sq] ? PRO_TEAMS[sq].colour : sq ? '#ff8a3d' : '#46a8ff';
+      const col = squadCol(pro, s.cp, sq, PRO_TEAMS);
       ctx.fillStyle = col; ctx.globalAlpha = 0.13; ctx.beginPath();
       for (const v of st.viewers) if (v.tvSq === sq && !v.off) { const pts = visionPolygon(v, sm, 140); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); }
       ctx.fill('nonzero'); ctx.globalAlpha = 1;
@@ -2988,7 +2989,7 @@ function draw(s, view, now, dt) {
       const k = c.id + ':' + Math.round((c.ag || 0) * 50), pts = tvCamCone.get(k) || visionPolygon({ ...feedView(c, { id: null }), ang: c.ag || 0 }, [], 0);
       tvCamCone.set(k, pts); if (tvCamCone.size > 200) tvCamCone.clear();
       ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath();
-      const sq = watched.get(c.id), on = sq !== undefined, col = on ? (pro && PRO_TEAMS[sq] ? PRO_TEAMS[sq].colour : sq ? '#ff8a3d' : '#46a8ff') : '#ffffff';
+      const sq = watched.get(c.id), on = sq !== undefined, col = on ? squadCol(pro, s.cp, sq, PRO_TEAMS) : '#ffffff';
       ctx.globalAlpha = on ? 0.16 : 0.045; ctx.fillStyle = col; ctx.fill();
       ctx.globalAlpha = on ? 0.75 : 0.16; ctx.strokeStyle = col; ctx.stroke(); ctx.globalAlpha = 1;
     }
@@ -3002,7 +3003,7 @@ function draw(s, view, now, dt) {
       if (!sp.a || sp.id === me.id) continue;
       const p = interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
       if (p.tm === side) {
-        if (!sp.sg && !seen(p.x, p.y)) bodyOutline(p, p.dn ? '255,80,80' : '70,168,255', 0.75); // a teammate out of your sight (he asked): an outline, not their view
+        if (!sp.sg && !seen(p.x, p.y)) bodyOutline(p, p.dn ? '#ff5050' : COLS.ally, 0.75); // a teammate out of your sight (he asked): an outline, not their view
         const u = UP();
         ctx.fillStyle = p.dn ? '#ff5050' : '#3aa0ff'; ctx.beginPath(); ctx.arc(p.x + u.x * 17, p.y + u.y * 17, 2, 0, 7); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(p.n + (p.dn ? ' ▼' : ''), p.x + u.x * 21, p.y + u.y * 21);
@@ -3144,7 +3145,7 @@ function drawStatus(p, ef, side, now, lift) {
   ctx.restore();
 }
 function bodyOutline(p, col, a) { // a body's shape and the way it aims, through walls
-  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ag || 0); ctx.strokeStyle = `rgba(${col},${a})`; ctx.lineWidth = 1.2; ctx.fillStyle = `rgba(${col},${a * 0.16})`;
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ag || 0); ctx.strokeStyle = rgba(col, a); ctx.lineWidth = 1.2; ctx.fillStyle = rgba(col, a * 0.16); // (col: '#rrggbb')
   ctx.beginPath(); ctx.ellipse(0, 0, 7.5, 10, 0, 0, 7); ctx.fill(); ctx.stroke(); if (!p.dn) { ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(17, 0); ctx.stroke(); } ctx.restore();
 }
 function deathMarks(view, now) {
@@ -3534,7 +3535,7 @@ function setText(id, v) { const el = typeof id === 'string' ? $(id) : id, t = St
 function setCls(el, c, on) { if (el.classList.contains(c) !== on) el.classList.toggle(c, on); }
 
 // Esports TV (he asked): rings by side, defenders blue and attackers orange, whoever the camera rides with
-const tvRing = p => st.tv && p && p.tm ? p.tm === 'def' : undefined;
+const tvRing = p => st.tv && p && p.sq !== undefined && st.last ? squadCol((st.last.tvl ?? PRO_LEVEL) === PRO_LEVEL, st.last.cp, p.sq, PRO_TEAMS) : undefined; // TV: each squad its own colour (teamcol.js)
 // role icons (he asked): simple line drawings in the button's colour
 const RI = {
   breach: '<path d="M12 2l2 6 6-3-3 6 6 2-6 2 3 6-6-3-2 6-2-6-6 3 3-6-6-2 6-2-3-6 6 3z"/>',
@@ -4266,9 +4267,22 @@ window.__r62d = { r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => (
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
   try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value, +$('steadySens').value, +$('farSens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, farSens: +$('farSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode };
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, farSens: +$('farSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode, cols: { ...COLS } };
 }
 let saveTimer = 0;
+// Settings → COLOURS (he asked 2026-11-14): ready colours + a custom picker for each (teamcol.js)
+function renderCols() {
+  for (const el of document.querySelectorAll('#settings .swatches')) {
+    const k = el.dataset.k, cur = COLS[k], own = !SWATCHES[k].includes(cur);
+    el.innerHTML = SWATCHES[k].map(c => `<button class="sw${c === cur ? ' on' : ''}" data-c="${c}" style="--c:${c}" title="${c}"></button>`).join('') +
+      `<label class="sw cust${own ? ' on' : ''}" title="Any colour" style="--c:${own ? cur : 'transparent'}"><input type="color" value="${cur}">+</label>`;
+    for (const b of el.querySelectorAll('button.sw')) b.onclick = () => { audio.ui(); setCols({ [k]: b.dataset.c }); renderCols(); saveSettings(); };
+    const inp = el.querySelector('input'); inp.oninput = () => { if (okHex(inp.value)) { setCols({ [k]: inp.value }); el.querySelector('.cust').style.setProperty('--c', inp.value); } };
+    inp.onchange = () => { renderCols(); saveSettings(); };
+  }
+}
+renderCols();
+$('colsReset').onclick = () => { audio.ui(); setCols(DEFAULT_COLS); renderCols(); saveSettings(); };
 function saveSettings() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => { if (st.token) send({ t: 'settings', s: currentSettings() }); }, 400);
@@ -4279,6 +4293,7 @@ function applySettings(s) {
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.xh) setXhair(s.xh, false);
   if (s.lean) setLean(s.lean, false);
+  if (s.cols) { setCols(s.cols); renderCols(); }
   if (AIM_MODES.includes(s.aim)) setAim(s.aimV === 2 ? s.aim : s.aim === 'pad' ? 'free' : s.aim, s.aimV !== 2); // the old default pad becomes the new Crosshair once
   showSens();
   applyVol(); setMusicVolume(musicVol());
