@@ -176,10 +176,10 @@ const RING_R = 13; // the team-coloured circle round each person (drawOperator)
 const WALL_HOLD = 1.5, WALL_TILES = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.TALL, T.DSHIELD]);
 function wallHeld(q, now) {
   const H = st.wallHold, dt = H ? Math.min(0.1, now - H.at) : 0; // (now: seconds)
-  if (!q || !q.stopped || !st.map || !st.pred) { st.wallHold = null; return; }
-  const m = st.map, a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), sn = Math.sin(a);
-  let k = q.person ? 'p' + q.person.id : -1; // on a person: held on that same person
-  if (q.person) { if (H && H.set.has(k)) { const was = H.t >= WALL_HOLD; H.t += dt; H.at = now; if (!was && H.t >= WALL_HOLD) H.pop = now; } else st.wallHold = { set: new Set([k]), t: 0, at: now, pop: 0 }; return; } for (let d = q.shot - 3; d <= q.shot + 12 && k < 0; d += 1.5) { const kk = Math.floor((st.pred.y + sn * d) / CELL) * m.W + Math.floor((st.pred.x + c * d) / CELL); if (WALL_TILES.has(m.tiles[kk])) k = kk; } // the first wall cell where the bullets stop
+  if (!q || !q.mk || !st.map || !st.pred) { st.wallHold = null; return; }
+  const m = st.map, a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), sn = Math.sin(a), qp = q.mk.person, qs = q.mk.d; // (the marker: before or past the crosshair)
+  let k = qp ? 'p' + qp.id : -1; // on a person: held on that same person
+  if (qp) { if (H && H.set.has(k)) { const was = H.t >= WALL_HOLD; H.t += dt; H.at = now; if (!was && H.t >= WALL_HOLD) H.pop = now; } else st.wallHold = { set: new Set([k]), t: 0, at: now, pop: 0 }; return; } for (let d = qs - 3; d <= qs + 12 && k < 0; d += 1.5) { const kk = Math.floor((st.pred.y + sn * d) / CELL) * m.W + Math.floor((st.pred.x + c * d) / CELL); if (WALL_TILES.has(m.tiles[kk])) k = kk; } // the first wall cell where the bullets stop
   if (k < 0) { st.wallHold = null; return; }
   if (H && H.set.has(k)) { const was = H.t >= WALL_HOLD; H.t += dt; H.at = now; if (!was && H.t >= WALL_HOLD) H.pop = now; return; }
   const set = new Set(); // the wall and everything solid joined to it
@@ -277,7 +277,7 @@ function adsReset() {
   // sliver past a door frame doesn't count, within its reach
   const a = Math.atan2(uy, ux), sn = st.me && st.me.aa && attFromCode(st.me.aa).sight === 'sniper';
   if (wallBlue()) { // the held wall's bracket is blue (he asked): aiming in snaps right onto it, however far it is
-    const q0 = freeAimPoint(), to = Math.min(reachOf(st.me, true), Math.max(AIM_MIN(), ADS_SNAP_MIN, q0.person ? q0.person.d + RING_R : q0.see)); // a person: onto them
+    const q0 = freeAimPoint(), m0 = q0.mk, to = Math.min(reachOf(st.me, true), Math.max(AIM_MIN(), ADS_SNAP_MIN, m0 && m0.person ? m0.person.d + RING_R : m0 ? m0.d : q0.see)); // a person: onto them
     aimOff = { x: ux * to, y: uy * to }; return;
   }
   if (sn) { const ds = []; for (let i = -2; i <= 2; i++) ds.push(castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, reachOf(st.me, true), null)); ds.sort((p, q) => q - p); d = Math.max(AIM_MIN(), ds[1] - 4); }
@@ -430,7 +430,17 @@ function freeAimPoint() {
     if (edge > 4 && edge < see - 2 && edge < shot - 2 && edge < l - 4 && (!person || edge < person.d)) person = { id: r.id, x: r.x, y: r.y, d: edge };
   }
   if (person) see = shot = person.d;
-  return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, person, rope: onRope, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
+  // the marker (he asked 2026-11-14): always on the first wall or person the bullets would reach, past the crosshair too
+  // (out to where the gun still reaches); on a rope never on the wall you hang on (2 cells), as before
+  let mk = shot < l - 4 ? { d: shot, person, x: st.pred.x + c * shot, y: st.pred.y + s * shot } : null;
+  if (!mk && st.map) {
+    const R = Math.max(l + 40, st.me ? reachOf(st.me, true) : 0), d0 = onRope ? CELL * 2 : 0;
+    let bd = d0 + castSight(st.map, st.pred.x + c * d0, st.pred.y + s * d0, a, R - d0, null, true) + 2, bp = null;
+    if (bd >= R - 2) bd = Infinity;
+    if (st.rings) for (const r of st.rings) { const ox = r.x - st.pred.x, oy = r.y - st.pred.y, along = ox * c + oy * s, perp = Math.abs(oy * c - ox * s); if (along <= l - 4 || perp > RING_R) continue; const e = along - Math.sqrt(RING_R * RING_R - perp * perp); if (e < bd) { bd = e; bp = { id: r.id, x: r.x, y: r.y, d: e }; } }
+    if (bd < Infinity && bd > l - 4) mk = { d: bd, person: bp, beyond: true, x: st.pred.x + c * bd, y: st.pred.y + s * bd };
+  }
+  return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, person, rope: onRope, mk, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
 }
 // is this aim (from where you stand) out through one of the windows you are looking down from?
 function winAimed(a) {
@@ -3385,20 +3395,17 @@ function crosshair(me, now) {
       const na = Math.atan2(y - gy, x - gx) + Math.PI / 2, tl = 5 * DPR;
       ctx.lineCap = 'round';
       if (q.stopped) { // bullets stop here: a bracket hugging the wall, orange; held on the same wall 1.5 s it turns blue (aiming in then ignores it)
-        const blue = wallBlue(), H = st.wallHold, pk = blue && H.pop ? Math.max(0, 1 - (now - H.pop) / 0.25) : 0, k = (1 + 0.35 * pk) * DPR;
-        const ux = Math.cos(na), uy = Math.sin(na), bx = (x - gx), by = (y - gy), bl = Math.hypot(bx, by) || 1, tx = bx / bl, ty = by / bl; // along the wall / back toward the crosshair
-        const W = 8.5 * k, A = -6 * k, cx = gx - tx * 2 * DPR, cy = gy - ty * 2 * DPR; // (A < 0: the arms point back toward you)
-        const path = () => { ctx.beginPath(); ctx.moveTo(cx - ux * W + tx * A, cy - uy * W + ty * A); ctx.lineTo(cx - ux * W, cy - uy * W); ctx.lineTo(cx + ux * W, cy + uy * W); ctx.lineTo(cx + ux * W + tx * A, cy + uy * W + ty * A); };
-        const col = blue ? '79,179,255' : '255,138,61';
-        ctx.lineJoin = 'round'; path();
-        ctx.strokeStyle = `rgba(${col},0.22)`; ctx.lineWidth = 8 * DPR; ctx.stroke(); // soft halo
-        ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 4.6 * DPR; ctx.stroke();
-        ctx.strokeStyle = `rgb(${col})`; ctx.lineWidth = 2.4 * DPR; ctx.stroke(); ctx.lineJoin = 'miter';
+        drawBracket(ctx, gx, gy, x, y, na, now);
       } else {
         ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 4 * DPR; ctx.beginPath(); ctx.moveTo(gx - Math.cos(na) * tl, gy - Math.sin(na) * tl); ctx.lineTo(gx + Math.cos(na) * tl, gy + Math.sin(na) * tl); ctx.stroke();
         ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2 * DPR; ctx.beginPath(); ctx.moveTo(gx - Math.cos(na) * tl, gy - Math.sin(na) * tl); ctx.lineTo(gx + Math.cos(na) * tl, gy + Math.sin(na) * tl); ctx.stroke();
       }
       ctx.lineCap = 'butt';
+    } else if (q.mk && q.mk.beyond) { // past the crosshair (he asked 2026-11-14): the bracket on the first wall or person the bullets reach, a faint dotted line out to it
+      const [lwx, lwy] = q.mk.person ? [0, 0] : liftOf(q.mk.x, q.mk.y, 0.45);
+      const G = w2s(q.mk.x + lwx, q.mk.y + lwy), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
+      ctx.setLineDash([2 * DPR, 4 * DPR]); ctx.lineWidth = 1 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(gx, gy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.lineCap = 'round'; drawBracket(ctx, gx, gy, x, y, Math.atan2(y - gy, x - gx) + Math.PI / 2, now); ctx.lineCap = 'butt';
     }
     if (dm >= 8) {
       ctx.font = `700 ${12 * DPR}px Barlow Condensed, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
@@ -3669,6 +3676,18 @@ function ropeWallSpots(ri, me) {
   for (const dir of ['left', 'right']) { let q = r, n = 0; while (q && q[dir] !== undefined && n++ < 6) { q = R[q[dir]]; add(q); } }
   st.wallSpots = { ri, m: st.map, sp };
   return [{ x: me.x, y: me.y, r: CELL * 4 }, ...sp];
+}
+// the orange / blue bracket hugging a wall (or a person's ring) where the bullets stop; blue once held 1.5 s (wallHeld)
+function drawBracket(ctx, gx, gy, x, y, na, now) {
+    const blue = wallBlue(), H = st.wallHold, pk = blue && H.pop ? Math.max(0, 1 - (now - H.pop) / 0.25) : 0, k = (1 + 0.35 * pk) * DPR;
+    const ux = Math.cos(na), uy = Math.sin(na), bx = (x - gx), by = (y - gy), bl = Math.hypot(bx, by) || 1, tx = bx / bl, ty = by / bl; // along the wall / back toward the crosshair
+    const W = 8.5 * k, A = -6 * k, cx = gx - tx * 2 * DPR, cy = gy - ty * 2 * DPR; // (A < 0: the arms point back toward you)
+    const path = () => { ctx.beginPath(); ctx.moveTo(cx - ux * W + tx * A, cy - uy * W + ty * A); ctx.lineTo(cx - ux * W, cy - uy * W); ctx.lineTo(cx + ux * W, cy + uy * W); ctx.lineTo(cx + ux * W + tx * A, cy + uy * W + ty * A); };
+    const col = blue ? '79,179,255' : '255,138,61';
+    ctx.lineJoin = 'round'; path();
+    ctx.strokeStyle = `rgba(${col},0.22)`; ctx.lineWidth = 8 * DPR; ctx.stroke(); // soft halo
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 4.6 * DPR; ctx.stroke();
+    ctx.strokeStyle = `rgb(${col})`; ctx.lineWidth = 2.4 * DPR; ctx.stroke(); ctx.lineJoin = 'miter';
 }
 function promptText(s, me) {
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;

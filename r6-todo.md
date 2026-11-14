@@ -8,6 +8,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
+- [x] (he asked 2026-11-14) the orange/blue marker should always snap to the nearest wall or shootable thing behind the reticle; keep the change for having it right in front of you (DONE 2026-11-14: the bracket now always sits on the first wall or person your bullets would reach: before the crosshair as before, and past it too, out to where your gun reaches, with a faint dotted line out to it; it still turns blue after 1.5 s on the same wall and aiming in then snaps onto it; on a rope the wall you hang on still never gets it. Checked in a test browser. Not yet played by him)
+
 - [x] (he asked 2026-11-14) the legs can be a bit shorter while rappelling (DONE 2026-11-14: hanging on a rope the feet sit about 20 cm higher under the body, hips unchanged; on the ground the legs are as before. Checked in a test browser. Not yet played by him)
 
 - [x] (he asked 2026-11-14) shorten the middle torso area a bit, it feels too long (DONE 2026-11-14: shoulders, arms, neck and head all sit a little over 10 cm lower (shoulders 0.41 of a wall instead of 0.45), hips and legs unchanged; head aim zones moved to match. Not yet played by him)
