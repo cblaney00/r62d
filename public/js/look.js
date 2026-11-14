@@ -274,7 +274,7 @@ function block(R, m, bx, by) {
     if (m.tiles[k] === T.BARRI) pieces.push(win ? [0.28, 0.69, [122, 92, 58], null] : [0.06, 0.72, [122, 92, 58], null]); // (boards are thin: no top)
     const X = x * CELL, Y = y * CELL, faces = out[0].faces;
     for (const [f0, f, base, tc] of pieces) {
-      const lintel = door && f0 >= 0.7; // the top of a doorway: half see-through (he chose 2026-11-14: nobody hides under it)
+      const lintel = (door && f0 >= 0.7) || (win && f0 >= 0.68); // the wall over a doorway or window: half see-through (he chose 2026-11-14: nobody hides under it; and the boards in a window always show)
       const col = lt => lintel ? `rgba(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0},${DOOR_TOP_A})` : `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`;
       for (const [dx, dy, lt] of FACES) {
         const n = k + dy * W + dx, nx = x + dx, ny = y + dy;
@@ -284,6 +284,7 @@ function block(R, m, bx, by) {
         if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0, x, y, c: col(lt), d, e: isOut(m, n) });
         else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0, x, y, c: col(lt), d, e: isOut(m, n) });
       }
+      if (!tc && base[0] === 122 && !door) { out[0].tops.push({ x, y, n: 1, f, g: 0 }); continue; } // window boards: their top from the map picture (planks, cracks, holes), so a boarded window shows from anywhere (he saw them only close up)
       if (tc) { const iN = thinOpen(m, k - W) ? WALL_INS : 0, iS = thinOpen(m, k + W) ? WALL_INS : 0, iW = thinOpen(m, k - 1) ? WALL_INS : 0, iE = thinOpen(m, k + 1) ? WALL_INS : 0;
         out[0].tops.push({ x, y, n: 1, f, g: 0, tc: lintel ? hexA(tc, DOOR_TOP_A) : tc, low: f < 0.99, iN, iS, iW, iE }); }
     }

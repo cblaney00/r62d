@@ -417,3 +417,4 @@ His wishes so far:
   - Rope reach: `ROPE_REACH_X` 8 m added to the rope crosshair cap and to `st.trackHH`; on a rope the camera keeps the crosshair (not you) inside, `onScreen` margin 0.28 of the screen height.
   - Smoke: drawn on #over (after the blackout) when you have a line to the cloud (`clear`), into `smokeCv` at 1/`SMOKE_DIV` size, `SMOKE_COL`.
   - Furniture: look.js `FURN` (kind → [height, 'legs'|'solid', side colour]), `propGrid`/`furnOf`, `legsOf` (shadow at floor, 4 legs, top edge) in the block builder; `furnTop` for people standing on furniture (main.js `fTop`).
+  - Window boards: their top comes from the map picture (look.js pieces, `base[0] === 122`), and window lintels are half see-through like doorways (`lintel`, `DOOR_TOP_A`).
