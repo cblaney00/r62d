@@ -2,7 +2,7 @@
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
 import { floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ropeAimLimit, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
-import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers } from '../shared/physics.js';
+import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers , inBox } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
 import { arenaThink, drillThink, defSetup, botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
@@ -424,7 +424,10 @@ export class Game {
     this.by = TEAM.DEF; this.boardWindows(); this.by = null; // the defenders' boards: their map shows them
     // defenders start on site, attackers at one spawn (their bodies wait while they drone)
     const site = map.sites[this.site];
-    this.prepBox = this.tut || this.free || this.arena || this.zb ? null : prepBox(map, this.site); // defenders stay round the site in preparation (he asked)
+    // defenders in preparation (he asked 2026-11-14): on Dust Town they stay in a box round the two site rooms; on every
+    // other map anywhere in the building, never outside (inBox: no open ground; the roof isn't in it)
+    this.prepSiteBox = map.id === 'dust';
+    this.prepBox = this.tut || this.free || this.arena || this.zb ? null : this.prepSiteBox ? prepBox(map, this.site) : map.floors.filter(F => !F.roof).map(F => [F.gx * CELL, 0, (F.gx + F.w) * CELL, F.h * CELL]);
     const defCells = this.freeCellsInRooms(site.rooms);
     const atkers = [];
     for (const p of this.players.values()) {
@@ -673,7 +676,8 @@ export class Game {
       (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK);
     const gw = p.guns && p.guns[p.slot] ? moveOf(WEAPONS[p.guns[p.slot].w]) : [1, 1];
     const box = this.phase === PHASE.PREP && this.prepBox && this.side(p) === TEAM.DEF && p.ctrl === 'body' ? this.prepBox : undefined; // (shared/map.js prepBox)
-    return { armor: o.armor, mul, downed: p.downed, frozen, gw: gw[0], ga: gw[1], ns: canSprint ? undefined : 1, box }; // ns: anything slowing you stops a sprint
+    const boxShow = box && this.prepSiteBox ? 1 : undefined; // (the outline is drawn only for the site box)
+    return { armor: o.armor, mul, downed: p.downed, frozen, gw: gw[0], ga: gw[1], ns: canSprint ? undefined : 1, box, boxShow }; // ns: anything slowing you stops a sprint
   }
 
   applyMove(p, dt) {
@@ -1679,6 +1683,7 @@ export class Game {
     const to = findVault(this.map, p.x, p.y, ang);
     if (!to) return false;
     if (this.zb && zbBlocksVault(this, p, to)) return false; // ZOMBIES: people can't climb out of the windows
+    if (this.phase === PHASE.PREP && this.prepBox && this.side(p) === TEAM.DEF && !inBox(this.map, this.prepBox, to.x, to.y)) return false; // defenders in preparation: no climbing out of the allowed area (prepBox)
     const d = Math.hypot(to.x - p.x, to.y - p.y);
     p.vault = { x0: p.x, y0: p.y, x1: to.x, y1: to.y, t: 0, dur: VAULT_TIME * (0.8 + 0.2 * d / 40) };
     p.reloadT = 0; p.adsT = 0; p.scanning = false; p.bracing = false;

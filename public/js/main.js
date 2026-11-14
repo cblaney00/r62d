@@ -3067,7 +3067,7 @@ function draw(s, view, now, dt) {
   }
   if (inGame && view) drawPeeps(); // GIMLET's peepholes, where you can see them
   if (inGame && view && st.winGoR) drawWinGo(st.winGoR, now); // the window helper's frame (winGo)
-  if (inGame && st.me && st.me.m && st.me.m.box && s.ph === PHASE.PREP) { // the defenders' preparation area (he asked): its edge, on this floor
+  if (inGame && st.me && st.me.m && st.me.m.box && st.me.m.boxShow && s.ph === PHASE.PREP) { // the defenders' preparation area (he asked): its edge, on this floor
     const F = st.map.floors[Math.max(0, floorAt(st.map, st.pred.x, st.pred.y))], u = UP();
     ctx.save(); ctx.setLineDash([6, 4]); ctx.lineWidth = 1.4; ctx.strokeStyle = `rgba(242,193,78,${0.55 + 0.2 * Math.sin(now * 3)})`;
     for (const r of st.me.m.box) if (F && r[0] >= F.gx * CELL - 1 && r[2] <= (F.gx + F.w) * CELL + 1) {
