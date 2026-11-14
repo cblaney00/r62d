@@ -1936,6 +1936,7 @@ function interp(id, kind) {
   const o = { ...pb, x: pa.x + (pb.x - pa.x) * f, y: pa.y + (pb.y - pa.y) * f };
   if (pa.ag !== undefined && pb.ag !== undefined) o.ag = pa.ag + angDiff(pb.ag, pa.ag) * f;
   if (pa.gt !== undefined && pb.gt !== undefined && pb.gt >= pa.gt) o.gt = pa.gt + (pb.gt - pa.gt) * f;
+  if (pa.rz !== undefined && pb.rz !== undefined && Math.abs(pb.rz - pa.rz) < 0.5) o.rz = pa.rz + (pb.rz - pa.rz) * f; // climbing a wall: smooth too
   return o;
 }
 
@@ -2580,12 +2581,16 @@ function liftDraw(x, y, z, fn) {
 }
 function draw(s, view, now, dt) {
   const z = st.zoom, m = st.map; let tq = performance.now();
+  { // your height on a rope (he asked 2026-11-14: smooth climbing): glides after the server's value instead of stepping 20 times a second
+    const t = st.me && st.me.ro && st.me.ro[0] ? st.me.ro[7] ?? 0.5 : null;
+    st.ropeH = t === null ? null : st.ropeH == null || Math.abs(t - st.ropeH) > 0.45 ? t : st.ropeH + (t - st.ropeH) * Math.min(1, dt * 14);
+  }
   let RH = RAISE_H * Math.max(0, Math.min(1, (RAISE_NONE - (st.viewH || 0)) / (RAISE_NONE - RAISE_FULL)));
   // the eye (the point things stand up away from) sits below the screen, as a camera tilted like the world layers would
   // see it (he asked 2026-11-14: more volume): everything, you in the middle too, shows its front and its height
   const OB = (st.viewH || 400) * EYE_BACK, U0 = UP();
   let eye = { x: st.cam.x - U0.x * OB, y: st.cam.y - U0.y * OB };
-  if (st.rt > 0 && st.rtFace != null) { const E = (st.viewH || 400) * 1.3, k = st.rt; eye = { x: eye.x + (st.cam.x - Math.cos(st.rtFace) * E - eye.x) * k, y: eye.y + (st.cam.y - Math.sin(st.rtFace) * E - eye.y) * k }; /* (glides from the usual eye to the one behind you) */ RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, me0.ro[7] ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.5 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
+  if (st.rt > 0 && st.rtFace != null) { const E = (st.viewH || 400) * 1.3, k = st.rt; eye = { x: eye.x + (st.cam.x - Math.cos(st.rtFace) * E - eye.x) * k, y: eye.y + (st.cam.y - Math.sin(st.rtFace) * E - eye.y) * k }; /* (glides from the usual eye to the one behind you) */ RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, st.ropeH ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.5 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
   setPersp(eye, gq.raised !== false && fxOn('walls3d') ? RH : 0); // everything else stands up by the same rule (people, gadgets: look.js persp)
   const shake = fxOn('shake') ? fx.shake : 0;
   const cr = Math.cos(st.rot || 0), sr = Math.sin(st.rot || 0), TA = z * cr, TB = z * sr, TC = -z * sr, TD = z * cr; // world -> screen (turned with Rotate aiming)
@@ -2749,7 +2754,7 @@ function draw(s, view, now, dt) {
       if (elv) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1; c.setLineDash([3, 2]); c.beginPath(); c.arc(p.x, p.y, 15.5, 0, 7); c.stroke(); c.restore();
         c.save(); c.translate(p.x, p.y); c.scale(1.12, 1.12); c.translate(-p.x, -p.y); }
     drawOperator(c, {
-      hang: hangW !== undefined ? (p.rp === 3 ? 'inv' : 'up') : null, wallA: hangW, zb: hangW !== undefined ? ((isMe ? me.ro && me.ro[7] : sp.rz) ?? 0.5) - 0.55 : 0,
+      hang: hangW !== undefined ? (p.rp === 3 ? 'inv' : 'up') : null, wallA: hangW, zb: hangW !== undefined ? ((isMe ? st.ropeH : p.rz) ?? 0.5) - 0.55 : 0,
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, slide: p.sd, downed: p.dn,
       sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
@@ -2828,16 +2833,17 @@ function draw(s, view, now, dt) {
     if (!rf) {
       const fr = st.floorRect;
       const X0 = Math.max(fr ? fr[0] : 0, wx0 - 40), Y0 = Math.max(fr ? fr[1] : 0, wy0 - 40), X1 = Math.min(fr ? fr[2] : m.W * CELL, wx1 + 40), Y1 = Math.min(fr ? fr[3] : m.H * CELL, wy1 + 40);
-      rf = raisedFrame(st.rend, rm, eye, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1);
+      rf = raisedFrame(st.rend, rm, eye, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1, (st.rt || 0) > 0.01);
     }
     // wall tops from the small copy of the map when the screen shows less than it holds (far out)
     const pk = pass === 'fog' ? fog.width / VW * z : z, pic = st.rend.picFor(pk);
-    if (pass === 'fog' || !view) { drawRaised(c, st.rend, rf, [0, 1], pic); pfa('raise', t0); return; }
+    const up2 = (st.rt || 0) > 0.01 ? () => { c.save(); c.globalAlpha = Math.min(1, st.rt * 1.4); drawRaised(c, st.rend, rf, [2], pic); c.restore(); } : null; // on a rope: the storeys above you, faded in with the rope camera
+    if (pass === 'fog' || !view) { if (up2) up2(); drawRaised(c, st.rend, rf, [0, 1], pic); pfa('raise', t0); return; }
     // walls in colour exactly where your team's sight reaches (raised with them), like the floor: no cell-by-cell snapping
     const fi = view ? floorAt(m, view.x, view.y) : -1, fl = fi >= 0 && m.floors[fi] ? m.floors[fi] : null, below = fl && !fl.roof ? fl.i : fl ? fl.i - 1 : 0;
-    const sc = sightClip(vpolys, vviews, eye, RH, null, below), mr = st.me && st.me.ro && st.me.ro[0] && st.pred; // on a rope: the wall in front of you is always in sight
-    if (mr) addSpots(sc, [{ x: mr.x, y: mr.y, r: CELL * 5 }], eye, RH, below);
-    c.save(); c.clip(sc); drawRaised(c, st.rend, rf, [0], pic); c.restore();
+    const ab = up2 ? 2 : 0, sc = sightClip(vpolys, vviews, eye, RH, null, below, ab), mr = st.me && st.me.ro && st.me.ro[0] && st.pred; // on a rope: the wall in front of you is always in sight
+    if (mr) addSpots(sc, [{ x: mr.x, y: mr.y, r: CELL * 5 }], eye, RH, below, ab);
+    c.save(); c.clip(sc); if (up2) up2(); drawRaised(c, st.rend, rf, [0], pic); c.restore();
     c.save(); c.clip(sightClip(vpolys, vviews, eye, RH, rm)); drawRaised(c, st.rend, rf, [1], pic); c.restore(); // cars, crates, shelves: only the part in sight
     pfa('raise', t0);
   } : null;

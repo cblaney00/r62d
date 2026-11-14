@@ -4,7 +4,7 @@
 // Everything here is cheap for the graphics card: the light is drawn once with the map, the walls are plain canvas
 // fills and copies of the map picture, and the tilt is one CSS transform the browser applies to the world layers.
 import { CELL, T, MAT, FL } from '/shared/constants.js';
-import { cellBelow } from '/shared/map.js';
+import { cellBelow, cellAbove } from '/shared/map.js';
 
 export const looks = { light: true }; // switched by Settings → Screen → Room lighting (main.js)
 
@@ -113,9 +113,10 @@ function topColour(m, k) {
   return mat === MAT.BRICK ? '#93503b' : '#d8d2c4';
 }
 const CH = 16;
+const isOut = (m, n) => n >= 0 && n < m.tiles.length && (m.floor[n] === FL.VOID || m.tiles[n] === T.GROUND || m.tiles[n] === T.VOID);
 const KEPT = new WeakMap(); // renderer → { m, cw, blocks: [] }
 function block(R, m, bx, by) {
-  const W = m.W, rise = riseOf(m), hg = k => height(m, k, rise), out = [{ faces: [], tops: [] }, { faces: [], tops: [] }];
+  const W = m.W, rise = riseOf(m), hg = k => height(m, k, rise), out = [{ faces: [], tops: [] }, { faces: [], tops: [] }, { faces: [], tops: [] }]; // 2: the storeys above (rope camera only)
   const x0 = bx * CH, y0 = by * CH, x1 = Math.min(W - 1, x0 + CH - 1), y1 = Math.min(m.H - 1, y0 + CH - 1);
   for (let y = y0; y <= y1; y++) {
     let run = null;
@@ -145,9 +146,9 @@ function block(R, m, bx, by) {
         const n = k + dy * W + dx, nx = x + dx, ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f && !(m.shape && m.shape[n])) continue;
         const ex = dx > 0 ? X + CELL : X, ey = dy > 0 ? Y + CELL : Y; // seen when the camera is on its side of it
-        const d = g ? 0 : base === BRICK ? 'b' : 'p';
-        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, x, y, c: col(lt), d });
-        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, x, y, c: col(lt), d });
+        const d = g ? 0 : base === BRICK ? 'b' : t === T.HARD && !(m.mat && m.mat[k] === MAT.DRYWALL) ? 'c' : 'p', e = isOut(m, n);
+        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, x, y, c: col(lt), d, e });
+        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, x, y, c: col(lt), d, e });
       }
       if (!run) run = { x, y, n: 0, f, g, tc }; run.n++;
     }
@@ -160,8 +161,8 @@ function block(R, m, bx, by) {
     if (!win && !door) continue;
     let wk = -1; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = k + dy * W + dx; if (hg(n) >= 1) { wk = n; break; } }
     const wb = wk >= 0 ? (m.tiles[wk] === T.SOFT && m.mat && m.mat[wk] === MAT.BRICK ? BRICK : SIDE[m.tiles[wk]] || SIDE[T.HARD]) : SIDE[T.SOFT], wtc = wk >= 0 ? topColour(m, wk) : '#d8d2c4';
-    const pieces = win ? [[0, 0.28, [196, 190, 176], '#d8d2c4'], [0.69, 1, wb, wtc]] : [[0.72, 1, wb, wtc]];
-    if (m.tiles[k] === T.BARRI) pieces.push(win ? [0.28, 0.69, [122, 92, 58], '#8b6a42'] : [0.06, 0.72, [122, 92, 58], '#8b6a42']);
+    const pieces = win ? [[0, 0.28, [176, 170, 158], '#b9b2a2'], [0.69, 1, wb, wtc]] : [[0.72, 1, wb, wtc]];
+    if (m.tiles[k] === T.BARRI) pieces.push(win ? [0.28, 0.69, [122, 92, 58], null] : [0.06, 0.72, [122, 92, 58], null]); // (boards are thin: no top)
     const X = x * CELL, Y = y * CELL, faces = out[0].faces;
     for (const [f0, f, base, tc] of pieces) {
       const col = lt => `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`;
@@ -169,14 +170,15 @@ function block(R, m, bx, by) {
         const n = k + dy * W + dx, nx = x + dx, ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f || (m.openId[n] === oi && oi >= 0)) continue; // against the wall, or more of the same opening
         const ex = dx > 0 ? X + CELL : X, ey = dy > 0 ? Y + CELL : Y;
-        const d = base === BRICK ? 'b' : base[0] === 122 ? 'w' : 'p';
+        const d = base === BRICK ? 'b' : base[0] === 122 ? 'w' : base[0] === 176 ? 's' : 'p';
         if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0, x, y, c: col(lt), d });
         else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0, x, y, c: col(lt), d });
       }
-      out[0].tops.push({ x, y, n: 1, f, g: 0, tc });
+      if (tc) out[0].tops.push({ x, y, n: 1, f, g: 0, tc, low: f < 0.99 });
     }
   }
-  facade(m, x0, y0, x1, y1, hg, out[0].faces);
+  facade(m, x0, y0, x1, y1, hg, out[0].faces, under, -1);
+  facade(m, x0, y0, x1, y1, hg, out[2].faces, cellAbove, 1);
   return out;
 }
 // The building below an upper floor (he asked 2026-11-14: more volume, more detail on the outside of the building): an
@@ -184,30 +186,39 @@ function block(R, m, bx, by) {
 // floor (-1 = the storey under it). Each storey shows what is really there: wall (brick or plaster), a window (sill,
 // glass, lintel) or a doorway, until the building steps in.
 const GLASS = [46, 62, 78], DOORWAY = [30, 27, 25];
-function facade(m, x0, y0, x1, y1, hg, faces) {
+// the cell under k, from the roof too (cellBelow leaves the roof out)
+function under(m, k) {
+  const r = cellBelow(m, k); if (r >= 0) return r;
+  const W = m.W, x = k % W, y = Math.floor(k / W), f = m.floors.find(q => x >= q.gx && x < q.gx + q.w);
+  if (!f || !f.roof || !f.i) return -1;
+  const b = m.floors[f.i - 1], lx = x - f.gx + f.x0 - b.x0, ly = y + f.y0 - b.y0;
+  return lx < 0 || ly < 0 || lx >= b.w || ly >= b.h ? -1 : ly * W + b.gx + lx;
+}
+function facade(m, x0, y0, x1, y1, hg, faces, next, dir) { // next: cellBelow (dir -1) or cellAbove (dir 1, the storeys over this one)
   const W = m.W, air = n => n >= 0 && n < m.tiles.length && m.floor[n] === FL.VOID;
   const outside = n => n >= 0 && n < m.tiles.length && (m.floor[n] === FL.VOID || m.tiles[n] === T.GROUND || m.tiles[n] === T.VOID);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    const k = y * W + x; if (cellBelow(m, k) < 0) continue;
+    const k = y * W + x; if (next(m, k) < 0) continue;
     const wall = hg(k) >= 1 && m.tiles[k] !== T.TALL && m.tiles[k] !== T.LOW, open = !wall && m.openId && m.openId[k] >= 0 && hg(k) === 0;
-    if (!wall && !open) continue;
+    const roofEdge = dir < 0 && m.floor[k] === FL.ROOF && m.tiles[k] !== T.LOW; // the roof's edge: the walls under it carry on down
+    if (!wall && !open && !roofEdge) continue;
     const X = x * CELL, Y = y * CELL;
     for (const [dx, dy, lt] of FACES) {
       const n = k + dy * W + dx; if (!air(n)) continue;
       const ex = dx > 0 ? X + CELL : X, ey = dy > 0 ? Y + CELL : Y;
       let kb = k, nb = n;
       for (let s = 1; s <= 4; s++) {
-        kb = cellBelow(m, kb); nb = cellBelow(m, nb); if (kb < 0 || nb < 0 || !outside(nb)) break;
+        kb = next(m, kb); nb = next(m, nb); if (kb < 0 || nb < 0 || !outside(nb)) break;
         const t = m.tiles[kb], win = !!(m.win && m.win[kb]), oi = m.openId ? m.openId[kb] : -1, door = !win && oi >= 0 && m.openings && m.openings[oi] && m.openings[oi].kind === 'door';
         const solid = t === T.HARD || t === T.SOFT || t === T.REINF || t === T.PANEL;
         if (!solid && !win && !door) break; // the building steps in under here
-        const wb = t === T.SOFT && m.mat && m.mat[kb] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.SOFT], dk = wb === BRICK ? 'b' : 'p';
+        const wb = t === T.SOFT && m.mat && m.mat[kb] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.SOFT], dk = wb === BRICK ? 'b' : t === T.HARD ? 'c' : 'p';
         const pieces = solid ? [[0, 1, wb, dk]] : win ? [[0, 0.28, wb, dk], [0.28, 0.69, GLASS, 'g'], [0.69, 1, wb, dk]] : [[0, 0.72, DOORWAY, 'o'], [0.72, 1, wb, dk]];
-        const low = 1 - 0.05 * s; // a little darker toward the ground
+        const low = dir < 0 ? 1 - 0.05 * s : 1; // a little darker toward the ground
         for (const [a, b, base, d] of pieces) {
-          const c = `rgb(${base[0] * lt * low | 0},${base[1] * lt * low | 0},${base[2] * lt * low | 0})`, f0 = a - s, f = b - s;
-          if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0: f0 || -1e-6, x, y, c, d, s });
-          else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0: f0 || -1e-6, x, y, c, d, s });
+          const c = `rgb(${base[0] * lt * low | 0},${base[1] * lt * low | 0},${base[2] * lt * low | 0})`, f0 = a + s * dir, f = b + s * dir;
+          if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0: f0 || -1e-6, x, y, c, d, s, e: 1 });
+          else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0: f0 || -1e-6, x, y, c, d, s, e: 1 });
         }
       }
     }
@@ -226,15 +237,15 @@ function kept(R, m) {
   return K;
 }
 // this frame's raised walls in cells x0..y1 (inclusive), seen from cam: per group, a path per colour and the tops
-export function raisedFrame(R, m, cam, h, x0, y0, x1, y1) {
+export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false) { // above: also the storeys over this floor (rope camera)
   const K = kept(R, m), cx = cam.x, cy = cam.y, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
   x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W - 1, x1); y1 = Math.min(m.H - 1, y1);
-  const groups = [{ paths: new Map(), tops: [], topPaths: new Map(), dark: new Path2D(), light: new Path2D(), glint: new Path2D() }, { paths: new Map(), tops: [], topPaths: new Map() }];
+  const groups = [{ paths: new Map(), tops: [], topPaths: new Map(), lowTops: new Map(), dark: new Path2D(), light: new Path2D(), glint: new Path2D() }, { paths: new Map(), tops: [], topPaths: new Map() }, { paths: new Map(), tops: [], topPaths: new Map(), dark: new Path2D(), light: new Path2D(), glint: new Path2D() }];
   for (let by = Math.floor(y0 / CH); by <= Math.floor(y1 / CH); by++) for (let bx = Math.floor(x0 / CH); bx <= Math.floor(x1 / CH); bx++) {
     const i = by * K.cw + bx, B = K.blocks[i] || (K.blocks[i] = block(R, m, bx, by));
     const whole = bx * CH >= x0 && by * CH >= y0 && bx * CH + CH - 1 <= x1 && by * CH + CH - 1 <= y1; // else: check each piece is in range
-    for (let g = 0; g < 2; g++) {
-      const G = groups[g];
+    for (let g = 0; g < 3; g++) {
+      const G = groups[g]; if (g === 2 && !above) continue;
       for (const F of B[g].faces) {
         if (F.nx * (cx - F.px) + F.ny * (cy - F.py) <= 0) continue; // turned away from the camera
         if (!whole && (F.x < x0 || F.x > x1 || F.y < y0 || F.y > y1)) continue;
@@ -246,7 +257,8 @@ export function raisedFrame(R, m, cam, h, x0, y0, x1, y1) {
       for (const r of B[g].tops) {
         if (!whole && (r.y < y0 || r.y > y1 || r.x + r.n - 1 < x0 || r.x > x1)) continue;
         if (!r.tc) { G.tops.push(r); continue; }
-        let T2 = G.topPaths.get(r.tc); if (!T2) G.topPaths.set(r.tc, T2 = { p: null, r: [] });
+        const TP = r.low && G.lowTops ? G.lowTops : G.topPaths; // a sill's top: under the faces of what stands above it
+        let T2 = TP.get(r.tc); if (!T2) TP.set(r.tc, T2 = { p: null, r: [] });
         const sc = 1 + h * r.f;
         if (r.sh) { const p = T2.p || (T2.p = new Path2D()); for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? p.lineTo(a, b) : p.moveTo(a, b); } p.closePath(); } }
         else { const [tx, ty] = up(r.x * CELL, r.y * CELL, r.f); T2.r.push(tx, ty, r.n * CELL * sc, CELL * sc); } // plain rectangles: far cheaper on the graphics card than one big shape
@@ -265,11 +277,17 @@ function deco(G, F, up) {
     const n = Math.min(Math.round((z1 - z0) * 14), Math.floor(tall / 2.6)); if (n < 2) return;
     const odd = (F.x + F.y) & 1;
     for (let i = 1; i <= n; i++) { const z = z0 + (z1 - z0) * i / n; if (i < n) line(G.dark, 0, z, 1, z); const zb = z0 + (z1 - z0) * (i - 1) / n, t = (i + odd) & 1 ? 0.5 : 0.02; line(G.dark, t, zb, t, z); }
-  } else if (F.d === 'p') { // plaster or concrete: skirting inside (on the floor), a storey band outside (below it)
-    if (z0 >= 0 && z1 >= 0.9 && tall > 6) line(G.dark, 0, 0.035, 1, 0.035);
-    if (z0 < 0) { const zt = Math.ceil(z0) === z0 ? z0 + 1 : Math.ceil(z0); if (zt <= z1 && tall > 4) { line(G.light, 0, zt - 0.03, 1, zt - 0.03); line(G.dark, 0, zt, 1, zt); } }
-    if (z1 > 0.5 && z0 < 0.5 && tall > 10 && (F.x * 7 + F.y * 3) % 5 === 0) line(G.dark, 0.5, Math.max(z0, 0.05), 0.5, Math.min(z1, 0.95)); // a panel seam now and then
-  } else if (F.d === 'g') { // glass: frame, a middle bar, a sill lip and a glint across
+  } else if (F.d === 'p' || F.d === 'c') { // plaster or concrete
+    const sb = Math.floor(z0 + 1e-6), full = z1 - z0 > 0.9; // the storey this face belongs to (0 = this floor, -1 the one below...)
+    if (F.e) { // outside: a plinth at the foot of each storey, a cornice line under its top
+      if (full && tall > 5) { line(G.dark, 0, sb + 0.06, 1, sb + 0.06); line(G.light, 0, sb + 0.94, 1, sb + 0.94); line(G.dark, 0, sb + 0.97, 1, sb + 0.97); }
+    } else if (z0 >= 0 && z1 >= 0.9 && tall > 6) { line(G.dark, 0, 0.035, 1, 0.035); line(G.light, 0, 0.05, 1, 0.05); } // inside: a skirting board
+    if (F.d === 'c' && full && tall > 9) { // concrete: formwork panels and the round tie holes left in them
+      line(G.dark, 0, sb + 0.36, 1, sb + 0.36); line(G.dark, 0, sb + 0.68, 1, sb + 0.68);
+      if (!((F.x + F.y) % 2)) line(G.dark, 0.02, sb + 0.06, 0.02, sb + 0.94);
+      if (tall > 14) for (const zz of [0.2, 0.52, 0.84]) for (const tt of [0.28, 0.76]) line(G.dark, tt, sb + zz, tt + 0.05, sb + zz);
+    } else if (z1 > 0.5 && z0 < 0.5 && tall > 10 && (F.x * 7 + F.y * 3) % 5 === 0) line(G.dark, 0.5, Math.max(z0, 0.08), 0.5, Math.min(z1, 0.92)); // plaster: a seam now and then
+  } else if (F.d === 's' && tall > 3) { line(G.light, 0, z1 - 0.01, 1, z1 - 0.01); line(G.dark, 0, z1 - 0.05, 1, z1 - 0.05); } /* a window sill: its lip */ else if (F.d === 'g') { // glass: frame, a middle bar, a sill lip and a glint across
     if (tall < 3) return;
     line(G.light, 0, z0, 1, z0); line(G.light, 0, z1, 1, z1); line(G.light, 0.02, z0, 0.02, z1); line(G.light, 0.98, z0, 0.98, z1);
     line(G.dark, 0.5, z0, 0.5, z1); line(G.glint, 0.15, z0 + (z1 - z0) * 0.2, 0.55, z0 + (z1 - z0) * 0.9);
@@ -282,6 +300,7 @@ export function drawRaised(ctx, R, fr, which, pic = R.c) {
   const cx = fr.cam.x, cy = fr.cam.y, h = fr.h, G = pic.width / R.Wp, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
   for (const g of which) {
     const grp = fr.groups[g];
+    if (grp.lowTops) for (const [c, T2] of grp.lowTops) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); }
     for (const [c, p] of grp.paths) { ctx.fillStyle = c; ctx.fill(p); }
     if (grp.dark) { ctx.lineWidth = 0.6; ctx.strokeStyle = 'rgba(20,16,14,0.32)'; ctx.stroke(grp.dark); ctx.strokeStyle = 'rgba(235,228,214,0.32)'; ctx.stroke(grp.light); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(210,230,250,0.22)'; ctx.stroke(grp.glint); }
     for (const [c, T2] of grp.topPaths) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); } // wall tops: plain colour
@@ -343,11 +362,11 @@ export const tilt = {
 // seen only in part used to light up whole)
 const HTS = [0, 1, 2, 3, 4].map(b => { const a = []; for (let f = -b; f <= 1.001; f += 0.25) a.push(+f.toFixed(2)); return a; });
 // the same, plus round spots (x, y, r) raised through the same heights: the wall a climber hangs on, always in sight
-export function addSpots(p, spots, cam, h, below = 0) {
-  for (const s of spots) for (const f of below ? HTS[Math.min(4, below)] : HTS[0]) { const x = s.x + (s.x - cam.x) * h * f, y = s.y + (s.y - cam.y) * h * f; p.moveTo(x + s.r, y); p.arc(x, y, s.r, 0, Math.PI * 2); }
+export function addSpots(p, spots, cam, h, below = 0, above = 0) {
+  for (const s of spots) for (const f of (below ? HTS[Math.min(4, below)] : HTS[0]).concat(above ? [1.5, 2, 2.5, 3].filter(f => f <= 1 + above) : [])) { const x = s.x + (s.x - cam.x) * h * f, y = s.y + (s.y - cam.y) * h * f; p.moveTo(x + s.r, y); p.arc(x, y, s.r, 0, Math.PI * 2); }
   return p;
 }
-export function sightClip(polys, views, cam, h, m, below = 0) { // below: storeys under this floor (their outside walls are drawn too)
+export function sightClip(polys, views, cam, h, m, below = 0, above = 0) { // below: storeys under this floor (their outside walls are drawn too)
   const p = new Path2D(), tall = (x, y) => m.tiles[Math.floor(y / CELL) * m.W + Math.floor(x / CELL)] === T.TALL;
   polys.forEach((pts, j) => {
     const v = views[j], far = [];
@@ -361,7 +380,7 @@ export function sightClip(polys, views, cam, h, m, below = 0) { // below: storey
     }
     // the sight shape swept from the lowest height drawn to the highest (a straight sweep, as the lift grows evenly
     // with height): the shape at both ends plus each edge's band between them, all wound the same way so they add up
-    const f0 = below ? -Math.min(4, below) : 0, f1 = 1, n = far.length;
+    const f0 = below ? -Math.min(4, below) : 0, f1 = 1 + above, n = far.length;
     if (n < 6) return;
     const at = (i, f) => [far[i] + (far[i] - cam.x) * h * f, far[i + 1] + (far[i + 1] - cam.y) * h * f];
     let ar = 0; for (let i = 0; i < n; i += 2) { const j = (i + 2) % n; ar += far[i] * far[j + 1] - far[j] * far[i + 1]; }
