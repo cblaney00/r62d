@@ -205,7 +205,7 @@ function box(ctx, x, y, w, h, r, col, outline = true) {
 // usual thin outline. When the camera is straight above, it is just the top ellipse.
 const shadeCache = new Map();
 const shadeOf = (col, f) => { const k = col + f; let v = shadeCache.get(k); if (!v) { if (shadeCache.size > 4000) shadeCache.clear(); shadeCache.set(k, v = col[0] === '#' ? shade(col, f) : col); } return v; };
-function column(ctx, ax, ay, arx, ary, bx, by, brx, bry, col, cap = false) {
+export function column(ctx, ax, ay, arx, ary, bx, by, brx, bry, col, cap = false) {
   const dx = bx - ax, dy = by - ay, rx = (arx + brx) / 2, ry = (ary + bry) / 2;
   if (dx * dx + dy * dy < 0.04) { ell(ctx, bx, by, brx, bry, col); return; }
   const t = Math.atan2(-ry * dx, rx * dy), c = Math.cos(t), sn = Math.sin(t);

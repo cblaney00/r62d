@@ -10,7 +10,7 @@ import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { tilt, raisedFrame, drawRaised, sightClip, addSpots, looks, setPersp, liftOf, persp, lifted } from './look.js';
 import { S, setMapScale } from './textures.js';
-import { drawZombie, drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
+import { column, drawZombie, drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
 import { FX, drawSmoke } from './fx.js';
 import * as audio from './audio.js';
@@ -2573,9 +2573,13 @@ function drawScanBlips(now) { // WRAITH: heartbeats, fuzzy
 // stays on the floor under anything off it.
 const GZ = { cam: 0.72, sticky: 0.4, breach: 0.4, cluster: 0.4, cutter: 0.45, grid: 0.4, scope: 0.5, dart: 0.42, saw: 0.3, cover: 0.26, dshield: 0.3, station: 0.12, radar: 0.1, catcher: 0.14, jammer: 0.06,
   plates: 0.06, pace: 0.08, echobox: 0.06, sensor: 0.05, spike: 0.04, mine: 0.01, prox: 0.015, concuss: 0.015, clamp: 0.012, alarm: 0.02, wire: 0.1, healzone: 0, defuser: 0.03, nade: 0.05, drill: 0.01, htrap: 0.01, dropch: 0.02, rig: 0.01 };
+// things that stand on the floor: how wide their solid body is (world px), so they show as objects in the tilted view
+const GB = { station: 4.5, radar: 4, catcher: 4, jammer: 3.5, plates: 4, pace: 3.5, echobox: 3, sensor: 2.5, spike: 2, defuser: 3 };
+const gadgetBase = e => e.ty === 'cam' && e.tu ? 4 : GB[e.ty];
 function gadgetZ(e) { if (e.ty === 'cam' && (e.tu || e.oc !== undefined)) return e.tu ? 0.16 : 0.9; return GZ[e.ty] ?? 0.05; }
-function liftDraw(x, y, z, fn) {
-  if (persp.h && z > 0.08) { const r = 4 + z * 5; ctx.fillStyle = `rgba(0,0,0,${Math.min(0.3, 0.12 + z * 0.2)})`; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.8, 0, 0, 7); ctx.fill(); }
+function liftDraw(x, y, z, fn, base) {
+  if (persp.h && base && z > 0.03) { const [dx, dy] = liftOf(x, y, z); column(ctx, x, y, base, base * 0.85, x + dx, y + dy, base * 0.9, base * 0.78, '#2c3035'); } // standing on the floor: a solid body down to it
+  else if (persp.h && z > 0.08) { const r = 4 + z * 5; ctx.fillStyle = `rgba(0,0,0,${Math.min(0.3, 0.12 + z * 0.2)})`; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.8, 0, 0, 7); ctx.fill(); }
   lifted(ctx, x, y, z, fn);
   if (persp.h && z >= 0.25) (st.upDraws || (st.upDraws = [])).push(() => lifted(ctx, x, y, z, fn)); // up a wall: drawn again over the raised walls (it hangs on their face)
 }
@@ -2624,7 +2628,7 @@ function draw(s, view, now, dt) {
   if (inGame) {
     const site = m.sites[s.site];
     if (s.zb) drawZbWorld(ctx, s, now);
-    if (!s.ar && !s.zb && (side === 'def' || s.rev || !me)) for (const b of site.bombs) if (!s.pl || s.pl.b !== b.id) liftDraw(b.x, b.y, 0.1, () => drawBomb(ctx, b, now));
+    if (!s.ar && !s.zb && (side === 'def' || s.rev || !me)) for (const b of site.bombs) if (!s.pl || s.pl.b !== b.id) liftDraw(b.x, b.y, 0.1, () => drawBomb(ctx, b, now), 5);
     if (s.pl) {
       ctx.save(); ctx.translate(s.pl.x, s.pl.y);
       const pulse = (now * 2) % 1;
@@ -2678,7 +2682,7 @@ function draw(s, view, now, dt) {
     if (e.ty === 'drone' || e.ty === 'cam' || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud' || e.ty === 'bird' || e.ty === 'swarm') continue;
     if (TRAPS.has(e.ty) && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < TRAP_SEEN)) continue; // hidden traps: one rule for all (he asked), seen only within 2 m
     if (!ally && !seen(e.x, e.y)) continue;
-    liftDraw(e.x, e.y, gadgetZ(e), () => drawGadget(ctx, e, now, ally));
+    liftDraw(e.x, e.y, gadgetZ(e), () => drawGadget(ctx, e, now, ally), gadgetBase(e));
   }
   for (const e of ents) if (e.ty === 'cam' && (e.tm === side || seen(e.x, e.y))) liftDraw(e.x, e.y, gadgetZ(e), () => drawCam(ctx, e, now, e.tm === side));
   for (const e of ents) { // an outside camera also shows on the wall above the ground under it (he asked: it can be shot from down there)
