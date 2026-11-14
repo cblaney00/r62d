@@ -138,6 +138,30 @@ const BRICK = [125, 68, 52];
 // showed a square slab of grass round it (he saw it as strange shapes)
 const BOXY = new Set(['planter', 'sandbags', 'lounger', 'aircon', 'skirack', 'bikerack', 'firepit', 'crates', 'wall', 'car', 'dumpster', 'rack', 'shelf', 'container', 'cabinet', 'bookshelf', 'pillar', 'van', 'locker', 'train', 'fridge', 'truck', 'booth', 'schoolbus', 'bus', 'gatehouse', 'lifthut', 'signalbox', 'tankcar', 'counter', 'forklift', 'snowcat', 'stall', 'cart',
   'desk', 'workbench', 'bench', 'couch', 'coffeetable', 'meetingtable', 'reception', 'island', 'console', 'bed', 'railing', 'barrier', 'marketstall', 'sink', 'tv', 'chairs']);
+// Furniture as it really is (he asked 2026-11-14: tables stood on raised platforms instead of on longer legs): each kind's
+// own height (a wall = 1 = 3.2 m), how it stands ('legs': legs at the corners under a thin top, the floor showing under
+// it; 'solid': a block) and the colour of its sides. Anything not listed: a solid block at the old height.
+const FURN = {
+  desk: [0.23, 'legs'], meetingtable: [0.23, 'legs'], coffeetable: [0.14, 'legs'], workbench: [0.28, 'legs'], bench: [0.14, 'legs'], chairs: [0.14, 'legs'],
+  marketstall: [0.28, 'legs'], railing: [0.33, 'legs'], lounger: [0.12, 'legs'], skirack: [0.3, 'legs'], bikerack: [0.25, 'legs'], barrier: [0.3, 'solid', [150, 150, 146]],
+  couch: [0.15, 'solid', [72, 70, 74]], bed: [0.17, 'solid', [150, 142, 130]], console: [0.24, 'solid', [62, 60, 58]], counter: [0.28, 'solid', [120, 106, 90]],
+  reception: [0.33, 'solid', [98, 82, 64]], island: [0.28, 'solid', [150, 146, 140]], sink: [0.28, 'solid', [172, 172, 174]], crates: [0.3, 'solid', [128, 98, 62]],
+  planter: [0.2, 'solid', [112, 92, 72]], aircon: [0.3, 'solid', [150, 155, 160]], sandbags: [0.25, 'solid', [150, 135, 100]], firepit: [0.1, 'solid', [90, 86, 80]],
+  car: [0.45, 'solid', [62, 64, 68]], van: [0.6, 'solid', [150, 152, 150]], truck: [0.8, 'solid', [90, 92, 96]], bus: [0.85, 'solid', [170, 160, 60]], schoolbus: [0.85, 'solid', [205, 160, 40]],
+  train: [1, 'solid', [80, 90, 100]], tankcar: [0.95, 'solid', [60, 60, 62]], container: [0.8, 'solid', [120, 70, 50]], dumpster: [0.45, 'solid', [60, 90, 70]],
+  rack: [0.6, 'solid', [80, 84, 90]], shelf: [0.6, 'solid', [96, 76, 58]], bookshelf: [0.6, 'solid', [92, 70, 52]], cabinet: [0.45, 'solid', [90, 92, 96]],
+  locker: [0.6, 'solid', [95, 105, 112]], fridge: [0.58, 'solid', [205, 205, 200]], tv: [0.4, 'solid', [40, 40, 44]], forklift: [0.7, 'solid', [200, 160, 40]],
+};
+const PROPG = new WeakMap(); // map → per cell: index + 1 of the boxy thing standing there
+function propGrid(m) {
+  let g = PROPG.get(m); if (g) return g;
+  PROPG.set(m, g = new Int32Array(m.W * m.H));
+  (m.props || []).forEach((p, i) => { if (BOXY.has(p.kind)) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (x >= 0 && y >= 0 && x < m.W && y < m.H) g[y * m.W + x] = i + 1; });
+  return g;
+}
+const furnOf = (m, k) => { const i = propGrid(m)[k]; if (!i) return null; const p = m.props[i - 1], F = FURN[p.kind]; return F ? { p, h: p.kind === 'crates' && m.tiles[k] === T.TALL ? 0.55 : F[0], legs: F[1] === 'legs', col: F[2] } : null; };
+// how high the furniture top at (x, y) stands (people standing up on it stand on that), or 0
+export function furnTop(m, x, y) { const k = Math.floor(y / CELL) * m.W + Math.floor(x / CELL); return k >= 0 && k < m.tiles.length ? height(m, k, riseOf(m)) : 0; }
 const RISE = new WeakMap(); // map → per cell: 1 where a tall cell belongs to a boxy thing
 export function riseOf(m) {
   let r = RISE.get(m); if (r) return r;
@@ -145,7 +169,7 @@ export function riseOf(m) {
   for (const p of m.props || []) if (BOXY.has(p.kind)) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) r[y * m.W + x] = 1;
   return r;
 }
-const height = (m, k, rise) => { const t = m.tiles[k]; return t === T.TALL || t === T.LOW ? (rise[k] && m.floor[k] !== FL.VOID ? HGT[t] : 0) : HGT[t] || 0; }; // (a rope ledge is a LOW cell over open air: never raised)
+const height = (m, k, rise) => { const t = m.tiles[k]; if (t === T.TALL || t === T.LOW) { if (!rise[k] || m.floor[k] === FL.VOID) return 0; const F = furnOf(m, k); return F ? F.h : HGT[t]; } return HGT[t] || 0; }; // (a rope ledge is a LOW cell over open air: never raised)
 // faces: [dx, dy, light] — light from the top left, so faces turned that way are brighter
 const FACES = [[0, 1, 0.5], [0, -1, 0.78], [1, 0, 0.6], [-1, 0, 0.72]];
 // The wall pieces are worked out once per block of cells (CH × CH) and kept (he asked: zoomed out it lagged, more of it
@@ -165,6 +189,21 @@ function topColour(m, k) {
   return mat === MAT.BRICK ? '#93503b' : '#d8d2c4';
 }
 const CH = 16;
+// a table, desk, bench or railing on legs (FURN 'legs'): a soft shadow on the floor under it (it covers the flat picture of
+// it there), a leg at each corner up to the underside of the top, and the top's thin edge; the top itself is the picture
+function legsOf(P, f, G, x, y) {
+  const X0 = P.x * CELL, Y0 = P.y * CELL, X1 = (P.x + P.w) * CELL, Y1 = (P.y + P.h) * CELL, ft = f * 0.78, s = Math.max(1.1, Math.min(1.8, Math.min(X1 - X0, Y1 - Y0) / 7)), e = 1;
+  for (let yy = P.y; yy < P.y + P.h; yy++) G.tops.push({ x: P.x, y: yy, n: P.w, f: 0.0001, g: 1, tc: 'rgba(8,9,11,0.62)', low: true });
+  const box = (ax, ay, bx, by, f0, f1, rgb) => {
+    for (const [dx, dy, lt] of FACES) {
+      const c = `rgb(${rgb[0] * lt | 0},${rgb[1] * lt | 0},${rgb[2] * lt | 0})`;
+      if (dx) { const ex = dx > 0 ? bx : ax; G.faces.push({ ax: ex, ay, bx: ex, by, nx: dx, ny: 0, px: ex, py: ay, f: f1, f0, x, y, c }); }
+      else { const ey = dy > 0 ? by : ay; G.faces.push({ ax, ay: ey, bx, by: ey, nx: 0, ny: dy, px: ax, py: ey, f: f1, f0, x, y, c }); }
+    }
+  };
+  for (const [lx, ly] of [[X0 + e, Y0 + e], [X1 - e - s, Y0 + e], [X0 + e, Y1 - e - s], [X1 - e - s, Y1 - e - s]]) box(lx, ly, lx + s, ly + s, 0, ft, [44, 40, 36]);
+  box(X0, Y0, X1, Y1, ft, f, [58, 50, 42]);
+}
 const isOut = (m, n) => n >= 0 && n < m.tiles.length && (m.floor[n] === FL.VOID || m.tiles[n] === T.GROUND || m.tiles[n] === T.VOID);
 const KEPT = new WeakMap(); // renderer → { m, cw, blocks: [] }
 function block(R, m, bx, by) {
@@ -178,7 +217,13 @@ function block(R, m, bx, by) {
       const wi = on && !g && !sh ? wallIns(m, k) : null, iN = wi ? wi.n : 0, iS = wi ? wi.s : 0;
       if (run && (!on || f !== run.f || g !== run.g || sh || tc !== run.tc || iN !== (run.iN || 0) || iS !== (run.iS || 0) || run.iE)) { out[run.g].tops.push(run); run = null; }
       if (!on) continue;
-      const t = m.tiles[k], base = t === T.SOFT && m.mat && m.mat[k] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.HARD], X = x * CELL, Y = y * CELL;
+      const FU = g ? furnOf(m, k) : null;
+      const t = m.tiles[k], base = FU && FU.col ? FU.col : t === T.SOFT && m.mat && m.mat[k] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.HARD], X = x * CELL, Y = y * CELL;
+      if (FU && FU.legs) { // on legs: no block; once per piece (at its top-left cell) its legs, its thin top edge and a soft shadow under it
+        if (FU.p.x === x && FU.p.y === y) legsOf(FU.p, f, out[1], x, y);
+        if (!run) run = { x, y, n: 0, f, g, tc, iN, iS, iW: 0 }; run.n++; run.iE = 0;
+        continue;
+      }
       const col = lt => `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`, faces = out[g].faces;
       if (sh) { // an angled or curved piece: its own edges, its own top
         for (const P of sh) {

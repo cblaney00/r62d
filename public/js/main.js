@@ -8,7 +8,7 @@ import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DR
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, liftBody, persp, lifted, withPersp } from './look.js';
+import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, liftBody, persp, lifted, withPersp, furnTop } from './look.js';
 const addL = (a, b) => [a[0] + b[0], a[1] + b[1]];
 import { S, setMapScale } from './textures.js';
 import { COLS, rgba, lighten, squadCol, setCols, SWATCHES, okHex, DEFAULT_COLS } from './teamcol.js';
@@ -2831,7 +2831,8 @@ function draw(s, view, now, dt) {
     const elv = isMe ? (st.pred.air > 0 ? 2 : st.pred.up ? 1 : 0) : p.el || 0;
     const hangW = p.rp === 1 || p.rp === 3 ? hangWall(p) : undefined; // on a rope: drawn hanging against the wall
     // up on furniture: standing on its top (0.28 of a wall up, like the raised desk under them), drawn again above the raised furniture later
-    const upDraw = c => { const ez = elv ? 0.28 + (elv > 1 ? 0.1 : 0) : 0;
+    const fTop = elv ? furnTop(st.map, p.x, p.y) || 0.28 : 0; // (each kind of furniture its own height: look.js FURN)
+    const upDraw = c => { const ez = elv ? fTop + (elv > 1 ? 0.1 : 0) : 0;
       if (elv) { c.save(); c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.ellipse(p.x + 3, p.y + 5, 11, 9, 0, 0, 7); c.fill(); c.restore(); }
       lifted(c, p.x, p.y, ez, () => {
       if (elv) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1; c.setLineDash([3, 2]); c.beginPath(); c.arc(p.x, p.y, 15.5, 0, 7); c.stroke(); c.restore();
@@ -2844,7 +2845,7 @@ function draw(s, view, now, dt) {
       if (elv) c.restore(); }); };
     upDraw(ctx); if ((elv || hangW !== undefined) && persp.h) (st.upDraws || (st.upDraws = [])).push(upDraw);
     else if (persp.h) (st.ghostDraws || (st.ghostDraws = [])).push(upDraw); // (shown faintly again over the raised walls)
-    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? 0.28 : 0, lb = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.4 * zk)), lh = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.53 * zk)); // (drawn standing up: rings and head zones where they show)
+    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? fTop : 0, lb = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.4 * zk)), lh = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.53 * zk)); // (drawn standing up: rings and head zones where they show)
     drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x + lb[0], y: p.y + lb[1] });
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x + lh[0], y: p.y + lh[1] });
     if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see
