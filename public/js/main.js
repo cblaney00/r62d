@@ -430,17 +430,13 @@ function freeAimPoint() {
     if (edge > 4 && edge < see - 2 && edge < shot - 2 && edge < l - 4 && (!person || edge < person.d)) person = { id: r.id, x: r.x, y: r.y, d: edge };
   }
   if (person) see = shot = person.d;
-  // the marker (he asked 2026-11-14): always on the first wall or person the bullets would reach, past the crosshair too
-  // (out to where the gun still reaches); on a rope never on the wall you hang on (2 cells), as before
-  let mk = shot < l - 4 ? { d: shot, person, x: st.pred.x + c * shot, y: st.pred.y + s * shot } : null;
-  if (!mk && st.map) {
-    const R = Math.max(l + 40, st.me ? reachOf(st.me, true) : 0), d0 = onRope ? CELL * 2 : 0;
-    let bd = d0 + castSight(st.map, st.pred.x + c * d0, st.pred.y + s * d0, a, R - d0, null, true) + 2, bp = null;
-    if (bd >= R - 2) bd = Infinity;
-    if (st.rings) for (const r of st.rings) { const ox = r.x - st.pred.x, oy = r.y - st.pred.y, along = ox * c + oy * s, perp = Math.abs(oy * c - ox * s); if ((!onRope && along <= l - 4) || along <= d0 || perp > RING_R) continue; const e = along - Math.sqrt(RING_R * RING_R - perp * perp); if (e < bd) { bd = e; bp = { id: r.id, x: r.x, y: r.y, d: e }; } }
-    if (bd < Infinity && bd > l - 4) mk = { d: bd, person: bp, beyond: true, x: st.pred.x + c * bd, y: st.pred.y + s * bd };
-    else if (onRope && bd < l - 4) { see = shot = bd; mk = { d: bd, person: bp, x: st.pred.x + c * bd, y: st.pred.y + s * bd }; } // on a rope: a wall between you and the crosshair (past the one you hang on) gets it as on the ground
+  // the marker sits on the wall (or person) between you and the crosshair where the bullets stop (he asked 2026-11-14: before
+  // the crosshair, not past it); on a rope the wall you hang on never gets it, but a wall further in does
+  if (onRope && st.map) {
+    const d0 = CELL * 2, bd = d0 + castSight(st.map, st.pred.x + c * d0, st.pred.y + s * d0, a, Math.max(1, l - d0), null, true) + 2;
+    if (bd < l - 4 && !person) { see = shot = bd; }
   }
+  const mk = shot < l - 4 ? { d: shot, person, x: st.pred.x + c * shot, y: st.pred.y + s * shot } : null;
   return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, person, rope: onRope, mk, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
 }
 // is this aim (from where you stand) out through one of the windows you are looking down from?

@@ -8,7 +8,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## Done
 
-- [x] (he asked 2026-11-14) the orange/blue marker should always snap to the nearest wall or shootable thing behind the reticle; keep the change for having it right in front of you (DONE 2026-11-14: the bracket now always sits on the first wall or person your bullets would reach: before the crosshair as before, and past it too, out to where your gun reaches, with a faint dotted line out to it; it still turns blue after 1.5 s on the same wall and aiming in then snaps onto it; on a rope the wall you hang on still never gets it, but a wall between you and the crosshair further in does, as on the ground. Checked in a test browser. Not yet played by him)
+- [x] (he asked 2026-11-14) the orange/blue marker should always snap to the nearest wall or shootable thing behind the reticle; keep the change for having it right in front of you (he meant: the wall before the crosshair, on the operator's side, not past it. DONE 2026-11-14: the bracket sits on the wall or person between you and the crosshair where the bullets stop, as before; on a rope too now, looking in through a window (it was switched off there), only the wall you hang on never gets it; nothing is marked past the crosshair. Checked in a test browser. Not yet played by him)
 
 - [x] (he asked 2026-11-14) the legs can be a bit shorter while rappelling (DONE 2026-11-14: hanging on a rope the feet sit about 20 cm higher under the body, hips unchanged; on the ground the legs are as before. Checked in a test browser. Not yet played by him)
 
