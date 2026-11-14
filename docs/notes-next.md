@@ -22,3 +22,14 @@ on his to-do list unless he asks for it.
 - HOIST: grapple used only ~3 times in 30 rounds (roof plays need a site under the roof). PERCH still sets the bipod ~5x a round.
 - Pro practice (600 rounds) ran on the version before these bot fixes; the game re-practises by itself on the next start.
 - 2026-11-10 later: fixed from the audit: bots see hidden traps only within 2 m like people (HIDDEN_TRAPS in bots.js; they used to clear every trap from 16 m), LOCKJAW rigs ~1 hatch a round, DEADFALL a hole most rounds, bots keep off hole rims (falls by accident now mostly in fights), bots never set breach charges on the floor, killcam judge: distance in the building frame and wall checks to the whole body (no false "bug" reports left in 4 audit runs).
+
+## After the volume / rope view work (2026-11-14) — Claude's notes for later (not his list)
+- Camera glitch climbing onto the roof: the building is drawn small and tilted for a moment (frames ~f0035-f0045 in screenshots/his-play-2026-11-14). Probably the floor switch + rope-camera glide (st.rt, ropeBaseH) jumping; ease the eye/zoom across the floor change.
+- Hatch view and stairs view (drawHatchView / drawStairView) are still drawn flat like the window view was: shrink them toward you by 1 -/+ persp.h for the storey between, as drawWindowView now does (st.winKp), and convert the aim the same way.
+- Wall ghosts / "▲ ON THE WALL" copies of climbers and window peekers on the ground are drawn flat too; check they line up with the facade now drawn below upper floors.
+- The ground far below past the side edge of a building is still the old dull blur (groundBelow only covers strips out from facade feet). Could draw the whole void with the shrunk view far below.
+- Normal (non-rope) view: people still mostly show their tops (11° tilt). If he wants more, consider a bit more RAISE_H with x-ray outlines of people behind walls.
+- Frame rate on a rope when not peeking is ~85-93 fps (wide view). If he feels it: drop wall surface lines further out, or the storeys-above group.
+- tests/roofbots.js and tests/ropebots.js sometimes crash in hitscan → damage (headshot branch, game.js ~1206); seen before these changes. Find the error message (it scrolls off) and fix.
+- His own "shading from light sources" note is on r6-todo.md (look.js lightMap has the lamp/window light per cell to build on).
+- Next item on his list after this: pro/bot team colours (he chose Northwind silver, Ironclad gold, varied bot pairs, colour settings for his own matches).
