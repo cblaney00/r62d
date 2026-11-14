@@ -14,6 +14,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 - [ ] (he asked 2026-11-14, "go hard on this one", any solution allowed) more 3D to the 2D, more volume in the game: the operators still look flat; smooth climbing on the walls; better assets for walls, doors and windows (anything on the side of the building should have a lot more detail); the Operators page is messed up with the operator previews; when you rappel or enter the tilt mode the operators and everything else players should focus on should have volume like a real object; tables and things you can jump up on should have some elevation too. Then: "dont stop cooking on this until it looks perfectly in line with the game and the game has more depth and volume from that tilted view, smooth transitions into the window are also a must"
 
+- [ ] (he asked 2026-11-14, a note for later, not now) use shading for depth that follows the natural light sources (sun through windows, room lamps); not full detailed shadows
+
 ## Done
 
 - [x] lets incorporate some changes that would get us more frames, we already did research on this so now we just need to implement a bit more, i only need about 35 more fps (then he added: find more ways that don't change how the game looks or feels. DONE 2026-11-12: the map picture now stays on the graphics card instead of being sent to it again every frame, and zoomed out the screen shows a smaller copy of the map that still has every pixel the screen can show. Nothing looks different. Measured on his kind of graphics card in a hidden display: standing about 40 → 120 fps, his walk-spin-zoom test 35 → about 94 fps, zoomed far out 31 → 167 fps. Not yet played by him)
