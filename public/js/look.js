@@ -201,7 +201,7 @@ export function drawRaised(ctx, R, fr, which, pic = R.c) {
 // The world layers (#world) are turned in 3D: a fixed angle (11°, he asked for more than the first 7°; the top of the screen a little further away) plus a lean
 // with your movement and a kick when you shoot or something blows up close by. The mouse is turned back with untilt.
 export const tilt = {
-  on: true, lean: true, el: null, M: null,
+  on: true, lean: true, el: null, M: null, extra: 0, // extra: more tilt (degrees; the rope camera)
   ax: 0, ay: 0, kx: 0, ky: 0, kvx: 0, kvy: 0,
   // vx, vy: your speed across the screen (px/s, screen directions); shake: the screen-shake amount
   update(dt, vx, vy, shake, W, H) {
@@ -215,7 +215,7 @@ export const tilt = {
     this.kx += this.kvx * dt; this.ky += this.kvy * dt;
     const P = new DOMMatrix(); P.m34 = -1 / Math.max(W, H) / 1.25;
     const M = new DOMMatrix().translateSelf(W / 2, H / 2).multiplySelf(P)
-      .rotateSelf(11 + this.ax + this.kx, this.ay + this.ky, 0).scaleSelf(1.1, 1.1).translateSelf(-W / 2, -H / 2 - H * 0.01);
+      .rotateSelf(11 + this.extra + this.ax + this.kx, this.ay + this.ky, 0).scaleSelf(1.1 + this.extra * 0.012, 1.1 + this.extra * 0.012).translateSelf(-W / 2, -H / 2 - H * 0.01 - H * this.extra * 0.006);
     this.M = M; this.el.style.transform = M.toString();
   },
   kick(k = 1) { if (this.lean && this.on) this.kvx -= 9 * k; },

@@ -250,6 +250,7 @@ function onScreen(x, y, m) {
 }
 function freeMove(dx, dy) {
   const z = st.zoom || 1; dx /= z; dy /= z;
+  if (st.rot) { const c = Math.cos(st.rot), sn = Math.sin(st.rot); [dx, dy] = [dx * c + dy * sn, -dx * sn + dy * c]; } // (a turned view: the rope camera)
   const o = aimOff, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = AIM_MIN(), hi = AIM_MAX();
   if (aimMode === 'free') { const tr = trackR(ux, uy); if (l0 > tr) { const m = 1 + (farSens() - 1) * Math.min(1, (l0 - tr) / PX_PER_M); dx *= m; dy *= m; } } // far out: slower, the same every way
   const r = dx * ux + dy * uy; // 1:1 out, back and sideways
@@ -1499,10 +1500,27 @@ function ptsPopups(c, x, y, now) {
 // ---- the 3D rope view (rope3d.js) ----
 // On for an attacker hanging on (or climbing) a rope; leaving it glides the camera back up to the top-down view over
 // R3_OUT s (inside the climb-in), so you can shoot as soon as you're through.
+const ROPE_TILT = 34, ROPE_RAISE = 0.1; // the rope camera's extra tilt (degrees) and how tall walls stand
 const R3_OUT = 0.45, FH3 = 3.2 * PX_PER_M;
 // which way the wall is for someone hanging at (p.x, p.y): the rope stretch they are on, facing it
 function hangWall(p) { for (const q of st.map.ropes || []) { const sx = Math.max(q.a, Math.min(q.b, (p.x - q.hang.x) * q.tx + (p.y - q.hang.y) * q.ty)); if (Math.hypot(q.hang.x + q.tx * sx - p.x, q.hang.y + q.ty * sx - p.y) < 4 && floorAt(st.map, p.x, p.y) === q.f) return q.out + Math.PI; } return undefined; }
-function r3on() { const me = st.me; return !!(me && me.ro && me.a && !me.dn && me.tm === 'atk' && me.ct === 'body' && !st.tv && st.map && st.map.ropes); }
+// He chose (2026-11-14) to stay in the drawn top-down world on a rope rather than switch to a 3D scene (the change of
+// art style was too jarring), so the 3D rope view is off; its code stays behind ROPE_3D.
+const ROPE_3D = false;
+// The tilted rope camera: on a rope the view turns so the wall is straight ahead (up the screen), tilts steeply and
+// leans in, and the walls stand up toward you, so you look over the wall line into the rooms. st.rt (0..1) eases it.
+function ropeFace() { // which way you face on a rope (into the wall), or null
+  const me = st.me; if (!(me && me.ro && me.a && !me.dn && me.ct === 'body' && !st.tv && st.map && st.map.ropes)) return null;
+  const ro = me.ro, R = st.map.ropes, ri = ro[0] ? ro[1] : ro[2] >= 0 ? ro[2] : ro[6] >= 0 ? ro[6] : -1;
+  return R[ri] ? R[ri].out + Math.PI : null;
+}
+function ropeCam(dt) {
+  const f = ropeFace(); if (f != null) st.rtFace = f;
+  const want = f != null ? 1 : 0; st.rt = st.rt || 0;
+  st.rt += (want - st.rt) * (1 - Math.exp(-dt * 4.5)); if (st.rt < 0.002 && !want) st.rt = 0;
+  return st.rt;
+}
+function r3on() { if (!ROPE_3D) return false; const me = st.me; return !!(me && me.ro && me.a && !me.dn && me.tm === 'atk' && me.ct === 'body' && !st.tv && st.map && st.map.ropes); }
 // Does your side see this (the 3D rope view shows only what the top-down view would show you)? Own side's shots always.
 function r3sees(shooter, x, y, x2, y2) {
   if (!st.r3last && !r3on()) return false;
@@ -1984,6 +2002,7 @@ function frame(nowMs) {
   if (sliding()) { padAng = wrapAng(slideAim(padAng)); const l = Math.hypot(aimOff.x, aimOff.y), a = slideAim(Math.atan2(aimOff.y, aimOff.x)); aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l }; }
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
   st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
+  { const rt = ropeCam(dt); if (rt > 0 && st.rtFace != null) { const to = -Math.PI / 2 - st.rtFace, d = Math.atan2(Math.sin(to - st.rot), Math.cos(to - st.rot)); st.rot += d * (rt * rt * (3 - 2 * rt)); } } // on a rope: the wall ahead, up the screen
   audio.setListenerRot(st.r3full && rope3d.active() ? -Math.PI / 2 - rope3d.facing() : st.rot); // (the 3D rope view: sounds pan the way the 3D camera faces)
   // he asked: no click needed to take the mouse when a match starts. Browsers only allow it soon after a click (any menu
   // click counts; the desktop app's Firefox remembers it for the day, play.sh) or in full screen; else CLICK TO TAKE CONTROL shows
@@ -2015,6 +2034,7 @@ function frame(nowMs) {
   let cx, cy;
   if (view) {
     cx = view.x; cy = view.y;
+    if (st.rt > 0 && view.kind === 'body' && st.rtFace != null) { const k = (st.viewH || 400) * 0.2 * st.rt; cx += Math.cos(st.rtFace) * k; cy += Math.sin(st.rtFace) * k; } // (the rope camera: you low on the screen, the rooms ahead)
     if (view.kind === 'body') {
       // he said the view was "super bouncy" when looking round: the lead used the crosshair's place on SCREEN, which itself
       // moves with the camera (a feedback loop). Crosshair mode now leads from the aim point in the world.
@@ -2121,6 +2141,7 @@ function frame(nowMs) {
     if (!locked) st.viewH = Math.max(st.viewH, st.fitH);
   } else st.fitH = 0;
   st.viewH *= viewMul(); // Settings: how much of the map you see (phones start further out)
+  if (st.rt > 0) st.viewH *= 1 - 0.22 * st.rt; // (the rope camera leans in)
   st.zoom = VH / st.viewH;
   if (freeAim && !locked) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
@@ -2755,21 +2776,23 @@ function draw(s, view, now, dt) {
   // raised walls (look.js): how tall, as a share of the distance from the middle of the view. Zoomed far out they sink
   // flat (full up to RAISE_FULL world px tall, none past RAISE_NONE): there they are a few pixels, and on his graphics
   // card any raised-wall drawing over a whole far view halved the frame rate (he asked 2026-11-09: no lag at any zoom)
-  const RH = 0.045 * Math.max(0, Math.min(1, (RAISE_NONE - (st.viewH || 0)) / (RAISE_NONE - RAISE_FULL)));
+  let RH = 0.045 * Math.max(0, Math.min(1, (RAISE_NONE - (st.viewH || 0)) / (RAISE_NONE - RAISE_FULL)));
+  let eye = st.cam; // (the point walls are raised away from)
+  if (st.rt > 0 && st.rtFace != null) { const E = (st.viewH || 400) * 1.3 * st.rt; eye = { x: st.cam.x - Math.cos(st.rtFace) * E, y: st.cam.y - Math.sin(st.rtFace) * E }; RH += (ROPE_RAISE - RH) * st.rt; }
   let rf = null; // this frame's raised walls, worked out once for both passes (look.js keeps the pieces between frames)
   const raise = inGame && RH > 0.002 && gq.raised !== false && fxOn('walls3d') ? (c, pass) => { // pass 'fog' (all, greyed by #fog) or 'lit'
     const t0 = performance.now(), rm = st.rend.map;
     if (!rf) {
       const fr = st.floorRect;
       const X0 = Math.max(fr ? fr[0] : 0, wx0 - 40), Y0 = Math.max(fr ? fr[1] : 0, wy0 - 40), X1 = Math.min(fr ? fr[2] : m.W * CELL, wx1 + 40), Y1 = Math.min(fr ? fr[3] : m.H * CELL, wy1 + 40);
-      rf = raisedFrame(st.rend, rm, st.cam, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1);
+      rf = raisedFrame(st.rend, rm, eye, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1);
     }
     // wall tops from the small copy of the map when the screen shows less than it holds (far out)
     const pk = pass === 'fog' ? fog.width / VW * z : z, pic = st.rend.picFor(pk);
     if (pass === 'fog' || !view) { drawRaised(c, st.rend, rf, [0, 1], pic); pfa('raise', t0); return; }
     // walls in colour exactly where your team's sight reaches (raised with them), like the floor: no cell-by-cell snapping
-    c.save(); c.clip(sightClip(vpolys, vviews, st.cam, RH)); drawRaised(c, st.rend, rf, [0], pic); c.restore();
-    c.save(); c.clip(sightClip(vpolys, vviews, st.cam, RH, rm)); drawRaised(c, st.rend, rf, [1], pic); c.restore(); // cars, crates, shelves: only the part in sight
+    c.save(); c.clip(sightClip(vpolys, vviews, eye, RH)); drawRaised(c, st.rend, rf, [0], pic); c.restore();
+    c.save(); c.clip(sightClip(vpolys, vviews, eye, RH, rm)); drawRaised(c, st.rend, rf, [1], pic); c.restore(); // cars, crates, shelves: only the part in sight
     pfa('raise', t0);
   } : null;
   showFog(!!(view && inGame));
@@ -2818,6 +2841,7 @@ function draw(s, view, now, dt) {
     const p = st.pred, lp = st.tiltLast || p, k = dt > 0 ? 1 / dt : 0, vx = p && lp ? (p.x - lp.x) * k : 0, vy = p && lp ? (p.y - lp.y) * k : 0;
     st.tiltLast = p ? { x: p.x, y: p.y } : null;
     const jump = Math.hypot(vx, vy) > 600; // a floor change or respawn: no lean
+    tilt.extra = ROPE_TILT * (st.rt || 0);
     tilt.update(dt, jump ? 0 : (vx * cr - vy * sr) * z, jump ? 0 : (vx * sr + vy * cr) * z, shake, innerWidth, innerHeight);
     const de = document.documentElement; de.classList.toggle('tilt3d', tilt.on === true); de.classList.toggle('edgeblur', fxOn('blur') && gq.blur === true);
   }
