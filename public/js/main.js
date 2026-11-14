@@ -8,7 +8,7 @@ import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DR
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, raisedFrame, drawRaised, sightClip, looks, setPersp, liftOf, persp } from './look.js';
+import { tilt, raisedFrame, drawRaised, sightClip, looks, setPersp, liftOf, persp, lifted } from './look.js';
 import { S, setMapScale } from './textures.js';
 import { drawZombie, drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
@@ -2566,6 +2566,16 @@ function drawScanBlips(now) { // WRAITH: heartbeats, fuzzy
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
   }
 }
+// Gadgets, drones, cameras and the like stand at their own heights (he asked 2026-11-14: everything 2D but looking 3D
+// as the camera tilts, by the walls' rule): wall-mounted things up the wall, traps flat on the floor. A soft shadow
+// stays on the floor under anything off it.
+const GZ = { cam: 0.72, sticky: 0.4, breach: 0.4, cluster: 0.4, cutter: 0.45, grid: 0.4, scope: 0.5, dart: 0.42, saw: 0.3, cover: 0.26, dshield: 0.3, station: 0.12, radar: 0.1, catcher: 0.14, jammer: 0.06,
+  plates: 0.06, pace: 0.08, echobox: 0.06, sensor: 0.05, spike: 0.04, mine: 0.01, prox: 0.015, concuss: 0.015, clamp: 0.012, alarm: 0.02, wire: 0.1, healzone: 0, defuser: 0.03, nade: 0.05, drill: 0.01, htrap: 0.01, dropch: 0.02, rig: 0.01 };
+function gadgetZ(e) { if (e.ty === 'cam' && (e.tu || e.oc !== undefined)) return e.tu ? 0.16 : 0.9; return GZ[e.ty] ?? 0.05; }
+function liftDraw(x, y, z, fn) {
+  if (persp.h && z > 0.08) { const r = 4 + z * 5; ctx.fillStyle = `rgba(0,0,0,${Math.min(0.3, 0.12 + z * 0.2)})`; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.8, 0, 0, 7); ctx.fill(); }
+  lifted(ctx, x, y, z, fn);
+}
 function draw(s, view, now, dt) {
   const z = st.zoom, m = st.map; let tq = performance.now();
   let RH = 0.045 * Math.max(0, Math.min(1, (RAISE_NONE - (st.viewH || 0)) / (RAISE_NONE - RAISE_FULL)));
@@ -2604,7 +2614,7 @@ function draw(s, view, now, dt) {
   if (inGame) {
     const site = m.sites[s.site];
     if (s.zb) drawZbWorld(ctx, s, now);
-    if (!s.ar && !s.zb && (side === 'def' || s.rev || !me)) for (const b of site.bombs) if (!s.pl || s.pl.b !== b.id) drawBomb(ctx, b, now);
+    if (!s.ar && !s.zb && (side === 'def' || s.rev || !me)) for (const b of site.bombs) if (!s.pl || s.pl.b !== b.id) liftDraw(b.x, b.y, 0.1, () => drawBomb(ctx, b, now));
     if (s.pl) {
       ctx.save(); ctx.translate(s.pl.x, s.pl.y);
       const pulse = (now * 2) % 1;
@@ -2658,9 +2668,9 @@ function draw(s, view, now, dt) {
     if (e.ty === 'drone' || e.ty === 'cam' || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud' || e.ty === 'bird' || e.ty === 'swarm') continue;
     if (TRAPS.has(e.ty) && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < TRAP_SEEN)) continue; // hidden traps: one rule for all (he asked), seen only within 2 m
     if (!ally && !seen(e.x, e.y)) continue;
-    drawGadget(ctx, e, now, ally);
+    liftDraw(e.x, e.y, gadgetZ(e), () => drawGadget(ctx, e, now, ally));
   }
-  for (const e of ents) if (e.ty === 'cam' && (e.tm === side || seen(e.x, e.y))) drawCam(ctx, e, now, e.tm === side);
+  for (const e of ents) if (e.ty === 'cam' && (e.tm === side || seen(e.x, e.y))) liftDraw(e.x, e.y, gadgetZ(e), () => drawCam(ctx, e, now, e.tm === side));
   for (const e of ents) { // an outside camera also shows on the wall above the ground under it (he asked: it can be shot from down there)
     const oc = e.ty === 'cam' && e.oc !== undefined && st.map.outCams && st.map.outCams[e.oc];
     if (!oc || !(e.tm === side || seen(oc.gx, oc.gy))) continue;
@@ -2769,7 +2779,7 @@ function draw(s, view, now, dt) {
     const hid = droneHidden(x, y), mineD = own || (view && view.cam && view.cam.id === e.id);
     if (hid && !mineD) continue;
     if (hid) ctx.globalAlpha = 0.35;
-    if (e.tm === side || seen(x, y)) drawDrone(ctx, { ...e, x, y, ag: a.heading, wheel: a.wheel, spd: a.spd, mvAng: a.mvAng ?? a.heading, sway: a.sway }, now, e.tm === side);
+    if (e.tm === side || seen(x, y)) liftDraw(x, y, 0.035, () => drawDrone(ctx, { ...e, x, y, ag: a.heading, wheel: a.wheel, spd: a.spd, mvAng: a.mvAng ?? a.heading, sway: a.sway }, now, e.tm === side));
     ctx.globalAlpha = 1;
   }
   for (const e of ents) if (e.ty === 'swarm' && (e.tm === side || seen(e.x, e.y))) { // MAGPIE's swarm
@@ -2781,7 +2791,7 @@ function draw(s, view, now, dt) {
     const x = own ? st.pred.x : e.x, y = own ? st.pred.y : e.y, a = anim(e.id);
     const sp = Math.hypot(x - (a.bx ?? x), y - (a.by ?? y)) / Math.max(dt, 0.001); a.bx = x; a.by = y;
     a.fl = (a.fl ?? 0.4) + (Math.min(1, 0.3 + sp / 150) - (a.fl ?? 0.4)) * Math.min(1, dt * 6);
-    if (e.tm === side || seen(x, y)) drawBird(ctx, { ...e, x, y, ag: own ? st.aim : e.ag, fl: a.fl }, now, e.tm === side);
+    if (e.tm === side || seen(x, y)) liftDraw(x, y, e.pe ? 0.62 : 0.4, () => drawBird(ctx, { ...e, x, y, ag: own ? st.aim : e.ag, fl: a.fl }, now, e.tm === side));
   }
   audio.pruneLoops(); audio.defuserAlarm(!!(s.pl && s.ph === PHASE.ACTION), s.pl && s.pl.x, s.pl && s.pl.y); tq = pfa('actors', tq);
   fx.draw(ctx);

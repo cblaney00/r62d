@@ -3,7 +3,7 @@
 // camera (parallax), and a camera tilt — a slight fixed angle plus a lean with your movement and a kick on shots/blasts.
 // Everything here is cheap for the graphics card: the light is drawn once with the map, the walls are plain canvas
 // fills and copies of the map picture, and the tilt is one CSS transform the browser applies to the world layers.
-import { CELL, T, MAT } from '/shared/constants.js';
+import { CELL, T, MAT, FL } from '/shared/constants.js';
 
 export const looks = { light: true }; // switched by Settings → Screen → Room lighting (main.js)
 
@@ -74,12 +74,13 @@ export function applyLight(ctx, lm, x0, y0, x1, y1) {
 // Walls (and tall furniture) stand up off the floor: seen from a camera above the middle of the screen, a wall's top
 // sits a little further out from the middle than its foot (by h of the distance), and the side facing the camera
 // shows in between. Drawn above the blackout (so walls never vanish into it) and dimmed where your team can't see them.
-const HGT = { [T.HARD]: 1, [T.SOFT]: 1, [T.REINF]: 1, [T.PANEL]: 1, [T.TALL]: 0.7, [T.DSHIELD]: 0.45 };
-const SIDE = { [T.HARD]: [107, 112, 118], [T.SOFT]: [178, 170, 155], [T.REINF]: [76, 84, 93], [T.PANEL]: [53, 59, 66], [T.TALL]: [70, 60, 50], [T.DSHIELD]: [40, 45, 52] };
+const HGT = { [T.HARD]: 1, [T.SOFT]: 1, [T.REINF]: 1, [T.PANEL]: 1, [T.TALL]: 0.7, [T.DSHIELD]: 0.45, [T.LOW]: 0.28 };
+const SIDE = { [T.HARD]: [107, 112, 118], [T.SOFT]: [178, 170, 155], [T.REINF]: [76, 84, 93], [T.PANEL]: [53, 59, 66], [T.TALL]: [70, 60, 50], [T.DSHIELD]: [40, 45, 52], [T.LOW]: [84, 70, 56] };
 const BRICK = [125, 68, 52];
 // furniture and things outdoors only stand up when they are boxy: a round tree, rock or bush raised as its square cells
 // showed a square slab of grass round it (he saw it as strange shapes)
-const BOXY = new Set(['crates', 'wall', 'car', 'dumpster', 'rack', 'shelf', 'container', 'cabinet', 'bookshelf', 'pillar', 'van', 'locker', 'train', 'fridge', 'truck', 'booth', 'schoolbus', 'bus', 'gatehouse', 'lifthut', 'signalbox', 'tankcar', 'counter', 'forklift', 'snowcat', 'stall', 'cart']);
+const BOXY = new Set(['crates', 'wall', 'car', 'dumpster', 'rack', 'shelf', 'container', 'cabinet', 'bookshelf', 'pillar', 'van', 'locker', 'train', 'fridge', 'truck', 'booth', 'schoolbus', 'bus', 'gatehouse', 'lifthut', 'signalbox', 'tankcar', 'counter', 'forklift', 'snowcat', 'stall', 'cart',
+  'desk', 'workbench', 'bench', 'couch', 'coffeetable', 'meetingtable', 'reception', 'island', 'console', 'bed', 'railing', 'barrier', 'marketstall', 'sink', 'tv', 'chairs']);
 const RISE = new WeakMap(); // map → per cell: 1 where a tall cell belongs to a boxy thing
 export function riseOf(m) {
   let r = RISE.get(m); if (r) return r;
@@ -87,7 +88,7 @@ export function riseOf(m) {
   for (const p of m.props || []) if (BOXY.has(p.kind)) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) r[y * m.W + x] = 1;
   return r;
 }
-const height = (m, k, rise) => { const t = m.tiles[k]; return t === T.TALL ? (rise[k] ? HGT[t] : 0) : HGT[t] || 0; };
+const height = (m, k, rise) => { const t = m.tiles[k]; return t === T.TALL || t === T.LOW ? (rise[k] && m.floor[k] !== FL.VOID ? HGT[t] : 0) : HGT[t] || 0; }; // (a rope ledge is a LOW cell over open air: never raised)
 // faces: [dx, dy, light] — light from the top left, so faces turned that way are brighter
 const FACES = [[0, 1, 0.5], [0, -1, 0.78], [1, 0, 0.6], [-1, 0, 0.72]];
 // The wall pieces are worked out once per block of cells (CH × CH) and kept (he asked: zoomed out it lagged, more of it
@@ -114,7 +115,7 @@ function block(R, m, bx, by) {
   for (let y = y0; y <= y1; y++) {
     let run = null;
     for (let x = x0; x <= x1 + 1; x++) {
-      const k = y * W + x, f = x <= x1 ? hg(k) : 0, on = f > 0, g = on && m.tiles[k] === T.TALL ? 1 : 0;
+      const k = y * W + x, f = x <= x1 ? hg(k) : 0, on = f > 0, g = on && (m.tiles[k] === T.TALL || m.tiles[k] === T.LOW) ? 1 : 0;
       const sh = on && m.shape && m.shape[k], tc = on && !g ? topColour(m, k) : '';
       if (run && (!on || f !== run.f || g !== run.g || sh || tc !== run.tc)) { out[run.g].tops.push(run); run = null; }
       if (!on) continue;
@@ -143,6 +144,29 @@ function block(R, m, bx, by) {
         else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, x, y, c: col(lt) });
       }
       if (!run) run = { x, y, n: 0, f, g, tc }; run.n++;
+    }
+  }
+  // windows and doorways (he asked: see a window from another angle as you climb past it): a sill and the wall above
+  // a window, the wall above a door, and the boards across a barricaded one, each a piece from f0 up to f
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const k = y * W + x; if (hg(k) > 0 || !m.openId) continue;
+    const oi = m.openId[k], win = !!(m.win && m.win[k]), op = oi >= 0 && m.openings && m.openings[oi], door = !win && op && op.kind === 'door';
+    if (!win && !door) continue;
+    let wk = -1; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = k + dy * W + dx; if (hg(n) >= 1) { wk = n; break; } }
+    const wb = wk >= 0 ? (m.tiles[wk] === T.SOFT && m.mat && m.mat[wk] === MAT.BRICK ? BRICK : SIDE[m.tiles[wk]] || SIDE[T.HARD]) : SIDE[T.SOFT], wtc = wk >= 0 ? topColour(m, wk) : '#d8d2c4';
+    const pieces = win ? [[0, 0.28, [196, 190, 176], '#d8d2c4'], [0.69, 1, wb, wtc]] : [[0.72, 1, wb, wtc]];
+    if (m.tiles[k] === T.BARRI) pieces.push(win ? [0.28, 0.69, [122, 92, 58], '#8b6a42'] : [0.06, 0.72, [122, 92, 58], '#8b6a42']);
+    const X = x * CELL, Y = y * CELL, faces = out[0].faces;
+    for (const [f0, f, base, tc] of pieces) {
+      const col = lt => `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`;
+      for (const [dx, dy, lt] of FACES) {
+        const n = k + dy * W + dx, nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f || (m.openId[n] === oi && oi >= 0)) continue; // against the wall, or more of the same opening
+        const ex = dx > 0 ? X + CELL : X, ey = dy > 0 ? Y + CELL : Y;
+        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0, x, y, c: col(lt) });
+        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, f0, x, y, c: col(lt) });
+      }
+      out[0].tops.push({ x, y, n: 1, f, g: 0, tc });
     }
   }
   return out;
@@ -174,7 +198,7 @@ export function raisedFrame(R, m, cam, h, x0, y0, x1, y1) {
         if (!whole && (F.x < x0 || F.x > x1 || F.y < y0 || F.y > y1)) continue;
         let p = G.paths.get(F.c); if (!p) G.paths.set(F.c, p = new Path2D());
         const [ux, uy] = up(F.ax, F.ay, F.f), [vx, vy] = up(F.bx, F.by, F.f);
-        p.moveTo(F.ax, F.ay); p.lineTo(F.bx, F.by); p.lineTo(vx, vy); p.lineTo(ux, uy); p.closePath();
+        if (F.f0) { const [a1, b1] = up(F.ax, F.ay, F.f0), [a2, b2] = up(F.bx, F.by, F.f0); p.moveTo(a1, b1); p.lineTo(a2, b2); } else { p.moveTo(F.ax, F.ay); p.lineTo(F.bx, F.by); } p.lineTo(vx, vy); p.lineTo(ux, uy); p.closePath(); // (a piece off the floor, like a window's lintel, starts at f0)
       }
       for (const r of B[g].tops) {
         if (!whole && (r.y < y0 || r.y > y1 || r.x + r.n - 1 < x0 || r.x > x1)) continue;
