@@ -5,7 +5,7 @@
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, PLAYER_R, T, FL, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
-import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked } from '../shared/physics.js';
+import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked, leanPoint, LEAN_PX } from '../shared/physics.js';
 import { ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
@@ -934,7 +934,7 @@ export function botThink(game, p, dt) {
     ai.strafeT = (ai.strafeT || 0) - dt;
     if (ai.strafeT <= 0) { ai.strafeT = 0.6 + Math.random(); ai.strafe = Math.random() < peekSkill(game, p) ? (Math.random() < 0.5 ? -1 : 1) : 0; }
     { const lu = linedUp(game, p, enemy); if (lu) { ai.strafe = lu; ai.strafeT = 0.5; } } // a teammate on the same line from the enemy: step off it // he asked: strafe-peeking in a fight is a hard skill, used now and then by a few, not by everyone all the time
-    if (ai.leanE !== enemy.id) { ai.leanE = enemy.id; ai.leanF = Math.random() < know(game, p).lean ? leanSide(game, p, want) : 0; if (ai.leanF) feat(p, 'lean'); }
+    if (ai.leanE !== enemy.id) { ai.leanE = enemy.id; ai.leanF = Math.random() < know(game, p).lean ? leanSide(game, p, want, enemy) : 0; if (ai.leanF) feat(p, 'lean'); }
     if (ai.leanF && !ai.strafe) inp.lean = ai.leanF; // leaning out from the corner to take the fight
     if (ai.strafe) { const sa = p.aim + Math.PI / 2 * ai.strafe; setDir(inp, Math.cos(sa), Math.sin(sa)); inp.walk = 1; }
     if ((p.pro || lvlOf(game, p) >= 4) && p.hp < p.maxHp * 0.4 && enemy.hp > p.hp && !game.planted) { const ba = Math.atan2(p.y - enemy.y, p.x - enemy.x); setDir(inp, Math.cos(ba), Math.sin(ba)); inp.walk = 1; } // Platinum up: losing the fight, back out of it while shooting
@@ -1630,7 +1630,7 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
       if (linedUp(game, p, ai.watch) && game.time > (ai.lineT || 0)) { ai.lineT = game.time + 3; if (ai.hold === goal) ai.hold = null; if (ai.spread) ai.spread = null; } // in a teammate's line: another spot
       inp.crouch = team === TEAM.DEF || persona(p).patience > 0.5 ? 1 : 0;
       // map knowledge: holding the angle leaning out from the cover beside it, or (a defender) lying down at it
-      if (ai.poseFor !== ai.watch) { const K = know(game, p); ai.poseFor = ai.watch; ai.leanS = Math.random() < K.lean ? leanSide(game, p, Math.atan2(ai.watch.y - p.y, ai.watch.x - p.x)) : 0; ai.proneH = team === TEAM.DEF && !ai.leanS && Math.random() < K.prone; if (ai.leanS) feat(p, 'lean'); if (ai.proneH) feat(p, 'prone'); }
+      if (ai.poseFor !== ai.watch) { const K = know(game, p); ai.poseFor = ai.watch; ai.leanS = Math.random() < K.lean ? leanSide(game, p, Math.atan2(ai.watch.y - p.y, ai.watch.x - p.x), ai.watch) : 0; ai.proneH = team === TEAM.DEF && !ai.leanS && Math.random() < K.prone; if (ai.leanS) feat(p, 'lean'); if (ai.proneH) feat(p, 'prone'); }
       if (at === ai.watch && ai.leanS) inp.lean = ai.leanS;
       if (ai.proneH) { inp.prone = 1; inp.crouch = 0; }
     }
@@ -1863,9 +1863,17 @@ function glareOn(game, p) {
   return null;
 }
 // leaning out from cover toward a point: the side with a wall right beside the line (lean past it), else none
-function leanSide(game, p, a) {
-  const r = castSight(game.map, p.x, p.y, a + 0.7, 40, null), l = castSight(game.map, p.x, p.y, a - 0.7, 40, null);
-  return Math.min(r, l) > 30 ? 0 : r < l ? 1 : -1;
+// which way to lean (1 right, -1 left, 0 not at all) looking along a, toward tgt if given: AWAY from the cover close
+// in front on one side, so the body stays behind it and only the head and gun come out past its edge. (It used to
+// lean toward the nearer wall: he saw pros lean into walls, their bullets hitting them, more of the body showing.)
+// Only when the leaning head really sees (and so shoots) past it to the target, or down the way it looks.
+export function leanSide(game, p, a, tgt) {
+  const m = game.map, r = castSight(m, p.x, p.y, a + 0.7, 40, null), l = castSight(m, p.x, p.y, a - 0.7, 40, null);
+  if (Math.min(r, l) > 30) return 0; // no cover close by: nothing to lean past
+  const s = r < l ? -1 : 1, lp = leanPoint(m, p.x, p.y, a, s * LEAN_PX);
+  if (Math.hypot(lp.x - p.x, lp.y - p.y) < LEAN_PX * 0.6) return 0; // no room to lean that way
+  const ta = tgt ? Math.atan2(tgt.y - lp.y, tgt.x - lp.x) : a, td = tgt ? Math.hypot(tgt.x - lp.x, tgt.y - lp.y) : 160;
+  return castSight(m, lp.x, lp.y, ta, td + 2, null) >= td - 4 ? s : 0;
 }
 // a way into the site for an attacker (not the pros, who have their plan): the obvious one from where it is, or
 // (KNOW.clever) another; better ranks weigh how exposed each is to the upper windows and spread out from teammates
@@ -2518,7 +2526,7 @@ function proAct(game, p, inp, dt, team) {
     pt = angleOn(game, p, pt); if (pt) turnTo(p, Math.atan2(pt.y - p.y, pt.x - p.x), S.turn * 0.6, dt); inp.crouch = crouch ? 1 : 0; // he asked: crosshair placement matters most — held still on the spot, no drifting
     // map knowledge: each new spot held leaning out from the cover beside it, or (defence) lying down at a deep angle
     const K = know(game, p), at = Math.round(p.x / 24) + ',' + Math.round(p.y / 24);
-    if (ai.poseAt !== at) { ai.poseAt = at; ai.leanS = Math.random() < K.lean ? leanSide(game, p, p.aim) : 0; ai.proneH = side === 'def' && crouch && !ai.leanS && Math.random() < K.prone * 1.5; if (ai.leanS) feat(p, 'lean'); if (ai.proneH) feat(p, 'prone'); }
+    if (ai.poseAt !== at) { ai.poseAt = at; ai.leanS = Math.random() < K.lean ? leanSide(game, p, pt ? Math.atan2(pt.y - p.y, pt.x - p.x) : p.aim, pt) : 0; ai.proneH = side === 'def' && crouch && !ai.leanS && Math.random() < K.prone * 1.5; if (ai.leanS) feat(p, 'lean'); if (ai.proneH) feat(p, 'prone'); }
     if (ai.leanS) inp.lean = ai.leanS;
     if (ai.proneH) { inp.prone = 1; inp.crouch = 0; }
   };
