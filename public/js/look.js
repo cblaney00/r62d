@@ -54,17 +54,39 @@ export function lightMap(map) {
     for (const n of [k - 1, k + 1, k - W, k + W]) if (n >= 0 && n < N && room[n] >= 0 && passes(n)) spread(n % W + 0.5, Math.floor(n / W) + 0.5, 6, 0.38, L);
     void x; void y;
   }
+  // how lit each cell is, and which way the light comes from (he asked 2026-11-14: shading for depth that follows the
+  // lamps and the sun through the windows, not full shadows). Walls aren't in a room, so they borrow the cell's own value.
+  const lv = new Float32Array(N); for (let k = 0; k < N; k++) lv[k] = room[k] >= 0 ? Math.min(1.2, L[k] + lamp[k]) : -1;
+  const lvAt = (n, k) => n >= 0 && n < N && lv[n] >= 0 ? lv[n] : lv[k];
+  const grad = k => [lvAt(k + 1, k) - lvAt(k - 1, k), lvAt(k + W, k) - lvAt(k - W, k)];
+  const raised = n => { const t = tile(n); return SOLID.has(t) || t === T.TALL || t === T.LOW || t === T.DSHIELD; };
+  // a soft contact shadow on the floor beside anything standing, on the side away from the light (the light comes from
+  // the brighter side, so the thing between the light and the floor shades it); stretched smooth over the floor
+  const shadow = new Float32Array(N);
+  for (let k = 0; k < N; k++) {
+    if (room[k] < 0 || !passes(k)) continue;
+    const [gx, gy] = grad(k);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = k + dy * W + dx; if (n < 0 || n >= N || !raised(n)) continue; const d = dx * gx + dy * gy; if (d > 0.015) shadow[k] = Math.max(shadow[k], Math.min(0.13, d * 0.9)); }
+  }
   const dark = document.createElement('canvas'), warm = document.createElement('canvas');
   dark.width = warm.width = W; dark.height = warm.height = H;
   const dc = dark.getContext('2d'), wc = warm.getContext('2d'), di = dc.createImageData(W, H), wi = wc.createImageData(W, H);
   for (let k = 0; k < N; k++) {
     if (room[k] < 0 || tile(k) === T.VOID) continue;
     const l = Math.min(1.2, L[k] + lamp[k]), j = k * 4;
-    di.data[j] = 18; di.data[j + 1] = 18; di.data[j + 2] = 24; di.data[j + 3] = Math.max(0, Math.min(1, 1 - l)) * 0.5 * 255;
+    di.data[j] = 18; di.data[j + 1] = 18; di.data[j + 2] = 24; di.data[j + 3] = Math.min(1, Math.max(0, Math.min(1, 1 - l)) * 0.5 + shadow[k]) * 255;
     wi.data[j] = 255; wi.data[j + 1] = 188; wi.data[j + 2] = 112; wi.data[j + 3] = Math.max(0, Math.min(1, lamp[k] - 0.2)) * 0.22 * 255;
   }
   dc.putImageData(di, 0, 0); wc.putImageData(wi, 0, 0);
-  return { dark, warm };
+  return { dark, warm, lv, grad };
+}
+// a raised face's light (inside rooms): a little brighter turned toward the light it gets, a little darker turned away,
+// and a touch darker in a dim corner; in steps of 0.04, so the faces share a few colours (each colour is one fill)
+function faceLight(lm, n, dx, dy) {
+  if (!lm || !lm.lv || n < 0 || n >= lm.lv.length || lm.lv[n] < 0) return 1;
+  const [gx, gy] = lm.grad(n), len = Math.hypot(dx, dy) || 1, d = (dx * gx + dy * gy) / len;
+  const f = (1 + Math.max(-0.12, Math.min(0.08, d * 1.6))) * (0.9 + 0.09 * Math.min(1.2, lm.lv[n]));
+  return Math.round(f * 25) / 25;
 }
 // over a part of the picture (cells x0..x1, y0..y1) that was just drawn; ctx draws in world units, clipped to the part
 export function applyLight(ctx, lm, x0, y0, x1, y1) {
@@ -147,8 +169,9 @@ function block(R, m, bx, by) {
         if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f && !(m.shape && m.shape[n])) continue;
         const ex = dx > 0 ? X + CELL : X, ey = dy > 0 ? Y + CELL : Y; // seen when the camera is on its side of it
         const d = g ? 0 : base === BRICK ? 'b' : t === T.HARD && !(m.mat && m.mat[k] === MAT.DRYWALL) ? 'c' : 'p', e = isOut(m, n);
-        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, x, y, c: col(lt), d, e });
-        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, x, y, c: col(lt), d, e });
+        const L2 = Math.min(1, lt * (e ? 1 : faceLight(R.lm, n, dx, dy))); // (inside: shaded by the room's light)
+        if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, x, y, c: col(L2), d, e });
+        else faces.push({ ax: X, ay: ey, bx: X + CELL, by: ey, nx: 0, ny: dy, px: X, py: ey, f, x, y, c: col(L2), d, e });
       }
       if (!run) run = { x, y, n: 0, f, g, tc }; run.n++;
     }

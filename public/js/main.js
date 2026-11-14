@@ -1507,7 +1507,7 @@ function ptsPopups(c, x, y, now) {
 // ---- the 3D rope view (rope3d.js) ----
 // On for an attacker hanging on (or climbing) a rope; leaving it glides the camera back up to the top-down view over
 // R3_OUT s (inside the climb-in), so you can shoot as soon as you're through.
-const ROPE_ZOOM = 0.38, ROPE_ZOOM_NAV = 0.12, ROPE_SIDE = 0.12; // ROPE_ZOOM peeking into a window, ROPE_ZOOM_NAV the rest of the time; // how much closer the rope camera comes in, how far it sits to your right (view heights)
+const ROPE_ZOOM = 0.38, ROPE_ZOOM_NAV = 0.12, ROPE_SIDE = 0.12, ROPE_ADS = 0.1; // ROPE_ADS: how much tighter aiming in on a rope comes in; // ROPE_ZOOM peeking into a window, ROPE_ZOOM_NAV the rest of the time; // how much closer the rope camera comes in, how far it sits to your right (view heights)
 const ROPE_TILT = 34, ROPE_TILT_WIN = 22, ROPE_RAISE = 0.1, ROPE_EYE = 1.6; // ROPE_EYE: how far behind you the rope camera's eye sits, in view heights (with ROPE_RAISE, a low over-the-shoulder angle: people on the wall stand up) // the rope camera's extra tilt (degrees) and how tall walls stand
 const R3_OUT = 0.45, FH3 = 3.2 * PX_PER_M;
 // which way the wall is for someone hanging at (p.x, p.y): the rope stretch they are on, facing it
@@ -2048,7 +2048,7 @@ function frame(nowMs) {
   let cx, cy;
   if (view) {
     cx = view.x; cy = view.y;
-    if (st.rt > 0 && view.kind === 'body' && st.rtFace != null) { const vh = (st.viewH || 400) * st.rt, k = vh * (0.3 + 0.14 * (st.rpk || 0)), sd = vh * ROPE_SIDE; cx += Math.cos(st.rtFace) * k - Math.sin(st.rtFace) * sd; cy += Math.sin(st.rtFace) * k + Math.cos(st.rtFace) * sd; } // (over your right shoulder: you low and a little left) // (the rope camera: you low on the screen, the rooms ahead)
+    if (st.rt > 0 && view.kind === 'body' && st.rtFace != null) { const vh = (st.viewH || 400) * st.rt, k = vh * (0.3 + 0.14 * (st.rpk || 0) + 0.06 * (st.rads || 0)), sd = vh * ROPE_SIDE * (1 - 0.3 * (st.rads || 0)); cx += Math.cos(st.rtFace) * k - Math.sin(st.rtFace) * sd; cy += Math.sin(st.rtFace) * k + Math.cos(st.rtFace) * sd; } // (over your right shoulder: you low and a little left) // (the rope camera: you low on the screen, the rooms ahead)
     if (view.kind === 'body') {
       // he said the view was "super bouncy" when looking round: the lead used the crosshair's place on SCREEN, which itself
       // moves with the camera (a feedback loop). Crosshair mode now leads from the aim point in the world.
@@ -2136,7 +2136,7 @@ function frame(nowMs) {
   st.envH = st.envH || st.envWant;
   st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * (view && view.kind === 'body' ? 3 : 6))); // a gentle glide, not a pump
   // aiming down sights widens the view, fast (he asked: it used to zoom in, the opposite of what you want); a 2x scope widest
-  const adsZ = view && view.kind === 'body' && me && me.ad ? (sniperOn(me) ? 1.5 : scopeOn(me) ? 1.3 : 1.12) : 1;
+  const adsZ = view && view.kind === 'body' && me && me.ad && !((st.rt || 0) > 0.5) ? (sniperOn(me) ? 1.5 : scopeOn(me) ? 1.3 : 1.12) : 1;
   st.adsZ = st.adsZ || 1;
   st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18));
   st.viewH = (locked ? st.camLock.h : st.envH) * st.adsZ;
@@ -2150,6 +2150,10 @@ function frame(nowMs) {
     st.rpk = (st.rpk || 0) + (pk - (st.rpk || 0)) * (1 - Math.exp(-dt * 3));
     st.ropeBaseH = st.ropeBaseH ? st.ropeBaseH + (st.viewH - st.ropeBaseH) * (1 - Math.exp(-dt * 2)) : st.viewH;
   }
+  // aiming in on a rope (he asked 2026-11-14): never zooms out; the camera comes in tighter on your shoulder, as if you
+  // leaned your head into the window, and the crosshair stays on screen instead of pulling the view back
+  st.rads = (st.rads || 0) + ((me && me.ad && (st.rt || 0) > 0.5 ? 1 : 0) - (st.rads || 0)) * (1 - Math.exp(-dt * 6));
+  if (st.rt > 0) st.viewH *= 1 - ROPE_ADS * st.rads * st.rt;
   if (st.rt > 0) st.viewH *= 1 - (ROPE_ZOOM_NAV + (ROPE_ZOOM - ROPE_ZOOM_NAV) * st.rpk) * st.rt; // (the rope camera comes in close over your shoulder: he asked for a lot closer; before the fit below, so you and your crosshair still both show)
   const freeAim = !st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && freeAimOn() && !gpRecent();
   if (freeAim) {
@@ -2160,10 +2164,12 @@ function frame(nowMs) {
     // out quickly; back in only once the smaller size has held for 0.5 s, and gently (he asked: on roofs the view pumped
     // in and out as the crosshair passed the edge, which threw the crosshair about on screen)
     st.fitDown = need < (st.fitH || need) * 0.97 ? (st.fitDown || 0) + dt : 0;
+    if ((st.rads || 0) > 0.05 && st.fitH) {} else // (aimed in on a rope: the size you had stays; aiming in never pulls the view back)
     st.fitH = !st.fitH ? need : need > st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : st.fitDown > 0.5 ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 1.5)) : st.fitH;
-    if (!locked) st.viewH = Math.max(st.viewH, st.fitH);
+    if (!locked) st.viewH = Math.max(st.viewH, st.fitH * (1 - ROPE_ADS * (st.rads || 0)));
   } else st.fitH = 0;
   st.viewH *= viewMul(); // Settings: how much of the map you see (phones start further out)
+  if (freeAim && (st.rads || 0) > 0.05) { const L = st.viewH * (1.6 - 0.75 * st.rads), l = Math.hypot(aimOff.x, aimOff.y); if (l > L) aimOff = { x: aimOff.x * L / l, y: aimOff.y * L / l }; } // (aimed in on a rope: the crosshair stays in the tight view)
   st.zoom = VH / st.viewH;
   if (freeAim && !locked) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
