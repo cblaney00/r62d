@@ -3368,7 +3368,11 @@ function crosshair(me, now) {
   // the gap is the true cone the next shot can land in, measured at the crosshair: shut when the next shot is exact
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
   const cone = w ? spreadCone(w, gm, { at: me.at || 0, run, crouch: !!me.cr, shots: gunHeat(me, w, now) }) : 0;
-  const spread = xh.dynamic ? Math.tan(cone) * Math.hypot(m.x - px, m.y - py) / DPR : 0;
+  // the gap glides (he asked 2026-11-14: much less aim jitter): the server's numbers come 20 times a second and your speed
+  // is worked out each frame, so it used to step and flicker; it opens at once for a shot and settles smoothly otherwise
+  const want = xh.dynamic ? Math.tan(cone) * Math.hypot(m.x - px, m.y - py) / DPR : 0, gdt = Math.min(0.1, now - (st.gapT || now)); st.gapT = now;
+  st.gapShow = st.gapShow === undefined || want > st.gapShow + 1.5 ? want : st.gapShow + (want - st.gapShow) * (1 - Math.exp(-gdt / 0.07));
+  const spread = st.gapShow;
   // aiming in: each enemy you can see shows the zone your crosshair must be on for a headshot; it lights red when it is
   if (me.pp) { // winding up a throw / setting something down (he asked): a ring filling round you, and what it is
     const [kd, left, dur] = me.pp, f = Math.max(0, Math.min(1, 1 - (left - (now - (st.mineAt || now))) / dur));

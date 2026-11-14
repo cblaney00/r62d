@@ -817,6 +817,12 @@ function roamSpot(game, p) {
   return game.freeSpotNear((r.x + r.w / 2) * CELL, (r.y + r.h / 2) * CELL, Math.min(r.w, r.h) * CELL * 0.3);
 }
 
+// the hand is never perfectly steady (he asked 2026-11-14: much less aim jitter): a slow drift that changes direction a few
+// times a second, not a new random twitch every tick (that made bots' guns shake); about the same wander over a second
+function handDrift(ai, S, dt) {
+  if ((ai.hdT = (ai.hdT ?? 0) - dt) <= 0) { ai.hdT = 0.25 + Math.random() * 0.2; ai.hdV = (Math.random() - 0.5) * 0.18 * (S.shake ?? 1); }
+  return ai.hdV * dt;
+}
 export function botThink(game, p, dt) {
   flushReplies(game);
   amateurComms(game, p, dt);
@@ -897,7 +903,7 @@ export function botThink(game, p, dt) {
       if (game.tut) { ai.react -= 0.7; ai.err *= 1.8; } // tutorial bots are slow and shaky, so a beginner can win
     }
     ai.react += dt; ai.err *= Math.exp(-dt * S.settle);
-    ai.err += (Math.random() - 0.5) * dt * 0.6 * (S.shake ?? 1); // hands are never perfectly steady
+    ai.err += handDrift(ai, S, dt); // hands are never perfectly steady
     const os = (ai.os || 0) / Math.max(1, d), want = Math.atan2(enemy.y + (enemy.x - p.x) * os - p.y, enemy.x - (enemy.y - p.y) * os - p.x) + ai.err; // somewhere across the body, not always the head
     turnTo(p, want, S.turn, dt);
     p.aimX = p.x + Math.cos(p.aim) * d; p.aimY = p.y + Math.sin(p.aim) * d; // their crosshair sits on what they aim at (it used to stay where the last throw went, so bots could almost never headshot)
@@ -2632,7 +2638,7 @@ export function arenaThink(game, p, dt) {
   if (enemy) {
     const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
     if (ai.seen !== enemy.id) { ai.seen = enemy.id; ai.seenT = game.time; ai.react = -S.react - Math.random() * S.reactX; ai.err = (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.4) * S.err; }
-    ai.react += dt; ai.err *= Math.exp(-dt * S.settle); ai.err += (Math.random() - 0.5) * dt * 0.6 * (S.shake ?? 1);
+    ai.react += dt; ai.err *= Math.exp(-dt * S.settle); ai.err += handDrift(ai, S, dt);
     const want = Math.atan2(enemy.y - p.y, enemy.x - p.x) + ai.err;
     turnTo(p, want, S.turn, dt);
     p.aimX = p.x + Math.cos(p.aim) * d; p.aimY = p.y + Math.sin(p.aim) * d;
@@ -2717,7 +2723,7 @@ export function drillThink(game, p, dt) {
       p.drillFight = { lean: !!ai.leanF, crouch: ai.crF, held: (ai.stillT || 0) > 0.8, seenT: game.time, heard: !!expected };
       if (D.onSee) D.onSee(p, enemy);
     }
-    ai.react += dt; ai.err *= Math.exp(-dt * S.settle); ai.err += (Math.random() - 0.5) * dt * 0.6 * (S.shake ?? 1);
+    ai.react += dt; ai.err *= Math.exp(-dt * S.settle); ai.err += handDrift(ai, S, dt);
     const os = (ai.os || 0) / Math.max(1, d), want = Math.atan2(enemy.y + (enemy.x - p.x) * os - p.y, enemy.x - (enemy.y - p.y) * os - p.x) + ai.err;
     turnTo(p, want, S.turn, dt);
     p.aimX = p.x + Math.cos(p.aim) * d; p.aimY = p.y + Math.sin(p.aim) * d;
