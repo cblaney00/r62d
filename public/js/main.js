@@ -8,7 +8,7 @@ import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DR
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, raisedFrame, drawRaised, sightClip, looks } from './look.js';
+import { tilt, raisedFrame, drawRaised, sightClip, looks, setPersp, liftOf, persp } from './look.js';
 import { S, setMapScale } from './textures.js';
 import { drawZombie, drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
@@ -2284,6 +2284,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
   const c = cursor(), mw = freeAimOn() && padOn && !gpRecent() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
   if (st.r3aim) { mw.x = st.r3aim.x; mw.y = st.r3aim.y; } // (the 3D rope view's crosshair)
+  if (persp.h) { const k = 1 + persp.h * 0.5; mw.x = persp.x + (mw.x - persp.x) / k; mw.y = persp.y + (mw.y - persp.y) / k; } // a head is drawn where its height shows it (look.js persp): back to where it really is
   msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
   st.aimUp = ctrl === 'body' && me && me.a && !me.dn && !!aimUpHatch(st.map, st.pred.x, st.pred.y, mw.x, mw.y); // your own aim-up pose, without waiting for the server
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
@@ -2567,6 +2568,10 @@ function drawScanBlips(now) { // WRAITH: heartbeats, fuzzy
 }
 function draw(s, view, now, dt) {
   const z = st.zoom, m = st.map; let tq = performance.now();
+  let RH = 0.045 * Math.max(0, Math.min(1, (RAISE_NONE - (st.viewH || 0)) / (RAISE_NONE - RAISE_FULL)));
+  let eye = st.cam; // (the point walls are raised away from)
+  if (st.rt > 0 && st.rtFace != null) { const E = (st.viewH || 400) * 1.3 * st.rt; eye = { x: st.cam.x - Math.cos(st.rtFace) * E, y: st.cam.y - Math.sin(st.rtFace) * E }; RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, me0.ro[7] ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.5 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
+  setPersp(eye, gq.raised !== false && fxOn('walls3d') ? RH : 0); // everything else stands up by the same rule (people, gadgets: look.js persp)
   const shake = fxOn('shake') ? fx.shake : 0;
   const cr = Math.cos(st.rot || 0), sr = Math.sin(st.rot || 0), TA = z * cr, TB = z * sr, TC = -z * sr, TD = z * cr; // world -> screen (turned with Rotate aiming)
   const ox = VW / 2 - (TA * st.cam.x + TC * st.cam.y) + (Math.random() - 0.5) * shake * DPR, oy = VH / 2 - (TB * st.cam.x + TD * st.cam.y) + (Math.random() - 0.5) * shake * DPR;
@@ -2726,13 +2731,14 @@ function draw(s, view, now, dt) {
       ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1.12, 1.12); ctx.translate(-p.x, -p.y); }
     const hangW = p.rp === 1 || p.rp === 3 ? hangWall(p) : undefined; // on a rope: drawn hanging against the wall
     drawOperator(ctx, {
-      hang: hangW !== undefined ? (p.rp === 3 ? 'inv' : 'up') : null, wallA: hangW,
+      hang: hangW !== undefined ? (p.rp === 3 ? 'inv' : 'up') : null, wallA: hangW, zb: hangW !== undefined ? ((isMe ? me.ro && me.ro[7] : sp.rz) ?? 0.5) - 0.55 : 0,
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, slide: p.sd, downed: p.dn,
       sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
     if (elv) ctx.restore();
-    drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x, y: p.y });
-    if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x, y: p.y });
+    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, lb = liftOf(p.x, p.y, 0.4 * zk), lh = liftOf(p.x, p.y, 0.53 * zk); // (drawn standing up: rings and head zones where they show)
+    drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x + lb[0], y: p.y + lb[1] });
+    if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x + lh[0], y: p.y + lh[1] });
     if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see
       const L = Math.min(260, castSight(st.map, p.x, p.y, p.ag, 260, sm));
       ctx.strokeStyle = 'rgba(255,40,40,0.35)'; ctx.lineWidth = 0.5;
@@ -2797,9 +2803,6 @@ function draw(s, view, now, dt) {
   // raised walls (look.js): how tall, as a share of the distance from the middle of the view. Zoomed far out they sink
   // flat (full up to RAISE_FULL world px tall, none past RAISE_NONE): there they are a few pixels, and on his graphics
   // card any raised-wall drawing over a whole far view halved the frame rate (he asked 2026-11-09: no lag at any zoom)
-  let RH = 0.045 * Math.max(0, Math.min(1, (RAISE_NONE - (st.viewH || 0)) / (RAISE_NONE - RAISE_FULL)));
-  let eye = st.cam; // (the point walls are raised away from)
-  if (st.rt > 0 && st.rtFace != null) { const E = (st.viewH || 400) * 1.3 * st.rt; eye = { x: st.cam.x - Math.cos(st.rtFace) * E, y: st.cam.y - Math.sin(st.rtFace) * E }; RH += (ROPE_RAISE - RH) * st.rt; }
   let rf = null; // this frame's raised walls, worked out once for both passes (look.js keeps the pieces between frames)
   const raise = inGame && RH > 0.002 && gq.raised !== false && fxOn('walls3d') ? (c, pass) => { // pass 'fog' (all, greyed by #fog) or 'lit'
     const t0 = performance.now(), rm = st.rend.map;

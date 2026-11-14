@@ -3,6 +3,7 @@ import { OPERATORS, WEAPONS, bodyW, RIOT } from '/shared/operators.js';
 import { shade } from './textures.js';
 import { G } from './gunart.js';
 import { HEADGEAR, PACK, VEST } from './headgear.js';
+import { persp, liftOf } from './look.js';
 const HAIR = ['#1b1512', '#3a2618', '#5a3a22', '#8a6a3a', '#c9a060', '#2a2a2a', '#6a2a1a', '#d8d2c4'];
 const hairOf = op => HAIR[(op.charCodeAt(0) * 7 + op.charCodeAt(op.length - 1) * 3 + op.length) % HAIR.length];
 
@@ -233,6 +234,36 @@ function drawGun(ctx, wkey, recoil) {
 }
 
 // p: {x,y,aim,team,op,walk,ads,crouch,downed,recoil,reload,brace,scan,melee,ally,flash,w}
+// The trousers (he asked 2026-11-14): one amorphous, deep-crotched baggy pair (Mr. Popo style) for everyone, dark and
+// neutral but leaning to each operator's own colours, so the legs never draw the eye.
+const pantsCache = {};
+function pantsOf(op, u) {
+  if (pantsCache[op]) return pantsCache[op];
+  const h = c => { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }, a = h(u.clothD && u.clothD[0] === '#' ? u.clothD : '#3a3a36'), b = [43, 44, 46];
+  const m = a.map((v, i) => v * 0.35 + b[i] * 0.65), g = (m[0] + m[1] + m[2]) / 3; // mostly charcoal, a third their colour, then muted
+  return (pantsCache[op] = '#' + m.map(v => Math.round(v * 0.75 + g * 0.25)).map(v => v.toString(16).padStart(2, '0')).join(''));
+}
+// Stacked from the floor (z 0) to the hips (z 0.29): at the bottom two soft blobs at the feet, which slide in and swell
+// into one wide hip shape higher up. Walking only rocks the feet blobs gently forward and back (no knees, no kick).
+function lowerBody(ctx, p, col, LZ, bw) {
+  const walk = p.walk || 0, mv = Math.min(1.1, p.legs ?? 1), cr = !!p.crouch && !p.prone, sw = Math.sin(walk);
+  if (p.prone || p.slide) { // lying (or sliding feet first): one long low shape
+    const dir = p.slide ? 1 : -1, len = p.slide ? 14 : 15, k = p.prone ? Math.sin(walk) * 1.2 * mv : 0;
+    for (let i = 0; i < 3; i++) { const [lx, ly] = LZ(i * 0.03); ctx.fillStyle = shade(col, 0.75 + i * 0.12); ctx.beginPath(); ctx.ellipse(dir * len * 0.5 + lx + k * 0.3, ly / bw, len * 0.62, 4.6, 0, 0, 7); ctx.fill(); }
+    for (const s2 of [1, -1]) { const [lx, ly] = LZ(0); ell(ctx, dir * (len + 2) + lx + s2 * k, s2 * 3.2 + ly / bw, 2.2, 2.1, '#1c1b1a'); }
+    return;
+  }
+  const stride = sw * (cr ? 1.8 : 3.4) * mv, side = cr ? 4.4 : 4.4;
+  const feet = cr ? [[4.5 + stride * 0.4, side], [1.5 - stride * 0.4, -side]] : [[stride, side], [-stride, -side]];
+  const N = 6;
+  for (let i = 0; i < N; i++) {
+    const f = i / (N - 1), [lx, ly] = LZ(f * 0.29), y0 = ly / bw, m = Math.max(0, Math.min(1, (f - 0.3) / 0.55)), mm = m * m * (3 - 2 * m);
+    ctx.fillStyle = shade(col, 0.7 + f * 0.32);
+    for (const [fx, fy] of feet) { const cx = fx + (-1 - fx) * f, cy = fy * (1 - f * 0.55); ctx.beginPath(); ctx.ellipse(cx + lx, cy + y0, 2.5 + f * 1.3, 2.3 + f * 1.1, 0, 0, 7); ctx.fill(); }
+    if (mm > 0) { ctx.beginPath(); ctx.ellipse(-1 + lx, y0, 3 + mm * 1.6, 2.6 + mm * 4.2, 0, 0, 7); ctx.fill(); } // the deep crotch filling in
+    if (!i) for (const [fx, fy] of feet) ell(ctx, fx + 1 + lx, fy + y0, 2.9, 2.1, '#1c1b1a'); // boots
+  }
+}
 export function drawOperator(ctx, p, t) {
   const o = OPERATORS[p.op]; if (!o) return;
   const u = curU = uniformOf(p.op, o.team), tc = SIDE_COL[o.team] || SIDE_COL.atk, acc = accentsOf(p.op);
@@ -244,13 +275,19 @@ export function drawOperator(ctx, p, t) {
   ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.stroke();
   const sg = ctx.createRadialGradient(2, 3, 2, 2, 3, 14); sg.addColorStop(0, 'rgba(0,0,0,0.45)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(2, 3, 14, 0, 7); ctx.fill();
-  if (p.hang && p.wallA !== undefined) { drawHanging(ctx, p, t, u, skin, tc, acc); ctx.restore(); return; }
+  if (p.hang && p.wallA !== undefined) { if (persp.h) { const [dx, dy] = liftOf(p.x, p.y, (p.zb || 0) + 0.3); ctx.translate(dx, dy); } drawHanging(ctx, p, t, u, skin, tc, acc); ctx.restore(); return; }
   ctx.rotate(p.aim);
+  // Perspective (he asked 2026-11-14): the body is built in height layers that each show where their height puts them,
+  // the walls' own rule (look.js persp), so it looks solid when the camera tilts. LZ(z): that lift in the body's frame.
+  const zk = p.prone || p.slide || p.downed ? 0.18 : p.crouch ? 0.66 : 1, cA = Math.cos(p.aim), sA = Math.sin(p.aim);
+  const LZ = z => { if (!persp.h) return [0, 0]; const [wx, wy] = liftOf(p.x, p.y, z * zk + (p.zb || 0)); return [wx * cA + wy * sA, -wx * sA + wy * cA]; };
+  const pants = pantsOf(p.op, u);
 
   if (p.downed) {
+    { const [dx, dy] = LZ(0.3); ctx.translate(dx, dy); }
     ctx.rotate(Math.PI * 0.85);
-    limb(ctx, [-5, -3, -10, -4, -15, -3 + Math.sin(t * 2) * 0.8], 3.4, u.clothD);
-    limb(ctx, [-5, 3, -10, 4.5, -15, 4], 3.4, u.clothD);
+    limb(ctx, [-5, -3, -10, -4, -15, -3 + Math.sin(t * 2) * 0.8], 4.2, pants);
+    limb(ctx, [-5, 3, -10, 4.5, -15, 4], 4.2, pants);
     ell(ctx, -15.5, -3, 2.4, 1.8, '#1a1a1a'); ell(ctx, -15.5, 4, 2.4, 1.8, '#1a1a1a');
     ell(ctx, -1, 0, 7.5, 8, u.cloth); box(ctx, -5.5, -5.5, 9.5, 11, 2.5, u.vest);
     limb(ctx, [1, -6.5, 5, -10, 10, -9.5], 3, u.cloth); limb(ctx, [1, 6.5, 6, 9, 11, 7 + Math.sin(t * 3) * 0.6], 3, u.cloth);
@@ -261,25 +298,14 @@ export function drawOperator(ctx, p, t) {
   // ---- legs (they step when walking AND when turning on the spot) ----
   const bw = bodyW(p.op); // skinnier build: legs, back gear and torso squeezed sideways (not the head)
   ctx.save(); ctx.scale(1, bw);
-  const walk = p.walk || 0, st = Math.sin(walk), cr = !!p.crouch && !p.prone;
-  if (p.prone) { // lying down (he asked): legs stretched out behind, kicking a little as you crawl
-    for (const s of [1, -1]) { const k = s * st * 1.6 * (p.legs ?? 1); limb(ctx, [-3, s * 3, -10 + k, s * 4, -17 + k, s * 4.6], 3.6, u.clothD); ell(ctx, -18 + k, s * 4.6, 2.3, 2.2, '#1c1b1a'); }
+  const cr = !!p.crouch && !p.prone;
+  lowerBody(ctx, p, pants, LZ, bw); // baggy dark trousers, stacked from the floor up to the hips
+  const sh = cr ? 0.93 : 1;
+  if (persp.h) { // the jacket's sides between the hips and the shoulders (what a tilted camera sees)
+    const tcol = u.cloth;
+    for (let i = 0; i < 4; i++) { const f = i / 3, [lx, ly] = LZ(0.29 + f * 0.14); ctx.fillStyle = shade(tcol, 0.62 + f * 0.2); ctx.beginPath(); ctx.ellipse(-1 + lx, ly / bw, 6.4 * sh, 9 * sh, 0, 0, 7); ctx.fill(); }
+    const [lx, ly] = LZ(0.45); ctx.translate(lx, ly / bw); // the top of the body at shoulder height
   }
-  if (p.slide) { // power slide (he asked, like modern CoD): feet first, one leg out straight, the other bent over on its side
-    limb(ctx, [0, 4, 8, 7, 15.5, 7.4], 3.6, u.clothD); ell(ctx, 16.7, 7.5, 3.4, 2.3, '#1c1b1a');
-    limb(ctx, [0, -3, 7, -9.5, 11.5, -2.2], 3.6, u.clothD); ell(ctx, 7, -9.5, 1.6, 1.7, '#1d1f22'); ell(ctx, 12.3, -1.6, 3.2, 2.2, '#1c1b1a');
-  }
-  const stride = st * (cr ? 2.2 : 4.6) * (p.legs ?? 1); // feet come back together when standing still
-  const feet = cr ? [[5.5 + stride * 0.3, 4.2], [4 - stride * 0.3, -4.6]] : [[stride, 4.8], [-stride, -4.8]];
-  for (const [fx, fy] of p.prone || p.slide ? [] : feet) {
-    const hip = [-1, fy > 0 ? 3.2 : -3.2];
-    const knee = cr ? [fx + 2.5, fy * 1.15] : [(hip[0] + fx) / 2 + 0.8, (hip[1] + fy) / 2 + (fy > 0 ? 0.3 : -0.3)];
-    limb(ctx, [hip[0], hip[1], knee[0], knee[1], fx, fy], 3.6, u.clothD);
-    if (cr) ell(ctx, knee[0], knee[1], 1.5, 1.6, '#1d1f22');
-    ell(ctx, fx + 1, fy, 3.4, 2.3, '#1c1b1a');
-    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(fx + 2.6, fy - 1.4, 1.2, 2.8);
-  }
-
   if (p.slide) ctx.translate(-3, 0); // sliding: the body leans back behind the legs
   // ---- leaning (he asked): the legs stay planted, everything from the hips up tips to the side ----
   if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean));
@@ -294,7 +320,6 @@ export function drawOperator(ctx, p, t) {
   if (acc.has('pack') && PACK[p.op] !== 'none') { box(ctx, -12, -1.6, 2.6, 3.2, 0.6, tc, false); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.3; ctx.strokeRect(-12, -1.6, 2.6, 3.2); }
 
   // ---- torso & plate carrier ----
-  const sh = cr ? 0.93 : 1;
   drawTorso(ctx, p.op, o, u, sh);
   { // side trim (he asked): a wide armband on each shoulder, attackers orange and defenders blue, plus this operator's own accents
     if (acc.has('vest')) { ctx.fillStyle = tc; ctx.fillRect(-5.4, -5.6 * sh, 1.7, 11.2 * sh); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-3.7, -5.6 * sh, 0.35, 11.2 * sh); }
@@ -310,6 +335,7 @@ export function drawOperator(ctx, p, t) {
   if (p.slide) ctx.translate(-3, 0);
   if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean)); ctx.translate(0, L * 5.5); ctx.rotate(L * 0.14); } // arms, gun and head lean with the torso
 
+  { const [lx, ly] = LZ(0.42); ctx.translate(lx, ly); } // arms and gun at chest height
   // ---- weapon & arms ----
   const shield = (id === 'brace' || p.riot) && p.brace, shieldBack = id === 'brace' && !p.brace && !p.riot, R = RIOT[p.riot];
   const pistol = WEAPONS[p.w] && (WEAPONS[p.w].cls === 'Pistol' || WEAPONS[p.w].cls === 'MP');
@@ -372,6 +398,7 @@ export function drawOperator(ctx, p, t) {
   }
 
   if (p.slide) { ctx.translate(3.4, 0.5); ctx.rotate(0.14); } // sliding (he asked): the head leans down onto the gun, as when aiming in
+  { const [ax, ay] = LZ(0.42), [hx, hy] = LZ(0.53); ctx.translate(hx - ax, hy - ay); } // the head on top
   // ---- head & headgear ----
   if (up) ctx.translate(-1.6 * up, 0); // head tipped back
   ell(ctx, 0.8, 0, 4.3, 4.3, skin);

@@ -6,6 +6,10 @@
 </head><body><canvas id="c"></canvas>
 <script type="module">
 import { drawOperator, drawGadget } from './js/sprites.js';
+import { setPersp } from './js/look.js';
+// ?persp=0.15 (how strong), &eye=60 (how far below each one the eye is), &walk=1, &pose=crouch|prone|lean, &aim=deg, &tilt=deg (CSS tilt like the game)
+const QP = new URLSearchParams(location.search), PH = +(QP.get('persp') || 0), EYE = +(QP.get('eye') || 60), POSE = QP.get('pose') || '', AIM = (QP.get('aim') !== null ? +QP.get('aim') : -90) * Math.PI / 180;
+if (QP.get('tilt')) { document.body.style.perspective = '1400px'; document.getElementById('c').style.transform = `rotateX(${QP.get('tilt')}deg) scale(1.15)`; }
 import { OPERATORS, OP_LIST } from '../shared/operators.js';
 const c = document.getElementById('c'), ctx = c.getContext('2d');
 const show = new URLSearchParams(location.search).get('show') || 'ops';
@@ -28,7 +32,9 @@ function frame(ms) {
     ctx.fillStyle = '#dfe6e0'; ctx.fillText(show === 'ops' ? OPERATORS[it].name : it.label, x + 6, y + 14);
     if (show === 'ops') {
       ctx.setTransform(Z, 0, 0, Z, x + cw / 2, y + ch / 2 + 6);
-      drawOperator(ctx, { x: 0, y: 0, aim: -Math.PI / 2, op: it, w: OPERATORS[it].primary, ally: OPERATORS[it].team === 'def', walk: 0, legs: 1, up: +new URLSearchParams(location.search).get('up') || 0 }, t);
+      setPersp({ x: 0, y: EYE }, PH);
+      drawOperator(ctx, { x: 0, y: 0, aim: AIM, op: it, w: OPERATORS[it].primary, ally: OPERATORS[it].team === 'def', walk: QP.get('walk') ? t * 8 : 0, legs: 1, crouch: POSE === 'crouch', prone: POSE === 'prone', lean: POSE === 'lean' ? 1 : 0, up: +QP.get('up') || 0 }, t);
+      setPersp({ x: 0, y: 0 }, 0);
     } else {
       for (const [k, ally] of [[0.3, true], [0.7, false]]) {
         ctx.setTransform(Z, 0, 0, Z, x + cw * k, y + ch / 2 + 6);

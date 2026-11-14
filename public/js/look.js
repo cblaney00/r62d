@@ -7,6 +7,16 @@ import { CELL, T, MAT } from '/shared/constants.js';
 
 export const looks = { light: true }; // switched by Settings → Screen → Room lighting (main.js)
 
+// One perspective for everything (he asked 2026-11-14: all assets stay 2D art but must look 3D as the camera tilts, the
+// same way the walls do). Something at height z (floor heights: a wall is 1 = 3.2 m) shows pushed away from the eye
+// point by h·z of its distance from it: the walls' own rule (raisedFrame). main.js sets it once a frame (setPersp);
+// h 0 = flat (menus, killcam, galleries).
+export const persp = { x: 0, y: 0, h: 0 };
+export function setPersp(eye, h) { persp.x = eye.x; persp.y = eye.y; persp.h = h; }
+export const liftOf = (x, y, z) => [(x - persp.x) * persp.h * z, (y - persp.y) * persp.h * z];
+// draw something standing at (x, y) at height z: fn() in the world frame, moved where its height shows it
+export function lifted(ctx, x, y, z, fn) { if (!persp.h || !z) { fn(); return; } const [dx, dy] = liftOf(x, y, z); ctx.save(); ctx.translate(dx, dy); fn(); ctx.restore(); }
+
 const SOLID = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL]);
 
 // ---------------------------------------------------------------- lighting
