@@ -20,6 +20,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 - [ ] (he asked 2026-11-14) leaning should exist in rappel mode; F and Space are the two ways off a rope: Space jumps in (through the window), F slides down quickly and disengages
 
+- [ ] (he asked 2026-11-14) leaning: the body should bend naturally with the lean, with centre-of-gravity compensation in the character model, and some footwork with the lean to make it realistic
+
 ## Done
 
 - [x] lets incorporate some changes that would get us more frames, we already did research on this so now we just need to implement a bit more, i only need about 35 more fps (then he added: find more ways that don't change how the game looks or feels. DONE 2026-11-12: the map picture now stays on the graphics card instead of being sent to it again every frame, and zoomed out the screen shows a smaller copy of the map that still has every pixel the screen can show. Nothing looks different. Measured on his kind of graphics card in a hidden display: standing about 40 → 120 fps, his walk-spin-zoom test 35 → about 94 fps, zoomed far out 31 → 167 fps. Not yet played by him)
