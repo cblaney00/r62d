@@ -1500,7 +1500,7 @@ function ptsPopups(c, x, y, now) {
 // ---- the 3D rope view (rope3d.js) ----
 // On for an attacker hanging on (or climbing) a rope; leaving it glides the camera back up to the top-down view over
 // R3_OUT s (inside the climb-in), so you can shoot as soon as you're through.
-const ROPE_TILT = 34, ROPE_RAISE = 0.1; // the rope camera's extra tilt (degrees) and how tall walls stand
+const ROPE_TILT = 34, ROPE_RAISE = 0.07; // the rope camera's extra tilt (degrees) and how tall walls stand
 const R3_OUT = 0.45, FH3 = 3.2 * PX_PER_M;
 // which way the wall is for someone hanging at (p.x, p.y): the rope stretch they are on, facing it
 function hangWall(p) { for (const q of st.map.ropes || []) { const sx = Math.max(q.a, Math.min(q.b, (p.x - q.hang.x) * q.tx + (p.y - q.hang.y) * q.ty)); if (Math.hypot(q.hang.x + q.tx * sx - p.x, q.hang.y + q.ty * sx - p.y) < 4 && floorAt(st.map, p.x, p.y) === q.f) return q.out + Math.PI; } return undefined; }
@@ -2034,7 +2034,7 @@ function frame(nowMs) {
   let cx, cy;
   if (view) {
     cx = view.x; cy = view.y;
-    if (st.rt > 0 && view.kind === 'body' && st.rtFace != null) { const k = (st.viewH || 400) * 0.2 * st.rt; cx += Math.cos(st.rtFace) * k; cy += Math.sin(st.rtFace) * k; } // (the rope camera: you low on the screen, the rooms ahead)
+    if (st.rt > 0 && view.kind === 'body' && st.rtFace != null) { const k = (st.viewH || 400) * 0.34 * st.rt; cx += Math.cos(st.rtFace) * k; cy += Math.sin(st.rtFace) * k; } // (the rope camera: you low on the screen, the rooms ahead)
     if (view.kind === 'body') {
       // he said the view was "super bouncy" when looking round: the lead used the crosshair's place on SCREEN, which itself
       // moves with the camera (a feedback loop). Crosshair mode now leads from the aim point in the world.
