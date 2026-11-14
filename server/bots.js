@@ -505,6 +505,7 @@ export function visibleEnemy(game, p, see) {
   let best = null, bd = Infinity;
   for (const q of game.players.values()) {
     if (!q.alive || game.side(q) === team || q.shrouded && Math.hypot(q.x - p.x, q.y - p.y) > 60) continue;
+    if (game.ropeHidden && game.ropeHidden(p, q)) continue; // an off-level climber and someone inside that wall
     const d = Math.hypot(q.x - p.x, q.y - p.y);
     if (d > see || d > bd) continue;
     const a = Math.atan2(q.y - p.y, q.x - p.x);
@@ -540,6 +541,7 @@ export function visibleEnemy(game, p, see) {
       const o = floorOff(m, gi, fl);
       for (const q of game.players.values()) {
         if (!q.alive || q.staged || game.side(q) === team || q.shrouded) continue;
+        if (game.ropeHidden && game.ropeHidden(p, q)) continue; // (a climber hidden below/above this window)
         const qf = floorAt(m, q.x, q.y), gh = qf > gi ? wallGhost(m, q.x, q.y) : null, at = qf === gi ? q : gh && gh.rope ? gh : null;
         if (at && vs.some(v => windowSees(m, v, at.x, at.y, smokes))) take(q, at.x + o.x, at.y + o.y, true);
       }
@@ -1399,7 +1401,11 @@ function windowPlay(game, p, inp, dt) {
     const b = plan.rope.base; if (Math.hypot(b.x - p.x, b.y - p.y) > 9) { moveTo(game, p, inp, b, dt); return true; }
     press('interact'); st.climbT = st.climbT || game.time; return true;
   }
-  if (p.rope.st !== 'hang') return true; // climbing
+  if (p.rope.st !== 'hang') return true; // letting go
+  { // climb (free, like a person: not floor by floor) until the head is level with the window
+    const R = m.ropes, at = R[p.rope.r].lvl + (p.rope.h ?? 0.5) - (p.rope.inv ? 0.45 : 0), want = plan.rope.lvl + 0.5;
+    if (Math.abs(at - want) > 0.08) { inp.rc = Math.sign(want - at); return true; }
+  }
   if (st.s === 'go') { st.s = 'hang'; st.hangT = game.time; log({ e: 'hang', r: p.rope.r }); if (Math.random() < 0.35) { inp.inv = 1; st.inv = true; } }
   const r = m.ropes[p.rope.r], s = ropeS(r, p.x, p.y), win = r.cells.length > 0;
   // fight: whoever is in sight through the window
@@ -1447,7 +1453,7 @@ function roofPlay(game, p, inp, dt) {
   const st = ai.roofSt && ai.roofSt.round === game.round ? ai.roofSt : (ai.roofSt = { round: game.round, s: 'go', t: game.time });
   if (st.s === 'done') return false;
   const fl = floorAt(m, p.x, p.y), prev = p.prevInput || {}, press = k => { inp[k] = prev[k] ? 0 : 1; }, h = R.h;
-  if (p.rope) { if (p.rope.st === 'hang') press(st.s === 'leave' ? 'interact' : 'sprint'); return true; } // up (or down) the rope a stop at a time
+  if (p.rope) { if (p.rope.st === 'hang') { inp.rc = st.s === 'leave' ? -1 : 1; inp.sprint = 1; } return true; } // up the wall to the roof (or back down to the ground)
   if (st.s !== 'leave' && st.s !== 'go' && (game.planted || game.timer < 30 || game.time - st.t > 70)) st.s = 'leave';
   if (st.s === 'go') {
     if (fl === m.roofFloor) { st.s = 'open'; st.t = game.time; if (!ai.roofSaid) { ai.roofSaid = true; teamSay(game, p, 'On the roof.', 'roof'); } }

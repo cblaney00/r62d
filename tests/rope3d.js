@@ -19,7 +19,7 @@ for (const id of process.argv[2] ? [process.argv[2]] : MAP_LIST) {
   if (g.side(a) !== TEAM.ATK) a.squad = 1 - a.squad;
   d.squad = 1 - a.squad; g.equip(d);
   const tick = (s, inp = {}) => { for (let i = 0; i < Math.max(1, s * 30); i++) { a.prevInput = a.input; a.input = { ...inp }; g.applyMove(a, 1 / 30); g.tickPlayer(a, 1 / 30); g.tickEnts && g.tickEnts(1 / 30); g.time += 1 / 30; } };
-  const hangOn = r => { Object.assign(a, { alive: true, downed: false, ctrl: 'body', rope: null, vault: null, busy: null, prep: null, hp: 999, x: r.base.x, y: r.base.y }); tick(0.1); tick(0.1, { interact: 1 }); tick(0.1); tick(2 * r.lvl + 0.3); if (a.rope && a.rope.st === 'hang') { a.x = r.hang.x; a.y = r.hang.y; a.rope.r = r.i; } return a.rope && a.rope.st === 'hang'; };
+  const hangOn = r => { Object.assign(a, { alive: true, downed: false, ctrl: 'body', rope: null, vault: null, busy: null, prep: null, hp: 999, x: r.base.x, y: r.base.y }); tick(0.1); tick(0.1, { interact: 1 }); tick(0.1); if (a.rope && a.rope.st === 'hang') { a.x = r.hang.x; a.y = r.hang.y; a.rope.r = r.i; a.rope.h = 0.5; } return a.rope && a.rope.st === 'hang'; };
   const ropes = m.ropes.filter(r => r.cells.length && r.down < 0 && r.inside).slice(0, 4);
   for (const r of ropes) {
     if (!hangOn(r)) { fail(id, 'rope', r.i, 'could not get onto it'); continue; }
@@ -50,16 +50,14 @@ for (const id of process.argv[2] ? [process.argv[2]] : MAP_LIST) {
     g.event(a, { k: 'gadget' }); tick(1.5);
     if (!g.ents.some(e => e.type === 'breach') && a.gadgetCount >= 1) fail(id, 'rope', r.i, 'no breach charge placed from the rope');
     g.ents = g.ents.filter(e => e.type !== 'breach');
-    // W: up a floor or onto the roof; S: back down
+    // climbing freely (he asked 2026-11-14): up past the window to the next floor or onto the roof, then back down
     if (!a.rope) { hangOn(r); }
-    const r0 = a.rope && a.rope.r;
-    tick(0.05, { rv: 1 }); tick(2.6);
+    tick(0.1, { inv: 0 }); if (a.rope && a.rope.inv) { tick(0.05, { inv: 1 }); tick(0.05); }
+    tick(2.4, { rc: 1 });
     const up = a.rope ? m.ropes[a.rope.r] : null;
-    if (r.up >= 0 || r.roof) {
-      if (r.up >= 0 && !(up && up.lvl > r.lvl)) fail(id, 'rope', r.i, 'W did not go up a floor', a.rope && a.rope.st);
-      if (r.up < 0 && (a.rope || floorAt(m, a.x, a.y) !== m.roofFloor)) fail(id, 'rope', r.i, 'W did not go onto the roof');
-      if (r.up >= 0 && up) { tick(0.05, { rv: -1 }); tick(1.4); if (!a.rope || m.ropes[a.rope.r].lvl !== r.lvl) fail(id, 'rope', r.i, 'S did not come back down a floor', a.rope && a.rope.r, r0); }
-    }
+    if (r.up >= 0 && !(up && up.lvl > r.lvl)) fail(id, 'rope', r.i, 'climbing did not reach the floor above', a.rope && a.rope.st);
+    if (r.up < 0 && r.roof && (a.rope || floorAt(m, a.x, a.y) !== m.roofFloor)) fail(id, 'rope', r.i, 'climbing did not get onto the roof', JSON.stringify(a.rope));
+    if (r.up >= 0 && up) { tick(2.0, { rc: -1 }); if (!a.rope || m.ropes[a.rope.r].lvl !== r.lvl) fail(id, 'rope', r.i, 'climbing down did not come back to this floor', a.rope && a.rope.r); }
   }
   console.log(`${id}: ${ropes.length} window ropes tried`);
 }

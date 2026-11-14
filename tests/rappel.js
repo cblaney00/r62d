@@ -17,6 +17,8 @@ for (const id of MAP_LIST) {
   if (!m.ropes.length) { fail(id, 'no ropes'); continue; }
   const tick = (s, inp = {}) => { for (let i = 0; i < s * 30; i++) { a.prevInput = a.input; a.input = { ...inp }; g.applyMove(a, 1 / 30); g.tickPlayer(a, 1 / 30); g.time += 1 / 30; } };
   let walls = 0;
+  // free climbing (he asked 2026-11-14): hold climb until the head is level with the window of rope q
+  const climb = q => { for (let i = 0; i < 30 * 14; i++) { const o = a.rope; if (!o || o.st !== 'hang') { tick(1 / 30); continue; } const at = m.ropes[o.r].lvl + (o.h ?? 0.5) - (o.inv ? 0.45 : 0), want = q.lvl + 0.5; if (Math.abs(at - want) < 0.05 && m.ropes[o.r].f === q.f) return true; tick(1 / 30, { rc: Math.sign(want - at) }); } return false; };
   for (const r of m.ropes) {
     if (r.down >= 0) continue; // (reached from the stop below it: tests/roof.js)
     n++;
@@ -24,14 +26,14 @@ for (const id of MAP_LIST) {
     if (g.side(a) !== TEAM.ATK) { a.squad = 1 - a.squad; if (g.side(a) !== TEAM.ATK) { fail(id, 'climber is not attacking'); break; } }
     tick(0.1); tick(0.1, { interact: 1 }); tick(0.1);
     if (!a.rope) { fail(id, 'rope', r.i, 'E did not start the climb'); continue; }
-    tick(2 * r.lvl + 0.2);
+    climb(r);
     if (!a.rope || a.rope.st !== 'hang' || floorAt(m, a.x, a.y) !== r.f) { fail(id, 'rope', r.i, 'not hanging on the right floor', a.rope && a.rope.st); continue; }
     if (a.rope.r !== r.i) { const q = m.ropes[a.rope.r]; if (q.f !== r.f || Math.abs(q.ax - r.ax) * CELL > Math.max(r.b - r.a, q.b - q.a) + 40) fail(id, 'rope', r.i, 'climbed a rope somewhere else', q.i); Object.assign(a, { rope: null }); continue; } // (two stretches start from the same spot on the ground: the nearer one)
     // slide both ways along the wall
     const along = () => { const q = m.ropes[a.rope.r]; return q.ax * CELL + ropeS(q, a.x, a.y) - r.ax * CELL; }; // (sliding can carry on onto the next stretch of wall)
     const s0 = along();
-    tick(3, { right: 1 }); tick(3, { down: 1 }); const s1 = along(), on1 = a.rope.r;
-    tick(6, { left: 1 }); tick(6, { up: 1 }); const s2 = along(), on2 = a.rope.r;
+    tick(3, { rw: 1 }); const s1 = along(), on1 = a.rope.r;
+    tick(6, { rw: -1 }); const s2 = along(), on2 = a.rope.r;
     a.rope.r = r.i;
     if (r.b - r.a > 20 && !(s1 > s0 + 4 || s2 < s0 - 4)) fail(id, 'rope', r.i, 'could not slide along the wall', s0, s1, s2);
     if ((on2 === r.i && s2 < r.a - 0.5) || (on1 === r.i && s1 > r.b + 0.5)) fail(id, 'rope', r.i, 'slid past the end');
@@ -64,7 +66,7 @@ for (const id of MAP_LIST) {
     if (a.rope || floorAt(m, a.x, a.y) !== r.f || Math.hypot(a.x - r.inside.x, a.y - r.inside.y) > 8) fail(id, 'rope', r.i, 'did not end up inside', !!a.rope, floorAt(m, a.x, a.y), r.f, Math.hypot(a.x - r.inside.x, a.y - r.inside.y).toFixed(1), a.alive);
     // and once more: climb up, let go, back on the ground
     Object.assign(a, { x: r.base.x, y: r.base.y, rope: null, vault: null });
-    tick(0.1, { interact: 1 }); tick(2 * r.lvl + 0.3); tick(0.1, { interact: 1 }); tick(0.1); tick(r.lvl + 0.3);
+    tick(0.1, { interact: 1 }); tick(0.1); climb(r); tick(0.1, { interact: 1 }); tick(0.1); tick(r.lvl + 0.6);
     if (a.rope || floorAt(m, a.x, a.y) !== m.groundFloor) fail(id, 'rope', r.i, 'letting go did not bring you down');
   }
   console.log(`${id}: ${m.ropes.length} ropes checked (${walls} on plain walls)`);

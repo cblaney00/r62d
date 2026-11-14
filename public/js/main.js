@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -1500,7 +1500,7 @@ function ptsPopups(c, x, y, now) {
 // ---- the 3D rope view (rope3d.js) ----
 // On for an attacker hanging on (or climbing) a rope; leaving it glides the camera back up to the top-down view over
 // R3_OUT s (inside the climb-in), so you can shoot as soon as you're through.
-const ROPE_TILT = 34, ROPE_RAISE = 0.07; // the rope camera's extra tilt (degrees) and how tall walls stand
+const ROPE_TILT = 34, ROPE_TILT_WIN = 22, ROPE_RAISE = 0.07; // the rope camera's extra tilt (degrees) and how tall walls stand
 const R3_OUT = 0.45, FH3 = 3.2 * PX_PER_M;
 // which way the wall is for someone hanging at (p.x, p.y): the rope stretch they are on, facing it
 function hangWall(p) { for (const q of st.map.ropes || []) { const sx = Math.max(q.a, Math.min(q.b, (p.x - q.hang.x) * q.tx + (p.y - q.hang.y) * q.ty)); if (Math.hypot(q.hang.x + q.tx * sx - p.x, q.hang.y + q.ty * sx - p.y) < 4 && floorAt(st.map, p.x, p.y) === q.f) return q.out + Math.PI; } return undefined; }
@@ -1985,6 +1985,7 @@ function frame(nowMs) {
     }
     else if (ctrl === 'cam') { const c = s.ents.find(e => e.id === me.fi); if (c) view = feedView(c, me); }
     else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: st.longV ? LONG_R : 1100, near: 26, kind: 'body', low: (st.pred.pr || 0) >= 1 }; } // you see from your (leaning) head
+    if (view && view.kind === 'body' && me.ro && me.ro[0] && !me.ro[8] && st.map.ropes[me.ro[1]]) { const r = st.map.ropes[me.ro[1]]; view.ang = r.out; view.fov = Math.PI * 0.98; view.near = 6; } // on a rope, not level with a window: you see out, not in (he chose R6's rule)
   } else if (inGame && me) {
     const mates = s.players.filter(p => p.a && p.sq === me.sq && p.id !== me.id);
     if (mouse.wl > 0) { st.spect++; mouse.wl = 0; }
@@ -2236,6 +2237,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
   if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
   { const r = moveTurn(); if (r) k.rot = Math.round(r * 1000) / 1000; } // Rotate view, Face aiming, sprint + W: the keys turn with you
+  if (me && me.ro && me.ro[0] && !r3on()) { const cr = keys.has('crouch') || keys.has('crouchTap'), tn = performance.now() / 1000; if (cr && !st.r3cr) st.r3invT = tn; st.r3cr = cr; k.inv = tn - (st.r3invT ?? -9) < 0.1 ? 1 : 0; k.crouch = 0; } // on a rope: crouch flips upside down
   if (r3on() && me && me.ro) { // the 3D rope view (he asked, R6's keys): W/S up and down a floor, A/D along the wall as you face it, crouch upside down
     const r = st.map.ropes[me.ro[1]];
     k.rw = r ? ((k.right ? 1 : 0) - (k.left ? 1 : 0)) * rope3d.wallSign(r) : 0; k.rv = k.up ? 1 : k.down ? -1 : 0;
@@ -2617,6 +2619,23 @@ function draw(s, view, now, dt) {
     ctx.strokeStyle = 'rgba(170,135,85,0.35)'; ctx.setLineDash([2, 2]); ctx.beginPath();
     ctx.moveTo(r.base.x + r.tx * r.a, r.base.y + r.ty * r.a); ctx.lineTo(r.base.x + r.tx * r.b, r.base.y + r.ty * r.b); ctx.stroke(); ctx.setLineDash([]);
   }
+  // he asked (2026-11-14): ropes hang from the roof, so a climber below a window (or on a floor below) shows their rope
+  // in front of every window above them; beside a window it runs beside it. Drawn where your side can see the ledge.
+  for (const sp of s.players) if (sp.rp && sp.a && sp.rr !== undefined && st.map.ropes[sp.rr]) {
+    const p = me && sp.id === me.id ? { x: st.pred.x, y: st.pred.y } : interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
+    const R = st.map.ropes, ally = sp.tm === side; let r = R[sp.rr], along = r.ax * CELL + ropeS(r, p.x, p.y);
+    for (let q = r, first = true; q; first = false) {
+      if (!first || (sp.rz ?? 0.5) < 0.72) { // on your own floor only where the rope passes above your head
+        const s2 = Math.max(q.a, Math.min(q.b, along - q.ax * CELL)), x = q.hang.x + q.tx * s2, y = q.hang.y + q.ty * s2, cf = floorAt(st.map, view ? view.x : x, view ? view.y : y);
+        if (floorAt(st.map, x, y) === cf && (ally || teamSees(x, y)) && !(first && me && sp.id === me.id)) {
+          ctx.strokeStyle = '#b08a55'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x - q.tx * 0.6, y - q.ty * 0.6); ctx.lineTo(x + Math.cos(q.out) * 2, y + Math.sin(q.out) * 2); ctx.stroke(); // the taut rope against the wall
+          ctx.fillStyle = '#d8b878'; ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 7); ctx.fill();
+          if (!ally && !(first && sp.ry)) { ctx.font = '700 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a3d'; const u = UP(); ctx.fillText('ROPE', x + u.x * 8, y + u.y * 8); }
+        }
+      }
+      q = q.up >= 0 ? R[q.up] : null;
+    }
+  }
   for (const sp of s.players) if (sp.rp && sp.a) {
     const p = me && sp.id === me.id ? { x: st.pred.x, y: st.pred.y } : interp(sp.id, 'players'); if (!p || p.x === undefined) continue;
     let r = null; for (const q of st.map.ropes || []) { const sx = Math.max(q.a, Math.min(q.b, (p.x - q.hang.x) * q.tx + (p.y - q.hang.y) * q.ty)); if (Math.hypot(q.hang.x + q.tx * sx - p.x, q.hang.y + q.ty * sx - p.y) < 3 || Math.hypot(q.base.x + q.tx * sx - p.x, q.base.y + q.ty * sx - p.y) < 6) { r = q; break; } }
@@ -2674,6 +2693,7 @@ function draw(s, view, now, dt) {
     // at an upper window or on a rope (he asked): they also show on the ground just outside the wall, to anyone below
     // they could see from there (what they can see can see them; through a bullet hole only from close by)
     let wg = !isMe && !gh && wallGhost(st.map, p.x, p.y);
+    if (wg && !ally && p.rp && !p.ry && view && p.rr !== undefined && st.map.ropes[p.rr]) { const r = st.map.ropes[p.rr]; if ((view.x - p.x) * -Math.cos(r.out) + (view.y - p.y) * -Math.sin(r.out) > 6 && floorAt(st.map, view.x, view.y) === r.f) wg = null; } // (off-level climber: not seen from inside, out of the window either)
     const wgAt = wg && (ally ? wg : !p.sh && wallGhostSeen(wg));
     if (wgAt) {
       wg = { ...wg, x: wgAt.x, y: wgAt.y };
@@ -2686,7 +2706,8 @@ function draw(s, view, now, dt) {
       if (!ally && !p.dn) st.heads.push({ x: wg.x, y: wg.y });
     }
     // Silent Shroud: drones and cameras can't see her, only eyes can
-    const vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
+    let vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
+    if (vis && !ally && !isMe && p.rp && !p.ry && view && p.rr !== undefined && st.map.ropes[p.rr]) { const r = st.map.ropes[p.rr]; if ((view.x - p.x) * -Math.cos(r.out) + (view.y - p.y) * -Math.sin(r.out) > 6 && floorAt(st.map, view.x, view.y) === r.f) vis = false; } // off-level on a rope: hidden from inside (only the rope gives them away)
     if (st.tv) (st.tvPos || (st.tvPos = new Map())).set(p.id, { x: p.x, y: p.y, p });
     if (!vis) { // ESPORTS TV (he asked): everyone's outline shows through walls; only the followed player's sight is live
       if (st.tv && !p.dn && p.x !== undefined) bodyOutline(p, p.sq ? '255,138,61' : '70,168,255', 0.9);
@@ -2841,7 +2862,7 @@ function draw(s, view, now, dt) {
     const p = st.pred, lp = st.tiltLast || p, k = dt > 0 ? 1 / dt : 0, vx = p && lp ? (p.x - lp.x) * k : 0, vy = p && lp ? (p.y - lp.y) * k : 0;
     st.tiltLast = p ? { x: p.x, y: p.y } : null;
     const jump = Math.hypot(vx, vy) > 600; // a floor change or respawn: no lean
-    tilt.extra = ROPE_TILT * (st.rt || 0);
+    { const me2 = st.me, r = me2 && me2.ro && me2.ro[0] && st.map.ropes[me2.ro[1]], win = !!(r && me2.ro[8] && Math.abs(ropeS(r, st.pred.x, st.pred.y)) < r.half + 14); st.rtW = (st.rtW || 0) + ((win ? 1 : 0) - (st.rtW || 0)) * (1 - Math.exp(-dt * 4)); tilt.extra = (ROPE_TILT + ROPE_TILT_WIN * st.rtW) * (st.rt || 0); } // very steep when level with a window (he chose)
     tilt.update(dt, jump ? 0 : (vx * cr - vy * sr) * z, jump ? 0 : (vx * sr + vy * cr) * z, shake, innerWidth, innerHeight);
     const de = document.documentElement; de.classList.toggle('tilt3d', tilt.on === true); de.classList.toggle('edgeblur', fxOn('blur') && gq.blur === true);
   }
@@ -3427,12 +3448,13 @@ function promptText(s, me) {
   if (me.ro && r3on() && me.ro[0]) { const r = m.ropes[me.ro[1]], atW = r && ropeAtWindow(r, x, y); // the 3D rope view's keys (R6's)
     const inW = atW ? (ropeWindowOpen(m, r) ? `<b>${label('vault')}</b>CLIMB IN  ·  ` : ropeWindowBoarded(m, r) ? `<b>${label('vault')}</b>SMASH IN  ·  ` : '') : '';
     return `${inW}<b>${label('up')}</b>/<b>${label('down')}</b>UP · DOWN  ·  <b>${label('left')}</b>/<b>${label('right')}</b>ALONG  ·  <b>${label('crouch')}</b>${me.ro[5] ? 'RIGHT WAY UP' : 'UPSIDE DOWN'}  ·  <b>${label('interact')}</b>LET GO`; }
-  if (me.ro) { // on a rope
-    if (!me.ro[0]) return me.ro[2] < 0 && !me.ro[4] ? 'LETTING GO…' : `CLIMBING ${Math.round(me.ro[3] * 100)}%`;
-    const r = m.ropes[me.ro[1]], atW = r && ropeAtWindow(r, x, y), hop = (i, n) => n >= 0 ? m.floors[m.ropes[n].f].name : i;
-    const what = !atW ? 'MOVE TO SLIDE ALONG THE WALL' : ropeWindowOpen(m, r) ? `<b>${label('vault')}</b>CLIMB IN` : ropeWindowBoarded(m, r) ? `<b>${label('vault')}</b>SWING IN THROUGH THE BOARDS` : 'WINDOW BLOCKED';
-    const up = r.up >= 0 ? hop('', r.up) : r.roof ? 'ROOF' : '', upKey = label('sprint');
-    return `${what}${up ? `  ·  <b>${upKey}</b>UP TO ${up}` : ''}  ·  <b>${label('interact')}</b>${r.down >= 0 ? 'DOWN TO ' + hop('', r.down) : 'LET GO'}`;
+  if (me.ro) { // on a rope (he asked: climb freely)
+    if (!me.ro[0]) return me.ro[2] < 0 && !me.ro[4] ? 'LETTING GO…' : 'CLIMBING…';
+    const r = m.ropes[me.ro[1]]; if (!r) return '';
+    const head = (me.ro[7] ?? 0.5) - (me.ro[5] ? 0.45 : 0), fl = m.floors[r.f].name, atW = ropeAtWindow(r, x, y), lvl = !!me.ro[8];
+    const where = !r.cells.length ? (head > 0 ? 'WALL · ' + fl : 'WALL') : lvl ? `LEVEL WITH THE ${fl} WINDOW` : head < 0.5 ? `BELOW THE ${fl} WINDOW` : `ABOVE THE ${fl} WINDOW`;
+    const inKey = atW && lvl ? (ropeWindowOpen(m, r) ? `  ·  <b>${label('vault')}</b>CLIMB IN` : ropeWindowBoarded(m, r) ? `  ·  <b>${label('vault')}</b>SWING IN THROUGH THE BOARDS` : '  ·  WINDOW BLOCKED') : '';
+    return `${where}${inKey}  ·  <b>${label('up')}</b>/<b>${label('down')}</b>CLIMB  ·  <b>${label('left')}</b>/<b>${label('right')}</b>ALONG  ·  <b>${label('crouch')}</b>${me.ro[5] ? 'RIGHT WAY UP' : 'UPSIDE DOWN'}  ·  <b>${label('interact')}</b>LET GO`;
   }
   const down = s.players.find(p => p.a && p.dn && p.tm === side && p.id !== me.id && Math.hypot(p.x - x, p.y - y) < 26);
   if (down && !me.dn && me.ct === 'body') return `<b>${label('interact')}</b>HOLD TO REVIVE ${esc(down.n.toUpperCase())}`; // before ropes (the server puts reviving first too)

@@ -19,6 +19,7 @@ const BARRI_BULLET_HP = 320; // bullet damage that breaks a whole wooden barrica
 const rnd = (a, b) => a + Math.random() * (b - a);
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 const DART_MAX = 8 * PX_PER_M, DART_SPEED = 700; // KESTREL's thrown dart
+const ROPE_HEAD0 = 0.56, ROPE_LEVEL = [0.26, 0.74], ROPE_INV = 0.45; // on a rope: head height off the ground when you start (floors), the window band, upside down lowers your head
 const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
 // everyday bots: their own names, never a pro's (he asked) or a gun's
@@ -1105,9 +1106,11 @@ export class Game {
 
   hitscan(src, x0, y0, ang, range, dmg, wname, cls) {
     const dx = Math.cos(ang), dy = Math.sin(ang), team = this.side(src), fl = floorAt(this.map, x0, y0);
+    if (src.rope && src.rope.st === 'hang' && !this.ropeLevel(src)) { const rr = this.map.ropes[src.rope.r]; if (rr && -(dx * Math.cos(rr.out) + dy * Math.sin(rr.out)) > 0.15) range = Math.min(range, CELL * 1.2); } // off-level on a rope: shots into the building stop at the wall
     let best = null, bestT = range;
     for (const q of this.players.values()) {
       if (q === src || !q.alive) continue; // friendly fire: teammates get hit too
+      if (this.ropeHidden(src, q)) continue; // an off-level climber and someone inside that wall
       if (this.phase === PHASE.PREP && this.side(q) === this.side(src)) continue; // ...except in preparation: shots pass teammates (he asked: shotgunning walls to set up)
       const at0 = src.viewTime !== null && src.viewTime !== undefined ? this.posAt(q, src.viewTime) : q; // favour the shooter
       const at = q.lo ? leanPoint(this.map, at0.x, at0.y, q.aim, q.lo) : at0; // a leaning target's upper body (and head) is where it leans to
@@ -1552,10 +1555,10 @@ export class Game {
       if (!edge('interact') || this.phase !== PHASE.ACTION || this.side(p) !== TEAM.ATK || p.ctrl !== 'body' || p.downed || p.busy || p.vault || !p.alive) return;
       if ([...this.players.values()].some(q => q !== p && q.alive && q.downed && this.side(q) === TEAM.ATK && Math.hypot(q.x - p.x, q.y - p.y) < 26)) return; // E next to a downed teammate revives, never climbs
       const top = roofRopeAt(this.map, p.x, p.y);
-      if (top) { p.rope = { st: 'move', r: -1, from: -2, to: top.i, s: 0, t: 0, dur: ROPE_DROP, top: { x: p.x, y: p.y } }; p.ropeHeld = true; p.reloadT = 0; p.adsT = 0; p.burst = 0; this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id }); return; }
+      if (top) { p.rope = { st: 'move', r: -1, from: -2, to: top.i, s: 0, t: 0, dur: ROPE_DROP, top: { x: p.x, y: p.y }, h: 0.85 }; p.ropeHeld = true; p.reloadT = 0; p.adsT = 0; p.burst = 0; this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id }); return; }
       const hit = ropeAt(this.map, p.x, p.y); if (!hit) return;
       const [r, s] = hit;
-      p.rope = { st: 'move', r: -1, from: -1, to: r.i, s, t: 0, dur: ROPE_CLIMB * r.lvl, base: ropeGround(this.map, r, s) }; p.ropeHeld = true;
+      p.rope = { st: 'hang', r: r.i, h: ROPE_HEAD0 - r.lvl }; p.x = r.hang.x + r.tx * s; p.y = r.hang.y + r.ty * s; p.ropeHeld = true; // on the wall at ground height: climb from there (he asked: free climbing, no floor-by-floor lift)
       p.reloadT = 0; p.adsT = 0; p.burst = 0;
       this.noise(p.x, p.y, this.side(p), 260); this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id });
       return;
@@ -1571,12 +1574,21 @@ export class Game {
         if (q) { const s2 = Math.max(q.a, Math.min(q.b, r.ax * CELL + s - q.ax * CELL)); p.x = q.hang.x + q.tx * s2; p.y = q.hang.y + q.ty * s2; o.r = q.i; r = q; }
       }
       if (edge('inv')) { o.inv = !o.inv; this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id }); } // upside down (R6: peek over the top of a window)
-      if (inp.rv > 0 && !(prev.rv > 0)) { o.inv = false; this.ropeUp(p, r); return; } // the 3D view's W: up a floor (or onto the roof)
-      if (inp.rv < 0 && !(prev.rv < 0) && r.down >= 0) { o.inv = false; this.ropeHop(p, r, R[r.down], ROPE_DROP); return; } // S: down a floor
-      if (edge('sprint')) { this.ropeUp(p, r); return; }
-      if (edge('interact') && r.down >= 0) { this.ropeHop(p, r, R[r.down], ROPE_DROP); p.ropeHeld = true; return; } // down to the window below
+      // up and down, freely (he asked 2026-11-14: not floor by floor like a lift; diagonal with sliding): pushing toward
+      // the wall climbs, away from it goes down (W / S on the rope camera); bots send rc. Sprint climbs faster.
+      { const mx = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), my = (inp.down ? 1 : 0) - (inp.up ? 1 : 0), c = Math.cos(inp.rot || 0), sn = Math.sin(inp.rot || 0), wx = mx * c - my * sn, wy = mx * sn + my * c;
+        let climb = isFinite(inp.rc) && inp.rc ? Math.sign(inp.rc) : -(wx * Math.cos(r.out) + wy * Math.sin(r.out));
+        if (Math.abs(climb) < 0.25) climb = 0;
+        if (o.h === undefined) o.h = 0.5;
+        o.h += Math.sign(climb) * dt / ROPE_CLIMB * (inp.sprint ? 1.6 : 1); o.cl = climb ? Math.sign(climb) : 0;
+        if (o.h >= 1) { if (r.up >= 0) { const q = R[r.up]; this.ropeShift(p, r, q); o.h -= q.lvl - r.lvl; r = q; } else if (r.roof && climb > 0) { o.inv = false; this.ropeUp(p, r); return; } else o.h = 0.98; }
+        if (o.h < 0 && r.down >= 0) { const q = R[r.down]; this.ropeShift(p, r, q); o.h += r.lvl - q.lvl; r = q; }
+        if (r.down < 0 && o.h + r.lvl < ROPE_HEAD0 - 0.04) { // down at the ground: off the rope
+          const g = ropeGround(this.map, r, ropeS(r, p.x, p.y)); p.x = g.x; p.y = g.y; p.vx = p.vy = 0; p.rope = null; return;
+        }
+      }
       if (edge('interact')) { // let go: slide back down to the ground below you
-        p.rope = { st: 'move', r: -1, from: -2, to: -1, t: 0, dur: ROPE_DROP * r.lvl, base: ropeGround(this.map, r, ropeS(r, p.x, p.y)), top: { x: p.x, y: p.y } };
+        p.rope = { st: 'move', r: -1, from: -2, to: -1, t: 0, dur: ROPE_DROP * Math.max(0.3, o.h + r.lvl), base: ropeGround(this.map, r, ropeS(r, p.x, p.y)), top: { x: p.x, y: p.y } };
         p.ropeHeld = true; p.adsT = 0; p.burst = 0; this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id });
       }
       return;
@@ -1585,8 +1597,30 @@ export class Game {
     const P = at(o.t < o.dur * 0.5 ? o.from : o.to); p.x = P.x; p.y = P.y; p.vx = p.vy = 0; // halfway up you show at the top
     if (o.t >= o.dur) {
       if (o.to < 0) p.rope = null;
-      else { o.st = 'hang'; o.r = o.to; }
+      else { o.st = 'hang'; o.r = o.to; if (o.h === undefined) o.h = 0.5; }
     }
+  }
+  // onto the stretch of wall above or below (q), keeping your place along it
+  ropeShift(p, r, q) {
+    const s = Math.max(q.a, Math.min(q.b, r.ax * CELL + ropeS(r, p.x, p.y) - q.ax * CELL));
+    p.x = q.hang.x + q.tx * s; p.y = q.hang.y + q.ty * s; p.rope.r = q.i;
+  }
+  // R6's rule (he chose): you see and shoot into a room only with your head level with its window, and only then can
+  // people inside see and shoot you. h = your head's height on this floor (0 floor .. 1 the floor above).
+  ropeLevel(p) {
+    const o = p.rope; if (!o || o.st !== 'hang') return false;
+    const r = this.map.ropes[o.r]; if (!r || !r.cells.length) return false;
+    const head = (o.h ?? 0.5) - (o.inv ? ROPE_INV : 0);
+    return head >= ROPE_LEVEL[0] && head <= ROPE_LEVEL[1];
+  }
+  // someone hanging off-level and someone inside behind that wall (same floor) can't see or shoot each other
+  ropeHidden(a, b) {
+    for (const [h, o] of [[a, b], [b, a]]) {
+      if (!h.rope || h.rope.st !== 'hang' || this.ropeLevel(h)) continue;
+      const r = this.map.ropes[h.rope.r]; if (!r) continue;
+      if ((o.x - h.x) * -Math.cos(r.out) + (o.y - h.y) * -Math.sin(r.out) > 6 && floorAt(this.map, o.x, o.y) === r.f) return true;
+    }
+    return false;
   }
   // from one window to the next on the same wall, keeping your place along it
   ropeHop(p, r, q, dur) {
@@ -1613,7 +1647,7 @@ export class Game {
   startVault(p, ang) {
     if (p.rope) { // hanging outside a window: climb in, swinging through wooden boards (he chose); never up to the roof
       const r = p.rope.st === 'hang' && this.map.ropes[p.rope.r];
-      if (!r || p.downed || !ropeAtWindow(r, p.x, p.y)) return false;
+      if (!r || p.downed || !ropeAtWindow(r, p.x, p.y) || !this.ropeLevel(p)) return false; // (level with it, like R6)
       const smash = !ropeWindowOpen(this.map, r);
       if (smash && !ropeWindowBoarded(this.map, r)) return false; // reinforced or blocked: no way in here
       if (smash) { for (const k of r.cells) if (this.map.tiles[k] === T.BARRI) this.destroyCell(k); this.noise(p.x, p.y, this.side(p), 700); }
@@ -2459,6 +2493,11 @@ export class Game {
       return;
     }
     if (m.a === 'ef' && process.env.R62D_FAST) { const q = this.players.get(m.id); if (q && EF_FIELD[m.k]) this.effect(q, m.k, +m.dur || 4, p); return; } // screenshot tests only: a status effect caused by you
+    if (m.a === 'hang' && process.env.R62D_FAST && this.map.ropes[m.r]) { // screenshot tests only: put someone (id, else you) on rope r at height h, s along
+      const q = m.id ? this.players.get(m.id) : p, r = this.map.ropes[m.r]; if (!q) return;
+      q.rope = { st: 'hang', r: r.i, h: isFinite(m.h) ? +m.h : 0.5, inv: !!m.inv }; q.x = r.hang.x + r.tx * (+m.s || 0); q.y = r.hang.y + r.ty * (+m.s || 0); q.vault = null; if (q.bot) q.hold = true;
+      return;
+    }
     if (m.a === 'ent' && process.env.R62D_FAST && isFinite(m.x) && isFinite(m.y)) { // screenshot tests only: a gadget (ty), or a grenade going off (boom: its kind), at x, y
       const team = m.team || this.side(p);
       if (m.boom) this.detonate({ id: -1, type: 'nade', kind: m.boom, x: m.x, y: m.y, team, owner: p.id });
@@ -3186,7 +3225,7 @@ export class Game {
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
-        el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? (p.rope.inv ? 3 : 1) : 2) : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadLen || WEAPONS[g.w].reload)) : 0, rq: p.reloadT > 0 && p.reloadLen && p.reloadLen !== WEAPONS[g.w].reload ? r2(p.reloadLen) : undefined,
+        el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? (p.rope.inv ? 3 : 1) : 2) : undefined, rr: p.rope && p.rope.st === 'hang' ? p.rope.r : undefined, rz: p.rope && p.rope.st === 'hang' ? r2(p.rope.h ?? 0.5) : undefined, ry: this.ropeLevel(p) ? 1 : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadLen || WEAPONS[g.w].reload)) : 0, rq: p.reloadT > 0 && p.reloadLen && p.reloadLen !== WEAPONS[g.w].reload ? r2(p.reloadLen) : undefined,
         ct: p.ctrl, cf: this.tv && p.ctrl === 'cam' ? p.feedId : undefined, // ESPORTS TV: which camera they are looking through
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : p.grapple ? { k: 'grapple', p: r2(p.grapple.t / p.grapple.dur) } : null, df: p.hasDefuser ? 1 : 0,
         gh: p.ghillieUntil > this.time ? 1 : undefined, bp: p.bipodSet ? 1 : undefined, // MOSS's ghillie (no glint), PERCH's bipod
@@ -3202,7 +3241,7 @@ export class Game {
         ga: this.free ? p.guns.map(q => q.w + ':' + attCode(q.att)) : undefined, // free play's gun menu shows what each held gun carries
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, ap: p.pierceShot ? 1 : undefined, su2: p.spotterUntil > this.time ? r1(p.spotterUntil - this.time) : undefined, gw2: p.ghillieUntil > this.time ? r1(p.ghillieUntil - this.time) : undefined, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
-        bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur), p.rope.climb ? 1 : 0, p.rope.inv ? 1 : 0, p.rope.from ?? -1] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
+        bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur), p.rope.climb ? 1 : 0, p.rope.inv ? 1 : 0, p.rope.from ?? -1, r2(p.rope.h ?? 0.5), this.ropeLevel(p) ? 1 : 0] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
         pp: p.prep ? [p.prep.mode === 'throw' ? 1 : 2, r2(Math.max(0, p.prep.until - this.time)), p.prep.dur] : undefined, m: this.mods(p), jp: [r2(p.air || 0), p.up ? 1 : 0, r2(p.jcd || 0), r1(p.lo || 0), r2(p.pr || 0), r2(p.slT || 0), r2(p.slR || 0), r2(p.slA || 0), r2(p.scd || 0)], vt: p.vault ? [r1(p.vault.x0), r1(p.vault.y0), r1(p.vault.x1), r1(p.vault.y1), r2(p.vault.t), r2(p.vault.dur)] : undefined, fs: r2(this.time - p.lastShot), gi: p.gasId ? 1 : 0, lu: p.lungeUntil > this.time ? r1(p.lungeUntil - this.time) : undefined, df: p.deafUntil > this.time ? 1 : undefined, su: p.downed && SELF_UP.has(p.op) ? r2(p.selfUp / SELF_UP_TIME) : undefined, scd: p.shroudCd > this.time ? r1(p.shroudCd - this.time) : undefined,
       }));
