@@ -175,6 +175,23 @@ export const ropeS = (r, x, y) => (x - r.hang.x) * r.tx + (y - r.hang.y) * r.ty;
 export const ropeAtWindow = (r, x, y) => r.cells.length > 0 && Math.abs(ropeS(r, x, y)) <= r.half - 4;
 // where Space can take you in through a window (he asked 2026-11-14): only a narrow area right in front of it, so going in
 // without setting it up first is dangerous
+// The defenders' preparation area (he asked 2026-11-14: in preparation defenders stay in a box round the two site rooms,
+// so they can't set up too much, but they can set up on both): the site rooms' outline in the building frame, grown by
+// PREP_PAD cells each way, on every floor but the roof (hatches above and below are in reach). In it, open ground
+// outside the building doesn't count (no run-outs while setting up). [[x0, y0, x1, y1], ...] in world px.
+export const PREP_PAD = 12;
+export function prepBox(m, site) {
+  const S = m.sites && m.sites[site]; if (!S) return null;
+  let bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
+  for (const name of S.rooms || []) { const r = m.rooms.find(q => q.name === name); if (!r) continue; const F = m.floors[r.fl]; const x = r.x - F.gx + F.x0, y = r.y + F.y0; bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x + r.w); by1 = Math.max(by1, y + r.h); }
+  if (bx0 > bx1) return null;
+  bx0 -= PREP_PAD; by0 -= PREP_PAD; bx1 += PREP_PAD; by1 += PREP_PAD;
+  const out = [];
+  for (const F of m.floors) { if (F.roof) continue;
+    const x0 = Math.max(F.gx, bx0 - F.x0 + F.gx), x1 = Math.min(F.gx + F.w, bx1 - F.x0 + F.gx), y0 = Math.max(0, by0 - F.y0), y1 = Math.min(F.h, by1 - F.y0);
+    if (x1 > x0 && y1 > y0) out.push([x0 * CELL, y0 * CELL, x1 * CELL, y1 * CELL]); }
+  return out;
+}
 // Climbing OUT of an upper window onto its rope (he asked 2026-11-14: attackers plant, then get outside to some safety
 // and play by the window): standing just inside an open (or only boarded) window that has a rope, facing out of it.
 export function ropeOutAt(m, x, y, ang) {

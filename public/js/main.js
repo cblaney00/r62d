@@ -1513,7 +1513,7 @@ function ptsPopups(c, x, y, now) {
 // ---- the 3D rope view (rope3d.js) ----
 // On for an attacker hanging on (or climbing) a rope; leaving it glides the camera back up to the top-down view over
 // R3_OUT s (inside the climb-in), so you can shoot as soon as you're through.
-const ROPE_ENV = 420; // world px: the rope camera's size before its zooms (fixed: nothing you look at changes it)
+const ROPE_ENV = 420, ROPE_REACH_X = 8; // ROPE_REACH_X: metres the crosshair may go past the rope view (he asked: it felt trapped) // world px: the rope camera's size before its zooms (fixed: nothing you look at changes it)
 const ROPE_ZOOM = 0.38, ROPE_ZOOM_NAV = 0.12, ROPE_SIDE = 0.12, ROPE_ADS = 0.1; // ROPE_ADS: how much tighter aiming in on a rope comes in; // ROPE_ZOOM peeking into a window, ROPE_ZOOM_NAV the rest of the time; // how much closer the rope camera comes in, how far it sits to your right (view heights)
 const ROPE_TILT = 34, ROPE_TILT_WIN = 0, ROPE_RAISE = 0.1, ROPE_EYE = 1.6; // ROPE_EYE: how far behind you the rope camera's eye sits, in view heights (with ROPE_RAISE, a low over-the-shoulder angle: people on the wall stand up) // the rope camera's extra tilt (degrees) and how tall walls stand
 const R3_OUT = 0.45, FH3 = 3.2 * PX_PER_M;
@@ -2150,7 +2150,7 @@ function frame(nowMs) {
   st.adsZ = st.adsZ || 1;
   st.adsZ += (adsZ - st.adsZ) * (1 - Math.exp(-dt * 18));
   st.viewH = (locked ? st.camLock.h : st.envH) * st.adsZ;
-  st.trackHH = st.viewH * viewMul() / 2; // the normal view's half height: past it the mouse moves the crosshair slower (freeMove)
+  st.trackHH = st.viewH * viewMul() / 2 + Math.min(1, st.rt || 0) * ROPE_REACH_X * PX_PER_M; // the normal view's half height: past it the mouse moves the crosshair slower (freeMove)
   // Crosshair mode: the crosshair can go anywhere you can see; if you and it don't fit on screen, the view grows
   // to hold it, and st.reachW (a circle round you, reachOf; on a drone DRONE_PING_R) is how far it can go
   { // on a rope (he asked 2026-11-14): tight over your shoulder while peeking into a window (level with it), wide for
@@ -2183,13 +2183,13 @@ function frame(nowMs) {
     if (!locked) st.viewH = Math.max(st.viewH, st.fitH * (1 - ROPE_ADS * (st.rads || 0)));
   } else st.fitH = 0;
   st.viewH *= viewMul(); // Settings: how much of the map you see (phones start further out)
-  if (freeAim && (st.rt || 0) > 0.05) { const L = st.viewH * (0.82 - 0.07 * (st.rads || 0) + (1 - Math.min(1, st.rt)) * 3), l = Math.hypot(aimOff.x, aimOff.y); if (l > L) aimOff = { x: aimOff.x * L / l, y: aimOff.y * L / l }; } // (aimed in on a rope: the crosshair stays in the tight view)
+  if (freeAim && (st.rt || 0) > 0.05) { const L = st.viewH * (0.82 - 0.07 * (st.rads || 0) + (1 - Math.min(1, st.rt)) * 3) + ROPE_REACH_X * PX_PER_M, l = Math.hypot(aimOff.x, aimOff.y); if (l > L) aimOff = { x: aimOff.x * L / l, y: aimOff.y * L / l }; } // (aimed in on a rope: the crosshair stays in the tight view)
   st.zoom = VH / st.viewH;
   if (freeAim && !locked) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
     const keep = (x, y, m) => { st.cam.x = Math.min(x + hw - m, Math.max(x - hw + m, st.cam.x)); st.cam.y = Math.min(y + hh - m, Math.max(y - hh + m, st.cam.y)); };
     // (the camera's target already keeps the room, gliding, above: this only stops it slipping off at the very edge)
-    if ((st.rt || 0) > 0.5) keep(st.pred.x, st.pred.y, 120 * DPR / st.zoom);
+    if ((st.rt || 0) > 0.5) keep(q.ax, q.ay, hh * 0.42); // (on a rope: the camera slides after the crosshair, never zooming out; you may go off screen, he asked)
     else { keep(st.pred.x, st.pred.y, 30 * DPR / st.zoom); keep(q.ax, q.ay, AHEAD() * 0.8 / st.zoom); } // (the tilt crops the screen edges a little)
   }
   if (view && view.kind === 'cam' && !view.dr) { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
@@ -2225,7 +2225,7 @@ function frame(nowMs) {
   if (locked) { st.camLock.x = st.cam.x; st.camLock.y = st.cam.y; } // (after the floor's edge stops it)
   if (freeAim) { // the crosshair always stays on the real screen (he saw it go off): at the floor's edge the camera stops
     // but the crosshair didn't, and the tilt crops the edges, so here the view may pass the edge just enough to show it
-    const q = freeAimPoint(), s0 = w2s(q.ax, q.ay), u = onScreen(s0.x, s0.y, locked ? LOCK_EDGE : AHEAD() * 0.7 / DPR);
+    const q = freeAimPoint(), s0 = w2s(q.ax, q.ay), u = onScreen(s0.x, s0.y, locked ? LOCK_EDGE : (st.rt || 0) > 0.5 ? VH / DPR * 0.28 : AHEAD() * 0.7 / DPR); // (on a rope: well inside, the steep tilt squeezes the far edge)
     if (u.x !== s0.x || u.y !== s0.y) { const w = screenToWorld(u.x, u.y);
       if (locked) aimOff = { x: aimOff.x + w.x - q.ax, y: aimOff.y + w.y - q.ay }; // locked camera: the crosshair stops at the screen edge (and pans the view, lockedTarget)
       else { st.cam.x += q.ax - w.x; st.cam.y += q.ay - w.y; } }
@@ -3019,6 +3019,16 @@ function draw(s, view, now, dt) {
   }
   if (inGame && view) drawPeeps(); // GIMLET's peepholes, where you can see them
   if (inGame && view && st.winGoR) drawWinGo(st.winGoR, now); // the window helper's frame (winGo)
+  if (inGame && st.me && st.me.m && st.me.m.box && s.ph === PHASE.PREP) { // the defenders' preparation area (he asked): its edge, on this floor
+    const F = st.map.floors[Math.max(0, floorAt(st.map, st.pred.x, st.pred.y))], u = UP();
+    ctx.save(); ctx.setLineDash([6, 4]); ctx.lineWidth = 1.4; ctx.strokeStyle = `rgba(242,193,78,${0.55 + 0.2 * Math.sin(now * 3)})`;
+    for (const r of st.me.m.box) if (F && r[0] >= F.gx * CELL - 1 && r[2] <= (F.gx + F.w) * CELL + 1) {
+      ctx.strokeRect(r[0], r[1], r[2] - r[0], r[3] - r[1]);
+      ctx.setLineDash([]); ctx.font = '700 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(242,193,78,0.85)';
+      ctx.fillText('PREPARATION AREA', (r[0] + r[2]) / 2 + u.x * 4, r[1] + 8); ctx.setLineDash([6, 4]);
+    }
+    ctx.restore();
+  }
   if (inGame && view) { drawStairView(s, st.me, now); drawHatchView(s, st.me, now); drawWindowView(s, st.me, now, view); drawWindowMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
   if (st.tv && inGame) { // each team's sight, faintly in its own colour (pro team colours, else blue / orange)
     const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;

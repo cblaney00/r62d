@@ -5,7 +5,7 @@
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, PLAYER_R, T, FL, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
-import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked, leanPoint, LEAN_PX } from '../shared/physics.js';
+import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked, leanPoint, LEAN_PX, inBox } from '../shared/physics.js';
 import { ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
@@ -1601,10 +1601,18 @@ function keepInside(game, goal) {
   c.set(k0, r); return r || goal;
 }
 const PATHS_A_TICK = 3;
+// a goal outside the defenders' preparation area: the nearest spot inside it on the goal's floor (else where they are)
+function boxGoal(game, p, goal) {
+  const m = game.map, f = floorAt(m, goal.x, goal.y), F = m.floors[f] || m.floors[floorAt(m, p.x, p.y)];
+  const r = game.prepBox.find(b => F && b[0] >= F.gx * CELL - 1 && b[2] <= (F.gx + F.w) * CELL + 1) || game.prepBox[0];
+  const x = Math.max(r[0] + CELL, Math.min(r[2] - CELL, goal.x)), y = Math.max(r[1] + CELL, Math.min(r[3] - CELL, goal.y));
+  const q = game.freeSpotNear(x, y, 40); return q && inBox(m, game.prepBox, q.x, q.y) ? q : { x: p.x, y: p.y };
+}
 function moveTo(game, p, inp, goal, dt, hold = false) {
   const ai = p.ai, map = game.map, team = game.side(p);
   const early = team === TEAM.DEF && (game.phase === PHASE.PREP || (game.phase === PHASE.ACTION && game.timer > DUR.action - 15)) && !game.free && !game.planted;
   if (early) goal = keepInside(game, goal);
+  if (game.phase === PHASE.PREP && team === TEAM.DEF && game.prepBox && goal && !inBox(map, game.prepBox, goal.x, goal.y)) goal = boxGoal(game, p, goal); // (the preparation area: shared/map.js prepBox)
   const gx = Math.floor(goal.x / CELL), gy = Math.floor(goal.y / CELL);
   const sx = Math.floor(p.x / CELL), sy = Math.floor(p.y / CELL);
   ai.pathT = (ai.pathT || 0) - dt;

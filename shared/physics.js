@@ -127,7 +127,21 @@ export function leanPoint(map, x, y, ang, lo) {
   const a = ang + (lo > 0 ? Math.PI / 2 : -Math.PI / 2), d = Math.min(Math.abs(lo), Math.max(0, castSight(map, x, y, a, Math.abs(lo) + 2, null, true) - 2));
   return { x: x + Math.cos(a) * d, y: y + Math.sin(a) * d };
 }
+// mods.box (the defenders' preparation area, shared/map.js prepBox): a step that would leave it, or go out onto the open
+// ground outside the building, slides along the edge instead (each axis on its own), so you are stopped, not stuck
+export function inBox(map, box, x, y) {
+  if (!box.some(r => x >= r[0] && x < r[2] && y >= r[1] && y < r[3])) return false;
+  const k = Math.floor(y / CELL) * map.W + Math.floor(x / CELL); return map.tiles[k] !== T.GROUND;
+}
 export function stepMove(map, o, input, dt, mods) {
+  if (!mods || !mods.box) return stepMoveFree(map, o, input, dt, mods);
+  const x0 = o.x, y0 = o.y, was = inBox(map, mods.box, x0, y0), r = stepMoveFree(map, o, input, dt, mods);
+  if (was && !inBox(map, mods.box, o.x, o.y)) {
+    if (inBox(map, mods.box, o.x, y0)) { o.y = y0; o.vy = 0; } else if (inBox(map, mods.box, x0, o.y)) { o.x = x0; o.vx = 0; } else { o.x = x0; o.y = y0; o.vx = 0; o.vy = 0; }
+  }
+  return r;
+}
+function stepMoveFree(map, o, input, dt, mods) {
   let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   let my = (input.down ? 1 : 0) - (input.up ? 1 : 0);
   if (input.rot && isFinite(input.rot) && (mx || my)) { const c = Math.cos(input.rot), s = Math.sin(input.rot); [mx, my] = [mx * c - my * s, mx * s + my * c]; } // keys relative to a turned view
