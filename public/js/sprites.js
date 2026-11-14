@@ -296,7 +296,7 @@ function lowerBody(ctx, p, col, LZ, bw) {
   // the leg further from the eye first, so the nearer one covers it
   const away = LZ(1); feet.sort((a, b) => (b[0] * away[0] + b[1] * away[1]) - (a[0] * away[0] + a[1] * away[1]));
   for (const [fx, fy] of feet) {
-    const lift2 = p.hang ? (fy > 0 ? 0.07 : 0.03) : cr ? 0.06 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) : 0.035 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) * mv; // the stepping foot comes off the floor a little
+    const lift2 = p.hang ? (fy > 0 ? 0.13 : 0.10) : cr ? 0.06 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) : 0.035 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) * mv; // the stepping foot comes off the floor a little
     const [bx0, by0] = lift(fx + 1, fy, lift2), [bx1, by1] = lift(fx + 1, fy, lift2 + 0.04);
     column(ctx, bx0, by0, 3, 2.2, bx1, by1, 2.8, 2.1, '#1c1b1a'); // boot
     const hy = (fy > 0 ? 2.6 : -2.6) + hs, [lx0, ly0] = lift(fx + 0.4, fy, lift2 + 0.035), [lx1, ly1] = lift(-1, hy, 0.27);
