@@ -10,6 +10,7 @@ import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R,
 import { drawTrail, TRAIL_LIFE } from './fx.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
+import { withPersp } from './look.js';
 import * as audio from './audio.js';
 import { isTouch } from './touch.js';
 
@@ -315,7 +316,7 @@ function draw(cv, dt) {
   for (const t of S.tracers) if (t.trail) drawTrail(c, 0, 0, t.x2, t.y2, t.life / TRAIL_LIFE); else { c.strokeStyle = `rgba(255,220,150,${t.life / 0.04 * 0.6})`; c.lineWidth = 0.45; c.beginPath(); c.moveTo(0, 0); c.lineTo(t.x2, t.y2); c.stroke(); }
   // shooter
   const op = OP_LIST.find(k => OPERATORS[k].primary === S.w || OPERATORS[k].secondary === S.w) || 'ember';
-  drawOperator(c, { x: 0, y: 0, aim: aimAngle(cv), op, w: S.w, ally: true, walk: 0, legs: 0, ads: S.adsT > 0.5, recoil: S.t - S.lastShot < 0.06 ? 1 : 0, reload: S.reloadT > 0 }, S.t);
+  withPersp({ x: 0, y: 0 }, 0, () => drawOperator(c, { x: 0, y: 0, aim: aimAngle(cv), op, w: S.w, ally: true, walk: 0, legs: 0, ads: S.adsT > 0.5, recoil: S.t - S.lastShot < 0.06 ? 1 : 0, reload: S.reloadT > 0 }, S.t));
   // reload ring round you, like a match
   if (S.reloadT > 0) { c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 1.6; c.beginPath(); c.arc(0, 0, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - S.reloadT / w.reload)); c.stroke(); }
   c.setTransform(1, 0, 0, 1, 0, 0);

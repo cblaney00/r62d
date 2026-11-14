@@ -3,6 +3,7 @@ import { RIOT } from '/shared/operators.js';
 import { OPERATORS, WEAPONS, GADGETS, LOADOUTS, GADGET_COUNT, BIOS, JOBS, resolveLoadout, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
+import { showcase } from './look.js';
 import { shade } from './textures.js';
 
 const GADGET_DESC = {
@@ -48,7 +49,7 @@ function render(el) {
   for (const b of list.querySelectorAll('.opbtn')) {
     const c = b.querySelector('canvas'), k = b.dataset.op, x = c.getContext('2d');
     x.fillStyle = shade(OPERATORS[k].color, 0.35); x.fillRect(0, 0, 64, 64);
-    x.save(); x.scale(64 / 34, 64 / 34); drawOperator(x, { x: 17, y: 17, aim: -0.6, op: k, w: loadoutOf(k).primary, ally: true }, 0); x.restore();
+    x.save(); x.scale(64 / 34, 64 / 34); showcase(17, 18, () => drawOperator(x, { x: 17, y: 18, aim: -0.6, op: k, w: loadoutOf(k).primary, ally: true }, 0)); x.restore();
     b.onclick = () => { state.sel = k; render(el); };
   }
   renderDetail(el, true);
@@ -155,7 +156,7 @@ function fillDetail(d, k, anim, compact, force) {
     for (let i = 0; i < 420; i += 30) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 420); x.moveTo(0, i); x.lineTo(420, i); x.stroke(); }
     x.save(); x.scale(420 / 40, 420 / 40);
     const s = t / 1000;
-    drawOperator(x, { x: 20, y: 20, aim: -0.5 + Math.sin(s * 0.6) * 0.5, op: k, w: cur.primary, ally: true, walk: s * 3, ads: Math.sin(s * 0.4) > 0.6 }, s);
+    showcase(20, 21, () => drawOperator(x, { x: 20, y: 21, aim: -0.5 + Math.sin(s * 0.6) * 0.5, op: k, w: cur.primary, ally: true, walk: s * 3, ads: Math.sin(s * 0.4) > 0.6 }, s));
     x.restore();
     anim.raf = requestAnimationFrame(loop);
   };

@@ -3,7 +3,7 @@ import { OPERATORS, WEAPONS, bodyW, RIOT } from '/shared/operators.js';
 import { shade } from './textures.js';
 import { G } from './gunart.js';
 import { HEADGEAR, PACK, VEST } from './headgear.js';
-import { persp, liftOf } from './look.js';
+import { persp, liftOf, showcase } from './look.js';
 const HAIR = ['#1b1512', '#3a2618', '#5a3a22', '#8a6a3a', '#c9a060', '#2a2a2a', '#6a2a1a', '#d8d2c4'];
 const hairOf = op => HAIR[(op.charCodeAt(0) * 7 + op.charCodeAt(op.length - 1) * 3 + op.length) % HAIR.length];
 
@@ -199,6 +199,33 @@ function box(ctx, x, y, w, h, r, col, outline = true) {
   if (outline) { ctx.strokeStyle = OUT; ctx.lineWidth = 0.5; ctx.stroke(); }
 }
 
+// A solid part of a body (he asked 2026-11-14: real volume from the tilted view): an upright column between an ellipse
+// at its foot (a: x, y, rx, ry) and one at its top (b), both already moved by their height (look.js persp). Drawn as
+// one shape, the two ellipses joined along their sides, shaded across like a cylinder lit from the top left, with the
+// usual thin outline. When the camera is straight above, it is just the top ellipse.
+const shadeCache = new Map();
+const shadeOf = (col, f) => { const k = col + f; let v = shadeCache.get(k); if (!v) { if (shadeCache.size > 4000) shadeCache.clear(); shadeCache.set(k, v = col[0] === '#' ? shade(col, f) : col); } return v; };
+function column(ctx, ax, ay, arx, ary, bx, by, brx, bry, col, cap = false) {
+  const dx = bx - ax, dy = by - ay, rx = (arx + brx) / 2, ry = (ary + bry) / 2;
+  if (dx * dx + dy * dy < 0.04) { ell(ctx, bx, by, brx, bry, col); return; }
+  const t = Math.atan2(-ry * dx, rx * dy), c = Math.cos(t), sn = Math.sin(t);
+  const up = Math.cos(t + Math.PI / 2) * rx * dx + Math.sin(t + Math.PI / 2) * ry * dy > 0; // the top's far half runs through t + 90°
+  ctx.beginPath();
+  ctx.moveTo(ax + arx * c, ay + ary * sn); ctx.lineTo(bx + brx * c, by + bry * sn);
+  ctx.ellipse(bx, by, brx, bry, 0, t, t + Math.PI, !up);
+  ctx.lineTo(ax - arx * c, ay - ary * sn);
+  ctx.ellipse(ax, ay, arx, ary, 0, t + Math.PI, t + Math.PI * 2, !up);
+  ctx.closePath();
+  if (SHADE) { // lit across: the side turned to the light brighter, the other side darker
+    const nx = c / rx, ny = sn / ry, lit = nx * LX + ny * LY > 0 ? 1 : -1, ex = (ax + bx) / 2, ey = (ay + by) / 2, wx = rx * c * lit, wy = ry * sn * lit;
+    const g = ctx.createLinearGradient(ex + wx, ey + wy, ex - wx, ey - wy);
+    g.addColorStop(0, shadeOf(col, 1.28)); g.addColorStop(0.35, col); g.addColorStop(1, shadeOf(col, 0.55));
+    ctx.fillStyle = g;
+  } else ctx.fillStyle = col;
+  ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 0.5; ctx.stroke();
+  if (cap) ell(ctx, bx, by, brx, bry, shadeOf(col, 1.08));
+}
+
 function drawGun(ctx, wkey, recoil) {
   const w = WEAPONS[wkey]; if (!w) return;
   const L = w.len, x0 = 4 - recoil;
@@ -253,16 +280,20 @@ function lowerBody(ctx, p, col, LZ, bw) {
     for (const s2 of [1, -1]) { const [lx, ly] = LZ(0); ell(ctx, dir * (len + 2) + lx + s2 * k, s2 * 3.2 + ly / bw, 2.2, 2.1, '#1c1b1a'); }
     return;
   }
-  const stride = sw * (cr ? 1.8 : 3.4) * mv, side = cr ? 4.4 : 4.4;
-  const feet = cr ? [[4.5 + stride * 0.4, side], [1.5 - stride * 0.4, -side]] : [[stride, side], [-stride, -side]];
-  const N = 6;
-  for (let i = 0; i < N; i++) {
-    const f = i / (N - 1), [lx, ly] = LZ(f * 0.29), y0 = ly / bw, m = Math.max(0, Math.min(1, (f - 0.3) / 0.55)), mm = m * m * (3 - 2 * m);
-    ctx.fillStyle = shade(col, 0.7 + f * 0.32);
-    for (const [fx, fy] of feet) { const cx = fx + (-1 - fx) * f, cy = fy * (1 - f * 0.55); ctx.beginPath(); ctx.ellipse(cx + lx, cy + y0, 2.5 + f * 1.3, 2.3 + f * 1.1, 0, 0, 7); ctx.fill(); }
-    if (mm > 0) { ctx.beginPath(); ctx.ellipse(-1 + lx, y0, 3 + mm * 1.6, 2.6 + mm * 4.2, 0, 0, 7); ctx.fill(); } // the deep crotch filling in
-    if (!i) for (const [fx, fy] of feet) ell(ctx, fx + 1 + lx, fy + y0, 2.9, 2.1, '#1c1b1a'); // boots
+  const stride = sw * (cr ? 1.8 : 3.4) * mv, side = cr ? 4.4 : 4.2;
+  const feet = p.hang ? [[3.6, 3.4], [3.2, -3.6]] : cr ? [[4.5 + stride * 0.4, side], [1.5 - stride * 0.4, -side]] : [[stride, side], [-stride, -side]];
+  const lift = (x, y, z) => { const [lx, ly] = LZ(z); return [x + lx, y + ly / bw]; };
+  // the leg further from the eye first, so the nearer one covers it
+  const away = LZ(1); feet.sort((a, b) => (b[0] * away[0] + b[1] * away[1]) - (a[0] * away[0] + a[1] * away[1]));
+  for (const [fx, fy] of feet) {
+    const lift2 = p.hang ? (fy > 0 ? 0.07 : 0.03) : cr ? 0.06 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) : 0.035 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) * mv; // the stepping foot comes off the floor a little
+    const [bx0, by0] = lift(fx + 1, fy, lift2), [bx1, by1] = lift(fx + 1, fy, lift2 + 0.04);
+    column(ctx, bx0, by0, 3, 2.2, bx1, by1, 2.8, 2.1, '#1c1b1a'); // boot
+    const hy = fy > 0 ? 2.6 : -2.6, [lx0, ly0] = lift(fx + 0.4, fy, lift2 + 0.035), [lx1, ly1] = lift(-1, hy, 0.27);
+    column(ctx, lx0, ly0, 2.3, 2.2, lx1, ly1, 3.2, 3, col); // trouser leg, baggy at the top
   }
+  const [hx0, hy0] = lift(-1, 0, 0.23), [hx1, hy1] = lift(-1, 0, 0.31);
+  column(ctx, hx0, hy0, 4.4, 6.4, hx1, hy1, 5.2, 7.4, col); // hips and seat
 }
 export function drawOperator(ctx, p, t) {
   const o = OPERATORS[p.op]; if (!o) return;
@@ -275,12 +306,15 @@ export function drawOperator(ctx, p, t) {
   ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.stroke();
   const sg = ctx.createRadialGradient(2, 3, 2, 2, 3, 14); sg.addColorStop(0, 'rgba(0,0,0,0.45)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(2, 3, 14, 0, 7); ctx.fill();
-  if (p.hang && p.wallA !== undefined) { if (persp.h) { const [dx, dy] = liftOf(p.x, p.y, (p.zb || 0) + 0.3); ctx.translate(dx, dy); } drawHanging(ctx, p, t, u, skin, tc, acc); ctx.restore(); return; }
-  ctx.rotate(p.aim);
+  // on a rope (he asked 2026-11-14: climbers solid like everyone): the same body, upright against the wall and facing it,
+  // one hand up the rope and the gun in the other turned to where they aim; upside down = the heights turned over
+  const hang = !!(p.hang && p.wallA !== undefined), inv = hang && p.hang === 'inv', bodyA = hang ? p.wallA : p.aim;
+  if (hang && !persp.h) { drawHanging(ctx, p, t, u, skin, tc, acc); ctx.restore(); return; } // (straight down: the old picture from above)
+  ctx.rotate(bodyA);
   // Perspective (he asked 2026-11-14): the body is built in height layers that each show where their height puts them,
   // the walls' own rule (look.js persp), so it looks solid when the camera tilts. LZ(z): that lift in the body's frame.
-  const zk = p.prone || p.slide || p.downed ? 0.18 : p.crouch ? 0.66 : 1, cA = Math.cos(p.aim), sA = Math.sin(p.aim);
-  const LZ = z => { if (!persp.h) return [0, 0]; const [wx, wy] = liftOf(p.x, p.y, z * zk + (p.zb || 0)); return [wx * cA + wy * sA, -wx * sA + wy * cA]; };
+  const zk = p.prone || p.slide || p.downed ? 0.18 : p.crouch && !hang ? 0.66 : 1, cA = Math.cos(bodyA), sA = Math.sin(bodyA);
+  const LZ = z => { if (!persp.h) return [0, 0]; const [wx, wy] = liftOf(p.x, p.y, (inv ? 0.6 - z : z) * zk + (p.zb || 0)); return [wx * cA + wy * sA, -wx * sA + wy * cA]; };
   const pants = pantsOf(p.op, u);
 
   if (p.downed) {
@@ -301,9 +335,16 @@ export function drawOperator(ctx, p, t) {
   const cr = !!p.crouch && !p.prone;
   lowerBody(ctx, p, pants, LZ, bw); // baggy dark trousers, stacked from the floor up to the hips
   const sh = cr ? 0.93 : 1;
-  if (persp.h) { // the jacket's sides between the hips and the shoulders (what a tilted camera sees)
-    const tcol = u.cloth;
-    for (let i = 0; i < 4; i++) { const f = i / 3, [lx, ly] = LZ(0.29 + f * 0.14); ctx.fillStyle = shade(tcol, 0.62 + f * 0.2); ctx.beginPath(); ctx.ellipse(-1 + lx, ly / bw, 6.4 * sh, 9 * sh, 0, 0, 7); ctx.fill(); }
+  if (persp.h) { // the body between the hips and the shoulders (what a tilted camera sees): belt, jacket, plate carrier
+    const lift = (x, y, z) => { const [lx, ly] = LZ(z); return [x + lx, y + ly / bw]; };
+    let [a0, a1] = lift(-1, 0, 0.3), [b0, b1] = lift(-1, 0, 0.33);
+    column(ctx, a0, a1, 5.2, 7.4, b0, b1, 5.3, 7.5, u.strap || '#2a2a2a'); // belt
+    [a0, a1] = lift(-1, 0, 0.32); [b0, b1] = lift(-1, 0, 0.44);
+    column(ctx, a0, a1, 5.4 * sh, 7.6 * sh, b0, b1, 6.6 * sh, 9.2 * sh, u.cloth); // jacket, wider at the shoulders
+    if (VEST[p.op] === undefined || /carrier|heavy|medic|police|bomb/.test(String(VEST[p.op]))) {
+      [a0, a1] = lift(-0.8, 0, 0.335); [b0, b1] = lift(-0.8, 0, 0.43);
+      column(ctx, a0, a1, 5.7 * sh, 6.6 * sh, b0, b1, 5.9 * sh, 6.9 * sh, u.vest); // plate carrier
+    }
     const [lx, ly] = LZ(0.45); ctx.translate(lx, ly / bw); // the top of the body at shoulder height
   }
   if (p.slide) ctx.translate(-3, 0); // sliding: the body leans back behind the legs
@@ -336,6 +377,11 @@ export function drawOperator(ctx, p, t) {
   if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean)); ctx.translate(0, L * 5.5); ctx.rotate(L * 0.14); } // arms, gun and head lean with the torso
 
   { const [lx, ly] = LZ(0.42); ctx.translate(lx, ly); } // arms and gun at chest height
+  if (hang) { // the free hand up the rope, then turn to the aim for the gun
+    const [ax, ay] = LZ(0.42), [rx, ry] = LZ(inv ? 0.2 : 0.66), gx = 4.5 + rx - ax, gy = ry - ay;
+    limb(ctx, [-0.5, -6.5, 2 + (rx - ax) * 0.5, -5 + (ry - ay) * 0.5, gx, gy - 0.8], 3, u.cloth); ell(ctx, gx, gy - 0.8, 1.7, 1.6, acc.has('gloves') ? tc : '#1f1f20');
+    ctx.rotate(p.aim - bodyA);
+  }
   // ---- weapon & arms ----
   const shield = (id === 'brace' || p.riot) && p.brace, shieldBack = id === 'brace' && !p.brace && !p.riot, R = RIOT[p.riot];
   const pistol = WEAPONS[p.w] && (WEAPONS[p.w].cls === 'Pistol' || WEAPONS[p.w].cls === 'MP');
@@ -397,8 +443,18 @@ export function drawOperator(ctx, p, t) {
     ctx.restore();
   }
 
+  if (hang) ctx.rotate(bodyA - p.aim); // the head faces the wall
   if (p.slide) { ctx.translate(3.4, 0.5); ctx.rotate(0.14); } // sliding (he asked): the head leans down onto the gun, as when aiming in
-  { const [ax, ay] = LZ(0.42), [hx, hy] = LZ(0.53); ctx.translate(hx - ax, hy - ay); } // the head on top
+  { const [ax, ay] = LZ(0.42), [hx, hy] = LZ(0.53);
+    if (persp.h) { // neck and the sides of the head, from where the arms are drawn (0.42) up to the headgear
+      const at = z => { const [x, y] = LZ(z); return [x - ax, y - ay]; };
+      let [n0, n1] = at(0.44), [m0, m1] = at(0.49);
+      column(ctx, n0 + 0.3, n1, 2.6, 2.8, m0 + 0.5, m1, 2.6, 2.8, skin); // neck
+      [n0, n1] = at(0.48); [m0, m1] = at(0.53);
+      column(ctx, n0 + 0.8, n1, 4, 4, m0 + 0.6, m1, 4.9, 4.9, o.helmet || skin); // head and headgear sides
+      const [f0, f1] = at(0.495); ell(ctx, f0 + 3.6, f1, 1.6, 2.6, skin, false); // the face under the brim
+    }
+    ctx.translate(hx - ax, hy - ay); } // the head on top
   // ---- head & headgear ----
   if (up) ctx.translate(-1.6 * up, 0); // head tipped back
   ell(ctx, 0.8, 0, 4.3, 4.3, skin);
@@ -909,7 +965,7 @@ export function portrait(canvas, opKey) {
   ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
   const s = canvas.width / 46;
   ctx.save(); ctx.scale(s, s);
-  drawOperator(ctx, { x: 21, y: 24, aim: -0.55, op: opKey, w: o.primary, ally: true, walk: 0.6 }, 0);
+  showcase(21, 25, () => drawOperator(ctx, { x: 21, y: 25, aim: -0.55, op: opKey, w: o.primary, ally: true, walk: 0.6 }, 0));
   ctx.restore();
 }
 

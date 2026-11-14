@@ -5,6 +5,7 @@
 import { OPERATORS } from '/shared/operators.js';
 import { visionPoly } from '/shared/physics.js';
 import { drawOperator } from './sprites.js';
+import { withPersp } from './look.js';
 
 const FOV = 103 * Math.PI / 180, VIEW_H = 520, PASSES = [['killer', 'THEIR VIEW'], ['victim', 'YOUR VIEW']];
 let el = null, raf = 0, kc = null, rend = null, map = null, t0 = 0, onClose = null;
@@ -85,7 +86,7 @@ export function drawClip(c, W, H, kc, rend, map, t, P, focus, cx, cy, z) {
   const now = performance.now() / 1000;
   for (const p of P.values()) {
     const ally = (kc.names[p.id] || [0, 0])[1] === 1;
-    drawOperator(c, { x: p.x, y: p.y, aim: p.aim, op: p.op, w: p.w, ally, ads: p.fl & 2, crouch: p.fl & 4, downed: p.fl & 1, brace: p.fl & 8 }, now);
+    withPersp(p, 0, () => drawOperator(c, { x: p.x, y: p.y, aim: p.aim, op: p.op, w: p.w, ally, ads: p.fl & 2, crouch: p.fl & 4, downed: p.fl & 1, brace: p.fl & 8 }, now));
     c.save(); c.font = '700 9px Barlow Condensed, sans-serif'; c.textAlign = 'center'; c.fillStyle = p.id === kc.killer ? '#ff8a6a' : p.id === kc.victim ? '#9fd0ff' : 'rgba(255,255,255,0.7)';
     c.fillText(`${nm(p.id)}${OPERATORS[p.op] ? ' · ' + OPERATORS[p.op].name : ''}`, p.x, p.y - 16); c.restore();
   }

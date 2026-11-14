@@ -33,7 +33,7 @@ function frame(ms) {
     if (show === 'ops') {
       ctx.setTransform(Z, 0, 0, Z, x + cw / 2, y + ch / 2 + 6);
       setPersp({ x: 0, y: EYE }, PH);
-      drawOperator(ctx, { x: 0, y: 0, aim: AIM, op: it, w: OPERATORS[it].primary, ally: OPERATORS[it].team === 'def', walk: QP.get('walk') ? t * 8 : 0, legs: 1, crouch: POSE === 'crouch', prone: POSE === 'prone', lean: POSE === 'lean' ? 1 : 0, up: +QP.get('up') || 0 }, t);
+      drawOperator(ctx, { hang: POSE === 'hang' ? 'up' : POSE === 'inv' ? 'inv' : null, wallA: POSE === 'hang' || POSE === 'inv' ? AIM : undefined, x: 0, y: 0, aim: POSE === 'hang' || POSE === 'inv' ? AIM + 0.7 : AIM, op: it, w: OPERATORS[it].primary, ally: OPERATORS[it].team === 'def', walk: QP.get('walk') ? t * 8 : 0, legs: 1, crouch: POSE === 'crouch', prone: POSE === 'prone', lean: POSE === 'lean' ? 1 : 0, up: +QP.get('up') || 0 }, t);
       setPersp({ x: 0, y: 0 }, 0);
     } else {
       for (const [k, ally] of [[0.3, true], [0.7, false]]) {

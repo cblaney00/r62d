@@ -8,7 +8,7 @@ import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DR
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, raisedFrame, drawRaised, sightClip, looks, setPersp, liftOf, persp, lifted } from './look.js';
+import { tilt, raisedFrame, drawRaised, sightClip, addSpots, looks, setPersp, liftOf, persp, lifted } from './look.js';
 import { S, setMapScale } from './textures.js';
 import { drawZombie, drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
@@ -185,6 +185,7 @@ function wallHeld(q, now) {
   st.wallHold = { set, t: 0, at: now, pop: 0 };
 }
 const wallBlue = () => !!(st.wallHold && st.wallHold.t >= WALL_HOLD);
+const EYE_BACK = 0.75, RAISE_H = 0.06; // RAISE_H: how much a wall (1 = 3.2 m) stands up per world px from the eye; // how far below the middle of the screen the eye sits, in view heights (draw())
 const RAISE_FULL = 760, RAISE_NONE = 1150; // raised walls sink flat between these view heights (world px), see draw()
 const farSens = () => { const v = +($('farSens') || {}).value; return v > 0 ? v / 100 : 0.5; };
 function trackR(ux, uy) {
@@ -2579,9 +2580,12 @@ function liftDraw(x, y, z, fn) {
 }
 function draw(s, view, now, dt) {
   const z = st.zoom, m = st.map; let tq = performance.now();
-  let RH = 0.045 * Math.max(0, Math.min(1, (RAISE_NONE - (st.viewH || 0)) / (RAISE_NONE - RAISE_FULL)));
-  let eye = st.cam; // (the point walls are raised away from)
-  if (st.rt > 0 && st.rtFace != null) { const E = (st.viewH || 400) * 1.3 * st.rt; eye = { x: st.cam.x - Math.cos(st.rtFace) * E, y: st.cam.y - Math.sin(st.rtFace) * E }; RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, me0.ro[7] ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.5 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
+  let RH = RAISE_H * Math.max(0, Math.min(1, (RAISE_NONE - (st.viewH || 0)) / (RAISE_NONE - RAISE_FULL)));
+  // the eye (the point things stand up away from) sits below the screen, as a camera tilted like the world layers would
+  // see it (he asked 2026-11-14: more volume): everything, you in the middle too, shows its front and its height
+  const OB = (st.viewH || 400) * EYE_BACK, U0 = UP();
+  let eye = { x: st.cam.x - U0.x * OB, y: st.cam.y - U0.y * OB };
+  if (st.rt > 0 && st.rtFace != null) { const E = (st.viewH || 400) * 1.3, k = st.rt; eye = { x: eye.x + (st.cam.x - Math.cos(st.rtFace) * E - eye.x) * k, y: eye.y + (st.cam.y - Math.sin(st.rtFace) * E - eye.y) * k }; /* (glides from the usual eye to the one behind you) */ RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, me0.ro[7] ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.5 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
   setPersp(eye, gq.raised !== false && fxOn('walls3d') ? RH : 0); // everything else stands up by the same rule (people, gadgets: look.js persp)
   const shake = fxOn('shake') ? fx.shake : 0;
   const cr = Math.cos(st.rot || 0), sr = Math.sin(st.rot || 0), TA = z * cr, TB = z * sr, TC = -z * sr, TD = z * cr; // world -> screen (turned with Rotate aiming)
@@ -2750,7 +2754,7 @@ function draw(s, view, now, dt) {
       sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
       if (elv) c.restore(); }); };
-    upDraw(ctx); if (elv && persp.h) (st.upDraws || (st.upDraws = [])).push(upDraw);
+    upDraw(ctx); if ((elv || hangW !== undefined) && persp.h) (st.upDraws || (st.upDraws = [])).push(upDraw);
     const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? 0.28 : 0, lb = liftOf(p.x, p.y, 0.4 * zk + ez0), lh = liftOf(p.x, p.y, 0.53 * zk + ez0); // (drawn standing up: rings and head zones where they show)
     drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x + lb[0], y: p.y + lb[1] });
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x + lh[0], y: p.y + lh[1] });
@@ -2830,7 +2834,10 @@ function draw(s, view, now, dt) {
     const pk = pass === 'fog' ? fog.width / VW * z : z, pic = st.rend.picFor(pk);
     if (pass === 'fog' || !view) { drawRaised(c, st.rend, rf, [0, 1], pic); pfa('raise', t0); return; }
     // walls in colour exactly where your team's sight reaches (raised with them), like the floor: no cell-by-cell snapping
-    c.save(); c.clip(sightClip(vpolys, vviews, eye, RH)); drawRaised(c, st.rend, rf, [0], pic); c.restore();
+    const fi = view ? floorAt(m, view.x, view.y) : -1, fl = fi >= 0 && m.floors[fi] ? m.floors[fi] : null, below = fl && !fl.roof ? fl.i : fl ? fl.i - 1 : 0;
+    const sc = sightClip(vpolys, vviews, eye, RH, null, below), mr = st.me && st.me.ro && st.me.ro[0] && st.pred; // on a rope: the wall in front of you is always in sight
+    if (mr) addSpots(sc, [{ x: mr.x, y: mr.y, r: CELL * 5 }], eye, RH, below);
+    c.save(); c.clip(sc); drawRaised(c, st.rend, rf, [0], pic); c.restore();
     c.save(); c.clip(sightClip(vpolys, vviews, eye, RH, rm)); drawRaised(c, st.rend, rf, [1], pic); c.restore(); // cars, crates, shelves: only the part in sight
     pfa('raise', t0);
   } : null;
@@ -2858,7 +2865,7 @@ function draw(s, view, now, dt) {
     const fb = st.floorRect, below = st.rend.below && st.rend.below.off[st.camFloor];
     st.belowOut = !!(fb && below);
     if (st.belowOut) {
-      const L = st.cam.x - ex - 50, Tp = st.cam.y - ey - 50, W2 = ex * 2 + 100, H2 = ey * 2 + 100;
+      const gx = (st.rt || 0) * Math.max(ex, ey) * 1.5, L = st.cam.x - ex - 50 - gx, Tp = st.cam.y - ey - 50 - gx, W2 = ex * 2 + 100 + gx * 2, H2 = ey * 2 + 100 + gx * 2; // (the steep rope camera sees further)
       fctx.save(); fctx.beginPath(); fctx.rect(L, Tp, W2, H2); fctx.rect(fb[0], fb[1], fb[2] - fb[0], fb[3] - fb[1]); fctx.clip('evenodd'); fctx.fillStyle = '#000'; fctx.fillRect(L, Tp, W2, H2);
       st.rend.drawBelow(fctx, st.camFloor, L, Tp, W2, H2); fctx.restore();
     }
