@@ -409,6 +409,10 @@ function freeAimPoint() {
     const vx = st.pred.x + c * (see + 3), vy = st.pred.y + s * (see + 3), k = Math.floor(vy / CELL) * st.map.W + Math.floor(vx / CELL);
     if (st.map.tiles[k] === T.VOID) { see = l; if (shot >= see - 40 || st.map.tiles[Math.floor((st.pred.y + s * (shot + 3)) / CELL) * st.map.W + Math.floor((st.pred.x + c * (shot + 3)) / CELL)] === T.VOID) shot = l; }
   }
+  { // on a rope and not level with a window: shots into the building stop at the wall (the server's rule, ropeLevel)
+    const me = st.me, r = me && me.ro && me.ro[0] && !me.ro[8] && st.map && st.map.ropes[me.ro[1]];
+    if (r && -(c * Math.cos(r.out) + s * Math.sin(r.out)) > 0.15) { const cap = CELL * 1.2; see = Math.min(see, cap); shot = Math.min(shot, cap); }
+  }
   const x = st.pred.x + c * l, y = st.pred.y + s * l;
   // someone in the way (he asked): the marker stops on their team-coloured circle, unless the crosshair is on them
   let person = null;
@@ -3292,7 +3296,8 @@ function crosshair(me, now) {
   if (fq) {
     const q = fq, dm = q.ad / PX_PER_M;
     if (q.blocked) { // something in the way: a tick on it and a dotted line on to the crosshair
-      const G = w2s(q.wx, q.wy), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
+      const [lwx, lwy] = q.person ? [0, 0] : liftOf(q.wx, q.wy, 0.45); // at chest height, where walls and window openings show (he asked: it must work looking in at windows)
+      const G = w2s(q.wx + lwx, q.wy + lwy), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
       ctx.setLineDash([2 * DPR, 3 * DPR]); ctx.lineWidth = 1.2 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.35)';
       ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
       const na = Math.atan2(y - gy, x - gx) + Math.PI / 2, tl = 5 * DPR;

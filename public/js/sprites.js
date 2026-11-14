@@ -464,7 +464,6 @@ export function drawOperator(ctx, p, t) {
     ctx.restore();
   }
 
-  if (hang) ctx.rotate(bodyA - p.aim); // the head faces the wall
   if (p.slide) { ctx.translate(3.4, 0.5); ctx.rotate(0.14); } // sliding (he asked): the head leans down onto the gun, as when aiming in
   { const [ax, ay] = LZ(0.42), [hx, hy] = LZ(0.53);
     if (persp.h) { // neck and the sides of the head, from where the arms are drawn (0.42) up to the headgear
