@@ -106,6 +106,7 @@ function applyGfx() {
 const perfWatch = { t: 0, n: 0, gap: 0, work: 0, skip: 2 };
 function watchPerf(gapMs, workMs) {
   if (gfxName !== 'auto' || document.hidden || !playing()) return;
+  if ((st.rt || 0) > 0.01) return; // the rope view is the heaviest one: a slow rope moment never drops Auto a level (he asked 2026-11-14: keep it 3D)
   perfWatch.n++; perfWatch.gap += gapMs; perfWatch.work += workMs; perfWatch.t += gapMs;
   if (perfWatch.t < 3000) return;
   const gap = perfWatch.gap / perfWatch.n, work = perfWatch.work / perfWatch.n;
@@ -2700,7 +2701,10 @@ function draw(s, view, now, dt) {
   const OB = (st.viewH || 400) * EYE_BACK, U0 = UP();
   let eye = { x: st.cam.x - U0.x * OB, y: st.cam.y - U0.y * OB };
   if (st.rt > 0 && st.rtFace != null) { const E = (st.ropeBaseH || st.viewH || 400) * ROPE_EYE, k = st.rt; eye = { x: eye.x + (st.cam.x - Math.cos(st.rtFace) * E - eye.x) * k, y: eye.y + (st.cam.y - Math.sin(st.rtFace) * E - eye.y) * k }; /* (glides from the usual eye to the one behind you) */ RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, st.ropeH ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.2 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
-  setPersp(eye, gq.raised !== false && fxOn('walls3d') ? RH : 0); // everything else stands up by the same rule (people, gadgets: look.js persp)
+  // Low graphics stays flat, except in the rope camera, which glides into its 3D look (he asked 2026-11-14)
+  const rOn = fxOn('walls3d') && (gq.raised !== false || (st.rt || 0) > 0.01);
+  if (gq.raised === false) RH *= st.rt || 0;
+  setPersp(eye, rOn ? RH : 0); // everything else stands up by the same rule (people, gadgets: look.js persp)
   persp.cap = BODY_CAP + (st.rt || 0) * 4000; // bodies never stand up more than at this distance from the eye (look.js liftBody); none in the rope camera
   const shake = fxOn('shake') ? fx.shake : 0;
   const cr = Math.cos(st.rot || 0), sr = Math.sin(st.rot || 0), TA = z * cr, TB = z * sr, TC = -z * sr, TD = z * cr; // world -> screen (turned with Rotate aiming)
@@ -2952,7 +2956,7 @@ function draw(s, view, now, dt) {
   // flat (full up to RAISE_FULL world px tall, none past RAISE_NONE): there they are a few pixels, and on his graphics
   // card any raised-wall drawing over a whole far view halved the frame rate (he asked 2026-11-09: no lag at any zoom)
   let rf = null; // this frame's raised walls, worked out once for both passes (look.js keeps the pieces between frames)
-  const raise = inGame && RH > 0.002 && gq.raised !== false && fxOn('walls3d') ? (c, pass) => { // pass 'fog' (all, greyed by #fog) or 'lit'
+  const raise = inGame && RH > 0.002 && rOn ? (c, pass) => { // pass 'fog' (all, greyed by #fog) or 'lit'
     const t0 = performance.now(), rm = st.rend.map;
     if (!rf) {
       const fr = st.floorRect;

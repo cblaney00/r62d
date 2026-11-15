@@ -6,7 +6,9 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+
 ## Done
+- [x] can we make any quick changes that allows the other graphics settings below High to not flatten the look of the rappelling feature. that's all i need, im low on tokens (DONE 2026-11-14: only Low made it flat. On Low the rope view now glides into the same 3D look as High when you clip on, and back to flat when you leave the rope; Auto no longer drops a level because of a slow moment on a rope. Medium already kept the 3D look)
 
 - [x] (he asked 2026-11-14, watching his screen) on a rope, something wooden showed through the concrete wall to the right of a boarded window (DONE 2026-11-14: it was a stack of crates in the room behind the wall. On a rope the wall you hang on was drawn before the room behind it, so things in that room could show over it; now that wall is drawn last, nearest the camera. Checked by hanging along the two longest upper walls of all seven maps (56 pictures): nothing else shows through. The one pale wedge left on Harbor Office is real, the top of a breakable plaster corner wall)
 - [x] (he asked 2026-11-14) boarded windows only showed up when your operator got close, popping in one at a time; they should always be there (DONE 2026-11-14: two causes. The boards every window starts with were only on the defenders' map, so attackers saw each one only once they had looked at it; now both sides know them from the start. And on a rope your view looks out from the wall, so the wall itself never counted as seen; now the wall you hang on does)
