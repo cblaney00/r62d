@@ -52,4 +52,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-14', k: 'mech', id: 'lean', t: 'Leaning works on ropes; bodies bend with the lean.', v: 1 },
   { d: '2026-11-15', k: 'mech', id: 'deadzone', t: 'The crosshair passes over your own character; while it is that close your aim holds its direction, unless an enemy is within 0.5 m of it.', v: 1 },
   { d: '2026-11-15', k: 'gun', id: 'anvil', t: 'Anvil Slug damage 76 to 66 (heavies now take three body hits) and its damage falls off sooner (from 4 m, down to 45% at 14 m).', v: -1 },
+  { d: '2026-11-15', k: 'gun', id: 'drummer', t: 'Drummer LMG 22 to 21 damage and 860 to 800 rpm: it out-killed every other defence gun.', v: -1 },
 ];

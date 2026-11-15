@@ -1,7 +1,8 @@
 // ESPORTS TV (he asked: a mode to just watch the pro teams play). Loaded by main.js only when Esports TV is opened, so
 // none of this sits in a normal match. main.js hands over what it shares with it in initTv.
 import { PHASE, PRO_LEVEL } from '/shared/constants.js';
-import { floorAt, MAPS } from '/shared/map.js';
+import { floorAt, localPos, MAPS } from '/shared/map.js';
+import { los } from '/shared/physics.js';
 import { OPERATORS, JOBS } from '/shared/operators.js';
 import { PRO_TEAMS } from '/shared/pros.js';
 import { RANKS } from '/shared/progress.js';
@@ -56,9 +57,18 @@ export function tvDirector(s, players, now) {
   for (const i of [0, 1]) T.sqTime[i] *= Math.exp(-sdt / 120);
   if (cur && cur.sq !== undefined && !T.overview) T.sqTime[cur.sq] += sdt;
   const share = sq => { const a = T.sqTime[sq], b = T.sqTime[1 - sq]; return (b - a) / Math.max(20, a + b); }; // > 0: this team is owed screen time
-  const alive = s.players.filter(p => p.a && !p.dn && p.x !== undefined);
-  const fl = p => floorAt(st.map, p.x, p.y), recentShot = (p, w) => now - (T.shot[p.id] || -9) < w;
-  const fighting = p => recentShot(p, 1.8) || alive.some(q => q.sq !== p.sq && fl(q) === fl(p) && Math.hypot(q.x - p.x, q.y - p.y) < 260 && recentShot(q, 1.8));
+  // 2026-11-15 pass (he asked: update it for the new changes): in preparation an attacker is their drone (their body
+  // waits off the map), so a drone finding defenders is a shot worth taking. Distances are measured in the building
+  // frame, so a fight up or down stairs, through a hatch or a floor, out of a window or off a rope counts as close
+  // (a floor between costs VERT px); being in each other's sight makes contact more urgent.
+  const drones = new Map(); for (const e of s.ents || []) if (e.ty === 'drone' && e.ow && e.x !== undefined) drones.set(e.ow, e);
+  const alive = s.players.filter(p => p.a && !p.dn && (p.x !== undefined || (prep && drones.has(p.id))));
+  const at = p => p.x !== undefined ? p : drones.get(p.id) || p; // where a player's action is
+  const fl = p => floorAt(st.map, at(p).x, at(p).y), recentShot = (p, w) => now - (T.shot[p.id] || -9) < w;
+  const BP = new Map(), bp = p => { let b = BP.get(p.id); if (!b) { const q = at(p); b = localPos(st.map, q.x, q.y); BP.set(p.id, b); } return b; };
+  const VERT = 140, gap = (p, q) => { const a = bp(p), b = bp(q), df = Math.abs(a.f - b.f); return df > 1 ? 1e9 : Math.hypot(a.x - b.x, a.y - b.y) + df * VERT; };
+  const sees = (p, q) => fl(p) === fl(q) && los(st.map, at(p).x, at(p).y, at(q).x, at(q).y, null);
+  const fighting = p => recentShot(p, 1.8) || alive.some(q => q.sq !== p.sq && gap(p, q) < 260 && recentShot(q, 1.8));
   T.calm = !T.ovUntil && !(curOk && fighting(cur)) && !(T.overview && alive.some(fighting)); // (an instant replay waits for this)
   // he asked: wide shots on the floor where the action is (not always the bomb's floor). Each floor is weighed by who is
   // on it (fights count triple, a plant/defuse more); the wide shot frames the players there (T.ovPts), and the floor
@@ -69,8 +79,8 @@ export function tvDirector(s, players, now) {
   if (T.ovFloor === undefined) T.ovFloor = alive.length ? top : undefined;
   else if (alive.length && top !== T.ovFloor && wt[top] > wt[T.ovFloor] + 0.5) { T.ovLead = T.ovLead || now; if (now - T.ovLead > 1.2) { T.ovFloor = top; T.ovLead = 0; } }
   else T.ovLead = 0;
-  const onF = alive.filter(p => fl(p) === T.ovFloor), hot = onF.filter(p => fighting(p) || onF.some(q => q.sq !== p.sq && Math.hypot(q.x - p.x, q.y - p.y) < 16 * 36));
-  T.ovPts = (hot.length ? hot : onF).map(p => [p.x, p.y]);
+  const onF = alive.filter(p => fl(p) === T.ovFloor), hot = onF.filter(p => fighting(p) || alive.some(q => q.sq !== p.sq && gap(p, q) < 16 * 36));
+  T.ovPts = (hot.length ? hot : onF).map(p => [at(p).x, at(p).y]);
   if (!T.auto && curOk) return;
   if (T.ovUntil) return;
   // the followed player died or went down: one beat on it, then the killer (the trade is the story)
@@ -90,27 +100,34 @@ export function tvDirector(s, players, now) {
   const leave = curOk && T.leave === cur.id;
   const score = p => {
     let sc = 0, contact = 0;
-    if (p.bu) sc += 120; // planting / defusing / reviving: the objective
+    if (p.bu) sc += p.bu.k === 'plant' || p.bu.k === 'defuse' ? 120 : p.bu.k === 'revive' ? 60 : prep ? 20 : 8; // the objective; a revive; setting up
     if (fighting(p)) sc += 70;
-    for (const q of alive) { // anticipation: an enemy close on the same floor, and closing in
-      if (q.sq === p.sq || fl(q) !== fl(p)) continue;
-      const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || 1, close = -(((q.vx || 0) - (p.vx || 0)) * dx + ((q.vy || 0) - (p.vy || 0)) * dy) / d;
+    for (const q of alive) { // anticipation: an enemy close (stairs, hatches, windows and ropes included) and closing in
+      if (q.sq === p.sq) continue;
+      const d = gap(p, q); if (d > 600) continue;
+      const a = at(p), b = at(q), dx = b.x - a.x, dy = b.y - a.y, dd = Math.hypot(dx, dy) || 1, close = -(((q.vx || 0) - (p.vx || 0)) * dx + ((q.vy || 0) - (p.vy || 0)) * dy) / dd;
       const tta = close > 5 ? d / close : 99; // seconds until they meet
-      contact = Math.max(contact, Math.max(0, 1 - d / 420) * 40 + (tta < 7 ? (7 - tta) * 6 : 0));
+      let c = Math.max(0, 1 - d / 420) * 40 + (tta < 7 ? (7 - tta) * 6 : 0);
+      if (d < 520 && sees(p, q)) c = c * 1.4 + 12; // in each other's sight: a shot is coming
+      contact = Math.max(contact, c);
     }
     sc += contact;
+    if (p.rp) sc += p.ry ? 26 : 10; // on a rope (an outside play), more when level with a window (a peek)
     const mates = alive.filter(q => q.sq === p.sq).length, foes = alive.filter(q => q.sq !== p.sq).length;
     if (mates === 1 && foes >= 1) sc += 35 + foes * 8; // a clutch
     sc += Math.min(3, ((T.kills || {})[p.id] || []).length) * 12; // a hot streak
     if (p.df) sc += 12;
     sc += Math.max(0, share(p.sq)) * 60; // the team that has been on screen less
     if (s.pl && p.tm === 'def') sc += Math.max(0, 30 - Math.hypot(s.pl.x - p.x, s.pl.y - p.y) / 12); // the retake
+    if (prep && p.tm === 'atk' && p.x === undefined) sc += 6; // a drone out scouting
     if (prep && p.tm === 'def') { if (now - (T.util[p.id] || -9) < 4) sc += 30; if (!T.prepSeen.has(p.id)) sc += 12; if (s.ents.some(e => e.tm === 'def' && Math.hypot(e.x - p.x, e.y - p.y) < 80)) sc += 6; }
     return sc;
   };
   const held = now - (T.cutT || -99);
   const curSc = curOk ? score(cur) : -1;
   if (curOk && !leave && fighting(cur)) return; // never cut away from a fight in progress
+  { const OBJ = q => !!(q && q.bu && (q.bu.k === 'plant' || q.bu.k === 'defuse')), obj = alive.find(p => OBJ(p) && p.id !== T.follow && !OBJ(cur)); // a plant / defuse just started: the round's key moment, at once
+    if (obj && !prep) { T.leave = null; T.follow = obj.id; T.cutT = now; send({ t: 'tv', a: 'follow', id: obj.id }); return; } }
   const quiet = curOk && curSc < 15;
   const minHold = prep ? 9 : 7; // he asked: it cut too often
   if (curOk && !leave && held < minHold) return;

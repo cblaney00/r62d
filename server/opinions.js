@@ -6,7 +6,7 @@
 import { training } from './training.js';
 import { PATCH_NOTES } from '../shared/patchnotes.js';
 import { PRO_TEAMS, PRO_PERSONA, JOB_NAME } from '../shared/pros.js';
-import { OPERATORS, WEAPONS, ATTACH } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, ATTACH, SIDEARMS, gunSide } from '../shared/operators.js';
 import { MAPS, MAP_LIST } from '../shared/map.js';
 
 const pct = x => Math.round(x * 100) + '%';
@@ -28,24 +28,38 @@ const quirk = (name, k) => { let h = 2166136261; for (const c of name + '|' + k)
 function candidates(pl) {
   const out = [], [aggr, patience] = PRO_PERSONA[pl.name] || [0.5, 0.5], sure = n => Math.min(1, n / 60);
   // operators that win far too much (the other side's, mostly: those are the ones beating them)
+  // (2026-11-15) measured against the average operator of the same side, so a side that wins more overall doesn't make
+  // every one of its operators look broken (that is the 'sides' complaint below), and only once there are enough rounds
+  const sideAvg = {}; for (const [op, x] of Object.entries(training.opx || {})) { if (!OPERATORS[op]) continue; const a = sideAvg[OPERATORS[op].team] || (sideAvg[OPERATORS[op].team] = [0, 0]); a[0] += x[0]; a[1] += x[1]; }
   for (const [op, x] of Object.entries(training.opx || {})) {
-    if (!OPERATORS[op] || !x[0]) continue; const wr = (x[1] + 1) / (x[0] + 2); if (wr < 0.53) continue;
+    if (!OPERATORS[op] || !x[0]) continue; const sa = sideAvg[OPERATORS[op].team], wr = (x[1] + 1) / (x[0] + 2) - sa[1] / Math.max(1, sa[0]) + 0.5; if (wr < 0.53) continue;
     const mine = (pl.pool.atk || []).concat(pl.pool.def || []).includes(op);
-    out.push({ kind: 'op', id: op, s: Math.min(1, (wr - 0.5) * 4) * sure(x[0]) * (mine ? 0.4 : 1), text: `${OPERATORS[op].name} is the worst thing in the game right now: the team with ${OPERATORS[op].name} wins ${pct(wr)} of practice rounds.${when(notesFor(op).slice(-1)[0])}` });
+    out.push({ kind: 'op', id: op, s: Math.min(1, (wr - 0.5) * 4) * Math.min(1, x[0] / 500) * (mine ? 0.4 : 1), text: `${OPERATORS[op].name} is the worst thing in the game right now: the team with ${OPERATORS[op].name} wins ${pct((x[1] + 1) / (x[0] + 2))} of practice rounds, ${Math.round((wr - 0.5) * 100)} points over the average ${OPERATORS[op].team === 'atk' ? 'attacker' : 'defender'}.${when(notesFor(op).slice(-1)[0])}` });
   }
   // guns: kills a round across every operator that carries it
   const guns = {}; for (const [k, r] of Object.entries(training.guns || {})) { const w = k.split('|')[1], g = guns[w] || (guns[w] = [0, 0, 0, 0]); r.forEach((v, i) => { g[i] += v; }); }
-  const kpr = Object.entries(guns).filter(([w, g]) => WEAPONS[w] && g[0] >= 40).map(([w, g]) => ({ w, cls: WEAPONS[w].cls, k: g[2] / g[0], n: g[0] }));
-  for (const g of kpr) { // against the other guns of its own kind (a rifle next to rifles: sidearms barely get used, so a plain average is unfair)
-    const same = kpr.filter(x => x.cls === g.cls && x !== g); if (!same.length) continue;
-    const avg = same.reduce((a, x) => a + x.k, 0) / same.length; if (g.k < avg * 1.2 || g.k - avg < 0.12 || avg < 0.1 || g.k * g.n < 20) continue; // (a real gap, in guns that really get used)
-    out.push({ kind: 'gun', id: g.w, s: Math.min(1, g.k / avg - 1) * 1.2 * sure(g.n) * (0.6 + aggr * 0.5), text: `The ${WEAPONS[g.w].name} is broken: ${g.k.toFixed(2)} kills a round in practice, the other ${g.cls === 'AR' ? 'rifles' : g.cls + 's'} get ${avg.toFixed(2)}.${when(notesFor(g.w).slice(-1)[0])}` });
+  // A main gun is judged against the other main guns of its own side (2026-11-15: compared only with its own kind, the
+  // Anvil slug, a long-range defence primary, always looked broken next to the close-range shotguns while it sat mid-pack
+  // among the guns it really competes with for the slot), and only when it also wins more rounds than they do.
+  const kpr = Object.entries(guns).filter(([w, g]) => WEAPONS[w] && !SIDEARMS.has(w) && g[0] >= 40).map(([w, g]) => ({ w, side: gunSide(w), k: g[2] / g[0], wr: (g[1] + 1) / (g[0] + 2), n: g[0] }));
+  for (const g of kpr) {
+    const same = kpr.filter(x => x.side === g.side && x !== g); if (same.length < 3) continue;
+    const n = same.reduce((a, x) => a + x.n, 0), avg = same.reduce((a, x) => a + x.k * x.n, 0) / n, wrAvg = same.reduce((a, x) => a + x.wr * x.n, 0) / n;
+    if (g.k < avg * 1.2 || g.k - avg < 0.12 || g.wr < wrAvg + 0.03 || g.k * g.n < 20) continue; // (a real gap in kills AND in wins, in guns that really get used)
+    out.push({ kind: 'gun', id: g.w, s: Math.min(1, g.k / avg - 1) * 1.2 * sure(g.n) * (0.6 + aggr * 0.5), text: `The ${WEAPONS[g.w].name} is broken: ${g.k.toFixed(2)} kills a round and ${pct(g.wr)} of rounds won in practice; the other ${g.side === 'def' ? 'defence' : 'attack'} main guns get ${avg.toFixed(2)} and ${pct(wrAvg)}.${when(notesFor(g.w).slice(-1)[0])}` });
   }
+  // one side winning too often overall (he asked for 45-50% attack): attack-minded players feel it most
+  { let a = [0, 0]; for (const [k, r] of Object.entries(training.ops || {})) { const side = k.split('|')[1]; if (side === 'atk') { a[0] += r.n; a[1] += r.w; } }
+    const ar = (a[1] + 1) / (a[0] + 2);
+    if (a[0] >= 500 && Math.abs(ar - 0.5) > 0.04) { const def = ar < 0.5; out.push({ kind: 'mech', id: 'sides', s: Math.abs(ar - 0.5) * 4 * (def ? 0.7 + aggr * 0.5 : 0.7 + patience * 0.5), text: `The game leans ${def ? 'defence' : 'attack'}: attackers win ${pct(ar)} of practice rounds. ${def ? 'Defenders get too long to set up and too many places to hold from.' : 'Defenders can\'t hold anything long enough.'}` }); } }
   // attachments that win much more than the others in their slot on the same gun
+  const awr = r => (r[1] + r[2] + 1) / (r[0] + r[2] + r[3] + 2), slotAvg = {}; // (2026-11-15) against the other choices for that slot on that gun, not 50%: a strong gun made all its parts look broken
+  for (const [k, r] of Object.entries(training.att || {})) { const [w, slot] = k.split('|'), a = slotAvg[w + '|' + slot] || (slotAvg[w + '|' + slot] = [0, 0]); a[0] += r[0]; a[1] += awr(r) * r[0]; }
   for (const [k, r] of Object.entries(training.att || {})) {
     const [w, slot, c] = k.split('|'); if (c === 'none' || !WEAPONS[w] || !ATTACH[slot] || !ATTACH[slot][c] || r[0] < 25) continue;
-    const wr = (r[1] + r[2] + 1) / (r[0] + r[2] + r[3] + 2); if (wr < 0.56) continue;
-    out.push({ kind: 'att', id: k, s: (wr - 0.5) * 3 * sure(r[0]) * (0.5 + patience * 0.4), text: `${ATTACH[slot][c].name} on the ${WEAPONS[w].name} is too good: setups with it win ${pct(wr)} of their fights and rounds. Everyone runs it.` });
+    const sa = slotAvg[w + '|' + slot], others = (sa[1] - awr(r) * r[0]) / Math.max(1, sa[0] - r[0]); if (sa[0] - r[0] < 25) continue;
+    const wr = awr(r) - others + 0.5; if (wr < 0.56) continue;
+    out.push({ kind: 'att', id: k, s: (wr - 0.5) * 3 * sure(r[0]) * (0.5 + patience * 0.4), text: `${ATTACH[slot][c].name} on the ${WEAPONS[w].name} is too good: setups with it win ${pct(awr(r))} of their fights and rounds, the other choices ${pct(others)}. Everyone runs it.` });
   }
   // maps: one side winning far too often
   const maps = {}; for (const [k, r] of Object.entries(training.plans || {})) { const [m, , side] = k.split('|'); if (!MAPS[m] || !MAP_LIST.includes(m)) continue; const x = maps[m] || (maps[m] = { atk: [0, 0], def: [0, 0] }); x[side][0] += r.n; x[side][1] += r.w; }
