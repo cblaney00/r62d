@@ -512,12 +512,10 @@ function drawColl(ctx, G, pic, R, h, up, plain) {
 export function drawRaised(ctx, R, fr, which, pic = R.c, plain = false, upA = 1) { // plain: no surface lines (the greyed copy out of sight)
   const cx = fr.cam.x, cy = fr.cam.y, h = fr.h, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
   const k = which === 'all' ? 'all' : 'lit';
-  if (which !== 'lit') {
-    drawColl(ctx, fr.fac[k], pic, R, h, up, plain);
-    if (fr.up[k].n && upA > 0.01) { ctx.save(); ctx.globalAlpha *= upA; drawColl(ctx, fr.up[k], pic, R, h, up, plain); ctx.restore(); }
-    if (which === 'out') return;
-  }
+  const outer = () => { drawColl(ctx, fr.fac[k], pic, R, h, up, plain); if (fr.up[k].n && upA > 0.01) { ctx.save(); ctx.globalAlpha *= upA; drawColl(ctx, fr.up[k], pic, R, h, up, plain); ctx.restore(); } };
+  if (which === 'out') { outer(); return; }
   for (const B of fr.order) { drawColl(ctx, B[k][0], pic, R, h, up, plain); drawColl(ctx, B[k][1], pic, R, h, up, plain); } // far to near; in each band the furniture, then the walls in front of it
+  if (which === 'all') outer(); // the outside walls (the storeys below, the wall a climber hangs on) last: they are nearest the camera
 }
 // ---------------------------------------------------------------- camera tilt
 // The world layers (#world) are turned in 3D: a fixed angle (11°, he asked for more than the first 7°; the top of the screen a little further away) plus a lean

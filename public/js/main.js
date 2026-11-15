@@ -722,7 +722,7 @@ function onSnap(s) {
     if (s.cells[i + 1] === T.BARRI && m.tiles[k] !== T.BARRI) delete m.holes[k]; // freshly boarded up: no old bullet holes
     m.tiles[k] = s.cells[i + 1]; m.hp[k] = s.cells[i + 2];
     holePortal(m, k); // an opened hatch drops you through
-    if (s.cb && s.cb[i / 3] === ours) now0.push(k); else st.unseen.add(k);
+    if (s.cb && (s.cb[i / 3] === ours || s.cb[i / 3] === 3)) now0.push(k); else st.unseen.add(k); // (3: known to everyone, e.g. the boards every window starts with)
   }
   for (let i = 0; i < (s.holes || []).length; i += 3) { // new bullet holes in soft walls
     const k = s.holes[i];
@@ -2968,9 +2968,10 @@ function draw(s, view, now, dt) {
     if (pass === 'fog' || !view) { drawRaised(c, st.rend, rf, 'all', pic, !!view, upA); pfa('raise', t0); return; } // (out of sight: greyed, no surface lines)
     // in colour: only pieces whose own spot your team sees (he asked: not deep in the building, nothing through solid
     // things), the storeys below/above by that alone, this floor's also clipped to the sight shapes for a smooth edge
-    drawRaised(c, st.rend, rf, 'out', pic, false, upA);
+    if (!rf.fac || !(st.rt > 0.05)) drawRaised(c, st.rend, rf, 'out', pic, false, upA); // (on a rope: after the room behind, below)
     const sc = sc0;
     c.save(); c.clip(sc); drawRaised(c, st.rend, rf, 'lit', pic); c.restore();
+    if (rf.fac && st.rt > 0.05) drawRaised(c, st.rend, rf, 'out', pic, false, upA); // on a rope the wall you hang on and the storeys round it are nearest the camera: drawn last, so nothing behind them shows over them (crates did)
     pfa('raise', t0);
   } : null;
   // every cell of a floor that is not open air, as one path of row runs (kept per floor; the ground below is drawn round them)
@@ -4172,6 +4173,7 @@ function teamSees(x, y) {
 // Is this map cell (often a wall, which blocks the line itself) visible to the team?
 function cellSeen(k) {
   const m = st.map, x = (k % m.W + 0.5) * CELL, y = (Math.floor(k / m.W) + 0.5) * CELL;
+  if (st.me && st.me.ro && st.me.ro[0] && st.wallSpots && st.wallSpots.ri === st.me.ro[1]) for (const q of st.wallSpots.sp) if (Math.hypot(x - q.x, y - q.y) < q.r) return true; // on a rope: the wall you hang on, you are looking right at it
   for (const v of st.viewers || []) {
     if (v.off) continue;
     const d = Math.hypot(x - v.x, y - v.y);
@@ -4438,7 +4440,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.

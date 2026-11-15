@@ -429,3 +429,4 @@ His wishes so far:
   - Aim smoothness: crosshair gap glides (`st.gapShow`, 70 ms, opens at once); bots' hand drift `handDrift` (bots.js: piecewise steady drift, 0.1–0.18 s, ±0.145 × shake rad/s).
   - Outdoors: mapdraw.js `groundDetail` (blotches + per-ground-kind marks, from `hash`), textures.js radial gradients fade to their own colour (black left grey rings). Outside walls: look.js deco for `F.e` faces (grime, drainpipe/vent/lamp/sign by cell hash).
   - Quick Match pre-boards credited to the defenders (`this.by` round `preBarricade`).
+  - Rope wall order + starting boards (2026-11-14, he saw crates through the wall and boards popping in): on a rope the outside wall group (`fac`/`up`) is drawn after the lit bands (main.js raise, look.js `drawRaised` `outer()` last in the `all` pass); `beginPrep` boards windows with `this.by = 'all'` → snapshot `cb` 3 = known to both sides (client `applyKnown` accepts 3); `cellSeen` counts `st.wallSpots` as seen on a rope.

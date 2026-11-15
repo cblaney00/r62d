@@ -421,7 +421,7 @@ export class Game {
     }
     for (const c of map.outCams || []) // outside cameras under the roof's edge (he asked): watch the yard, the ropes and the roof edge
       this.ents.push({ id: this.eid(), type: 'cam', x: c.x, y: c.y, gx: c.gx, gy: c.gy, oc: c.i, team: TEAM.DEF, hp: 1, offUntil: 0, ang: c.n, wn: c.n, ws: OUTCAM_TURN, wall: [] });
-    this.by = TEAM.DEF; this.boardWindows(); this.by = null; // the defenders' boards: their map shows them
+    this.by = 'all'; this.boardWindows(); this.by = null; // every window starts boarded: both sides' maps show it at once (he saw boards pop in one by one)
     // defenders start on site, attackers at one spawn (their bodies wait while they drone)
     const site = map.sites[this.site];
     // defenders in preparation (he asked 2026-11-14): on Dust Town they stay in a box round the two site rooms; on every
@@ -3234,7 +3234,7 @@ export class Game {
   broadcast() {
     const cells = [];
     for (const k of this.changed) cells.push(k, this.map.tiles[k], Math.max(0, Math.round(this.map.hp[k])));
-    const by = { atk: 1, def: 2 }, cb = [], hb = [];
+    const by = { atk: 1, def: 2, all: 3 }, cb = [], hb = [];
     for (const k of this.changed) cb.push(by[this.chBy.get(k)] || 0);
     for (let i = 0; i < this.newHoles.length; i += 3) hb.push(by[this.holeBy.get(this.newHoles[i])] || 0);
     this.changed.clear(); this.chBy.clear(); this.holeBy.clear(); const holes = this.newHoles; this.newHoles = [];

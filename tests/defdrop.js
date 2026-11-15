@@ -10,7 +10,7 @@ watcher.sock = { open: true, send: s => { const m = JSON.parse(s); if (m.t === '
 // 1. map changes are tagged with the side that made them: defenders' boards and reinforcements in preparation
 while (g.phase !== PHASE.ACTION) { g.tick(1 / 30); if (g.time % 0.05 < 1 / 30) g.broadcast(); }
 let built = 0, tagged = 0;
-for (const s of snaps) for (let i = 0; i < s.cells.length; i += 3) if (s.cells[i + 1] === T.BARRI || s.cells[i + 1] === T.REINF) { built++; if (s.cb[i / 3] === 2) tagged++; }
+for (const s of snaps) for (let i = 0; i < s.cells.length; i += 3) if (s.cells[i + 1] === T.BARRI || s.cells[i + 1] === T.REINF) { built++; if (s.cb[i / 3] === 2 || s.cb[i / 3] === 3) tagged++; } // (3: known to both sides, the boards every window starts with)
 if (!built) fail('no boards or reinforcements made in preparation');
 else if (tagged / built < 0.95) fail(`only ${tagged} of ${built} built cells tagged as the defenders'`);
 // an attacker's blast is the attackers'
