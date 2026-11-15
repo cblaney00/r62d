@@ -79,3 +79,19 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
   more for people, who use their skills more.
 - BULWARK: K4 Carbine as his only main gun (he asked; was pistols). Trained pros: attack 39.1% (402 rounds; same as before
   within luck). BULWARK himself 43% won, K/D 1.06 over 47 rounds (was 41%, K/D 0.69 in practice).
+
+## 2026-11-15: the pros' complaints, 2,000 practice rounds
+- The pros' top complaint was the Anvil Slug (8 of 10). Practice showed that came from how they judged guns: only against
+  the other shotguns (all close-range and weak), while the Anvil is a long-range defence primary and sits mid-pack among
+  the defence main guns (0.57 kills a round, 55% wins vs Sentry 0.96, SMGs 0.6-0.8). Trimmed anyway (76 → 66 damage,
+  falls off sooner; heavies take 3 body hits): after it 0.51 / 54%.
+- server/opinions.js now judges fairly: a main gun against its own side's main guns (kills AND wins), an operator against
+  its side's average (with 500 rounds needed, his Patch Watch rule), an attachment against the other choices for that
+  slot on that gun, plus a side-balance view ('sides').
+- With that, the Drummer LMG stood out (0.98 kills a round, 61%, the top defence gun): 22 → 21 damage, 860 → 800 rpm.
+  After: 0.89 / 57% (the defence average).
+- After both (1,000 rounds on the new version): no operator, gun or attachment stands clearly out. Pros now name taste
+  rules he chose (bullet trails, blurred sound, run-outs, defuser drop announced), thin hitboxes, and Dust Town.
+- The real imbalance is the sides: attack wins ~44% (Villa 38%, Lodge 40%, School 40%, Depot 44%, Embassy 45%, Harbor 49%,
+  Dust Town 56%). Target 45-50%. Not changed: the round rules (prep 30 s, 10 reinforcements, 2:40) are his choices.
+- Watch: Ox Belt-Fed (0.85-0.96 kills a round on attack, few rounds yet), Hatchet MP's suppressor (small sample).
