@@ -101,3 +101,8 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
   current 40% avg · 7 reinforcements 42% · 20 s preparation 39% (all within noise). One more breakable wall per site
   room on Villa/Lodge/School made no difference either (reverted). So Villa needs a change to the map itself.
   Test knobs: `R62D_REINF`, `R62D_PREP` (server/game.js). Across maps: 4+ defenders on site at 30 s → attack wins ~9%.
+- Villa new ways in (balcony + Kids Room doors, north terrace + stone steps): attack 31% → 43-48%.
+- After rat spots, +3 cameras a map, hallway baffles, 5 m plant areas, PERCH Overwatch and defuser requests (trained pros,
+  ~125 rounds a map, ±9%): Harbor 55, Villa 44, Depot 42, Embassy 49, Lodge 34, School 38, Dust 48; overall ~44%.
+  Weak sites are all upstairs: Lodge 2F Office 20%, School 2F Principal Office 30% / 3F Clock Room 29%, Depot 2F Manager
+  Office 29%. Next: give those the Villa treatment (an outside way up). `tests/probe.js 7 N <map>` prints per-site results.
