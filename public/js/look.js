@@ -142,6 +142,7 @@ const BOXY = new Set(['planter', 'sandbags', 'lounger', 'aircon', 'skirack', 'bi
 // own height (a wall = 1 = 3.2 m), how it stands ('legs': legs at the corners under a thin top, the floor showing under
 // it; 'solid': a block) and the colour of its sides. Anything not listed: a solid block at the old height.
 const FURN = {
+  pillar: [1, 'solid'], // (a column runs floor to ceiling: drawn short it looked like it couldn't hide anything, so its sight shadow read as a grey streak, he saw in the Villa gallery)
   desk: [0.23, 'legs'], meetingtable: [0.23, 'legs'], coffeetable: [0.14, 'legs'], workbench: [0.28, 'legs'], bench: [0.14, 'legs'], chairs: [0.14, 'legs'],
   marketstall: [0.28, 'legs'], railing: [0.33, 'legs'], lounger: [0.12, 'legs'], skirack: [0.3, 'legs'], bikerack: [0.25, 'legs'], barrier: [0.3, 'solid', [150, 150, 146]],
   couch: [0.15, 'solid', [72, 70, 74]], bed: [0.17, 'solid', [150, 142, 130]], console: [0.24, 'solid', [62, 60, 58]], counter: [0.28, 'solid', [120, 106, 90]],

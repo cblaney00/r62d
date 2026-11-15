@@ -550,7 +550,7 @@ button.big { font-size: 22px; padding: 14px 34px; }
 #countdown.go { animation: pop 0.9s ease-out forwards; }
 
 /* end of match */
-#endscreen { overflow: auto; padding: 30px; }
+#endscreen { overflow: auto; padding: 30px; pointer-events: auto; cursor: default; } /* (inside #ui, which lets the mouse through to the game, where the pointer is hidden) */
 #endscreen .t { animation: letterIn 0.8s cubic-bezier(.2,.8,.2,1) both; }
 #endscreen .s { animation: fadeIn 0.5s 0.4s both; }
 .endGrid { display: grid; grid-template-columns: 320px 520px; gap: 20px; animation: rise 0.5s 0.5s both; }
