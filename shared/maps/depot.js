@@ -82,6 +82,7 @@ export function build() {
 
   // ================= 2F =================
   U.slab(72, 22, 2, 6, FL.CONCRETE);                     // fire-escape landing
+  U.slab(46, 44, 10, 2, FL.CONCRETE);                    // (2026-11-15, he asked: attack won ~29% here) a steel walkway along the Manager Office's south wall
   U.drop(12, 14, 33, 26);                                // open space above the shed floor
   U.room('North Catwalk', 9, 11, 36, 3, FL.SERVER);
   U.room('South Catwalk', 9, 40, 36, 3, FL.SERVER);
@@ -98,7 +99,7 @@ export function build() {
   for (const [rx, ry, rw, rh] of [[12, 14, 33, 1], [12, 39, 33, 1], [12, 15, 1, 11], [12, 28, 1, 11], [13, 25, 32, 1], [13, 28, 32, 1]]) U.prop('railing', rx, ry, rw, rh, T.LOW);
   U.door(45, 12, 45, 13); U.door(45, 40, 45, 41); U.door(45, 26, 45, 27);
   U.door(58, 15, 58, 16); U.door(51, 21, 52, 21); U.door(64, 21, 65, 21); U.door(51, 25, 52, 25); U.door(64, 25, 65, 25);
-  U.door(64, 34, 65, 34); U.door(58, 38, 58, 39); U.door(71, 23, 71, 24, true);
+  U.door(64, 34, 65, 34); U.door(58, 38, 58, 39); U.door(71, 23, 71, 24, true); U.door(50, 43, 51, 43, true); // (the last: from the south walkway into the Manager Office)
   U.window(14, 10, 15, 10); U.window(38, 10, 39, 10); U.window(71, 15, 71, 16);
   U.window(71, 38, 71, 39); U.window(52, 43, 53, 43); U.window(66, 43, 67, 43); U.window(8, 12, 8, 12); U.window(8, 41, 8, 41);
   U.prop('console', 47, 12, 9, 1, T.LOW); U.prop('rack', 56, 15, 1, 5, T.TALL); U.prop('desk', 48, 16, 4, 2, T.LOW);
@@ -138,6 +139,7 @@ export function build() {
   stair(0, 1, 47, 34, 2, 6, 'n', FL.CONCRETE);           // workshop -> manager office
   G.prop('railing', 49, 33, 1, 7, T.LOW); G.prop('railing', 47, 33, 2, 1, T.LOW);
   U.prop('railing', 49, 35, 1, 5, T.LOW); U.prop('railing', 47, 40, 2, 1, T.LOW);
+  stair(0, 1, 56, 44, 6, 2, 'w', FL.CONCRETE, 'rust');           // yard -> south walkway (Manager Office), 2026-11-15
   stair(0, 1, 72, 28, 2, 6, 'n', FL.CONCRETE, 'rust');           // outside fire escape -> corridor
   G.prop('railing', 72, 27, 2, 1, T.LOW);
   U.prop('railing', 72, 34, 2, 1, T.LOW);

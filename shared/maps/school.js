@@ -91,6 +91,7 @@ export function build() {
 
   // ================= 2F =================
   U.slab(66, 22, 2, 6, FL.CONCRETE);                     // fire-escape landing
+  U.slab(66, 36, 2, 5, FL.CONCRETE);                     // (2026-11-15, he asked: attack won ~30% upstairs) a second fire escape's landing, by the Staff Room
   U.area('Library', 30, 11, 16, 10, FL.CARPET);
   U.area('Science Lab', 11, 11, 18, 10, FL.TILE);
   U.area('Computer Lab', 47, 11, 18, 10, FL.SERVER);
@@ -106,7 +107,7 @@ export function build() {
   U.pillar([[10, 10], [65, 10], [10, 43], [65, 43], [29, 10], [46, 10], [10, 21], [10, 26], [65, 21], [65, 26], [29, 21], [46, 21]]);
   U.door(36, 21, 39, 21); U.door(19, 21, 20, 21); U.door(55, 21, 56, 21); U.door(29, 15, 29, 16); U.door(46, 15, 46, 16);
   U.door(17, 26, 18, 26); U.door(30, 26, 31, 26); U.door(44, 26, 45, 26); U.door(59, 26, 60, 26); U.door(37, 27, 37, 28);
-  U.door(54, 38, 54, 39); U.door(59, 34, 60, 34); U.door(65, 23, 65, 24, true);
+  U.door(54, 38, 54, 39); U.door(59, 34, 60, 34); U.door(65, 23, 65, 24, true); U.door(65, 36, 65, 37, true); // (the last: Staff Room onto the new fire escape)
   U.window(15, 10, 16, 10); U.window(23, 10, 24, 10); U.window(51, 10, 52, 10); U.window(59, 10, 60, 10); U.window(10, 14, 10, 15);
   U.window(65, 14, 65, 15); U.window(65, 30, 65, 31); U.window(37, 34, 37, 35);
   U.prop('counter', 13, 13, 8, 1, T.LOW); U.prop('counter', 13, 17, 8, 1, T.LOW); U.prop('shelf', 27, 12, 1, 7, T.TALL); U.prop('sink', 23, 12, 2, 1, T.LOW);
@@ -150,7 +151,7 @@ export function build() {
   C.box(30, 10, 45, 21, T.SOFT, MAT.BRICK);
   C.door(38, 12, 38, 13); C.door(38, 18, 38, 19);
   C.window(33, 10, 35, 10); C.window(30, 14, 30, 16); C.window(45, 13, 45, 14); C.window(34, 21, 35, 21);
-  C.prop('tank', 32, 14, 4, 4, T.TALL); C.prop('crates', 36, 19, 1, 1, T.TALL);
+  C.prop('tank', 36, 15, 2, 2, T.TALL); // (moved aside for the Library stairs, 2026-11-15) C.prop('crates', 36, 19, 1, 1, T.TALL);
   C.round(31, 11, 2, 'se', T.HARD, MAT.BRICK); C.round(31, 21, 2, 'ne', T.HARD, MAT.BRICK); // the Clock Room's rounded corners
 
   // ================= stairs =================
@@ -167,6 +168,9 @@ export function build() {
   G.prop('railing', 66, 27, 2, 1, T.LOW);
   U.prop('railing', 66, 34, 2, 1, T.LOW);
 
+  stair(0, 1, 66, 41, 2, 6, 'n', FL.CONCRETE, 'green');           // second fire escape -> Staff Room (2026-11-15)
+  stair(1, 2, 34, 15, 2, 4, 'n', FL.WOOD);               // library -> clock room (2026-11-15: a second way up the tower)
+  U.prop('railing', 33, 18, 1, 1, T.LOW); C.prop('railing', 36, 18, 1, 1, T.LOW);
   stair(0, 1, 58, 57, 2, 5, 'n', FL.MARBLE);             // trophy hall -> trophy gallery
   G.prop('railing', 57, 56, 1, 6, T.LOW); G.prop('railing', 58, 56, 2, 1, T.LOW);
   U.prop('railing', 57, 57, 1, 5, T.LOW); U.prop('railing', 58, 62, 2, 1, T.LOW);

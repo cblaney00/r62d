@@ -93,13 +93,17 @@ export function build() {
   U.door(34, 31, 35, 31); U.door(25, 36, 25, 37); U.door(53, 31, 54, 31); U.door(46, 36, 46, 37); U.door(17, 20, 18, 20); U.door(53, 20, 54, 20);
   U.door(34, 42, 35, 42, true);
   U.window(14, 9, 15, 9); U.window(34, 9, 37, 9); U.window(56, 9, 57, 9); U.window(10, 30, 10, 31);
-  U.window(61, 14, 61, 15); U.window(61, 27, 61, 28); U.window(17, 42, 18, 42); U.window(40, 42, 41, 42); U.window(56, 42, 57, 42); /* moved off the tall shelves so it can be used */
+  U.window(61, 14, 61, 15); U.window(17, 42, 18, 42); U.window(40, 42, 41, 42); U.window(56, 42, 57, 42); /* moved off the tall shelves so it can be used */
+  // (2026-11-15, he asked: attack won ~20-35% on the upstairs sites) timber balconies with outside steps up to the Office and the Games Room
+  U.slab(62, 22, 2, 11, FL.WOOD); U.door(61, 29, 61, 30, true);  // east balcony, door into the Office
+  U.baffle(61, 22, 61, 28);                                      // the Office wall along it stays breakable brick (no window: it made the balcony a shooting gallery)
+  U.slab(8, 33, 2, 6, FL.WOOD); U.door(10, 35, 10, 36, true);    // west balcony, door into the Games Room
   U.prop('bench', 38, 11, 6, 1, T.LOW); U.prop('plant', 44, 16, 1, 1, T.TALL);
   U.prop('bed', 13, 12, 5, 6, T.LOW); U.prop('cabinet', 22, 11, 2, 1, T.TALL);
   U.prop('bed', 54, 12, 5, 6, T.LOW); U.prop('cabinet', 48, 11, 2, 1, T.TALL);
   U.prop('couch', 29, 22, 6, 1, T.LOW); U.prop('couch', 37, 22, 6, 1, T.LOW); U.prop('coffeetable', 33, 25, 5, 2, T.LOW); U.prop('tv', 35, 29, 4, 1, T.TALL);
   U.prop('meetingtable', 14, 25, 6, 4, T.LOW); U.prop('meetingtable', 14, 33, 6, 4, T.LOW); U.prop('couch', 22, 22, 1, 5, T.LOW, 1);
-  U.prop('desk', 50, 23, 5, 2, T.LOW); U.prop('bookshelf', 59, 22, 1, 7, T.TALL); U.prop('console', 48, 29, 4, 1, T.LOW);
+  U.prop('desk', 50, 23, 5, 2, T.LOW); U.prop('bookshelf', 56, 21, 4, 1, T.TALL); U.prop('console', 48, 29, 4, 1, T.LOW);
   U.prop('bookshelf', 27, 33, 1, 8, T.TALL); U.prop('bookshelf', 31, 36, 10, 1, T.TALL); U.prop('desk', 42, 33, 3, 2, T.LOW);
   U.prop('crates', 48, 38, 3, 2, T.TALL); U.prop('crates', 52, 34, 2, 2, T.TALL); U.prop('shelf', 49, 41, 7, 1, T.TALL);
   U.outside([[10, 9], [12.8, 9], [10, 11.8]]); U.walls([[10.5, 11.5], [12.5, 9.5]], 1, T.SOFT, MAT.BRICK);
@@ -139,6 +143,8 @@ export function build() {
   stair(0, 1, 58, 34, 2, 4, 'n', FL.CONCRETE);           // storeroom -> attic
   G.prop('railing', 57, 33, 1, 5, T.LOW); G.prop('railing', 58, 33, 2, 1, T.LOW);
   U.prop('railing', 57, 34, 1, 4, T.LOW); U.prop('railing', 58, 38, 2, 1, T.LOW);
+  stair(0, 1, 62, 33, 2, 6, 'n', FL.WOOD, 'timber');              // outside steps -> east balcony (Office)
+  stair(0, 1, 8, 39, 2, 6, 'n', FL.WOOD, 'timber');               // outside steps -> west balcony (Games Room)
   stair(0, 1, 47, 44, 2, 6, 'n', FL.WOOD, 'timber');               // outside steps -> balcony
   G.prop('railing', 47, 43, 2, 1, T.LOW); G.prop('railing', 46, 43, 1, 6, T.LOW); G.prop('railing', 49, 43, 1, 6, T.LOW);
 

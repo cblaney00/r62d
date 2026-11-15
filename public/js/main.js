@@ -39,6 +39,7 @@ import { compassRoute as sharedRoute } from '/shared/compass.js';
 import { touchPad, touchContext, touchActive, isTrackpad, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
 import { EYE_H } from '/shared/map.js';
+import { META } from '/shared/meta.js';
 
 const $ = id => document.getElementById(id);
 // Stacked layers: the map (moved and scaled by the browser, see MapRenderer.mount), the people and effects, the line-of-sight blackout (drawn small and stretched by
@@ -4358,6 +4359,7 @@ const lanText = a => a ? `${a.host} · version ${a.version.id}${a.version.date ?
 // OPEN TO LAN (he asked: always current with the right VPN): the homelab VPN address is the main one (and the code)
 // whenever the VPN is on; the dialog asks again every 2 s while it is open, so turning the VPN on or off shows at once.
 function lanFill() {
+  fetch('/api/meta').then(r => r.json()).then(m => { for (const k of ['ops', 'guns']) if (m && m[k]) { for (const x of Object.keys(META[k])) delete META[k][x]; Object.assign(META[k], m[k]); } }).catch(() => {}); // default loadouts = the pros' current meta (he asked)
   fetch('/api/addr').then(r => r.json()).then(a => {
     st.addr = a; const main = a.urls[0], key = a.urls.map(u => u.url).join(' ');
     if (key === st.lanKey) return; st.lanKey = key;

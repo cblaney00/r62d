@@ -11,6 +11,7 @@ for (const id of MAP_LIST) {
   const g = new Game({ free: true });
   const a = g.addPlayer('Low', false), b = g.addPlayer('High', false);
   g.mapId = id; g.map = buildMap(id); g.handle(a, { t: 'free', a: 'start', map: id, bots: 0 });
+  g.ents = g.ents.filter(e => !(e.type === 'cam' && e.oc !== undefined)); // (outside cameras on the roof edge can sit over an outside staircase and take the bullet first; this test is about the stairs)
   const m = g.map;
   for (const q of [a, b]) { q.alive = true; q.downed = false; q.ctrl = 'body'; q.viewTime = null; q.staged = false; }
   m.stairs.forEach((s, i) => {

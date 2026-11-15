@@ -5,13 +5,14 @@
 // Usage: node tests/longsight.js [metres=20] [--all]   (prints every angle; PASS if the game has at most MAX outside Dust Town)
 import { buildMap, MAP_LIST, floorAt, roomAt } from '../shared/map.js';
 import { castSight } from '../shared/physics.js';
-import { CELL, T, PX_PER_M } from '../shared/constants.js';
+import { CELL, T, FL, PX_PER_M } from '../shared/constants.js';
 const LONG = (+process.argv[2] || 20) * PX_PER_M, MAX = 3, FREE = new Set(['dust']);
 const INDOOR = t => t === T.FLOOR || t === T.LOW || t === T.STAIR || t === T.HATCH;
 let total = 0; const all = [];
 for (const it of MAP_LIST) {
   const id = it.id || it, m = buildMap(id), W = m.W, angles = [];
-  const indoor = (x, y) => { const k = Math.floor(y / CELL) * W + Math.floor(x / CELL); return INDOOR(m.tiles[k]) && m.flAt[k] !== m.roofFloor; };
+  const rooms = new Set(m.rooms.map(r => r.name)); // indoors = inside a named room (a balcony, walkway or the ledge along an outside wall is not)
+  const indoor = (x, y) => { const k = Math.floor(y / CELL) * W + Math.floor(x / CELL); return INDOOR(m.tiles[k]) && m.flAt[k] !== m.roofFloor && m.floor[k] !== FL.VOID && rooms.has(roomAt(m, x, y)); };
   for (let k = 0; k < m.tiles.length; k += 1) {
     const cx = k % W, cy = Math.floor(k / W); if ((cx + cy) % 2) continue; // every other cell is plenty
     if (!INDOOR(m.tiles[k]) || m.flAt[k] === m.roofFloor || m.flAt[k] < 0) continue;

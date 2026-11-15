@@ -2,6 +2,7 @@
 import { RIOT } from '/shared/operators.js';
 import { OPERATORS, WEAPONS, GADGETS, LOADOUTS, GADGET_COUNT, BIOS, JOBS, resolveLoadout, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
+import { META } from '/shared/meta.js';
 import { drawOperator } from './sprites.js';
 import { showcase } from './look.js';
 import { shade } from './textures.js';
@@ -75,13 +76,13 @@ function fillDetail(d, k, anim, compact, force) {
   const pips = n => [1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('');
   const weaponCard = (w, slot) => `<button class="wcard ${cur[slot] === w ? 'on' : ''}" data-slot="${slot}" data-v="${w}">
       <div class="wpic" data-w="${w}"></div>
-      <div class="wn">${RIOT[w] ? RIOT[w].name : WEAPONS[w].name}<small>${RIOT[w] ? 'Riot shield + pistol' : CLASS_NAME[WEAPONS[w].cls]}</small></div><div class="wtip">${RIOT[w] ? RIOT[w].trait : WEAPONS[w].trait || CLASS_TIP[WEAPONS[w].cls]}</div>${bars(w)}</button>`;
+      ${(META.ops[k] || {})[slot === 'primary' ? 'p' : 's'] === w ? '<span class="propick" title="What the pro teams play most on this operator in practice">PROS\' PICK</span>' : ''}<div class="wn">${RIOT[w] ? RIOT[w].name : WEAPONS[w].name}<small>${RIOT[w] ? 'Riot shield + pistol' : CLASS_NAME[WEAPONS[w].cls]}</small></div><div class="wtip">${RIOT[w] ? RIOT[w].trait : WEAPONS[w].trait || CLASS_TIP[WEAPONS[w].cls]}</div>${bars(w)}</button>`;
   // attachments for the gun chosen in that slot: three rows of choices, each with what it does
   const attRows = slot => {
     const w = cur[slot]; if (!w || !WEAPONS[w]) return ''; // (a riot shield has no attachments)
     const a = cleanAtt(w, cur.att[w], k), opts = attachFor(w);
     return `<div class="atts" data-slot="${slot}"><div class="atthead">${WEAPONS[w].name} attachments</div>` + ATTACH_SLOTS.map(([s, label]) => `<div class="attrow"><span>${label}</span>` +
-      opts[s].map(v => `<button class="att ${a[s] === v ? 'on' : ''}" data-w="${w}" data-s="${s}" data-v="${v}" title="${ATTACH[s][v].desc}">${ATTACH[s][v].short}</button>`).join('') +
+      opts[s].map(v => `<button class="att ${a[s] === v ? 'on' : ''}${(META.guns[w] || {})[s] === v ? ' pro' : ''}" data-w="${w}" data-s="${s}" data-v="${v}" title="${ATTACH[s][v].desc}${(META.guns[w] || {})[s] === v ? ' (the pros\' pick)' : ''}">${ATTACH[s][v].short}</button>`).join('') +
       `<em>${ATTACH[s][a[s]].desc}</em></div>`).join('') +
       `<label class="attown"><input type="checkbox" data-w="${w}" ${cur.own[w] ? 'checked' : ''}><b>Only for ${o.name}</b><small>${cur.own[w] ? `${o.name} keeps this setup; other operators use your shared one` : `These attachments are used on the ${WEAPONS[w].name} for every operator`}</small></label></div>`;
   };

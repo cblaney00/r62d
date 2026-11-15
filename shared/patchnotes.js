@@ -67,4 +67,7 @@ export const PATCH_NOTES = [
   { d: '2026-11-15', k: 'op', id: 'trench', t: 'TRENCH: 4 Drop Covers (was 3).', v: 1 },
   { d: '2026-11-15', k: 'op', id: 'hammer', t: 'HAMMER: 6 Breaching Rounds (was 5).', v: 1 },
   { d: '2026-11-15', k: 'op', id: 'rush', t: 'RUSH: 5 Breaching Dashes (was 4).', v: 1 },
+  { d: '2026-11-15', k: 'map', id: 'lodge', t: 'Alpine Lodge: timber balconies with outside steps into the Office (breakable wall along it) and the Games Room.', v: 1 },
+  { d: '2026-11-15', k: 'map', id: 'school', t: 'Clocktower School: a second fire escape into the Staff Room, and stairs from the Library up into the Clock Room.', v: 1 },
+  { d: '2026-11-15', k: 'map', id: 'depot', t: 'Rail Depot: a steel walkway with steps up to a door into the Manager Office.', v: 1 },
 ];

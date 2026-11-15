@@ -1259,3 +1259,8 @@ html.tv .sc[data-tc] { background: var(--tc); color: #0b0e12; } /* TV: each team
 #winGo.wait { border-color: rgba(255,255,255,0.35); color: #cfd6df; font-size: 16px; animation: none; }
 #winGo.wait b { background: rgba(255,255,255,0.8); }
 @keyframes winGoPulse { from { box-shadow: 0 0 0 rgba(242,193,78,0); } to { box-shadow: 0 0 22px rgba(242,193,78,0.55); } }
+
+/* the pros' picks (he asked 2026-11-15: defaults follow the pros' meta, and players get pointed at it) */
+.wcard { position: relative; }
+.wcard .propick { position: absolute; top: 8px; right: 10px; font: 700 10px var(--head); letter-spacing: 0.14em; color: #111; background: var(--gold); padding: 2px 6px; border-radius: 2px; }
+.att.pro::after { content: '★'; color: var(--gold); margin-left: 4px; font-size: 0.85em; }

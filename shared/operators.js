@@ -1,4 +1,5 @@
 // Weapons and the 30 operators (15 attack, 15 defence).
+import { META } from './meta.js'; // the pros' preferred loadouts (server/metaloadouts.js)
 
 export const WEAPONS = {
   k4:      { name: 'K4 Carbine',   cls: 'AR',      dmg: 31, rpm: 720, mag: 30, reserve: 150, reload: 2.4, spread: 0.06, ads: 0.014, bloom: 0.012, auto: true,  pellets: 1, range: 1100, len: 15,
@@ -410,9 +411,10 @@ export const RIOT = {
 export const isRiot = w => !!RIOT[w];
 // how far a riot shield (or BULWARK's) covers right now
 export const riotArc = (id, crouch, still) => { const R = RIOT[id]; return !R ? SHIELD_ARC : R.plant && crouch && still ? R.plant : R.arc; };
+// Defaults follow the pros' meta (he asked 2026-11-15: shared/meta.js, made by server/metaloadouts.js from practice)
 export function defaultLoadout(op) {
-  const L = LOADOUTS[op];
-  return { primary: L.primaries[0], secondary: L.secondaries[0] || null, gadget: L.gadgets[0] };
+  const L = LOADOUTS[op], M = META.ops[op] || {};
+  return { primary: L.primaries.includes(M.p) ? M.p : L.primaries[0], secondary: L.secondaries.includes(M.s) ? M.s : L.secondaries[0] || null, gadget: L.gadgets[0] };
 }
 // Keep only choices that operator actually has.
 export function cleanLoadout(op, l) {
@@ -548,6 +550,10 @@ const START_ATT = {
   Pistol: { barrel: 'none', grip: 'laser', sight: 'reddot' },
 };
 export function defaultAtt(w, op) {
+  if (META.guns[w]) { const ok = attachFor(w), m = META.guns[w], out = { barrel: 'none', grip: 'none', sight: 'iron', ammo: 'none' }; for (const k of Object.keys(out)) if (m[k] && ok[k].includes(m[k])) out[k] = m[k]; else if (!m[k]) out[k] = defaultAttOld(w, op)[k]; return out; } // what the pros run on it
+  return defaultAttOld(w, op);
+}
+function defaultAttOld(w, op) { // (before the meta: a starter set by gun class and role)
   const W = WEAPONS[w], ok = attachFor(w), base = { ammo: 'none', ...(START_ATT[W ? W.cls : 'AR'] || START_ATT.AR) }, job = op ? jobOf(op) : null;
   if (W && W.pellets === 1 && W.cls === 'Shotgun') { base.barrel = 'extended'; base.sight = 'reddot'; } // a slug reaches
   if (['flank', 'intel', 'roamer', 'trapper'].includes(job) && !SIDEARMS.has(w)) base.barrel = 'suppressor';
