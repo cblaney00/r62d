@@ -36,6 +36,7 @@ const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free pla
 
 // R62D_FAST=1 shortens the menus, for quick testing.
 if (typeof process !== 'undefined' && process.env.R62D_FAST) { DUR.select = 3; DUR.prep = 6; }
+if (typeof process !== 'undefined' && +process.env.R62D_PREP) DUR.prep = +process.env.R62D_PREP; // (balance tests: another preparation length)
 
 const THROW_K = 5; // drag on thrown things: they come to rest where you aimed
 const EMP_R = 36; // buffed (he asked: it was no better than ordinary utility): ~1 m, and it fries defenders' electronics too

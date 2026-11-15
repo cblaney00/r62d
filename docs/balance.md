@@ -8,7 +8,7 @@ and prints, per operator: round win %, kills and deaths per round, damage per ro
 and damage per player carrying it, and headshot %; plus damage from gadgets. Fewer matches are too
 noisy (±18% win rate at 30 rounds per operator). Bots can't use every ability well (smoke, intel), so
 treat low numbers on ability-heavy operators as a bot limit, and look for things that are clearly too
-STRONG. A healthy spread is roughly 40–60% win rate, attackers 45–50% of rounds.
+STRONG. A healthy spread is roughly 40–60% win rate per operator; attackers should win 45–55% of rounds on every map (he set this 2026-11-15).
 
 ## Changes (2026-10-28)
 Before: Bulwark 68% wins / 2.0 kills a round / almost never died; Breaker-12 82% of kills were
@@ -95,3 +95,9 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
 - The real imbalance is the sides: attack wins ~44% (Villa 38%, Lodge 40%, School 40%, Depot 44%, Embassy 45%, Harbor 49%,
   Dust Town 56%). Target 45-50%. Not changed: the round rules (prep 30 s, 10 reinforcements, 2:40) are his choices.
 - Watch: Ox Belt-Fed (0.85-0.96 kills a round on attack, few rounds yet), Hatchet MP's suppressor (small sample).
+- Later the same day, with trained pros (tests/probe.js and strats.js with `R62D_TEST_TRAINING` = a copy of the real
+  practice): overall attack 44%. Villa is the one map clearly below 45% in every run (31%, 31%, 38% in practice); the
+  rest swing 39-52% with the noise (±8% at ~130 rounds). Levers measured on five maps, ~125 rounds each:
+  current 40% avg · 7 reinforcements 42% · 20 s preparation 39% (all within noise). One more breakable wall per site
+  room on Villa/Lodge/School made no difference either (reverted). So Villa needs a change to the map itself.
+  Test knobs: `R62D_REINF`, `R62D_PREP` (server/game.js). Across maps: 4+ defenders on site at 30 s → attack wins ~9%.

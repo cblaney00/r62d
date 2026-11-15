@@ -51,7 +51,7 @@ function candidates(pl) {
   // one side winning too often overall (he asked for 45-50% attack): attack-minded players feel it most
   { let a = [0, 0]; for (const [k, r] of Object.entries(training.ops || {})) { const side = k.split('|')[1]; if (side === 'atk') { a[0] += r.n; a[1] += r.w; } }
     const ar = (a[1] + 1) / (a[0] + 2);
-    if (a[0] >= 500 && Math.abs(ar - 0.5) > 0.04) { const def = ar < 0.5; out.push({ kind: 'mech', id: 'sides', s: Math.abs(ar - 0.5) * 4 * (def ? 0.7 + aggr * 0.5 : 0.7 + patience * 0.5), text: `The game leans ${def ? 'defence' : 'attack'}: attackers win ${pct(ar)} of practice rounds. ${def ? 'Defenders get too long to set up and too many places to hold from.' : 'Defenders can\'t hold anything long enough.'}` }); } }
+    if (a[0] >= 500 && Math.abs(ar - 0.5) > 0.05) { const def = ar < 0.5; out.push({ kind: 'mech', id: 'sides', s: Math.abs(ar - 0.5) * 4 * (def ? 0.7 + aggr * 0.5 : 0.7 + patience * 0.5), text: `The game leans ${def ? 'defence' : 'attack'}: attackers win ${pct(ar)} of practice rounds. ${def ? 'Defenders get too long to set up and too many places to hold from.' : 'Defenders can\'t hold anything long enough.'}` }); } }
   // attachments that win much more than the others in their slot on the same gun
   const awr = r => (r[1] + r[2] + 1) / (r[0] + r[2] + r[3] + 2), slotAvg = {}; // (2026-11-15) against the other choices for that slot on that gun, not 50%: a strong gun made all its parts look broken
   for (const [k, r] of Object.entries(training.att || {})) { const [w, slot] = k.split('|'), a = slotAvg[w + '|' + slot] || (slotAvg[w + '|' + slot] = [0, 0]); a[0] += r[0]; a[1] += awr(r) * r[0]; }
@@ -65,7 +65,7 @@ function candidates(pl) {
   const maps = {}; for (const [k, r] of Object.entries(training.plans || {})) { const [m, , side] = k.split('|'); if (!MAPS[m] || !MAP_LIST.includes(m)) continue; const x = maps[m] || (maps[m] = { atk: [0, 0], def: [0, 0] }); x[side][0] += r.n; x[side][1] += r.w; }
   for (const [m, x] of Object.entries(maps)) {
     const n = x.atk[0] + x.def[0]; if (n < 30) continue; const a = (x.atk[1] + 1) / (x.atk[0] + 2);
-    if (Math.abs(a - 0.5) < 0.06) continue;
+    if (Math.abs(a - 0.5) <= 0.05) continue; // (he set 2026-11-15: 45-55% attack is healthy)
     const fav = a > 0.5 ? 'attack' : 'defence', hurt = a > 0.5 ? (pl.jobs.def === 'anchor' || pl.jobs.def === 'trapper') : (pl.jobs.atk === 'entry' || pl.jobs.atk === 'breach');
     out.push({ kind: 'map', id: m, s: Math.abs(a - 0.5) * 3 * sure(n) * (hurt ? 1.3 : 0.9), text: `${MAPS[m].name} is the worst map: ${fav} wins ${pct(a > 0.5 ? a : 1 - a)} of practice rounds there. It needs another way in${a > 0.5 ? ' that defenders can hold' : ' for attackers'}.` });
   }
