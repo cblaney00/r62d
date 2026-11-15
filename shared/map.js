@@ -57,7 +57,8 @@ function addCams(m) {
 // back down. While hanging you slide left / right along the wall, up to ROPE_SPAN cells past either side of the window
 // (he asked: outside-the-window play matters). map.ropes[i] = { f, lvl, cells, hang (by the window's middle), base,
 // inside, out, tx, ty (along the wall), a, b (how far you can slide each way, px), up, down }.
-export const ROPE_CLIMB = 2, ROPE_DROP = 0.8, ROPE_REACH = 20, ROPE_SPAN = 5;
+// (2026-11-15, he asked: rappelling faster to help attackers: 2 → 1.3 s a storey)
+export const ROPE_CLIMB = 1.3, ROPE_DROP = 0.8, ROPE_REACH = 20, ROPE_SPAN = 5;
 // on a rope you face the wall: your aim stays within ROPE_AIM of facing it (he saw the body spin round like a pinwheel);
 // a little past each side along the wall, never out behind you
 export const ROPE_AIM = 1.92;

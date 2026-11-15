@@ -28,7 +28,7 @@ const HTRAP_R = 2.5 * PX_PER_M;
 // HOIST's climbs were 1.6 / 3 s until Ball Knowledge 2026-11-10 (39% of rounds won)
 const DRILL_T = 3, GRAPPLE_T = 1.2, GRAPPLE_ROOF = 2.2, GRAPPLE_REACH = 2.2 * PX_PER_M, DROP_T = 2; // GIMLET's drill, HOIST's climbs, DEADFALL's fuse (s)
 const SPRINT_RAISE = 0.3, SPRINT_LOUD = 520; // seconds to get the gun back up after a sprint; how far sprinting steps carry (a jog is 320)
-const ROPE_SLIDE = 0.45; // s per storey sliding down when you let go
+const ROPE_SLIDE = 0.3; // s per storey sliding down when you let go (2026-11-15, he asked: faster, to help attackers; was 0.45)
 const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, sprint: 0, sa: 0, crouch: 0, prone: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0, rw: 0, rv: 0, inv: 0 }; // rw / rv / inv: the 3D rope view's along-the-wall, up/down and upside-down keys
 const JAM_R = 90;
 const VAULT_TIME = 0.6, VAULT_RECOVER = 0.35; // climbing over (no shooting, gun down), then a moment before you can aim again
