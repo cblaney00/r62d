@@ -91,3 +91,6 @@ export const isWall = t => t === T.HARD || t === T.SOFT || t === T.REINF || t ==
 
 export const TEAM = { ATK: 'atk', DEF: 'def' };
 export const other = team => (team === TEAM.ATK ? TEAM.DEF : TEAM.ATK);
+
+// PERCH's Overwatch (he chose 2026-11-15): a locked watch cone, 30°, 30 m, 20 s
+export const OVERWATCH = { time: 20, range: 30 * PX_PER_M, half: 15 * Math.PI / 180 };

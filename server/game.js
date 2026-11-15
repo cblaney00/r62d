@@ -1,5 +1,5 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
-import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM } from '../shared/constants.js';
+import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM, OVERWATCH } from '../shared/constants.js';
 import { floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ropeAimLimit, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers , inBox } from '../shared/physics.js';
@@ -668,7 +668,6 @@ export class Game {
     if (this.arena) mul *= arenaSpeed(this, p); // the infected are quicker
     if (this.zb) mul *= zbSpeed(this, p); // zombies shamble
     if (p.shrouded) mul *= 0.8;
-    if (p.bipodSet) mul *= 0.15; // PERCH's bipod is down: you can only shuffle
     if (this.ghost(p)) mul *= 0.85; // STRIDER's Ghost Step: careful, slower steps (he asked: it was too strong)
     for (const e of this.ents) if (e.type === 'wire' && e.team !== this.side(p) && Math.hypot(e.x - p.x, e.y - p.y) < 24) { mul *= 0.3; break; }
     const beingRevived = p.downed && [...this.players.values()].some(q => q.busy && q.busy.k === 'revive' && q.busy.target === p.id); // he asked: revives kept failing — the downed crawled out of reach
@@ -922,7 +921,6 @@ export class Game {
 
   // the sniper operators' running parts (he asked 2026-11-10)
   tickSnipers(p) {
-    if (p.bipodSet && (!p.alive || p.downed || p.ctrl !== 'body' || !(p.input.crouch || p.pr >= 1) || Math.hypot(p.x - p.bipodSet.x, p.y - p.bipodSet.y) > 14)) p.bipodSet = null; // stood up or moved off: the bipod folds
     if (p.spotterUntil > this.time && p.alive && !p.downed && p.ctrl === 'body' && (p.adsT || 0) >= 0.6 && this.time - (p.spotT || 0) > 0.2) { // OSPREY: whoever the scope sees
       p.spotT = this.time;
       const team = this.side(p), fl = floorAt(this.map, p.x, p.y), sm = this.smokeList();
@@ -961,7 +959,6 @@ export class Game {
     let m = gun.m || gunMods(gun.w);
     const low = !!(p.input.crouch || p.pr >= 1);
     if (bipodOn(w, low, Math.hypot(p.vx || 0, p.vy || 0))) m = { ...m, kick: m.kick * w.bipod, sway: m.sway * w.bipod }; // the Trestle's bipod is down
-    if (p.bipodSet && w.cls === 'DMR') { m = { ...m, kick: m.kick * 0.5, sway: m.sway * 0.5 }; p.fireCd -= 60 / fireRpm(w, at0, 9) * 0.4 / 1.4; } // PERCH's bipod: 40% faster bolt, half the kick
     this.pierceNow = !!(p.pierceShot && w.pellets === 1); if (this.pierceNow) { p.pierceShot = 0; p.pierceLast = this.time; } // NAIL's round
     const D = fireDmg(w, at0) * m.dmg; // the Verdict hits harder aimed in
     // the aiming model (shared/operators.js): exact first shot, a fixed cone after that, a fixed recoil pattern
@@ -2126,7 +2123,7 @@ export class Game {
     else if (id === 'grapple') { // HOIST (he asked): up through an open hatch above you, or onto the roof from an outside wall
       const to = this.grappleTarget(p);
       if (!to) { this.events.push({ e: 'deny', id: p.id, why: 'Stand under an open hatch, or outside facing the building\'s wall, to grapple up' }); return; }
-      p.grapple = { t: 0, dur: to.roof ? GRAPPLE_ROOF : GRAPPLE_T, x: to.x, y: to.y, sx: p.x, sy: p.y }; p.adsT = 0; p.reloadT = 0; p.bipodSet = null;
+      p.grapple = { t: 0, dur: to.roof ? GRAPPLE_ROOF : GRAPPLE_T, x: to.x, y: to.y, sx: p.x, sy: p.y }; p.adsT = 0; p.reloadT = 0;
       used(); this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id }); this.noise(p.x, p.y, team, 420);
     }
     else if (id === 'htrap') { // LOCKJAW (he asked): rig a shut hatch; the first attacker to open it or come through is stunned and spotted
@@ -2141,12 +2138,13 @@ export class Game {
       this.ents.push({ id: this.eid(), type: 'dropch', x: w.x, y: w.y, cell: w.k, floor: true, t: DROP_T, team, owner: p.id, hp: 1 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(w.x), y: r1(w.y) });
     }
-    else if (id === 'bipod') { // PERCH (he asked: a bipod sniper): crouched or lying and still, the bipod goes down; again lifts it
-      if (p.bipodSet) { p.bipodSet = null; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); return; }
-      if (!(p.input.crouch || p.pr >= 1) || Math.hypot(p.vx || 0, p.vy || 0) > 12) { this.events.push({ e: 'deny', id: p.id, why: 'Crouch or lie down and stand still to set the bipod' }); return; }
-      p.bipodSet = { x: p.x, y: p.y }; this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y), id: p.id });
-    }
     else if (id === 'ghillie') { p.ghillieUntil = this.time + 12; used(); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); } // MOSS: no scope glint
+    else if (id === 'overwatch') { // PERCH (he chose 2026-11-15): a locked watch cone where you aim, shown to your team; defenders crossing it are pinged
+      if (p.ctrl !== 'body') return;
+      this.ents = this.ents.filter(e => !(e.type === 'watch' && e.owner === p.id)); // one at a time: a new one replaces the old
+      this.ents.push({ id: this.eid(), type: 'watch', x: p.x, y: p.y, team: this.side(p), owner: p.id, ang: p.aim, until: this.time + OVERWATCH.time, t: 0 });
+      used(); this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y), id: p.id });
+    }
     else if (id === 'spotter') { p.spotterUntil = this.time + 8; used(); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); } // OSPREY
     else if (id === 'pierce') { // NAIL: one armour-piercing round in the chamber
       if (p.pierceShot) { this.events.push({ e: 'deny', id: p.id, why: 'A piercing round is already loaded' }); return; }
@@ -2677,6 +2675,21 @@ export class Game {
     for (const e of [...this.ents]) {
       if (!this.ents.includes(e)) continue;
       switch (e.type) {
+        case 'watch': { // PERCH's overwatch cone: pings every enemy that steps into it (once per entry)
+          if (this.time > e.until) { this.ents.splice(this.ents.indexOf(e), 1); break; }
+          if ((e.t -= dt) > 0) break; e.t = 0.2;
+          const fl = floorAt(this.map, e.x, e.y), sm = this.smokeList(), seen = e.seen || (e.seen = new Set()), now = new Set(), o = this.players.get(e.owner);
+          for (const q of this.players.values()) {
+            if (!q.alive || q.staged || this.side(q) === e.team || floorAt(this.map, q.x, q.y) !== fl) continue;
+            const d = Math.hypot(q.x - e.x, q.y - e.y);
+            if (d > OVERWATCH.range || Math.abs(angDiff(Math.atan2(q.y - e.y, q.x - e.x), e.ang)) > OVERWATCH.half || !los(this.map, e.x, e.y, q.x, q.y, sm)) continue;
+            now.add(q.id); if (seen.has(q.id)) continue;
+            q.spotFrom = this.time + 4; this.spot(e.team, q.id, 4); if (o) this.pts(o, 10, 'Spotted an enemy');
+            this.events.push({ e: 'snd', s: 'beep', x: r1(e.x), y: r1(e.y), id: e.owner });
+          }
+          e.seen = now; // (leaving and coming back pings again)
+          break;
+        }
         case 'drone': {
           const o = this.players.get(e.owner);
           if (!o || !o.alive) { if (o && o.ctrl === 'drone') o.ctrl = 'body'; }
@@ -3254,7 +3267,7 @@ export class Game {
         el: p.up ? 1 : p.air > 0 ? 2 : undefined, le: p.lo ? r1(p.lo) : undefined, rp: p.rope ? (p.rope.st === 'hang' ? (p.rope.inv ? 3 : 1) : 2) : undefined, rr: p.rope && p.rope.st === 'hang' ? p.rope.r : undefined, rz: p.rope && p.rope.st === 'hang' ? r2(p.rope.h ?? 0.5) : undefined, ry: this.ropeLevel(p) ? 1 : undefined, sl: p.slot, w: g ? g.w : null, rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadLen || WEAPONS[g.w].reload)) : 0, rq: p.reloadT > 0 && p.reloadLen && p.reloadLen !== WEAPONS[g.w].reload ? r2(p.reloadLen) : undefined,
         ct: p.ctrl, cf: this.tv && p.ctrl === 'cam' ? p.feedId : undefined, // ESPORTS TV: which camera they are looking through
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : p.grapple ? { k: 'grapple', p: r2(p.grapple.t / p.grapple.dur) } : null, df: p.hasDefuser ? 1 : 0,
-        gh: p.ghillieUntil > this.time ? 1 : undefined, bp: p.bipodSet ? 1 : undefined, // MOSS's ghillie (no glint), PERCH's bipod
+        gh: p.ghillieUntil > this.time ? 1 : undefined, // MOSS's ghillie (no glint), PERCH's bipod
         gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch || p.pr || p.slR > 0 ? 1 : 0, sd: p.slT > 0 ? 1 : undefined, pn: p.pr >= 1 ? 1 : undefined, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, au: p.ctrl === 'body' && !p.downed && !p.rope && aimUpHatch(this.map, p.x, p.y, p.aimX, p.aimY) ? 1 : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
         aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,

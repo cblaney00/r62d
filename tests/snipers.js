@@ -1,5 +1,4 @@
-// The four sniper attackers (he asked 2026-11-10, he chose all four): PERCH's bipod (only crouched/lying and still;
-// faster bolt, half the kick, barely moves, folds when you stand), MOSS's ghillie (no glint flag while it lasts),
+// The four sniper attackers (he asked 2026-11-10, he chose all four): PERCH's Overwatch cone (2026-11-15, was a bipod), MOSS's ghillie (no glint flag while it lasts),
 // OSPREY's spotting scope (aimed in, enemies in view are spotted for the team; not through walls), NAIL's piercing
 // round (one shot through reinforced wall at 55% damage, no one-shot kill through it). Run: node tests/snipers.js
 import './_tmpdata.js';
@@ -21,16 +20,13 @@ const shoot = (p, q) => { // one aimed shot straight at q's body
   g.fire(p, gun, WEAPONS[gun.w]);
 };
 
-// PERCH
-setup(a, 'perch', wx - 200, wy, 0);
-g.useAbility(a); ok(!a.bipodSet, 'bipod set standing up');
-a.input = { crouch: 1 }; g.useAbility(a); ok(a.bipodSet, 'bipod not set crouched and still');
-ok(g.mods(a).mul < 0.2, 'bipod down: should barely move', g.mods(a).mul);
-a.guns[0] = { w: 'pike', ammo: 5, reserve: 10, att: { sight: 'sniper' }, m: gunMods('pike', { sight: 'sniper' }) };
-const cdOf = () => { a.fireCd = 0; a.lastShot = -9; a.rc = 0; a.shots = 0; g.fire(a, a.guns[0], WEAPONS.pike); return { cd: a.fireCd, rc: Math.abs(a.rc) }; };
-const down = cdOf(); a.input = {}; g.tickSnipers(a); ok(!a.bipodSet, 'bipod did not fold when standing'); const up = cdOf();
-ok(down.cd < up.cd * 0.75, 'bipod: bolt not faster', down.cd, up.cd); ok(down.rc < up.rc * 0.6, 'bipod: kick not halved', down.rc, up.rc);
-a.input = { crouch: 1 }; g.useAbility(a); a.x += 30; g.tickSnipers(a); ok(!a.bipodSet, 'bipod did not fold after moving off');
+// PERCH: Overwatch (he chose 2026-11-15, replacing the bipod): a locked cone pings defenders who step into it, not through walls
+setup(a, 'perch', wx - 200, wy, 0); setup(d, 'lynx', wx + 3 * CELL, wy, Math.PI); g.spots.atk.clear();
+g.useAbility(a); const ow = g.ents.find(e => e.type === 'watch' && e.owner === a.id); ok(ow, 'overwatch: no watch cone');
+a.aim = Math.PI; g.tickEnts(0.3); ok(!g.spots.atk.has(d.id), 'overwatch: spotted through the wall');
+d.x = wx - 80; g.tickEnts(0.3); ok(g.spots.atk.has(d.id), 'overwatch: did not ping a defender in the cone after PERCH looked away');
+d.y = wy + 400; g.spots.atk.clear(); g.tickEnts(0.3); ok(!g.spots.atk.has(d.id), 'overwatch: pinged outside the cone');
+g.time += 21; g.tickEnts(0.3); ok(!g.ents.includes(ow), 'overwatch: cone did not run out');
 
 // MOSS
 setup(a, 'moss', wx - 200, wy, 0); g.useAbility(a); ok(a.ghillieUntil > g.time, 'ghillie not on');
@@ -52,6 +48,6 @@ g.useAbility(a); ok(a.pierceShot === 1, 'round not loaded'); shoot(a, d);
 const dmg = 500 - d.hp; ok(dmg > 0 && dmg < WEAPONS.saker.dmg * 0.6, 'piercing round damage', dmg); ok(!a.pierceShot, 'piercing round not used up');
 a.guns[0] = { w: 'mammoth', ammo: 5, reserve: 10, att: { sight: 'sniper' }, m: gunMods('mammoth', { sight: 'sniper' }) };
 d.hp = d.maxHp = 150; g.useAbility(a); shoot(a, d); ok(d.alive && !d.downed, 'the Mammoth one-shot through reinforced wall with a piercing round');
-console.log(`PERCH bolt ${down.cd.toFixed(2)} s down vs ${up.cd.toFixed(2)} s up; NAIL through reinforced: ${dmg} damage`);
+console.log(`NAIL through reinforced: ${dmg} damage`);
 console.log(fails ? `${fails} failure(s)` : 'PASS snipers');
 process.exit(fails ? 1 : 0);

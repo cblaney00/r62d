@@ -86,6 +86,7 @@ export function build() {
   U.area('Ambassador Office', 30, 11, 16, 12, FL.WOOD);
   U.area('Comms Room', 47, 11, 16, 12, FL.SERVER);
   U.area('Upper Corridor', 13, 24, 50, 4, FL.CARPET);
+  U.baffle(40, 24, 40, 25); U.baffle(45, 26, 45, 27); // (2026-11-15, he asked: chop up long hallways) a brick chicane
   U.area('Residence', 13, 29, 16, 16, FL.WOOD);
   U.area('Library', 47, 29, 16, 8, FL.CARPET);
   U.area('Guest Suite', 47, 38, 16, 7, FL.CARPET);
@@ -134,6 +135,7 @@ export function build() {
   B.area('Vault', 30, 11, 16, 12, FL.SERVER, T.HARD, MAT.CONCRETE);
   B.area('Server Farm', 47, 11, 16, 12, FL.SERVER);
   B.area('Tunnel', 13, 24, 50, 4, FL.CONCRETE);
+  B.baffle(35, 24, 35, 25); B.baffle(40, 26, 40, 27); // (2026-11-15, he asked: chop up long hallways) a brick chicane
   B.area('Boiler Room', 13, 29, 16, 16, FL.CONCRETE);
   B.area('Evidence Storage', 30, 29, 16, 16, FL.CONCRETE);
   B.area('Cell Block', 47, 29, 16, 16, FL.TILE);

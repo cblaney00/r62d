@@ -1081,8 +1081,10 @@ export function botThink(game, p, dt) {
     else {
       // he asked: defenders wander a little: every so often, while nothing is heard, a new spot round the site
       if (!heardRecently && game.time > (ai.holdT || 0)) { // (map knowledge: an off-angle on a way in, else somewhere round the bomb)
-        const kh = Math.random() < know(game, p).angles ? knownHold(game, p) : null;
-        ai.hold = kh ? kh.at : nearBomb(game, site, ai.role === 'anchor' ? 60 : 100); ai.watch = kh ? kh.watch : null; ai.holdT = game.time + 10 + Math.random() * 18; if (kh) feat(p, 'offAngle'); }
+        const rat = Math.random() < (p.pro ? 0.15 : 0.25) ? ratHold(game, p) : null; // a rat spot (he asked): tucked in a corner nook, waiting for someone who doesn't clear it
+        const kh = !rat && Math.random() < know(game, p).angles ? knownHold(game, p) : null;
+        if (rat) { ai.hold = rat.at; ai.watch = rat.watch; ai.holdT = game.time + 25 + Math.random() * 20; feat(p, 'rat'); }
+        else { ai.hold = kh ? kh.at : nearBomb(game, site, ai.role === 'anchor' ? 60 : 100); ai.watch = kh ? kh.watch : null; ai.holdT = game.time + 10 + Math.random() * 18; if (kh) feat(p, 'offAngle'); } }
       goal = ai.hold || (ai.hold = nearBomb(game, site, 70));
     }
   }
@@ -1251,11 +1253,8 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
     if (ok() && heard && game.phase === PHASE.ACTION) { const h = localPos(game.map, ai.heard.x, ai.heard.y); if (h.f === lp.f - 1 && Math.hypot(h.x - lp.x, h.y - lp.y) < 3 * PX_PER_M && game.floorCharge(p)) { useAbility(); done(8); } }
     return;
   }
-  if (abId === 'bipod') { // PERCH: holding an angle (still for a moment), crouch and set it; wanting to move again, lift it (the audit: he never set it)
-    const pi = p.input || {}, moving = !!(pi.up || pi.down || pi.left || pi.right);
-    ai.stillT = moving ? 0 : (ai.stillT || 0) + dt; ai.goT = moving ? (ai.goT || 0) + dt : 0;
-    if (p.bipodSet) { if (ai.goT > (enemy ? 0.6 : 0.25)) { useAbility(); done(6); } else inp.crouch = 1; return; }
-    if (ai.stillT > 2.5 && game.time > (ai.abT || 0)) { /* only a real hold: the audit saw it flipped up and down ~10 times a round */ inp.crouch = 1; if (pi.crouch || p.pr >= 1) { useAbility(); done(3); } }
+  if (abId === 'overwatch') { // PERCH (2026-11-15): holding an angle aimed in with nobody in sight, lock the watch cone on it
+    if (!enemy && ai.watch && (p.adsT || 0) >= 0.6 && ok()) { useAbility(); done(25); }
     return; }
   if (abId === 'ghillie') { if ((enemy || heard) && ok() && !(p.ghillieUntil > game.time)) { useAbility(); done(14); } return; }
   if (abId === 'spotter') { if ((enemy || heard) && ok() && !(p.spotterUntil > game.time) && Math.random() < dt * 1.5) { useAbility(); done(10); } return; }
@@ -1903,6 +1902,15 @@ function pickWay(game, p) {
   return w;
 }
 // a defender's spot: one of the off-angles on a way in (siteIntel holds), not one a teammate already has
+// a free rat spot (map.rats, mapkit.js ratSpots) in this site's rooms or a room beside them
+function ratHold(game, p) {
+  const m = game.map, site = m.sites[game.site]; if (!m.rats || !site) return null;
+  const bx = site.bombs[0].x, by = site.bombs[0].y, f = floorAt(m, bx, by);
+  const taken = [...game.players.values()].filter(q => q !== p && q.alive && q.squad === p.squad && q.ai && q.ai.hold).map(q => q.ai.hold);
+  const L = m.rats.filter(r => (site.rooms.includes(r.room) || (floorAt(m, r.x, r.y) === f && Math.hypot(r.x - bx, r.y - by) < 30 * CELL)) && !taken.some(h => Math.hypot(h.x - r.x, h.y - r.y) < 40));
+  const r = L[Math.floor(Math.random() * L.length)];
+  return r ? { at: { x: r.x, y: r.y }, watch: r.face } : null;
+}
 function knownHold(game, p) {
   const ways = siteIntel(game.map, game.site).ways.filter(w => w.hold);
   const taken = [...game.players.values()].filter(q => q !== p && q.alive && q.squad === p.squad && q.ai && q.ai.hold).map(q => q.ai.hold);
@@ -2002,7 +2010,7 @@ function threatPoint(game, p, dir) {
   for (const h of m.hatches || []) if (hatchOpen(m, h)) pts.push({ x: h.x, y: h.y }, { x: h.bx, y: h.by });
   // map knowledge (KNOW.angles): an attacker who knows the map also checks where defenders like to sit (the off-angles
   // inside the site), not only the doorways
-  if (game.side(p) === TEAM.ATK && (p.ai.angK ??= Math.random() < know(game, p).angles)) for (const w of siteIntel(m, game.site).ways) if (w.hold) pts.push(w.hold);
+  if (game.side(p) === TEAM.ATK && (p.ai.angK ??= Math.random() < know(game, p).angles)) { for (const w of siteIntel(m, game.site).ways) if (w.hold) pts.push(w.hold); for (const r of m.rats || []) pts.push(r); }
   let best = null, bs = Infinity;
   for (const q of pts) {
     const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < 70 || d > 400) continue;

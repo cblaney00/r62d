@@ -205,8 +205,8 @@ export const OPERATORS = {
              ability: { id: 'lunge', name: 'Lunge', count: 2, desc: 'Aim at an enemy within 5 metres and draw your blade: they hear it and are warned. After 1 second, for 5 seconds, your melee is a 5-metre lunge straight at them that downs them, from any side.' },
              gadget: 'stun', gadgetCount: 2, color: '#3a3d46', helmet: '#2a2c32', look: 'hood' },
   // ---- snipers (he asked 2026-11-10: more attackers with sniper rifles; he chose all four ideas) ----
-  perch: { team: 'atk', name: 'PERCH', role: 'Bipod Sniper', armor: 1, primary: 'mammoth', secondary: 'needle',
-             ability: { id: 'bipod', name: 'Sniper Bipod', count: 0, desc: 'Crouch or lie down and press to set the bipod: no scope sway, a marksman rifle cycles 40% faster and kicks half as much. You can barely move until you press again, stand up or move off the spot.' },
+  perch: { team: 'atk', name: 'PERCH', role: 'Overwatch Sniper', armor: 1, primary: 'mammoth', secondary: 'needle', // (2026-11-15, he asked: the bipod made no sense; he chose Overwatch)
+             ability: { id: 'overwatch', name: 'Overwatch', count: 2, desc: 'Press to lock a watch cone where you aim (30°, 30 m) for 20 seconds. Your team sees it on their screens, and any defender who steps into it is pinged for them, even after you look away or move on.' },
              gadget: 'claymore', gadgetCount: 2, color: '#a08a5a', helmet: '#4a4434', look: 'cap' },
   moss: { team: 'atk', name: 'MOSS', role: 'Ghillie Sniper', armor: 3, primary: 'saker', secondary: 'whisper',
              ability: { id: 'ghillie', name: 'Ghillie Wrap', count: 3, desc: 'Wrap your scope in a ghillie for 12 seconds: it gives no glint, so defenders can\'t see the flash that gives a sniper away.' },

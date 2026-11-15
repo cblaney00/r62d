@@ -53,4 +53,9 @@ export const PATCH_NOTES = [
   { d: '2026-11-15', k: 'mech', id: 'deadzone', t: 'The crosshair passes over your own character; while it is that close your aim holds its direction, unless an enemy is within 0.5 m of it.', v: 1 },
   { d: '2026-11-15', k: 'gun', id: 'anvil', t: 'Anvil Slug damage 76 to 66 (heavies now take three body hits) and its damage falls off sooner (from 4 m, down to 45% at 14 m).', v: -1 },
   { d: '2026-11-15', k: 'gun', id: 'drummer', t: 'Drummer LMG 22 to 21 damage and 860 to 800 rpm: it out-killed every other defence gun.', v: -1 },
+  { d: '2026-11-15', k: 'op', id: 'perch', t: 'PERCH: the bipod is gone; Overwatch locks a 30°, 30 m watch cone for 20 s that his team sees and that pings defenders who step into it.', v: 1 },
+  { d: '2026-11-15', k: 'map', id: 'villa', t: 'Cliffside Villa: a balcony with glass doors into the Kids Room, and a north terrace with stone steps and doors into the Master Bedroom.', v: 1 },
+  { d: '2026-11-15', k: 'mech', id: 'rats', t: 'Rat spots: a nook behind a cabinet in the corner of bomb-site rooms and the rooms beside them, out of sight of the doorways.', v: 0 },
+  { d: '2026-11-15', k: 'mech', id: 'cams', t: 'Three more defender cameras on every map, in rooms next to the bomb sites.', v: -1 },
+  { d: '2026-11-15', k: 'map', id: 'all', t: 'Long hallways chopped up with breakable brick baffles: only three long indoor angles are left outside Dust Town.', v: 0 },
 ];

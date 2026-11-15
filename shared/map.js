@@ -28,11 +28,26 @@ const cache = new Map();
 export function buildMap(id = 'harbor') {
   if (!MAPS[id]) id = 'harbor';
   const m = MAPS[id].build();
+  addCams(m);
   addRopes(m);
   addRoofEdges(m);
   addOutCams(m);
   addYardCover(m);
   return m;
+}
+
+// A few more defender cameras (he asked 2026-11-15: not a crazy amount more, a few): EXTRA_CAMS per map, in the biggest
+// rooms a door away from a bomb site that have no camera yet (the ways attackers come in). wallMount puts each on a wall.
+const EXTRA_CAMS = 3;
+function addCams(m) {
+  if (!m.cams || !m.sites) return;
+  const W = m.W, roomOf = new Int16Array(m.tiles.length).fill(-1);
+  m.rooms.forEach((r, i) => { for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) roomOf[y * W + x] = i; });
+  const site = new Set(m.sites.flatMap(st => st.rooms || []).map(n => m.rooms.findIndex(r => r.name === n)).filter(i => i >= 0)), near = new Set();
+  for (const o of m.openings) if (o.kind === 'door') { const sides = new Set(); for (const k of o.cells) for (const d of [1, -1, W, -W]) if (roomOf[k + d] >= 0) sides.add(roomOf[k + d]); if ([...sides].some(i => site.has(i))) for (const i of sides) if (!site.has(i)) near.add(i); }
+  const hasCam = new Set(m.cams.map(c => roomOf[Math.floor(c.y / CELL) * W + Math.floor(c.x / CELL)]));
+  const pick = [...near].filter(i => !hasCam.has(i) && m.rooms[i].w >= 4 && m.rooms[i].h >= 4).sort((a, b) => m.rooms[b].w * m.rooms[b].h - m.rooms[a].w * m.rooms[a].h).slice(0, EXTRA_CAMS);
+  for (const i of pick) { const r = m.rooms[i]; m.cams.push({ x: (r.x + r.w / 2) * CELL, y: (r.y + r.h / 2) * CELL, extra: 1 }); }
 }
 
 // ---- Rappelling (he asked: attackers need a quicker way up) ----

@@ -24,6 +24,7 @@ export function build() {
   G.room('Archive', 43, 11, 13, 11, FL.CARPET);
   G.room('East Office', 57, 11, 14, 11, FL.WOOD);
   G.room('Main Hall', 13, 23, 58, 5, FL.MARBLE);
+  G.baffle(52, 23, 52, 25); G.baffle(57, 25, 57, 27); // (2026-11-15, he asked: chop up long hallways) a brick chicane halfway down the hall
   G.room('Kitchen', 13, 29, 13, 11, FL.TILE);
   G.room('Lounge', 27, 29, 17, 11, FL.CARPET);
   G.room('Bathroom', 45, 29, 7, 11, FL.TILE);

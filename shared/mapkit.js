@@ -50,6 +50,7 @@ export function makeMap({ id, name, floors }) {
   const W = gx - GAP, H = Math.max(...floors.map(f => f.h)), N = W * H;
   const tiles = new Uint8Array(N).fill(T.VOID), floor = new Uint8Array(N).fill(FL.VOID);
   const mat = new Uint8Array(N).fill(MAT.DRYWALL), hp = new Int16Array(N);
+  const keepSoft = new Uint8Array(N); // baffles: soft walls that hardenWalls never turns to concrete
   const dhole = new Uint8Array(N); // 1 = a drone hole at the foot of this (soft) wall cell
   const win = new Uint8Array(N); // 1 = a window cell: bodies must vault through it
   const openId = new Int16Array(N).fill(-1), portal = new Int32Array(N).fill(-1), flAt = new Uint8Array(N).fill(255);
@@ -79,6 +80,9 @@ export function makeMap({ id, name, floors }) {
       wall(x0, y0, x1, y1, t = T.SOFT, m = MAT.DRYWALL) { each(x0, y0, x1, y1, k => { tiles[k] = t; mat[k] = m; hp[k] = CELL_HP[t] || 0; delete shape[k]; }); },
       // a rectangle of walls around (and including the edge of) x0..x1, y0..y1
       box(x0, y0, x1, y1, t = T.SOFT, m = MAT.DRYWALL) { K.wall(x0, y0, x1, y0, t, m); K.wall(x0, y1, x1, y1, t, m); K.wall(x0, y0, x0, y1, t, m); K.wall(x1, y0, x1, y1, t, m); },
+      // a baffle (he asked 2026-11-15: chop up long hallways; a long angle only after soft walls are destroyed): a short
+      // brick wall that always stays breakable. Two from opposite sides a few cells apart make a chicane you walk round.
+      baffle(x0, y0, x1, y1) { K.wall(x0, y0, x1, y1, T.SOFT, MAT.BRICK); each(x0, y0, x1, y1, k => { keepSoft[k] = 1; }); },
       pillar(list) { for (const [x, y] of list) K.wall(x, y, x, y, T.HARD, MAT.CONCRETE); },
       // a hand-placed drone hole in a soft wall cell (finish() also adds one between neighbouring rooms)
       droneHole(x, y) { const k = idx(x, y); if (k >= 0) dhole[k] = 1; },
@@ -232,7 +236,7 @@ export function makeMap({ id, name, floors }) {
       }
     }
     for (const [key, w] of walls) if (!decided.has(key) && hash(key) < (w.a < 0 ? 0.1 : 0.2)) soft.add(key); // he asked twice: fewer (too much wallbanging)
-    const make = k => { tiles[k] = T.HARD; mat[k] = MAT.CONCRETE; hp[k] = 0; hardened[k] = 1; };
+    const make = k => { if (keepSoft[k]) return; tiles[k] = T.HARD; mat[k] = MAT.CONCRETE; hp[k] = 0; hardened[k] = 1; };
     for (const [key, w] of walls) if (!soft.has(key)) w.cells.forEach(make);
     // corners and joints between walls: solid unless they touch a wall that stayed breakable
     const rest = [];
@@ -510,6 +514,46 @@ export function makeMap({ id, name, floors }) {
     for (; propN < props.length; propN++) { const p = props[propN]; for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) propGrid[y * W + x] = 1; }
     return propGrid[k] === 1;
   };
+  // Rat spots (he asked 2026-11-15: places people can hide to punish those who don't clear angles as they take a room):
+  // in each bomb-site room and each room a door away from one, a tall cabinet stands one cell off a wall in a corner,
+  // leaving a two-cell nook behind it that none of the room's doorways can see into. You only see it by walking in and
+  // turning to check the corner. map.rats = [{ x, y (the nook, world px), room, face: { x, y } (the room's middle) }].
+  const rats = [];
+  const ratSpots = (sites) => {
+    if (!sites) return;
+    const near = new Set(), roomOf = new Int16Array(N).fill(-1);
+    rooms.forEach((r, i) => { for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) roomOf[y * W + x] = i; });
+    const site = new Set(sites.flatMap(st => st.rooms || []).map(n => rooms.findIndex(r => r.name === n)).filter(i => i >= 0));
+    for (const o of openings) if (o.kind === 'door') { const sides = new Set(); for (const k of o.cells) for (const d of [1, -1, W, -W]) if (roomOf[k + d] >= 0) sides.add(roomOf[k + d]); if ([...sides].some(i => site.has(i))) for (const i of sides) near.add(i); }
+    for (const i of site) near.add(i);
+    const opened = new Uint8Array(N); for (const o of openings) for (const k of o.cells) opened[k] = 1;
+    const free = k => k >= 0 && k < N && tiles[k] === T.FLOOR && !shape[k] && !propAt(k) && portal[k] < 0 && hatchAt[k] < 0 && hatchBelow[k] < 0 && ![1, -1, W, -W].some(d => opened[k + d]);
+    const blocks = k => { const t = tiles[k]; return !(t === T.FLOOR || t === T.LOW || t === T.STAIR || t === T.HATCH || opened[k]) || shape[k]; };
+    const sees = (ax, ay, bx, by, extra) => { const L = Math.hypot(bx - ax, by - ay), n = Math.ceil(L * 4); for (let i = 1; i < n; i++) { const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n, k = Math.floor(y) * W + Math.floor(x); if (extra.has(k) || blocks(k)) return false; } return true; };
+    const hash = t => { let h = 2166136261; for (const c of id + t) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
+    for (const ri of near) {
+      const r = rooms[ri]; if (!r || r.w < 6 || r.h < 6) continue;
+      const eyes = []; // where someone steps into the room: the room cell next to each doorway
+      for (const o of openings) if (o.kind === 'door') for (const k of o.cells) for (const d of [1, -1, W, -W]) if (roomOf[k + d] === ri) eyes.push([(k + d) % W + 0.5, Math.floor((k + d) / W) + 0.5]);
+      if (!eyes.length) continue;
+      const tries = [];
+      for (const [cx, sx] of [[r.x, 1], [r.x + r.w - 1, -1]]) for (const [cy, sy] of [[r.y, 1], [r.y + r.h - 1, -1]]) for (const along of ['x', 'y']) tries.push({ cx, cy, sx, sy, along });
+      tries.sort((a, b) => hash(ri + ':' + a.cx + ',' + a.cy + a.along) - hash(ri + ':' + b.cx + ',' + b.cy + b.along));
+      for (const t of tries) {
+        const c = (u, v) => t.along === 'x' ? (t.cy + v * t.sy) * W + t.cx + u * t.sx : (t.cy + u * t.sy) * W + t.cx + v * t.sx; // u along the wall, v out from it
+        const nook = [c(0, 0), c(1, 0)], cab = [c(0, 1), c(1, 1)], entry = [c(2, 0), c(2, 1)];
+        if (![...nook, ...cab].every(free) || !entry.every(k => k >= 0 && tiles[k] === T.FLOOR && !propAt(k) && !shape[k])) continue;
+        if ([...nook, ...cab, ...entry].some(k => roomOf[k] !== ri)) continue;
+        const wall = new Set(cab);
+        if (eyes.some(([ex, ey]) => nook.some(k => sees(ex, ey, k % W + 0.5, Math.floor(k / W) + 0.5, wall)))) continue; // a doorway sees in: no good
+        const x0 = Math.min(...cab.map(k => k % W)), y0 = Math.min(...cab.map(k => Math.floor(k / W)));
+        props.push({ kind: 'cabinet', x: x0, y: y0, w: t.along === 'x' ? 2 : 1, h: t.along === 'x' ? 1 : 2, rot: 0, rat: 1 });
+        for (const k of cab) tiles[k] = T.TALL;
+        const k0 = nook[0]; rats.push({ x: (k0 % W + 0.5) * CELL, y: (Math.floor(k0 / W) + 0.5) * CELL, room: r.name, face: { x: (r.x + r.w / 2) * CELL, y: (r.y + r.h / 2) * CELL } });
+        break;
+      }
+    }
+  };
   const finish = (extra) => {
     finishShapes();
     // walls take the floor of the room next to them, so a hole shows the right floor
@@ -528,6 +572,7 @@ export function makeMap({ id, name, floors }) {
     droneHoles();
     buildRoof();
     placeHatches(extra && extra.sites);
+    ratSpots(extra && extra.sites);
     roofProps();
     padGround();
     if (extra && extra.atkSpawns) extra.atkSpawns = extra.atkSpawns.map((s, i) => coverSpawn(s, i));
@@ -537,7 +582,7 @@ export function makeMap({ id, name, floors }) {
     for (const p of props) if (UNDER_KINDS.has(p.kind)) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) under[y * W + x] = 1;
     return {
       id, name, W, H, tiles, floor, mat, hp, holes: {}, openId, dhole, props, openings, rooms, portal, flAt, stairs, decor, shape, shapeSide, shapeFill,
-      hatches, hatchAt, hatchBelow, win, hardened, under, outdoors,
+      hatches, hatchAt, hatchBelow, win, hardened, under, outdoors, rats,
       floors: fl.map(f => ({ name: f.name, i: f.i, gx: f.gx, w: f.w, h: f.h, x0: f.x0, y0: f.y0, roof: !!f.roof })),
       roofFloor: fl[fl.length - 1].i,
       ...extra,

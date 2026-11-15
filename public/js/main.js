@@ -1,6 +1,6 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
-import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL } from '/shared/constants.js';
+import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL, OVERWATCH } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
 import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
@@ -327,7 +327,7 @@ const steadying = () => !!(st.me && st.me.ct === 'body' && st.me.a && sniperOn(s
 function scopeSway(dt, me, now) {
   const on = me && me.ct === 'body' && me.a && !me.dn && sniperOn(me) && !st.tv ? Math.min(1, me.at || 0) : 0;
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
-  const want = on * (me && me.bp ? 0 : steadying() ? 0.0008 : 0.011 * (1 + run * 1.5)); // PERCH's bipod: no sway at all
+  const want = on * (steadying() ? 0.0008 : 0.011 * (1 + run * 1.5));
   st.swayA = (st.swayA || 0) + (want - (st.swayA || 0)) * (1 - Math.exp(-dt * (want < (st.swayA || 0) ? 22 : 4)));
   const v = st.swayA * (Math.sin(now * 1.3) + 0.5 * Math.sin(now * 2.9 + 1)), d = v - (st.swayV || 0);
   st.swayV = v; if (!d) return;
@@ -2839,7 +2839,7 @@ function draw(s, view, now, dt) {
   const ents = s.ents.map(e => interp(e.id, 'ents') || e);
   for (const e of ents) {
     const ally = e.tm === side;
-    if (e.ty === 'drone' || e.ty === 'cam' || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud' || e.ty === 'bird' || e.ty === 'swarm') continue;
+    if (e.ty === 'drone' || e.ty === 'cam' || e.ty === 'smoke' || e.ty === 'decoy' || e.ty === 'gascloud' || e.ty === 'bird' || e.ty === 'swarm' || e.ty === 'watch') continue;
     if (TRAPS.has(e.ty) && !ally && !(view && Math.hypot(e.x - view.x, e.y - view.y) < TRAP_SEEN)) continue; // hidden traps: one rule for all (he asked), seen only within 2 m
     if (!ally && !seen(e.x, e.y)) continue;
     liftDraw(e.x, e.y, gadgetZ(e), () => drawGadget(ctx, e, now, ally), gadgetBase(e));
@@ -3181,6 +3181,12 @@ function draw(s, view, now, dt) {
     const site = m.sites[s.site];
     if (side === 'def' || s.rev) for (const b of site.bombs) marker(b.x, b.y, b.id, '#f2c14e', view);
     if (s.pl) marker(s.pl.x, s.pl.y, '!', '#ff4040', view);
+    for (const e of ents) if (e.ty === 'watch' && e.tm === side) { // PERCH's Overwatch cone, his team only: the wedge as far as sight reaches
+      const sm = smokes(st.last), pts = [[e.x, e.y]], a0 = e.ag || 0;
+      for (let i = 0; i <= 15; i++) { const a = a0 - OVERWATCH.half + (2 * OVERWATCH.half) * i / 15, d = castSight(m, e.x, e.y, a, OVERWATCH.range, sm); pts.push([e.x + Math.cos(a) * d, e.y + Math.sin(a) * d]); }
+      const zz = st.zoom || 1; ctx.save(); ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); // (world coordinates here)
+      ctx.fillStyle = 'rgba(255,170,60,0.1)'; ctx.fill(); ctx.setLineDash([6 / zz, 5 / zz]); ctx.strokeStyle = 'rgba(255,170,60,0.6)'; ctx.lineWidth = 1.5 / zz; ctx.stroke(); ctx.restore();
+    }
     for (const e of ents) if (e.ty === 'defuser') { // a dropped defuser: both sides know where it lies (he asked), bigger for its first seconds
       const age = st.defDrop && Math.hypot(st.defDrop.x - e.x, st.defDrop.y - e.y) < 30 ? now - st.defDrop.t : 9;
       marker(e.x, e.y, 'D', '#f2c14e', view, 'DEFUSER', age < 4 ? 1.8 + 0.35 * Math.abs(Math.sin(age * 5)) : 1.2);
@@ -3653,7 +3659,7 @@ function hud(s) {
   st.tBadge = { skill: me.gi || salvoWait || me.lu ? '!' : String(abCount), gadget: me.ni ? '!' : String(me.gc ?? ''), view: side === 'atk' && s.ph === PHASE.ACTION ? String(me.dr ?? '') : '' };
   if (s.zb) setHTML('gadgets', `<div class="${me.gc <= 0 ? 'out' : ''}"><b>${label('gadget')}</b>${g.name}<em>${me.gc}</em></div>`); else // ZOMBIES: grenades only
   setHTML('gadgets',
-    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : me.scd ? `${ab.name} ready in ${Math.ceil(me.scd)}s` : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : me.ap ? 'Piercing round loaded' : me.bp ? 'Bipod down · press to lift' : me.su2 ? `Spotting ${Math.ceil(me.su2)}s · aim in` : me.gw2 ? `Ghillie ${Math.ceil(me.gw2)}s` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
+    `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : me.scd ? `${ab.name} ready in ${Math.ceil(me.scd)}s` : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : me.ap ? 'Piercing round loaded' : me.su2 ? `Spotting ${Math.ceil(me.su2)}s · aim in` : me.gw2 ? `Ghillie ${Math.ceil(me.gw2)}s` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
     `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>${label('gadget')}</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +
     `<div><b>${label('view')}</b>${viewName}</div>`);
   // view label
