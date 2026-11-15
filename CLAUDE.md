@@ -462,4 +462,5 @@ His wishes so far:
 
 ## Batch of 2026-11-15 (late, he asked)
 - Ball Knowledge: every tab lists most to least % (guns by rounds won, attachments by `rec`, maps by attack win %, drill pro cards by drills won; operators already were).
+- Revive reach `REVIVE_REACH` 34 px on the server (the client prompt is 26 on interpolated positions, so the server is a bit more generous); `node tests/revivetrap.js` revives on every trap/gadget kind.
 - Main menu `⬇ DOWNLOAD FOR WINDOWS` (`.dlNav` in `.hsmall`): links to the newest GitHub release's `R62D-windows.zip` (`releases/latest/download/...`), so a friend can play on their own computer with no VPN. Hidden in the program / kiosk (`html.inapp`, set from `inApp()`) and on phones. Release a new build (`desktop/release.sh`) when the download should catch up.

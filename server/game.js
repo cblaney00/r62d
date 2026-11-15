@@ -43,6 +43,7 @@ const EMP_R = 36; // buffed (he asked: it was no better than ordinary utility): 
 const LANCE_STEP = 0.5; // RIVET: seconds per burnt-through point (the first is a bullet-sized hole)
 const HAMMER_CD = 2; // was 4, then 2.5 (he asked: Ferro stronger; 2026-11-10 attackers' skills stronger as a whole)
 const WINDUP_T = 0.5, SETUP_T = 1.2;
+const REVIVE_REACH = 34; // see startInteract
 const EF_FIELD = { blind: 'stunUntil', stun: 'stunUntil', slow: 'slowUntil', snare: 'clampUntil', daze: 'dazeUntil', deaf: 'deafUntil' };
 const THROWN_G = new Set(['smoke', 'frag', 'stun', 'impact', 'nitro']), PLACED_G = new Set(['breach', 'claymore', 'wire', 'dshield']);
 const THROWN_AB = new Set(['emp', 'sonar', 'stickycam', 'gas', 'flare', 'medkit', 'echobox']);
@@ -1505,6 +1506,8 @@ export class Game {
   }
 
   // ---------------- interaction ----------------
+  // (the screen shows HOLD TO REVIVE within 26 px of where it draws them, ~0.1 s behind; the server takes a little more so a
+  //  prompt on screen always works, he saw E do nothing until he shuffled closer)
   startInteract(p) {
     const team = this.side(p);
     if (this.phase === PHASE.ACTION && team === TEAM.ATK && p.hasDefuser && !this.planted) {
@@ -1514,7 +1517,7 @@ export class Game {
     if (team === TEAM.DEF && this.planted && Math.hypot(this.planted.x - p.x, this.planted.y - p.y) < 30)
       return { k: 'defuse', t: 0, dur: DUR.defuse };
     for (const q of this.players.values())
-      if (q !== p && q.alive && q.downed && this.side(q) === team && Math.hypot(q.x - p.x, q.y - p.y) < 26)
+      if (q !== p && q.alive && q.downed && this.side(q) === team && Math.hypot(q.x - p.x, q.y - p.y) < REVIVE_REACH)
         return { k: 'revive', t: 0, dur: DUR.revive * (this.zb ? zbReviveTime(this, p) : 1), target: q.id };
     if (team === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION)) {
       const f = this.facingCell(p, 28); // the same reach as the on-screen prompt
@@ -1567,7 +1570,7 @@ export class Game {
     if (!inp.interact) p.ropeHeld = false; // E that started or ended a climb doesn't also start something else
     if (!p.rope) {
       if (!edge('interact') || this.phase !== PHASE.ACTION || this.side(p) !== TEAM.ATK || p.ctrl !== 'body' || p.downed || p.busy || p.vault || !p.alive) return;
-      if ([...this.players.values()].some(q => q !== p && q.alive && q.downed && this.side(q) === TEAM.ATK && Math.hypot(q.x - p.x, q.y - p.y) < 26)) return; // E next to a downed teammate revives, never climbs
+      if ([...this.players.values()].some(q => q !== p && q.alive && q.downed && this.side(q) === TEAM.ATK && Math.hypot(q.x - p.x, q.y - p.y) < REVIVE_REACH)) return; // E next to a downed teammate revives, never climbs
       const top = roofRopeAt(this.map, p.x, p.y);
       if (top) { p.rope = { st: 'move', r: -1, from: -2, to: top.i, s: 0, t: 0, dur: ROPE_DROP, top: { x: p.x, y: p.y }, h: 0.85 }; p.ropeHeld = true; p.reloadT = 0; p.adsT = 0; p.burst = 0; this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id }); return; }
       const hit = ropeAt(this.map, p.x, p.y); if (!hit) return;
