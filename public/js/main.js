@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL, OVERWATCH } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, plantBomb, PLANT_R, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf, hitR } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -3179,6 +3179,7 @@ function draw(s, view, now, dt) {
     }
     // objective markers
     const site = m.sites[s.site];
+    if ((side === 'def' || s.rev) && !s.pl) plantArea(m, s.site, view); // where the defuser can go (he asked: anywhere round the bomb, inside its room)
     if (side === 'def' || s.rev) for (const b of site.bombs) marker(b.x, b.y, b.id, '#f2c14e', view);
     if (s.pl) marker(s.pl.x, s.pl.y, '!', '#ff4040', view);
     for (const e of ents) if (e.ty === 'watch' && e.tm === side) { // PERCH's Overwatch cone, his team only: the wedge as far as sight reaches
@@ -3326,6 +3327,22 @@ function deathMarks(view, now) {
     const age = t - (c.t || 0), pulse = 1.8 * (age < 4 ? 1 + 0.3 * Math.abs(Math.sin(age * 5)) : 1);
     marker(x, y, '✖', '#ff4040', view, up + (c.n || 'Teammate'), pulse);
   }
+}
+// the plant area round each bomb (shared/map.js plantBomb): faint gold cells with a dashed edge, on the floor you are on
+const plantCache = new WeakMap();
+function plantArea(m, si, view) {
+  let c = plantCache.get(m); if (!c || c.si !== si) { // cells and edges, worked out once per map and site
+    const site = m.sites[si], W = m.W, inA = new Set(), edges = [];
+    for (const bm of site.bombs) { const r = Math.ceil(PLANT_R / CELL) + 1, bx = Math.floor(bm.x / CELL), by = Math.floor(bm.y / CELL);
+      for (let y = by - r; y <= by + r; y++) for (let x = bx - r; x <= bx + r; x++) if (plantBomb(m, site, (x + 0.5) * CELL, (y + 0.5) * CELL) === bm) inA.add(y * W + x); }
+    for (const k of inA) { const x = k % W, y = Math.floor(k / W); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!inA.has(k + dx + dy * W)) { const ex = dx === 1 ? x + 1 : x, ey = dy === 1 ? y + 1 : y; edges.push(dx ? [ex, y, ex, y + 1] : [x, ey, x + 1, ey]); } }
+    plantCache.set(m, c = { si, inA, edges, f: floorAt(m, site.bombs[0].x, site.bombs[0].y) });
+  }
+  if (!view || floorAt(m, view.x, view.y) !== c.f) return;
+  const zz = st.zoom || 1; ctx.save(); ctx.fillStyle = 'rgba(242,193,78,0.07)';
+  for (const k of c.inA) ctx.fillRect((k % m.W) * CELL, Math.floor(k / m.W) * CELL, CELL, CELL);
+  ctx.beginPath(); for (const [x0, y0, x1, y1] of c.edges) { ctx.moveTo(x0 * CELL, y0 * CELL); ctx.lineTo(x1 * CELL, y1 * CELL); }
+  ctx.setLineDash([5 / zz, 4 / zz]); ctx.strokeStyle = 'rgba(242,193,78,0.55)'; ctx.lineWidth = 1.4 / zz; ctx.stroke(); ctx.restore();
 }
 function marker(x, y, label, col, view, sub, big = 1) {
   const z = st.zoom;
@@ -3793,7 +3810,7 @@ function promptText(s, me) {
   if (side === 'atk' && s.ph === PHASE.ACTION && me.ct === 'body' && !me.dn && roofRopeAt(m, x, y)) return `<b>${label('interact')}</b>RAPPEL DOWN`;
   if (side === 'def' && s.rf > 0) { const at = hatchAtPoint(m, x, y); if (at && !at.up && at.h.roof && m.tiles[at.h.cells[0]] === T.HATCH) return `<b>${label('interact')}</b>HOLD TO REINFORCE ROOF HATCH (${s.rf} LEFT)`; }
   if (side === 'atk' && me.df && s.ph === PHASE.ACTION && !s.pl) {
-    const b = m.sites[s.site].bombs.find(b => Math.hypot(b.x - x, b.y - y) < 30);
+    const b = plantBomb(m, m.sites[s.site], x, y); // anywhere in the plant area round a bomb (he asked)
     if (b) return `<b>${label('interact')}</b>HOLD TO PLANT DEFUSER (BOMB ${b.id})`;
   }
   if (side === 'def' && s.pl && Math.hypot(s.pl.x - x, s.pl.y - y) < 30) return '<b>' + label('interact') + '</b>HOLD TO DISABLE DEFUSER';

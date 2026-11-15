@@ -377,6 +377,19 @@ export function localPos(map, wx, wy) {
   return { x: wx + (F.x0 - F.gx) * CELL, y: wy + F.y0 * CELL, f };
 }
 
+// Where the defuser can be planted (he asked 2026-11-15): anywhere within PLANT_R of a bomb marker, but only inside that
+// bomb's own room (it never spills into the next room). Returns the bomb, or null. One rule for the server, the prompt,
+// the plant-area outline and the bots.
+export const PLANT_R = 5 * 36; // 5 m
+export function plantBomb(map, site, x, y) {
+  if (!site) return null;
+  for (const b of site.bombs) {
+    if (Math.hypot(b.x - x, b.y - y) > PLANT_R || floorAt(map, x, y) !== floorAt(map, b.x, b.y)) continue;
+    if (roomAt(map, x, y) === (b.room || roomAt(map, b.x, b.y))) return b;
+  }
+  return null;
+}
+
 export function roomAt(map, wx, wy) {
   const cx = Math.floor(wx / CELL), cy = Math.floor(wy / CELL);
   for (const r of map.rooms) if (cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h) return r.name;

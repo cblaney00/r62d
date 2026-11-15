@@ -1,6 +1,6 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM, OVERWATCH } from '../shared/constants.js';
-import { floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
+import { plantBomb, floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ropeAimLimit, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers , inBox } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
@@ -1503,8 +1503,8 @@ export class Game {
   startInteract(p) {
     const team = this.side(p);
     if (this.phase === PHASE.ACTION && team === TEAM.ATK && p.hasDefuser && !this.planted) {
-      const b = this.map.sites[this.site].bombs.find(b => Math.hypot(b.x - p.x, b.y - p.y) < 30);
-      if (b) { this.events.push({ e: 'snd', s: 'plantStart', x: r1(p.x), y: r1(p.y) }); return { k: 'plant', t: 0, dur: DUR.plant, bomb: b.id }; }
+      const b = plantBomb(this.map, this.map.sites[this.site], p.x, p.y); // anywhere in the plant area round a bomb (he asked)
+      if (b) { this.events.push({ e: 'snd', s: 'plantStart', x: r1(p.x), y: r1(p.y) }); return { k: 'plant', t: 0, dur: DUR.plant, bomb: b.id, x: p.x, y: p.y }; }
     }
     if (team === TEAM.DEF && this.planted && Math.hypot(this.planted.x - p.x, this.planted.y - p.y) < 30)
       return { k: 'defuse', t: 0, dur: DUR.defuse };
@@ -1532,10 +1532,10 @@ export class Game {
     p.busy = null; p.input.interact = 0;
     if (b.k === 'plant') {
       const bomb = this.map.sites[this.site].bombs.find(x => x.id === b.bomb);
-      this.planted = { x: bomb.x, y: bomb.y, bomb: bomb.id, t: this.tut ? 3 : DUR.bomb }; // the tutorial doesn't make you wait
+      this.planted = { x: b.x ?? bomb.x, y: b.y ?? bomb.y, bomb: bomb.id, t: this.tut ? 3 : DUR.bomb }; // where it was planted; the tutorial doesn't make you wait
       p.hasDefuser = false; if (p.ms) p.ms.plants++; this.pts(p, 150, 'DEFUSER PLANTED');
       this.events.push({ e: 'banner', text: 'DEFUSER PLANTED', sub: `Bomb ${bomb.id} — ${bomb.room}` });
-      this.events.push({ e: 'snd', s: 'planted', x: r1(bomb.x), y: r1(bomb.y) });
+      this.events.push({ e: 'snd', s: 'planted', x: r1(this.planted.x), y: r1(this.planted.y) });
     } else if (b.k === 'defuse') {
       this.events.push({ e: 'banner', text: 'DEFUSER DISABLED', sub: '' }); if (p.ms) p.ms.defuses++; this.pts(p, 150, 'DEFUSER DISABLED');
       this.endRound(TEAM.DEF, 'Defuser disabled');

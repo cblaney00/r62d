@@ -58,4 +58,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-15', k: 'mech', id: 'rats', t: 'Rat spots: a nook behind a cabinet in the corner of bomb-site rooms and the rooms beside them, out of sight of the doorways.', v: 0 },
   { d: '2026-11-15', k: 'mech', id: 'cams', t: 'Three more defender cameras on every map, in rooms next to the bomb sites.', v: -1 },
   { d: '2026-11-15', k: 'map', id: 'all', t: 'Long hallways chopped up with breakable brick baffles: only three long indoor angles are left outside Dust Town.', v: 0 },
+  { d: '2026-11-15', k: 'mech', id: 'plant', t: 'The defuser can be planted anywhere within 5 m of a bomb marker inside its room, and lands where it was planted.', v: 1 },
 ];
