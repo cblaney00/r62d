@@ -12,7 +12,7 @@ import { los } from './physics.js';
 // calm: how little pressure shakes them (0-1); traits: what they are known for, flaws included.
 export const PRO_TEAMS = [
   {
-    id: 'nwd', tag: 'NWD', name: 'Northwind', colour: '#dde5ee',
+    id: 'nwd', tag: 'NWD', name: 'Northwind', colour: '#9b5cff',
     style: 'Fast and aggressive. They hit before the defenders are set, trade kills tight and win on speed and surprise.',
     prefer: { atk: ['fast', 'split', 'window', 'pinch', 'default', 'vertical', 'lurk', 'fake', 'late'], def: ['layers', 'roam', 'bait', 'cross', 'hunter', 'hold', 'vert', 'retake', 'tworooms', 'turtle'] },
     players: [
@@ -29,7 +29,7 @@ export const PRO_TEAMS = [
     ],
   },
   {
-    id: 'irc', tag: 'IRC', name: 'Ironclad Collective', colour: '#e8b445',
+    id: 'irc', tag: 'IRC', name: 'Ironclad Collective', colour: '#ffe03a',
     style: 'Slow and methodical. Full droning, utility before every push, crossfires on defence; they win the last minute.',
     prefer: { atk: ['default', 'late', 'vertical', 'pinch', 'fake', 'lurk', 'split', 'window', 'fast'], def: ['cross', 'layers', 'hold', 'retake', 'vert', 'tworooms', 'bait', 'hunter', 'roam', 'turtle'] },
     players: [

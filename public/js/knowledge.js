@@ -128,7 +128,7 @@ function gunsData() {
 function renderGuns() {
   const gs = gunsData().filter(g => g.r[0]);
   const avgOf = g => { const same = gs.filter(x => WEAPONS[x.w].cls === WEAPONS[g.w].cls && x.r[0] >= 10); return same.reduce((a, x) => a + x.r[2] / x.r[0], 0) / Math.max(1, same.length) || 0.01; }; // (each gun against its own kind)
-  gs.sort((a, b) => b.r[2] / b.r[0] - a.r[2] / a.r[0]);
+  gs.sort((a, b) => b.r[1] / b.r[0] - a.r[1] / a.r[0]); // he asked: most to least %
   const att = (S.data || {}).att || {};
   return gs.map(g => { const W = WEAPONS[g.w], [n, w, k, de] = g.r, kpr = k / n, avg = avgOf(g);
     const best = g.ops.sort((a, b) => rec(b.r) - rec(a.r))[0];
@@ -142,7 +142,7 @@ function renderGuns() {
 function renderAtt() {
   const d = S.data || {}, A = {};
   for (const [k, r] of Object.entries(d.att || {})) { const [w, sl, c] = k.split('|'); if (!ATTACH[sl] || !ATTACH[sl][c]) continue; const x = A[sl + '|' + c] || (A[sl + '|' + c] = { sl, c, r: [0, 0, 0, 0], guns: [] }); add(x.r, r); if (r[0] >= 8 && WEAPONS[w]) x.guns.push({ w, r }); }
-  const xs = Object.values(A).filter(x => x.r[0] >= 10).sort((a, b) => a.sl < b.sl ? -1 : a.sl > b.sl ? 1 : rec(b.r) - rec(a.r));
+  const xs = Object.values(A).filter(x => x.r[0] >= 10).sort((a, b) => rec(b.r) - rec(a.r));
   return xs.map(x => { const a = ATTACH[x.sl][x.c], best = x.guns.sort((p, q) => rec(q.r) - rec(p.r))[0], worst = x.guns[x.guns.length - 1], rt = rec(x.r);
     const tips = [esc(a.desc || '')]; if (best) tips.push(`Best on the <b>${esc(WEAPONS[best.w].name)}</b> (${Math.round(rec(best.r) * 100)}%).`); if (worst && worst !== best && x.guns.length > 2) tips.push(`Worst on the ${esc(WEAPONS[worst.w].name)} (${Math.round(rec(worst.r) * 100)}%).`);
     return card(esc(a.name), x.sl.toUpperCase(), `${Math.round(rt * 100)}% of rounds and fights won · ${x.r[0]} rounds`, list(tips), rt > 0.56 ? '#ff7a5a' : rt < 0.44 ? '#5ec8ff' : '#93a0ad'); }).join('') || '<p class="hint">No attachment numbers yet.</p>';
@@ -151,7 +151,8 @@ function renderMaps() {
   const d = S.data || {}, M = {};
   for (const [k, r] of Object.entries(d.plans || {})) { const [m, site, side, plan] = k.split('|'); if (!MAP_LIST.includes(m)) continue; const x = M[m] || (M[m] = { atk: [0, 0], def: [0, 0], plans: [] }); x[side][0] += r.n; x[side][1] += r.w; if (r.n >= 4) x.plans.push({ side, plan, site, r }); }
   const opsOn = (m, side) => Object.entries(d.ops || {}).filter(([k, r]) => k.startsWith(m + '|' + side + '|') && r.n >= 5).map(([k, r]) => ({ op: k.split('|')[2], r })).sort((a, b) => b.r.w / b.r.n - a.r.w / a.r.n);
-  return MAP_LIST.map(m => { const x = M[m]; if (!x) return card(esc(mapName(m)), '', 'no rounds yet', '');
+  const atkOf = m => M[m] && M[m].atk[0] ? M[m].atk[1] / M[m].atk[0] : -1;
+  return MAP_LIST.slice().sort((a, b) => atkOf(b) - atkOf(a)).map(m => { const x = M[m]; if (!x) return card(esc(mapName(m)), '', 'no rounds yet', '');
     const a = x.atk[0] ? x.atk[1] / x.atk[0] : 0.5, tips = [];
     const top = side => x.plans.filter(p => p.side === side).sort((p, q) => q.r.w / q.r.n - p.r.w / p.r.n)[0];
     for (const side of ['atk', 'def']) { const p = top(side), o = opsOn(m, side)[0]; if (p) tips.push(`${side === 'atk' ? 'Attack' : 'Defence'}: the <b>${esc(nice(p.plan))}</b> play on site ${+p.site + 1} wins ${pct(p.r.w, p.r.n)}${o && OPERATORS[o.op] ? `; best pick ${esc(OPERATORS[o.op].name)} (${pct(o.r.w, o.r.n)})` : ''}.`); }
@@ -175,7 +176,7 @@ function renderDrills() {
   const word = r => Math.abs(r) > 0.6 ? 'strongly' : Math.abs(r) > 0.3 ? 'somewhat' : 'hardly';
   const matters = card('WHICH SKILLS MATTER', 'drill skills next to real practice results', 'ten pros: a hint, not a law', rows.length ? list(rows.map(x => `<b>${esc(x.sk)}</b> goes ${word(x.r)} with winning rounds${x.r < -0.3 ? ' (the other way!)' : ''} and ${word(x.k)} with K/D`)) : '<p class="hint">Needs practice rounds and drills for every pro.</p>', '#f2c14e');
   const kinds = card('THE DRILLS', 'the Drill Hall: two blocks, a line nobody crosses, no skills, one minute', 'a draw is a loss for everyone', list(Object.entries(D.kinds || {}).map(([k, x]) => `<b>${esc(({ duel: 'Block duel', trade: 'Two on two', hold: 'Hold or swing', clutch: 'Clutch' })[k] || k)}</b>: ${x.n} played, ${pct(x.draws, x.n)} ran out of time, ${(x.time / Math.max(1, x.n)).toFixed(0)} s on average`)), '#f2c14e');
-  const pros = PRO_TEAMS.flatMap(t => t.players.map(pl => ({ pl, t }))).filter(x => D.pro[x.pl.name]).map(({ pl, t }) => { const p = D.pro[pl.name], sty = (D.style || {})[pl.name];
+  const pros = PRO_TEAMS.flatMap(t => t.players.map(pl => ({ pl, t }))).filter(x => D.pro[x.pl.name]).sort((a, b) => { const A = D.pro[a.pl.name], B = D.pro[b.pl.name]; return B.w / Math.max(1, B.n) - A.w / Math.max(1, A.n); }).map(({ pl, t }) => { const p = D.pro[pl.name], sty = (D.style || {})[pl.name];
     return card(`[${esc(t.tag)}] ${esc(pl.name)}`, `${p.n} drills · ${Math.round(p.pts / Math.max(1, p.n))} points a drill`, `won ${pct(p.w, p.n)}`, list(drillSkills(D, pl.name).map(s => `${esc(s.n)}: <b>${s.f}</b>`).concat(sty ? [`Style learned: leans ${pct(sty.lean, 1)}, crouches ${pct(sty.crouch, 1)}, jiggles ${pct(sty.strafe, 1)}, holds ${sty.patience.toFixed(1)} s before swinging`] : [])), t.colour); });
   return what + matters + kinds + pros.join('');
 }

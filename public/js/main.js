@@ -4676,6 +4676,7 @@ setInterval(() => { const now = performance.now(); for (const d of $('chatLog').
 // The desktop app's window is already full screen (Firefox kiosk). Asking the browser for full
 // screen again there shrinks the picture into a corner, so the switch only acts in a normal browser.
 function inApp() { return !!window.r62dApp || new URLSearchParams(location.search).has('app'); }
+if (inApp()) document.documentElement.classList.add('inapp'); // the download link is for browsers only
 function toggleFullscreen() {
   if (window.r62dApp && window.r62dApp.toggleFull) return window.r62dApp.toggleFull();
   if (appWin) { fetch('/api/window', { method: 'POST' }).catch(() => {}); return; }
