@@ -61,4 +61,10 @@ export const PATCH_NOTES = [
   { d: '2026-11-15', k: 'mech', id: 'plant', t: 'The defuser can be planted anywhere within 5 m of a bomb marker inside its room, and lands where it was planted.', v: 1 },
   { d: '2026-11-15', k: 'mech', id: 'defreq', t: 'Attackers can request the defuser in operator select; it goes to one of those who asked.', v: 1 },
   { d: '2026-11-15', k: 'mech', id: 'ropes', t: 'Rappelling is faster: 1.3 s a storey climbing (was 2), 0.3 s sliding down (was 0.45).', v: 1 },
+  { d: '2026-11-15', k: 'op', id: 'osprey', t: 'OSPREY: Spotting Scope lasts 12 s (was 8), marks for 6 s (was 4) and covers a wider view.', v: 1 },
+  { d: '2026-11-15', k: 'op', id: 'vapor', t: 'VAPOR: 4 Smoke Bursts (was 3), each lasting 11 s (was 8).', v: 1 },
+  { d: '2026-11-15', k: 'op', id: 'kestrel', t: 'KESTREL: Seeker Dart sees enemies further from it (6.4 m, was 4.7).', v: 1 },
+  { d: '2026-11-15', k: 'op', id: 'trench', t: 'TRENCH: 4 Drop Covers (was 3).', v: 1 },
+  { d: '2026-11-15', k: 'op', id: 'hammer', t: 'HAMMER: 6 Breaching Rounds (was 5).', v: 1 },
+  { d: '2026-11-15', k: 'op', id: 'rush', t: 'RUSH: 5 Breaching Dashes (was 4).', v: 1 },
 ];

@@ -932,9 +932,9 @@ export class Game {
       for (const q of this.players.values()) {
         if (!q.alive || q.staged || this.side(q) === team || floorAt(this.map, q.x, q.y) !== fl) continue;
         const d = Math.hypot(q.x - p.x, q.y - p.y);
-        if (d > 70 * PX_PER_M || Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) > 0.35 || !los(this.map, p.x, p.y, q.x, q.y, sm)) continue;
+        if (d > 70 * PX_PER_M || Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) > 0.45 || !los(this.map, p.x, p.y, q.x, q.y, sm)) continue; // (2026-11-15 buff: 0.35 → 0.45)
         if (!(q.spotFrom && q.spotFrom > this.time)) this.pts(p, 10, 'Spotted an enemy');
-        q.spotFrom = this.time + 4; this.spot(team, q.id, 4);
+        q.spotFrom = this.time + 6; this.spot(team, q.id, 6); // (2026-11-15 buff: marked 4 → 6 s)
       }
     }
   }
@@ -2150,7 +2150,7 @@ export class Game {
       this.ents.push({ id: this.eid(), type: 'watch', x: p.x, y: p.y, team: this.side(p), owner: p.id, ang: p.aim, until: this.time + OVERWATCH.time, t: 0 });
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y), id: p.id });
     }
-    else if (id === 'spotter') { p.spotterUntil = this.time + 8; used(); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); } // OSPREY
+    else if (id === 'spotter') { p.spotterUntil = this.time + 12; /* (2026-11-15 buff: 8 → 12 s) */ used(); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); } // OSPREY
     else if (id === 'pierce') { // NAIL: one armour-piercing round in the chamber
       if (p.pierceShot) { this.events.push({ e: 'deny', id: p.id, why: 'A piercing round is already loaded' }); return; }
       p.pierceShot = 1; used(); this.events.push({ e: 'snd', s: 'reload', x: r1(p.x), y: r1(p.y), id: p.id });
@@ -2175,7 +2175,7 @@ export class Game {
           q.push([nx, ny]);
         }
       }
-      this.ents.push({ id: this.eid(), type: 'smoke', x: p.x, y: p.y, ang: p.aim, r: 14, life: 8, team, kind: 'cone', puffs });
+      this.ents.push({ id: this.eid(), type: 'smoke', x: p.x, y: p.y, ang: p.aim, r: 14, life: 11, team, kind: 'cone', puffs }); // (2026-11-15 buff: 8 → 11 s)
       used(); this.events.push({ e: 'snd', s: 'smoke', x: r1(p.x), y: r1(p.y) });
     } else if (id === 'alarm') place('alarm', 12, { arm: DUR.trapArm });
     else if (id === 'pace') place('pace', 10, { life: 999, hit: {} }); // RALLY: stays for the round (one bullet breaks it)
@@ -2829,7 +2829,7 @@ export class Game {
             e.ping = 1.5;
             let any = false; const sm = this.smokeList(), fl = floorAt(this.map, e.x, e.y);
             // only who it can see from where it sits (he asked: nothing through walls, floors or anything solid)
-            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 170 && floorAt(this.map, q.x, q.y) === fl && los(this.map, e.x, e.y, q.x, q.y, sm)) { this.spot(e.team, q.id, 1.6); any = true; }
+            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 230 && floorAt(this.map, q.x, q.y) === fl /* (2026-11-15 buff: 170 → 230) */ && los(this.map, e.x, e.y, q.x, q.y, sm)) { this.spot(e.team, q.id, 1.6); any = true; }
             this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any });
           }
           if (e.life <= 0) this.removeEnt(e);
