@@ -1648,7 +1648,10 @@ export class Game {
   // shot off the rope: down on the ground below it
   ropeFall(p) {
     if (!p.rope) return;
-    const r = p.rope.st === 'hang' && this.map.ropes[p.rope.r], g = r ? ropeGround(this.map, r, ropeS(r, p.x, p.y)) : p.rope.base;
+    // (2026-11-15: a climber shot mid-move between stretches had no base and crashed the server: fall to the ground under
+    // the rope they were moving from or to, else stay where they are)
+    const R = this.map.ropes, r = p.rope.st === 'hang' && R[p.rope.r], via = R[p.rope.to] || R[p.rope.from] || R[p.rope.r];
+    const g = r ? ropeGround(this.map, r, ropeS(r, p.x, p.y)) : p.rope.base || (via ? ropeGround(this.map, via, ropeS(via, p.x, p.y)) : null) || { x: p.x, y: p.y };
     p.x = g.x; p.y = g.y; p.vx = p.vy = 0; p.rope = null;
   }
 
