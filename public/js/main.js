@@ -1424,14 +1424,15 @@ function buildSelect(s) {
   $('selSide').style.color = lighten(side === 'atk' ? COLS.atk : COLS.def);
   const site = st.map.sites[s.site];
   const spawns = st.map.atkSpawns, mySpawn = spawns[me.spn] || spawns[0];
-  const sc = $('siteChoice'), used = s.su || [], sk = side === 'def' ? s.rd + ':' + s.site + ':' + used.join() : 'atk:' + s.rd + ':' + me.spn + ':' + (me.sr ? 1 : 0);
+  const sc = $('siteChoice'), used = s.su || [], dqN = s.players.filter(q => q.tm === 'atk' && q.dq).length, sk = side === 'def' ? s.rd + ':' + s.site + ':' + used.join() : 'atk:' + s.rd + ':' + me.spn + ':' + (me.sr ? 1 : 0) + ':' + (me.dq ? 1 : 0) + dqN;
   if (sc.dataset.k !== sk) {
     sc.dataset.k = sk;
     // defenders pick the site; each attacker picks where they start (he asked)
     sc.innerHTML = side === 'def' ? '<span>CHOOSE THE SITE TO DEFEND</span>' + st.map.sites.map((x, i) => used.includes(i) && i !== s.site ? `<button data-n="${i}" class="used" disabled title="Already played this match">${esc(x.name)}</button>` : `<button data-n="${i}" class="${i === s.site ? 'on' : ''}">${esc(x.name)}</button>`).join('')
       : '<span>CHOOSE YOUR SPAWN</span>' + `<button data-n="-1" class="${me.sr ? 'on atk' : 'atk'}" title="The team spreads out: usually two groups and one player on their own">RANDOM</button>` // the default (he asked)
-        + spawns.map((x, i) => `<button data-n="${i}" class="${!me.sr && i === me.spn ? 'on atk' : 'atk'}">${esc(x.name)}${me.sr && i === me.spn ? ' ✓' : ''}</button>`).join('');
-    for (const b of sc.querySelectorAll('button')) b.onclick = () => { audio.ui(); send(side === 'def' ? { t: 'site', n: +b.dataset.n } : { t: 'spawn', n: +b.dataset.n }); };
+        + spawns.map((x, i) => `<button data-n="${i}" class="${!me.sr && i === me.spn ? 'on atk' : 'atk'}">${esc(x.name)}${me.sr && i === me.spn ? ' ✓' : ''}</button>`).join('')
+        + `<button data-dq="1" class="${me.dq ? 'on atk' : 'atk'}" title="The defuser goes to one of the attackers who asked for it (anyone, if nobody asks)">${me.dq ? '✓ ' : ''}REQUEST DEFUSER${dqN ? ` · ${dqN} ASKED` : ''}</button>`; // (he asked 2026-11-15)
+    for (const b of sc.querySelectorAll('button')) b.onclick = () => { audio.ui(); send(b.dataset.dq ? { t: 'defreq', on: !me.dq } : side === 'def' ? { t: 'site', n: +b.dataset.n } : { t: 'spawn', n: +b.dataset.n }); };
   }
   drawSpawnMap(side === 'atk' ? mates : null, me);
   const mapName = st.map.name.toUpperCase();

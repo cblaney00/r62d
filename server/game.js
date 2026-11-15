@@ -243,6 +243,9 @@ export class Game {
       else if (m.a === 'start' && this.phase === PHASE.LOBBY) this.startMatch();
       else if (m.a === 'end' && this.phase !== PHASE.LOBBY) { this.msg(`${p.name} ended the match`); this.resetToLobby(); }
     } else if (m.t === 'pick') this.pickOp(p, m.op);
+    else if (m.t === 'defreq') { // (he asked 2026-11-15) an attacker asks for the defuser in operator select; it goes to one of those who asked
+      if (this.side(p) === TEAM.ATK && this.phase === PHASE.SELECT) p.defReq = !!m.on;
+    }
     else if (m.t === 'spawn') { // attackers choose where they start (operator select or preparation)
       const sp = this.map && this.map.atkSpawns[m.n], ok = this.side(p) === TEAM.ATK && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP);
       if (ok && m.n === -1) p.spawn = null; // RANDOM: the team's spawn plan places them (the default)
@@ -378,6 +381,7 @@ export class Game {
 
   nextRound() {
     this.round++;
+    for (const p of this.players.values()) p.defReq = false; // a defuser request lasts one round
     this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
     this.baseTiles = this.map.tiles.slice(); // how the walls were built (SOLDER welds broken soft walls back)
     this.ents = []; this.planted = null; this.winner = null; this.reason = ''; this.noises = [];
@@ -447,7 +451,8 @@ export class Game {
         atkers.push(p);
       }
     }
-    if (atkers.length) atkers[Math.floor(Math.random() * atkers.length)].hasDefuser = true;
+    { const asked = atkers.filter(p => p.defReq), pool = asked.length ? asked : atkers; // whoever asked for it, else anyone
+      if (pool.length) pool[Math.floor(Math.random() * pool.length)].hasDefuser = true; }
     if (this.rules.preBoards) { this.by = TEAM.DEF; this.preBarricade(this.rules.preBoards); this.by = null; } // (the defenders' boards: their map shows them at once)
     for (const p of this.players.values()) if (p.bot) botPrep(this, p);
     this.phase = PHASE.PREP; this.timer = DUR.prep;
@@ -3275,7 +3280,7 @@ export class Game {
         ef: this.efOut(p),
       });
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
-      if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; } }
+      if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; if (p.defReq) o.dq = 1; } }
       if (p.alive && (p.sock || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
         ga: this.free ? p.guns.map(q => q.w + ':' + attCode(q.att)) : undefined, // free play's gun menu shows what each held gun carries
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, ap: p.pierceShot ? 1 : undefined, su2: p.spotterUntil > this.time ? r1(p.spotterUntil - this.time) : undefined, gw2: p.ghillieUntil > this.time ? r1(p.ghillieUntil - this.time) : undefined, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,

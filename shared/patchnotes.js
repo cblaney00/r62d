@@ -59,4 +59,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-15', k: 'mech', id: 'cams', t: 'Three more defender cameras on every map, in rooms next to the bomb sites.', v: -1 },
   { d: '2026-11-15', k: 'map', id: 'all', t: 'Long hallways chopped up with breakable brick baffles: only three long indoor angles are left outside Dust Town.', v: 0 },
   { d: '2026-11-15', k: 'mech', id: 'plant', t: 'The defuser can be planted anywhere within 5 m of a bomb marker inside its room, and lands where it was planted.', v: 1 },
+  { d: '2026-11-15', k: 'mech', id: 'defreq', t: 'Attackers can request the defuser in operator select; it goes to one of those who asked.', v: 1 },
 ];
