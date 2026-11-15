@@ -111,3 +111,7 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
   (+1 burst, 11 s), KESTREL 39 → 39% (dart sees 6.4 m), TRENCH 39 → 39% (+1 cover). Smoke, a dart and cover are the
   kind of skill bots barely use well (see "How to check"), so those three may not show in bot numbers at all.
   Rappelling 2 → 1.3 s a storey, slide down 0.45 → 0.3 s. Attack overall ~43% in practice.
+- New ways up (trained pros, ~200-300 rounds a map): Depot 42 → 46% (Manager Office 29 → 37%), School 33 → 38%
+  (Principal Office 20 → 34%, Clock Room 29 → 34%), Lodge 33 → 34% (Office 20 → 35%). Forced onto one site, School's
+  Principal Office was 54% for attack, so part of the low figures is the defenders' site vote. Lodge's attackers die
+  mostly outside, shot from upstairs rooms on the approach: Lodge's problem is map-wide, not one site.
