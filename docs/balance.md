@@ -106,3 +106,8 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
   ~125 rounds a map, ±9%): Harbor 55, Villa 44, Depot 42, Embassy 49, Lodge 34, School 38, Dust 48; overall ~44%.
   Weak sites are all upstairs: Lodge 2F Office 20%, School 2F Principal Office 30% / 3F Clock Room 29%, Depot 2F Manager
   Office 29%. Next: give those the Villa treatment (an outside way up). `tests/probe.js 7 N <map>` prints per-site results.
+- Lagging attackers buffed (1,500 practice rounds before / after; old results halve, so "after" still mixes in some):
+  OSPREY 35 → 42% (12 s scope, 6 s marks, wider), HAMMER 41 → 44% (+1 round), RUSH 41 → 42% (+1 dash), VAPOR 36 → 35%
+  (+1 burst, 11 s), KESTREL 39 → 39% (dart sees 6.4 m), TRENCH 39 → 39% (+1 cover). Smoke, a dart and cover are the
+  kind of skill bots barely use well (see "How to check"), so those three may not show in bot numbers at all.
+  Rappelling 2 → 1.3 s a storey, slide down 0.45 → 0.3 s. Attack overall ~43% in practice.
