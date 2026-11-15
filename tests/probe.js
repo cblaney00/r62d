@@ -8,7 +8,7 @@ import { OPERATORS, WEAPONS } from '../shared/operators.js';
 
 const lvl = +(process.argv[2] ?? 7), per = +process.argv[3] || 2, only = process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : null;
 const GUNS = new Set(Object.values(WEAPONS).map(w => w.name));
-const R = { rounds: 0, atk: 0, kills: 0, hs: 0, skill: 0, melee: 0, plant: 0, defuse: 0, wipe: 0, time: 0, rlen: 0, ops: {}, plans: {}, why: {} };
+const R = { rounds: 0, atk: 0, kills: 0, hs: 0, skill: 0, melee: 0, plant: 0, defuse: 0, wipe: 0, time: 0, rlen: 0, ops: {}, plans: {}, why: {}, sites: {} };
 const O = k => R.ops[k] || (R.ops[k] = { r: 0, w: 0, k: 0, d: 0, hs: 0, sk: 0 });
 const maps = only ? [only] : MAP_LIST;
 for (let n = 0; n < per; n++) for (const id of maps) {
@@ -32,6 +32,7 @@ for (let n = 0; n < per; n++) for (const id of maps) {
         R.rounds++; R.rlen += actT; actT = 0;
         const atkSq = [...g.players.values()].find(p => g.side(p) === TEAM.ATK).squad;
         if (g.winner === atkSq) R.atk++;
+        { const x = R.sites[g.site] || (R.sites[g.site] = [0, 0]); x[0]++; if (g.winner === atkSq) x[1]++; } // per bomb site (attack wins)
         const why = g.roundWhy || g.endWhy || ''; R.why[why] = (R.why[why] || 0) + 1;
         for (const p of g.players.values()) if (p.op) { const o = O(p.op); o.r++; if (p.squad === g.winner) o.w++; }
         for (const sq of [0, 1]) { const st = (g.proState || {})[sq]; if (st && st.plan) { const side = sq === atkSq ? 'atk' : 'def', key = side + ':' + st.plan.id, x = R.plans[key] || (R.plans[key] = [0, 0]); x[0]++; if (g.winner === sq) x[1]++; } }
@@ -44,6 +45,7 @@ if (process.argv.includes('--json')) { console.log(JSON.stringify(R)); process.e
 const pc = (a, b) => b ? Math.round(a / b * 100) + '%' : '-';
 console.log(`level ${lvl}: ${R.rounds} rounds, attack wins ${pc(R.atk, R.rounds)}, avg action ${(R.rlen / Math.max(1, R.rounds)).toFixed(0)} s, ${R.kills} kills: headshots ${pc(R.hs, R.kills)}, skill ${pc(R.skill, R.kills)}, melee ${pc(R.melee, R.kills)}`);
 console.log('round ends:', JSON.stringify(R.why));
+if (only) { const m = buildMap(only); console.log('sites', Object.entries(R.sites).map(([i, [n, w]]) => `${m.sites[i] ? m.sites[i].name : i} ${pc(w, n)} of ${n}`).join(' | ')); }
 for (const side of ['atk', 'def']) {
   const rows = Object.entries(R.ops).filter(([o]) => OPERATORS[o].team === side).sort((a, b) => b[1].w / b[1].r - a[1].w / a[1].r);
   console.log(side, rows.map(([o, s]) => `${o} ${pc(s.w, s.r)}/${s.r} k${s.k} d${s.d} hs${s.hs}`).join(' | '));

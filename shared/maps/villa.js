@@ -82,7 +82,7 @@ export function build() {
   G.round(-26, 14, 4, 'se', T.HARD, MAT.DRYWALL); G.round(-26, 37, 4, 'ne', T.HARD, MAT.DRYWALL);    // the rounded west end
 
   // ================= 2F =================
-  U.slab(30, 42, 18, 3, FL.WOOD);            // south balcony over the terrace
+  U.slab(11, 42, 37, 3, FL.WOOD);            // south balcony over the terrace, along the Gallery and (2026-11-15, he asked for new ways in: attack won ~31% on this site) the Kids Room
   U.area('Master Bedroom', 11, 9, 18, 14, FL.WOOD);
   U.area('Upper Landing', 30, 9, 12, 16, FL.CARPET);
   U.area('Guest Bedroom', 43, 9, 18, 11, FL.CARPET);
@@ -96,6 +96,9 @@ export function build() {
   U.door(29, 15, 29, 16); U.door(42, 12, 42, 13); U.door(42, 22, 42, 23); U.door(35, 25, 36, 25);
   U.door(29, 32, 29, 33); U.door(19, 23, 20, 23); U.door(47, 33, 48, 33); U.door(56, 33, 57, 33); U.door(51, 20, 52, 20); U.door(42, 37, 42, 38);
   U.door(35, 41, 36, 41, true);              // gallery onto the balcony
+  U.door(19, 41, 20, 41, true);              // glass doors from the Kids Room onto the balcony
+  U.slab(15, 6, 12, 2, FL.MARBLE);           // north terrace outside the Master Bedroom (2026-11-15, a second new way in)
+  U.door(19, 8, 20, 8, true);                // terrace doors into the Master Bedroom
   U.window(16, 8, 17, 8); U.window(23, 8, 24, 8); U.window(48, 8, 49, 8); U.window(55, 8, 56, 8); 
    U.window(61, 13, 61, 14); U.window(61, 26, 61, 27); U.window(16, 41, 17, 41); U.window(23, 41, 24, 41);
   U.prop('bed', 14, 11, 6, 7, T.LOW); U.prop('cabinet', 26, 10, 2, 1, T.TALL); U.prop('couch', 22, 20, 5, 1, T.LOW);
@@ -166,6 +169,7 @@ export function build() {
   stair(0, 1, 62, 11, 4, 3, 'e', FL.CONCRETE, 'ramp');         // garage ramp (outside, east)
   G.prop('railing', 62, 10, 4, 1, T.LOW); G.prop('railing', 62, 14, 4, 1, T.LOW);
   stair(1, 2, 44, 43, 2, 6, 'n', FL.MARBLE);           // terrace steps -> balcony
+  stair(1, 2, 27, 6, 6, 2, 'w', FL.MARBLE, 'stone');    // stone steps from the front path up to the north terrace
   G.prop('railing', 43, 42, 1, 6, T.LOW); G.prop('railing', 46, 42, 1, 6, T.LOW); G.prop('railing', 44, 42, 2, 1, T.LOW);
 
   stair(1, 2, -21, 25, 5, 2, 'w', FL.MARBLE);         // West Hall -> 2F West Hall
