@@ -138,7 +138,7 @@ export function build() {
   stair(0, 1, 47, 34, 2, 6, 'n', FL.CONCRETE);           // workshop -> manager office
   G.prop('railing', 49, 33, 1, 7, T.LOW); G.prop('railing', 47, 33, 2, 1, T.LOW);
   U.prop('railing', 49, 35, 1, 5, T.LOW); U.prop('railing', 47, 40, 2, 1, T.LOW);
-  stair(0, 1, 72, 28, 2, 6, 'n', FL.CONCRETE);           // outside fire escape -> corridor
+  stair(0, 1, 72, 28, 2, 6, 'n', FL.CONCRETE, 'rust');           // outside fire escape -> corridor
   G.prop('railing', 72, 27, 2, 1, T.LOW);
   U.prop('railing', 72, 34, 2, 1, T.LOW);
 

@@ -173,7 +173,9 @@ export function makeMap({ id, name, floors }) {
 
   // A staircase from floor a (bottom) up to floor b, occupying x..x+w-1, y..y+h-1 on both floors.
   // dir is the way you face while climbing ('n', 's', 'e', 'w').
-  const stair = (a, b, x, y, w, h, dir, look = FL.CONCRETE) => {
+  // sty: how an outside staircase is built (public/js/mapdraw.js STAIR_STY): 'steel' / 'rust' / 'green' fire escapes,
+  // 'stone' steps, 'timber' steps, 'ramp' (a garage ramp); none = ordinary steps indoors
+  const stair = (a, b, x, y, w, h, dir, look = FL.CONCRETE, sty) => {
     const A = kits[a], B = kits[b];
     const cells = [];
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
@@ -187,7 +189,7 @@ export function makeMap({ id, name, floors }) {
       if (top(p)) portal[A.idx(p[0], p[1])] = B.idx(p[0], p[1]);     // arrive at the top end, upstairs
       if (bottom(p)) portal[B.idx(p[0], p[1])] = A.idx(p[0], p[1]);  // arrive at the bottom end, downstairs
     }
-    stairs.push({ a, b, x, y, w, h, dir, ga: A.idx(x, y), gb: B.idx(x, y) });
+    stairs.push({ a, b, x, y, w, h, dir, ga: A.idx(x, y), gb: B.idx(x, y), sty });
   };
 
   // Fewer breakable walls (he asked: too many ways into a site by blowing the whole room open). Every straight wall

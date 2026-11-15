@@ -2237,8 +2237,10 @@ function frame(nowMs) {
     }
     const hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom, x0 = F.gx * CELL, mw = F.w * CELL, mh = F.h * CELL;
     if (st.rot) { /* a turned view isn't kept inside the floor's edges; the blackout hides what's beyond */ } else
-    if (isTouch) { // phone: the view may go a little past the edge so you are never under a thumb at the map's edge
-      const ex = hw * 0.55, ey = hh * 0.45;
+    if (isTouch || (st.rend && st.rend.below && st.rend.below.off[fi])) { // phone: the view may go a little past the edge so you are never under a thumb at the map's edge;
+      // an upper floor too (he asked 2026-11-15: outside stairs looked wrong): past its edge the ground far below shows, so
+      // at the top of a fire escape or on a balcony you are not pinned to the screen's edge with nothing beyond
+      const up = !isTouch, ex = hw * (up ? 0.6 : 0.55), ey = hh * (up ? 0.6 : 0.45);
       const lim = (v, lo, hi) => lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v));
       st.cam.x = lim(st.cam.x, x0 + hw - ex, x0 + mw - hw + ex); st.cam.y = lim(st.cam.y, hh - ey, mh - hh + ey);
     } else {
@@ -3045,6 +3047,18 @@ function draw(s, view, now, dt) {
   // smoke and gas, over the blackout (he said you couldn't see smoke at all: it blocks sight, so it always sat in the dark):
   // every cloud you have a clear line to (walls block it, smoke doesn't), on your floor. All of it into one small layer
   // (SMOKE_DIV smaller each way: many smokes lagged the game, each is ~50 big soft blobs) stretched on once.
+  if (st.floorRect && !st.belowOut) { // hide the neighbouring floors that sit beside this one in the map grid (the fog step covers them with the ground below)
+    const [a, b, c, d] = st.floorRect;
+    ctx.fillStyle = '#050607';
+    const L = st.cam.x - ex - 50, R = st.cam.x + ex + 50, Tp = st.cam.y - ey - 50, B = st.cam.y + ey + 50;
+    if (L < a) ctx.fillRect(L, Tp, a - L, B - Tp);
+    if (R > c) ctx.fillRect(c, Tp, R - c, B - Tp);
+    if (B > d) ctx.fillRect(a, d, c - a, B - d);
+  }
+  // views onto a LOWER floor (down a staircase, down through a hatch, out of a window to the ground) lie under this
+  // floor's walls, smoke and people up high: drawn before them, so a wall of this floor never shows the floor below
+  // through it (they used to go on top of everything). Views onto a floor ABOVE go after the raised walls, further down.
+  if (inGame && view) { drawStairView(s, st.me, now, false); drawHatchView(s, st.me, now, false); drawWindowView(s, st.me, now, view); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
   if (inGame) { const vx = view ? view.x : st.cam.x, vy = view ? view.y : st.cam.y, vf = floorAt(st.map, vx, vy);
     const clear = e => { if (st.tv || !view) return true; if (floorAt(st.map, e.x, e.y) !== vf) return false; const d = Math.hypot(e.x - vx, e.y - vy); return d < (e.r || 60) + 20 || castSight(st.map, vx, vy, Math.atan2(e.y - vy, e.x - vx), d, null) >= d - (e.r || 60) * 0.8; };
     const sm = ents.filter(e => (e.ty === 'smoke' || (e.ty === 'gascloud' && (e.tm === side || seen(e.x, e.y)))) && clear(e));
@@ -3056,14 +3070,6 @@ function draw(s, view, now, dt) {
       for (const e of sm) if (e.ty === 'smoke') drawSmoke(sc, e, now, gq.smoke, SMOKE_COL); else drawSmoke(sc, { ...e, l: Math.min(e.l * 1.5, 12) }, now, Math.ceil(gq.smoke * 0.6), '150,200,70');
       ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(smokeCv, 0, 0, w * D, h * D); ctx.restore();
     } }
-  if (st.floorRect && !st.belowOut) { // hide the neighbouring floors that sit beside this one in the map grid (the fog step covers them with the ground below)
-    const [a, b, c, d] = st.floorRect;
-    ctx.fillStyle = '#050607';
-    const L = st.cam.x - ex - 50, R = st.cam.x + ex + 50, Tp = st.cam.y - ey - 50, B = st.cam.y + ey + 50;
-    if (L < a) ctx.fillRect(L, Tp, a - L, B - Tp);
-    if (R > c) ctx.fillRect(c, Tp, R - c, B - Tp);
-    if (B > d) ctx.fillRect(a, d, c - a, B - d);
-  }
   if (raise) raise(ctx, 'lit'); // raised walls in sight (look.js), above the blackout
   if (st.upDraws && st.upDraws.length) { if (raise) for (const fn of st.upDraws) fn(ctx); st.upDraws.length = 0; }
   // everyone you see, faintly over the raised walls and doorframes (he chose 2026-11-14: nobody hides under a raised wall)
@@ -3089,7 +3095,7 @@ function draw(s, view, now, dt) {
     }
     ctx.restore();
   }
-  if (inGame && view) { drawStairView(s, st.me, now); drawHatchView(s, st.me, now); drawWindowView(s, st.me, now, view); drawWindowMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); }
+  if (inGame && view) { drawStairView(s, st.me, now, true); drawHatchView(s, st.me, now, true); drawWindowMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); } // (views up a floor: over this floor's walls)
   if (st.tv && inGame) { // each team's sight, faintly in its own colour (pro team colours, else blue / orange)
     const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
     for (const sq of [0, 1]) {
@@ -3898,6 +3904,7 @@ function floorHints(view, now, vh) { // which floor a sound came from, never whi
 // Close to a staircase (on its steps, or within a few metres of its open end) a live corner window shows the other
 // end: what you would see standing at the top (or bottom) landing looking out. It is your own eyes for this, so
 // anything it shows is also seen on your side of the screen (marks, the remembered map).
+const STAIR_SEE = 4; // cells past the steps' far end that the stairs view shows
 const PIP_R = 90; // world px from the middle of the stairs view to where it has faded out
 function stairPeek(view, me, inGame) {
   if (!view || view.kind !== 'body' || !me || !me.a || me.dn || !st.map || !(st.map.stairs || []).length) return null;
@@ -3929,9 +3936,9 @@ function stairPeek(view, me, inGame) {
 // can see, the other floor's landing is drawn right where the steps lead, in the map, fading out at its edges.
 // Floors sit side by side in the map grid, so it is that floor's picture moved by the staircase's offset.
 const stairCv = document.createElement('canvas');
-function drawStairView(s, me, now) {
+function drawStairView(s, me, now, up) {
   const pv = fxOn('pip') ? st.pip : null;
-  if (!pv || !me) return;
+  if (!pv || !me || !!pv.up !== up) return;
   const S = st.map.stairs[pv.s], W = st.map.W, sdx = (S.gb % W - S.ga % W) * CELL, sdy = (Math.floor(S.gb / W) - Math.floor(S.ga / W)) * CELL;
   const offX = pv.up ? -sdx : sdx, offY = pv.up ? -sdy : sdy; // the other floor -> this floor
   const z = st.zoom || 1, px = Math.ceil(PIP_R * 2 * z);
@@ -3983,12 +3990,22 @@ function drawStairView(s, me, now) {
   // onto the top layer, where the steps lead on this floor
   const kp = persp.h ? (pv.up ? 1 + persp.h : Math.max(0.05, 1 - persp.h)) : 1, ex = st.pred.x, ey = st.pred.y; // a storey up drawn grown toward you, down shrunk (like the walls)
   const P = w2s(ex + (cx + offX - ex) * kp, ey + (cy + offY - ey) * kp), pk = px * kp;
+  // only the strip where the steps carry on (he asked 2026-11-15: polish the stairs' outdoor view; a round patch spread
+  // over the floor round the stairs' end, grass or carpet circles beside the steps): the other floor's stair width plus two
+  // cells each side, from a cell back on the steps to STAIR_SEE cells past their end, as a stairwell would show it
+  const og = pv.up ? S.gb : S.ga, X0 = (og % W) * CELL, Y0 = Math.floor(og / W) * CELL, X1 = X0 + S.w * CELL, Y1 = Y0 + S.h * CELL;
+  const ux = Math.round(Math.cos(pv.ang)), uy = Math.round(Math.sin(pv.ang)), far = STAIR_SEE * CELL;
+  const qx0 = ux ? (ux > 0 ? X1 - CELL : X0 - far) : X0 - 2 * CELL, qx1 = ux ? (ux > 0 ? X1 + far : X0 + CELL) : X1 + 2 * CELL; // (2 cells each side: some stairs come out sideways)
+  const qy0 = uy ? (uy > 0 ? Y1 - CELL : Y0 - far) : Y0 - 2 * CELL, qy1 = uy ? (uy > 0 ? Y1 + far : Y0 + CELL) : Y1 + 2 * CELL;
+  const toS = (x, y) => w2s(ex + (x + offX - ex) * kp, ey + (y + offY - ey) * kp);
+  const Q = [toS(qx0, qy0), toS(qx1, qy0), toS(qx1, qy1), toS(qx0, qy1)];
   octx.save(); octx.setTransform(1, 0, 0, 1, 0, 0);
-  octx.drawImage(stairCv, P.x - pk / 2, P.y - pk / 2, pk, pk);
+  octx.beginPath(); Q.forEach((q, i) => i ? octx.lineTo(q.x, q.y) : octx.moveTo(q.x, q.y)); octx.closePath(); octx.save(); octx.clip();
+  octx.drawImage(stairCv, P.x - pk / 2, P.y - pk / 2, pk, pk); octx.restore();
   octx.font = `700 ${Math.round(12 * DPR)}px Barlow, sans-serif`; octx.textAlign = 'center';
   octx.fillStyle = 'rgba(255,255,255,0.7)'; octx.strokeStyle = 'rgba(0,0,0,0.8)'; octx.lineWidth = 3 * DPR;
-  const L = pv.up ? '▲ UPSTAIRS' : '▼ DOWNSTAIRS', ly = P.y - pk * 0.36;
-  octx.strokeText(L, P.x, ly); octx.fillText(L, P.x, ly);
+  const L = pv.up ? '▲ UPSTAIRS' : '▼ DOWNSTAIRS', fe = toS((ux ? (ux > 0 ? X1 + far * 0.8 : X0 - far * 0.8) : (X0 + X1) / 2), (uy ? (uy > 0 ? Y1 + far * 0.8 : Y0 - far * 0.8) : (Y0 + Y1) / 2)); // (at the far end of the strip, clear of the map's own stair signs)
+  octx.strokeText(L, fe.x, fe.y); octx.fillText(L, fe.x, fe.y);
   octx.restore();
 }
 function wallGhostSeen(gh) { // a window peeker / climber's copy on the ground: seen by something of ours down there? Where it shows, or null
@@ -4064,9 +4081,9 @@ function drawWindowView(s, me, now, view) {
 // Through an open hatch (he asked: like the stairs, limited, and lying down shows more sideways): the other floor's
 // patch the opening lets you see (hatchSight), drawn where it really is under (or over) this floor, darker, with the
 // people and gadgets there your team sees. Your crosshair on it shoots through the hatch (server holeAim).
-function drawHatchView(s, me, now) {
-  const hs = (st.viewers || []).filter(v => v.mask);
-  st.hatchKp = [];
+function drawHatchView(s, me, now, up) {
+  const hs = (st.viewers || []).filter(v => v.mask && !!v.mask.lim === up); // (lim: looking up through it from below)
+  if (!up) st.hatchKp = [];
   if (!hs.length || !me) return;
   const m = st.map, sm = smokes(s), R = st.rend, k = R.c.width / R.Wp, c = octx, side = me.tm;
   for (const v of hs) {

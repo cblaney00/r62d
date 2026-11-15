@@ -283,6 +283,7 @@ export class MapRenderer {
       const X = gx * CELL, Y = gy * CELL, Wd = st.w * CELL, Hd = st.h * CELL;
       const vert = st.dir === 'n' || st.dir === 's', n = (vert ? st.h : st.w) * 2;
       // step k = 0 at the bottom end
+      if (st.sty && STAIR_STY[st.sty]) this.styledStairs(st, X, Y, Wd, Hd, vert, n, up); else
       for (let k = 0; k < n; k++) {
         const f = k / (n - 1), lit = up ? 0.55 + 0.45 * f : 1 - 0.6 * f; // climbing gets lighter; going down gets darker
         const along = (st.dir === 'n' || st.dir === 'w') ? n - 1 - k : k;
@@ -291,7 +292,7 @@ export class MapRenderer {
         x.fillStyle = 'rgba(0,0,0,0.35)';
         if (vert) x.fillRect(X, Y + along * CELL / 2 + CELL / 2 - 0.8, Wd, 0.8); else x.fillRect(X + along * CELL / 2 + CELL / 2 - 0.8, Y, 0.8, Hd);
       }
-      x.strokeStyle = 'rgba(30,30,30,0.9)'; x.lineWidth = 1; x.strokeRect(X + 0.5, Y + 0.5, Wd - 1, Hd - 1);
+      if (!st.sty) { x.strokeStyle = 'rgba(30,30,30,0.9)'; x.lineWidth = 1; x.strokeRect(X + 0.5, Y + 0.5, Wd - 1, Hd - 1); }
       // he asked: make it obvious which way stairs go. Chevrons all along the steps point the way you walk to change
       // floor (gold going up, blue going down), a coloured strip marks the end you step on from, and a label at each
       // end says where it takes you ("▲ UP TO 2F" / "▼ DOWN TO 1F").
@@ -316,6 +317,41 @@ export class MapRenderer {
       x.fillStyle = 'rgba(10,12,16,0.72)'; x.fillRect(lx - tw / 2, ly - 5.5, tw, 11);
       x.fillStyle = `rgba(${col},1)`; x.fillText(label, lx, ly + 0.5);
       x.restore();
+    }
+  }
+
+  // An outside staircase in the style of its building (he asked 2026-11-15: outside stairs should fit the building and
+  // where they stand): a steel fire escape (open grating treads, a steel stringer each side, bolted), stone steps with
+  // stone cheek walls, timber steps on log stringers, or a garage ramp (no steps: grooved concrete, kerbs). The raised
+  // rails and walls on their sides are in look.js (stairRails).
+  styledStairs(st, X, Y, Wd, Hd, vert, n, up) {
+    const x = this.ctx, S = STAIR_STY[st.sty], tread = CELL / 2, side = S.side, rgb = (c, k) => `rgb(${Math.min(255, c[0] * k) | 0},${Math.min(255, c[1] * k) | 0},${Math.min(255, c[2] * k) | 0})`;
+    const len = vert ? Hd : Wd, wid = vert ? Wd : Hd, cell = (a, b, w, h) => vert ? x.fillRect(X + b, Y + a, w, h) : x.fillRect(X + a, Y + b, h, w); // a: along the flight, b: across it
+    if (S.kind === 'grate' || S.kind === 'timber') { x.fillStyle = S.gap; x.fillRect(X, Y, Wd, Hd); } // (the ground or the dark under the treads, seen between them)
+    if (S.kind === 'ramp') {
+      x.fillStyle = rgb(S.top, 1); x.fillRect(X, Y, Wd, Hd);
+      x.fillStyle = 'rgba(0,0,0,0.16)'; for (let a = 3; a < len - 1; a += 4) cell(a, side, wid - side * 2, 1); // anti-slip grooves across it
+      const g = vert ? x.createLinearGradient(0, Y, 0, Y + Hd) : x.createLinearGradient(X, 0, X + Wd, 0), d = (st.dir === 'n' || st.dir === 'w') ? 1 : 0;
+      g.addColorStop(d, 'rgba(0,0,0,0)'); g.addColorStop(1 - d, up ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,0.3)'); x.fillStyle = g; x.fillRect(X, Y, Wd, Hd); // the low end darker on the floor above
+    } else for (let k = 0; k < n; k++) {
+      const fk = k / (n - 1), lit = up ? 0.78 + 0.22 * fk : 1 - 0.35 * fk, along = (st.dir === 'n' || st.dir === 'w') ? n - 1 - k : k, a0 = along * tread;
+      if (S.kind === 'grate') {
+        x.fillStyle = rgb(S.top, lit); cell(a0 + 0.6, side, wid - side * 2, tread - 1.6);
+        x.fillStyle = 'rgba(0,0,0,0.45)'; for (let b = side + 1.5; b < wid - side - 0.5; b += 2.2) cell(a0 + 1.4, b, 0.8, tread - 3.2); // the grating's slots
+        x.fillStyle = S.nose; cell(a0 + 0.6, side, wid - side * 2, 1); // the front edge of each tread
+      } else if (S.kind === 'timber') {
+        x.fillStyle = rgb(S.top, lit * (0.92 + 0.12 * ((k * 7) % 3) / 2)); cell(a0 + 0.5, side, wid - side * 2, tread - 1.2);
+        x.fillStyle = 'rgba(40,24,12,0.35)'; cell(a0 + tread * 0.5, side, wid - side * 2, 0.5); x.fillStyle = 'rgba(30,18,8,0.6)'; for (const b of [side + 2.5, wid - side - 3]) cell(a0 + 1.5, b, 0.8, 0.8); // plank seam, nail heads
+      } else { // stone
+        x.fillStyle = rgb(S.top, lit); cell(a0, side, wid - side * 2, tread);
+        x.fillStyle = rgb(S.top, lit * 1.12); cell(a0, side, wid - side * 2, 1.2); x.fillStyle = 'rgba(0,0,0,0.28)'; cell(a0 + tread - 0.7, side, wid - side * 2, 0.7); // light nosing, shadow line under it
+      }
+    }
+    // the sides: steel stringers with bolts, log stringers, stone cheek walls or ramp kerbs
+    for (const b of [0, wid - side]) {
+      x.fillStyle = S.sideC; cell(0, b, side, len);
+      x.fillStyle = 'rgba(255,255,255,0.18)'; cell(0, b, 0.6, len); // (a lit edge)
+      if (S.bolt) { x.fillStyle = S.bolt; for (let a = tread / 2; a < len; a += tread) cell(a - 0.6, b + side / 2 - 0.6, 1.2, 1.2); }
     }
   }
 
@@ -770,6 +806,15 @@ export class MapRenderer {
 function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
 function shadowRect(ctx, x, y, w, h, r = 2) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; rr(ctx, x + 2, y + 3, w, h, r); ctx.fill(); }
 
+// outside staircases (styledStairs): kind, tread colour, the gaps between treads, front edge, side width/colour, bolts
+export const STAIR_STY = {
+  steel: { kind: 'grate', top: [118, 122, 126], gap: 'rgba(14,16,18,0.9)', nose: 'rgba(214,176,58,0.85)', side: 2.6, sideC: '#3d4246', bolt: '#7d848b' }, // galvanised, safety-yellow edges (Harbor)
+  rust: { kind: 'grate', top: [112, 74, 58], gap: 'rgba(16,12,10,0.9)', nose: 'rgba(150,100,74,0.9)', side: 2.6, sideC: '#5a3226', bolt: '#9a6a52' }, // oxide red, like the depot's ironwork
+  green: { kind: 'grate', top: [84, 112, 92], gap: 'rgba(12,16,14,0.9)', nose: 'rgba(226,226,214,0.8)', side: 2.6, sideC: '#2e4a3a', bolt: '#8aa494' }, // school-green paint, white edges
+  stone: { kind: 'stone', top: [196, 188, 170], side: 3, sideC: '#a89f8c', bolt: null }, // limestone, as the Embassy's front
+  timber: { kind: 'timber', top: [150, 112, 74], gap: 'rgba(30,22,16,0.9)', side: 2.8, sideC: '#5c3d24', bolt: null }, // the lodge's wood
+  ramp: { kind: 'ramp', top: [128, 128, 124], side: 2.2, sideC: '#a6a6a0', bolt: null }, // poured concrete, painted kerbs
+};
 const CAR_COLORS = ['#8c1d1d', '#1d3f73', '#d8d8d4', '#2c2c2e', '#5e6a72', '#3d5b3a', '#b48a2c'];
 
 export function drawProp(ctx, p, m) {

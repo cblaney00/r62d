@@ -139,7 +139,7 @@ export function build() {
   stair(0, 1, 58, 34, 2, 4, 'n', FL.CONCRETE);           // storeroom -> attic
   G.prop('railing', 57, 33, 1, 5, T.LOW); G.prop('railing', 58, 33, 2, 1, T.LOW);
   U.prop('railing', 57, 34, 1, 4, T.LOW); U.prop('railing', 58, 38, 2, 1, T.LOW);
-  stair(0, 1, 47, 44, 2, 6, 'n', FL.WOOD);               // outside steps -> balcony
+  stair(0, 1, 47, 44, 2, 6, 'n', FL.WOOD, 'timber');               // outside steps -> balcony
   G.prop('railing', 47, 43, 2, 1, T.LOW); G.prop('railing', 46, 43, 1, 6, T.LOW); G.prop('railing', 49, 43, 1, 6, T.LOW);
 
   const g = G.c, u = U.c;

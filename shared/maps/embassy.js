@@ -170,9 +170,9 @@ export function build() {
   stair(0, 1, 60, 40, 2, 3, 'n', FL.CONCRETE);           // cell block -> mail room
   B.prop('railing', 59, 39, 1, 4, T.LOW); B.prop('railing', 60, 39, 2, 1, T.LOW);
   G.prop('railing', 59, 41, 1, 2, T.LOW); G.prop('railing', 60, 43, 2, 1, T.LOW);
-  stair(0, 1, 8, 13, 4, 3, 'w', FL.CONCRETE);            // garage ramp (outside, west)
+  stair(0, 1, 8, 13, 4, 3, 'w', FL.CONCRETE, 'ramp');            // garage ramp (outside, west)
   G.prop('railing', 8, 12, 4, 1, T.LOW); G.prop('railing', 8, 16, 4, 1, T.LOW);
-  stair(1, 2, 64, 31, 2, 6, 'n', FL.CONCRETE);           // outside steps -> east balcony
+  stair(1, 2, 64, 31, 2, 6, 'n', FL.CONCRETE, 'stone');           // outside steps -> east balcony
   G.prop('railing', 64, 30, 2, 1, T.LOW);
   U.prop('railing', 64, 37, 2, 1, T.LOW);
 

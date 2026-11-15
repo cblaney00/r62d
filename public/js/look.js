@@ -5,6 +5,7 @@
 // fills and copies of the map picture, and the tilt is one CSS transform the browser applies to the world layers.
 import { CELL, T, MAT, FL, CELL_HP } from '/shared/constants.js';
 import { cellBelow, cellAbove } from '/shared/map.js';
+import { hash } from './textures.js';
 
 export const looks = { light: true }; // switched by Settings → Screen → Room lighting (main.js)
 
@@ -149,7 +150,7 @@ const FURN = {
   reception: [0.33, 'solid', [98, 82, 64]], island: [0.28, 'solid', [150, 146, 140]], sink: [0.28, 'solid', [172, 172, 174]], crates: [0.3, 'solid', [128, 98, 62]],
   planter: [0.2, 'solid', [112, 92, 72]], aircon: [0.3, 'solid', [150, 155, 160]], sandbags: [0.25, 'solid', [150, 135, 100]], firepit: [0.1, 'solid', [90, 86, 80]],
   car: [0.45, 'solid', [62, 64, 68]], van: [0.6, 'solid', [150, 152, 150]], truck: [0.8, 'solid', [90, 92, 96]], bus: [0.85, 'solid', [170, 160, 60]], schoolbus: [0.85, 'solid', [205, 160, 40]],
-  train: [1, 'solid', [80, 90, 100]], tankcar: [0.95, 'solid', [60, 60, 62]], container: [0.8, 'solid', [120, 70, 50]], dumpster: [0.45, 'solid', [60, 90, 70]],
+  train: [1, 'solid', [80, 90, 100]], tankcar: [0.95, 'solid', [60, 60, 62]], container: [0.8, 'solid', [47, 95, 138]], dumpster: [0.45, 'solid', [47, 90, 58]], // (painted as on the map)
   rack: [0.6, 'solid', [80, 84, 90]], shelf: [0.6, 'solid', [96, 76, 58]], bookshelf: [0.6, 'solid', [92, 70, 52]], cabinet: [0.45, 'solid', [90, 92, 96]],
   locker: [0.6, 'solid', [95, 105, 112]], fridge: [0.58, 'solid', [205, 205, 200]], tv: [0.4, 'solid', [40, 40, 44]], forklift: [0.7, 'solid', [200, 160, 40]],
 };
@@ -216,6 +217,72 @@ function legsOf(P, f, G, x, y) {
   for (const [lx, ly] of [[X0 + e, Y0 + e], [X1 - e - s, Y0 + e], [X0 + e, Y1 - e - s], [X1 - e - s, Y1 - e - s]]) box(lx, ly, lx + s, ly + s, 0, ft, [44, 40, 36]);
   box(X0, Y0, X1, Y1, ft, f, [58, 50, 42]);
 }
+// Vehicles (he saw 2026-11-15: cars and trucks stood on grey platforms): a vehicle is drawn smaller than the cells it
+// takes, so raising its whole cells lifted a strip of road round it on dark sides. Each kind is raised as its own body
+// instead: [in from the long sides, in from the ends, corner cut, body colour] in world px, the same sizes and paint
+// as its picture (mapdraw.js car/van/train, outprops.js vehicle/long), on a dark band of wheels and tyres at the bottom.
+const CAR_COLORS = ['#8c1d1d', '#1d3f73', '#d8d8d4', '#2c2c2e', '#5e6a72', '#3d5b3a', '#b48a2c']; // (mapdraw.js's own list)
+const VEH = {
+  car: p => [3, 2, 5, CAR_COLORS[Math.floor(hash(p.x, p.y, 1) * CAR_COLORS.length)]], van: () => [3, 2, 5, '#e2e2dc'],
+  bus: () => [2, 1, 4, '#3f6f9e'], schoolbus: () => [2, 1, 4, '#e2ad1f'], truck: () => [1, 0, 2, '#c9cbcd'], snowcat: () => [0, 1, 2, '#c23a2a'],
+  forklift: () => [2, 0, 2, '#d8a324'], tankcar: () => [1, 3, 6, '#7d8f99'], train: p => [0, 0, 1, hash(p.x, p.y, 1) < 0.5 ? '#7a2f25' : '#2f4a63'], cart: () => [1, 1, 1, '#6d4c2f'],
+};
+const rgbOf = hx => [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)];
+// a railing (mapdraw.js 'railing': a 3 px steel bar along its middle, a post at every cell): the bar at the top, the posts
+// under it, nothing else (the floor round it stays on the floor)
+function railOf(P, f, G) {
+  const hor = P.w >= P.h, X = P.x * CELL, Y = P.y * CELL, cx = X + P.w * CELL / 2, cy = Y + P.h * CELL / 2, n = hor ? P.w : P.h, b = 1.5, p = 1.2, x = P.x, y = P.y;
+  const box = (ax, ay, bx, by, f0, f1, rgb) => { for (const [dx, dy, lt] of FACES) { const c = `rgb(${rgb[0] * lt | 0},${rgb[1] * lt | 0},${rgb[2] * lt | 0})`;
+    if (dx) { const ex = dx > 0 ? bx : ax; G.faces.push({ ax: ex, ay, bx: ex, by, nx: dx, ny: 0, px: ex, py: ay, f: f1, f0, x, y, c }); }
+    else { const ey = dy > 0 ? by : ay; G.faces.push({ ax, ay: ey, bx, by: ey, nx: 0, ny: dy, px: ax, py: ey, f: f1, f0, x, y, c }); } } };
+  if (hor) box(X, cy - b, X + P.w * CELL, cy + b, f - 0.04, f, [125, 132, 139]); else box(cx - b, Y, cx + b, Y + P.h * CELL, f - 0.04, f, [125, 132, 139]);
+  for (let i = 0; i <= n; i++) { const px = hor ? Math.min(X + i * CELL, X + P.w * CELL - p / 2) : cx, py = hor ? cy : Math.min(Y + i * CELL, Y + P.h * CELL - p / 2);
+    box(Math.max(X, px - p / 2), Math.max(Y, py - p / 2), Math.max(X, px - p / 2) + p, Math.max(Y, py - p / 2) + p, 0, f - 0.04, [74, 80, 86]); }
+}
+function vehOf(P, f, G) {
+  const [a, e, cut, col] = VEH[P.kind](P), hor = P.w > P.h, ix = hor ? e : a, iy = hor ? a : e;
+  const X0 = P.x * CELL + ix, Y0 = P.y * CELL + iy, X1 = (P.x + P.w) * CELL - ix, Y1 = (P.y + P.h) * CELL - iy, c = Math.min(cut, (X1 - X0) / 3, (Y1 - Y0) / 3);
+  const poly = [X0 + c, Y0, X1 - c, Y0, X1, Y0 + c, X1, Y1 - c, X1 - c, Y1, X0 + c, Y1, X0, Y1 - c, X0, Y0 + c];
+  const rgb = rgbOf(col), wheels = Math.min(0.12, f * 0.25), cx = (X0 + X1) / 2, cy = (Y0 + Y1) / 2;
+  const sh = k => `rgb(${Math.min(255, rgb[0] * k) | 0},${Math.min(255, rgb[1] * k) | 0},${Math.min(255, rgb[2] * k) | 0})`;
+  for (let i = 0; i < poly.length; i += 2) {
+    const ax = poly[i], ay = poly[i + 1], bx = poly[(i + 2) % 16], by = poly[(i + 3) % 16]; if (Math.hypot(bx - ax, by - ay) < 0.01) continue;
+    let nx = by - ay, ny = -(bx - ax); const len = Math.hypot(nx, ny), mx = (ax + bx) / 2, my = (ay + by) / 2;
+    if (nx * (mx - cx) + ny * (my - cy) < 0) { nx = -nx; ny = -ny; }
+    const lt = 0.62 + 0.16 * (-nx - ny) / len, x = Math.floor((mx - nx / len) / CELL), y = Math.floor((my - ny / len) / CELL);
+    G.faces.push({ ax, ay, bx, by, nx, ny, px: mx, py: my, f: wheels, f0: 0, x, y, c: 'rgb(22,22,24)' }); // tyres and the dark underside
+    G.faces.push({ ax, ay, bx, by, nx, ny, px: mx, py: my, f, f0: wheels, x, y, c: sh(lt) });
+  }
+  for (let yy = P.y; yy < P.y + P.h; yy++) G.tops.push({ x: P.x, y: yy, n: P.w, f, g: 1, sh: [poly] }); // its top: its own picture, cut to the body
+}
+// The sides of an outside staircase standing up (he asked 2026-11-15: outside stairs should fit the building): a fire
+// escape's or timber flight's handrail on posts, the Embassy steps' stone cheek walls; not against a wall, not a ramp.
+// [rail height, rail colour, 'rail' (posts + a bar) or 'wall' (solid)], the side widths as mapdraw.js STAIR_STY draws them.
+const RAIL = { steel: [0.33, [61, 66, 70], 'rail', 2.6], rust: [0.33, [90, 50, 38], 'rail', 2.6], green: [0.33, [46, 74, 58], 'rail', 2.6], timber: [0.33, [92, 61, 36], 'rail', 2.8], stone: [0.3, [168, 159, 140], 'wall', 3] };
+function stairRails(m, x0, y0, x1, y1, hg, G) {
+  const W = m.W;
+  for (const s of m.stairs || []) { const R = RAIL[s.sty]; if (!R) continue;
+    const [f, rgb, kind, sw] = R, vert = s.dir === 'n' || s.dir === 's', len = vert ? s.h : s.w, wid = vert ? s.w : s.h;
+    for (const g of [s.ga, s.gb]) {
+      const gx = g % W, gy = Math.floor(g / W);
+      for (const across of [0, wid - 1]) for (let i = 0; i < len; i++) {
+        const cx = gx + (vert ? across : i), cy = gy + (vert ? i : across); if (cx < x0 || cx > x1 || cy < y0 || cy > y1) continue;
+        const sx = vert ? (across ? 1 : -1) : 0, sy = vert ? 0 : (across ? 1 : -1), n = (cy + sy) * W + cx + sx;
+        if (hg(n) > 0) continue; // against a wall or the building's own railing: that is its side
+        // the strip along this side of the cell, sw wide, at the cell's outer edge
+        const X = cx * CELL, Y = cy * CELL, ax = sx > 0 ? X + CELL - sw : X, ay = sy > 0 ? Y + CELL - sw : Y, bx = sx ? ax + sw : X + CELL, by = sy ? ay + sw : Y + CELL;
+        const box = (px0, py0, px1, py1, f0, f1, k) => { for (const [dx, dy, lt] of FACES) { const c = `rgb(${rgb[0] * lt * k | 0},${rgb[1] * lt * k | 0},${rgb[2] * lt * k | 0})`;
+          if (dx) { const ex = dx > 0 ? px1 : px0; G.faces.push({ ax: ex, ay: py0, bx: ex, by: py1, nx: dx, ny: 0, px: ex, py: py0, f: f1, f0, x: cx, y: cy, c }); }
+          else { const ey = dy > 0 ? py1 : py0; G.faces.push({ ax: px0, ay: ey, bx: px1, by: ey, nx: 0, ny: dy, px: px0, py: ey, f: f1, f0, x: cx, y: cy, c }); } } };
+        if (kind === 'wall') { box(ax, ay, bx, by, 0, f, 1); G.tops.push({ x: cx, y: cy, n: 1, f, g: 1, sh: [[ax, ay, bx, ay, bx, by, ax, by]] }); continue; } // (its top from the picture: the cheek wall's stone)
+        const p = 1.3, mx = vert ? (ax + bx) / 2 : 0, my = vert ? 0 : (ay + by) / 2;
+        box(ax, ay, bx, by, f - 0.035, f, 1.15); // the handrail
+        if (vert) box(mx - p / 2, Y + 0.3, mx + p / 2, Y + 0.3 + p, 0, f - 0.035, 0.85); else box(X + 0.3, my - p / 2, X + 0.3 + p, my + p / 2, 0, f - 0.035, 0.85); // a post at the start of each cell
+        if (i === len - 1) { if (vert) box(mx - p / 2, Y + CELL - p - 0.3, mx + p / 2, Y + CELL - 0.3, 0, f - 0.035, 0.85); else box(X + CELL - p - 0.3, my - p / 2, X + CELL - 0.3, my + p / 2, 0, f - 0.035, 0.85); } // and one at the far end
+      }
+    }
+  }
+}
 const isOut = (m, n) => n >= 0 && n < m.tiles.length && (m.floor[n] === FL.VOID || m.tiles[n] === T.GROUND || m.tiles[n] === T.VOID);
 const KEPT = new WeakMap(); // renderer → { m, cw, blocks: [] }
 function block(R, m, bx, by) {
@@ -231,6 +298,8 @@ function block(R, m, bx, by) {
       if (!on) continue;
       const FU = g ? furnOf(m, k) : null;
       const t = m.tiles[k], base = FU && FU.col ? FU.col : t === T.SOFT && m.mat && m.mat[k] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.HARD], X = x * CELL, Y = y * CELL;
+      if (FU && FU.p.kind === 'railing') { if (FU.p.x === x && FU.p.y === y) railOf(FU.p, f, out[1]); continue; } // a railing: a rail on posts (its cells lifted whole looked like a slab)
+      if (FU && VEH[FU.p.kind]) { if (FU.p.x === x && FU.p.y === y) vehOf(FU.p, f, out[1]); continue; } // a vehicle: its own body, once
       if (FU && FU.legs) { // on legs: no block; once per piece (at its top-left cell) its legs, its thin top edge and a soft shadow under it
         if (FU.p.x === x && FU.p.y === y) legsOf(FU.p, f, out[1], x, y);
         if (!run) run = { x, y, n: 0, f, g, tc, iN, iS, iW: 0 }; run.n++; run.iE = 0;
@@ -304,6 +373,7 @@ function block(R, m, bx, by) {
         out[0].tops.push({ x, y, n: 1, f, g: 0, tc: lintel ? hexA(tc, DOOR_TOP_A) : tc, low: f < 0.99, iN, iS, iW, iE }); }
     }
   }
+  stairRails(m, x0, y0, x1, y1, hg, out[1]);
   facade(m, x0, y0, x1, y1, hg, out[0].faces, under, -1);
   facade(m, x0, y0, x1, y1, hg, out[2].faces, cellAbove, 1);
   return out;

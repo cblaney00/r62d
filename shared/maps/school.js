@@ -163,7 +163,7 @@ export function build() {
   stair(1, 2, 42, 15, 2, 4, 'n', FL.WOOD);               // library -> bell loft
   U.prop('railing', 41, 14, 1, 5, T.LOW); U.prop('railing', 42, 14, 2, 1, T.LOW);
   C.prop('railing', 41, 15, 1, 4, T.LOW); C.prop('railing', 42, 19, 2, 1, T.LOW);
-  stair(0, 1, 66, 28, 2, 6, 'n', FL.CONCRETE);           // outside fire escape -> upper corridor
+  stair(0, 1, 66, 28, 2, 6, 'n', FL.CONCRETE, 'green');           // outside fire escape -> upper corridor
   G.prop('railing', 66, 27, 2, 1, T.LOW);
   U.prop('railing', 66, 34, 2, 1, T.LOW);
 
