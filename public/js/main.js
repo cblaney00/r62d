@@ -1263,10 +1263,12 @@ $('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(
 function renderControls() {
   const L = id => keyName(bindsFor(id)[0]);
   const rows = [[`${L('up')}${L('left')}${L('down')}${L('right')}`, 'Move'], ['Mouse', 'Aim'], ['Left click', 'Shoot'], ['Right click', 'Aim down sights'],
-    [L('sprint'), 'Sprint (loud)'], [L('walk'), 'Walk (silent)'], [bindsFor('crouch')[0] ? L('crouch') : L('crouchTap'), bindsFor('crouch')[0] ? 'Crouch (hold, silent)' : 'Crouch (tap, silent)'], [L('reload'), 'Reload'],
+    [L('sprint'), 'Sprint (loud); crouch while sprinting = power slide'], [L('walk'), 'Walk (silent)'], [bindsFor('crouch')[0] ? L('crouch') : L('crouchTap'), bindsFor('crouch')[0] ? 'Crouch (hold, silent)' : 'Crouch (tap, silent)'], [L('prone'), 'Lie down / get up'],
+    [L('leanL') + ' / ' + L('leanR'), 'Lean left / right'], [L('vault'), 'Jump, vault windows and low walls; on a rope: swing in'], [L('reload'), 'Reload'],
     [L('interact') + ' (hold)', 'Reinforce, barricade, plant, defuse, revive'], [L('ability'), 'Operator skill'],
     [L('gadget'), 'Secondary gadget'], [L('melee'), 'Melee'], [L('drone'), 'Put out / drive your drone'], [L('view'), 'Team drones & cameras (' + L('leanL') + ' / ' + L('leanR') + ' switch)'], [L('spot') + ' · Middle click', 'Ping (enemies, gadgets, walls, doors, places)'],
-    [L('wheel') + ' (hold, drag)', 'Ping wheel'], [L('map'), 'Map: click it to ping'], [`${L('primary')} / ${L('secondary')} · Wheel`, 'Switch weapon'], [L('scoreboard'), 'Scoreboard']];
+    [L('wheel') + ' (hold, drag)', 'Ping wheel'], [L('map'), 'Map: click it to ping'],
+    [L('interact') + ' at a rope', 'Clip onto an outside wall (attack): ' + L('up') + ' / ' + L('down') + ' climb, ' + L('interact') + ' slide down'], [L('camLock') + ' · ' + L('camCentre'), 'Lock the camera · centre it'], [`${L('primary')} / ${L('secondary')} · Wheel`, 'Switch weapon'], [L('scoreboard'), 'Scoreboard']];
   const html = rows.map(([k, d]) => `<span>${k}</span>${d}`).join('');
   if ($('ctlGrid').innerHTML !== html) $('ctlGrid').innerHTML = html;
 }
@@ -4453,7 +4455,13 @@ const TIPS = [
   'Bullets go through soft walls. If you can hear them, you can shoot them.',
   'A downed teammate can be revived — hold interact next to them.',
   'Press {spot} (or middle click) to ping anything for your team: enemies, cameras, traps, doors, walls, or a place to go.',
-  'New to R62D? The TUTORIAL tab teaches the phases, the roles and pinging in two short playable lessons.',
+  'New to R62D? The TUTORIAL teaches the whole game in one short playable run: you attack a round, then defend one.',
+  'Hold {wheel} for the ping wheel, and press {map} for the floor plan: a click on it pings that spot.',
+  'Attackers can clip onto a rope on any outside wall ({interact} at its foot), climb to a window, peek it upside down ({crouch}) and swing in ({vault}).',
+  'Open hatches, broken floors and stairwells work both ways: you can see and shoot a floor up or down through them.',
+  'Your crosshair can pass over your own character: while it is that close, your aim keeps pointing the way it was.',
+  '{camLock} locks the camera in place; push the crosshair to the screen edge to scroll it, {camCentre} brings it back.',
+  'Defenders must stay inside the building during preparation, and can barricade as many doorways as they like.',
   'Cameras see a cone: aim them with the mouse and switch with {leanL} and {leanR}.',
   'Change your loadout for every operator on the Operators page.',
   'Smashed barricades leave splinters that crack underfoot.',
@@ -4577,7 +4585,7 @@ function setAim(m, save = true) {
   for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
   if (m !== 'cursor') { padAng = st.aim || 0; padReach = 0.6; }
   if (m === 'free') aimOff = { x: Math.cos(st.aim || 0) * 150, y: Math.sin(st.aim || 0) * 150 };
-  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', face: 'Face: the map stays still and the mouse turns your character. W walks the way you face, A and D step sideways, S steps back. Aiming in locks you to a narrow 30° area until you let go. Mouse up / down moves the crosshair further / nearer.', classic: 'Crosshair Classic: the first Crosshair mode. The crosshair moves the way your mouse moves and stays with you; the further out it is, the more mouse it takes to turn (like a pointer round a circle). Aiming in leaves it where it is.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Hold sprint and W to sprint toward the crosshair. Push it past the edge of the screen to look further: it goes anywhere you can see. Pull it through your character to turn round.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
+  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', face: 'Face: the map stays still and the mouse turns your character. W walks the way you face, A and D step sideways, S steps back. Aiming in locks you to a narrow 30° area until you let go. Mouse up / down moves the crosshair further / nearer.', classic: 'Crosshair Classic: the first Crosshair mode. The crosshair moves the way your mouse moves and stays with you; the further out it is, the more mouse it takes to turn (like a pointer round a circle). Aiming in leaves it where it is.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Hold sprint and W to sprint toward the crosshair. Push it past the edge of the screen to look further: it goes anywhere you can see. Pull it through your character to turn round: while it is over your character your aim stays as it was (unless an enemy is right by the crosshair), so resting the mouse there never spins you.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
     turn: 'Turn: like an FPS. Mouse left / right turns you, mouse up / down moves the crosshair further / nearer.',
     cursor: 'Cursor: you aim at wherever the mouse pointer is.' }[m];
   if (save) saveSettings();

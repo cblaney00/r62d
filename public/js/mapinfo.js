@@ -11,7 +11,7 @@ const SITE_COL = ['#f2c14e', '#5ec8ff', '#ff7a7a', '#8be38b', '#d79bff', '#ffb36
 const LAYERS = [
   ['sites', 'Bomb sites', '#f2c14e'], ['spawns', 'Attacker spawns', '#ff8a3d'], ['cams', 'Cameras', '#9fb3c8'],
   ['hatches', 'Floor hatches', '#c8a06a'], ['stairs', 'Stairs', '#ffffff'], ['soft', 'Breakable walls', '#e0763a'],
-  ['ropes', 'Rappel spots', '#cda564'], ['rooms', 'Room names', '#c9d1d9'],
+  ['ropes', 'Ropes', '#cda564'], ['rooms', 'Room names', '#c9d1d9'],
 ];
 let S = null;
 
@@ -71,7 +71,7 @@ function side(el) {
     <div class="mkSites">${m.sites.map((s, i) => `<button data-i="${i}" class="${i === S.site ? 'on' : ''}"><i style="background:${SITE_COL[i % SITE_COL.length]}"></i><b>${esc(s.name)}</b><span>${esc(flName(siteFl(s)))}</span></button>`).join('')}</div>
     <h4>Show</h4>
     <div class="mkLayers">${LAYERS.map(([k, label, col]) => `<button data-k="${k}" class="${S.on[k] ? 'on' : ''}"><i style="background:${col}"></i>${label}</button>`).join('')}</div>
-    <p class="dim small">Bombs A and B of a pair are in the two rooms named. Cameras are the defenders' fixed cameras. Ropes: attackers can rappel up from the coil to the window above.</p>`;
+    <p class="dim small">Bombs A and B of a pair are in the two rooms named. Cameras are the defenders' fixed cameras. Ropes: attackers clip on at a coil and can climb and slide along every outside wall above the ground floor, peek its windows and swing in; the lines show each stretch of wall. Outside cameras sit on the roof's edge, looking at the yard.</p>`;
   for (const b of box.querySelectorAll('.mkSites button')) b.onclick = () => {
     audio.ui(); const i = +b.dataset.i; S.site = S.site === i ? -1 : i;
     if (S.site >= 0) { S.fl = siteFl(m.sites[i]); floors(el); }

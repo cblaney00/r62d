@@ -21,10 +21,11 @@ const siteName = c => c.map && c.map.sites[c.s.site] ? c.map.sites[c.s.site].nam
 // cont: Space just continues. go: Space (or finishing) tells the server to start the next phase.
 const STEPS = [
   { part: 0, ph: PHASE.SELECT, cont: true, t: 'How R62D works', b: () => `
-    Two teams of five. A match is <b>first to 3 rounds</b> and the sides swap every round. Each round has three phases:
+    Two teams of five, attack against defence. A <b>Quick Match</b> is first to 3 rounds with the sides swapping every round
+    (Unranked and Ranked: first to 4, swap at half time). Each round has three phases:
     <ol><li><b>Operator select</b> — pick who you play.</li>
     <li><b>Preparation</b> (30 s) — attackers scout with drones, defenders fortify.</li>
-    <li><b>Action</b> (3 min) — attackers break in and plant the <b>defuser</b> at bomb A or B; defenders stop them.</li></ol>
+    <li><b>Action</b> (2:40) — attackers break in and plant the <b>defuser</b> at bomb A or B; defenders stop them.</li></ol>
     This run takes about 4 minutes: you attack one round, then defend one. The enemy bots here never shoot.` },
   { part: 0, ph: PHASE.SELECT, t: 'Pick an attacker', b: () => `Each round you choose a <b>role</b>, then an operator from it:
     <ul>${roles('atk')}</ul>${PICK}`, done: c => !!c.me.op, go: true },
@@ -33,7 +34,7 @@ const STEPS = [
     into the building — it fits through the small <b>drone holes</b> at the foot of walls. The objective is
     <b>${siteName(c)}</b>: get it on your screen until the yellow <b>A</b> and <b>B</b> markers appear.`, done: c => !!c.s.rev },
   { part: 0, ph: PHASE.PREP, t: 'Ping it for your team', b: () => `
-    Point at a bomb marker (or an enemy, a door, anything)${isTouch ? ' with your right thumb' : ''} and press ${K('spot')}${isTouch ? '' : ' or click'}. Your team sees a marker and a chat line.`,
+    Point at a bomb marker (or an enemy, a door, anything)${isTouch ? ' with your right thumb' : ''} and press ${K('spot')}${isTouch ? '' : ' or click'}. Your team sees a marker and a chat line.${isTouch ? '' : ` Hold ${K('wheel')} for the ping wheel (go here, danger, need help…), and ${K('map')} opens the map.`}`,
     done: c => c.tu.n > c.base.n },
   { part: 0, ph: PHASE.PREP, go: true, t: 'Into action', b: () => `
     Nice. The action phase is starting: you are back in your body at the spawn.`,
@@ -43,14 +44,16 @@ const STEPS = [
     more accurate. Put your <b>right thumb</b> anywhere on the right half to aim: drag the way you want to look, further to look
     further. <b>FIRE</b> shoots, and you can slide your thumb on it to aim while shooting; hold ${K('ads')} for tighter shots and a
     wider view. ${K('interact')} and ${K('vault')} pop up when there is something to use or climb. ${K('melee')}, ${K('ability')} and ${K('gadget')} do what they say.` : `
-    ${K('up')}${K('left')}${K('down')}${K('right')} runs (loud). Hold ${K('walk')} to walk and ${K('crouch')} to crouch: both silent and
-    more accurate. Move the mouse to aim, <b>left click</b> to shoot, <b>right click</b> to aim in (tighter shots, wider view).
+    ${K('up')}${K('left')}${K('down')}${K('right')} runs (loud); hold ${K('sprint')} to sprint even faster, and crouch while
+    sprinting for a power slide. Hold ${K('walk')} to walk and ${K('crouch')} to crouch: both silent and more accurate.
+    ${K('leanL')} / ${K('leanR')} lean round corners. Move the mouse to aim, <b>left click</b> to shoot, <b>right click</b> to aim in (tighter shots, wider view).
     The first shot goes exactly on the crosshair once you stand still. ${K('interact')} uses things, ${K('melee')} is melee,
     ${K('ability')} your operator's skill and ${K('gadget')} your gadget.` },
   { part: 0, ph: PHASE.ACTION, t: 'Break in', b: c => `
     Go to <b>${siteName(c)}</b> (follow the yellow markers). Windows start boarded and some walls are soft: shoot,
     melee (${K('melee')}) or blow them open, or <b>vault</b> a low wall or open window with ${K('vault')}. Upstairs?
-    Attackers can <b>rappel</b>: press ${K('interact')} at a rope coil under a window. Take down any defender you see —
+    Attackers can <b>rappel</b>: press ${K('interact')} at a rope coil to clip onto the wall, push toward the wall to climb,
+    and ${K('vault')} swings in through a window when you are level with it. Take down any defender you see —
     a headshot (crosshair on the head) is an instant kill.`, done: c => c.inSite },
   { part: 0, ph: PHASE.ACTION, t: 'Plant the defuser', b: () => `
     You carry the <b>defuser</b>. Stand next to bomb <b>A</b> or <b>B</b> and <b>hold ${K('interact')}</b> until it is planted.
@@ -61,10 +64,10 @@ const STEPS = [
   { part: 1, ph: PHASE.SELECT, t: 'Pick a defender', b: () => `<ul>${roles('def')}</ul>${PICK}`, done: c => !!c.me.op, go: true },
   { part: 1, ph: PHASE.PREP, t: 'Reinforce a wall', b: c => `
     Go to <b>${siteName(c)}</b>, face one of its <b>soft walls</b> and <b>hold ${K('interact')}</b>. Reinforced walls stop bullets
-    and most breaching. Your team shares 10.`, done: c => c.tu.reinf > c.base.reinf },
+    and most breaching. Your team shares 10. In preparation defenders must stay inside the building.`, done: c => c.tu.reinf > c.base.reinf },
   { part: 1, ph: PHASE.PREP, t: 'Barricade a doorway', b: () => `
-    Face an <b>open doorway</b> and <b>hold ${K('interact')}</b> (you have 3 a round). Barricades block walking and sight,
-    but break easily — the noise warns you someone is coming.`, done: c => c.tu.barri > c.base.barri },
+    Face an <b>open doorway</b> and <b>hold ${K('interact')}</b> (as many as you like). Barricades block walking and sight,
+    but break easily — the noise warns you someone is coming. Bullets only chew small see-through holes in them.`, done: c => c.tu.barri > c.base.barri },
   { part: 1, ph: PHASE.PREP, t: 'Watch the cameras', b: () => `
     Press ${K('view')} for the cameras; ${isTouch ? '<kbd>◀</kbd> / <kbd>▶</kbd>' : `${K('leanL')} / ${K('leanR')} or the wheel`} flip through them. <b>${isTouch ? `Point at something and press ${K('spot')}` : 'Click something'} to ping it</b>
     for your team (an attacker's drone is a good find — shoot drones you see). ${K('view')} again to leave.`,

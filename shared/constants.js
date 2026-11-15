@@ -31,7 +31,7 @@ export const PHASE = {
   ROUND_END: 'roundEnd', MATCH_END: 'matchEnd',
 };
 
-// He asked: each defender can put up only 3 barricades a round (doorways start open, windows start boarded).
+// Doorways start open, windows start boarded (it was 3 barricades a round once).
 export const BARRICADES_EACH = 999; // wooden barricades on doors and windows: unlimited (he asked; reinforcing soft walls stays limited)
 
 export const DUR = {
