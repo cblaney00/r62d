@@ -97,7 +97,7 @@ export const needsTraining = version => roundsLeft(version) > 0;
 // The practice version: a fingerprint of every .js in server/ and shared/ (gameplay code), so menu/art/sound changes
 // don't start a new practice. The server's plumbing (web server, saving, practice itself) is left out: changing it
 // doesn't change how a match plays. null if the files can't be read.
-const NOT_PLAY = new Set(['server.js', 'practice.js', 'training.js', 'train-worker.js', 'store.js', 'ws.js', 'opinions.js', 'drills.js']);
+const NOT_PLAY = new Set(['server.js', 'practice.js', 'training.js', 'train-worker.js', 'store.js', 'ws.js', 'opinions.js', 'drills.js', 'replays.js']);
 export function playVersion() {
   const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const h = crypto.createHash('sha1'), walk = d => { for (const f of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (f.name.endsWith('.js') && !(d.endsWith('server') && NOT_PLAY.has(f.name)) && f.name !== 'joincode.js') h.update(f.name).update(fs.readFileSync(p)); } };

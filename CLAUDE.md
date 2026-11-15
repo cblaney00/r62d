@@ -464,3 +464,8 @@ His wishes so far:
 - Ball Knowledge: every tab lists most to least % (guns by rounds won, attachments by `rec`, maps by attack win %, drill pro cards by drills won; operators already were).
 - Revive reach `REVIVE_REACH` 34 px on the server (the client prompt is 26 on interpolated positions, so the server is a bit more generous); `node tests/revivetrap.js` revives on every trap/gadget kind.
 - Main menu `⬇ DOWNLOAD FOR WINDOWS` (`.dlNav` in `.hsmall`): links to the newest GitHub release's `R62D-windows.zip` (`releases/latest/download/...`), so a friend can play on their own computer with no VPN. Hidden in the program / kiosk (`html.inapp`, set from `inApp()`) and on phones. Release a new build (`desktop/release.sh`) when the download should catch up.
+
+## Replays (IN PROGRESS, started 2026-11-15; plan: /root/.claude/plans/this-is-a-coding-async-frost.md)
+- He asked: last 3 matches kept, deleted when out of date (gameplay version), watched like Esports TV with pause/speed/timeline, DOWNLOAD asks replay file or video (video = whole match, recorded while it plays). He chose: whole matches, only Quick Match / Unranked / Ranked.
+- Done: `server/replays.js` (startRec/recFrame/stopRec, prune/listReplays, openUpload, ReplayView streaming with seek via `rpmap`), in `NOT_PLAY`. NOT hooked up yet.
+- Left: game.js hooks (startRec at end of startMatch, recFrame at end of broadcast with mine for every alive player while `this.rec`, stopRec at MATCH_END and resetToLobby), server.js (/ws?replay=, ticking views at SNAP_RATE, /api/replays, /api/replay/file, POST /api/replay/open), client REPLAYS page + `#rpBar` + `rpmap`/`rpst`/`rpinfo` handling + download dialog + video (getDisplayMedia + MediaRecorder), Electron display-media handler, tests/replays.js.
