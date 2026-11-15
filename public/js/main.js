@@ -5,7 +5,7 @@ import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './ping
 import { parseCommand } from '/shared/commands.js';
 import { roofRopeAt, hatchAtPoint, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf, hitR } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, liftBody, persp, lifted, withPersp, furnTop } from './look.js';
@@ -159,6 +159,29 @@ let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return 
 let aimOff = { x: 150, y: 0 };
 const AHEAD = () => Math.max(36 * DPR, VH * 0.13); // screen room always left beyond the crosshair
 const AIM_MIN = () => 46 * DPR / (st.zoom || 1), AIM_MAX = () => st.reachW || 400;
+// Close-aim dead zone (he asked 2026-11-15): the crosshair passes straight over your character (it used to stop
+// AIM_MIN short of you), but while it is within DZ_R of you your aim keeps the direction it had (st.dzAng), so a mouse
+// resting on your character never spins you round. An enemy you can see whose body is within DZ_FOE (0.5 m) of the
+// crosshair switches it off (he chose: near the crosshair), so someone right in front of you can still be hit.
+const DZ_R = () => 46 * DPR / (st.zoom || 1), DZ_FOE = 0.5 * PX_PER_M;
+function dzLive() {
+  const x = st.pred.x + aimOff.x, y = st.pred.y + aimOff.y;
+  for (const p of st.foesSeen || []) if (Math.hypot(p.x - x, p.y - y) <= DZ_FOE + hitR(p.op)) return true;
+  return false;
+}
+const dzHeld = () => st.dzAng != null && !!st.pred && Math.hypot(aimOff.x, aimOff.y) < DZ_R() && !dzLive();
+function aimAng() { // the direction you aim in Crosshair mode (held inside the dead zone)
+  if (dzHeld()) return st.dzAng;
+  return (st.dzAng = Math.atan2(aimOff.y, aimOff.x));
+}
+function turnAim(d) { // turn the crosshair round you by d (aim help, scope sway); a held aim turns with it
+  if (dzHeld()) st.dzAng += d;
+  const c = Math.cos(d), s = Math.sin(d); aimOff = { x: aimOff.x * c - aimOff.y * s, y: aimOff.x * s + aimOff.y * c };
+}
+function limitAim(fn) { // keep the aim inside a limit (rope: facing the wall; slide: ahead)
+  if (dzHeld()) { st.dzAng = fn(st.dzAng); return; }
+  const l = Math.hypot(aimOff.x, aimOff.y), a = fn(Math.atan2(aimOff.y, aimOff.x)); if (l > 0.01) aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l };
+}
 // how far a view can grow to fit you and your crosshair: further when aiming in, furthest with a 2x scope
 const scopeOn = me => !!me && /scope|sniper/.test(String(me.aa || '')), sniperOn = me => !!me && String(me.aa || '').includes('sniper');
 // the crosshair's reach: a circle round you (AIM_REACH), its size set by your sight while aiming in
@@ -179,7 +202,7 @@ const WALL_HOLD = 1.5, WALL_TILES = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T
 function wallHeld(q, now) {
   const H = st.wallHold, dt = H ? Math.min(0.1, now - H.at) : 0; // (now: seconds)
   if (!q || !q.mk || !st.map || !st.pred) { st.wallHold = null; return; }
-  const m = st.map, a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), sn = Math.sin(a), qp = q.mk.person, qs = q.mk.d; // (the marker: before or past the crosshair)
+  const m = st.map, a = aimAng(), c = Math.cos(a), sn = Math.sin(a), qp = q.mk.person, qs = q.mk.d; // (the marker: before or past the crosshair)
   let k = qp ? 'p' + qp.id : -1; // on a person: held on that same person
   if (qp) { if (H && H.set.has(k)) { const was = H.t >= WALL_HOLD; H.t += dt; H.at = now; if (!was && H.t >= WALL_HOLD) H.pop = now; } else st.wallHold = { set: new Set([k]), t: 0, at: now, pop: 0 }; return; } for (let d = qs - 3; d <= qs + 12 && k < 0; d += 1.5) { const kk = Math.floor((st.pred.y + sn * d) / CELL) * m.W + Math.floor((st.pred.x + c * d) / CELL); if (WALL_TILES.has(m.tiles[kk])) k = kk; } // the first wall cell where the bullets stop
   if (k < 0) { st.wallHold = null; return; }
@@ -261,18 +284,23 @@ function freeMove(dx, dy) {
   if (st.rot) { const c = Math.cos(st.rot), sn = Math.sin(st.rot); [dx, dy] = [dx * c + dy * sn, -dx * sn + dy * c]; } // (a turned view: the rope camera)
   const o = aimOff, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = AIM_MIN(), hi = AIM_MAX();
   if (aimMode === 'free') { const tr = trackR(ux, uy); if (l0 > tr) { const m = 1 + (farSens() - 1) * Math.min(1, (l0 - tr) / PX_PER_M); dx *= m; dy *= m; } } // far out: slower, the same every way
-  const r = dx * ux + dy * uy; // 1:1 out, back and sideways
-  let l = l0 + r, a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / l0;
-  if (l < 0) { l = -l; a += Math.PI; } // pulled through the middle: out the other side
+  if (st.pred) aimAng(); // (remember the direction before this move, for the dead zone)
+  let l, a;
+  if (l0 < 2 * lo) { const nx = o.x + dx, ny = o.y + dy; l = Math.hypot(nx, ny); a = l > 1e-6 ? Math.atan2(ny, nx) : Math.atan2(uy, ux); } // near you: plain x/y, so it glides straight over your character
+  else {
+    const r = dx * ux + dy * uy; // 1:1 out, back and sideways
+    l = l0 + r; a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / l0;
+    if (l < 0) { l = -l; a += Math.PI; } // pulled through the middle: out the other side
+  }
   if (l > hi) l = Math.max(hi, Math.min(l, l0)); // no pushing past the reach (a reach that just shrank keeps your spot)
-  else if (l < lo) l = lo;
-  if (st.map && !(st.winViewsOn && winAimed(a))) l = Math.min(l, Math.max(lo, floorLim(a, l))); // nor past the floor's edge, where it would stop while the mouse kept going
+  l = Math.max(0.5, l);
+  if (st.map && st.pred && !(st.winViewsOn && winAimed(a))) l = Math.min(l, Math.max(Math.min(l, lo), floorLim(a, l))); // nor past the floor's edge, where it would stop while the mouse kept going
   aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l };
 }
 // aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked; never nearer than 2 m), else to its sight's distance
 function adsReset() {
   if (st.me && st.me.ro && st.me.ro[0]) return; // on a rope: aiming in leaves the crosshair where it is (no snapping onto walls)
-  const l = Math.hypot(aimOff.x, aimOff.y) || 1, ux = aimOff.x / l, uy = aimOff.y / l; let d = adsStart(st.me && st.me.aa ? attFromCode(st.me.aa).sight : 'iron', st.me && st.me.w) * PX_PER_M; // gun first, then sight (he asked)
+  const a0 = aimAng(), ux = Math.cos(a0), uy = Math.sin(a0); let d = adsStart(st.me && st.me.aa ? attFromCode(st.me.aa).sight : 'iron', st.me && st.me.w) * PX_PER_M; // gun first, then sight (he asked)
   // a set distance per sight, whatever distance you were at (he asked); a nearer wall stops it, but not the edge of a
   // doorway: if 2 of 5 lines spread over ±2.5° get through, it goes the full distance (no jumping onto door frames)
   // The sniper scope goes as far as you can see that way (he asked): the second-longest of those 5 sight lines, so a
@@ -303,7 +331,7 @@ function scopeSway(dt, me, now) {
   st.swayA = (st.swayA || 0) + (want - (st.swayA || 0)) * (1 - Math.exp(-dt * (want < (st.swayA || 0) ? 22 : 4)));
   const v = st.swayA * (Math.sin(now * 1.3) + 0.5 * Math.sin(now * 2.9 + 1)), d = v - (st.swayV || 0);
   st.swayV = v; if (!d) return;
-  if (padOn && freeAimOn() && !gpRecent()) { const c = Math.cos(d), s = Math.sin(d); aimOff = { x: aimOff.x * c - aimOff.y * s, y: aimOff.x * s + aimOff.y * c }; }
+  if (padOn && freeAimOn() && !gpRecent()) turnAim(d);
   else padAng = wrapAng(padAng + d);
 }
 const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
@@ -374,7 +402,7 @@ function aimAssist(dt, view) {
   const ads = adsHeld() || gpk.ads, aiming = performance.now() - (st.aimMoveT || -1e9) < 300 || stick || mouse.l || gpk.fire || keys.has('fire') || ads;
   if (!aiming) return;
   const step = Math.sign(best.da) * Math.min(Math.abs(best.da), (ads ? ASSIST.adsPull : ASSIST.pull) * dt);
-  if (freeAimOn() && !gpRecent()) { const l = Math.hypot(aimOff.x, aimOff.y), a = Math.atan2(aimOff.y, aimOff.x) + step; aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l }; }
+  if (freeAimOn() && !gpRecent()) turnAim(step);
   else if (stick) st.asOff = Math.max(-ASSIST.max, Math.min(ASSIST.max, (st.asOff || 0) + step)); // the thumb holds the stick's angle: the pull rides on top of it
   else padAng = wrapAng(padAng + step);
 }
@@ -408,7 +436,11 @@ function fitBoth(dx, dy) {
 }
 function freeAimPoint() {
   let l = Math.min(Math.hypot(aimOff.x, aimOff.y) || 1, AIM_MAX());
-  const a = Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), s = Math.sin(a);
+  const held = st.pred && dzHeld(), a = st.pred ? aimAng() : Math.atan2(aimOff.y, aimOff.x), c = Math.cos(a), s = Math.sin(a);
+  if (held) { // in the dead zone: drawn where it really is (over you), aimed the held way, just outside you
+    const dz = DZ_R(), hx = st.pred.x + c * dz, hy = st.pred.y + s * dz;
+    return { x: st.pred.x + aimOff.x, y: st.pred.y + aimOff.y, a, held: true, d: dz, ax: hx, ay: hy, ad: dz, see: dz, shot: dz, person: null, rope: !!(st.me && st.me.ro && st.me.ro[0]), mk: null, wx: hx, wy: hy, blocked: false, stopped: false };
+  }
   const outWin = st.map && st.winViewsOn && winAimed(a); // aiming out of an upper window, down at the ground below
   if (st.map && !outWin) l = floorLim(a, l); // never off the edge of the floor you are on
   let see = st.map ? castSight(st.map, st.pred.x, st.pred.y, a, l, null) + 2 : l;
@@ -462,7 +494,7 @@ function freeAimPoint() {
       see = Math.min(see, B); if (onRope) shot = Math.min(shot, B);
     }
   }
-  return { x, y, d: l, ax: x, ay: y, ad: l, see, shot, person, rope: onRope, mk, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
+  return { x, y, a, d: l, ax: x, ay: y, ad: l, see, shot, person, rope: onRope, mk, wx: st.pred.x + c * see, wy: st.pred.y + s * see, blocked: see < l - 4, stopped: shot < l - 4 };
 }
 // is this aim (from where you stand) out through one of the windows you are looking down from?
 function winAimed(a) {
@@ -2054,8 +2086,8 @@ function frame(nowMs) {
   pollPad(dt, view);
   aimAssist(dt, view);
   setTouchVisible(playing() && !st.tv && !menuOpen() && !!st.me && $('pause').classList.contains('hidden')); // phone controls only while playing
-  { const R = ropeOf(); if (R) { padAng = wrapAng(ropeAimLimit(R, padAng)); const l = Math.hypot(aimOff.x, aimOff.y), a = ropeAimLimit(R, Math.atan2(aimOff.y, aimOff.x)); if (l > 0.01) aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l }; } } // on a rope: facing the wall
-  if (sliding()) { padAng = wrapAng(slideAim(padAng)); const l = Math.hypot(aimOff.x, aimOff.y), a = slideAim(Math.atan2(aimOff.y, aimOff.x)); aimOff = { x: Math.cos(a) * l, y: Math.sin(a) * l }; }
+  { const R = ropeOf(); if (R) { padAng = wrapAng(ropeAimLimit(R, padAng)); if (freeAimOn()) limitAim(a => ropeAimLimit(R, a)); } } // on a rope: facing the wall
+  if (sliding()) { padAng = wrapAng(slideAim(padAng)); if (freeAimOn()) limitAim(slideAim); }
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
   st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
   { const rt = ropeCam(dt); if (rt > 0 && st.rtFace != null) { const to = -Math.PI / 2 - st.rtFace, d = Math.atan2(Math.sin(to - st.rot), Math.cos(to - st.rot)); st.rot += d * (rt * rt * (3 - 2 * rt)); } } // on a rope: the wall ahead, up the screen
@@ -2070,7 +2102,7 @@ function frame(nowMs) {
   // (It used to follow the loose pointer, and the camera sliding after it made everything bounce — he noticed.)
   if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone')) {
     const c = cursor(), mw = screenToWorld(c.x, c.y);
-    st.aim = Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x);
+    st.aim = padOn && freeAimOn() && !gpRecent() ? aimAng() : Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x); // (Crosshair mode: its own direction, held in the close dead zone)
     if (sliding()) st.aim = slideAim(st.aim);
     { const R = ropeOf(); if (R) st.aim = ropeAimLimit(R, st.aim); }
     if (r3on() && rope3d.active()) { const a = rope3d.aim(); if (a) { st.aim = a.ang; aimOff = { x: a.x - st.pred.x, y: a.y - st.pred.y }; st.r3aim = a; } } else st.r3aim = null; // the 3D rope view: where its crosshair is

@@ -189,10 +189,16 @@ function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): 1:
   const z = S.z || 1; dx /= z; dy /= z;
   const o = S.aim, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = aimMin(), hi = aimMax();
   if (O.mode() === 'free' && O.far && S.trackHH) { const hh = S.trackHH, hw = hh * (S.aspect || 16 / 9), c = Math.abs(ux), s = Math.abs(uy); const tr = Math.min(c > 0.01 ? hw / c : Infinity, s > 0.01 ? hh / s : Infinity) - hh * 0.26; if (l0 > tr) { const m = 1 + (O.far() - 1) * Math.min(1, (l0 - tr) / PX_PER_M); dx *= m; dy *= m; } }
-  const r = dx * ux + dy * uy;
-  let l = l0 + r, a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / l0;
-  if (l < 0) { l = -l; a += Math.PI; }
-  if (l > hi) l = Math.max(hi, Math.min(l, l0)); else if (l < lo) l = lo;
+  if (l0 >= lo) S.dzA = Math.atan2(uy, ux); // (the match's close dead zone: the aim keeps this way while the crosshair is over you)
+  let l, a;
+  if (l0 < 2 * lo) { const nx = o.x + dx, ny = o.y + dy; l = Math.hypot(nx, ny); a = l > 1e-6 ? Math.atan2(ny, nx) : Math.atan2(uy, ux); } // near you: plain x/y, straight over your character
+  else {
+    const r = dx * ux + dy * uy;
+    l = l0 + r; a = Math.atan2(uy, ux) + (-dx * uy + dy * ux) / l0;
+    if (l < 0) { l = -l; a += Math.PI; }
+  }
+  if (l > hi) l = Math.max(hi, Math.min(l, l0));
+  l = Math.max(0.5, l);
   S.aim = { x: Math.cos(a) * l, y: Math.sin(a) * l };
 }
 const CAM0 = { x: 0, y: -150 }; // the first frame works out the aim before the camera has a place
@@ -200,13 +206,13 @@ function screenToWorld(cv, x, y) { const c = S.cam || CAM0, z = S.z || 1; return
 function w2s(cv, x, y) { const c = S.cam || CAM0; return { x: (x - c.x) * S.z + cv.width / 2, y: (y - c.y) * S.z + cv.height / 2 }; }
 // the point you aim at, held at the range's walls like a wall holds it in a match
 function aimPoint(cv) {
-  let x, y;
+  let x, y, held = false;
   if (O.mode() === 'cursor' && !isTouch) { const p = screenToWorld(cv, S.mouse.x, S.mouse.y); x = p.x; y = p.y; }
-  else { x = S.aim.x; y = S.aim.y; }
+  else { x = S.aim.x; y = S.aim.y; const l0 = Math.hypot(x, y); if (l0 < aimMin() && S.dzA != null) { x = Math.cos(S.dzA) * aimMin(); y = Math.sin(S.dzA) * aimMin(); held = true; } } // (inside the dead zone: aimed the held way)
   let l = Math.hypot(x, y) || 1; const c = x / l, s = y / l;
   if (s < -1e-6) l = Math.min(l, farEnd() / -s); if (s > 1e-6) l = Math.min(l, 60 / s);
   if (Math.abs(c) > 1e-6) l = Math.min(l, ROOM_W / Math.abs(c));
-  return { x: c * l, y: s * l, d: l };
+  return { x: c * l, y: s * l, d: l, sx: held ? S.aim.x : c * l, sy: held ? S.aim.y : s * l };
 }
 function aimAngle(cv) { const p = aimPoint(cv); return Math.atan2(p.y, p.x); }
 function camera(cv, dt) {
@@ -324,7 +330,7 @@ function draw(cv, dt) {
   for (const d of S.dummies) label(`${d.label} ${d.max}`, d.x, d.y + 24 / z, 11, 'rgba(255,255,255,0.75)');
   for (const p of S.pops) { c.globalAlpha = Math.min(1, p.life * 2); label(p.txt, p.x, p.y - (0.9 - p.life) * 30 / z, p.head ? 15 : 13, p.head ? '#ff4040' : '#fff'); c.globalAlpha = 1; }
   // crosshair: your own one, kicked round you by recoil and with the true spread gap, exactly as in a match
-  const q = aimPoint(cv), Q = w2s(cv, q.x, q.y), rc = S.rc, cs = Math.cos(rc), sn = Math.sin(rc);
+  const q = aimPoint(cv), Q = w2s(cv, q.sx, q.sy), rc = S.rc, cs = Math.cos(rc), sn = Math.sin(rc);
   const x = O0.x + (Q.x - O0.x) * cs - (Q.y - O0.y) * sn, y = O0.y + (Q.x - O0.x) * sn + (Q.y - O0.y) * cs;
   const LM = sniper() && S.adsT > 0.3 ? lensMag(S.adsT) : 1, LR = lensR(cv); // the sniper lens magnifies (as in a match)
   if (LM > 1.01) magnify(c, cv, x, y, LR, LM);

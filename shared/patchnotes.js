@@ -50,4 +50,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-14', k: 'mech', id: 'ropeexit', t: 'Off a rope only by sliding down (F) or swinging in (Space) from right in front of the window.', v: -1 },
   { d: '2026-11-14', k: 'mech', id: 'colours', t: 'Each team in its own colour on broadcasts; players choose their own team colours.', v: 0 },
   { d: '2026-11-14', k: 'mech', id: 'lean', t: 'Leaning works on ropes; bodies bend with the lean.', v: 1 },
+  { d: '2026-11-15', k: 'mech', id: 'deadzone', t: 'The crosshair passes over your own character; while it is that close your aim holds its direction, unless an enemy is within 0.5 m of it.', v: 1 },
 ];
