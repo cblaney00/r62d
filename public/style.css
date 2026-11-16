@@ -1266,3 +1266,34 @@ html.tv .sc[data-tc] { background: var(--tc); color: #0b0e12; } /* TV: each team
 .wcard { position: relative; }
 .wcard .propick { position: absolute; top: 8px; right: 10px; font: 700 10px var(--head); letter-spacing: 0.14em; color: #111; background: var(--gold); padding: 2px 6px; border-radius: 2px; }
 .att.pro::after { content: '★'; color: var(--gold); margin-left: 4px; font-size: 0.85em; }
+
+/* ---------------- REPLAYS (replay.js) ---------------- */
+#rpList { display: flex; flex-direction: column; gap: 12px; margin: 14px 0; }
+.rpCard { display: flex; align-items: stretch; gap: 18px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--gold); padding: 10px; }
+.rpPic { width: 220px; flex: none; } .rpPic canvas { width: 100%; height: auto; display: block; }
+.rpTxt { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; text-align: left; }
+.rpTxt em { font: 700 13px var(--head); letter-spacing: 0.2em; color: var(--gold); font-style: normal; }
+.rpTxt b { font: 800 28px var(--head); letter-spacing: 0.06em; }
+.rpScore { font: 800 22px var(--head); } .rpWho { color: var(--dim); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rpBtns { display: flex; flex-direction: column; justify-content: center; gap: 8px; } .rpBtns button { min-width: 150px; font: 800 18px var(--head); letter-spacing: 0.12em; padding: 10px 16px; }
+.rpEmpty { background: var(--panel); border: 1px dashed var(--line); padding: 26px; } .rpEmpty b { font: 800 24px var(--head); letter-spacing: 0.12em; }
+#tab-replays .row { display: flex; align-items: center; gap: 14px; }
+#rpDl .menu { display: flex; flex-direction: column; gap: 10px; width: min(560px, 92vw); background: var(--panel); border: 1px solid var(--line); padding: 22px; }
+#rpDl h2 { margin: 0; font: 800 40px var(--head); letter-spacing: 0.2em; }
+.rpChoice { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; padding: 14px 16px; }
+.rpChoice b { font: 800 24px var(--head); letter-spacing: 0.12em; } .rpChoice span { color: var(--dim); font: 400 14px var(--body); letter-spacing: normal; text-transform: none; line-height: 1.35; }
+.rpChoice:not(:disabled):hover { border-color: var(--gold); } .rpChoice:disabled { opacity: 0.45; }
+#rpBar { display: none; }
+html.replay #rpBar { display: flex; align-items: center; gap: 10px; position: fixed; left: 50%; top: 152px; transform: translateX(-50%); width: min(980px, 92vw); z-index: 3;
+  background: rgba(8, 11, 15, 0.86); border: 1px solid var(--line); padding: 8px 12px; pointer-events: auto; }
+html.rprec #rpBar { display: none; } /* (recording a video: the bar stays out of the picture) */
+#rpBar button { padding: 4px 9px; font: 700 15px var(--head); letter-spacing: 0.06em; }
+#rpPlay { min-width: 42px; } .rpSpeeds { display: flex; gap: 2px; } .rpSpeeds button.on { border-color: var(--gold); color: var(--gold); }
+#rpTime, #rpLen { font: 700 15px var(--head); min-width: 40px; text-align: center; color: var(--dim); }
+#rpLine { position: relative; flex: 1; height: 22px; cursor: pointer; touch-action: none; }
+#rpLine::before { content: ''; position: absolute; left: 0; right: 0; top: 9px; height: 4px; background: rgba(255,255,255,0.15); }
+#rpDone { position: absolute; left: 0; top: 9px; height: 4px; background: var(--gold); }
+#rpKnob { position: absolute; top: 4px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px var(--gold); }
+#rpMarks i { position: absolute; top: 2px; width: 2px; height: 18px; background: rgba(255,255,255,0.45); }
+#rpMarks i span { position: absolute; top: -15px; left: -8px; font: 700 10px var(--head); color: var(--dim); }
+#rpRecTag { position: fixed; top: 10px; right: 14px; z-index: 6; color: #ff5a5a; font: 800 14px var(--head); letter-spacing: 0.12em; background: rgba(0,0,0,0.6); padding: 4px 10px; }

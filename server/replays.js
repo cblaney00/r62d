@@ -28,6 +28,7 @@ const MODE_NAME = { quick: 'Quick Match', unranked: 'Unranked', ranked: 'Ranked'
 export function startRec(g) {
   stopRec(g, true);
   if (g.tut || g.free || g.tv || !MODES.has(g.mode)) return;
+  if (!g.recBots && ![...g.players.values()].some(p => p.sock)) return; // a person must be playing (not the pros' practice; tests set recBots)
   try {
     fs.mkdirSync(DIR, { recursive: true });
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), file = path.join(DIR, id + '.r62d');
@@ -187,9 +188,11 @@ export class ReplayView {
     const msg = { t: 'snap', tv: 1, you: fl, ...(fl != null && m[String(fl)] ? { mine: m[String(fl)] } : {}), ...f, rp: this.status() };
     this.send(msg);
   }
-  status() { const R = this.R; return { t: Math.round((this.rt - R.t0) * 10) / 10, d: R.dur, p: this.paused ? 1 : 0, s: this.speed, e: this.ended ? 1 : 0 }; }
+  status() { const R = this.R; return { at: Math.round((this.rt - R.t0) * 10) / 10, d: R.dur, p: this.paused ? 1 : 0, s: this.speed, e: this.ended ? 1 : 0 }; }
   sendStatus() { if (this.R) this.send({ t: 'rpst', ...this.status() }); }
-  tick(dt) {
+  tick(dt) { // dt: tests pass it; the server leaves it out and the real clock is used (its snapshots don't come at exact steps)
+    const now = performance.now(), real = this.lastT ? Math.min(0.25, (now - this.lastT) / 1000) : 0; this.lastT = now;
+    if (dt === undefined) dt = real;
     const R = this.R; if (!R || this.closed || this.paused || this.ended) return;
     this.rt += dt * this.speed;
     let j = this.i; while (j + 1 < R.frames.length && R.frames[j + 1].t <= this.rt) j++;

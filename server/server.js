@@ -15,6 +15,7 @@ import { refreshMeta } from './metaloadouts.js';
 import { META } from '../shared/meta.js';
 refreshMeta(); // default loadouts = the pros' current meta (he asked)
 import { Game } from './game.js';
+import { ReplayView, listReplays, replayFile, downloadName, openUpload } from './replays.js';
 const perfLog = [];
 import { store, publicProfile } from './store.js';
 import { TICK_RATE, SNAP_RATE } from '../shared/constants.js';
@@ -100,6 +101,19 @@ function api(req, res) {
   if (u.pathname === '/api/meta') return json(200, META); // the pros' preferred loadouts: every browser's defaults
   if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, guns: training.guns, att: training.att, pro: training.pro, drills: training.drills, opinions: training.opinions, running: !!trainer, session: trainer ? trainer.rounds : 0, current: PLAY_VERSION });
   if (u.pathname === '/api/train' && req.method === 'POST') { const r = trainCheck(true); return json(200, { running: !!trainer, why: r || '' }); } // TRAIN THE PROS button
+  // REPLAYS (server/replays.js): the newest 3, a download, and opening a downloaded file again
+  if (u.pathname === '/api/replays') return json(200, { list: listReplays() });
+  if (u.pathname === '/api/replay/file') {
+    const f = replayFile(q('id')); if (!f) return json(404, { error: 'no such replay' });
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${downloadName(q('id'))}.r62d"`, 'Content-Length': fs.statSync(f).size });
+    return fs.createReadStream(f).pipe(res);
+  }
+  if (u.pathname === '/api/replay/open' && req.method === 'POST') {
+    const parts = []; let n = 0, big = false;
+    req.on('data', c => { n += c.length; if (n > 300 * 1024 * 1024) { big = true; req.destroy(); } else parts.push(c); });
+    req.on('end', () => json(200, big ? { error: 'That file is too big to be a replay.' } : openUpload(Buffer.concat(parts))));
+    return;
+  }
   if (u.pathname === '/api/match') { const m = store.match(q('id')); return m ? json(200, m) : json(404, { error: 'no such match' }); }
   if (u.pathname === '/api/players') return json(200, Object.values(store.profiles).map(p => ({ id: p.id, name: p.name, matches: p.stats.matches, wins: p.stats.wins, kills: p.stats.kills, deaths: p.stats.deaths })));
   json(404, { error: 'unknown' });
@@ -111,7 +125,10 @@ const tutorials = new Set();
 // ESPORTS TV someone left (he asked): kept 20 s, paused, in case they come straight back (same key = the same broadcast),
 // then closed so it never slows down a real match
 const TV_HOLD_MS = +process.env.R62D_TV_HOLD_MS || 20000, heldTv = new Map();
+const replayViews = new Set();
 attachWebSocket(server, '/ws', (sock, req) => {
+  const rp = /[?&]replay=([a-z0-9]{4,20})(&|$)/.exec(req.url);
+  if (rp) { const v = new ReplayView(sock, rp[1]); replayViews.add(v); sock.on('close', () => replayViews.delete(v)); return; }
   const tut = /[?&]tut=1/.test(req.url), free = /[?&]free=1/.test(req.url), tv = /[?&]tv=1/.test(req.url);
   if (!tut && !free && !tv) return game.connect(sock);
   const key = tv ? (/[?&]key=([a-z0-9]{6,24})(&|$)/.exec(req.url) || [])[1] : null;
@@ -138,7 +155,7 @@ const step = () => {
   while (acc >= dt) {
     acc -= dt; game.tick(dt); for (const g of tutorials) if (!held(g)) g.tick(dt);
     snapAcc += dt;
-    if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = 0; game.broadcast(); for (const g of tutorials) if (!g.heldUntil) g.broadcast(); }
+    if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = 0; game.broadcast(); for (const g of tutorials) if (!g.heldUntil) g.broadcast(); for (const v of replayViews) v.tick(); }
   }
 };
 setTimeout(loop, 1000 / TICK_RATE);

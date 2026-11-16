@@ -11,7 +11,7 @@ Plays 10 bots through a full match (25 sim-minutes max). Prints each round's win
    (e.g. `runuser -u insideabush -- mktemp -d /tmp/r62d-ff.XXXX`):
    `runuser -u insideabush -- firefox --headless --no-remote --profile <dir> --remote-debugging-port 9333 &`
 3. `node tests/shoot.mjs 9333 <outdir> <steps.json>` — steps are
-   `{"url":..}`, `{"js": "...", "wait": ms, "shot": "name"}`. Keys/mouse are simulated by
+   `{"url":..}`, `{"js": "...", "wait": ms, "shot": "name"}` (add `"act": true` when the page needs a real click, e.g. screen recording). Keys/mouse are simulated by
    dispatching `KeyboardEvent` on `window` and `MouseEvent` on `#game`. A Firefox instance only
    allows one BiDi session, so restart Firefox for each run.
 - `play.sh` on another computer: clone it with a throwaway `HOME` and `PORT`, `MOZ_HEADLESS=1`, run as insideabush with `env -i` and a chosen `PATH`.

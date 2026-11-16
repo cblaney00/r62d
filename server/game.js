@@ -11,6 +11,7 @@ import { arenaStart, arenaTick, arenaKill, arenaDamage, arenaSpeed, arenaEndMatc
 import { zbSurge, zbDev, ZB, zbDown, zbUp, zbReviveTime, zbSlideEnd, zbStart, zbTick, zombieThink, zbSpeed, zbDamage, zbKill, zbCanGoDown, zbReloadMul, zbBlocksVault, zbUse, zbEnd, zbPlayer, zbInfo } from './zombies.js';
 import { MODES, CLASSIC, DEFAULT_MODE, attackSquad, roundsToWin, inOvertime } from '../shared/modes.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
+import { startRec, recFrame, stopRec } from './replays.js';
 import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
 const PING_KINDS = new Set(['go', 'omw', 'watch', 'hold', 'danger', 'help', 'enemy', 'open']); // the ping wheel (public/js/pingwheel.js)
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
@@ -190,6 +191,7 @@ export class Game {
   side(p) { if (this.zb) return p.zombie ? TEAM.DEF : TEAM.ATK; if (this.arena) return this.arena.ffa ? 'f' + p.squad : p.squad === 0 ? TEAM.ATK : TEAM.DEF; return p.squad === this.atkSquad() ? TEAM.ATK : TEAM.DEF; } // fun modes: everyone for themselves = a side each (survivors attack, the infected defend)
 
   resetToLobby() {
+    if (this.rec) stopRec(this, true); // ended early: kept if a round was finished
     if (this.arena) arenaEndMatch(this);
     if (this.zb) zbEnd(this);
     this.phase = PHASE.LOBBY; this.timer = 0; this.round = 0; this.score = [0, 0];
@@ -378,6 +380,7 @@ export class Game {
     for (const p of this.players.values()) { p.kills = 0; p.deaths = 0; p.ms = this.blankMatchStats(); }
     this.departed = []; this.roundLog = []; this.matchStart = Date.now(); this.bans = []; this.banRun = null; this.sitesUsed = [];
     this.nextRound();
+    startRec(this); // REPLAYS: Quick Match / Unranked / Ranked only (server/replays.js)
   }
 
   nextRound() {
@@ -598,6 +601,7 @@ export class Game {
           const mvp = [...this.players.values()].map(p => ({ p, sc: (p.ms && p.ms.score) || matchScore(p.ms || {}) })).sort((a, b) => b.sc - a.sc)[0]; // the MVP is the top score
           this.events.push({ e: 'matchEnd', squad: win, mvp: mvp ? { id: mvp.p.id, name: mvp.p.name, op: mvp.p.op, ...(mvp.p.ms || {}), ops: undefined } : null });
           const xp = this.saveMatch(win) || {};
+          if (this.rec) { this.broadcast(); stopRec(this, false, win); } // the last snapshot (MATCH END) goes in first
           for (const p of this.players.values()) if (p.sock && xp[p.pid]) {
             const prof = store.byToken(p.token); if (prof && prof.mmr != null) p.mmr = prof.mmr;
             p.sock.send(JSON.stringify({ t: 'xp', ...xp[p.pid], stats: p.ms, profile: publicProfile(prof) }));
@@ -3284,7 +3288,7 @@ export class Game {
       });
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
       if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; if (p.defReq) o.dq = 1; } }
-      if (p.alive && (p.sock || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
+      if (p.alive && (p.sock || this.rec || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
         ga: this.free ? p.guns.map(q => q.w + ':' + attCode(q.att)) : undefined, // free play's gun menu shows what each held gun carries
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, ap: p.pierceShot ? 1 : undefined, su2: p.spotterUntil > this.time ? r1(p.spotterUntil - this.time) : undefined, gw2: p.ghillieUntil > this.time ? r1(p.ghillieUntil - this.time) : undefined, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
@@ -3327,6 +3331,7 @@ export class Game {
     });
     this.events = [];
     for (const p of this.players.values()) if (p.sock && p.sock.open) p.sock.send('{"t":"snap","you":"' + p.id + '",' + (mine.has(p.id) ? '"mine":' + mine.get(p.id) + ',' : '') + common.slice(1));
+    if (this.rec) recFrame(this, common, mine);
     if (this.tv) { const f = this.tv.follow, msg = '{"t":"snap","tv":1,"you":' + JSON.stringify(f) + ',' + (f && mine.has(f) ? '"mine":' + mine.get(f) + ',' : '') + common.slice(1); for (const sk of this.tv.socks) if (sk.open) sk.send(msg); }
   }
 }

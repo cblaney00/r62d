@@ -25,7 +25,7 @@ ws.onopen = async () => {
       if (s.viewport) await call('browsingContext.setViewport', { context: ctx, viewport: { width: s.viewport[0], height: s.viewport[1] } });
       if (s.url) await call('browsingContext.navigate', { context: ctx, url: s.url, wait: 'complete' });
       if (s.js) {
-        const r = await call('script.evaluate', { expression: s.js, target: { context: ctx }, awaitPromise: true });
+        const r = await call('script.evaluate', { expression: s.js, target: { context: ctx }, awaitPromise: true, userActivation: !!s.act }); // act: as if the person clicked (e.g. screen recording needs that)
         if (r.result && r.result.value !== undefined) console.log('js ->', String(r.result.value).slice(0, 200000));
         if (r.exceptionDetails) console.log('js error', r.exceptionDetails.text);
       }

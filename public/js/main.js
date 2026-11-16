@@ -31,6 +31,7 @@ const rankTag = i => i == null ? '' : `<span class="rankTag" style="color:${RANK
 import { ACTIONS, PRESETS, applyPreset, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION, lockMouse } from './keys.js';
 import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX } from '/shared/physics.js';
 import { createCoach } from './tutorial.js';
+import * as RP from './replay.js';
 import { drawQr } from './qr.js';
 import { readCode, showCode } from '/shared/joincode.js';
 import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
@@ -512,7 +513,7 @@ fx.quality = gq.parts; setShading(gq.shade);
 
 // ---------------- network ----------------
 function connect(mode = '', tvKey = null) { // '' = the shared match, 'tut' / 'free' = a private one
-  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws${mode ? `?${mode}=1` : ''}${tvKey ? `&key=${tvKey}` : ''}`);
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws${mode === 'replay' ? `?replay=${tvKey}` : `${mode ? `?${mode}=1` : ''}${tvKey ? `&key=${tvKey}` : ''}`}`);
   st.ws = ws;
   ws.onopen = () => { if (st.rejoin) { st.rejoin = false; $('joinBtn').click(); } };
   ws.onmessage = ev => {
@@ -521,24 +522,17 @@ function connect(mode = '', tvKey = null) { // '' = the shared match, 'tut' / 'f
     if (m.t === 'welcome') {
       if (st.tutorial) send({ t: 'tut', a: 'start', lesson: st.tutorial });
       if (st.free) send({ t: 'free', a: 'start', map: st.free.map, bots: st.free.bots, level: st.free.level });
-      if (st.tv) send({ t: 'tv', a: 'start', map: st.tv.map, level: st.tv.level, req: st.tv.req });
+      if (st.tv && !st.tv.replay) send({ t: 'tv', a: 'start', map: st.tv.map, level: st.tv.level, req: st.tv.req });
       st.id = m.id;
-      if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
-        resetMap(m.mapVersion);
-        for (let k = 0; k < m.tiles.length; k++) if (m.tiles[k] !== st.map.tiles[k] || m.hp[k] !== st.map.hp[k]) {
-          st.map.tiles[k] = st.known.tiles[k] = m.tiles[k]; st.map.hp[k] = st.known.hp[k] = m.hp[k]; holePortal(st.map, k); st.rend.cellChanged(k);
-        }
-        for (const k in m.holes || {}) { st.map.holes[k] = m.holes[k]; st.known.holes[k] = m.holes[k].slice(); st.rend.cellChanged(+k); }
-      } else {
-        st.mapLoading = true;
-        runLoading('LOADING MAP', [['Building the map', () => loadMap(m.mapVersion, m.tiles, m.hp, m.mapId, m.holes)], ['Getting every floor ready', () => frames(6)]], m.mapId).then(() => { st.mapLoading = false; });
-      }
+      takeMap(m);
       st.token = m.token; st.profile = m.profile; updateCard();
       if (m.profile.settings) { applySettings(m.profile.settings); if (trackpadKeys()) saveSettings(); } else { trackpadKeys(); saveSettings(); } // first time: keep what this browser had
       try { localStorage.setItem('r62d-token', m.token); } catch {}
       $('join').classList.add('hidden'); $('room').classList.remove('hidden');
       if (st.wantTab) { const t = st.wantTab; st.wantTab = null; setTab(t); } // they picked a page before giving a name
     } else if (m.t === 'snap') onSnap(m);
+    else if (m.t === 'rpmap') { const go = () => { if (st.mapLoading) return setTimeout(go, 100); takeMap(m); st.snaps = []; }; go(); } // (a jump while the map is still loading waits for it)
+    else if (m.t === 'rpinfo' || m.t === 'rpst' || m.t === 'rpgone') RP.onMsg(m);
     else if (m.t === 'tvclip') { if (st.tv && ((m.big.length && !(st.tv.seen && st.tv.seen[m.victim])) || st.tvAllReplays)) TV.offerReplay(m); } // (tvAllReplays: screenshot tests) // a big moment the camera missed
     else if (m.t === 'killcam') { st.killcam = m; m.got = performance.now(); } // watched from the death screen (F or the button)
     else if (m.t === 'full') alert('The game is full (10 players).');
@@ -548,6 +542,19 @@ function connect(mode = '', tvKey = null) { // '' = the shared match, 'tut' / 'f
     else if (m.t === 'profile') { st.profile = m.profile; updateOpsProfile($('opsPage'), m.profile); st.loDirty = true; }
   };
   ws.onclose = () => { if (ws !== st.ws) return; $('conn').classList.remove('hidden'); $('conn').textContent = 'Disconnected — reconnecting…'; setTimeout(() => location.reload(), 2500); };
+}
+// the full map from the server: on joining (welcome), and a replay jumping to another moment (rpmap)
+function takeMap(m) {
+  if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
+    resetMap(m.mapVersion);
+    for (let k = 0; k < m.tiles.length; k++) if (m.tiles[k] !== st.map.tiles[k] || m.hp[k] !== st.map.hp[k]) {
+      st.map.tiles[k] = st.known.tiles[k] = m.tiles[k]; st.map.hp[k] = st.known.hp[k] = m.hp[k]; holePortal(st.map, k); st.rend.cellChanged(k);
+    }
+    for (const k in m.holes || {}) { st.map.holes[k] = m.holes[k]; st.known.holes[k] = m.holes[k].slice(); st.rend.cellChanged(+k); }
+  } else {
+    st.mapLoading = true;
+    runLoading('LOADING MAP', [['Building the map', () => loadMap(m.mapVersion, m.tiles, m.hp, m.mapId, m.holes)], ['Getting every floor ready', () => frames(6)]], m.mapId).then(() => { st.mapLoading = false; });
+  }
 }
 const send = o => { if (st.ws && st.ws.readyState === 1) st.ws.send(JSON.stringify(o)); };
 // latency: a ping every 2 s; your own figure is shown on the HUD and sent on so the scoreboard shows everyone's
@@ -565,14 +572,15 @@ function switchMatch(lesson, free = null, tv = null) {
   // leaving Esports TV: the server keeps that broadcast paused for 20 s; opening the same one again in that time resumes it
   if (st.tv) st.tvHold = { key: st.tv.key, pick: st.tv.pick, until: performance.now() + 19000 };
   const pick = tv && JSON.stringify([tv.map, tv.level, tv.req || []]), hold = st.tvHold;
-  const key = !tv ? null : hold && hold.pick === pick && performance.now() < hold.until ? hold.key : Math.random().toString(36).slice(2, 12).padEnd(8, '0');
-  if (tv) st.tvHold = null; else { st.tvSay = st.tvPos = null; }
-  st.tutorial = lesson; st.free = free; st.tv = tv ? { map: tv.map, level: tv.level, req: tv.req || [], key, pick, auto: true, follow: null, overview: false, cutT: 0, shot: {} } : null; st.rejoin = true; st.marks = [];
-  document.documentElement.classList.toggle('tv', !!tv);
+  const key = !tv ? null : tv.replay ? tv.replay : hold && hold.pick === pick && performance.now() < hold.until ? hold.key : Math.random().toString(36).slice(2, 12).padEnd(8, '0');
+  if (tv && tv.replay) { st.tvHold = null; st.tvSay = st.tvPos = null; } else if (tv) st.tvHold = null; else { st.tvSay = st.tvPos = null; }
+  st.tutorial = lesson; st.free = free; st.tv = tv ? { replay: tv.replay || null, map: tv.map, level: tv.level, req: tv.req || [], key, pick, auto: true, follow: null, overview: false, cutT: 0, shot: {} } : null; st.rejoin = true; st.marks = [];
+  document.documentElement.classList.toggle('tv', !!tv); document.documentElement.classList.toggle('replay', !!(tv && tv.replay));
   if (lesson) coach.start(lesson); else coach.stop();
-  const leave = lesson ? 'Leave tutorial' : free ? 'Leave free play' : tv ? 'Leave Esports TV' : '';
+  const leave = lesson ? 'Leave tutorial' : free ? 'Leave free play' : tv && tv.replay ? 'Leave replay' : tv ? 'Leave Esports TV' : '';
   $('pEnd').textContent = leave || 'End match for everyone'; $('leaveBtn').textContent = leave || 'End match';
-  const old = st.ws; connect(lesson ? 'tut' : free ? 'free' : tv ? 'tv' : '', key); try { old.close(); } catch {}
+  if (!tv || !tv.replay) RP.cancelVideo();
+  const old = st.ws; connect(lesson ? 'tut' : free ? 'free' : tv && tv.replay ? 'replay' : tv ? 'tv' : '', key); try { old.close(); } catch {}
   $('pause').classList.add('hidden');
 }
 for (const b of document.querySelectorAll('[data-lesson]')) b.onclick = () => switchMatch(b.dataset.lesson);
@@ -774,6 +782,7 @@ function onSnap(s) {
   const prevMe = st.me;
   if (st.tv) TV.tvCasters(s, players);
   if (st.tv) { TV.tvDirector(s, players, now); st.id = st.tv.follow; if (st.rend) TV.tickReplay(!!st.tv.calm && s.ph === PHASE.ACTION, st.rend, st.map); } // ESPORTS TV: ride along with whoever the director (or you) picked
+  if (s.rp) RP.onSnap(s); // REPLAYS: the play bar
   st.last = s; st.me = players.get(st.tv ? st.tv.follow : s.you) || null;
   if (st.map) st.map.covers = s.ents.filter(e => e.ty === 'cover').map(coverOf); // TRENCH's plates block you here too (prediction, sight)
   for (const e of s.ev) onEvent(e, s, players);
@@ -914,6 +923,7 @@ addEventListener('keydown', e => {
   if (document.activeElement && document.activeElement.tagName === 'INPUT') { if (e.key === 'Enter') $('joinBtn').click(); return; }
   if (e.code === 'Space' && coach.active && !e.repeat && coach.space(st.last)) { e.preventDefault(); return; }
   if ((e.code === 'Enter' || e.code === 'NumpadEnter') && coach.blocking && !e.repeat) { coach.space(st.last); e.preventDefault(); return; } // Enter dismisses a tutorial card too
+  if (st.tv && st.tv.replay && !menuOpen() && RP.key(e)) { e.preventDefault(); return; } // REPLAYS: Space, arrows, , .
   if (st.tv && !menuOpen() && TV.tvKey(e)) { e.preventDefault(); return; }
   const a = actionFor(e.code);
   if (a || e.code === 'AltLeft' || e.code === 'AltRight' || e.code === 'Tab' || ((e.ctrlKey || e.metaKey) && playing())) e.preventDefault(); // Ctrl is crouch: Ctrl+W etc. must not close the game
@@ -4394,7 +4404,7 @@ $('splash').addEventListener('click', () => {
 // page (#lobby.paged) with BACK (Esc) in its top bar. Operators, Armory, Map Knowledge, Playbook, Ball Knowledge,
 // Profile and Settings are their own full-screen pages already and open over whichever menu page you are on.
 const PAGES = { play: ['PLAY', 'QUICK MATCH'], unranked: ['PLAY', 'UNRANKED'], ranked: ['PLAY', 'RANKED'], fun: ['PLAY', 'FUN MODES'], join: ['PLAY', 'JOIN A GAME'], free: ['PLAY', 'FREE PLAY'], tutorial: ['LEARN', 'TUTORIAL'],
-  tv: ['WATCH', 'ESPORTS TV'], intel: ['LEARN', 'INTEL'], controls: ['INTEL', 'CONTROLS'] };
+  tv: ['WATCH', 'ESPORTS TV'], replays: ['WATCH', 'REPLAYS'], intel: ['LEARN', 'INTEL'], controls: ['INTEL', 'CONTROLS'] };
 const PAGE_UP = { controls: 'intel' }; // BACK from these goes to that page, not home
 const NEEDS_NAME = new Set(['play', 'unranked', 'ranked', 'ops', 'profile']);
 const MODE_TAB = { play: 'quick', unranked: 'unranked', ranked: 'ranked' }; // these pages are the one lobby, set to that mode
@@ -4440,11 +4450,13 @@ function setTab(tab) {
   if (tab === 'fun') renderFun();
   if (tab === 'free') renderFree();
   if (tab === 'tv') { renderTv(); trainInfo(); }
+  if (tab === 'replays') RP.renderReplays();
   if (tab === 'join') { $('codeMsg').textContent = ''; setTimeout(() => $('codeIn').focus(), 50); }
 }
 function updateNav() {}
 for (const b of $('lobby').querySelectorAll('[data-tab]')) b.onclick = () => setTab(b.dataset.tab);
 $('backBtn').onclick = pageBack;
+RP.initReplay({ st, send, $, esc, mapThumb, switchMatch, audio }); $('rpOpen').onclick = () => { audio.ui(); RP.openFile(); };
 // JOIN A GAME: the code (or an address) → check a game answers there → go to it, keeping the app / touch flags
 async function joinByCode() {
   const r = readCode($('codeIn').value), msg = t => { $('codeMsg').textContent = t; };
@@ -4480,6 +4492,7 @@ const TIPS = [
   'Attackers: use your drone in preparation to find the objective before you go in.',
   'Bullets go through soft walls. If you can hear them, you can shoot them.',
   'A downed teammate can be revived — hold interact next to them.',
+  'REPLAYS (main menu) keeps your last 3 matches: watch them like Esports TV, or download the replay file or a video.',
   'Press {spot} (or middle click) to ping anything for your team: enemies, cameras, traps, doors, walls, or a place to go.',
   'New to R62D? The TUTORIAL teaches the whole game in one short playable run: you attack a round, then defend one.',
   'Hold {wheel} for the ping wheel, and press {map} for the floor plan: a click on it pings that spot.',

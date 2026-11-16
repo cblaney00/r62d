@@ -1,7 +1,7 @@
 // R62D as its own program (Electron). This file is the starter: it opens the window, looks on GitHub for a newer
 // release of the game and fetches it (updates.js), then runs the game part (app.js) from the newest copy it has.
 // The starter itself only changes with a new download; everything else (game, server, start screen) updates itself.
-import { app, BrowserWindow, Menu, ipcMain } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, desktopCapturer } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -33,6 +33,13 @@ app.whenReady().then(async () => {
   win.on('leave-full-screen', () => { try { fs.writeFileSync(WINDOWED, ''); } catch {} }); // he asked: windowed stays windowed next time
   win.on('enter-full-screen', () => { try { fs.rmSync(WINDOWED, { force: true }); } catch {} });
   win.webContents.on('page-title-updated', e => e.preventDefault());
+  // REPLAYS → DOWNLOAD → VIDEO records the game's own window (with its sound on Windows), no picker
+  win.webContents.session.setDisplayMediaRequestHandler((req, cb) => {
+    desktopCapturer.getSources({ types: ['window'] }).then(list => {
+      const me = list.find(x => x.id === win.getMediaSourceId()) || list.find(x => x.name === 'R62D');
+      cb(me ? { video: me, ...(process.platform === 'win32' ? { audio: 'loopback' } : {}) } : {});
+    }).catch(() => cb({}));
+  });
   await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(LOADING));
   const say = (text, frac) => win.webContents.executeJavaScript(`s.textContent=${JSON.stringify(text)};${frac != null ? `b.style.width='${Math.round(frac * 100)}%'` : ''}`).catch(() => {});
 

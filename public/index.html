@@ -44,6 +44,7 @@
         <button data-tab="free"><b>FREE PLAY</b><small>Any map, any operator, no clock</small></button>
         <button data-tab="tutorial"><b>TUTORIAL</b><small>Learn the round in four minutes</small></button>
         <button data-tab="tv"><b>ESPORTS TV</b><small>Watch the pro teams play</small></button>
+        <button data-tab="replays"><b>REPLAYS</b><small>Watch or download your last 3 matches</small></button>
         <button data-tab="intel"><b>INTEL</b><small>Operators, armory, maps, playbooks and stats</small></button>
         <div class="hsmall"><button data-tab="profile">PROFILE</button><button data-tab="settings">SETTINGS</button><button data-tab="quit" class="quitNav">QUIT</button><a class="dlNav" href="https://github.com/cblaney00/r62d/releases/latest/download/R62D-windows.zip" title="The R62D program for Windows: play on your own computer, no VPN needed (unzip, then open R62D.exe)">⬇ DOWNLOAD FOR WINDOWS</a></div>
       </nav>
@@ -88,6 +89,14 @@
           <p class="hint">Pick up to 3 operators to see how the pros use them: the player with that role plays it every round (one per role on each side).</p>
           <div id="tvReq"></div>
           <div class="row"><button id="tvGo" class="primary big">START WATCHING</button><span class="trainBox"><span class="trainInfo"></span><button class="trainBtn">TRAIN THE PROS</button></span></div>
+        </div>
+      </section>
+      <section class="tab" id="tab-replays">
+        <div class="tutPage">
+          <h2>REPLAYS</h2>
+          <p class="hint">Your last 3 Quick Match, Unranked and Ranked matches, start to finish. Watch them like Esports TV: everyone on both teams, <kbd>1</kbd>-<kbd>5</kbd> / <kbd>6</kbd>-<kbd>0</kbd> follow a player, <kbd>A</kbd> lets the camera choose, <kbd>M</kbd> shows the whole floor; <kbd>Space</kbd> pauses, <kbd>←</kbd> <kbd>→</kbd> jump 10 s, <kbd>,</kbd> <kbd>.</kbd> slower / faster. DOWNLOAD saves the replay file or a video. When the game gets a gameplay update, older replays are removed.</p>
+          <div id="rpList"></div>
+          <div class="row"><button id="rpOpen">OPEN A REPLAY FILE</button><span class="hint" id="rpMsg"></span></div>
         </div>
       </section>
       <section class="tab" id="tab-free">
