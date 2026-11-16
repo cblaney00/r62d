@@ -467,7 +467,7 @@ button.big { font-size: 22px; padding: 14px 34px; }
 .hsmall button { background: none; border: none; font: 700 17px var(--head); letter-spacing: 0.2em; color: var(--dim); padding: 6px 10px; }
 .hsmall button:hover { color: #fff; }
 .hsmall .dlNav { font: 700 17px var(--head); letter-spacing: 0.2em; color: var(--gold, #f2c14e); padding: 6px 10px; text-decoration: none; } .hsmall .dlNav:hover { color: #fff; }
-html.inapp .dlNav, html.touch .dlNav { display: none; } .hsmall .quitNav { color: #b77; } .hsmall .quitNav:hover { color: #ff8a8a; }
+html.inapp .dlNav, html.touch .dlNav:not(.dlAnd), html.touch:not(.android) .dlAnd { display: none; } .hsmall .quitNav { color: #b77; } .hsmall .quitNav:hover { color: #ff8a8a; }
 #home .joinCard { position: absolute; right: 6vw; bottom: 15vh; width: 470px; max-width: 40vw; animation: rise 0.5s 0.3s both; border-top: 3px solid var(--gold); }
 .joinCard h2 { margin: 0 0 6px; font: 800 36px var(--head); letter-spacing: 0.12em; }
 .joinCard .hint { text-align: left; } .joinCard .row { flex-wrap: nowrap; } .joinCard input { flex: 1; width: auto; min-width: 0; }

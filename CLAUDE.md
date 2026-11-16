@@ -54,6 +54,7 @@ Search these with grep for a feature, a function name or a test name before chan
 | `docs/drills.md` | pro drills, patch notes, pro opinions |
 | `docs/sound.md` | sound mix |
 | `docs/notes-next.md`, `docs/batch-*.md`, `docs/sniper-wip.md`, `docs/voice.md` | older plans and leftovers |
+| `android/README.md` | the Android app (joins games hosted on a computer), how it is built and signed |
 | `shared/patchnotes.js` | add a line for every gameplay change |
 
 When adding a feature a player uses, also update: tutorial.js `STEPS`, index.html
