@@ -27,7 +27,8 @@ cat > "$APP/package.json" <<'EOF'
 { "name": "r62d", "productName": "R62D", "type": "module", "main": "desktop/main.js" }
 EOF
 ver=$(git log -1 --format=%h); date=$(git log -1 --format=%cs); n=$(git rev-list --count HEAD)   # n: build number, only ever grows
-echo "{ \"version\": \"$ver\", \"date\": \"$date\", \"n\": $n, \"electron\": \"${EV#v}\" }" > "$APP/desktop/build.json"
+ANDROID=1   # what the Android app must understand to play this pack (APP_LEVEL in android/.../MainActivity.java): raise both together
+echo "{ \"version\": \"$ver\", \"date\": \"$date\", \"n\": $n, \"electron\": \"${EV#v}\", \"android\": $ANDROID }" > "$APP/desktop/build.json"
 
 
 (cd build && 7z a -tzip -mx=7 -bso0 -bsp0 R62D-windows.zip R62D)

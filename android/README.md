@@ -1,17 +1,23 @@
 # R62D for Android
 
-A small app (`build/R62D-android.apk`, ~70 KB) that joins R62D games hosted on a computer. Phones can't host.
+`build/R62D-android.apk` (~1.1 MB): the whole game, playable on the phone alone, plus joining games hosted on a computer.
 
-- `MainActivity.java`: a full-screen landscape web view. It shows itself to the page as `window.r62dApp` (like the
-  Windows program), so main.js treats it as an app: QUIT returns to the start page, download links are hidden.
+- `MainActivity.java`: a full-screen landscape web view that starts on `assets/start.html`:
+  - PLAY ON THIS PHONE: the game served from `https://local.r62d/` with its server running in the page (how: public/phone/README.md).
+  - JOIN WITH A CODE / GAMES NEARBY: asks `/api/addr` on the last game joined, Lando's homelab (192.168.1.76:6262) and
+    every address in the /24 round each of the phone's own addresses (home Wi-Fi, homelab VPN); one entry per computer.
+    `?nets=127.0.0.2/24` in a desktop browser for tests.
+- Game packs (he asked: phones get the rest of the game when the app opens): the app carries the game it was built with
+  (`assets/game`). Each time it opens it asks the GitHub releases (cblaney00/r62d, tags `b<n>`) for `R62D-update.zip`
+  (the same file the Windows program updates from); a newer one is checked (sha256 digest), unzipped into the app's
+  storage and used from the next PLAY (straight away if you are on the start page). Offline: plays what it has.
+- Bridge `window.r62dApp`: quit (to start page), exit, play, pack (build + update status), gameVersion, nets, version.
   Phone Back = Esc. Screen stays on. Links to GitHub open in the phone's browser.
-- `assets/start.html`: JOIN WITH A CODE (shared/joincode.js is pasted in at build time) and GAMES NEARBY: asks
-  `/api/addr` on the last game joined, Lando's homelab (192.168.1.76:6262), and every address in the /24 round each of
-  the phone's own addresses (home Wi-Fi, the homelab VPN). One entry per computer. In a desktop browser it takes
-  `?nets=127.0.0.2/24` instead of the app's list (for tests).
-- The game itself always comes from the host, so the app only needs a new version when this folder changes.
+- The first app (build 476) had no game inside and can't update itself; when it joins a computer's game, main.js asks
+  once whether to download the new app (`r62d-newapp`).
 - Build: `sudo -u insideabush -H env PATH="$PATH" bash android/build.sh` (tools from `sdk.nix` via Nix, a JDK from
-  nixpkgs). The signing key is `~insideabush/.local/share/r62d/android-release.jks`, password `r62d-android`:
-  keep it, or updates won't install over the old app. `desktop/release.sh` builds and attaches it to each release.
-- Not tested on a real phone or emulator yet (this PC has no KVM): tested the start page in Firefox against a server.
-- Over plain http the browser has no game controller access (Gamepad API needs https); touch controls work.
+  nixpkgs). Signing key `~insideabush/.local/share/r62d/android-release.jks`, password `r62d-android`: keep it, or
+  updates won't install over the old app. `desktop/release.sh` builds and attaches it to each release.
+- Not run on a real phone or emulator yet (this PC has no KVM). Tested on a computer: the start page against a server,
+  and playing alone through `tests/phonehost.mjs` (free play, Quick Match with bots, the built-in game copy).
+- Over plain http (joining a computer) there is no game controller (Gamepad API wants https); playing on the phone is https.

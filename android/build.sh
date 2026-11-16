@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the Android app: build/R62D-android.apk. No Gradle: the SDK's own tools (aapt2, javac, d8, apksigner) from
+# Builds the Android app: build/R62D-android.apk (the app + the whole game; see android/README.md). No Gradle: the SDK's own tools (aapt2, javac, d8, apksigner) from
 # android/sdk.nix, fetched by Nix the first time (a few hundred MB, kept in the Nix store). Needs magick and zip/7z.
 # Signing key: $R62D_ANDROID_KEY (default ~/.local/share/r62d/android-release.jks), made on first use. Keep it: an
 # update signed with another key won't install over the old app (phones would have to uninstall first).
@@ -20,6 +20,11 @@ done
 # the start page, with the HOST-code reader (shared/joincode.js) put in as a plain script
 awk '/\/\*JOINCODE\*\//{ while ((getline l < "shared/joincode.js") > 0) { sub(/^export /, "", l); print l } next } { print }' android/assets/start.html > "$W/assets/start.html"
 sed "s/@CODE@/$n/; s/@NAME@/$name/" android/AndroidManifest.xml > "$W/AndroidManifest.xml"
+# the whole game built in (PLAY ON THIS PHONE works offline from the first start; newer packs are downloaded by the app)
+mkdir -p "$W/assets/game/desktop"; cp -r server shared public "$W/assets/game/"
+rm -f "$W/assets/game/server/train-worker.js" "$W/assets/game/server/practice.js"
+ANDROID=$(sed -n 's/^ANDROID=\([0-9]*\).*/\1/p' desktop/build.sh)
+echo "{ \"version\": \"$(git log -1 --format=%h)\", \"date\": \"$(git log -1 --format=%cs)\", \"n\": $n, \"android\": $ANDROID }" > "$W/assets/game/desktop/build.json"
 
 aapt2 compile --dir "$W/res" -o "$W/flat"
 aapt2 link -I "$JAR" --manifest "$W/AndroidManifest.xml" -A "$W/assets" -o "$W/base.apk" "$W"/flat/*.flat

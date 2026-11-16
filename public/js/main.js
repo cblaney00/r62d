@@ -4693,6 +4693,8 @@ setInterval(() => { const now = performance.now(); for (const d of $('chatLog').
 function inApp() { return !!window.r62dApp || new URLSearchParams(location.search).has('app'); }
 if (inApp()) document.documentElement.classList.add('inapp'); // the download link is for browsers only
 if (/Android/i.test(navigator.userAgent)) document.documentElement.classList.add('android'); // phones see the Android app link
+// the first Android app (build 476, before the game was built in) can only join: point it at the new app, once
+if (window.r62dApp && window.r62dApp.nets && !window.r62dApp.play) { let seen = null; try { seen = localStorage.getItem('r62d-newapp'); } catch {} if (!seen) { try { localStorage.setItem('r62d-newapp', '1'); } catch {} setTimeout(() => { if (confirm('A new R62D app is out: it plays the whole game on this phone, no computer needed, and keeps itself up to date. Download it now?')) location.href = 'https://github.com/cblaney00/r62d/releases/latest/download/R62D-android.apk'; }, 4000); } }
 function toggleFullscreen() {
   if (window.r62dApp && window.r62dApp.toggleFull) return window.r62dApp.toggleFull();
   if (appWin) { fetch('/api/window', { method: 'POST' }).catch(() => {}); return; }

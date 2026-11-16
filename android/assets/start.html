@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>R62D</title>
-<!-- The Android app's start page (android/README.md). Finds R62D games on the phone's networks (home Wi-Fi, the homelab
-     VPN) and joins one; a friend's HOST code or an address can be typed too. Phones can't host: a computer does. -->
+<!-- The Android app's start page (android/README.md). PLAY ON THIS PHONE plays the whole game with no computer (the app
+     serves the game's files and its server runs in the page). JOIN finds R62D games on the phone's networks (home Wi-Fi,
+     the homelab VPN) or takes a friend's HOST code. Phones can't host: a computer does. -->
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root { --ally: #3aa0ff; --gold: #f2c14e; --text: #eef2f5; --dim: #93a0ad; --line: rgba(255,255,255,.12); --panel: rgba(10,13,18,.82);
@@ -27,11 +28,14 @@
   button { font: 700 20px var(--head); letter-spacing: .14em; color: var(--text); background: rgba(255,255,255,.1); border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px; }
   button:active { filter: brightness(1.3); } button:disabled { opacity: .5; }
   button.blue { background: var(--ally); color: #000; border-color: var(--ally); }
+  button.gold { background: var(--gold); color: #000; border-color: var(--gold); font-size: 26px; padding: 12px; }
+  .box.main { border-color: rgba(242,193,78,.45); }
+  #pack { color: var(--dim); font-size: 12.5px; margin: 0; } #pack a { color: var(--gold); }
   button.small { font-size: 15px; padding: 6px 12px; }
   .typed { display: flex; gap: 8px; }
   .typed input { flex: 1; min-width: 0; font: 700 22px var(--head); letter-spacing: .12em; text-transform: uppercase; color: var(--text); background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; outline: none; user-select: text; }
   .typed input:focus { border-color: var(--ally); }
-  #games { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 34vh; }
+  #games { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 24vh; }
   .game { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px; text-align: left; padding: 9px 14px; font-family: var(--body); letter-spacing: 0; }
   .game b { font: 700 20px var(--head); letter-spacing: .08em; }
   .game span { color: var(--dim); font-size: 12.5px; grid-column: 1; }
@@ -50,10 +54,14 @@
 <main>
   <div class="left">
     <h1>R62D<small>TACTICAL OPERATIONS</small></h1>
-    <p>Join a game hosted on a computer: on your home Wi-Fi, or anywhere with Lando's VPN switched on. On the computer, press <b>HOST</b> in the lobby to see its code.</p>
+    <p>Play on your own against bots, free play or the tutorial, no computer needed. Or join friends in a game hosted on a computer (on the computer, press <b>HOST</b> in the lobby to see its code).</p>
     <div id="msg"></div>
   </div>
   <div class="right">
+    <div class="box main">
+      <button class="gold" id="play">PLAY ON THIS PHONE</button>
+      <p id="pack"></p>
+    </div>
     <div class="box">
       <h2>JOIN WITH A CODE</h2>
       <div class="typed"><input id="addr" placeholder="CODE" spellcheck="false" autocomplete="off" autocapitalize="characters"><button class="blue" id="typedGo">JOIN</button></div>
@@ -68,7 +76,7 @@
 <footer><span id="ver"></span><a id="quit">QUIT</a></footer>
 <script>
 /*JOINCODE*/
-const $ = id => document.getElementById(id), A = window.r62dApp || { nets: () => new URLSearchParams(location.search).get('nets') || '', version: () => 'test', exit: () => {} }; // (the stub is for testing in a browser)
+const $ = id => document.getElementById(id), A = window.r62dApp || { nets: () => new URLSearchParams(location.search).get('nets') || '', version: () => 'test', exit: () => {}, play: () => {}, pack: () => '{"n":1,"version":"test","status":"Game up to date"}' }; // (the stub is for testing in a browser)
 const PORT = 6262, HOMELAB = 'http://192.168.1.76:6262'; // Lando's homelab server (on the VPN)
 const say = (t, bad) => { $('msg').textContent = t; $('msg').classList.toggle('bad', !!bad); };
 const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -141,6 +149,14 @@ $('typedGo').onclick = typedGo;
 $('addr').onkeydown = e => { if (e.key === 'Enter') { $('addr').blur(); typedGo(); } };
 $('again').onclick = look;
 $('quit').onclick = () => A.exit();
+$('play').onclick = () => { say('Starting…'); A.play(); };
+// which game is on this phone, and how the update check went (the app calls onPack when that changes)
+window.onPack = () => {
+  let p = {}; try { p = JSON.parse(A.pack()); } catch {}
+  const apk = 'https://github.com/cblaney00/r62d/releases/latest/download/R62D-android.apk';
+  $('pack').innerHTML = 'Game build ' + esc(p.n || '?') + (p.status ? ' · ' + esc(p.status) : '') + (p.needApp ? ` · <a href="${apk}">get the new app</a>` : '');
+};
+onPack();
 $('ver').textContent = 'ANDROID APP ' + (A.version() || '');
 const lost = new URLSearchParams(location.search).get('lost');
 if (lost) say(`Lost the game at ${lost}. It may have closed.`, true);

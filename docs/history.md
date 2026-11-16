@@ -272,3 +272,7 @@ Moved out of CLAUDE.md on 2026-11-16, word for word. Each section is one batch o
 ## Roof hatches over top-floor sites, wider resting view (2026-11-16)
 - He chose "attack from the roof" for the weak upstairs sites: see docs/balance.md (2026-11-16), `siteRoom` hatches in mapkit.js, `ROOF_SITE` in bots.js.
 - Resting view 20% further out (he asked; he chose: only the room-size resting zoom, for your character and Esports TV / replays; not drones, cameras, the rope view or phones; the long-sightline zoom-out and the aim-far fit keep their limits): `REST_ZOOM` 1.2 in main.js, applied to the body's room-size `want`.
+
+## Android app plays the whole game (2026-11-16, he asked: no computer needed; phones get the rest of the game when the app opens)
+- public/phone/ (server.js, shim.js, node/*), the app's file serving + game packs updater (MainActivity.java), PLAY ON THIS PHONE on the start page, `tests/phonehost.mjs` to try it on a computer. Details: public/phone/README.md, android/README.md.
+- Packs carry `"android": 1` in desktop/build.json (`ANDROID` in desktop/build.sh). The old app (build 476) can't update itself: main.js asks it once to download the new one.
