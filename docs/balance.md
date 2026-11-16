@@ -115,3 +115,12 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
   (Principal Office 20 → 34%, Clock Room 29 → 34%), Lodge 33 → 34% (Office 20 → 35%). Forced onto one site, School's
   Principal Office was 54% for attack, so part of the low figures is the defenders' site vote. Lodge's attackers die
   mostly outside, shot from upstairs rooms on the approach: Lodge's problem is map-wide, not one site.
+
+## 2026-11-16: upstairs sites are the side gap (trained pros, ~175-190 rounds a map, ±7%)
+- Villa 37% (B Wine Cellar 40, Kitchen 42, Library 44, **2F Master Bedroom 25**), Embassy 41% (B Vault 59, Reception 32,
+  Archives 51, **2F Ambassador Office 30**), Lodge 41% (Bar 52, Dining 47, **2F Office 30, 2F Games Room 33**), Dust 58%
+  (A 62, B 54). Earlier 80-round runs: Depot 38-51%, Harbor 48%, School 42%. Overall ~43%.
+- Ground-floor and basement sites are about fair; upstairs sites are 25-33% and the defenders' site vote picks them most
+  (56-61 of ~180 rounds), so they drag each map down. Extra outside ways up (Villa balcony/terrace) were not enough.
+- ~70% of attacker deaths come in the first 30 s of the action phase; only ~15-25% outside (Dust 65%: its fights are
+  outdoors). `node tests/deaths.js <matches> <map>` prints it.
