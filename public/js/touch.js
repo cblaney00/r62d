@@ -39,7 +39,7 @@ export function setInputChoice(c) { store('r62d-input', c); location.reload(); }
 // Settings that phones especially need (he asked: adjustable): how big the menus and match text are (1 = fit the
 // screen), and how much of the map you see (bigger = further zoomed out). Kept on this device.
 export const uiScale = () => Math.max(0.7, Math.min(1.6, +(store('r62d-uiscale') || 1)));
-export const viewMul = () => Math.max(0.8, Math.min(2, +(store('r62d-view') || (isTouch ? 1.35 : 1))));
+export const viewMul = () => Math.max(0.8, Math.min(2, +(store('r62d-view') || 1))); // (phones the same as a computer: he asked 2026-11-16; they used to start at 1.35, further out)
 export function setUiScale(v) { store('r62d-uiscale', String(v)); fitUi(); }
 export function setViewMul(v) { store('r62d-view', String(v)); }
 

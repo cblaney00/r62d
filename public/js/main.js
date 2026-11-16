@@ -2268,7 +2268,7 @@ function frame(nowMs) {
     for (let i = 0; i < 24; i++) sum += view.kind === 'body' ? edgeSight(view.x, view.y, i / 24 * Math.PI * 2, 700) : castSight(st.map, view.x, view.y, i / 24 * Math.PI * 2, 700, null);
     const avg = sum / 24, aimD = castSight(st.map, view.x, view.y, view.ang, 900, null);
     want = Math.max(240, Math.min(470, avg * 1.15 + 110));
-    if (view.kind === 'body' && !isTouch) want *= REST_ZOOM; // (he asked 2026-11-16: the resting view 20% further out; also Esports TV / replays, not drones, cameras, ropes or phones)
+    if (view.kind === 'body') want *= REST_ZOOM; // (he asked 2026-11-16: the resting view 20% further out; also Esports TV / replays and phones (same as a computer), not drones, cameras or ropes)
     if (view.kind !== 'body') want = Math.max(want, Math.min(view.kind === 'cam' ? 580 : 520, aimD * (view.kind === 'cam' ? 0.75 : 0.6))); // (a body: farS below, steadier)
     if (view.kind === 'body') {
       // how far you can be seen (and so shot) from in the way you face: the 80th-percentile sightline across your
@@ -2339,7 +2339,7 @@ function frame(nowMs) {
     st.fitH = !st.fitH ? need : need > st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : st.fitDown > 0.5 ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 1.5)) : st.fitH;
     if (!locked) st.viewH = Math.max(st.viewH, st.fitH * (1 - ROPE_ADS * (st.rads || 0)));
   } else st.fitH = 0;
-  st.viewH *= viewMul(); // Settings: how much of the map you see (phones start further out)
+  st.viewH *= viewMul(); // Settings: how much of the map you see (phones the same as a computer since 2026-11-16)
   if (freeAim && (st.rt || 0) > 0.05) { const L = st.viewH * (0.82 - 0.07 * (st.rads || 0) + (1 - Math.min(1, st.rt)) * 3) + ROPE_REACH_X * PX_PER_M, l = Math.hypot(aimOff.x, aimOff.y); if (l > L) aimOff = { x: aimOff.x * L / l, y: aimOff.y * L / l }; } // (aimed in on a rope: the crosshair stays in the tight view)
   st.zoom = VH / st.viewH;
   if (freeAim && !locked) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
