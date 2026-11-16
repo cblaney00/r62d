@@ -7,6 +7,8 @@ PORT="${PORT:-6262}"; export PORT
 URL="http://localhost:$PORT/?app=1"
 up() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }
 SHARE="${XDG_DATA_HOME:-$HOME/.local/share}/r62d"
+# his change history document (he asked 2026-11-16): rebuilt in the background if the game changed since the last one
+[ "$(id -un)" = insideabush ] && [ -x tools/changelog/update.sh ] && { nohup bash tools/changelog/update.sh --if-old > /dev/null 2>&1 & }
 HC=$(command -v hyprctl)
 [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ] || HC=
 if [ -n "$HC" ]; then export R62D_HYPRCTL="$HC" R62D_WINFILE="$SHARE/windowed"; fi # the game's full screen / window switch
