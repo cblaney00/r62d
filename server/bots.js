@@ -1341,6 +1341,7 @@ function botCams(game, p, dt) {
 // usually) climbs a rope to the roof, opens the hatch, throws a grenade down, lies by it watching below (shooting
 // whoever shows in it) and drops in when the team pushes. A reinforced hatch or the clock: back down the rope.
 const ROOF_CHANCE = [0.15, 0.25, 0.35, 0.45, 0.55, 0.6, 0.65, 0.7]; // by rank (lvlOf), the last for pros
+const ROOF_SITE = [0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85]; // the same when a roof hatch opens straight into a site room
 const ROOF_JOBS = ['flank', 'intel', 'support'];
 function roofPick(game, p) {
   const m = game.map, R = game._roof && game._roof.round === game.round ? game._roof : (game._roof = { round: game.round, sq: {} });
@@ -1359,9 +1360,11 @@ function roofPick(game, p) {
       const team = [...game.players.values()].filter(q => q.bot && q.alive && q.squad === p.squad);
       const lvl = team.some(q => q.pro) ? 7 : lvlOf(game, p);
       const hoist = team.some(q => q.op === 'hoist' && q.abilityCount > 0); // HOIST (2026-11-10): the grapple makes the roof a real option
-      if (rope && team.length >= 2 && Math.random() < (hoist ? Math.max(0.75, ROOF_CHANCE[lvl]) : ROOF_CHANCE[lvl])) {
+      const into = best && site.rooms && site.rooms.includes(best.siteRoom); // a hatch straight into the site (2026-11-16): the roof is the main way up
+      const chance = into ? Math.max(ROOF_SITE[lvl], ROOF_CHANCE[lvl]) : ROOF_CHANCE[lvl];
+      if (rope && team.length >= 2 && Math.random() < (hoist ? Math.max(0.75, chance) : chance)) {
         const pref = q => q.op === 'hoist' && q.abilityCount > 0 ? -1 : (q.pro ? ROOF_JOBS.includes(q.pro.pl.jobs.atk) : ['flank', 'intel'].includes(q.ai && q.ai.role)) ? 0 : 1;
-        const ids = team.filter(q => !q.hasDefuser).sort((a, b) => pref(a) - pref(b) || Math.random() - 0.5).slice(0, lvl >= 5 && team.length >= 4 ? 2 : 1).map(q => q.id);
+        const ids = team.filter(q => !q.hasDefuser).sort((a, b) => pref(a) - pref(b) || Math.random() - 0.5).slice(0, (lvl >= 5 || (into && lvl >= 3)) && team.length >= 4 ? 2 : 1).map(q => q.id);
         plan = { h: best, rope, top: top(rope), ids, dropAt: 40 + Math.random() * 25 };
       }
     }

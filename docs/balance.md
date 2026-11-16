@@ -124,3 +124,8 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
   (56-61 of ~180 rounds), so they drag each map down. Extra outside ways up (Villa balcony/terrace) were not enough.
 - ~70% of attacker deaths come in the first 30 s of the action phase; only ~15-25% outside (Dust 65%: its fights are
   outdoors). `node tests/deaths.js <matches> <map>` prints it.
+- Roof hatch into every top-floor site room (he chose: attack from the roof, like Siege; `siteRoom` on the hatch in
+  mapkit.js `placeHatches`, `ROOF_SITE` odds in bots.js `roofPick`). First run, before the pros have practised with it
+  (~185 rounds a map, ±7%): Embassy 2F Ambassador Office 30 → 52%, School 3F Clock Room 25% (Bell Loft sits under the
+  tower: no hatch), Villa 2F 25 → 30%, Lodge 2F 30/33 → 29/25%, Harbor 2F Boardroom 31%, Depot 2F 37/46%. Mixed: measure
+  again after practice on this version.

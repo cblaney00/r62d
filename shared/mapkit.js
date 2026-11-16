@@ -375,6 +375,9 @@ export function makeMap({ id, name, floors }) {
   const MAX_HATCHES = 3;
   const placeHatches = (sites) => {
     const bombs = []; for (const s of sites || []) for (const b of s.bombs || []) bombs.push(b);
+    // (he chose 2026-11-16, attack from the roof like Siege: upstairs sites were 25-33% for attack) every bomb-site room
+    // on the floor under the roof gets a roof hatch of its own first; these don't count toward the roof's usual four
+    const siteRooms = new Set((sites || []).flatMap(s => s.rooms || []));
     const propAt = new Uint8Array(N);
     for (const p of props) for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) propAt[y * W + x] = 1;
     for (const f of fl) {
@@ -391,23 +394,27 @@ export function makeMap({ id, name, floors }) {
         const covered = k => fl.some(q => q.i > b.i && !q.roof && (() => { const lx = (k % W) - f.gx + f.x0 - q.x0, ly = Math.floor(k / W) + f.y0 - q.y0; return lx >= 0 && ly >= 0 && lx < q.w && ly < q.h && tiles[ly * W + q.gx + lx] !== T.VOID; })());
         const clear = k => k >= 0 && tiles[k] === T.FLOOR && !shape[k] && !propAt[k] && portal[k] < 0 && hatchAt[k] < 0 && hatchBelow[k] < 0;
         const fit = min => (f.roof ? rooms.filter(r => r.fl === b.i).map(r => ({ ...r, x: r.x + dx, y: r.y - dy })) : rooms.filter(r => r.fl === f.i)).filter(r => r.w >= min && r.h >= min).sort((p, q) => q.w * q.h - p.w * p.h);
-        for (const r of f.roof ? [...fit(5), ...fit(4).filter(q => q.w < 5 || q.h < 5)] : fit(5)) {
-          if (n >= max) break;
+        const onSite = f.roof ? fit(4).filter(q => siteRooms.has(q.name)) : [];
+        for (const r of f.roof ? [...onSite, ...fit(5), ...fit(4).filter(q => q.w < 5 || q.h < 5)] : fit(5)) {
+          const site = onSite.includes(r);
+          if (!site && n >= max) break;
+          if (!site && hatches.some(h => h.siteRoom === r.name && h.fl === f.i)) continue;
           const spots = [];
           for (let y = r.y + 1; y <= r.y + r.h - 3; y++) for (let x = r.x + 1; x <= r.x + r.w - 3; x++)
             spots.push([x, y, Math.hypot(x + 1 - (r.x + r.w / 2), y + 1 - (r.y + r.h / 2))]);
           spots.sort((p, q) => p[2] - q[2]);
           for (const [x, y] of spots) {
             let ok = true;
-            for (let j = -1; j <= 2 && ok; j++) for (let i = -1; i <= 2 && ok; i++) { const k = (y + j) * W + x + i; if (!clear(k) || !clear(down(k)) || (f.roof && covered(k))) ok = false; }
+            const ring = site ? 0 : 1; // a site room's roof hatch only needs its own 2x2 clear (site rooms are full of furniture)
+            for (let j = -ring; j <= 1 + ring && ok; j++) for (let i = -ring; i <= 1 + ring && ok; i++) { const k = (y + j) * W + x + i; if (!clear(k) || !clear(down(k)) || (f.roof && covered(k))) ok = false; }
             const cx = (x + 1) * CELL, cy = (y + 1) * CELL;
-            if (!ok || bombs.some(bb => Math.hypot(bb.x + (f.roof ? dx * CELL : 0) - cx, bb.y - (f.roof ? dy * CELL : 0) - cy) < CELL * 4)) continue;
+            if (!ok || bombs.some(bb => Math.hypot(bb.x + (f.roof ? dx * CELL : 0) - cx, bb.y - (f.roof ? dy * CELL : 0) - cy) < CELL * (site ? 3 : 4))) continue;
             const id = hatches.length, cells = [y * W + x, y * W + x + 1, (y + 1) * W + x, (y + 1) * W + x + 1], below = cells.map(down);
             for (const k of cells) { tiles[k] = T.HATCH; hp[k] = CELL_HP[T.HATCH]; hatchAt[k] = id; }
             for (const k of below) hatchBelow[k] = id;
             const bk = below[0];
-            hatches.push({ id, fl: f.i, cells, below, x: cx, y: cy, bx: (bk % W + 1) * CELL, by: (Math.floor(bk / W) + 1) * CELL, roof: !!f.roof });
-            n++; break;
+            hatches.push({ id, fl: f.i, cells, below, x: cx, y: cy, bx: (bk % W + 1) * CELL, by: (Math.floor(bk / W) + 1) * CELL, roof: !!f.roof, ...(site ? { siteRoom: r.name } : {}) });
+            if (!site) n++; break;
           }
         }
       }
