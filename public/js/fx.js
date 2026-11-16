@@ -40,6 +40,11 @@ export class FX {
     this.add({ type: 'smoke', x, y, vx: 0, vy: 0, life: 0.6, max: 0.6, size: 2, grow: 14, col: kind === 'blood' ? '120,20,20' : '200,195,185', a: 0.25 });
   }
 
+  // a window pane shattering (he asked 2026-11-16): pale glints flying out both ways and a little glitter dust
+  shatter(x, y) {
+    for (let i = 0; i < 26; i++) { const a = Math.random() * Math.PI * 2, sp = 30 + Math.random() * 90; this.add({ type: 'chunk', x: x + (Math.random() - 0.5) * 10, y: y + (Math.random() - 0.5) * 10, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.5 + Math.random() * 0.5, max: 1, size: 0.6 + Math.random() * 1.1, col: Math.random() < 0.5 ? '210,236,248' : '170,205,225', rot: Math.random() * 6 }); }
+    this.add({ type: 'smoke', x, y, vx: 0, vy: 0, life: 0.4, max: 0.4, size: 3, grow: 10, col: '220,235,245', a: 0.18 });
+  }
   explosion(x, y, r, kind) {
     const big = kind === 'frag' || kind === 'nitro' || kind === 'cutter';
     this.shake = Math.max(this.shake, big ? 7 : 4);

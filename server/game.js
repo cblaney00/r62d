@@ -1,7 +1,7 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM, OVERWATCH , LUNGE_M } from '../shared/constants.js';
 import { plantBomb, floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
-import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ropeAimLimit, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
+import { localPos, buildMap, windowGlass, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ropeAimLimit, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers , inBox } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
@@ -112,7 +112,7 @@ export class Game {
         p.token = login.token; p.pid = login.profile.id; p.mmr = login.profile.mmr ?? START_MMR;
         p.ms = this.blankMatchStats();
         sock.send(JSON.stringify({ t: 'welcome', id: p.id, mapVersion: this.mapVersion, mapId: this.mapId, token: p.token, profile: publicProfile(login.profile),
-          tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp), holes: this.map.holes }));
+          tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp), holes: this.map.holes, gl: glassGone(this.map) }));
         this.msg(`${p.name} joined`);
       } else if (p) this.handle(p, m);
     });
@@ -136,7 +136,7 @@ export class Game {
         joined = true; this.tv.socks.add(sock);
         const login = store.login(cleanName(m.name));
         sock.send(JSON.stringify({ t: 'welcome', id: null, tv: 1, mapVersion: this.mapVersion, mapId: this.mapId, token: login.token, profile: publicProfile(login.profile),
-          tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp), holes: this.map.holes }));
+          tiles: Array.from(this.map.tiles), hp: Array.from(this.map.hp), holes: this.map.holes, gl: glassGone(this.map) }));
       } else if (m.t === 'tv' && joined) {
         if (m.a === 'start' && this.phase === PHASE.LOBBY) {
           // viewer requests (he asked): up to 3 operators, one per role on each side, that the bots must play
@@ -1236,6 +1236,7 @@ export class Game {
 
   // A small bullet hole through a soft wall, on the bullet's path through the middle of the cell.
   holeCell(k, cx, cy, x0, y0, dx, dy, tIn) {
+    this.glassBreak(k);
     const h = this.map.holes[k] || (this.map.holes[k] = []);
     if (h.length >= HOLE_MAX * 2) return;
     const tx = dx > 0 ? ((cx + 1) * CELL - x0) / dx : dx < 0 ? (cx * CELL - x0) / dx : Infinity;
@@ -1394,7 +1395,15 @@ export class Game {
     this.events.push({ e: 'hit', k: 'hard', x: r1(tx), y: r1(ty) });
   }
 
+  // an outside window's glass shatters the first time anything damages the window (shots, melee, blasts, smashing in)
+  glassBreak(k) {
+    const m = this.map; if (!m.glass || !m.glass[k] || !(m.openId[k] >= 0)) return;
+    const cells = m.openings[m.openId[k]].cells; for (const c of cells) m.glass[c] = 0;
+    const c0 = cells[cells.length >> 1];
+    this.events.push({ e: 'glass', x: r1((c0 % m.W + 0.5) * CELL), y: r1((Math.floor(c0 / m.W) + 0.5) * CELL), c: cells });
+  }
   damageCell(k, amount) {
+    this.glassBreak(k);
     if (this.map.hatchAt[k] >= 0) return this.hatchDamage(this.map.hatchAt[k], amount);
     const t = this.map.tiles[k];
     if (t !== T.SOFT && t !== T.BARRI && t !== T.PANEL && t !== T.DSHIELD) return;
@@ -1403,6 +1412,7 @@ export class Game {
   }
 
   destroyCell(k, stub = false) { // stub: a soft wall knocked through by bullets or melee leaves a low stub to vault
+    this.glassBreak(k);
     const m = this.map, t = m.tiles[k];
     if (m.hatchAt[k] >= 0) return this.breakHatch(m.hatchAt[k]);
     if (t === T.BARRI && m.openId[k] >= 0) { // a barricade is one board: when any of it breaks, all of it goes (no half-boarded doors)
@@ -1742,6 +1752,7 @@ export class Game {
 
   // he asked: bullets wear a planked door or window right down: 320 damage of bullets in all breaks the whole board
   barriShot(k, dmg) {
+    this.glassBreak(k);
     if (this.zb) return; // ZOMBIES: the window boards only come off to zombies
     const id = this.map.openId[k]; if (id < 0 || id === undefined) return;
     const D = this.map.barriDmg || (this.map.barriDmg = {});
@@ -1765,6 +1776,7 @@ export class Game {
 
   // A melee hit on a barricade: three break it (the whole board across the doorway or window, like R6)
   barriHit(k) {
+    this.glassBreak(k);
     if (this.zb) return;
     const o = this.map.openings[this.map.openId[k]], cells = o ? o.cells.filter(c => this.map.tiles[c] === T.BARRI) : [k];
     for (const c of cells) { this.map.hp[c] -= CELL_HP[T.BARRI] / 3 + 0.01; this.changed.add(c); }
@@ -3355,3 +3367,6 @@ for (const [name, who] of [['handle', (g, p) => g.side(p)], ['tickPlayer', (g, p
     try { return f0.call(this, a, ...rest); } finally { this.by = was; }
   };
 }
+
+// the outside windows whose glass is already broken (for someone joining mid-round)
+function glassGone(m) { const full = windowGlass(m), out = []; for (let k = 0; k < full.length; k++) if (full[k] && m.glass && !m.glass[k]) out.push(k); return out; }

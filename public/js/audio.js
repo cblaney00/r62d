@@ -331,6 +331,18 @@ export function quietZap(x, y) {
   const g = out(x, y, 0.13, 240, 0.04); if (!g) return;
   const t = ac.currentTime; noise(g, t, 0.07, 'bandpass', 5200, 3, 0.6); tone(g, t, 0.04, 2400, 1800, 'square', 0.15);
 }
+// A window pane shattering (he asked 2026-11-16): a sharp crack, the pane bursting, then shards tinkling down for most
+// of a second. Loud: heard through the building like other breaking glass (range 1100).
+export function shatter(x, y) {
+  C = 'impacts';
+  const g = out(x, y, 0.75, 1100, 0.3); if (!g) return;
+  const t = ac.currentTime;
+  noise(g, t, 0.05, 'highpass', 2500, 0.7, 1.0); // the crack
+  noise(g, t + 0.005, 0.22, 'bandpass', 4200, 0.8, 0.8, 0.002); // the pane bursting
+  noise(g, t + 0.01, 0.12, 'lowpass', 900, 0.7, 0.35); // the frame's thud
+  for (let i = 0; i < 26; i++) { const dt = 0.03 + Math.pow(Math.random(), 1.6) * 0.85; ring(g, t + dt, rnd(2800, 7500), 0.05 + 0.1 * (1 - dt), 0.06 + Math.random() * 0.08); } // shards falling and bouncing
+  noise(g, t + 0.12, 0.6, 'highpass', 6000, 0.5, 0.12, 0.05); // the glassy hiss of the pile settling
+}
 export function impact(mat, x, y) {
   C = 'impacts';
   const g = out(x, y, mat === 'glass' ? 0.55 : 0.4, mat === 'glass' ? 1100 : 650, 0.2); if (!g) return; // breaking glass carries

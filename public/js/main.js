@@ -577,6 +577,8 @@ function connect(mode = '', tvKey = null) { // '' = the shared match, 'tut' / 'f
   ws.onclose = () => { if (ws !== st.ws) return; $('conn').classList.remove('hidden'); $('conn').textContent = 'Disconnected — reconnecting…'; setTimeout(() => location.reload(), 2500); };
 }
 // the full map from the server: on joining (welcome), and a replay jumping to another moment (rpmap)
+// windows whose glass is already broken (joining mid-round): no pane there
+function glassGoneAt(list) { if (!list || !st.map || !st.map.glass) return; for (const k of list) { st.map.glass[k] = 0; if (st.rend) st.rend.cellChanged(k); } }
 function takeMap(m) {
   if (st.rend && m.mapId === st.mapId) { // the map already on screen: just bring it up to date
     resetMap(m.mapVersion);
@@ -584,9 +586,10 @@ function takeMap(m) {
       st.map.tiles[k] = st.known.tiles[k] = m.tiles[k]; st.map.hp[k] = st.known.hp[k] = m.hp[k]; holePortal(st.map, k); st.rend.cellChanged(k);
     }
     for (const k in m.holes || {}) { st.map.holes[k] = m.holes[k]; st.known.holes[k] = m.holes[k].slice(); st.rend.cellChanged(+k); }
+    glassGoneAt(m.gl);
   } else {
     st.mapLoading = true;
-    runLoading('LOADING MAP', [['Building the map', () => loadMap(m.mapVersion, m.tiles, m.hp, m.mapId, m.holes)], ['Getting every floor ready', () => frames(6)]], m.mapId).then(() => { st.mapLoading = false; });
+    runLoading('LOADING MAP', [['Building the map', () => loadMap(m.mapVersion, m.tiles, m.hp, m.mapId, m.holes)], ['Getting every floor ready', () => frames(6)]], m.mapId).then(() => { st.mapLoading = false; glassGoneAt(m.gl); });
   }
 }
 const send = o => { if (st.ws && st.ws.readyState === 1) st.ws.send(JSON.stringify(o)); };
@@ -923,6 +926,7 @@ function onEvent(e, s, players) {
       st.marks.push({ ...e, pk, t: now }); fx.ping(e.x, e.y, pingOf(pk).col);
       audio.pingSound(pk);
     } break;
+    case 'glass': if (st.map && st.map.glass) { for (const c of e.c || []) { st.map.glass[c] = 0; if (st.rend) st.rend.cellChanged(c); } } audio.shatter(e.x, e.y); fx.shatter(e.x, e.y); break; // a window pane shattering (he asked 2026-11-16)
     case 'lungeWarn': if (e.id === st.id) { addFeed('CROW drew a blade on you: a lunge can come in 1 s'); audio.play('unsheathe', st.pred.x, st.pred.y); st.lungeWarnT = now; } break;
     case 'deny': if (e.id === st.id) addFeed(e.why); break;
     case 'emped': if (e.id === st.id) { addFeed('EMP! Your skill and gadget are fried for 8 seconds'); audio.foley('beep', st.pred.x, st.pred.y); st.empUntil = now + e.dur; } break; // TALON

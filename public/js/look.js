@@ -194,6 +194,7 @@ const CH = 16;
 // Boards seen from the side (he asked 2026-11-14: in every view the boards show their three damage stages and the bullet
 // holes you can see through, like the map from above): the stage from the board's health (the map's own rule: whole,
 // cracked, splitting) and each hole in the cell as a point along the face, at a height of its own (from where it is)
+const PANE = [178, 218, 238]; // an outside window's pane (see the window pieces below)
 function boardLook(m, k, X, Y, dx, dy, f0, f) {
   const hpF = m.hp ? m.hp[k] / CELL_HP[T.BARRI] : 1, st = hpF > 0.95 ? 0 : hpF > 0.5 ? 1 : 2, H = m.holes && m.holes[k], hl = [];
   if (H) for (let i = 0; i < H.length; i += 2) {
@@ -353,16 +354,17 @@ function block(R, m, bx, by) {
     const wb = wk >= 0 ? (m.tiles[wk] === T.SOFT && m.mat && m.mat[wk] === MAT.BRICK ? BRICK : SIDE[m.tiles[wk]] || SIDE[T.HARD]) : SIDE[T.SOFT], wtc = wk >= 0 ? topColour(m, wk) : '#d8d2c4';
     const pieces = win ? [[0, 0.28, [176, 170, 158], '#b9b2a2'], [0.69, 1, wb, wtc]] : [[0.72, 1, wb, wtc]];
     if (m.tiles[k] === T.BARRI) pieces.push(win ? [0.28, 0.69, [122, 92, 58], null] : [0.06, 0.72, [122, 92, 58], null]); // (boards are thin: no top)
+    if (win && m.glass && m.glass[k]) pieces.push([0.28, 0.69, PANE, null]); // an outside window's pane over the boards (he asked 2026-11-16), see-through, until it breaks
     const X = x * CELL, Y = y * CELL, faces = out[0].faces;
     for (const [f0, f, base, tc] of pieces) {
       const lintel = (door && f0 >= 0.7) || (win && f0 >= 0.68); // the wall over a doorway or window: half see-through (he chose 2026-11-14: nobody hides under it; and the boards in a window always show)
       const seeFace = lintel && door; // (over a window only the top is see-through, so the boards show from above; its side stays solid: from a rope it looked like a hole in the wall, he saw)
-      const col = lt => seeFace ? `rgba(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0},${DOOR_TOP_A})` : `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`;
+      const col = lt => base === PANE ? `rgba(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0},0.34)` : seeFace ? `rgba(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0},${DOOR_TOP_A})` : `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`;
       for (const [dx, dy, lt] of FACES) {
         const n = k + dy * W + dx, nx = x + dx, ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= W || ny >= m.H || hg(n) >= f || (m.openId[n] === oi && oi >= 0)) continue; // against the wall, or more of the same opening
         const ins = thinOpen(m, n) ? WALL_INS : 0, ex = dx > 0 ? X + CELL - ins : X + ins, ey = dy > 0 ? Y + CELL - ins : Y + ins; // (as thin as the wall)
-        const d = base === BRICK ? 'b' : base[0] === 122 ? 'w' : base[0] === 176 ? 's' : 'p';
+        const d = base === PANE ? 'g' : base === BRICK ? 'b' : base[0] === 122 ? 'w' : base[0] === 176 ? 's' : 'p';
         const bd = d === 'w' ? boardLook(m, k, X, Y, dx, dy, f0, f) : null; // (boards: their damage stage and bullet holes, as on the map)
         const lt2 = bd ? lt * (1 - 0.12 * bd.st) : lt; // (cracked boards a little darker)
         if (dx) faces.push({ ax: ex, ay: Y, bx: ex, by: Y + CELL, nx: dx, ny: 0, px: ex, py: Y, f, f0, x, y, c: col(lt2), d, e: isOut(m, n), st: bd && bd.st, hl: bd && bd.hl });

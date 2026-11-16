@@ -416,7 +416,7 @@ export class MapRenderer {
     for (let y = ey0; y <= ey1; y++) for (let x = ex0; x <= ex1; x++) {
       if (x < 0 || y < 0 || x >= m.W || y >= m.H) continue;
       const k = y * m.W + x, t = m.tiles[k];
-      if (m.openId[k] >= 0 || t === T.OPEN || t === T.BARRI || t === T.PANEL || t === T.BEAM) this.opening(x, y, k);
+      if (m.openId[k] >= 0 || t === T.OPEN || t === T.BARRI || t === T.PANEL || t === T.BEAM) { this.opening(x, y, k); if (m.glass && m.glass[k]) this.glassPane(x, y); }
       if (SOLID.has(t) || t === T.DSHIELD) this.wall(x, y, k, t);
       if (t === T.RUBBLE) this.stub(x, y, k);
       if (m.hatchAt && (m.hatchAt[k] >= 0 || m.hatchBelow[k] >= 0) && x >= x0 && x <= x1 && y >= y0 && y <= y1) this.hatchCell(x, y, k);
@@ -505,6 +505,17 @@ export class MapRenderer {
     }
   }
 
+  // an outside window's pane (he asked 2026-11-16): pale glass over the boards, with a glint, until it is broken
+  glassPane(x, y) {
+    const ctx = this.ctx, X = x * CELL, Y = y * CELL;
+    const horiz = WALLISH.has(this.t(x - 1, y)) || WALLISH.has(this.t(x + 1, y)) || this.t(x - 1, y) === T.OPEN || this.t(x + 1, y) === T.OPEN;
+    ctx.save();
+    if (horiz) { ctx.translate(X, Y + CELL / 2); } else { ctx.translate(X + CELL / 2, Y); ctx.rotate(Math.PI / 2); }
+    ctx.fillStyle = 'rgba(178,218,238,0.5)'; ctx.fillRect(0, -2.2, CELL, 4.4);
+    ctx.fillStyle = 'rgba(235,248,255,0.75)'; ctx.fillRect(0, -2.2, CELL, 0.7); ctx.fillRect(0, 1.5, CELL, 0.5);
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(3, 1.6); ctx.lineTo(6, -1.6); ctx.moveTo(7.5, 1.6); ctx.lineTo(9, -0.2); ctx.stroke();
+    ctx.restore();
+  }
   opening(x, y, k) {
     const ctx = this.ctx, m = this.map, X = x * CELL, Y = y * CELL, t = m.tiles[k];
     const o = m.openings[m.openId[k]];
@@ -512,7 +523,7 @@ export class MapRenderer {
     // threshold
     ctx.fillStyle = o && o.kind === 'window' ? '#5a5248' : 'rgba(70,60,50,0.55)';
     if (horiz) ctx.fillRect(X, Y + 5, CELL, 6); else ctx.fillRect(X + 5, Y, 6, CELL);
-    if (o && o.kind === 'window') { // broken glass scattered in and around the window
+    if (o && o.kind === 'window' && !(m.glass && m.glass[k])) { // broken glass scattered in and around the window (an outside one only once its pane has gone)
       for (let i = 0; i < 26; i++) {
         const sx = X + (hash(x, y, i) - 0.5) * (horiz ? 18 : 44) + 8, sy = Y + (hash(y, x, i) - 0.5) * (horiz ? 44 : 18) + 8;
         ctx.save(); ctx.translate(sx, sy); ctx.rotate(hash(i, x, y) * 6);

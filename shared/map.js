@@ -33,6 +33,7 @@ export function buildMap(id = 'harbor') {
   addRoofEdges(m);
   addOutCams(m);
   addYardCover(m);
+  m.glass = windowGlass(m);
   return m;
 }
 
@@ -744,3 +745,16 @@ export function addPeep(m, k) {
   return h;
 }
 export function syncPeeps(m, list) { if (list && m.hatches) for (const k of list) if (!(m.peeps || []).includes(k)) addPeep(m, k); }
+
+// Glass on the outside windows (he asked 2026-11-16: a pane over the boards, seen from every view, with a breaking
+// sound when attackers break in). 1 per cell of an outside window that still has its glass; the server breaks a window's
+// glass the first time it is damaged (game.js glassBreak) and tells everyone (event 'glass', welcome 'gl').
+export function windowGlass(m) {
+  const g = new Uint8Array(m.tiles.length), W = m.W;
+  for (const o of m.openings || []) {
+    if (o.kind !== 'window') continue;
+    const out = o.ext || o.cells.some(c => [1, -1, W, -W].some(d => { const k = c + d, t = m.tiles[k]; return !o.cells.includes(k) && m.flAt[k] === m.flAt[c] && (t === T.GROUND || t === T.VOID || (t === T.LOW && m.floor[k] === FL.VOID)); }));
+    if (out) for (const c of o.cells) g[c] = 1;
+  }
+  return g;
+}
