@@ -110,6 +110,7 @@ async function run() {
       const g1 = (await report('aimed out')).aimDeg; await gyro(60, 500); await sleep(200); console.log('  gyro while not aimed in moved the aim', (await report('gyro, not aimed in')).aimDeg - g1, 'degrees (default "while aimed in": want 0)');
       await touch(finger('C', [Cr, [Cr[0], Cr[1], 60]])); await sleep(500); await report('left CROUCH tapped (crouch should be 1)');
       await shot('f1-buttons');
+      const Hq = await centre('[data-id="help"]'); if (Hq) { await touch(finger('H', [Hq, [Hq[0], Hq[1], 60]])); await sleep(500); await shot('f2-help'); await touch(finger('H', [[W / 2, H / 2], [W / 2, H / 2, 60]])); await sleep(400); console.log('guide closed by a tap:', await js("document.getElementById('tHelp').classList.contains('hidden')")); }
       return;
     }
     if (process.env.SCENARIO === 'more') { // the controls added for phones on 2026-11-10: sprint, slide, lie down, lean, map

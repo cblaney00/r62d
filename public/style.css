@@ -1316,3 +1316,32 @@ html.rprec #rpBar { display: none; } /* (recording a video: the bar stays out of
 #rpMarks i { position: absolute; top: 2px; width: 2px; height: 18px; background: rgba(255,255,255,0.45); }
 #rpMarks i span { position: absolute; top: -15px; left: -8px; font: 700 10px var(--head); color: var(--dim); }
 #rpRecTag { position: fixed; top: 10px; right: 14px; z-index: 6; color: #ff5a5a; font: 800 14px var(--head); letter-spacing: 0.12em; background: rgba(0,0,0,0.6); padding: 4px 10px; }
+/* Phone buttons as pictures (he asked 2026-11-16: the word buttons on the right were big and in the way): small round
+   buttons with a picture each; the ? at the top opens #tHelp, which names them all */
+#touchUI .tbtn.ico { display: grid; place-items: center; color: #fff; }
+#touchUI .tbtn.ico svg { width: 24px; height: 24px; pointer-events: none; }
+#touchUI .tbtn.ico.on { color: #000; }
+#touchUI .tbtn.r, #touchUI .tbtn.lb, #touchUI .tbtn.lean { width: 50px; height: 50px; border-radius: 50%; }
+#touchUI .tbtn.r { right: max(22px, env(safe-area-inset-right)); } #touchUI .tbtn.r.c1 { right: calc(max(22px, env(safe-area-inset-right)) + 58px); }
+#touchUI .tbtn.r1 { bottom: 112px; } #touchUI .tbtn.r2 { bottom: 168px; } #touchUI .tbtn.r3 { bottom: 224px; }
+#touchUI .tbtn.fire { width: 80px; height: 80px; } #touchUI .tbtn.fire svg { width: 30px; height: 30px; }
+#touchUI .tbtn.fire.left { left: max(160px, calc(env(safe-area-inset-left) + 140px)); }
+#touchUI .tbtn.lean { bottom: 112px; } #touchUI .tbtn.lb { bottom: 168px; }
+#touchUI .tbtn.l1, #touchUI .tbtn.lb1 { left: calc(max(20px, env(safe-area-inset-left)) + 146px); } #touchUI .tbtn.l2, #touchUI .tbtn.lb2 { left: calc(max(20px, env(safe-area-inset-left)) + 204px); }
+#touchUI .tbtn.ctx, #touchUI .tbtn.t2, #touchUI .tbtn.t3 { width: 64px; height: 64px; } #touchUI .tbtn.ctx svg, #touchUI .tbtn.t2 svg, #touchUI .tbtn.t3 svg { width: 28px; height: 28px; }
+#touchUI .tbtn.c-use, #touchUI .tbtn.t3 { right: calc(max(20px, env(safe-area-inset-right)) + 92px); bottom: 28px; }
+#touchUI .tbtn.c-vault, #touchUI .tbtn.t2 { right: calc(max(20px, env(safe-area-inset-right)) + 164px); bottom: 28px; }
+#touchUI .tbtn.t { width: 42px; height: 42px; border-radius: 50%; top: 8px; } #touchUI .tbtn.t svg { width: 21px; height: 21px; }
+#touchUI .tbtn.t5 { right: 16px; } #touchUI .tbtn.t9 { right: 64px; } #touchUI .tbtn.t4 { right: 112px; } #touchUI .tbtn.t1 { right: 160px; width: 42px; } #touchUI .tbtn.t7 { right: 208px; width: 42px; } #touchUI .tbtn.t6 { right: auto; top: auto; bottom: 168px; width: 42px; }
+#touchUI .tbtn.t9 b { font: 800 20px var(--head); }
+#touchUI .tbtn.t2, #touchUI .tbtn.t3 { top: auto; }
+#touchUI #tHelp { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(820px, 94vw); max-height: 88vh; overflow: auto; z-index: 5;
+  background: rgba(8,11,15,0.95); border: 1px solid rgba(242,193,78,0.5); border-radius: 12px; padding: 12px 16px; color: #eef2f5; }
+#touchUI #tHelp.hidden { display: none; }
+#touchUI #tHelp h3 { margin: 0 0 8px; font: 800 16px var(--head); letter-spacing: 0.16em; color: #f2c14e; text-align: center; }
+#touchUI #tHelp .thGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 12px; }
+#touchUI #tHelp .thGrid > div { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; }
+#touchUI #tHelp .thI { grid-row: 1 / 3; width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.35); display: grid; place-items: center; }
+#touchUI #tHelp .thI svg { width: 20px; height: 20px; }
+#touchUI #tHelp b { font: 800 12px var(--head); letter-spacing: 0.08em; } #touchUI #tHelp small { font-size: 10.5px; line-height: 1.2; color: #b9c2cb; }
+#touchUI #tHelp p { margin: 8px 0 0; font-size: 11px; color: #93a0ad; text-align: center; }

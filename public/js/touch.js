@@ -105,6 +105,45 @@ const BUTTONS = [
   { id: 'view', label: 'DRONE / CAMS', b: 13, cls: 't t1' }, { id: 'prev', label: '◀', b: 14, cls: 't t2 hidden' }, { id: 'next', label: '▶', b: 15, cls: 't t3 hidden' },
   { id: 'tiltc', label: '⟲ TILT', b: null, cls: 't t6 hidden' }, { id: 'map', label: 'MAP', b: 22, cls: 't t7' },
   { id: 'leanL', label: '◀ LEAN', b: 20, cls: 'lean l1' }, { id: 'leanR', label: 'LEAN ▶', b: 21, cls: 'lean l2' }, { id: 'score', label: 'SCORES', b: 8, cls: 't t4' }, { id: 'pause', label: '❚❚', b: 9, cls: 't t5' },
+  { id: 'help', label: '?', b: null, cls: 't t9' }, // the guide to the pictures
+];
+// Pictures instead of words on the buttons (he asked 2026-11-16: the word buttons were big and in the way); the ? button
+// opens a guide (HELP below) that names each one
+const svg = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+export const ICONS = {
+  fire: svg('<path d="M9 21h6M10 21V9l2-6 2 6v12" fill="currentColor" fill-opacity=".25"/>'),
+  ads: svg('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>'),
+  crouch: svg('<circle cx="13" cy="4.5" r="2"/><path d="M12 8l-2 5 4 2-1 6M10 13l-4 2M14 15l4 1"/>'),
+  sprint: svg('<path d="M5 6l6 6-6 6M12 6l6 6-6 6"/>'),
+  leanL: svg('<circle cx="8" cy="5" r="2"/><path d="M9 8l4 13M10.5 13l-5 1M19 12h-6M15 9l-3 3 3 3"/>'),
+  leanR: svg('<circle cx="16" cy="5" r="2"/><path d="M15 8l-4 13M13.5 13l5 1M5 12h6M9 9l3 3-3 3"/>'),
+  reload: svg('<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>'),
+  swap: svg('<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/>'),
+  skill: svg('<path d="M13 2L5 13h6l-1 9 8-11h-6z" fill="currentColor" fill-opacity=".25"/>'),
+  gadget: svg('<circle cx="11" cy="14" r="6"/><path d="M11 8V5h4M15 5l3 2M13 3h-4"/>'),
+  melee: svg('<path d="M14 3l7 7-9 9-3-1-1-3z"/><path d="M8 15l-5 5M6 13l5 5"/>'),
+  ping: svg('<path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>'),
+  use: svg('<path d="M9 12V5a1.5 1.5 0 0 1 3 0v6M12 10V4a1.5 1.5 0 0 1 3 0v7M15 10a1.5 1.5 0 0 1 3 0v4c0 4-3 7-6 7h-1c-3 0-4.5-2-5.5-4.5L4 13a1.5 1.5 0 0 1 2.6-1.4L9 15"/>'),
+  vault: svg('<path d="M3 21h18M9 21v-5h6v5"/><path d="M4 14c2-8 14-8 16 0"/><path d="M17 11l3 3 2-4"/>'),
+  map: svg('<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>'),
+  view: svg('<rect x="3" y="7" width="12" height="10" rx="2"/><path d="M15 11l6-3v8l-6-3z"/>'),
+  score: svg('<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/>'),
+  pause: svg('<path d="M8 5v14M16 5v14" stroke-width="3"/>'),
+  prev: svg('<path d="M15 5l-7 7 7 7" stroke-width="2.6"/>'), next: svg('<path d="M9 5l7 7-7 7" stroke-width="2.6"/>'),
+  tiltc: svg('<path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/>'),
+  help: '<b>?</b>',
+};
+const HELP = [
+  ['fire', 'FIRE', 'Shoot. Drag the right one to aim while you shoot.'], ['ads', 'AIM', 'Aim in: tap on, tap again to aim out.'],
+  ['crouch', 'CROUCH', 'Tap to crouch. Hold to lie down. While sprinting: a slide.'], ['leanL', 'LEAN', 'Lean left or right round a corner: tap on, tap off.'],
+  ['reload', 'RELOAD', 'Reload your gun.'], ['swap', 'SWAP', 'Switch between your guns.'],
+  ['skill', 'SKILL', 'Your operator\'s ability. The number is how many are left.'], ['gadget', 'GADGET', 'Throw or place your gadget.'],
+  ['melee', 'MELEE', 'Knife hit. Breaks wooden boards.'], ['ping', 'PING', 'Mark what you aim at for your team.'],
+  ['use', 'USE', 'Open, plant, defuse, reinforce, revive. One tap keeps it going.'], ['vault', 'VAULT', 'Climb over, through windows, onto or off ropes.'],
+  ['view', 'DRONE / CAMS', 'Your drones (attack) or cameras (defence).'], ['sprint', 'SPRINT', 'On a drone the crouch button sprints.'],
+  ['map', 'MAP', 'The map: tap it to ping a spot.'], ['score', 'SCORES', 'Who is up and who is down.'],
+  ['prev', 'PREVIOUS / NEXT', 'Flip through cameras and drones.'], ['pause', 'PAUSE', 'The pause menu.'],
+  ['tiltc', 'LEVEL', 'Tilt to move: how you hold the phone now is level.'],
 ];
 const N = 23;
 const held = new Array(N).fill(false), trig = { lt: 0, rt: 0 }, tc = { lt: 0, rt: 0 }; // tc: fingers on each trigger button
@@ -136,7 +175,8 @@ function build() {
   ui = document.createElement('div'); ui.id = 'touchUI'; ui.className = 'hidden';
   ui.innerHTML = `<div class="tzone" id="tzRight"></div><div class="tzone" id="tzLeft"></div>
     <div class="tstick" id="tsLeft"><i></i></div><div class="tstick dyn hidden" id="tsRight"><i></i></div>
-    ${BUTTONS.map(b => `<button class="tbtn ${b.cls}" data-id="${b.id}" data-label="${b.label}">${b.label}</button>`).join('')}
+    ${BUTTONS.map(b => `<button class="tbtn ico ${b.cls}" data-id="${b.id}" data-label="${b.label}" aria-label="${b.label}">${ICONS[b.id] || (b.id.startsWith('fire') ? ICONS.fire : b.label)}</button>`).join('')}
+    <div id="tHelp" class="hidden"><h3>WHAT THE BUTTONS DO</h3><div class="thGrid">${HELP.map(([i, n, d]) => `<div><span class="thI">${ICONS[i]}</span><b>${n}</b><small>${d}</small></div>`).join('')}</div><p>Left side: the move stick (push past its ring to sprint). Right side: drag anywhere to aim. Tap to close.</p></div>
     <div id="tTurn" class="hidden"><b>⟳</b>Turn your phone sideways to play</div>`;
   document.body.appendChild(ui);
   const base = ui.querySelector('#tsLeft'), dyn = ui.querySelector('#tsRight');
@@ -151,6 +191,7 @@ function build() {
   const grab = (id, x, y) => {
     if (fingers.has(id)) return; // the same finger can be announced twice
     const under = document.elementFromPoint(x, y), btn = under && under.closest && under.closest('#touchUI .tbtn');
+    if (under && under.closest && under.closest('#tHelp')) { ui.querySelector('#tHelp').classList.add('hidden'); return; } // a tap closes the guide
     if (btn && !btn.classList.contains('hidden')) return pressButton(id, btn, x, y);
     if (x >= innerWidth / 2) { // right half: the aim stick appears under the thumb
       if (aimF !== null) return;
@@ -178,6 +219,7 @@ function build() {
     const b = BUTTONS.find(q => q.id === el.dataset.id);
     if (b.id === 'ads') { adsEl = el; setAds(!adsLatch); return; } // a tap switches aiming in on or off
     if (b.id === 'use') { useEl = el; useLostT = 0; setUse(!useLatch); return; } // a tap starts using, and it carries on
+    if (b.id === 'help') { const h = ui.querySelector('#tHelp'); h.classList.toggle('hidden'); return; } // the guide (tap it to close)
     if (b.b === null) { tiltLevelNow(); el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 200); return; } // ⟲ TILT: how you hold it now is level
     const set = on => { el.classList.toggle('on', on); if (b.b === 'lt' || b.b === 'rt') { tc[b.b] = Math.max(0, tc[b.b] + (on ? 1 : -1)); trig[b.b] = tc[b.b] ? 1 : 0; } else held[b.b] = on; };
     set(true);
@@ -218,10 +260,10 @@ export function touchContext(c) {
     if (el.classList.contains('hidden') === want) el.classList.toggle('hidden', !want);
   }
   for (const [id, d] of [['leanL', -1], ['leanR', 1]]) { const el = ui.querySelector(`[data-id="${id}"]`); el.classList.toggle('hidden', !c.body); el.classList.toggle('act', c.lean === d); } // lean: only on your own body; lit while leaning that way
-  const cr = ui.querySelector('[data-id="crouch"]'), cl = c.drone ? 'SPRINT' : 'CROUCH'; // on a drone the crouch button sprints
-  if (cr.textContent !== cl) cr.textContent = cl;
+  const cr = ui.querySelector('[data-id="crouch"]'), cl = c.drone ? 'sprint' : 'crouch'; // on a drone the crouch button sprints
+  if (cr.dataset.ic !== cl) { cr.dataset.ic = cl; cr.innerHTML = ICONS[cl]; cr.setAttribute('aria-label', cl.toUpperCase()); }
   for (const [id, n] of [['skill', c.badge.skill], ['gadget', c.badge.gadget], ['view', c.badge.view]]) { // how many are left, on the button itself
-    const el = ui.querySelector(`[data-id="${id}"]`), h = el.dataset.label + (n ? `<em>${n}</em>` : '');
+    const el = ui.querySelector(`[data-id="${id}"]`), h = (ICONS[id] || el.dataset.label) + (n ? `<em>${n}</em>` : '');
     if (el.innerHTML !== h) { el.innerHTML = h; el.classList.toggle('out', n === '0' || n === '0%'); }
   }
 }
