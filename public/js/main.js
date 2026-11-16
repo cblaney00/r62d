@@ -1752,7 +1752,19 @@ function rope3dFrame(s, me, now, dt) {
   $('world').style.visibility = full && now - st.r3start > 0.45 ? 'hidden' : ''; // (fully in the 3D view: the top-down picture needn't show)
   $('r3x').classList.toggle('hidden', !full);
 }
-function compassRoute(s, from) { return sharedRoute(st.map, st.known, s.site, from, st); }
+function compassRoute(s, from) { st.cmpUp = hoistLinks(); return sharedRoute(st.map, st.known, s.site, from, st); }
+// HOIST with a grapple left (he asked 2026-11-16: the compass may lead him up a hatch): every open hatch, as you know it, is a
+// way up: the cell under each hole leads to a floor cell beside it upstairs
+function hoistLinks() {
+  const me = st.me, m = st.map, K = st.known; if (!me || me.op !== 'hoist' || !(me.ac > 0) || !m || !m.hatches) return null;
+  const L = new Map(), W = m.W;
+  for (const h of m.hatches) {
+    if (h.peep || h.roof || !h.cells.every(k => (K || m).tiles[k] === T.HOLE)) continue;
+    let land = -1; for (const k of h.cells) for (const d of [1, -1, W, -W, 2, -2, 2 * W, -2 * W]) { const t = (K || m).tiles[k + d]; if (land < 0 && (t === T.FLOOR || t === T.STAIR) && m.flAt[k + d] === h.fl) land = k + d; }
+    if (land >= 0) for (const b of h.below) if (b >= 0) L.set(b, land);
+  }
+  return L.size ? L : null;
+}
 // where your teammates are, in words (he asked): name, room and floor, updated a few times a second
 function drawAllies(s, me, now) {
   const box = $('allies'), show = s && me && st.id && !st.tv && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION) && st.map;
@@ -1787,6 +1799,12 @@ function drawCompass(s, me, now) {
   const from = { x: st.pred.x, y: st.pred.y };
   if (!st.cmp || now - st.cmp.t > 0.35 || Math.hypot(from.x - st.cmp.x, from.y - st.cmp.y) > CELL * 2) st.cmp = { t: now, x: from.x, y: from.y, r: compassRoute(s, from) };
   const r = st.cmp.r, c = box.querySelector('canvas'), g = c.getContext('2d'), label = box.querySelector('b');
+  { // the site's name and floor beside the needle (he asked: the one place to find them), and your own floor when it differs
+    const site = st.map.sites[s.site], bf = floorAt(st.map, site.bombs[0].x, site.bombs[0].y), mf = floorAt(st.map, from.x, from.y);
+    const fl = st.map.floors[bf] ? st.map.floors[bf].name : '', name = site.name.replace(/^(B|\d+F)\s+/, '').toUpperCase();
+    setText(box.querySelector('.cmpSite'), name);
+    setHTML(box.querySelector('.cmpFl'), fl ? `BOMB SITE · FLOOR ${fl}${mf !== bf && st.map.floors[mf] ? ` <u>· YOU ${st.map.floors[mf].name}</u>` : ''}` : 'BOMB SITE');
+  }
   g.clearRect(0, 0, 96, 96);
   g.fillStyle = 'rgba(8,11,15,0.78)'; g.beginPath(); g.arc(48, 48, 44, 0, 7); g.fill();
   g.strokeStyle = 'rgba(242,193,78,0.55)'; g.lineWidth = 2; g.stroke();
@@ -1795,7 +1813,10 @@ function drawCompass(s, me, now) {
   if (!r) { text = 'NO ROUTE KNOWN'; st.cmpNoRoute = true; }
   else if (r.here) { text = 'ON SITE'; g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(48, 48, 9, 0, 7); g.fill(); }
   else {
-    const k = r.aim, tx = (k % st.map.W + 0.5) * CELL, ty = (Math.floor(k / st.map.W) + 0.5) * CELL;
+    // on the bomb's floor (he asked): straight at the nearest bomb spot; on another floor: the way to the stairs / hatch
+    const site = st.map.sites[s.site], sameFl = floorAt(st.map, from.x, from.y) === floorAt(st.map, site.bombs[0].x, site.bombs[0].y);
+    const nb = sameFl ? site.bombs.reduce((a, b) => Math.hypot(b.x - from.x, b.y - from.y) < Math.hypot(a.x - from.x, a.y - from.y) ? b : a) : null;
+    const k = r.aim, tx = nb ? nb.x : (k % st.map.W + 0.5) * CELL, ty = nb ? nb.y : (Math.floor(k / st.map.W) + 0.5) * CELL;
     const want = Math.atan2(ty - from.y, tx - from.x); // glide the needle so it doesn't jump when the route is worked out again
     st.cmpA = st.cmpA == null || st.cmpNoRoute ? want : st.cmpA + angDiff(want, st.cmpA) * Math.min(1, (now - (st.cmpT || now)) * 10); st.cmpT = now; st.cmpNoRoute = false;
     const a = st.cmpA + (st.rot || 0); st.cmpDir = st.cmpA; // also a small arrow by your character (he asked)
@@ -1804,7 +1825,7 @@ function drawCompass(s, me, now) {
     g.beginPath(); g.moveTo(34, 0); g.lineTo(-10, -15); g.lineTo(-3, 0); g.lineTo(-10, 15); g.closePath(); g.stroke(); g.fill();
     g.restore();
     const m = Math.round(r.cells * CELL / PX_PER_M), ms = Math.round((r.toStairs || 0) * CELL / PX_PER_M);
-    text = r.stairs ? `${r.stairs} STAIRS TO ${r.to} · ${ms} m · SITE ${m} m` : `${r.site} · ${m} m`;
+    text = r.stairs ? `${r.stairs} ${r.hatch ? 'HATCH' : 'STAIRS'} TO ${r.to} IN ${ms} m · ${m} m IN ALL` : `${m} m AWAY`; // (the site and its floor are above this line)
   }
   if (label.textContent !== text) label.textContent = text;
 }
@@ -3163,7 +3184,7 @@ function draw(s, view, now, dt) {
     }
     ctx.restore();
   }
-  if (inGame && view) { drawStairView(s, st.me, now, true); drawHatchView(s, st.me, now, true); drawWindowMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); } // (views up a floor: over this floor's walls)
+  if (inGame && view) { drawStairView(s, st.me, now, true); drawHatchView(s, st.me, now, true); drawWindowMarks(s, view, now); drawHatchMarks(s, view, now); ctx.setTransform(TA, TB, TC, TD, ox, oy); } // (views up a floor: over this floor's walls)
   if (st.tv && inGame) { // each team's sight, faintly in its own colour (pro team colours, else blue / orange)
     const pro = (s.tvl ?? PRO_LEVEL) === PRO_LEVEL;
     for (const sq of [0, 1]) {
@@ -3742,7 +3763,7 @@ function hud(s) {
     setHTML('prompt', isTouch ? pt.replace(/<b>([A-Z ]+)<\/b>\1(?![A-Z])/g, '<b>$1</b>') : pt); // phone: no "VAULT VAULT"
   }
   { const g = winGo(me), wg = $('winGo'), wc = g ? (g.ok ? '' : 'wait') : 'hidden'; if (wg.className !== wc) wg.className = wc; if (g) setHTML('winGo', g.ok ? `<b>${label('vault')}</b>${g.txt}` : g.txt); st.winGoR = g && g.ok ? g.r : null; }
-  if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone', body: me.ct === 'body' && !me.dn, lean: st.leanT || 0, badge: st.tBadge || {} }); }
+  if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), busy: !!me.bu, vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone', body: me.ct === 'body' && !me.dn, lean: st.leanT || 0, badge: st.tBadge || {} }); }
 }
 function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!el) return; if (el.innerHTML !== h) el.innerHTML = h; }
 // (he said it got laggy: the HUD rewrote about a dozen elements ten times a second even when nothing had changed)
@@ -4227,6 +4248,35 @@ function drawHatchView(s, me, now, up) {
 // ground under every upper outside window showing its state as your team last saw it from down there — boards intact,
 // boards with holes (someone may be looking through), broken open, or reinforced. All windows start boarded.
 const WIN_LOOK = { boarded: ['#8a5a2e', 'BOARDED'], holed: ['#d9a13a', 'HOLES'], open: ['#ff5a3c', 'OPEN'], shut: ['#8f969c', 'BLOCKED'] };
+// Hatches for the people who can use them (he asked 2026-11-16): anyone carrying a Breach Charge or Nitro Pack, EMBER
+// (plasma cutter) and DEADFALL (drop charge) see every hatch in the floor they stand on; HOIST (grapple) sees every hatch
+// in the ceiling above. Not HAMMER, SALVO or FERRO: they only knock one open by hitting it. State as last known.
+function hatchUse(me) {
+  if (!me || me.ct !== 'body' || !me.a || me.dn) return null;
+  const o = OPERATORS[me.op]; if (!o) return null;
+  const ab = o.ability && o.ability.id, gd = me.gd || o.gadget;
+  const charge = (gd === 'breach' || gd === 'nitro') && me.gc > 0, cut = ab === 'cutter' && me.ac > 0, drop = ab === 'dropcharge' && me.ac > 0;
+  return { floor: charge || cut || drop, reinf: cut, up: me.op === 'hoist' && me.ac > 0 };
+}
+function drawHatchMarks(s, view, now) {
+  const m = st.map, use = hatchUse(st.me); if (!use || !(use.floor || use.up) || !m.hatches || !view) return;
+  const fl = floorAt(m, view.x, view.y), K = st.known || m, c = octx, u = UP(), R = 1500;
+  for (const h of m.hatches) {
+    if (h.peep) continue;
+    const ceil = use.up && h.below[0] >= 0 && m.flAt[h.below[0]] === fl, flo = use.floor && h.fl === fl;
+    if (!ceil && !flo) continue;
+    const x = ceil ? h.bx : h.x, y = ceil ? h.by : h.y; if (Math.abs(x - st.cam.x) > R || Math.abs(y - st.cam.y) > R) continue;
+    const t = K.tiles[h.cells[0]], open = t === T.HOLE, reinf = t === T.HATCHR;
+    const col = open ? '#7dffa0' : reinf && !(flo && use.reinf) ? '#9aa3ab' : '#f2c14e';
+    const word = ceil ? (open ? '▲ HATCH ABOVE · OPEN' : reinf ? '▲ HATCH ABOVE · REINFORCED' : '▲ HATCH ABOVE · CLOSED') : open ? 'HATCH · OPEN' : reinf ? (use.reinf ? 'HATCH · REINFORCED · CUT IT' : 'HATCH · REINFORCED') : 'HATCH · BLOW IT';
+    const pulse = 0.65 + 0.25 * Math.sin(now * 3);
+    c.save(); c.globalAlpha = pulse; c.strokeStyle = col; c.lineWidth = 1.6; c.setLineDash(ceil ? [3, 3] : [6, 3]);
+    c.strokeRect(x - CELL - 2, y - CELL - 2, CELL * 2 + 4, CELL * 2 + 4); c.setLineDash([]);
+    if (ceil) { c.beginPath(); c.moveTo(x + u.x * 7, y + u.y * 7); c.lineTo(x - u.x * 2 + u.y * 5, y - u.y * 2 - u.x * 5); c.lineTo(x - u.x * 2 - u.y * 5, y - u.y * 2 + u.x * 5); c.closePath(); c.fillStyle = col; c.fill(); }
+    c.font = '700 7px Barlow Condensed, sans-serif'; c.textAlign = 'center'; c.fillStyle = col; c.globalAlpha = 0.9;
+    c.fillText(word, x + u.x * (CELL + 9), y + u.y * (CELL + 9)); c.restore();
+  }
+}
 function drawWindowMarks(s, view, now) {
   const m = st.map, gi = m.groundFloor;
   if (gi === undefined || floorAt(m, view.x, view.y) !== gi || !fxOn('winmarks')) return;

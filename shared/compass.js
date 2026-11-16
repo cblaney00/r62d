@@ -5,7 +5,7 @@ const WALKISH = new Set([T.FLOOR, T.GROUND, T.STAIR, T.OPEN, T.HATCH, T.HATCHR, 
 // (K, the map as you know it: doors, boards, holes and stairs/hatch links), 8-way with true diagonal lengths, to the nearest cell of a
 // site room. The arrow points at the furthest cell of that route you could walk to in a straight line (so it points
 // down the corridor you should take, not at a corner ten cells on); a floor change on the way points at the stairs or
-// hatch first. Distance = the real route length in metres.
+// hatch first. Distance = the real route length in metres. (main.js points straight at the bomb once you are on its floor.)
 export function compassRoute(m, K, siteIdx, from, C = {}) {
   K = K || m; const s = { site: siteIdx }, site = m.sites[siteIdx], W = m.W, N = W * m.H;
   const start = Math.floor(from.y / CELL) * W + Math.floor(from.x / CELL);
@@ -37,13 +37,15 @@ export function compassRoute(m, K, siteIdx, from, C = {}) {
       step(nb, c);
     }
     if (m.portal && m.portal[k] >= 0 && m.portal[k] < N) step(m.portal[k], 1);
+    if (C.cmpUp && C.cmpUp.has(k)) step(C.cmpUp.get(k), 2); // HOIST: up through an open hatch (main.js gives the links)
   }
   if (goal < 0) return null;
   const path = []; for (let k = goal; k >= 0; k = prev[k]) path.push(k); path.reverse();
   const flOf = k => m.flAt[k];
   let end = path.length - 1, stairs = null;
   for (let i = 1; i < path.length; i++) if (flOf(path[i]) !== flOf(path[i - 1]) || (m.portal && m.portal[path[i - 1]] === path[i])) {
-    end = i - 1; stairs = { up: flOf(path[i]) > flOf(path[i - 1]), to: m.floors[flOf(path[i])].name }; break;
+    const a = path[i - 1], b = path[i], hatch = (m.hatchAt && (m.hatchAt[a] >= 0 || m.hatchAt[b] >= 0)) || (m.hatchBelow && (m.hatchBelow[a] >= 0 || m.hatchBelow[b] >= 0));
+    end = i - 1; stairs = { up: flOf(b) > flOf(a), to: m.floors[flOf(b)].name, hatch: !!hatch }; break;
   }
   // furthest route cell (before any floor change) you could walk straight to
   const clear = (a, b) => { const ax = a % W + 0.5, ay = Math.floor(a / W) + 0.5, bx = b % W + 0.5, by = Math.floor(b / W) + 0.5, len = Math.hypot(bx - ax, by - ay), n2 = Math.ceil(len * 3);
@@ -52,5 +54,5 @@ export function compassRoute(m, K, siteIdx, from, C = {}) {
   let aim = path[Math.min(1, end)];
   for (let j = end; j >= 1; j--) if (clear(start, path[j])) { aim = path[j]; break; }
   const total = dist[goal];
-  return { aim, at: stairs ? path[end] : null, via: stairs ? path[end + 1] : null, cells: total, stairs: stairs ? (stairs.up ? '▲' : '▼') : null, to: stairs ? stairs.to : null, toStairs: stairs ? dist[path[end]] : null, site: site.name, siteFloor: m.floors[flOf(goal)].name };
+  return { aim, at: stairs ? path[end] : null, via: stairs ? path[end + 1] : null, cells: total, stairs: stairs ? (stairs.up ? '▲' : '▼') : null, hatch: stairs ? stairs.hatch : false, to: stairs ? stairs.to : null, toStairs: stairs ? dist[path[end]] : null, site: site.name, siteFloor: m.floors[flOf(goal)].name };
 }

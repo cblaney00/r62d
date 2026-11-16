@@ -714,9 +714,15 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 #outWarn small { font: 600 13px var(--head); letter-spacing: 0.08em; opacity: 0.9; margin-left: 8px; }
 @keyframes outPulse { 50% { box-shadow: 0 0 6px rgba(255,60,40,0.2); background: rgba(120,15,15,0.85); } }
 #outWarn:not(.hidden) ~ #compass { top: 128px; }
-#compass { position: absolute; top: 92px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+/* the compass (he asked 2026-11-16): the needle, and beside it the bomb site's name and floor, the one place to read them */
+#compass { position: absolute; top: 92px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: row; align-items: center; gap: 10px; pointer-events: none;
+  background: rgba(8,11,15,0.55); border: 1px solid rgba(242,193,78,0.3); border-radius: 40px 10px 10px 40px; padding: 3px 14px 3px 3px; }
+#compass .cmpTxt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.05; }
+#compass .cmpSite { font: 800 19px var(--head); font-style: normal; letter-spacing: 0.08em; color: #fff; text-shadow: 0 1px 3px #000; white-space: nowrap; }
+#compass .cmpFl { font: 700 13px var(--head); font-style: normal; letter-spacing: 0.14em; color: #f2c14e; text-shadow: 0 1px 3px #000; white-space: nowrap; }
+#compass .cmpFl u { text-decoration: none; color: #cfd6dc; }
 #compass canvas { width: 64px; height: 64px; }
-#compass b { margin-top: 2px; font: 700 14px var(--head); letter-spacing: 0.1em; color: #f2c14e; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; }
+#compass b { margin-top: 2px; font: 600 12px var(--head); letter-spacing: 0.1em; color: #f2c14e; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; }
 /* phone / tablet controls (touch.js; he asked: they pop up by themselves on mobile) */
 html.touch, html.touch body { touch-action: pan-x pan-y; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
 html.touchplay, html.touchplay body { touch-action: none; } /* menus scroll with a finger; only the match takes every touch */
@@ -769,7 +775,8 @@ html.touchplay #corner { display: none; }
 html.touch #chat { bottom: 150px; }
 /* phones while playing (2026-11-16, a thumb-played match): chat ran down the left over AIM / CROUCH / LEAN and the ammo;
    now the last 3 lines, small, at the top in the middle under the score bar, where no thumb goes */
-html.touchplay #chat { top: 66px; bottom: auto; left: 50%; transform: translateX(-50%); width: min(400px, 44vw); font-size: 12px; text-align: center; }
+html.touchplay #chat { top: 66px; bottom: auto; left: 69%; transform: translateX(-50%); width: min(300px, 32vw); font-size: 11px; text-align: center; }
+html.touchplay #compass { top: 62px; left: 36%; }
 html.touchplay #chatLog div:not(:nth-last-child(-n+3)) { display: none; }
 html.touchplay #leftCount { top: 58px; width: min(560px, 64vw); } html.touchplay #leftCount b { font-size: 22px; } html.touchplay #leftCount span { font-size: 8px; letter-spacing: 0.12em; }
 html.touch #clickIn { display: none !important; }

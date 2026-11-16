@@ -72,4 +72,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-15', k: 'map', id: 'depot', t: 'Rail Depot: a steel walkway with steps up to a door into the Manager Office.', v: 1 },
   { d: '2026-11-15', k: 'rule', t: 'Reviving starts from a little further away (about 1 m), so holding E whenever the prompt shows always works.', v: 1 },
   { d: '2026-11-16', k: 'rule', t: 'Every bomb-site room on the top floor gets its own roof hatch, and attackers go over the roof much more when one opens into the site.', v: 1 },
+  { d: '2026-11-16', k: 'rule', t: 'The compass points straight at the bomb on its own floor, and to the stairs or hatch that lead there from any other floor. HOIST is led up open hatches; breach charges, nitro, EMBER and DEADFALL see the hatches in their floor, HOIST the ones in the ceiling.', v: 1 },
 ];

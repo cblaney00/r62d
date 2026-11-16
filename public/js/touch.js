@@ -111,6 +111,10 @@ const held = new Array(N).fill(false), trig = { lt: 0, rt: 0 }, tc = { lt: 0, rt
 let prevHeld = new Array(N).fill(false);
 const ls = { x: 0, y: 0 }, rs = { x: 0, y: 0 };
 let releaseAll = () => {}, fireAim = false, sprintLock = false, adsLatch = false, adsEl = null;
+// USE (same day: planting meant holding USE with the aiming thumb for 7 s, unable to look round): a tap starts it and it
+// keeps going (plant, defuse, reinforce, revive...) until it is done, you tap again or you move with the stick
+let useLatch = false, useEl = null, useLostT = 0;
+const setUse = on => { useLatch = on; held[0] = on; if (useEl) useEl.classList.toggle('on', on); };
 const setAds = on => { adsLatch = on; trig.lt = on ? 1 : 0; if (adsEl) adsEl.classList.toggle('on', on); }; // AIM: tap on, tap off // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
 let ui = null, shown = false, recentre = () => {};
 export const touchAimReset = () => recentre();
@@ -164,7 +168,7 @@ function build() {
       if (leftF !== null) return;
       leftF = id; const z = tz(), r = R * z, cx = x, cy = y;
       base.style.left = `${cx / z - 62}px`; base.style.top = `${cy / z - 62}px`; base.style.bottom = 'auto'; base.classList.add('held');
-      const move = (x, y) => { let u = (x - cx) / r, v = (y - cy) / r; const l = Math.hypot(u, v); if (l >= SPRINT_PUSH) { if (!sprintLock) setAds(false); sprintLock = true; } else if (l < 0.6) sprintLock = false; base.classList.toggle('spr', sprintLock); if (l > 1) { u /= l; v /= l; } ls.x = u; ls.y = v; knob(base, ls); }; // push past the ring to sprint (like phone shooters)
+      const move = (x, y) => { let u = (x - cx) / r, v = (y - cy) / r; const l = Math.hypot(u, v); if (l > 0.4 && useLatch) setUse(false); if (l >= SPRINT_PUSH) { if (!sprintLock) setAds(false); sprintLock = true; } else if (l < 0.6) sprintLock = false; base.classList.toggle('spr', sprintLock); if (l > 1) { u /= l; v /= l; } ls.x = u; ls.y = v; knob(base, ls); }; // push past the ring to sprint (like phone shooters)
       move(x, y);
       fingers.set(id, { move, end() { leftF = null; sprintLock = false; base.classList.remove('spr'); ls.x = ls.y = 0; knob(base, ls); base.style.left = base.style.top = base.style.bottom = ''; base.classList.remove('held'); } });
     }
@@ -173,6 +177,7 @@ function build() {
   const pressButton = (id, el, x0, y0) => {
     const b = BUTTONS.find(q => q.id === el.dataset.id);
     if (b.id === 'ads') { adsEl = el; setAds(!adsLatch); return; } // a tap switches aiming in on or off
+    if (b.id === 'use') { useEl = el; useLostT = 0; setUse(!useLatch); return; } // a tap starts using, and it carries on
     if (b.b === null) { tiltLevelNow(); el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 200); return; } // ⟲ TILT: how you hold it now is level
     const set = on => { el.classList.toggle('on', on); if (b.b === 'lt' || b.b === 'rt') { tc[b.b] = Math.max(0, tc[b.b] + (on ? 1 : -1)); trig[b.b] = tc[b.b] ? 1 : 0; } else held[b.b] = on; };
     set(true);
@@ -206,6 +211,7 @@ const ctxSeen = { use: 0, vault: 0, prev: 0, next: 0 };
 export function touchContext(c) {
   if (!ui || !shown) return;
   const now = performance.now();
+  if (useLatch && !c.use && !c.busy) { if (!useLostT) useLostT = now; else if (now - useLostT > 600) setUse(false); } else useLostT = 0; // nothing left to use: let go
   for (const id in ctxSeen) {
     if (id === 'prev' || id === 'next' ? c.cams : c[id]) ctxSeen[id] = now;
     const el = ui.querySelector(`[data-id="${id}"]`), want = now - ctxSeen[id] < 400 || el.classList.contains('on');
@@ -229,7 +235,7 @@ export function setTouchVisible(on) {
   if (on === shown) return;
   if (on) { tiltLevel = null; ui.querySelector('[data-id="tiltc"]').classList.toggle('hidden', !tiltOn()); } // a match starts level
   shown = on; ui.classList.toggle('hidden', !on); document.documentElement.classList.toggle('touchplay', on); keepAwake(on);
-  if (!on) { releaseAll(); setAds(false); sprintLock = false; ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
+  if (!on) { releaseAll(); setAds(false); setUse(false); sprintLock = false; ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
 }
 // Menus and match text shrink to fit small screens (the game picture itself always fills the screen), times the
 // player's own size setting. Menus are laid out for ~900 px tall, the match text for ~760 (and both for the width).
