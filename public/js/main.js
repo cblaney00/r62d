@@ -8,7 +8,7 @@ import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DR
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf, hitR, fireAuto } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, liftBody, persp, lifted, withPersp, furnTop } from './look.js';
+import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, liftBody, persp, lifted, withPersp, furnTop, wallIns } from './look.js';
 const addL = (a, b) => [a[0] + b[0], a[1] + b[1]];
 import { S, setMapScale } from './textures.js';
 import { COLS, rgba, lighten, squadCol, setCols, SWATCHES, okHex, DEFAULT_COLS } from './teamcol.js';
@@ -200,7 +200,7 @@ const ADS_SNAP_MIN = 2 * PX_PER_M;
 // or anything joined to it for WALL_HOLD s and it turns blue; while it stays blue, aiming in snaps the crosshair
 // onto the bracket (the wall), however far away it is (he asked). Looking off it (or the marker going away) starts over.
 const RING_R = 13; // the team-coloured circle round each person (drawOperator)
-const WALL_HOLD = 1.5, WALL_TILES = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.TALL, T.DSHIELD, T.BARRI, T.BEAM, T.LOW]);
+const WALL_HOLD = 0.6, WALL_TILES = new Set([T.HARD, T.SOFT, T.REINF, T.PANEL, T.TALL, T.DSHIELD, T.BARRI, T.BEAM, T.LOW]);
 function wallHeld(q, now) {
   const H = st.wallHold, dt = H ? Math.min(0.1, now - H.at) : 0; // (now: seconds)
   if (!q || !q.mk || !st.map || !st.pred) { st.wallHold = null; return; }
@@ -214,6 +214,23 @@ function wallHeld(q, now) {
   st.wallHold = { set, t: 0, at: now, pop: 0 };
 }
 const wallBlue = () => !!(st.wallHold && st.wallHold.t >= WALL_HOLD);
+// A blue marker on a camera or a gadget you can shoot (he asked 2026-11-16): an enemy camera, drone or gadget within
+// about a metre of the marker (or just in front of it, along your aim) that you can see is the target: it gets the blue
+// ring and aiming in snaps onto it, so the shot breaks it
+const NOT_UTIL = new Set(['decoy', 'cover', 'dshield', 'healzone', 'smoke', 'gas', 'watch', 'flare']);
+function blueUtil(q) {
+  if (!wallBlue() || !q || !q.mk || q.mk.person || !st.last || !st.me || !st.map) return null;
+  const side = st.me.tm, M = q.mk, a = aimAng(); let best = null, bd = 1.2 * PX_PER_M;
+  for (const e of st.last.ents || []) {
+    if (!e.tm || e.tm === side || NOT_UTIL.has(e.ty) || e.x === undefined) continue;
+    const dx = e.x - st.pred.x, dy = e.y - st.pred.y, d = Math.hypot(dx, dy); if (d < 8 || d > M.d + 1.2 * PX_PER_M) continue;
+    const off = Math.min(Math.hypot(e.x - M.x, e.y - M.y), Math.abs(angDiff(Math.atan2(dy, dx), a)) < 0.1 ? Math.abs(dx * Math.sin(a) - dy * Math.cos(a)) : 1e9);
+    if (off >= bd) continue;
+    if (castSight(st.map, st.pred.x, st.pred.y, Math.atan2(dy, dx), d, null) < d - 12) continue; // (a camera on a wall sits just on its face)
+    bd = off; best = e;
+  }
+  return best;
+}
 const smokeCv = document.createElement('canvas'), SMOKE_DIV = 3, SMOKE_COL = '196,198,200'; // smoke grey // the smoke layer (draw)
 const GHOST_A = 0.38; // how strongly the people you see show through raised walls
 const BODY_CAP = 300; // world px: people stand up at most as tall as this far from the eye (he saw long stretched legs zoomed out)
@@ -310,7 +327,8 @@ function adsReset() {
   // sliver past a door frame doesn't count, within its reach
   const a = Math.atan2(uy, ux), sn = st.me && st.me.aa && attFromCode(st.me.aa).sight === 'sniper';
   if (wallBlue()) { // the held wall's bracket is blue (he asked): aiming in snaps right onto it, however far it is
-    const q0 = freeAimPoint(), m0 = q0.mk, to = Math.min(reachOf(st.me, true), Math.max(AIM_MIN(), ADS_SNAP_MIN, m0 && m0.person ? m0.person.d + RING_R : m0 ? m0.d : q0.see)); // a person: onto them
+    const q0 = freeAimPoint(), U = blueUtil(q0); if (U) { aimOff = { x: U.x - st.pred.x, y: U.y - st.pred.y }; return; } // a camera / gadget there: onto it
+    const m0 = q0.mk, to = Math.min(reachOf(st.me, true), Math.max(AIM_MIN(), ADS_SNAP_MIN, m0 && m0.person ? m0.person.d + RING_R : m0 ? m0.d : q0.see)); // a person: onto them
     aimOff = { x: ux * to, y: uy * to }; return;
   }
   if (sn) { const ds = []; for (let i = -2; i <= 2; i++) ds.push(castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, reachOf(st.me, true), null)); ds.sort((p, q) => q - p); d = Math.max(AIM_MIN(), ds[1] - 4); }
@@ -493,7 +511,21 @@ function freeAimPoint() {
         if (ax0 !== ax1 && ay0 === ay1) { nx = -Math.sign(c); ny = 0; } else if (ay0 !== ay1 && ax0 === ax1) { nx = 0; ny = -Math.sign(s); }
         else if (ax0 !== ax1) { const bx = hx - c * 2, by = hy - s * 2, fx = Math.abs(bx / CELL - Math.round(bx / CELL)), fy = Math.abs(by / CELL - Math.round(by / CELL)); if (fx < fy) { nx = -Math.sign(c); ny = 0; } else { nx = 0; ny = -Math.sign(s); } }
       }
-      mk = { d: B, person: who, x: hx, y: hy, nx, ny };
+      // exactly where it is drawn (he asked 2026-11-16: more accurate): the cell's true edge, then in to the face as drawn
+      // (plain walls look thinner: look.js WALL_INS), and how tall the thing is, so the bracket sits halfway up its face
+      let px0 = hx, py0 = hy, z = 0.45;
+      if (!who) {
+        const cellAt = t => Math.floor((st.pred.y + s * t) / CELL) * m.W + Math.floor((st.pred.x + c * t) / CELL), kHit = cellAt(B);
+        if (!(m.shape && m.shape[kHit])) {
+          let lo = Math.max(d0, B - 6), hi = B; if (cellAt(lo) === kHit) lo = Math.max(d0, B - 12);
+          for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; if (cellAt(mid) === kHit) hi = mid; else lo = mid; }
+          const ins = wallIns(m, kHit), inset = !ins ? 0 : nx < 0 ? ins.w : nx > 0 ? ins.e : ny < 0 ? ins.n : ny > 0 ? ins.s : 0;
+          const cosN = Math.max(0.25, Math.abs(c * nx + s * ny)), t = hi + inset / cosN;
+          px0 = st.pred.x + c * t; py0 = st.pred.y + s * t;
+        }
+        const h = furnTop(m, hx, hy); if (h > 0) z = Math.min(0.5, h * 0.5);
+      }
+      mk = { d: B, person: who, x: px0, y: py0, nx, ny, z };
       see = Math.min(see, B); if (onRope) shot = Math.min(shot, B);
     }
   }
@@ -3560,13 +3592,20 @@ function crosshair(me, now) {
     const q = fq, dm = q.ad / PX_PER_M;
     if (q.blocked) { // something in the way: a tick on it and a dotted line on to the crosshair
       const [lwx, lwy] = q.person ? [0, 0] : liftOf(q.wx, q.wy, 0.45); // at chest height, where walls and window openings show (he asked: it must work looking in at windows)
-      const G = w2s(q.wx + lwx, q.wy + lwy), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
+      let G = w2s(q.wx + lwx, q.wy + lwy), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
       ctx.setLineDash([2 * DPR, 3 * DPR]); ctx.lineWidth = 1.2 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.35)';
       ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
       const na = Math.atan2(y - gy, x - gx) + Math.PI / 2, tl = 5 * DPR;
       ctx.lineCap = 'round';
       if (q.mk) { // the barrier: a bracket lying along its face, orange; held on the same thing 1.5 s it turns blue (aiming in then goes onto it)
-        const M = q.mk, P = (wx, wy) => { const [lx, ly] = M.person ? [0, 0] : liftOf(wx, wy, 0.45), Q = w2s(wx + lx, wy + ly); return [px + (Q.x - px) * c - (Q.y - py) * s2, py + (Q.x - px) * s2 + (Q.y - py) * c]; };
+        const M = q.mk, P = (wx, wy) => { const [lx, ly] = M.person ? [0, 0] : liftOf(wx, wy, M.z ?? 0.45), Q = w2s(wx + lx, wy + ly); return [px + (Q.x - px) * c - (Q.y - py) * s2, py + (Q.x - px) * s2 + (Q.y - py) * c]; };
+        if (!M.person) [gx, gy] = P(M.x, M.y); // (on the face exactly, at half the height of what it hit)
+        const U = blueUtil(q); if (U) { // a camera / gadget there: a blue ring round it (aiming in goes onto it)
+          const [lx, ly] = liftOf(U.x, U.y, gadgetZ(U)), Q = w2s(U.x + lx, U.y + ly), ux0 = px + (Q.x - px) * c - (Q.y - py) * s2, uy0 = py + (Q.x - px) * s2 + (Q.y - py) * c, rr = 9 * DPR * (1 + 0.12 * Math.sin(now * 9));
+          ctx.save(); ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 4 * DPR; ctx.beginPath(); ctx.arc(ux0, uy0, rr, 0, 7); ctx.stroke();
+          ctx.strokeStyle = '#4fb3ff'; ctx.lineWidth = 2 * DPR; ctx.beginPath(); ctx.arc(ux0, uy0, rr, 0, 7); ctx.stroke();
+          ctx.font = `700 ${10 * DPR}px Barlow Condensed, sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = '#4fb3ff'; ctx.fillText(U.ty === 'cam' ? 'CAMERA' : U.ty === 'drone' ? 'DRONE' : 'GADGET', ux0, uy0 - rr - 4 * DPR); ctx.restore();
+        }
         const [ax, ay] = P(M.x - M.ny * 4, M.y + M.nx * 4), [bx2, by2] = P(M.x + M.ny * 4, M.y - M.nx * 4), [ox, oy] = P(M.x + M.nx * 4, M.y + M.ny * 4);
         const ul = Math.hypot(bx2 - ax, by2 - ay) || 1, nl = Math.hypot(ox - gx, oy - gy) || 1;
         drawBracket(ctx, gx, gy, (bx2 - ax) / ul, (by2 - ay) / ul, -(ox - gx) / nl, -(oy - gy) / nl, now);
@@ -4635,7 +4674,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint }; // for automated screenshot tests
+window.__r62d = { pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
