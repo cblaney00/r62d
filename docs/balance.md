@@ -129,3 +129,8 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
   (~185 rounds a map, ±7%): Embassy 2F Ambassador Office 30 → 52%, School 3F Clock Room 25% (Bell Loft sits under the
   tower: no hatch), Villa 2F 25 → 30%, Lodge 2F 30/33 → 29/25%, Harbor 2F Boardroom 31%, Depot 2F 37/46%. Mixed: measure
   again after practice on this version.
+- After 600 practice rounds with the roof hatches (trained pros, ~188 rounds a map, ±7%): overall ~45% attack. Harbor 57
+  (2F Boardroom 47), Villa 34 (2F Master Bedroom 22, every site under 41), Depot 47 (2F Control Room 34), Embassy 47
+  (2F Ambassador 49), Lodge 41 (2F Games Room 30), School 40 (2F Principal Office 30, 2F Computer Lab 35), Dust 50.
+  Villa is the map that needs work (all its sites); upstairs sites mostly fine now except Lodge Games Room, School 2F,
+  Depot Control Room. Balance parked here 2026-11-16 (he asked: back seat).
