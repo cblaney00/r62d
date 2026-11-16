@@ -753,6 +753,7 @@ html.touch #pause .menu, html.touch #quitDlg .menu { zoom: 1.15; }
 #touchUI .tbtn.t7 { right: 290px; width: 64px; } /* MAP */
 #touchUI .tbtn.lean { top: auto; bottom: 122px; height: 40px; width: 84px; font-size: 14px; } #touchUI .tbtn.l1 { left: calc(max(20px, env(safe-area-inset-left)) + 140px); } #touchUI .tbtn.l2 { left: calc(max(20px, env(safe-area-inset-left)) + 232px); } /* above the left FIRE */
 #touchUI .tbtn.lean.act { background: rgba(242,193,78,0.35); border-color: var(--gold); }
+#touchUI .tbtn.lb { top: auto; bottom: 168px; height: 42px; width: 84px; font-size: 14px; } #touchUI .tbtn.lb1 { left: calc(max(20px, env(safe-area-inset-left)) + 140px); } #touchUI .tbtn.lb2 { left: calc(max(20px, env(safe-area-inset-left)) + 232px); } /* AIM, CROUCH: above LEAN, for the left thumb */
 #touchUI #tsLeft.spr { border-color: var(--gold); box-shadow: 0 0 18px rgba(242,193,78,0.45); } #touchUI #tsLeft.spr::after { content: 'SPRINT'; position: absolute; left: 0; right: 0; top: -22px; text-align: center; font: 800 13px var(--head); letter-spacing: 0.2em; color: var(--gold); }
 #touchUI .tbtn.t4 { right: 72px; width: 80px; } #touchUI .tbtn.t5 { right: 20px; width: 44px; }
 #tTurn { position: fixed; inset: 0; z-index: 90; background: rgba(5,7,9,0.96); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font: 700 22px var(--head); letter-spacing: 0.08em; color: #fff; text-align: center; padding: 30px; }
@@ -766,6 +767,11 @@ html.touch #br { bottom: auto; top: 172px; right: auto; left: 18px; text-align: 
 html.touch #hud #feed, html.touch #hud #killfeed { margin-top: 56px; }
 html.touchplay #corner { display: none; }
 html.touch #chat { bottom: 150px; }
+/* phones while playing (2026-11-16, a thumb-played match): chat ran down the left over AIM / CROUCH / LEAN and the ammo;
+   now the last 3 lines, small, at the top in the middle under the score bar, where no thumb goes */
+html.touchplay #chat { top: 66px; bottom: auto; left: 50%; transform: translateX(-50%); width: min(400px, 44vw); font-size: 12px; text-align: center; }
+html.touchplay #chatLog div:not(:nth-last-child(-n+3)) { display: none; }
+html.touchplay #leftCount { top: 58px; width: min(560px, 64vw); } html.touchplay #leftCount b { font-size: 22px; } html.touchplay #leftCount span { font-size: 8px; letter-spacing: 0.12em; }
 html.touch #clickIn { display: none !important; }
 /* phone match screen, slimmed (he found it cluttered): no gun picture or gadget list (the counts are on the buttons), ammo
    right under health, and the drone / camera line at the bottom */
@@ -1027,6 +1033,12 @@ html.touch #lobby.home .mtop { padding: 10px 18px; } html.touch #lobby.home .pca
 html.touch .mtop { padding: 6px 18px; gap: 16px; } html.touch .ptitle small { display: none; } html.touch .ptitle b { font-size: 28px; }
 html.touch .back { padding: 8px 14px; } html.touch .pcard .xpbar { width: 110px; }
 html.touch .mbody { padding: 12px 18px; }
+/* phones (he said 2026-11-16: nobody should have to scroll to START): the Quick Match page is squeezed to fit, and its
+   bottom bar (bot rank, fill, START MATCH) stays pinned to the bottom of the screen whatever happens above it */
+html.touch #room .roomFoot { position: sticky; bottom: -12px; z-index: 3; margin: 6px -18px -12px; padding: 8px 18px 10px; background: rgba(8,10,14,0.95); border-top: 1px solid var(--line); align-items: center; }
+html.touch #room #mapPick canvas, html.touch #room #mapPick .tvRandom { height: 44px; } html.touch #room #mapPick { gap: 6px; } html.touch #room #mapPick button { padding: 4px; gap: 2px; }
+html.touch #room .squad ul { min-height: 0; margin-bottom: 6px; } html.touch #room .squad li { font-size: 15px; padding: 2px 8px; } html.touch #room .squad h3 { font-size: 17px; margin: 0 0 4px; }
+html.touch #room .roomFoot .row { margin: 0; } html.touch #room .roomFoot .rfLeft { display: flex; flex-direction: column; gap: 6px; }
 html.touch .intelGrid { gap: 10px; } html.touch .icard { height: 130px; padding: 14px 16px; } html.touch .icard b { font-size: 24px; } html.touch .icard small { font-size: 12px; } html.touch .icard i { font-size: 70px; }
 html.touch #codeIn { font-size: 38px; padding: 10px; } html.touch .startBig { font-size: 24px; padding: 14px 32px; }
 html.touch #settings { width: 96vw; }

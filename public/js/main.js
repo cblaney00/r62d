@@ -5,7 +5,7 @@ import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './ping
 import { parseCommand } from '/shared/commands.js';
 import { roofRopeAt, hatchAtPoint, plantBomb, PLANT_R, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf, hitR } from '/shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf, hitR, fireAuto } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, liftBody, persp, lifted, withPersp, furnTop } from './look.js';
@@ -37,7 +37,7 @@ import { readCode, showCode } from '/shared/joincode.js';
 import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
 import * as rope3d from './rope3d.js';
 import { compassRoute as sharedRoute } from '/shared/compass.js';
-import { touchPad, touchContext, touchActive, isTrackpad, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead } from './touch.js';
+import { touchPad, touchContext, touchActive, isTrackpad, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
 import { EYE_H } from '/shared/map.js';
 import { META } from '/shared/meta.js';
@@ -1000,6 +1000,21 @@ function vaultDir() {
   return mx || my ? Math.atan2(my, mx) + moveTurn() : st.aim;
 }
 // Read the controller once a frame and turn it into the same actions as the keyboard and mouse.
+// phone auto fire: is the aim line on a seen enemy's body (within reach)? Semi-automatic guns get separate taps.
+function autoShot() {
+  const me = st.me; if (!me || me.ct !== 'body' || !me.a || me.dn || !st.pred) return 0;
+  const a = st.aim, w = WEAPONS[me.w]; if (a == null || !w) return 0;
+  const reach = aimReach(me.aa ? attFromCode(me.aa).sight : 'iron', me.ad) * PX_PER_M;
+  for (const p of st.foesSeen || []) {
+    if (p.a === 0) continue;
+    const dx = p.x - st.pred.x, dy = p.y - st.pred.y, d = Math.hypot(dx, dy);
+    if (d > reach || d < 1) continue;
+    const off = Math.abs(dx * Math.sin(a) - dy * Math.cos(a)), ahead = dx * Math.cos(a) + dy * Math.sin(a);
+    if (ahead > 0 && (off < hitR(p.op) * 0.9 || Math.abs(angDiff(Math.atan2(dy, dx), a)) < 0.06)) // (within the aim help's pull, which finishes the aim while it fires: a thumb is never pixel-exact)
+      return fireAuto(w, me.at || 0) || performance.now() % 160 < 80 ? 1 : 0;
+  }
+  return 0;
+}
 function pollPad(dt, view) {
   const gp = readPad() || touchPad(); // a real controller first, else the phone's touch controls (touch.js)
   if (!gp) { if (gpName) { for (const k in gpk) gpk[k] = 0; gpName = ''; renderSettings(); } return; }
@@ -1039,12 +1054,17 @@ function pollPad(dt, view) {
   const aimReset = gp.lt > 0.35 && !gpk.ads && touchActive();
   if (aimReset) { padReach = 0.22; touchAimReset(); } // phone (he asked): aiming in pulls the crosshair in to ~2.5 m, like the mouse's aim-in reset
   gpk.fire = gp.rt > 0.35 ? 1 : 0; gpk.ads = gp.lt > 0.35 ? 1 : 0;
+  if (!gpk.fire && touchActive() && autoFire()) gpk.fire = autoShot(); // phone: auto fire while the crosshair is on an enemy you see
   // right stick: aim. A stick snapping back to the middle when let go is ignored, so the aim stays put.
   const falling = (gpLastL - rs.l) / Math.max(dt, 1e-3) > 4;
+  // phone gyro (touch.js): turning the phone turns the aim; on top of a thumb on the aim stick too, until that thumb lets go
+  const gm = gp.gyro ? gyroMode() : 'off', gy = gm === 'always' || (gm === 'ads' && (gpk.ads || (st.me && st.me.ad))) ? gp.gyro * gyroSens() * (gyroInv() ? -1 : 1) : 0;
+  const onAim = st.me && (st.me.ct === 'body' || st.me.ct === 'drone') && !(view && view.kind === 'cam');
+  if (!(rs.l > 0.05)) st.gyroOff = 0;
   if (rs.l > 0.05 && !falling && !aimReset) { // (the frame you aim in on a phone keeps the pulled-in crosshair)
     if (view && view.kind === 'cam') { mouse.x = VW / 2 + rs.x / rs.l * VH * 0.25; mouse.y = VH / 2 + rs.y / rs.l * VH * 0.25; }
-    else { padAng = Math.atan2(rs.y, rs.x); if (!gp.rsDir) padReach = rs.l; }
-  }
+    else { if (onAim) st.gyroOff = (st.gyroOff || 0) + gy; padAng = wrapAng(Math.atan2(rs.y, rs.x) + (st.gyroOff || 0)); if (!gp.rsDir) padReach = rs.l; }
+  } else if (gy && onAim) padAng = wrapAng(padAng + gy);
   gpLastL = rs.l;
 }
 addEventListener('keyup', e => {
@@ -4361,6 +4381,13 @@ for (const b of $('inputSeg').querySelectorAll('button')) {
   u.value = Math.round(uiScale() * 100); v.value = Math.round(viewMul() * 100); show();
   u.addEventListener('input', show); u.addEventListener('change', () => { show(); setUiScale(u.value / 100); }); // on letting go: resizing while dragging moved the slider under the mouse
   v.addEventListener('input', () => { show(); setViewMul(v.value / 100); }); }
+{ // phone: gyro aim (off / aimed in / always, speed, invert) and auto fire, kept on this device
+  const gs = $('gyroSeg'), sp = $('gyroSens'), inv = $('gyroInv'), af = $('autoFireSeg');
+  const show = () => { for (const b of gs.children) b.classList.toggle('on', b.dataset.g === gyroMode()); $('gyroSensVal').textContent = Math.round(sp.value) + '%'; inv.checked = gyroInv(); for (const b of af.children) b.classList.toggle('on', (b.dataset.f === '1') === autoFire()); };
+  sp.value = Math.round(gyroSens() * 100); show();
+  for (const b of gs.children) b.onclick = () => { audio.ui(); setGyro(b.dataset.g); show(); };
+  for (const b of af.children) b.onclick = () => { audio.ui(); setAutoFire(b.dataset.f === '1'); show(); };
+  sp.addEventListener('input', () => { setGyroSens(sp.value / 100); show(); }); inv.addEventListener('change', () => { setGyroInv(inv.checked); show(); }); }
 { // phone: tilt to move (on/off + dead zone), kept on this device
   const seg = $('tiltSeg'), dz = $('tiltDz'), show = () => { for (const b of seg.children) b.classList.toggle('on', (b.dataset.t === '1') === tiltOn()); $('tiltDzVal').textContent = dz.value + '°'; };
   dz.value = tiltDead(); show();

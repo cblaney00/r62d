@@ -3,6 +3,7 @@
 // same page (public/phone/server.js), started the first time it is needed.
 (() => {
   window.__PENV = {}; // the server's process.env (the app rewrites process.env to this)
+  try { const t = localStorage.getItem('r62d-penv'); if (t) { Object.assign(__PENV, JSON.parse(t)); window.process = window.process || { env: __PENV }; } } catch {} // (tests only: e.g. {"R62D_FAST": "1"})
   let srv = null;
   const server = () => srv || (srv = import('/phone/server.js'));
   const later = f => setTimeout(f, 0); // (messages arrive on their own turn, like a network)

@@ -43,10 +43,11 @@ async function run() {
     await call('browsingContext.setViewport', { context: ctx, viewport: { width: +W, height: +H } });
     await call('browsingContext.navigate', { context: ctx, url, wait: 'complete' });
     await sleep(2000);
-    await js("localStorage.setItem('r62d-name', 'Thumbs'); location.reload(); true"); await sleep(2500); // a returning player: the name is remembered, so menus open straight away
+    await js("localStorage.setItem('r62d-name', 'Thumbs'); " + (process.env.SCENARIO === 'fix' ? "localStorage.setItem('r62d-penv', '{\"R62D_FAST\":\"1\"}'); " : "localStorage.removeItem('r62d-penv'); ") + "location.reload(); true"); await sleep(2500); // a returning player: the name is remembered, so menus open straight away
     console.log('touch device?', await js(`('ontouchstart' in window) + ' ' + matchMedia('(pointer: coarse)').matches + ' ' + document.documentElement.className`));
     // menus, all by thumb
-    await touch(finger('t', [[W / 2, H / 2], [W / 2, H / 2, 60]])); await sleep(2500);
+    for (let i = 0; i < 20 && !(await js("!!document.getElementById('splash')")); i++) await sleep(500);
+    for (let i = 0; i < 6 && await js("!document.getElementById('splash').classList.contains('hidden')"); i++) { await touch(finger('t', [[W / 2, H / 2], [W / 2, H / 2, 60]])); await sleep(1500); } // tap the title screen until it opens
     console.log('after first tap: fullscreen =', await js('!!document.fullscreenElement'));
     // headless full screen would grow the window past the phone size: leave it and stop asking (the check above is what counts)
     await js(`document.exitFullscreen && document.exitFullscreen().catch(() => {}); Element.prototype.requestFullscreen = () => Promise.reject(); true`); await sleep(800);
@@ -87,6 +88,30 @@ async function run() {
     const L = await centre('#tsLeft'); console.log('left stick at', L);
     const R0 = [Math.round(W * 0.78), Math.round(H * 0.45)];
     let s0 = await report('start');
+    if (process.env.SCENARIO === 'fix') { // the 2026-11-16 thumb fixes: AIM switch and CROUCH by the left thumb, auto fire, gyro aim
+      await js("__r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'clearBots' })); __r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'botsFire', on: false })); true"); await sleep(600);
+      // stand in the middle of the biggest ground-floor room, facing east, so the dummy lands in plain sight
+      await js(`(() => { const s = __r62d.st, m = s.map, C = 16, r = m.rooms.filter(q => q.fl === m.groundFloor).sort((p, q) => q.w * q.h - p.w * p.h)[0]; const x = (r.x + r.w / 2 - 3) * C, y = (r.y + r.h / 2) * C; s.ws.send(JSON.stringify({ t: 'free', a: 'tp', x, y, aim: 0 })); return true; })()`); await sleep(1200);
+      await touch(finger('R', [R0, [R0[0] + 55, R0[1], 200]], 300)); await sleep(400);
+      await js("__r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'dummy' })); true"); await sleep(1500);
+      const dummy = async () => JSON.parse(await js("(() => { const s = __r62d.st, d = (s.last.players || []).find(p => /^DUMMY/.test(p.n)); return JSON.stringify(d ? { hp: d.hp, a: d.a, dn: d.dn, ang: Math.round(Math.atan2(d.y - s.pred.y, d.x - s.pred.x) * 180 / Math.PI), m: Math.round(Math.hypot(d.x - s.pred.x, d.y - s.pred.y) / 36 * 10) / 10, seen: (s.foesSeen || []).length } : null); })()"));
+      const d0 = await dummy(); console.log('dummy', JSON.stringify(d0));
+      const at = d => (d.ang + d) ; const toward = (deg, off) => { const a = (deg + off) * Math.PI / 180; return [R0, [Math.round(R0[0] + Math.cos(a) * 55), Math.round(R0[1] + Math.sin(a) * 55), 200]]; };
+      await js('window.__fires = 0'); await touch(finger('R', toward(d0.ang, 40), 900)); await sleep(200);
+      console.log('aim 40° off the dummy:', await js('window.__fires'), 'fire inputs (want 0)', JSON.stringify(await dummy()));
+      await js('window.__fires = 0'); await touch(finger('R', toward(d0.ang, 3), 1200)); await sleep(300);
+      console.log('aim 3° off the dummy:', await js('window.__fires'), 'fire inputs (want many), dummy', JSON.stringify(await dummy()));
+      const A = await centre('[data-id="ads"]'), Cr = await centre('[data-id="crouch"]'); console.log('AIM at', A, 'CROUCH at', Cr, '(both on the left half:', A[0] < W / 2 && Cr[0] < W / 2, ')');
+      await touch(finger('A', [A, [A[0], A[1], 60]])); await sleep(500); s0 = await report('AIM tapped once (ads should be 1)');
+      const g0 = s0.aimDeg;
+      const gyro = (alpha, ms) => js(`new Promise(r => { const t0 = performance.now(); const go = () => { dispatchEvent(new DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: { x: 0, y: 0, z: 9.8 }, rotationRate: { alpha: ${alpha}, beta: 0, gamma: 0 }, interval: 16 })); if (performance.now() - t0 < ${ms}) setTimeout(go, 16); else r(true); }; go(); })`);
+      await gyro(60, 500); await sleep(200); s0 = await report('gyro: phone turned left 30° (aim should turn ~-30)'); console.log('  aim moved', s0.aimDeg - g0, 'degrees');
+      await touch(finger('A', [A, [A[0], A[1], 60]])); await sleep(500); await report('AIM tapped again (ads should be 0)');
+      const g1 = (await report('aimed out')).aimDeg; await gyro(60, 500); await sleep(200); console.log('  gyro while not aimed in moved the aim', (await report('gyro, not aimed in')).aimDeg - g1, 'degrees (default "while aimed in": want 0)');
+      await touch(finger('C', [Cr, [Cr[0], Cr[1], 60]])); await sleep(500); await report('left CROUCH tapped (crouch should be 1)');
+      await shot('f1-buttons');
+      return;
+    }
     if (process.env.SCENARIO === 'more') { // the controls added for phones on 2026-11-10: sprint, slide, lie down, lean, map
       const L1 = await centre('#tsLeft');
       await touch(finger('L', [L1, [L1[0], L1[1] - 120, 250], [L1[0], L1[1] - 120, 1500]], 300)); await report('stick pushed past its ring (sprint)');

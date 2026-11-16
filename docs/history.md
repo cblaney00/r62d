@@ -276,3 +276,8 @@ Moved out of CLAUDE.md on 2026-11-16, word for word. Each section is one batch o
 ## Android app plays the whole game (2026-11-16, he asked: no computer needed; phones get the rest of the game when the app opens)
 - public/phone/ (server.js, shim.js, node/*), the app's file serving + game packs updater (MainActivity.java), PLAY ON THIS PHONE on the start page, `tests/phonehost.mjs` to try it on a computer. Details: public/phone/README.md, android/README.md.
 - Packs carry `"android": 1` in desktop/build.json (`ANDROID` in desktop/build.sh). The old app (build 476) can't update itself: main.js asks it once to download the new one.
+
+## Phone controls for two thumbs (2026-11-16, he asked: play it with thumbs, maybe a gyroscope; fix what two thumbs can't do)
+- `tests/thumbmatch.mjs` plays a whole Quick Match by two simulated thumbs on the phone version (tests/phonehost.mjs) and counts moments a third thumb was wanted; `SCENARIO=fix node tests/thumbs.mjs` checks the fixes with a dummy.
+- Found: AIM had to be held (a third thumb in a fight), AIM/CROUCH were under the aiming thumb, auto aim precision is not thumb precision, chat covered the left buttons, the Quick Match START was below a phone screen.
+- Fixed: AIM is a tap switch (sprint turns it off) and sits with CROUCH above LEAN for the left thumb (`lb` buttons in touch.js / style.css); auto fire (`autoShot` in main.js, `r62d-autofire`, on by default on phones) fires while the aim is within the aim help's 0.06 rad of a seen enemy; gyro aim (`gyroMode`/`gyroSens`/`gyroInv` in touch.js: turn rate round gravity from `devicemotion`, applied in `pollPad`, default while aimed in); phone chat = last 3 lines at the top middle, `#leftCount` smaller; Quick Match bottom bar pinned on phones.

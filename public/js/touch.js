@@ -54,6 +54,19 @@ export function setTilt(on) {
   tiltLevel = null;
 }
 export function setTiltDead(v) { store('r62d-tiltdz', String(v)); }
+// Gyro aim (2026-11-16: he asked for the phone controls to suit two thumbs "and maybe a gyroscope"): turning the phone
+// left or right, round the up-down line however you hold it, turns your aim. Your thumbs can then press AIM, CROUCH or
+// RELOAD and the aim still follows you. Off / only while aimed in (the default) / always; speed; the other way round.
+export const gyroMode = () => { const m = store('r62d-gyro'); return m === 'off' || m === 'always' ? m : 'ads'; };
+export const gyroSens = () => Math.max(0.2, Math.min(3, +(store('r62d-gyrosens') || 1)));
+export const gyroInv = () => store('r62d-gyroinv') === '1';
+export function setGyro(m) { store('r62d-gyro', m); try { if (m !== 'off' && typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) DeviceMotionEvent.requestPermission().catch(() => {}); } catch {} }
+export const setGyroSens = v => store('r62d-gyrosens', String(v)), setGyroInv = on => store('r62d-gyroinv', on ? '1' : '0');
+// Auto fire (same day): the gun shoots by itself while your crosshair is on an enemy you can see, so the right thumb only
+// has to aim (phone shooters offer the same). On by default on phones; Settings turns it off.
+export const autoFire = () => store('r62d-autofire') !== '0';
+export const setAutoFire = on => store('r62d-autofire', on ? '1' : '0');
+let gyroAcc = 0; // radians turned since the game last asked
 const TILT_FULL = 16; // degrees past the dead zone for a full run
 let grav = null, tiltLevel = null; // smoothed gravity on the screen (x right, y up; 1 = straight down), and "level"
 const tiltV = { x: 0, y: 0 };
@@ -68,6 +81,13 @@ addEventListener('devicemotion', e => {
   const d0 = Math.sin(tiltDead() * Math.PI / 180), d1 = Math.sin((tiltDead() + TILT_FULL) * Math.PI / 180);
   const k = l <= d0 ? 0 : Math.min(1, (l - d0) / (d1 - d0)) / l;
   tiltV.x = x * k; tiltV.y = y * k;
+  // gyro: the turn rate round "up" (gravity, as the phone measures it: it points up), whatever way the phone is held
+  const r = e.rotationRate;
+  if (r && r.alpha != null && g.z != null) {
+    const n = Math.hypot(g.x, g.y, g.z) || 1, yaw = ((r.alpha || 0) * g.z + (r.beta || 0) * g.x + (r.gamma || 0) * g.y) / n; // degrees a second, turning left = +
+    const iv = e.interval > 1 ? e.interval / 1000 : (e.interval || 0.016); // (some browsers give ms, some seconds)
+    if (Math.abs(yaw) > 1.5) gyroAcc = Math.max(-1, Math.min(1, gyroAcc - yaw * Math.PI / 180 * Math.min(0.1, iv))); // (a still phone's tiny drift is ignored)
+  }
 });
 export const tiltLevelNow = () => { tiltLevel = grav ? { ...grav } : null; };
 
@@ -76,10 +96,12 @@ export const tiltLevelNow = () => { tiltLevel = grav ? { ...grav } : null; };
 const BUTTONS = [
   { id: 'fireL', label: 'FIRE', b: 'rt', cls: 'fire left' }, { id: 'fireR', label: 'FIRE', b: 'rt', cls: 'fire right' },
   { id: 'use', label: 'USE', b: 0, cls: 'ctx c-use hidden' }, { id: 'vault', label: 'VAULT', b: 10, cls: 'ctx c-vault hidden' },
-  { id: 'ads', label: 'AIM', b: 'lt', cls: 'r r1 c1' }, { id: 'crouch', label: 'CROUCH', b: 1, cls: 'r r1 c2' },
-  { id: 'reload', label: 'RELOAD', b: 2, cls: 'r r2 c1' }, { id: 'swap', label: 'SWAP', b: 3, cls: 'r r2 c2' },
-  { id: 'skill', label: 'SKILL', b: 5, cls: 'r r3 c1' }, { id: 'gadget', label: 'GADGET', b: 4, cls: 'r r3 c2' },
-  { id: 'melee', label: 'MELEE', b: 11, cls: 'r r4 c1' }, { id: 'ping', label: 'PING', b: 12, cls: 'r r4 c2' },
+  // AIM and CROUCH sit by the left thumb (2026-11-16, a thumb-played match: on the right they meant stopping aiming and
+  // shooting in the middle of a fight); AIM is a tap on / tap off switch (holding it needed a third thumb)
+  { id: 'ads', label: 'AIM', b: 'lt', cls: 'lb lb1' }, { id: 'crouch', label: 'CROUCH', b: 1, cls: 'lb lb2' },
+  { id: 'reload', label: 'RELOAD', b: 2, cls: 'r r1 c1' }, { id: 'swap', label: 'SWAP', b: 3, cls: 'r r1 c2' },
+  { id: 'skill', label: 'SKILL', b: 5, cls: 'r r2 c1' }, { id: 'gadget', label: 'GADGET', b: 4, cls: 'r r2 c2' },
+  { id: 'melee', label: 'MELEE', b: 11, cls: 'r r3 c1' }, { id: 'ping', label: 'PING', b: 12, cls: 'r r3 c2' },
   { id: 'view', label: 'DRONE / CAMS', b: 13, cls: 't t1' }, { id: 'prev', label: '◀', b: 14, cls: 't t2 hidden' }, { id: 'next', label: '▶', b: 15, cls: 't t3 hidden' },
   { id: 'tiltc', label: '⟲ TILT', b: null, cls: 't t6 hidden' }, { id: 'map', label: 'MAP', b: 22, cls: 't t7' },
   { id: 'leanL', label: '◀ LEAN', b: 20, cls: 'lean l1' }, { id: 'leanR', label: 'LEAN ▶', b: 21, cls: 'lean l2' }, { id: 'score', label: 'SCORES', b: 8, cls: 't t4' }, { id: 'pause', label: '❚❚', b: 9, cls: 't t5' },
@@ -88,7 +110,8 @@ const N = 23;
 const held = new Array(N).fill(false), trig = { lt: 0, rt: 0 }, tc = { lt: 0, rt: 0 }; // tc: fingers on each trigger button
 let prevHeld = new Array(N).fill(false);
 const ls = { x: 0, y: 0 }, rs = { x: 0, y: 0 };
-let releaseAll = () => {}, fireAim = false, sprintLock = false; // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
+let releaseAll = () => {}, fireAim = false, sprintLock = false, adsLatch = false, adsEl = null;
+const setAds = on => { adsLatch = on; trig.lt = on ? 1 : 0; if (adsEl) adsEl.classList.toggle('on', on); }; // AIM: tap on, tap off // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
 let ui = null, shown = false, recentre = () => {};
 export const touchAimReset = () => recentre();
 
@@ -100,7 +123,8 @@ export function touchPad() {
   const pressed = held.map((v, i) => v && !prevHeld[i]), released = prevHeld.map((v, i) => v && !held[i]);
   prevHeld = held.slice();
   const L = (ls.x || ls.y || !tiltOn()) ? ls : tiltV; // a thumb on the stick wins over tilting
-  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsDir: fireAim, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released };
+  const gyro = gyroAcc; gyroAcc = 0;
+  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsDir: fireAim, rsHeld: rs.x !== 0 || rs.y !== 0, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released, gyro };
 }
 export const touchActive = () => isTouch && shown;
 
@@ -140,7 +164,7 @@ function build() {
       if (leftF !== null) return;
       leftF = id; const z = tz(), r = R * z, cx = x, cy = y;
       base.style.left = `${cx / z - 62}px`; base.style.top = `${cy / z - 62}px`; base.style.bottom = 'auto'; base.classList.add('held');
-      const move = (x, y) => { let u = (x - cx) / r, v = (y - cy) / r; const l = Math.hypot(u, v); if (l >= SPRINT_PUSH) sprintLock = true; else if (l < 0.6) sprintLock = false; base.classList.toggle('spr', sprintLock); if (l > 1) { u /= l; v /= l; } ls.x = u; ls.y = v; knob(base, ls); }; // push past the ring to sprint (like phone shooters)
+      const move = (x, y) => { let u = (x - cx) / r, v = (y - cy) / r; const l = Math.hypot(u, v); if (l >= SPRINT_PUSH) { if (!sprintLock) setAds(false); sprintLock = true; } else if (l < 0.6) sprintLock = false; base.classList.toggle('spr', sprintLock); if (l > 1) { u /= l; v /= l; } ls.x = u; ls.y = v; knob(base, ls); }; // push past the ring to sprint (like phone shooters)
       move(x, y);
       fingers.set(id, { move, end() { leftF = null; sprintLock = false; base.classList.remove('spr'); ls.x = ls.y = 0; knob(base, ls); base.style.left = base.style.top = base.style.bottom = ''; base.classList.remove('held'); } });
     }
@@ -148,6 +172,7 @@ function build() {
   // buttons: held while the finger that pressed them is down (wherever it slides)
   const pressButton = (id, el, x0, y0) => {
     const b = BUTTONS.find(q => q.id === el.dataset.id);
+    if (b.id === 'ads') { adsEl = el; setAds(!adsLatch); return; } // a tap switches aiming in on or off
     if (b.b === null) { tiltLevelNow(); el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 200); return; } // ⟲ TILT: how you hold it now is level
     const set = on => { el.classList.toggle('on', on); if (b.b === 'lt' || b.b === 'rt') { tc[b.b] = Math.max(0, tc[b.b] + (on ? 1 : -1)); trig[b.b] = tc[b.b] ? 1 : 0; } else held[b.b] = on; };
     set(true);
@@ -204,7 +229,7 @@ export function setTouchVisible(on) {
   if (on === shown) return;
   if (on) { tiltLevel = null; ui.querySelector('[data-id="tiltc"]').classList.toggle('hidden', !tiltOn()); } // a match starts level
   shown = on; ui.classList.toggle('hidden', !on); document.documentElement.classList.toggle('touchplay', on); keepAwake(on);
-  if (!on) { releaseAll(); sprintLock = false; ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
+  if (!on) { releaseAll(); setAds(false); sprintLock = false; ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
 }
 // Menus and match text shrink to fit small screens (the game picture itself always fills the screen), times the
 // player's own size setting. Menus are laid out for ~900 px tall, the match text for ~760 (and both for the width).
