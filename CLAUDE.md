@@ -71,9 +71,10 @@ only add to this file if it is a rule every session needs.
   doors/windows on a shared wall go AFTER the wing's `box`; never run a shape through
   furniture, doors or stairs. `node tests/reach.js`, `tests/openings.js` must pass.
 - Tests import `tests/_tmpdata.js` first so they never write to the real `data/`.
-- Known flaky now and then (seen before recent changes): `tests/feeds.js`,
-  `tests/stuckbots.js`, `tests/prepff.js`, `tests/roofbots.js`/`ropebots.js` (crash in
-  `hitscan` → `damage`).
+- Node is not on PATH in a plain session: run tests through
+  `nix develop /home/insideabush/nixos-config#vibe-web --command ...` (a failing `node` hides in grep).
+- Checked 2026-11-16: `tests/feeds.js` 4/4, `stuckbots.js` 3/3, `ropebots.js` 3/3 pass;
+  `prepff.js` was a test fault (a third teammate or a wall in the line of fire), fixed, 40/40.
 
 ## How it is built
 
