@@ -65,6 +65,8 @@ ok(!g.ents.some(e => e.type === 'nade'), 'grenade catcher did not zap the grenad
 fresh(); setup(a, 'crow', X, Y, 0); setup(d, 'lynx', X + 60, Y, Math.PI); d.hp = d.maxHp = 100; g.melee(a); ok(d.hp === 100, 'a plain melee should not reach 60 px');
 a.meleeCd = 0; use(a); ok(a.lungeUntil > g.time, 'lunge not ready'); g.time += 1.6; g.melee(a); run(0.3); ok(!d.alive || d.downed, 'the lunge did not down the defender (facing him)'); ok(a.x > X + 30, 'Crow did not lunge forward', a.x);
 setup(a, 'crow', X, Y, 0); a.meleeCd = 0; setup(d, 'lynx', X + 50, Y, 0); d.hp = d.maxHp = 100; use(a); g.time += 1.6; g.melee(a); run(0.3); ok(!d.alive || d.downed, 'the lunge did not down the defender (from behind)');
+setup(a, 'crow', X, Y, 0); a.meleeCd = 0; setup(d, 'lynx', X + 50, Y, 0); d.hp = d.maxHp = 100; use(a); g.time += 1.6; use(a); run(0.3); ok(!d.alive || d.downed, 'pressing the skill again (2026-11-16) did not lunge')
+setup(a, 'crow', X, Y, 0); a.meleeCd = 0; setup(d, 'lynx', X + 50, Y, 0); d.hp = d.maxHp = 100; use(a); g.time += 0.3; use(a); run(0.3); ok(d.alive && !d.downed, 'the skill pressed again before the blade is ready should not lunge')
 setup(a, 'crow', X, Y, 0); setup(d, 'lynx', X + 18, Y, Math.PI); d.hp = d.maxHp = 100; a.meleeCd = 0; g.melee(a); ok(d.alive && d.hp === 45, 'a front melee should be a normal hit', d.hp);
 // BLAZE: blinds a defender facing the flare, not one looking away
 fresh(); setup(a, 'blaze', X, Y, 0); setup(d, 'lynx', X + 150, Y, Math.PI); const d2 = g.addPlayer('Def2', false); d2.squad = d.squad; setup(d2, 'lynx', X + 150, Y + 20, 0);

@@ -94,3 +94,6 @@ export const other = team => (team === TEAM.ATK ? TEAM.DEF : TEAM.ATK);
 
 // PERCH's Overwatch (he chose 2026-11-15): a locked watch cone, 30°, 30 m, 20 s
 export const OVERWATCH = { time: 20, range: 30 * PX_PER_M, half: 15 * Math.PI / 180 };
+
+// CROW: how far the marked lunge reaches (m; was 4, Ball Knowledge 2026-11-10). Shared: the client shows CROW the distance.
+export const LUNGE_M = 5;

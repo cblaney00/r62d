@@ -41,7 +41,7 @@ const C = {}; const want = (k, why) => { C[k] = (C[k] || 0) + 1; if (C[k] <= 3) 
 // the first of these that is showing on the screen (a player only taps what they can see)
 const tapVis = async sel => { const c = JSON.parse(await js(`(() => { for (const e of document.querySelectorAll(${JSON.stringify(sel)})) { const r = e.getBoundingClientRect(); if (r.width && r.height && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth) return JSON.stringify([Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]); } return 'null'; })()`)); if (!c) { console.log('  nothing to tap on screen:', sel); return false; } await touch(finger('t', [c, [c[0], c[1], 60]])); return true; };
 const pt = (c, a, r) => [Math.max(2, Math.min(W - 3, Math.round(c[0] + Math.cos(a) * r))), Math.max(2, Math.min(H - 3, Math.round(c[1] + Math.sin(a) * r)))]; // (a thumb stays on the screen)
-let lastAmmo = null, fights = 0, shotsT = 0;
+let lastAmmo = null, fights = 0, shotsT = 0, lastPos = null, stuck = 0;
 
 async function run() {
   await call('session.new', { capabilities: {} });
@@ -91,11 +91,18 @@ async function run() {
     }
     if (s.shown.includes('vault')) { await tap('[data-id="vault"]'); await sleep(900); continue; }
     if (s.shown.includes('use') && /PLANT|DEFUS|REVIVE/i.test(s.prompt)) { // plant / defuse / revive: hold USE (right thumb), nothing to aim with meanwhile
-      const U = await centre('[data-id="use"]'); console.log('  holding USE:', s.prompt.slice(0, 40)); want('watch while planting', 'holding USE: the right thumb can\'t look around');
-      await touch(finger('U', [U, [U[0], U[1], 50]], 7500)); continue;
+      // USE is a tap that carries on (2026-11-16): tap it, then look round with the right thumb while it works
+      const U = await centre('[data-id="use"]'); console.log('  tapped USE:', s.prompt.slice(0, 40));
+      await touch(finger('U', [U, [U[0], U[1], 60]])); await sleep(300);
+      let best = 0; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; await touch(finger('R', [R0, pt(R0, a, 55)], 700)); best = Math.max(best, +(await js("(() => { const b = __r62d.st.me && __r62d.st.me.bu; return b ? b.p : 0; })()")) || 0); }
+      console.log('  while looking round, the action got to', Math.round(best * 100) + '%', '| planted:', await js("!!(__r62d.st.last && __r62d.st.last.pl)")); continue;
     }
     // no enemy: follow the compass (attack) or wander the site (defence), looking where you go
-    const a = s.cmp != null ? s.cmp + (Math.random() - 0.5) * 0.4 : Math.random() * Math.PI * 2;
+    // stuck (hardly moved since the last look): step off sideways for a moment, like a player sliding round a corner
+    const moved = lastPos ? Math.hypot(s.x - lastPos.x, s.y - lastPos.y) : 99; lastPos = { x: s.x, y: s.y };
+    stuck = moved < 12 ? stuck + 1 : 0;
+    const a = stuck ? (s.cmp != null ? s.cmp : 0) + (stuck % 2 ? 1 : -1) * (Math.PI / 2 + Math.random()) : s.cmp != null ? s.cmp + (Math.random() - 0.5) * 0.4 : Math.random() * Math.PI * 2;
+    if (stuck === 3) C['got stuck (a person would steer round)'] = (C['got stuck (a person would steer round)'] || 0) + 1;
     await touch(finger('L', [Lc, pt(Lc, a, s.side === 'def' && s.cmp == null ? 40 : 70)], 1100), finger('R', [R0, pt(R0, a, 55)], 1000, 60));
   }
   console.log('\n--- thumb report ---');

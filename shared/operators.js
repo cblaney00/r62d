@@ -203,7 +203,7 @@ export const OPERATORS = {
              ability: { id: 'burst', name: 'Smoke Burst', count: 3, desc: 'Blast a cone of thick smoke out in front of you. It spreads almost instantly and fills the shape of the room for 11 seconds.' },
              gadget: 'frag', gadgetCount: 2, color: '#9aa8b8', helmet: '#40444c', look: 'mask' },
   crow: { team: 'atk', name: 'CROW', role: 'Lunge Flanker', armor: 3, primary: 'sabre', secondary: 'p10',
-             ability: { id: 'lunge', name: 'Lunge', count: 2, desc: 'Aim at an enemy within 5 metres and draw your blade: they hear it and are warned. After 1 second, for 5 seconds, your melee is a 5-metre lunge straight at them that downs them, from any side.' },
+             ability: { id: 'lunge', name: 'Lunge', count: 2, desc: 'Aim at an enemy within 5 metres and draw your blade: they hear it and are warned. After 1 second, for 5 seconds, press the skill again (or melee) for a 5-metre lunge straight at them that downs them, from any side. A blade mark over each enemy you see shows how far they are.' },
              gadget: 'stun', gadgetCount: 2, color: '#3a3d46', helmet: '#2a2c32', look: 'hood' },
   // ---- snipers (he asked 2026-11-10: more attackers with sniper rifles; he chose all four ideas) ----
   perch: { team: 'atk', name: 'PERCH', role: 'Overwatch Sniper', armor: 1, primary: 'mammoth', secondary: 'needle', // (2026-11-15, he asked: the bipod made no sense; he chose Overwatch)

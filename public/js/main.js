@@ -1,6 +1,6 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
-import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL, OVERWATCH } from '/shared/constants.js';
+import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL, OVERWATCH, LUNGE_M } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
 import { roofRopeAt, hatchAtPoint, plantBomb, PLANT_R, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
@@ -891,7 +891,7 @@ function onEvent(e, s, players) {
       st.marks.push({ ...e, pk, t: now }); fx.ping(e.x, e.y, pingOf(pk).col);
       audio.pingSound(pk);
     } break;
-    case 'lungeWarn': if (e.id === st.id) { addFeed('CROW drew a blade on you: a lunge is coming in 1.5 s'); audio.play('unsheathe', st.pred.x, st.pred.y); st.lungeWarnT = now; } break;
+    case 'lungeWarn': if (e.id === st.id) { addFeed('CROW drew a blade on you: a lunge can come in 1 s'); audio.play('unsheathe', st.pred.x, st.pred.y); st.lungeWarnT = now; } break;
     case 'deny': if (e.id === st.id) addFeed(e.why); break;
     case 'emped': if (e.id === st.id) { addFeed('EMP! Your skill and gadget are fried for 8 seconds'); audio.foley('beep', st.pred.x, st.pred.y); st.empUntil = now + e.dur; } break; // TALON
     case 'scanned': if (e.id === st.id) { addFeed('A scanner just picked up your heartbeat'); audio.foley('beep', st.pred.x, st.pred.y); } break; // WRAITH
@@ -3225,6 +3225,22 @@ function draw(s, view, now, dt) {
         if (st.tv && sp.ef.some(e => e[0] === 'blind')) { const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, 16); g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, 16, 0, 7); ctx.fill(); } // TV: who the flash got
         drawStatus(p, sp.ef, side, now, p.tm === side ? 28 : 27);
         ctx.font = '600 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
+      }
+      if (p.tm !== side && me.op === 'crow' && me.ct === 'body' && !st.tv && !p.dn) { // CROW (he asked 2026-11-16): a blade mark over enemies he sees, the one he marked always, with how far he is
+        const lg = me.lg, marked = lg && lg[0] === p.id;
+        if (marked || seen(p.x, p.y)) {
+          const u = UP(), d = Math.hypot(p.x - st.pred.x, p.y - st.pred.y) / PX_PER_M, inR = d <= LUNGE_M, ready = marked && lg[1] <= 0;
+          const col = inR ? '#7dffa0' : '#ff9d5c', tx = p.x + u.x * 34, ty = p.y + u.y * 34, px = -u.y, py = u.x, z = marked ? 1.5 : 1;
+          ctx.save(); ctx.globalAlpha = marked ? 0.95 : 0.7; ctx.fillStyle = col; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(tx - u.x * 5 * z, ty - u.y * 5 * z); ctx.lineTo(tx + px * 1.6 * z, ty + py * 1.6 * z); ctx.lineTo(tx + u.x * 4 * z, ty + u.y * 4 * z); ctx.lineTo(tx - px * 1.6 * z, ty - py * 1.6 * z); ctx.closePath(); ctx.fill(); ctx.stroke(); // the blade, point down
+          ctx.beginPath(); ctx.moveTo(tx + u.x * 4 * z - px * 3 * z, ty + u.y * 4 * z - py * 3 * z); ctx.lineTo(tx + u.x * 4 * z + px * 3 * z, ty + u.y * 4 * z + py * 3 * z); ctx.strokeStyle = col; ctx.lineWidth = 1.4 * z; ctx.stroke(); // the guard
+          if (marked) { ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p.x, p.y, 13 + Math.sin(now * 8) * 1.2, 0, 7); ctx.stroke(); }
+          ctx.font = `700 ${(marked ? 8.5 : 7) * nk}px Barlow Condensed, sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = col;
+          const key = label('ability'), dm = d.toFixed(1) + ' m';
+          const txt = !marked ? (inR ? `${dm} · ${key} TO MARK` : `${dm} · LUNGE ${LUNGE_M} m`) : !ready ? `BLADE OUT ${Math.ceil(lg[1])} s · ${dm}` : inR ? `LUNGE READY · ${key} · ${dm}` : `GET WITHIN ${LUNGE_M} m · ${dm}`;
+          ctx.fillText(txt, tx + u.x * 9, ty + u.y * 9); ctx.restore();
+          ctx.font = '600 6px Barlow Condensed, sans-serif'; ctx.textAlign = 'center';
+        }
       }
       if (p.tm !== side && spotted.has(p.id)) {
         const u = UP(), tx = p.x + u.x * 19, ty = p.y + u.y * 19, px = -u.y, py = u.x; // spotted: a small faint triangle above them (he asked: fewer, quieter marks)

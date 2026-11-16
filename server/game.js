@@ -1,5 +1,5 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
-import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM, OVERWATCH } from '../shared/constants.js';
+import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM, OVERWATCH , LUNGE_M } from '../shared/constants.js';
 import { plantBomb, floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
 import { localPos, buildMap, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ropeAimLimit, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers , inBox } from '../shared/physics.js';
@@ -49,7 +49,6 @@ const EF_FIELD = { blind: 'stunUntil', stun: 'stunUntil', slow: 'slowUntil', sna
 const THROWN_G = new Set(['smoke', 'frag', 'stun', 'impact', 'nitro']), PLACED_G = new Set(['breach', 'claymore', 'wire', 'dshield']);
 const THROWN_AB = new Set(['emp', 'sonar', 'stickycam', 'gas', 'flare', 'medkit', 'echobox']);
 const PLACED_AB = new Set(['prox', 'concuss', 'clamp', 'sensor', 'plates', 'turret', 'spike', 'alarm', 'pace', 'radar', 'station', 'catcher', 'jammer', 'mine', 'grid', 'cover', 'cutter', 'periscope', 'scope']);
-const LUNGE_M = 5; // CROW: how far the marked lunge reaches (m; was 4, Ball Knowledge 2026-11-10: 40% of rounds won)
 const LUNGE_WIND = 1; // CROW: seconds from drawing the blade to the lunge being ready (was 1.5)
 const PIERCE_DMG = 0.55; // NAIL: damage a piercing round keeps through the wall (was 0.4)
 const SHIELD_ASIDE = 0.45; // BULWARK: seconds to swing the shield out of the way when aiming in // FERRO: seconds between hammer swings // TALON's EMP: a circle about a door wide (he asked), centred inside the wall it stuck to
@@ -1978,6 +1977,11 @@ export class Game {
       const waiting = this.ents.filter(e => e.type === 'sticky' && e.owner === p.id && e.stuck);
       if (waiting.length) { waiting.forEach((e, i) => { e.t = 0.05 + i * 0.08; e.go = true; }); this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); return; }
     }
+    if (id === 'lunge' && p.lungeUntil > this.time) { // CROW (he asked 2026-11-16): the skill key again lunges, once the blade is ready
+      if (this.time >= (p.lungeReady || 0) && !p.bracing && !p.rope && !p.downed && p.ctrl === 'body' && !(p.meleeCd > 0)) { this.events.push({ e: 'melee', id: p.id }); p.fireCd = Math.max(p.fireCd, 0.45); this.lunge(p); }
+      else this.events.push({ e: 'deny', id: p.id, why: 'The blade is not ready yet' });
+      return;
+    }
     if (op.ability.count && p.abilityCount <= 0) return;
     const ca = Math.cos(p.aim), sa = Math.sin(p.aim);
     const place = (type, dist, extra = {}) => { // set something down just in front of you, if there's floor there
@@ -3290,7 +3294,7 @@ export class Game {
       if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; if (p.defReq) o.dq = 1; } }
       if (p.alive && (p.sock || this.rec || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
         ga: this.free ? p.guns.map(q => q.w + ':' + attCode(q.att)) : undefined, // free play's gun menu shows what each held gun carries
-        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, ap: p.pierceShot ? 1 : undefined, su2: p.spotterUntil > this.time ? r1(p.spotterUntil - this.time) : undefined, gw2: p.ghillieUntil > this.time ? r1(p.ghillieUntil - this.time) : undefined, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
+        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, lg: p.lungeUntil > this.time ? [p.lungeTarget, r1(Math.max(0, (p.lungeReady || 0) - this.time)), r1(p.lungeUntil - this.time)] : undefined, /* CROW: marked enemy, s until ready, s left */ ap: p.pierceShot ? 1 : undefined, su2: p.spotterUntil > this.time ? r1(p.spotterUntil - this.time) : undefined, gw2: p.ghillieUntil > this.time ? r1(p.ghillieUntil - this.time) : undefined, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur), p.rope.climb ? 1 : 0, p.rope.inv ? 1 : 0, p.rope.from ?? -1, r2(p.rope.h ?? 0.5), this.ropeLevel(p) ? 1 : 0] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),
