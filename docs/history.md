@@ -268,3 +268,7 @@ Moved out of CLAUDE.md on 2026-11-16, word for word. Each section is one batch o
 - `android/` (see android/README.md): a ~70 KB APK, built without Gradle by `android/build.sh` (SDK tools from `android/sdk.nix` through Nix), signed with `~insideabush/.local/share/r62d/android-release.jks`. Start page finds games on the phone's networks or takes a HOST code, then shows the host's game in a full-screen web view (`window.r62dApp` bridge: quit, exit, nets, version). Phones can't host.
 - Main menu `⬇ ANDROID APP` (`.dlAnd`, `html.android` from the user agent in main.js): shown on computers and Android phones, hidden in the apps. `desktop/release.sh` builds and attaches `R62D-android.apk`.
 - Not run on a real phone or emulator (no KVM here); start page tested in headless Firefox against a server: finds it, joins it, refuses a wrong code.
+
+## Roof hatches over top-floor sites, wider resting view (2026-11-16)
+- He chose "attack from the roof" for the weak upstairs sites: see docs/balance.md (2026-11-16), `siteRoom` hatches in mapkit.js, `ROOF_SITE` in bots.js.
+- Resting view 20% further out (he asked; he chose: only the room-size resting zoom, for your character and Esports TV / replays; not drones, cameras, the rope view or phones; the long-sightline zoom-out and the aim-far fit keep their limits): `REST_ZOOM` 1.2 in main.js, applied to the body's room-size `want`.

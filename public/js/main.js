@@ -259,6 +259,7 @@ function lockedTarget(dt, view) {
 // to hold you and the crosshair (he asked: zoom, never let it leave the screen), up to FIT_MAX world px tall; only past
 // that does it slide along.
 const DRONE_PING_R = 10 * PX_PER_M, FIT_MAX = 2000;
+const REST_ZOOM = 1.2; // the resting (room-size) view of a body: he asked 2026-11-16 for 20% further out
 // A sightline for the camera's lead that stops where the floor you stand on ends (he asked: on a roof the open air past
 // the edge counted as a long view, so turning swung the camera out over nothing and back)
 function edgeSight(x, y, a, L) {
@@ -2194,6 +2195,7 @@ function frame(nowMs) {
     for (let i = 0; i < 24; i++) sum += view.kind === 'body' ? edgeSight(view.x, view.y, i / 24 * Math.PI * 2, 700) : castSight(st.map, view.x, view.y, i / 24 * Math.PI * 2, 700, null);
     const avg = sum / 24, aimD = castSight(st.map, view.x, view.y, view.ang, 900, null);
     want = Math.max(240, Math.min(470, avg * 1.15 + 110));
+    if (view.kind === 'body' && !isTouch) want *= REST_ZOOM; // (he asked 2026-11-16: the resting view 20% further out; also Esports TV / replays, not drones, cameras, ropes or phones)
     if (view.kind !== 'body') want = Math.max(want, Math.min(view.kind === 'cam' ? 580 : 520, aimD * (view.kind === 'cam' ? 0.75 : 0.6))); // (a body: farS below, steadier)
     if (view.kind === 'body') {
       // how far you can be seen (and so shot) from in the way you face: the 80th-percentile sightline across your
