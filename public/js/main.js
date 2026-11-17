@@ -2613,6 +2613,9 @@ function sendInput(dt, me, ctrl, view, s, now) {
     mw.x = persp.x + dx * k; mw.y = persp.y + dy * k; } // a head is drawn where its height shows it (look.js persp): back to where it really is
   if (st.winKp && st.winKp < 1 && st.winViewsOn && st.map && winAimed(st.aim)) { mw.x = st.pred.x + (mw.x - st.pred.x) / st.winKp; mw.y = st.pred.y + (mw.y - st.pred.y) / st.winKp; } // aiming down out of a window: the ground there is drawn shrunk toward you (drawWindowView)
   for (const H of st.hatchKp || []) if (H.kp !== 1 && mw.x >= H.x0 && mw.x <= H.x1 && mw.y >= H.y0 && mw.y <= H.y1) { mw.x = H.ex + (mw.x - H.ex) / H.kp; mw.y = H.ey + (mw.y - H.ey) / H.kp; break; } // aiming into a hatch view (drawHatchView): back to the real spot
+  // the bullet flies toward that real spot, not the drawn one: with the tilt a head is drawn away from the body, so a shot
+  // along the drawn direction passed beside the real body and missed (he noticed 2026-11-16: headshots missing on computer)
+  if (persp.h && ctrl === 'body' && !st.r3aim && Math.hypot(mw.x - st.pred.x, mw.y - st.pred.y) > 8) msg.a = Math.round(Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x) * 100000) / 100000;
   msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
   st.aimUp = ctrl === 'body' && me && me.a && !me.dn && !!aimUpHatch(st.map, st.pred.x, st.pred.y, mw.x, mw.y); // your own aim-up pose, without waiting for the server
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
