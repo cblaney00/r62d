@@ -153,6 +153,10 @@ const AIM_MODES = ['free', 'classic', 'face', 'spin', 'pad', 'turn', 'cursor'];
 // mode as it first was: aiming in leaves it where it is, and no slower mouse far out. Both move 1:1 every way now (he
 // asked for crispy aim). Everything else is the Crosshair mode (freeAimOn).
 const freeAimOn = () => aimMode === 'free' || aimMode === 'classic';
+// Phone on a rope (he asked 2026-11-17: "the aim should switch to a drag, like the PC version"): the aim thumb drags the
+// crosshair round like a mouse (pollPad), with every Crosshair-mode rule of the rope view. st.rdOn is set in pollPad.
+const ropeDrag = () => !!st.rdOn;
+const freeLive = () => padOn && ((freeAimOn() && !gpRecent()) || ropeDrag());
 const FACE_ADS = 15 * Math.PI / 180; // Face aiming (he asked): aiming in keeps you within 15° either side of where you faced
 let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return localStorage.getItem('r62d-aim2') && AIM_MODES.includes(m) ? m : 'free'; } catch { return 'free'; } })();
 // Crosshair mode: where the crosshair sits from your character, in WORLD pixels. It can go anywhere you can see
@@ -200,6 +204,7 @@ const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45;
 // room-size view before it grows to fit the crosshair) the mouse moves it by Settings → Far aim sensitivity (0.5),
 // the same both ways, blended in over 1 m. Aiming in never puts it nearer than ADS_SNAP_MIN (he asked: 2 m).
 const ADS_SNAP_MIN = 2 * PX_PER_M;
+const ROPE_DRAG = 2; // phone rope drag: crosshair px per thumb px at the normal aim stick setting
 // Held wall (he asked 2026-11-09): keep the orange marker (bullets stop at a wall before the crosshair) on the same wall
 // or anything joined to it for WALL_HOLD s and it turns blue; while it stays blue, aiming in snaps the crosshair
 // onto the bracket (the wall), however far away it is (he asked). Looking off it (or the marker going away) starts over.
@@ -264,7 +269,7 @@ function lockedTarget(dt, view) {
   const L = st.camLock, hh = L.h * (st.adsZ || 1) * viewMul() / 2, hw = hh * VW / VH;
   if (floorAt(st.map, L.x, L.y) !== floorAt(st.map, view.x, view.y)) { L.x = view.x; L.y = view.y; L.free = false; } // another floor: go with you
   if (L.home) { const k = 1 - Math.exp(-dt * 12); L.x += (view.x - L.x) * k; L.y += (view.y - L.y) * k; if (Math.hypot(view.x - L.x, view.y - L.y) < 2) L.home = false; } // centre key: glide back onto you
-  const fa = padOn && freeAimOn() && !gpRecent() ? freeAimPoint() : null;
+  const fa = freeLive() ? freeAimPoint() : null;
   const sp = fa ? w2s(fa.ax, fa.ay) : cursor(), p = tilt.project(sp.x / DPR, sp.y / DPR), W = VW / DPR, H = VH / DPR;
   const band = LOCK_EDGE + Math.min(W, H) * 0.07, dep = v => Math.max(0, Math.min(1, v / (band - LOCK_EDGE)));
   const ex = dep(band - p.x) > 0 ? -dep(band - p.x) : dep(p.x - (W - band)), ey = dep(band - p.y) > 0 ? -dep(band - p.y) : dep(p.y - (H - band));
@@ -360,7 +365,7 @@ function scopeSway(dt, me, now) {
   st.swayA = (st.swayA || 0) + (want - (st.swayA || 0)) * (1 - Math.exp(-dt * (want < (st.swayA || 0) ? 22 : 4)));
   const v = st.swayA * (Math.sin(now * 1.3) + 0.5 * Math.sin(now * 2.9 + 1)), d = v - (st.swayV || 0);
   st.swayV = v; if (!d) return;
-  if (padOn && freeAimOn() && !gpRecent()) turnAim(d);
+  if (freeLive()) turnAim(d);
   else padAng = wrapAng(padAng + d);
 }
 const pad = () => ({ x: VW * 0.84, y: VH * 0.52, r: VH * 0.12 });
@@ -431,7 +436,7 @@ function aimAssist(dt, view) {
   const ads = adsHeld() || gpk.ads, aiming = performance.now() - (st.aimMoveT || -1e9) < 300 || stick || mouse.l || gpk.fire || keys.has('fire') || ads;
   if (!aiming) return;
   const step = Math.sign(best.da) * Math.min(Math.abs(best.da), (ads ? ASSIST.adsPull : ASSIST.pull) * dt);
-  if (freeAimOn() && !gpRecent()) turnAim(step);
+  if (freeLive()) turnAim(step);
   else if (stick) st.asOff = Math.max(-ASSIST.max, Math.min(ASSIST.max, (st.asOff || 0) + step)); // the thumb holds the stick's angle: the pull rides on top of it
   else padAng = wrapAng(padAng + step);
 }
@@ -442,7 +447,7 @@ function cursor() {
     return l <= R ? mouse : { x: P.x + dx / l * R, y: P.y + dy / l * R };
   }
   const z = st.zoom || 1, P0 = w2s(st.pred.x, st.pred.y), px = P0.x, py = P0.y;
-  if (freeAimOn() && !gpRecent()) { const q = freeAimPoint(); return w2s(q.x, q.y); }
+  if (freeLive()) { const q = freeAimPoint(); return w2s(q.x, q.y); }
   if (touchFar()) { const q = padPointW(); return w2s(q.ax, q.ay); }
   const cx = Math.cos(padAng + (st.asOff || 0) + (st.rot || 0)), cy = Math.sin(padAng + (st.asOff || 0) + (st.rot || 0)), m = 30 * DPR; // (asOff: the aim help's pull)
   const scoped = scopeOn(st.me);
@@ -1118,6 +1123,21 @@ function pollPad(dt, view) {
   // phone gyro (touch.js): turning the phone turns the aim; on top of a thumb on the aim stick too, until that thumb lets go
   const gm = gp.gyro ? gyroMode() : 'off', gy = gm === 'always' || (gm === 'ads' && (gpk.ads || (st.me && st.me.ad))) ? gp.gyro * gyroSens() * (gyroInv() ? -1 : 1) : 0;
   const onAim = st.me && (st.me.ct === 'body' || st.me.ct === 'drone') && !(view && view.kind === 'cam');
+  { // phone on a rope: drag aim (see ropeDrag). Starts from where the crosshair is, so nothing jumps; back on the stick
+    // after, from where the drag left it
+    const want = touchActive() && !st.tv && !!st.me && st.me.ct === 'body' && st.me.a && !st.me.dn && !!(st.me.ro && st.me.ro[0]) && !(view && view.kind === 'cam');
+    if (want && !st.rdOn && st.pred) { const c = cursor(), w = screenToWorld(c.x, c.y); aimOff = { x: w.x - st.pred.x, y: w.y - st.pred.y }; st.dzAng = Math.atan2(aimOff.y, aimOff.x); st.rdLast = null; }
+    if (!want && st.rdOn) { const l = Math.hypot(aimOff.x, aimOff.y), R = reachOf(st.me); padAng = Math.atan2(aimOff.y, aimOff.x); padReach = Math.max(0, Math.min(1, (l - AIM_MIN()) / Math.max(1, R - AIM_MIN()))); st.stk = null; st.hold = null; }
+    st.rdOn = want;
+    if (want) {
+      const p = gp.rsPx;
+      if (p && st.rdLast && st.rdLast.n === p.n) { // the same finger moved: the crosshair moves with it (faster than 1:1: a thumb's room is small)
+        const slow = (gpk.ads || st.me.ad ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1), k = ROPE_DRAG * (stickSens() / 0.7) * slow * DPR;
+        const dx = (p.x - st.rdLast.x) * k, dy = (p.y - st.rdLast.y) * k; if (dx || dy) { st.aimMoveT = performance.now(); freeMove(dx, dy); }
+      }
+      st.rdLast = p; gpLastL = rs.l; return;
+    }
+  }
   if (!(rs.l > 0.05) && !gp.rsOn) st.gyroOff = 0;
   // PHONE aim stick (he asked 2026-11-17: gentler, an accelerating outer zone, fine aim, everything a mouse has):
   // public/js/aimstick.js 'steady', chosen by tests/aimstick.js with simulated human thumbs. It starts from where you aim
@@ -2332,8 +2352,8 @@ function frame(nowMs) {
   pollPad(dt, view);
   aimAssist(dt, view);
   setTouchVisible(playing() && !st.tv && !menuOpen() && !!st.me && $('pause').classList.contains('hidden')); // phone controls only while playing
-  { const R = ropeOf(); if (R) { padAng = wrapAng(ropeAimLimit(R, padAng)); if (freeAimOn()) limitAim(a => ropeAimLimit(R, a)); } } // on a rope: facing the wall
-  if (sliding()) { padAng = wrapAng(slideAim(padAng)); if (freeAimOn()) limitAim(slideAim); }
+  { const R = ropeOf(); if (R) { padAng = wrapAng(ropeAimLimit(R, padAng)); if (freeAimOn() || ropeDrag()) limitAim(a => ropeAimLimit(R, a)); } } // on a rope: facing the wall
+  if (sliding()) { padAng = wrapAng(slideAim(padAng)); if (freeAimOn() || ropeDrag()) limitAim(slideAim); }
   padOn = (aimMode !== 'cursor' || gpRecent()) && !!view && (view.kind === 'body' || view.kind === 'drone');
   st.rot = aimMode === 'spin' && padOn && !gpRecent() ? -Math.PI / 2 - padAng : 0; // Rotate: you always face up the screen
   { const rt = ropeCam(dt); if (rt > 0 && st.rtFace != null) { const to = -Math.PI / 2 - st.rtFace, d = Math.atan2(Math.sin(to - st.rot), Math.cos(to - st.rot)); st.rot += d * (rt * rt * (3 - 2 * rt)); } } // on a rope: the wall ahead, up the screen
@@ -2348,7 +2368,7 @@ function frame(nowMs) {
   // (It used to follow the loose pointer, and the camera sliding after it made everything bounce — he noticed.)
   if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone')) {
     const c = cursor(), mw = screenToWorld(c.x, c.y);
-    st.aim = padOn && freeAimOn() && !gpRecent() ? aimAng() : Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x); // (Crosshair mode: its own direction, held in the close dead zone)
+    st.aim = freeLive() ? aimAng() : Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x); // (Crosshair mode: its own direction, held in the close dead zone)
     if (sliding()) st.aim = slideAim(st.aim);
     { const R = ropeOf(); if (R) st.aim = ropeAimLimit(R, st.aim); }
     if (r3on() && rope3d.active()) { const a = rope3d.aim(); if (a) { st.aim = a.ang; aimOff = { x: a.x - st.pred.x, y: a.y - st.pred.y }; st.r3aim = a; } } else st.r3aim = null; // the 3D rope view: where its crosshair is
@@ -2373,7 +2393,7 @@ function frame(nowMs) {
     if (view.kind === 'body') {
       // he said the view was "super bouncy" when looking round: the lead used the crosshair's place on SCREEN, which itself
       // moves with the camera (a feedback loop). Crosshair mode now leads from the aim point in the world.
-      const fa = !st.tv && padOn && freeAimOn() && !gpRecent() ? freeAimPoint() : null;
+      const fa = !st.tv && freeLive() ? freeAimPoint() : null;
       const c = cursor(), mw = st.tv ? { x: st.pred.x + Math.cos(st.aim) * 160, y: st.pred.y + Math.sin(st.aim) * 160 } : fa ? { x: fa.ax, y: fa.ay } : screenToWorld(c.x, c.y); // TV: lead the way they look
       const vh = st.viewH || 400;
       const lx = (mw.x - st.pred.x) * 0.22, ly = (mw.y - st.pred.y) * 0.22, l = Math.hypot(lx, ly), mx = vh * (me && me.ad ? (sniperOn(me) ? 0.5 : scopeOn(me) ? 0.46 : 0.32) : 0.2); // a scope looks further ahead
@@ -2404,7 +2424,7 @@ function frame(nowMs) {
     }
     st.lastViewPos = view ? { x: view.x, y: view.y } : null;
   }
-  if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && freeAimOn() && !gpRecent() && st.zoom) { // Crosshair mode: the target keeps
+  if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone') && freeLive() && st.zoom) { // Crosshair mode: the target keeps
     // you and the crosshair on screen with room past it (he asked), so the view glides there instead of jumping
     const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
     const keepT = (x, y, m) => { cx = Math.min(x + hw - m, Math.max(x - hw + m, cx)); cy = Math.min(y + hh - m, Math.max(y - hh + m, cy)); };
@@ -2480,7 +2500,7 @@ function frame(nowMs) {
   st.rads = (st.rads || 0) + ((me && me.ad && (st.rt || 0) > 0.5 ? 1 : 0) - (st.rads || 0)) * (1 - Math.exp(-dt * 6));
   if (st.rt > 0) st.viewH *= 1 - ROPE_ADS * st.rads * st.rt;
   if (st.rt > 0) st.viewH *= 1 - (ROPE_ZOOM_NAV + (ROPE_ZOOM - ROPE_ZOOM_NAV) * st.rpk) * st.rt; // (the rope camera comes in close over your shoulder: he asked for a lot closer; before the fit below, so you and your crosshair still both show)
-  const freeAim = !st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && freeAimOn() && !gpRecent();
+  const freeAim = !st.tv && view && (view.kind === 'body' || view.kind === 'drone') && freeLive();
   const tFar = !freeAim && view && view.kind === 'body' && touchFar();
   if (tFar) { // (phones: the same fit as below, for the aim stick's far point)
     const q = padPointW(), need = Math.min(FIT_MAX, fitBoth(q.ax - st.pred.x, q.ay - st.pred.y) * 1.45); // (more room: the thumb buttons cover the screen edges)
@@ -2647,7 +2667,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
     st.fireK = k.fire;
   }
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
-  const c = cursor(), mw = freeAimOn() && padOn && !gpRecent() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
+  const c = cursor(), mw = freeLive() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
   if (st.r3aim) { mw.x = st.r3aim.x; mw.y = st.r3aim.y; } // (the 3D rope view's crosshair)
   if (persp.h) { // (bodies stand up at most as if persp.cap from the eye: liftBody)
     const hh = persp.h * 0.46, dx = mw.x - persp.x, dy = mw.y - persp.y, d = Math.hypot(dx, dy), k = d / (1 + hh) <= persp.cap ? 1 / (1 + hh) : Math.max(0, d - persp.cap * hh) / Math.max(1e-6, d);
@@ -3735,7 +3755,7 @@ function crosshair(me, now) {
     ctx.strokeStyle = on ? '#ff3b3b' : 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.arc(H.x, H.y, r, 0, 7); ctx.stroke();
     if (on) { ctx.fillStyle = 'rgba(255,59,59,0.22)'; ctx.fill(); }
   }
-  const fq = freeAimOn() && padOn && !gpRecent() ? freeAimPoint() : null;
+  const fq = freeLive() ? freeAimPoint() : null;
   wallHeld(fq, now);
   if (sliding() || (aimMode === 'face' && padOn && !gpRecent() && adsHeld() && me.ct === 'body')) { // aimed in (Face) or sliding: the narrow area you are locked to
     const ca = sliding() ? st.pred.slA : st.faceC ?? padAng, R = Math.hypot(m.x - px, m.y - py);
@@ -4860,7 +4880,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset }; // for automated screenshot tests
+window.__r62d = { padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset, scr: () => { const c = cursor(), p = tilt.project(c.x / DPR, c.y / DPR), q = w2s(st.pred.x, st.pred.y), o = tilt.project(q.x / DPR, q.y / DPR); return { x: Math.round(p.x - o.x), y: Math.round(p.y - o.y) }; } }; // scr: the crosshair on screen, CSS px from your character // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.

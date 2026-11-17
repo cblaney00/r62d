@@ -96,6 +96,21 @@ async function run() {
       const off = (u, v) => Math.round(Math.hypot(u.x - v.x, u.y - v.y)); console.log('PRE-AIM spot moved', off(a, b), 'px while strafing,', off(a, c), 'px after walking right (player moved', off({ x: a.me[0], y: a.me[1] }, { x: c.me[0], y: c.me[1] }), 'px)');
       return;
     }
+    if (process.env.SCENARIO === 'rope') { // he asked 2026-11-17: on a rope the phone's aim drags the crosshair, like a mouse
+      const P = () => js('JSON.stringify((() => { const s = __r62d.st, c = __r62d.freeAimPoint(), m = s.me || {}; return { rope: !!(m.ro && m.ro[0]), drag: !!s.rdOn, ax: Math.round(c.ax), ay: Math.round(c.ay), aim: Math.round(s.aim * 57.3), scr: __r62d.scr() }; })())').then(JSON.parse);
+      const spot = JSON.parse(await js(`(() => { const m = __r62d.st.map, r = m.ropes.find(r => r.down < 0 && r.base && !r.wall && Math.abs(r.b - r.a) > 40) || m.ropes.find(r => r.down < 0 && r.base); const t = (r.a + r.b) / 2; return JSON.stringify({ x: r.base.x + r.tx * t, y: r.base.y + r.ty * t }); })()`));
+      await js(`__r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'clearBots' })); __r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'tp', x: ${spot.x}, y: ${spot.y} })); true`); await sleep(1200);
+      await tap('[data-id="use"]'); await sleep(2500);
+      const a0 = await P(); console.log('after ACTION at a rope:', JSON.stringify(a0), '(want rope and drag true)');
+      await shot('r1-on-rope');
+      await touch(finger('R', [R0, [R0[0] - 30, R0[1], 200], [R0[0] - 60, R0[1], 200]], 200)); await sleep(300);
+      const a1 = await P(); console.log('dragged the aim thumb 60 px LEFT (want the crosshair ~120 px left on screen):', JSON.stringify(a1), 'crosshair moved', Math.round(Math.hypot(a1.ax - a0.ax, a1.ay - a0.ay)), 'world px');
+      await touch(finger('R', [[R0[0] - 100, R0[1] + 40], [R0[0] - 100, R0[1] + 40, 300]], 200)); await sleep(300);
+      const a2 = await P(); console.log('a thumb landing and holding still elsewhere:', JSON.stringify(a2), 'moved', Math.round(Math.hypot(a2.ax - a1.ax, a2.ay - a1.ay)), '(want 0: no jump)');
+      await touch(finger('R', [R0, [R0[0], R0[1] - 50, 300]], 200)); await sleep(300);
+      const a3 = await P(); console.log('dragged 50 px up (want ~100 px up on screen):', JSON.stringify(a3)); await shot('r2-dragged');
+      return;
+    }
     if (process.env.SCENARIO === 'close') {
       { const st = await centre('#tsRight'), rl = await centre('[data-id="reload"]'); console.log('aim stick centre', st, 'RELOAD centre', rl, '(he asked: level, so the same height)'); } // he found 2026-11-17: the crosshair froze when brought close to the operator
       await js(`window.__rec = []; (function rec() { const s = __r62d.st; if (s.pred && s.me) { const p = __r62d.padFar(), d = Math.hypot(p.ax - s.pred.x, p.ay - s.pred.y), pd = __r62d.pad(), k = s.stk; __rec.push([Math.round(performance.now()), Math.round(d), Math.round(pd.padAng * 57.3), Math.round(pd.padReach * 1000) / 1000, Math.round((s.aim || 0) * 57.3), k ? Math.round(k.ox * 100) / 100 + ',' + Math.round(k.oy * 100) / 100 : '-']); } requestAnimationFrame(rec); })(); true`);

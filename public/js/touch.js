@@ -167,7 +167,7 @@ let releaseAll = () => {}, fireAim = false, sprintLock = false, adsLatch = false
 let useLatch = false, useEl = null, useLostT = 0;
 const setUse = on => { useLatch = on; held[0] = on; if (useEl) useEl.classList.toggle('on', on); };
 const setAds = on => { adsLatch = on; trig.lt = on ? 1 : 0; if (ui) for (const el of ui.querySelectorAll('.tbtn.aim')) el.classList.toggle('on', on); }; // AIM: tap on, tap off // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
-let ui = null, shown = false, recentre = () => {}, aimOn = false;
+let ui = null, shown = false, recentre = () => {}, aimOn = false, aimPx = null, aimPxN = 0; // aimPx: the aiming finger (aim stick or dragged FIRE) in screen px; aimPxN changes with each new finger
 export const touchAimReset = () => recentre();
 
 function stickOf(v) { const l = Math.min(1, Math.hypot(v.x, v.y)); return l < 0.08 ? { x: 0, y: 0, l: 0 } : { x: v.x / Math.max(l, 1e-6) * l, y: v.y / Math.max(l, 1e-6) * l, l }; }
@@ -179,7 +179,7 @@ export function touchPad() {
   prevHeld = held.slice();
   const L = (ls.x || ls.y || !tiltOn()) ? ls : tiltV; // a thumb on the stick wins over tilting
   const gyro = gyroAcc; gyroAcc = 0;
-  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsRaw: { x: rs.x, y: rs.y }, rsOn: aimOn, rsDir: fireAim, rsHeld: rs.x !== 0 || rs.y !== 0, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released, gyro }; // rsOn: a thumb is on the aim stick (main.js / aimstick.js turn it into aim)
+  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsRaw: { x: rs.x, y: rs.y }, rsOn: aimOn, rsDir: fireAim, rsHeld: rs.x !== 0 || rs.y !== 0, rsPx: aimPx && { x: aimPx.x, y: aimPx.y, n: aimPxN }, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released, gyro }; // rsOn: a thumb is on the aim stick (main.js / aimstick.js turn it into aim)
 }
 export const touchActive = () => isTouch && shown;
 
@@ -214,16 +214,16 @@ function build() {
     if (pb) { pb.click(); return; }
     if (x >= innerWidth / 2) { // right half: the aim stick appears under the thumb
       if (aimF !== null) return;
-      aimF = id; aimOn = true; ox = tx = x; oy = ty = y;
+      aimF = id; aimOn = true; ox = tx = x; oy = ty = y; aimPx = { x, y }; aimPxN++;
       dyn.classList.add('held'); rs.x = rs.y = 0; knob(dyn, rs);
       fingers.set(id, {
         move(x, y) {
           const Ra = R / stickSens() * TUNE.TRAVEL; // (lower sensitivity: a longer reach for the thumb; TRAVEL: extra room for fine aim, he asked)
-          tx = x; ty = y; let u = (x - ox) / Ra, v = (y - oy) / Ra; const l = Math.hypot(u, v);
+          tx = x; ty = y; aimPx = { x, y }; let u = (x - ox) / Ra, v = (y - oy) / Ra; const l = Math.hypot(u, v);
           if (l > 1) { ox += (u / l) * (l - 1) * Ra; oy += (v / l) * (l - 1) * Ra; u /= l; v /= l; } // the centre follows a thumb that slides past the edge
           rs.x = u; rs.y = v; knob(dyn, rs);
         },
-        end() { aimF = null; aimOn = false; rs.x = rs.y = 0; knob(dyn, rs); dyn.classList.remove('held'); },
+        end() { aimF = null; aimOn = false; aimPx = null; rs.x = rs.y = 0; knob(dyn, rs); dyn.classList.remove('held'); },
       });
     } else if (y > innerHeight * 0.3) { // lower left: the move stick jumps to wherever the thumb lands
       if (leftF !== null) return;
@@ -250,11 +250,12 @@ function build() {
       move(x, y) {
         if (b.id !== 'fireR' || aimF !== null) return; // the aim stick has priority if a thumb is on it too
         let u = (x - fx) / R, v = (y - fy) / R; const l = Math.hypot(u, v);
+        if (aimF === null) { if (!dragAim) aimPxN++; aimPx = { x, y }; } // (the rope's drag aim follows the FIRE thumb too)
         if (!dragAim && l * R < 10) return; // a small wobble while tapping doesn't turn you
         dragAim = fireAim = true; if (l > 1) { fx += (u / l) * (l - 1) * R; fy += (v / l) * (l - 1) * R; u /= l; v /= l; }
         rs.x = u; rs.y = v;
       },
-      end() { set(false); if (dragAim && aimF === null) rs.x = rs.y = 0; if (dragAim) fireAim = false; },
+      end() { set(false); if (aimF === null) aimPx = null; if (dragAim && aimF === null) rs.x = rs.y = 0; if (dragAim) fireAim = false; },
     });
   };
   const release = id => { const f = fingers.get(id); if (f) { fingers.delete(id); f.end(); } };

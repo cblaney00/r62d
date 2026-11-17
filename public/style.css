@@ -1458,3 +1458,10 @@ html.touch body:has(#status:not(:empty)) #allies { top: calc(34% + 50px); }
 #touchUI .tbtn.act .aw { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 3px; font: 800 11px var(--head); letter-spacing: 0.08em; color: #f2c14e; text-shadow: 0 1px 3px #000; white-space: nowrap; pointer-events: none; }
 #touchUI .tbtn.act.idle { background: rgba(10,14,18,0.5); border-color: rgba(242,193,78,0.5); } #touchUI .tbtn.act.idle .aw { color: #cfd6dc; } /* ACTION with nothing prompted: a quieter PING */
 #touchUI .tbtn.t3 { right: calc(max(22px, env(safe-area-inset-right)) + 232px); bottom: 24px; } #touchUI .tbtn.t2 { right: calc(max(22px, env(safe-area-inset-right)) + 294px); bottom: 24px; } /* camera arrows left of ACTION */
+/* the bomb-site finder under the score bar, thin (he asked 2026-11-17: much thinner, to free the view round your
+   character): one line, a small needle, then the site, its floor and how far */
+#compass { gap: 6px; padding: 2px 12px 2px 2px; border-radius: 14px; }
+#compass canvas { width: 22px; height: 22px; }
+#compass .cmpTxt { flex-direction: row; align-items: baseline; gap: 8px; line-height: 1; }
+#compass .cmpSite { font-size: 14px; } #compass .cmpFl { font-size: 11px; letter-spacing: 0.1em; } #compass b { margin-top: 0; font-size: 11px; }
+html.touchplay #compass .cmpSite { font-size: 12px; } html.touchplay #compass canvas { width: 18px; height: 18px; }

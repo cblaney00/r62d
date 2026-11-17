@@ -44,7 +44,7 @@
 
 /* ---------- 2. MATCH HUD (phone and computer) ---------- */
 /* the panels: the shared tint (--panel, now see-through) + sheen + grain, a lit rim and a soft shadow */
-#clock, .icons div, #objective, #killfeed div, #feed div, #hpwrap, #gadgets div, #cambar button, #scoreboard, #endscreen .board,
+#compass, #clock, .icons div, #objective, #killfeed div, #feed div, #hpwrap, #gadgets div, #cambar button, #scoreboard, #endscreen .board,
 #chatLog div, #viewlabel, #camTag, #tipNow, #freeHint, #outWarn, #winGo, #kcBtn, #deathCard, #coach, #tvCast .cl, .tvCard, #progress .bar, #stairPip {
   background-image: var(--g-sheen), var(--g-grain) !important; background-size: auto, 160px 160px !important; }
 #clock, .icons div, #objective, #hpwrap, #gadgets div, #cambar button, #viewlabel, #camTag, #tipNow, #freeHint, #kcBtn, #winGo {

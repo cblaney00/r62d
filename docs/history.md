@@ -433,3 +433,15 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Measured in headless gamescope on his GPU, empty free play, 1600x900 High, glass on vs off (same page, the
   stylesheet disabled), 3 rounds: 128 vs 131 fps average, 1% low 76 both (noise). With 5 bots fighting the numbers
   swing 60-140 either way, so measure empty. `tests/uicheck.js` with glass on vs off: no new cut-off text at 1280x720.
+
+## Phone rope drag aim; thin site finder (2026-11-17, he asked)
+- On a rope a phone now aims like the computer's Crosshair mode: the aim thumb (or a dragged FIRE) drags the crosshair
+  (`freeMove`, which turns the drag for the rope camera's `st.rot`), `ROPE_DRAG` 2 crosshair px per thumb px at aim
+  stick setting 0.7, slower aimed in / steadying. `pollPad` sets `st.rdOn` (body, alive, `me.ro[0]`, not a camera):
+  on the way in `aimOff` starts at the current crosshair; on the way out `padAng`/`padReach` come from it. Every
+  "Crosshair mode" check is now `freeLive()` (= the old `padOn && freeAimOn() && !gpRecent()`, or `ropeDrag()`), so
+  the rope view's reach, camera slide and wall rules all apply. touch.js reports the aiming finger as `rsPx` (with a
+  number per new finger, so a new touch never jumps). `SCENARIO=rope tests/thumbs.mjs`: on the rope drag is on, a 60 px
+  drag moves the crosshair the same way on screen, a new thumb holding still moves it 0. `__r62d.scr()` added.
+- The site finder (`#compass`) is one line: an 22 px needle (18 on phones), site, floor and distance in a row; 28 px
+  tall on a computer (was ~70). Now glass too.
