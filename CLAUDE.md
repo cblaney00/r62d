@@ -55,7 +55,7 @@ Search these with grep for a feature, a function name or a test name before chan
 | `docs/sound.md` | sound mix |
 | `docs/notes-next.md`, `docs/batch-*.md`, `docs/sniper-wip.md`, `docs/voice.md` | older plans and leftovers |
 | `android/README.md`, `public/phone/README.md` | the Android app: the whole game on a phone (its server runs in the page), joining computers, updates, signing |
-| `tools/changelog/` | his change history document (rebuilt after every commit into ~/Documents); add each new day to `days.json` |
+| `tools/changelog/` | his change history document (rebuilt after every commit into ~/Documents); add each new day to `days.json`. The living online copy is a Claude Doc, https://claude.ai/artifact/EZYgwK9XPQkXkghFDzfuLA: add each batch to it too |
 | `shared/patchnotes.js` | add a line for every gameplay change |
 
 When adding a feature a player uses, also update: tutorial.js `STEPS`, index.html
