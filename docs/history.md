@@ -374,3 +374,10 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   calmer out there (`FAR_A`, `FAR_L` 0.25); the sweep (`SWEEP=1`, kept only settings that held 3 m ≥ 97 % and 8 m ≥
   75 %) also picked ZONE 0.7, NEAR 0.55, OUT 1.2. Body held: 3 m 100 %, 8 m 82 %, 15 m 41 % (old stick 6 %).
   tests/aimstick.js now fails under 25 % at 15 m.
+- Later (he asked: fine movement needs more room, the outer feel is good): `TUNE.TRAVEL` 1.5 (touch.js `Ra`): the thumb
+  travels 50 % further, all of it added to the fine zone (ZONE 0.8; the outer zone keeps its ~27 px and slope, NEAR
+  0.55). The first 20 % of the reach now takes 47 px of thumb (was 28). `SWEEP=inner` in tests/aimstick.js; the
+  simulated tremor is in screen px. Thumb test: 3 m 100 %, 8 m 78 %, 15 m 38 %.
+- White slashes beside the phone buttons (he saw them): the menu buttons' parked shine (`button::after`, skewed, off
+  to the left) showed because `#touchUI .tbtn` has `overflow: visible` for the count badges; hidden on touch buttons,
+  with the tap ripple.

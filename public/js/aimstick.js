@@ -21,7 +21,7 @@ export const SCHEMES = {
 };
 // reach curve: inside ZONE of the stick the crosshair only goes out to NEAR of its reach (fine control); past it the
 // reach climbs steeply (the acceleration zone) to full reach at the rim
-export const TUNE = { ZONE: 0.7, NEAR: 0.55, IN: 1.25, OUT: 1.2, FINE: 0.3, SLOW: 0.6, FAST: 3.2, SWIPE: 0.14, PAUSE: 0.12, QUICK: 1.6, BIG: 1.15, CALM: 4, FAR_A: 0.25, FAR_L: 0.25 }; // (ZONE, NEAR, CALM chosen by the simulated-thumb sweep, 2026-11-17)
+export const TUNE = { ZONE: 0.8, NEAR: 0.55, IN: 1.25, OUT: 1.2, FINE: 0.3, SLOW: 0.6, FAST: 3.2, SWIPE: 0.14, PAUSE: 0.12, QUICK: 1.6, BIG: 1.15, CALM: 4, FAR_A: 0.25, FAR_L: 0.25, TRAVEL: 1.5 }; // TRAVEL: how much further the thumb travels than the stick drawn (touch.js) // (ZONE, NEAR, CALM chosen by the simulated-thumb sweep, 2026-11-17)
 const T = TUNE;
 export function reachFrom(l, curve) {
   l = Math.max(0, Math.min(1, l));

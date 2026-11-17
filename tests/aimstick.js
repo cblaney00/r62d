@@ -11,7 +11,7 @@ import { newStick, stepStick, stickFrom, SCHEMES, TUNE } from '../public/js/aims
 
 export const DIAG = { n: 0, lat: 0, rad: 0 };
 const TRIALS = Number(process.argv[2] || 300), DT = 1 / 60, PXM = 36, AIM_MIN = 46, REACH = 18 * PXM;
-const sens = 0.7, Rpx = 62 / sens; // the stick radius the thumb really travels, in screen px
+const sens = 0.7; let Rpx = 62 / sens * TUNE.TRAVEL; // (the shake below is in screen px, so a longer stick shakes less in stick terms) // the stick radius the thumb really travels, in screen px
 let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const gauss = () => { let u = 0; for (let i = 0; i < 6; i++) u += rnd(); return (u - 3) / Math.sqrt(0.5); };
 const dist = r => AIM_MIN + r * (REACH - AIM_MIN);
@@ -51,7 +51,7 @@ function trial(scheme, m, gyro) {
         mv = null; nextLook = t + 0.08;
       }
     }
-    trem.x = trem.x * 0.8 + gauss() * 0.003; trem.y = trem.y * 0.8 + gauss() * 0.003; // ~0.5 px of shake at 8-12 Hz
+    const tq = 0.003 * 88.6 / Rpx; trem.x = trem.x * 0.8 + gauss() * tq; trem.y = trem.y * 0.8 + gauss() * tq; // ~0.5 px of shake at 8-12 Hz
     const tt = { x: thumb.x + trem.x, y: thumb.y + trem.y }, tl = Math.hypot(tt.x, tt.y);
     if (tl > 1) { tt.x /= tl; tt.y /= tl; }
     stepStick(s, tt, DT, 1, 1);
@@ -73,16 +73,16 @@ function trial(scheme, m, gyro) {
 
 // SWEEP=1: try combinations of the stick's numbers (TUNE) and print the best (body held, then speed, then shake)
 if (process.env.SWEEP) {
-  const grid = { NEAR: [0.45, 0.55], ZONE: [0.7, 0.75], OUT: [0.6, 0.85, 1.2], FAR_A: [0.25, 0.5, 1], FAR_L: [0.25, 0.5, 1] }, keys = Object.keys(grid), res = [];
+  const grid = process.env.SWEEP === 'inner' ? { TRAVEL: [1, 1.2, 1.35, 1.5], IN: [1.25, 1.5, 1.8] } : { NEAR: [0.45, 0.55], ZONE: [0.7, 0.75], OUT: [0.6, 0.85, 1.2], FAR_A: [0.25, 0.5, 1], FAR_L: [0.25, 0.5, 1] }, keys = Object.keys(grid), res = [];
   const combos = keys.reduce((acc, k) => acc.flatMap(c => grid[k].map(v => ({ ...c, [k]: v }))), [{}]);
   for (const scheme of ['steady']) for (const c of combos) {
-    Object.assign(TUNE, c);
+    Object.assign(TUNE, c); if (process.env.SWEEP === 'inner') { Rpx = 62 / sens * c.TRAVEL; TUNE.ZONE = 1 - 0.3 / c.TRAVEL; TUNE.NEAR = 0.55; } // (the outer part keeps its size in px and its feel; the inner part gets the extra travel)
     let pb = 0, tm = 0, sh = 0; const by = {};
     for (const m of [3, 8, 15]) { seed = 7 + m; const rs = []; for (let i = 0; i < TRIALS; i++) rs.push(trial(scheme, m, false)); const ok = rs.filter(r => r.tBody !== null); pb += ok.length / TRIALS / 3; by[m] = ok.length / TRIALS; tm += (ok.length ? ok.reduce((a, r) => a + r.tBody, 0) / ok.length : 3) / 3; sh += (ok.length ? ok.reduce((a, r) => a + (r.rms || 0), 0) / ok.length : 20) / 3; }
-    res.push({ scheme, c: { ...c }, pb, tm, sh, by });
+    res.push({ scheme, c: { ...c }, pb, tm, sh, by, trav: stickFrom(0.2, 'zone') * Rpx, near: TUNE.ZONE });
   }
   res.sort((a, b) => ((b.by[3] >= 0.97 && b.by[8] >= 0.75) - (a.by[3] >= 0.97 && a.by[8] >= 0.75)) || b.by[15] - a.by[15] || b.pb - a.pb);
-  for (const r of res.slice(0, 10)) console.log(JSON.stringify(r.c), 'body 3/8/15 m', [3, 8, 15].map(m => (r.by[m] * 100).toFixed(0) + '%').join(' / '), 'time', r.tm.toFixed(2), 'shake', r.sh.toFixed(1));
+  for (const r of res.slice(0, 12)) console.log(JSON.stringify(r.c), 'ZONE', r.near.toFixed(2), 'thumb px for the first 20% of reach', r.trav.toFixed(0), 'body 3/8/15 m', [3, 8, 15].map(m => (r.by[m] * 100).toFixed(0) + '%').join(' / '), 'time', r.tm.toFixed(2), 'shake', r.sh.toFixed(1));
   process.exit(0);
 }
 const med = a => { const b = a.filter(v => v !== null).sort((x, y) => x - y); return b.length ? b[b.length >> 1] : null; };

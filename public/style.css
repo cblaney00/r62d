@@ -1447,3 +1447,5 @@ html.touchplay #feed { max-width: 300px; }
 #touchUI .tbtn.l1 { left: max(150px, calc(env(safe-area-inset-left) + 130px)); } #touchUI .tbtn.l2 { left: max(200px, calc(env(safe-area-inset-left) + 180px)); }
 html.touch #siteFound { top: 31%; }
 html.touch #siteFound { top: 15%; } html.touch #siteFound canvas { width: 170px; height: 102px; } /* phones: a smaller floor plan so the card fits between the clock and the tip line */
+#touchUI .tbtn::after { display: none; } /* no menu-button shine on the phone buttons (he saw white slashes beside them: overflow is visible for the count badges, so the parked shine showed) */
+#touchUI .tbtn .ripple { display: none; }

@@ -1,4 +1,5 @@
 // Phone / tablet controls (he asked: a UI that pops up by itself on mobile). The touches act like a game controller
+import { TUNE } from './aimstick.js';
 // (main.js pollPad reads touchPad() when no real controller is plugged in), so every rule stays the same.
 //   Left thumb: a fixed stick to move (a light push walks, silently).
 //   Right half of the screen: a stick that appears wherever your thumb lands (he asked): drag to aim, further to
@@ -209,7 +210,7 @@ function build() {
       dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; dyn.classList.remove('hidden'); rs.x = rs.y = 0; knob(dyn, rs);
       fingers.set(id, {
         move(x, y) {
-          const Ra = R / stickSens(); // (lower sensitivity: a longer reach for the thumb)
+          const Ra = R / stickSens() * TUNE.TRAVEL; // (lower sensitivity: a longer reach for the thumb; TRAVEL: extra room for fine aim, he asked)
           tx = x; ty = y; let u = (x - ox) / Ra, v = (y - oy) / Ra; const l = Math.hypot(u, v);
           if (l > 1) { ox += (u / l) * (l - 1) * Ra; oy += (v / l) * (l - 1) * Ra; u /= l; v /= l; dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; } // the stick follows a thumb that slides past its edge
           rs.x = u; rs.y = v; knob(dyn, rs);

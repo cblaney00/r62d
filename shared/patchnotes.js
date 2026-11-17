@@ -90,4 +90,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: buttons sized and placed by how often you press them, AIM on the corner of each FIRE, a gentler aim stick with its own sensitivity setting, and steady aim when scoped in with the move thumb off.', v: 1 },
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the aim stick has a fine-aim inner zone and an outer zone that accelerates out to full reach, damps thumb shake, and starts from where you already aim.', v: 1 },
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the aim stick is calmer out in its accelerating zone, so far targets (15 m) are much easier to stay on.', v: 1 },
+  { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the aim stick gives fine aiming 50% more thumb room; the outer zone feels the same.', v: 1 },
 ];
