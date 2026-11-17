@@ -21,7 +21,7 @@ export const SCHEMES = {
 };
 // reach curve: inside ZONE of the stick the crosshair only goes out to NEAR of its reach (fine control); past it the
 // reach climbs steeply (the acceleration zone) to full reach at the rim
-export const TUNE = { ZONE: 0.75, NEAR: 0.45, IN: 1.25, OUT: 0.85, FINE: 0.3, SLOW: 0.6, FAST: 3.2, SWIPE: 0.14, PAUSE: 0.12, QUICK: 1.6, BIG: 1.15, CALM: 4 }; // (ZONE, NEAR, CALM chosen by the simulated-thumb sweep, 2026-11-17)
+export const TUNE = { ZONE: 0.7, NEAR: 0.55, IN: 1.25, OUT: 1.2, FINE: 0.3, SLOW: 0.6, FAST: 3.2, SWIPE: 0.14, PAUSE: 0.12, QUICK: 1.6, BIG: 1.15, CALM: 4, FAR_A: 0.25, FAR_L: 0.25 }; // (ZONE, NEAR, CALM chosen by the simulated-thumb sweep, 2026-11-17)
 const T = TUNE;
 export function reachFrom(l, curve) {
   l = Math.max(0, Math.min(1, l));
@@ -53,7 +53,12 @@ export function stepStick(s, t, dt, sens = 1, slow = 1) {
     if (s.tx === null) { s.tx = t.x; s.ty = t.y; } // (o starts where you already aim: it glides from there to the thumb)
     if (Math.hypot(t.x, t.y) < 0.05) { s.tx = t.x; s.ty = t.y; return s; } // a thumb resting in the middle changes nothing
     const sp = Math.hypot(t.x - s.tx, t.y - s.ty) / Math.max(dt, 1e-3), k = (T.CALM + 60 * smooth((sp - T.SLOW) / (T.FAST - T.SLOW))) * Math.max(0.3, Math.min(1.6, sens) * slow);
-    const f = Math.min(1, dt * k); s.ox += (t.x - s.ox) * f; s.oy += (t.y - s.oy) * f; s.tx = t.x; s.ty = t.y;
+    // filtered as direction and distance: out in the accelerating zone a wobble moves the crosshair a lot, so both are
+    // calmer there (FAR_A for the direction, FAR_L for the distance; he asked for more hits at 15 m)
+    const tl = Math.hypot(t.x, t.y), ol = Math.hypot(s.ox, s.oy), oa = Math.atan2(s.oy, s.ox), ta = Math.atan2(t.y, t.x);
+    const far = smooth((Math.max(tl, ol) - T.ZONE) / (1 - T.ZONE)), fa = Math.min(1, dt * k * (1 - (1 - T.FAR_A) * far)), fl = Math.min(1, dt * k * (1 - (1 - T.FAR_L) * far));
+    const na = ol < 0.04 ? ta : oa + Math.atan2(Math.sin(ta - oa), Math.cos(ta - oa)) * fa, nl = ol + (tl - ol) * fl;
+    s.ox = Math.cos(na) * nl; s.oy = Math.sin(na) * nl; s.tx = t.x; s.ty = t.y;
   } else if (S.kind === 'abs') { s.ox = t.x; s.oy = t.y; }
   else {
     if (s.tx === null) { s.tx = t.x; s.ty = t.y; s.first = true; s.sw = false; s.ep = 0; } // the thumb just landed: no jump, o stays where the aim is

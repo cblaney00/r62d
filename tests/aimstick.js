@@ -9,6 +9,7 @@
 // the crosshair shakes while holding. Run: node tests/aimstick.js [trials]
 import { newStick, stepStick, stickFrom, SCHEMES, TUNE } from '../public/js/aimstick.js';
 
+export const DIAG = { n: 0, lat: 0, rad: 0 };
 const TRIALS = Number(process.argv[2] || 300), DT = 1 / 60, PXM = 36, AIM_MIN = 46, REACH = 18 * PXM;
 const sens = 0.7, Rpx = 62 / sens; // the stick radius the thumb really travels, in screen px
 let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -60,6 +61,7 @@ function trial(scheme, m, gyro) {
     }
     const p = point(s.ang, s.reach), ex2 = p.x - target.x, ey2 = p.y - target.y;
     const lat = Math.abs(Math.sin(s.ang - Math.atan2(target.y, target.x))) * tx, rad = Math.abs(Math.hypot(p.x, p.y) - tx);
+    if (t > 1) { DIAG.n++; if (lat >= 5) DIAG.lat++; if (rad >= 30) DIAG.rad++; }
     onBody = lat < 5 && rad < 30 ? onBody + DT : 0; onHead = Math.hypot(ex2, ey2) < 3 ? onHead + DT : 0;
     if (tBody === null && onBody >= 0.2) tBody = t;
     if (tHead === null && onHead >= 0.2) tHead = t;
@@ -71,16 +73,16 @@ function trial(scheme, m, gyro) {
 
 // SWEEP=1: try combinations of the stick's numbers (TUNE) and print the best (body held, then speed, then shake)
 if (process.env.SWEEP) {
-  const grid = { NEAR: [0.4, 0.45, 0.5], ZONE: [0.7, 0.75, 0.8], CALM: [4, 8, 14, 25] }, keys = Object.keys(grid), res = [];
+  const grid = { NEAR: [0.45, 0.55], ZONE: [0.7, 0.75], OUT: [0.6, 0.85, 1.2], FAR_A: [0.25, 0.5, 1], FAR_L: [0.25, 0.5, 1] }, keys = Object.keys(grid), res = [];
   const combos = keys.reduce((acc, k) => acc.flatMap(c => grid[k].map(v => ({ ...c, [k]: v }))), [{}]);
-  for (const scheme of ['accel', 'steady']) for (const c of combos) {
-    Object.assign(TUNE, c); if (scheme === 'accel' && c.CALM !== 8) continue;
-    let pb = 0, tm = 0, sh = 0;
-    for (const m of [3, 8, 15]) { seed = 7 + m; const rs = []; for (let i = 0; i < TRIALS; i++) rs.push(trial(scheme, m, false)); const ok = rs.filter(r => r.tBody !== null); pb += ok.length / TRIALS / 3; tm += (ok.length ? ok.reduce((a, r) => a + r.tBody, 0) / ok.length : 3) / 3; sh += (ok.length ? ok.reduce((a, r) => a + (r.rms || 0), 0) / ok.length : 20) / 3; }
-    res.push({ scheme, c: { ...c }, pb, tm, sh });
+  for (const scheme of ['steady']) for (const c of combos) {
+    Object.assign(TUNE, c);
+    let pb = 0, tm = 0, sh = 0; const by = {};
+    for (const m of [3, 8, 15]) { seed = 7 + m; const rs = []; for (let i = 0; i < TRIALS; i++) rs.push(trial(scheme, m, false)); const ok = rs.filter(r => r.tBody !== null); pb += ok.length / TRIALS / 3; by[m] = ok.length / TRIALS; tm += (ok.length ? ok.reduce((a, r) => a + r.tBody, 0) / ok.length : 3) / 3; sh += (ok.length ? ok.reduce((a, r) => a + (r.rms || 0), 0) / ok.length : 20) / 3; }
+    res.push({ scheme, c: { ...c }, pb, tm, sh, by });
   }
-  res.sort((a, b) => b.pb - a.pb || a.tm - b.tm);
-  for (const r of res.slice(0, 10)) console.log(r.scheme, JSON.stringify(r.c), 'body', (r.pb * 100).toFixed(0) + '%', 'time', r.tm.toFixed(2), 'shake', r.sh.toFixed(1));
+  res.sort((a, b) => ((b.by[3] >= 0.97 && b.by[8] >= 0.75) - (a.by[3] >= 0.97 && a.by[8] >= 0.75)) || b.by[15] - a.by[15] || b.pb - a.pb);
+  for (const r of res.slice(0, 10)) console.log(JSON.stringify(r.c), 'body 3/8/15 m', [3, 8, 15].map(m => (r.by[m] * 100).toFixed(0) + '%').join(' / '), 'time', r.tm.toFixed(2), 'shake', r.sh.toFixed(1));
   process.exit(0);
 }
 const med = a => { const b = a.filter(v => v !== null).sort((x, y) => x - y); return b.length ? b[b.length >> 1] : null; };
@@ -92,6 +94,7 @@ for (const scheme of Object.keys(SCHEMES)) for (const gyro of [false, true]) for
   const pb = rs.filter(r => r.tBody !== null).length / TRIALS, ph = rs.filter(r => r.tHead !== null).length / TRIALS;
   const mb = med(rs.map(r => r.tBody)), mh = med(rs.map(r => r.tHead)), sh = med(rs.map(r => r.rms));
   (out[scheme + (gyro ? '+gyro' : '')] ||= {})[m] = { pb, ph, mb, mh, sh };
+  if (process.env.DIAG) console.log('   after 1 s, off across', (DIAG.lat / DIAG.n * 100).toFixed(0) + '%', 'off along', (DIAG.rad / DIAG.n * 100).toFixed(0) + '%'); DIAG.n = DIAG.lat = DIAG.rad = 0;
   console.log(`${(scheme + (gyro ? '+gyro' : '')).padEnd(13)} ${String(m).padStart(3)}m  ${(pb * 100).toFixed(0).padStart(4)}  ${mb === null ? '   -  ' : mb.toFixed(2).padStart(6)}  ${(ph * 100).toFixed(0).padStart(4)}  ${mh === null ? '   -  ' : mh.toFixed(2).padStart(6)}  ${sh === null ? '-' : sh.toFixed(2)}`);
 }
 // the chosen scheme (steady) must beat the old stick: holds the body at least as often at every distance, and shakes less
@@ -101,5 +104,6 @@ for (const m of [3, 8, 15]) {
   if (h.pb + 0.02 < o.pb) { fails++; console.log(`FAIL steady holds the body less often than the old stick at ${m} m`); }
   if (h.sh !== null && o.sh !== null && h.sh > o.sh * 1.05) { fails++; console.log(`FAIL steady shakes more than the old stick at ${m} m`); }
 }
+if (out.steady[15].pb < 0.25) { fails++; console.log('FAIL the body is held at 15 m less than 25 % of the time (he asked for 25 %)', out.steady[15].pb); }
 console.log(fails ? `${fails} failure(s)` : 'PASS aimstick');
 process.exit(fails ? 1 : 0);

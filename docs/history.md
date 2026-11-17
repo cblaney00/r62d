@@ -369,3 +369,8 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   at once; a new touch starts from where you aim. Body held 0.2 s: 3 m 100 % (old 98 %), 8 m 79 % (old 39 %),
   15 m 10 % (old 6 %); headshot holds at 3 m 56 % (old 0 %); shake roughly halved. Far shots still need the gyro (on
   while aimed in by default) and aim help.
+- Later (he asked: "body at up to 25% at 15 m"): far misses were both sideways and in distance, because a wobble out
+  in the accelerating zone moves the crosshair a lot. `stepStick` now filters direction and distance separately and
+  calmer out there (`FAR_A`, `FAR_L` 0.25); the sweep (`SWEEP=1`, kept only settings that held 3 m ≥ 97 % and 8 m ≥
+  75 %) also picked ZONE 0.7, NEAR 0.55, OUT 1.2. Body held: 3 m 100 %, 8 m 82 %, 15 m 41 % (old stick 6 %).
+  tests/aimstick.js now fails under 25 % at 15 m.
