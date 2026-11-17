@@ -84,7 +84,7 @@ export function zbStart(game) {
   const Z = game.map.zombies, m = game.map;
   game.zb = { round: 0, open: new Set([0]), gates: Z.gates.map(g => ({ ...g, open: false })), power: false,
     crate: { at: Math.floor(Math.random() * 2), uses: 0, roll: null, moving: 0, moved: false },
-    forge: null, prevMap, left: 0, spawnT: 0, betweenT: 3, fieldT: 0, boards: {}, over: false, kills: 0,
+    forge: null, prevMap, left: 0, spawnT: 0, betweenT: 3, fieldT: 0, boards: {}, over: false, kills: 0, t0: game.time,
     teamPts: 0, dropAt: ZB.dropMark, dropInc: ZB.dropMark, drops: 0, bag: [], pows: [], insta: 0, double: 0, firesale: 0, nid: 1, qrUses: 0 };
   for (const g of game.zb.gates) for (const k of g.cells) { m.tiles[k] = T.BEAM; m.hp[k] = 99999; game.changed.add(k); }
   // every ground-floor window starts with all its boards
@@ -496,7 +496,8 @@ export function zbPlayer(game, p) { return p.zombie ? [1, p.zspeed === 'sprint' 
 export function zbInfo(game) {
   const Zs = game.zb; if (!Zs) return undefined;
   const t = game.time, C = Zs.crate, F = Zs.forge, left = v => v > t ? r1(v - t) : 0;
-  return { r: Zs.round, left: Zs.left + zombies(game).filter(z => z.alive).length, pw: Zs.power ? 1 : 0, g: Zs.gates.map(g => g.open ? 1 : 0),
+  return { r: Zs.round, el: Math.floor(t - (Zs.t0 ?? t)), bt: Zs.betweenT > 0 ? Math.ceil(Zs.betweenT) : undefined, // the HUD clock: time survived, or the wait for the next wave
+    left: Zs.left + zombies(game).filter(z => z.alive).length, pw: Zs.power ? 1 : 0, g: Zs.gates.map(g => g.open ? 1 : 0),
     c: C.moving ? -1 : C.at, cr: C.roll ? [C.roll.ready ? 1 : 0, C.roll.w, C.roll.by, r1((C.roll.ready ? C.roll.until : C.roll.t) - t)] : undefined,
     fo: F ? [F.ready ? 1 : 0, F.w, F.by, r1((F.ready ? F.until : F.t) - t)] : undefined,
     b: Zs.betweenT > 0 ? r1(Zs.betweenT) : 0, wb: Zs.boards, pu: Zs.pows.map(u => [u.id, u.k, r1(u.x), r1(u.y), r1(u.until - t)]),

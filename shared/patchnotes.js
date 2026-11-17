@@ -82,4 +82,9 @@ export const PATCH_NOTES = [
   { d: '2026-11-16', k: 'mech', id: 'touch', t: 'Phones: after a sprint the move stick keeps turning your crosshair with you until you aim in.', v: 1 },
   { d: '2026-11-16', k: 'mech', id: 'touch', t: 'Phones: the aim stick reaches as far as a mouse (18 m from the hip, further with scopes); the view zooms out to follow.', v: 1 },
   { d: '2026-11-16', k: 'mech', id: 'select', t: 'Operator select: picking the same operator as last round shows your loadout again instead of leaving the map up.', v: 0 },
+  { d: '2026-11-17', k: 'gun', id: 'breaker', t: 'Shotguns remade: the pellets bunch towards the middle like a real spray and every pellet shows. Breaker-12: one shot drops anyone out to about 4 m, two across a room, weak past 10 m.', v: 1 },
+  { d: '2026-11-17', k: 'gun', id: 'tusk', t: 'Tusk Auto-12, Hedge Lever-12 and Stub Sawn-off hit much harder up close (one blast at 1-2 m) and still fall away fast past a room.', v: 1 },
+  { d: '2026-11-17', k: 'gun', id: 'quill', t: 'Quill Flechette: harder darts (two blasts out to 5 m) with a longer reach than the buckshot guns.', v: 1 },
+  { d: '2026-11-17', k: 'mech', id: 'loadouts', t: 'Nobody carries three or more guns of one type any more (Onyx had three LMGs: now an LMG, a shotgun and a rifle with the shield); seventeen operators got a new gun and nineteen a new sidearm.', v: 0 },
+  { d: '2026-11-17', k: 'mech', id: 'zombies', t: 'Zombies: the clock shows how long you have survived, and the countdown to the next wave between rounds.', v: 0 },
 ];

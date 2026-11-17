@@ -52,3 +52,8 @@ sections as the GPU queue fills. Options, best first:
 2. Play his own copy in a Chromium-based window (the Windows program already is Electron). Chromium's GPU canvas is
    usually steadier than Firefox's. Needs a system change (`vibe` → "Change or fix something on your computer").
 3. Rebuild in Godot: fastest, but months of work and no joining by a browser link.
+
+# Check of 2026-11-17 (full test pass)
+Same headless gamescope recipe, free play on The Embassy with 6 bots (earlier checks had none), High, 1600x900:
+standing 118 fps; his stress test 83 fps (1% low 38, worst frame 165 ms); locked camera zooming to 3000 px 101 fps
+(1% low 53); firing the reworked Breaker every 0.3 s 123 fps (every pellet now draws a brief streak: no cost seen).

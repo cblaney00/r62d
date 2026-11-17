@@ -917,6 +917,9 @@ export function botThink(game, p, dt) {
       if (([...game.players.values()].some(q => !q.bot && q.squad === p.squad) || (game.tv && !p.pro)) && game.markOk(p)) game.mark(p, enemy.x, enemy.y, 'ENEMY ' + OPERATORS[enemy.op].name, enemy.id); // he asked: most ranks ping rather than talk
     }
     if (gun && gun.ammo === 0) { game.startReload(p); if (d < 120 && p.guns[1] && p.slot === 0 && gun.reserve >= 0) game.event(p, { k: 'slot', n: 1 }); }
+    // a buckshot gun is weak past a room (2026-11-17 shotgun rework): far off, take the sidearm; close again, back to the shotgun
+    else if (gun && WEAPONS[gun.w] && WEAPONS[gun.w].pellets > 1 && p.slot === 0 && d > 10 * PX_PER_M && p.guns[1] && p.guns[1].ammo > 0 && WEAPONS[p.guns[1].w].pellets === 1) { ai.sgSwap = 1; game.event(p, { k: 'slot', n: 1 }); }
+    else if (ai.sgSwap && p.slot === 1 && d < 5 * PX_PER_M && p.guns[0] && p.guns[0].ammo > 0) { ai.sgSwap = 0; game.event(p, { k: 'slot', n: 0 }); }
     // a shield facing us: circle round it and only shoot once its side shows (as people do)
     if (p.bracing && d < 32) { p.aim = Math.atan2(enemy.y - p.y, enemy.x - p.x); game.event(p, { k: 'melee' }); return; } // shield bash
     if (p.bracing && abId === 'brace' && Math.random() < dt * 0.8) inp.ability = 1; // now and then put the shield away to shoot (a riot shield stays up: aiming in swings it aside)

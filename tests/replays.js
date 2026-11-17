@@ -38,7 +38,7 @@ function play(mode = 'quick', free = false, maxMin = 25) {
 const t0 = performance.now();
 const a = play();
 console.log(`match 1: ${(a.t / 60).toFixed(1)} min played in ${((performance.now() - t0) / 1000).toFixed(1)} s, ${a.shots.length} map checks`);
-await sleep(500);
+for (let i = 0; i < 50 && listReplays().length < 1; i++) await sleep(100); // (writing a long match takes a moment)
 let list = listReplays();
 if (list.length !== 1) fail('expected 1 replay, got', list.length);
 const r = list[0];

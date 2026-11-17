@@ -12,7 +12,7 @@ import { zbSurge, zbDev, ZB, zbDown, zbUp, zbReviveTime, zbSlideEnd, zbStart, zb
 import { MODES, CLASSIC, DEFAULT_MODE, attackSquad, roundsToWin, inOvertime } from '../shared/modes.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { startRec, recFrame, stopRec } from './replays.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, mainPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
 const PING_KINDS = new Set(['go', 'omw', 'watch', 'hold', 'danger', 'help', 'enemy', 'open']); // the ping wheel (public/js/pingwheel.js)
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 const BARRI_BULLET_HP = 320; // bullet damage that breaks a whole wooden barricade (he asked)
@@ -1009,7 +1009,7 @@ export class Game {
       else if (this.winCarry && end.k === 'none') end = this.shotOutWindow(p, eye, a, w.range, D, w.name, w.cls);
       this.winCarry = null;
       if (w.surge && this.zb) zbSurge(this, p, end.x, end.y); // ZOMBIES: the wonder weapon bursts where it lands
-      if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined, nt: m.notrail || undefined });
+      if (tracerPellet(w, i)) this.events.push({ e: 'shot', id: p.id, w: gun.w, x: r1(mx), y: r1(my), x2: r1(end.x), y2: r1(end.y), k: end.k, q: m.quiet || undefined, nt: m.notrail || undefined, pl: w.pellets > 1 && !mainPellet(w, i) ? 1 : undefined });
     }
     if (w.pellets > 1) this.events.push({ e: 'shotgun', id: p.id });
     this.shotW = null; this.shotAim = null; this.pierceNow = false;

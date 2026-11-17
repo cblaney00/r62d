@@ -1,5 +1,5 @@
 // The Operators page: who each operator is, their gear choices (saved per player), and your stats with them.
-import { RIOT } from '/shared/operators.js';
+import { RIOT, gunRating, STAT_NAMES, GUN_COLOR } from '/shared/operators.js';
 import { OPERATORS, WEAPONS, GADGETS, LOADOUTS, GADGET_COUNT, BIOS, JOBS, resolveLoadout, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { META } from '/shared/meta.js';
@@ -56,12 +56,14 @@ function render(el) {
   renderDetail(el, true);
 }
 
+// he asked (2026-11-17): nicer bars with better stats, so guns that play differently never look alike: ten segments,
+// in the gun type's colour, from gunRating (shared/operators.js); a riot shield keeps its own five
 function bars(w) {
-  const W = WEAPONS[w];
-  const stat = (label, v) => `<div class="bar"><span>${label}</span><i><b style="width:${Math.max(4, Math.min(100, v))}%"></b></i></div>`;
-  const R = RIOT[w]; if (R) return stat('Cover', (R.plant || R.arc) / 1.45 * 100) + stat('Speed', (R.speed - 0.6) / 0.4 * 100) + stat('Swing aside', (0.6 - R.aside) / 0.5 * 100) + stat('Bash', R.bash / 0.45) + stat('Toughness', R.hp ? R.hp / 8 : 100); // a riot shield
-  return stat('Damage', W.dmg * W.pellets / 1.2) + stat('Fire rate', W.rpm / 10) + stat('Magazine', W.mag / 0.8) +
-    stat('Accuracy', 100 - W.ads * 1500) + stat('Range', W.range / 13);
+  const seg = (label, n, col) => `<div class="bar"><span>${label}</span><i style="--gc:${col}">${Array.from({ length: 10 }, (_, k) => `<u class="${k < n ? 'on' : ''}"></u>`).join('')}</i></div>`;
+  const R = RIOT[w], to10 = v => Math.max(1, Math.min(10, Math.round(v / 10)));
+  if (R) return seg('Cover', to10((R.plant || R.arc) / 1.45 * 100), '#9fb6c8') + seg('Speed', to10((R.speed - 0.6) / 0.4 * 100), '#9fb6c8') + seg('Swing aside', to10((0.6 - R.aside) / 0.5 * 100), '#9fb6c8') + seg('Bash', to10(R.bash / 0.45), '#9fb6c8') + seg('Toughness', to10(R.hp ? R.hp / 8 : 100), '#9fb6c8'); // a riot shield
+  const r = gunRating(w), col = GUN_COLOR[WEAPONS[w].cls] || '#e8e8e8';
+  return STAT_NAMES.map(([k, label]) => seg(label, r[k], col)).join('');
 }
 
 function renderDetail(el, force) { fillDetail(el.querySelector('#opsDetail'), state.sel, state, false, force); }
@@ -76,7 +78,7 @@ function fillDetail(d, k, anim, compact, force) {
   const pips = n => [1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('');
   const weaponCard = (w, slot) => `<button class="wcard ${cur[slot] === w ? 'on' : ''}" data-slot="${slot}" data-v="${w}">
       <div class="wpic" data-w="${w}"></div>
-      ${(META.ops[k] || {})[slot === 'primary' ? 'p' : 's'] === w ? '<span class="propick" title="What the pro teams play most on this operator in practice">PROS\' PICK</span>' : ''}<div class="wn">${RIOT[w] ? RIOT[w].name : WEAPONS[w].name}<small>${RIOT[w] ? 'Riot shield + pistol' : CLASS_NAME[WEAPONS[w].cls]}</small></div><div class="wtip">${RIOT[w] ? RIOT[w].trait : WEAPONS[w].trait || CLASS_TIP[WEAPONS[w].cls]}</div>${bars(w)}</button>`;
+      ${(META.ops[k] || {})[slot === 'primary' ? 'p' : 's'] === w ? '<span class="propick" title="What the pro teams play most on this operator in practice">PROS\' PICK</span>' : ''}<div class="wn">${RIOT[w] ? RIOT[w].name : WEAPONS[w].name}<small${RIOT[w] ? '' : ` style="color:${GUN_COLOR[WEAPONS[w].cls]}"`}>${RIOT[w] ? 'Riot shield + pistol' : CLASS_NAME[WEAPONS[w].cls]}</small></div><div class="wtip">${RIOT[w] ? RIOT[w].trait : WEAPONS[w].trait || CLASS_TIP[WEAPONS[w].cls]}</div>${bars(w)}</button>`;
   // attachments for the gun chosen in that slot: three rows of choices, each with what it does
   const attRows = slot => {
     const w = cur[slot]; if (!w || !WEAPONS[w]) return ''; // (a riot shield has no attachments)
@@ -126,8 +128,9 @@ function fillDetail(d, k, anim, compact, force) {
   const pics = {}; // gun picture per card, redrawn only when that gun's attachments change
   const drawPics = () => { for (const p of d.querySelectorAll('.wpic')) {
     const w = p.dataset.w, a = WEAPONS[w] ? cleanAtt(w, cur.att[w], k) : null, key = JSON.stringify(a);
-    if (pics[w + p.closest('.wcard').dataset.slot] === key) continue;
-    pics[w + p.closest('.wcard').dataset.slot] = key; p.replaceChildren(gunPicture(w, a, 270, 84));
+    if (pics[w + p.closest('.wcard').dataset.slot] === key + p.clientWidth) continue;
+    pics[w + p.closest('.wcard').dataset.slot] = key + p.clientWidth; const bw = Math.round(p.clientWidth) || 270, bh = Math.round(p.clientHeight) || 84; // drawn for the box it sits in (he asked: on his phone the guns were squashed shorter)
+    p.replaceChildren(gunPicture(w, a, Math.max(90, Math.min(400, bw)), Math.max(40, Math.min(120, bh))));
   } };
   const refresh = () => {
     cur = loadoutOf(k);

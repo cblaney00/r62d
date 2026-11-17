@@ -90,6 +90,19 @@ export function newVersion(version) {
   for (const kind of ['guns', 'att']) for (const x of Object.values(training[kind])) half(x);
   { const T = training.drills; T.n = Math.round(T.n / 2); for (const p of Object.values(T.pro)) for (const k in p) p[k] = Math.round(p[k] / 2); for (const x of Object.values(T.feats)) half(x); for (const x of Object.values(T.kinds)) for (const k in x) x[k] = Math.round(x[k] / 2); }
   for (const P of Object.values(training.pro)) { for (const kind of ['ops', 'guns', 'att']) for (const x of Object.values(P[kind] || {})) half(x); for (const t of Object.values(P.tend || {})) for (const k of Object.keys(t)) t[k] = Math.round(t[k] / 2); }
+  forgetReworked();
+}
+// Guns remade so much that their old results mean nothing (he asked 2026-11-17: shotguns were bad, get the pros using
+// them): once per rework, every record with them is dropped, so practice tries them again from scratch
+export const REWORKED = { 'shotguns-2026-11-17': ['breaker', 'tusk', 'stub', 'quill', 'hedge'] };
+export function forgetReworked() {
+  const done = training.reworked || (training.reworked = []);
+  for (const [tag, ids] of Object.entries(REWORKED)) {
+    if (done.includes(tag)) continue; done.push(tag);
+    for (const k of Object.keys(training.guns)) if (ids.includes(k.split('|').pop())) delete training.guns[k];
+    for (const k of Object.keys(training.att)) if (ids.includes(k.split('|')[0])) delete training.att[k];
+    for (const P of Object.values(training.pro)) { for (const id of ids) if (P.guns) delete P.guns[id]; for (const k of Object.keys(P.att || {})) if (ids.includes(k.split('|')[0])) delete P.att[k]; }
+  }
 }
 export const roundsLeft = version => training.version !== version ? ROUNDS_PER_VERSION : Math.max(0, ROUNDS_PER_VERSION - (training.verRounds || 0));
 export const needsTraining = version => roundsLeft(version) > 0;

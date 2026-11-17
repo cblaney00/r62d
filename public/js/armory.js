@@ -6,7 +6,7 @@
 import { PX_PER_M } from '/shared/constants.js';
 import { drawXhair, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
 import { lockMouse } from './keys.js';
-import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, shotOffset, recoilStep, recoilMax, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
+import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, mainPellet, aimedDamage, shotOffset, recoilStep, recoilMax, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
 import { drawTrail, TRAIL_LIFE } from './fx.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
@@ -268,7 +268,7 @@ function fire(w, cv) {
       if (t > 0 && t < bt) { bt = t; best = d; }
     }
     const ex = dx * bt, ey = dy * bt;
-    if (tracerPellet(w, i)) S.tracers.push({ x2: ex, y2: ey, life: m.notrail ? 0.04 : TRAIL_LIFE, trail: !m.notrail });
+    if (tracerPellet(w, i)) { const t = !m.notrail && (w.pellets === 1 || mainPellet(w, i)); S.tracers.push({ x2: ex, y2: ey, life: t ? TRAIL_LIFE : 0.04, trail: t }); } // a shotgun's other pellets: a brief streak
     if (best) {
       hitAny = true; S.hits++;
       const q = aimPoint(cv), onH = onHead(q.x, q.y, best.x, best.y); // same rule as a match: crosshair on the head
@@ -377,7 +377,7 @@ function sprayPic(w, m) {
 
 function stats(el) {
   const w = WEAPONS[S.w], m = modsOf(S.w), a = attOf(S.w), opts = attachFor(S.w), d = S.dist * M, f = fallAt(w, d, m.range) * m.dmg;
-  const stk = hp => Math.ceil(hp / (w.dmg * f * (w.pellets > 1 ? w.pellets * 0.7 : 1)));
+  const stk = hp => Math.ceil(hp / (w.pellets > 1 ? Math.max(1, aimedDamage(w, S.dist) * m.dmg) : w.dmg * f)); // a shotgun: the pellets that really land at this distance
   const ttk = hp => ((stk(hp) - 1) * 60 / w.rpm).toFixed(2);
   const fo = falloffOf(w), rk = recoilOf(w).kick * ((SPRAY[w.id] || {}).k || 1);
   const bar = (v, max) => `<i style="width:${Math.min(100, v / max * 100)}%"></i>`;

@@ -59,6 +59,7 @@ async function run() {
   await js(`localStorage.setItem('r62d-name', 'Thumbs'); localStorage.removeItem('r62d-penv'); location.reload(); true`); await sleep(3000);
   for (let i = 0; i < 20 && !(await js("!!document.getElementById('splash')")); i++) await sleep(500);
   for (let i = 0; i < 6 && await js("!document.getElementById('splash').classList.contains('hidden')"); i++) { await touch(finger([[W / 2, H / 2], [W / 2, H / 2]])); await sleep(1500); }
+  console.log('splash gone:', await js(`JSON.stringify({ gone: document.getElementById('splash').classList.contains('hidden'), started: window.__r62d && __r62d.st.started, at: document.elementsFromPoint(innerWidth / 2, innerHeight / 2).map(e => e.tagName + '#' + e.id + '.' + e.className).join(' > '), vp: innerWidth + 'x' + innerHeight })`));
   await js(`document.exitFullscreen && document.exitFullscreen().catch(() => {}); Element.prototype.requestFullscreen = () => Promise.reject(); true`); await sleep(500);
   await call('browsingContext.setViewport', { context: ctx, viewport: { width: +W, height: +H } });
   await tapVis('[data-tab="play"]'); await sleep(1500);

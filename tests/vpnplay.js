@@ -45,7 +45,7 @@ function client(name, lag) {
 const A = client('VpnTestBlaney', 0), B = client('VpnTestLando', LAG);
 await new Promise(r => setTimeout(r, 1500));
 A.send({ t: 'lobby', a: 'start' });
-let seq = 0; const t0 = Date.now(), walk = setInterval(() => { for (const c of [A, B]) c.send({ t: 'input', s: ++seq, dt: 0.033, a: 0, k: { right: 1 } }); }, 33);
+let seq = 0; const t0 = Date.now(), walk = setInterval(() => { for (const c of [A, B]) c.send({ t: 'input', s: ++seq, dt: 0.033, a: 0, k: Math.floor(seq / 60) % 2 ? { left: 1 } : { right: 1 } }); }, 33); // back and forth: walking one way ends at a wall
 while (Date.now() - t0 < 40000 && !(A.phases.has(PHASE.ACTION) && B.phases.has(PHASE.ACTION) && A.otherMoves > 10 && B.otherMoves > 10)) await new Promise(r => setTimeout(r, 250));
 clearInterval(walk); A.ws.close(); B.ws.close(); srv.kill();
 const fails = [];

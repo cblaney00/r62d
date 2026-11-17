@@ -297,3 +297,41 @@ Moved out of CLAUDE.md on 2026-11-16, word for word. Each section is one batch o
 - Phone free play and steering (he asked, same day, before a first-impression play): free play's OPERATORS · GUNS · BOTS button couldn't be tapped on a phone (the touch zones took the touch) — touch.js `grab` now clicks a page button under the finger (`#freeHint`, `#cambar`, `#kcBtn`); the free play panel fills a phone screen with taller operator buttons; the hover zoom on operator cards is off on phones (it stuck after a tap and cut the picture). Steer after sprint (`st.steer` in `pollPad`): after a phone sprint the move thumb keeps turning the crosshair with you, across stops and while firing from the hip, until you aim in; a thumb on the aim side wins. Checks: `tests/phonefree.mjs` (panel, two switches, steer, pause) and `tests/phonescreens.mjs`, both now also flag cut-off icons.
 - Phone aim reach (he asked, same day: couldn't aim far enough on a phone): the touch aim used the old pad crosshair, kept on screen (~8 m at full push). Now `touchFar()` / `padPointW()` in main.js: the aim stick reaches as far as a mouse with that sight (`reachOf`: hip 18 m, scopes further), the camera fit (`tFar` beside the free-aim fit, 1.45× room for the thumb buttons) zooms / slides to keep it on screen, and AIM puts it at the sight's aim-in distance (`adsStart`). `tests/phonefree.mjs` pushes the stick out: 18 m.
 - Round 2 loadout bug (he found it, same day, ranked): picking the same operator as last round left the select map up. `fillDetail` (ops.js) only refreshes when `d.dataset.op` matches, and `showSelMap` replaced `#selLoBody`'s HTML without clearing it; it now clears `dataset.op` / `_refresh`. Checked in headless Firefox (old: map stays, fixed: loadout shown); `tests/selectflow.js` passes.
+
+## Full test pass + shotguns, loadouts, gun bars, phone fixes (2026-11-17, he asked)
+He asked for another full test of every mode from every perspective, then (same session) for: no skill explanations on
+the operator-select cards; phone loadout guns not squished (his phone: Galaxy Z Flip 7, ~960×411 sideways); shotguns
+that are deadly up close and weak past a room, with a real spray, used by the pros; nobody carrying 3+ guns of one
+type (Onyx had 3 LMGs); nicer gun stat bars that keep similar guns apart; and why his phone had no ? button.
+- Test pass: all ~110 `tests/*.js` (8 at a time), a hidden-browser playthrough of Quick Match, Unranked (bans), Ranked,
+  One in the Chamber, Gun Game, Infected, Zombies, Free Play, Tutorial, Esports TV and every menu page at 1280×720 and
+  1920×1080 (cut-off check), and the phone screens at 960×411 / 760×360. The playthrough script lives only in that
+  session's scratchpad; its pieces (wait for loading, pick/ban until the round starts: the `bn` list is [op, ...] pairs)
+  are worth rebuilding the same way.
+- Found and fixed: the "Objective found" card was drawn through the big PREPARATION PHASE title (`siteFound` waits for
+  `st.bannerT`, a tick later so the title can start first; on phones it sits below the clock, `html.touch #siteFound`);
+  the Quick Match tip line sat under the death card (`beginnerHelp` hides it while `#deathCard` shows); the home
+  screen's PROFILE · SETTINGS · QUIT · downloads row squeezed into "PROFIL SETTING" (`.hsmall` wraps); Zombies' clock
+  read 0:00 forever (server `zbInfo` sends `el` time survived and `bt` the wait for the next wave); the phone title
+  screen ignored test taps (it now also starts on a touch `pointerup`); three operators (Haze, Brisk, Strider) started
+  with a primary that wasn't in their own list; `tests/vpnplay.js` walked both players into a wall (now back and forth).
+- Shotguns (`tests/shotguns.js` prints the damage of an aimed and a hip blast at 1-15 m and checks his rules): the
+  pellets used to fly in an even fan, so at 4 m only one or two hit (Breaker: 18 damage at 4 m, 8 blasts to drop
+  someone). `shotOffset` now bunches them towards the middle (`choke` per gun, higher = tighter), every pellet sends a
+  shot event (`tracerPellet`; the extra ones carry `pl` and draw a brief streak, `mainPellet` keeps the old three
+  trails), and each shotgun has its own `fall`. He chose: the pump one-shots within about 4 m. Now Breaker one blast
+  to 4 m, two across a room (7 m), 5+ past 10 m; Tusk one blast to 2 m; Hedge to 2 m; Stub to 2 m; Quill two blasts
+  out to 5 m with the longest reach; Anvil unchanged. `forgetReworked` (server/training.js, `REWORKED`) drops all the
+  pros' old shotgun results once, so practice tries them fresh; bots holding buckshot take the sidearm past 10 m and
+  go back under 5 m (bots.js, `ai.sgSwap`).
+- Loadouts: `tests/weapons.js` fails anyone with 3+ guns of one type. 17 operators got a new primary, 19 a new
+  sidearm (third pistol → an MP: whisper/hatchet on attack, gnat on defence). Onyx: Mule, Tusk, K4 + the Aegis shield.
+- Gun bars (he chose "just nicer bars"): `gunRating(id)` in shared/operators.js works out Power (aimed hit / blast at
+  3 m), Fire rate, Reach (damage left at 10/20/30 m), Handling (aim time + recoil + hip spread) and Mobility, then
+  spreads each over 1-10 half by size and half by rank, so no two guns show the same five bars. Drawn as ten slanted
+  segments in the gun type's colour (`GUN_COLOR`), the type label in the same colour. The Armory's shots-to-kill uses
+  `aimedDamage` for shotguns.
+- Phone gun pictures: drawn for a 270×84 box and stretched into the narrow phone card; now drawn for the box they sit
+  in (`drawPics` in ops.js; the height is on `.wpic`).
+- The ? button: the phone app updates only from GitHub releases; the last one (b487) was made before the ? button
+  (commit 489). A new release from this session carries everything.

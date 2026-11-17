@@ -860,7 +860,7 @@ function onEvent(e, s, players) {
     case 'shot': {
       if (st.r3shots && st.map && r3sees(players.get(e.id), e.x, e.y, e.x2, e.y2)) st.r3shots.push({ f: floorAt(st.map, e.x, e.y), x: e.x, y: e.y, x2: e.x2, y2: e.y2, k: e.k }); // (the 3D rope view: only shots your side could see, like the top-down streaks under the blackout)
       const w = WEAPONS[e.w]; const a = Math.atan2(e.y2 - e.y, e.x2 - e.x);
-      if (e.nt) fx.tracer(e.x, e.y, e.x2, e.y2); else fx.trail(e.x, e.y, e.x2, e.y2); // subsonic ammo: only the old brief streak
+      if (e.nt || e.pl) fx.tracer(e.x, e.y, e.x2, e.y2); else fx.trail(e.x, e.y, e.x2, e.y2); // subsonic ammo: only the old brief streak; a shotgun's other pellets (pl) too
       const an = anim(e.id);
       if (an.lastShotSnd !== s.time && st.listen && st.map && !e.q && e.id !== st.id) { // gunfire on the floor above or below: an arrow towards it
         const lv = localPos(st.map, st.listen.x, st.listen.y), ls = localPos(st.map, e.x, e.y), fd = ls.f - lv.f;
@@ -1542,7 +1542,7 @@ function buildSelect(s) {
       d.innerHTML = `<div class="who"></div>`;
       d.appendChild(c);
       const info = document.createElement('div'); info.className = 'info';
-      info.innerHTML = `<div class="nm">${o.name}</div><div class="role">${o.role}</div><div class="ab">${o.ability.name}</div><div class="more">${esc(o.ability.desc)}</div>`;
+      info.innerHTML = `<div class="nm">${o.name}</div><div class="role">${o.role}</div><div class="ab">${o.ability.name}</div>`; // he asked (2026-11-17): no skill explanation on the cards (it cluttered phones); tap the operator to read it in the loadout
       d.appendChild(info);
       d.onclick = () => { send({ t: 'pick', op: k }); };
       grid.appendChild(d);
@@ -1674,8 +1674,10 @@ function drawSpawnMap(mates, me) {
 
 // The attackers found the objective (he asked: make it obvious, it's a massive deal): a big alert with the two bomb
 // rooms, their floor, and a picture of that floor with the rooms lit up and where you are, for about 6 seconds.
-function siteFound(s) {
+function siteFound(s, later) {
+  if (!later) { setTimeout(() => siteFound(s, 1), 120); return; } // (the phase title can come in the same moment: let it start first)
   const m = st.map, site = m && m.sites[s.site]; if (!site) return;
+  const wait = (st.bannerT || 0) - performance.now() / 1000; if (wait > 0) { setTimeout(() => siteFound(s, 1), wait * 1000 + 450); return; } // after the big PREPARATION PHASE title: it was drawn right through it
   const box = $('siteFound'), c = box.querySelector('canvas'), g = c.getContext('2d');
   const fl = Math.max(0, floorAt(m, site.bombs[0].x, site.bombs[0].y)), F = m.floors[fl];
   const flNames = [...new Set(site.bombs.map(b => m.floors[Math.max(0, floorAt(m, b.x, b.y))].name))];
@@ -3807,7 +3809,7 @@ function screens(s, phase, now) {
 // Quick Match's beginner help (he asked): big TEAMMATES LEFT / ENEMIES LEFT numbers and one line saying what to do now.
 // Only in Quick Match (s.md 'quick'); Unranked and Ranked show less.
 function beginnerHelp(s, me, mine, theirs) {
-  const on = s.md === 'quick' && !st.tv && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION);
+  const on = s.md === 'quick' && !st.tv && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION) && !(!me.a && !$('deathCard').classList.contains('hidden')); // (not under the death card: they sat on top of each other)
   setCls($('leftCount'), 'hidden', !on); setCls($('tipNow'), 'hidden', !on);
   if (!on) return;
   const up = l => l.filter(p => p.a).length;
@@ -3846,10 +3848,10 @@ function hud(s) {
   setHTML('tiL', icons(mine, true)); setHTML('tiR', icons(theirs, !!st.tv));
   if (s.zb) { setText('scL', s.zb.r); setText('scR', s.zb.left); } else if (s.ar) { const [l, r] = arenaScores(s, me); setText('scL', l); setText('scR', r); } else { setText('scL', s.sc[hs]); setText('scR', s.sc[1 - hs]); }
   if (st.tv) TV.tvHud(s);
-  const t = s.pl ? s.pl.t : s.tm;
+  const t = s.pl ? s.pl.t : s.zb ? (s.zb.bt ?? s.zb.el ?? 0) : s.tm; // ZOMBIES has no round clock (it read 0:00): time survived, or the wait for the next wave
   setText('time', s.fp && !s.pl ? '∞' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`);
   setCls($('time'), 'planted', !!s.pl);
-  setText('phase', s.zb ? 'ZOMBIES' : s.ar ? 'FUN MODE' : s.pl ? 'DEFUSER' : s.fp ? 'FREE PLAY' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER');
+  setText('phase', s.zb ? (s.zb.bt ? 'NEXT WAVE IN' : 'SURVIVED') : s.ar ? 'FUN MODE' : s.pl ? 'DEFUSER' : s.fp ? 'FREE PLAY' : s.ph === PHASE.PREP ? 'PREPARATION' : s.ph === PHASE.ACTION ? 'ACTION' : 'ROUND OVER');
   setText('roundNo', s.zb ? `ROUND ${s.zb.r} · ZOMBIES LEFT ${s.zb.left}` : s.ar ? (MODES[s.ar.m] || {}).name : s.fp ? (side === 'atk' ? 'ATTACK' : 'DEFENCE') : `${s.ot ? 'OVERTIME · ' : ''}ROUND ${s.rd} · ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`);
   beginnerHelp(s, me, mine, theirs);
   // free play: which keys switch operator, and who you'd get
@@ -4654,6 +4656,7 @@ $('lanBtn').onclick = openLan; $('pLan').onclick = () => { $('pause').classList.
 $('lanClose').onclick = () => { audio.ui('back'); $('lanDlg').classList.add('hidden'); };
 // the title screen says which computer and version you are connected to (a phone might be on someone else's server)
 fetch('/api/addr').then(r => r.json()).then(a => { st.addr = a; $('serverTag').textContent = 'Connected to ' + lanText(a); $('homeVer').textContent = lanText(a); }).catch(() => {});
+$('splash').addEventListener('pointerup', e => { if (e.pointerType === 'touch') $('splash').click(); }); // a lifted finger is enough (some phone browsers never turn the tap into a click)
 $('splash').addEventListener('click', () => {
   if (st.started) return;
   audio.initAudio(); audio.ui('open');

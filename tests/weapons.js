@@ -11,6 +11,12 @@ for (const [op, L] of Object.entries(LOADOUTS)) for (const w of [...L.primaries,
   (sides[w] || (sides[w] = new Set())).add(OPERATORS[op].team);
   if (L.secondaries.includes(w) && !SIDEARMS.has(w)) fail(op, 'has', w, 'as a sidearm');
 }
+// he asked (2026-11-17): nobody carries 3 or more guns of one type (Onyx had 3 LMGs); and the starting guns are in the lists
+for (const [op, L] of Object.entries(LOADOUTS)) {
+  const n = {}; for (const w of [...L.primaries, ...L.secondaries]) { const k = RIOT[w] ? 'shield' : WEAPONS[w] && WEAPONS[w].cls; n[k] = (n[k] || 0) + 1; }
+  for (const [k, c] of Object.entries(n)) if (c >= 3) fail(op, 'carries', c, k + 's');
+  if (!L.primaries.includes(OPERATORS[op].primary) && !RIOT[OPERATORS[op].primary]) fail(op, 'starts with a primary not in their list', OPERATORS[op].primary);
+}
 for (const [w, s] of Object.entries(sides)) if (s.size > 1) fail(WEAPONS[w].name, 'is carried by both sides');
 for (const w of Object.keys(WEAPONS).filter(k => !WEAPONS[k].zb)) {
   if (!sides[w]) fail(WEAPONS[w].name, 'is carried by nobody');
