@@ -50,8 +50,9 @@ export function stepStick(s, t, dt, sens = 1, slow = 1) {
   const S = SCHEMES[s.scheme] || SCHEMES.hybrid;
   if (!t) { s.tx = s.ty = null; return s; }
   if (S.kind === 'abs' && S.calm) {
-    if (s.tx === null) { s.tx = t.x; s.ty = t.y; } // (o starts where you already aim: it glides from there to the thumb)
-    if (Math.hypot(t.x, t.y) < 0.05) { s.tx = t.x; s.ty = t.y; return s; } // a thumb resting in the middle changes nothing
+    if (s.tx === null) { s.tx = t.x; s.ty = t.y; s.moved = false; } // (o starts where you already aim: it glides from there to the thumb)
+    if (!s.moved && Math.hypot(t.x, t.y) < 0.05) { s.tx = t.x; s.ty = t.y; return s; } // a thumb just resting where it landed changes nothing
+    s.moved = true; // (after that the whole stick counts, right to the middle: he found aiming close to himself cut out)
     const sp = Math.hypot(t.x - s.tx, t.y - s.ty) / Math.max(dt, 1e-3), k = (T.CALM + 60 * smooth((sp - T.SLOW) / (T.FAST - T.SLOW))) * Math.max(0.3, Math.min(1.6, sens) * slow);
     // filtered as direction and distance: out in the accelerating zone a wobble moves the crosshair a lot, so both are
     // calmer there (FAR_A for the direction, FAR_L for the distance; he asked for more hits at 15 m)
@@ -78,7 +79,7 @@ export function stepStick(s, t, dt, sens = 1, slow = 1) {
     s.tx = t.x; s.ty = t.y;
   }
   const ol = Math.hypot(s.ox, s.oy);
-  if (ol > 0.04) s.ang = Math.atan2(s.oy, s.ox); // (right in the middle the direction means nothing: keep it)
+  if (ol > 0.012) s.ang = Math.atan2(s.oy, s.ox); // (right in the middle the direction means nothing: keep it)
   s.reach = reachFrom(ol, S.curve);
   return s;
 }

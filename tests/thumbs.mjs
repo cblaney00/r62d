@@ -87,6 +87,14 @@ async function run() {
       window.__fires = 0; const ws = __r62d.st.ws, send = ws.send.bind(ws); ws.send = d => { try { const m = JSON.parse(d); if (m.k && m.k.fire) __fires++; } catch {} return send(d); }; true`);
     const L = await centre('#tsLeft'); console.log('left stick at', L);
     const R0 = [Math.round(W * 0.78), Math.round(H * 0.45)];
+    if (process.env.SCENARIO === 'preaim') { // he asked 2026-11-17: pre-aim while moving. Aim at a spot, let go, strafe: the crosshair should stay on the spot
+      const P = () => js('JSON.stringify((p => ({ x: Math.round(p.ax), y: Math.round(p.ay), me: [Math.round(__r62d.st.pred.x), Math.round(__r62d.st.pred.y)] }))(__r62d.padFar()))').then(JSON.parse);
+      await touch(finger('R', [R0, [R0[0] + 45, R0[1] - 10, 250]], 300)); await sleep(400); const a = await P(); console.log('aimed and let go', JSON.stringify(a));
+      await touch(finger('L', [L, [L[0], L[1] - 60, 150]], 1500)); await sleep(300); const b = await P(); console.log('after strafing up 1.5 s', JSON.stringify(b));
+      await touch(finger('L', [L, [L[0] + 60, L[1], 150]], 1000)); await sleep(300); const c = await P(); console.log('after walking right 1 s', JSON.stringify(c));
+      const off = (u, v) => Math.round(Math.hypot(u.x - v.x, u.y - v.y)); console.log('PRE-AIM spot moved', off(a, b), 'px while strafing,', off(a, c), 'px after walking right (player moved', off({ x: a.me[0], y: a.me[1] }, { x: c.me[0], y: c.me[1] }), 'px)');
+      return;
+    }
     let s0 = await report('start');
     if (process.env.SCENARIO === 'fix') { // the 2026-11-16 thumb fixes: AIM switch and CROUCH by the left thumb, auto fire, gyro aim
       await js("__r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'clearBots' })); __r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'botsFire', on: false })); true"); await sleep(600);

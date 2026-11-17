@@ -66,7 +66,8 @@ async function run() {
   await tapVis('#botLevel [data-lv="1"]'); await sleep(300); await tapVis('#fillBtn'); await sleep(800);
   await tapVis('#startBtn');
   for (let i = 0; i < 60 && await phase() !== 'select'; i++) await sleep(500);
-  await sleep(1500); await check('s1-select', true); // step 1: the spawn list and the map
+  await sleep(1500); if (process.env.DEF) await js("__r62d.st.ws.send(JSON.stringify({ t: 'defreq', on: 1 })); true"); // DEF=1: ask for the defuser (to see the carrier's screen)
+  await check('s1-select', true); // step 1: the spawn list and the map
   await tapVis('#roleBar button:nth-child(3)'); await sleep(500); await tapVis('#lockBtn'); await sleep(900); await check('s1b-spawn-locked', true);
   await tapVis('#roleBar button:nth-child(2)'); await sleep(600);
   await tapVis('#opgrid .op:not(.taken):not(.banned)'); await sleep(900); await check('s2-op-picked', true);

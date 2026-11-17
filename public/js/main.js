@@ -161,7 +161,7 @@ let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return 
 // the crosshair on the wall while they are in the way; it comes back out when you aim past them.
 let aimOff = { x: 150, y: 0 };
 const AHEAD = () => Math.max(36 * DPR, VH * 0.13); // screen room always left beyond the crosshair
-const AIM_MIN = () => 46 * DPR / (st.zoom || 1), AIM_MAX = () => st.reachW || 400;
+const AIM_MIN = () => (touchActive() ? 24 : 46) * DPR / (st.zoom || 1), AIM_MAX = () => st.reachW || 400;
 // Close-aim dead zone (he asked 2026-11-15): the crosshair passes straight over your character (it used to stop
 // AIM_MIN short of you), but while it is within DZ_R of you your aim keeps the direction it had (st.dzAng), so a mouse
 // resting on your character never spins you round. An enemy you can see whose body is within DZ_FOE (0.5 m) of the
@@ -349,7 +349,11 @@ const steadying = () => !!(st.me && st.me.ct === 'body' && st.me.a && sniperOn(s
 function scopeSway(dt, me, now) {
   const on = me && me.ct === 'body' && me.a && !me.dn && sniperOn(me) && !st.tv ? Math.min(1, me.at || 0) : 0;
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
-  const want = on * (steadying() ? 0.0008 : 0.011 * (1 + run * 1.5));
+  // he asked (2026-11-17): no sway within 12 m of where you aim, and a bit less far out (it was 0.011 at any distance):
+  // it eases in from 12 m and tops out at 0.007 by 30 m
+  const ap = padOn ? padPointW() : { ax: st.pred.x + aimOff.x, ay: st.pred.y + aimOff.y }, am = Math.hypot(ap.ax - st.pred.x, ap.ay - st.pred.y) / PX_PER_M;
+  const far = Math.max(0, Math.min(1, (am - 12) / 18));
+  const want = on * far * (steadying() ? 0.0008 : 0.007 * (1 + run * 1.5));
   st.swayA = (st.swayA || 0) + (want - (st.swayA || 0)) * (1 - Math.exp(-dt * (want < (st.swayA || 0) ? 22 : 4)));
   const v = st.swayA * (Math.sin(now * 1.3) + 0.5 * Math.sin(now * 2.9 + 1)), d = v - (st.swayV || 0);
   st.swayV = v; if (!d) return;
@@ -1092,7 +1096,7 @@ function pollPad(dt, view) {
   // he asked 2026-11-16: after a sprint the move thumb keeps turning the crosshair with you (across stops too, and while
   // firing from the hip) until you aim in; aiming in goes back to moving without turning. A thumb on the aim side wins.
   if (spr && touchActive()) st.steer = true;
-  if (st.steer && (gp.lt > 0.35 || (st.me && st.me.ad) || !st.me || st.me.ct !== 'body' || !touchActive() || !st.last || st.last.ph !== PHASE.ACTION && st.last.ph !== PHASE.PREP)) st.steer = false;
+  if (st.steer && (gp.lt > 0.35 || gp.rsOn || (st.me && st.me.ad) || !st.me || st.me.ct !== 'body' || !touchActive() || !st.last || st.last.ph !== PHASE.ACTION && st.last.ph !== PHASE.PREP)) st.steer = false;
   if ((spr || st.steer) && ls.l > (spr ? 0 : 0.25) && rs.l < 0.05 && !(gp.rt > 0.35)) padAng = wrapAng(padAng + angDiff(Math.atan2(ls.y, ls.x) - (st.rot || 0), padAng) * Math.min(1, dt * 12));
   // left stick: 8 directions like WASD; a light push walks (silent)
   const nx = ls.l ? ls.x / ls.l : 0, ny = ls.l ? ls.y / ls.l : 0; st.padStill = !ls.l;
@@ -1102,7 +1106,8 @@ function pollPad(dt, view) {
   gpk.walk = st.me && st.me.ct === 'drone' ? (gp.held[1] ? 1 : 0) : ls.l && ls.l < 0.55 ? 1 : 0;
   if (gp.rt > 0.35 && !gpk.fire) mouse.wl++; // a trigger pull also counts as a click (next teammate, ping in a camera)
   const aimReset = gp.lt > 0.35 && !gpk.ads && touchActive();
-  if (aimReset) { const me = st.me, R = reachOf(me, true), d = adsStart(me && me.aa ? attFromCode(me.aa).sight : 'iron', me && me.w) * PX_PER_M; padReach = touchFar() ? Math.max(0, Math.min(1, (d - AIM_MIN()) / Math.max(1, R - AIM_MIN()))) : 0.22; touchAimReset(); } // phone (he asked): aiming in pulls the crosshair in to ~2.5 m, like the mouse's aim-in reset
+  if (aimReset && st.hold && !sniperOn(st.me)) touchAimReset(); // a pre-aimed spot stays put when you aim in (sniper scopes still snap out)
+  else if (aimReset) { st.hold = null; const me = st.me, R = reachOf(me, true), d = adsStart(me && me.aa ? attFromCode(me.aa).sight : 'iron', me && me.w) * PX_PER_M; padReach = touchFar() ? Math.max(0, Math.min(1, (d - AIM_MIN()) / Math.max(1, R - AIM_MIN()))) : 0.22; touchAimReset(); } // phone (he asked): aiming in pulls the crosshair in to ~2.5 m, like the mouse's aim-in reset
   gpk.fire = gp.rt > 0.35 ? 1 : 0; gpk.ads = gp.lt > 0.35 ? 1 : 0;
   if (!gpk.fire && touchActive() && autoFire()) gpk.fire = autoShot(); // phone: auto fire while the crosshair is on an enemy you see
   // right stick: aim. A stick snapping back to the middle when let go is ignored, so the aim stays put.
@@ -1116,12 +1121,26 @@ function pollPad(dt, view) {
   // when the thumb lands, damps thumb shake, and is calmer aimed in / steadying (the same settings as the mouse)
   if (touchActive() && onAim && !gp.rsDir && !(view && view.kind === 'cam')) {
     if (gp.rsOn && !aimReset) {
+      st.hold = null;
       if (!st.stk) st.stk = newStick('steady', wrapAng(padAng - (st.gyroOff || 0)), padReach);
       st.gyroOff = (st.gyroOff || 0) + gy;
       const slow = (gpk.ads || (st.me && st.me.ad) ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1);
-      stepStick(st.stk, { x: rs.x, y: rs.y }, dt, stickSens(), slow);
+      stepStick(st.stk, gp.rsRaw || { x: rs.x, y: rs.y }, dt, stickSens(), slow);
       padAng = wrapAng(st.stk.ang + st.gyroOff); padReach = st.stk.reach;
-    } else { st.stk = null; if (gy) padAng = wrapAng(padAng + gy); }
+    } else {
+      st.stk = null; if (gy) padAng = wrapAng(padAng + gy);
+      // PRE-AIM (he asked 2026-11-17: pre-aiming while moving was very hard): with the aim thumb off the stick the crosshair
+      // stays on the spot you left it on while you walk, strafe or crouch (it used to slide along with you). Sprinting,
+      // steering after a sprint, or walking right up to the spot lets it go; the next touch of the stick starts from it
+      const body = st.me && st.me.ct === 'body' && st.pred;
+      if (!body || spr || st.steer || gp.rsDir) st.hold = null;
+      else {
+        if (!st.hold) { const p = padPointW(); st.hold = { x: p.ax, y: p.ay }; }
+        const dx = st.hold.x - st.pred.x, dy = st.hold.y - st.pred.y, d = Math.hypot(dx, dy), R = reachOf(st.me);
+        if (d < AIM_MIN() * 1.3 || d > R * 1.05) st.hold = null;
+        else { padAng = wrapAng(Math.atan2(dy, dx) - (st.asOff || 0)); padReach = Math.max(0, Math.min(1, (d - AIM_MIN()) / Math.max(1, R - AIM_MIN()))); }
+      }
+    }
   } else if (rs.l > 0.05 && !falling && !aimReset) { // (the frame you aim in on a phone keeps the pulled-in crosshair)
     if (view && view.kind === 'cam') { mouse.x = VW / 2 + rs.x / rs.l * VH * 0.25; mouse.y = VH / 2 + rs.y / rs.l * VH * 0.25; }
     else {
@@ -3965,7 +3984,10 @@ function hud(s) {
     setHTML('prompt', isTouch ? pt.replace(/<b>([A-Z ]+)<\/b>\1(?![A-Z])/g, '<b>$1</b>') : pt); // phone: no "VAULT VAULT"
   }
   { const g = winGo(me), wg = $('winGo'), wc = g ? (g.ok ? '' : 'wait') : 'hidden'; if (wg.className !== wc) wg.className = wc; if (g) setHTML('winGo', g.ok ? `<b>${label('vault')}</b>${g.txt}` : g.txt); st.winGoR = g && g.ok ? g.r : null; }
-  if (isTouch) { const ph = $('prompt').innerHTML; touchContext({ use: ph.includes('<b>' + label('interact') + '</b>'), busy: !!me.bu, vault: ph.includes('<b>' + label('vault') + '</b>'), cams: me.ct !== 'body', drone: me.ct === 'drone', body: me.ct === 'body' && !me.dn, lean: st.leanT || 0, badge: st.tBadge || {} }); }
+  if (isTouch) { const ph = $('prompt').innerHTML, iu = ph.indexOf('<b>' + label('interact') + '</b>'), iv = ph.indexOf('<b>' + label('vault') + '</b>'), first = iv >= 0 && (iu < 0 || iv < iu) ? 'vault' : iu >= 0 ? 'use' : null;
+    // the phone's ACTION button names what it will do: the first word of the prompt after its key ("HOLD TO PLANT DEFUSER" → PLANT)
+    const word = first ? ((ph.split('<b>' + label(first === 'vault' ? 'vault' : 'interact') + '</b>')[1] || '').replace(/<[^>]*>/g, ' ').replace(/^\s*(HOLD|PRESS|TAP)\s+(TO\s+)?/i, '').trim().split(/\s+/)[0] || '').toUpperCase().slice(0, 9) : '';
+    touchContext({ use: first === 'use', busy: !!me.bu, vault: first === 'vault', word, cams: me.ct !== 'body', drone: me.ct === 'drone', body: me.ct === 'body' && !me.dn, lean: st.leanT || 0, badge: st.tBadge || {} }); }
 }
 function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!el) return; if (el.innerHTML !== h) el.innerHTML = h; }
 // (he said it got laggy: the HUD rewrote about a dozen elements ten times a second even when nothing had changed)

@@ -35,7 +35,7 @@ const look = async () => JSON.parse(await js(`(() => { const s = __r62d.st, l = 
   const me0 = (l.players || []).find(p => p.id === l.you) || {};
   return JSON.stringify({ ph: l.ph, rd: l.rd, sc: l.sc, side: me0.tm, alive: me0.a, dn: me0.dn, hp: me0.hp, k: me0.k, d: me0.d, x: Math.round(P.x || 0), y: Math.round(P.y || 0),
     ct: m.ct, am: m.am, ad: m.ad, cmp: s.cmpDir, foes, prompt: (document.getElementById('prompt') || {}).textContent || '',
-    shown: [...document.querySelectorAll('#touchUI .tbtn:not(.hidden)')].map(b => b.dataset.id),
+    shown: [...document.querySelectorAll('#touchUI .tbtn:not(.hidden)')].map(b => b.dataset.id), act: (document.querySelector('#touchUI [data-id="use"]') || {}).dataset?.act, word: (document.querySelector('#touchUI [data-id="use"]') || {}).dataset?.w,
     sel: !document.getElementById('select') || !document.getElementById('select').classList.contains('hidden'), end: !!document.querySelector('#endscreen:not(.hidden)') }); })()`));
 const C = {}; const want = (k, why) => { C[k] = (C[k] || 0) + 1; if (C[k] <= 3) console.log('  third thumb wanted:', k, '-', why); };
 // the first of these that is showing on the screen (a player only taps what they can see)
@@ -89,7 +89,7 @@ async function run() {
       shotsT++;
       continue;
     }
-    if (s.shown.includes('vault')) { await tap('[data-id="vault"]'); await sleep(900); continue; }
+    if (s.shown.includes('use') && s.act === 'vault') { await tap('[data-id="use"]'); await sleep(900); continue; } // (ACTION does the vault now)
     if (s.shown.includes('use') && /PLANT|DEFUS|REVIVE/i.test(s.prompt)) { // plant / defuse / revive: hold USE (right thumb), nothing to aim with meanwhile
       // USE is a tap that carries on (2026-11-16): tap it, then look round with the right thumb while it works
       const U = await centre('[data-id="use"]'); console.log('  tapped USE:', s.prompt.slice(0, 40));

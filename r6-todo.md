@@ -5,6 +5,10 @@ finished it gets ticked and moved to **Done**, then work continues on the next o
 Only ideas he asks for go in **To do** (added to the bottom). Claude never adds its own suggestions here.
 
 ## To do
+- [ ] i notice that in the mobile version of the game the reticle control cuts out when it gets too close to the player, i dont want this to be the case, i also think that the right joystick should be placed in a consistent location and i need there to be a bit less weapon sway when aimed fair out and none within 12meters
+- [ ] i also havent figured out how to make this aiming feel good and responsive and accurate and considerate of the need for quick reaction times, i want to make the mobile controls ready for fast and reactive combat, in these games it is important to pre-aim everything and that is proving very difficult to do while moving right now
+- [ ] also if you have the defuser, that should not be behind anything, also there needs to be a button that kind of does a whole bunch of things depending on the situation. anything that the game would prompt you to do, sort of like the "use" key but more wide ranging to allow us to cut down on clutter on screen
+- [ ] make sure the sightlines dont shake while smoothly dragging the camera around, they seem to do this with both drones and regular operator view and it is very horrible and annoying and needs to not happen, if we have to rework how you draw the sight lines that is fine if it is faster and doesnt affect how the game is played
 
 
 ## Done

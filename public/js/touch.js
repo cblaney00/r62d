@@ -100,7 +100,10 @@ export const tiltLevelNow = () => { tiltLevel = grav ? { ...grav } : null; };
 // USE, VAULT and the camera arrows only show when they do something (he found the screen too cluttered)
 const BUTTONS = [
   { id: 'fireL', label: 'FIRE', b: 'rt', cls: 'fire left' }, { id: 'fireR', label: 'FIRE', b: 'rt', cls: 'fire right' },
-  { id: 'use', label: 'USE', b: 0, cls: 'ctx c-use hidden' }, { id: 'vault', label: 'VAULT', b: 10, cls: 'ctx c-vault hidden' },
+  // ACTION (he asked 2026-11-17: one button for whatever the game prompts, to cut clutter): replaces USE and VAULT. It
+  // shows what it will do (PLANT, REVIVE, VAULT...) and does it: a hold action (plant, defuse, revive, reinforce, open)
+  // starts with a tap and carries on; a vault or climb happens on the tap
+  { id: 'use', label: 'ACTION', b: 0, cls: 'ctx c-use act hidden' },
   // AIM (he asked 2026-11-17): a small button on the bottom right of each FIRE, a tap on / tap off switch (both light up
   // together); the old AIM by the left thumb is gone. Sizes and places follow how often each is pressed (style.css,
   // "phone layout by priority"): FIRE and AIM biggest, then crouch / reload / swap round the right FIRE, then skill,
@@ -146,7 +149,7 @@ const HELP = [
   ['reload', 'RELOAD', 'Reload your gun.'], ['swap', 'SWAP', 'Switch between your guns.'],
   ['skill', 'SKILL', 'Your operator\'s ability. The number is how many are left.'], ['gadget', 'GADGET', 'Throw or place your gadget.'],
   ['melee', 'MELEE', 'Knife hit. Breaks wooden boards.'], ['ping', 'PING', 'Mark what you aim at for your team.'],
-  ['use', 'USE', 'Open, plant, defuse, reinforce, revive. One tap keeps it going.'], ['vault', 'VAULT', 'Climb over, through windows, onto or off ropes.'],
+  ['use', 'ACTION', 'Pops up when there is something to do and says what: plant, defuse, revive, reinforce, open, climb, go through a window. One tap does it (and keeps a hold going).'],
   ['view', 'DRONE / CAMS', 'Your drones (attack) or cameras (defence).'], ['sprint', 'SPRINT', 'On a drone the crouch button sprints.'],
   ['map', 'MAP', 'The map: tap it to ping a spot.'], ['score', 'SCORES', 'Who is up and who is down.'],
   ['prev', 'PREVIOUS / NEXT', 'Flip through cameras and drones.'], ['pause', 'PAUSE', 'The pause menu.'],
@@ -174,14 +177,14 @@ export function touchPad() {
   prevHeld = held.slice();
   const L = (ls.x || ls.y || !tiltOn()) ? ls : tiltV; // a thumb on the stick wins over tilting
   const gyro = gyroAcc; gyroAcc = 0;
-  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsOn: aimOn, rsDir: fireAim, rsHeld: rs.x !== 0 || rs.y !== 0, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released, gyro }; // rsOn: a thumb is on the aim stick (main.js / aimstick.js turn it into aim)
+  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsRaw: { x: rs.x, y: rs.y }, rsOn: aimOn, rsDir: fireAim, rsHeld: rs.x !== 0 || rs.y !== 0, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released, gyro }; // rsOn: a thumb is on the aim stick (main.js / aimstick.js turn it into aim)
 }
 export const touchActive = () => isTouch && shown;
 
 function build() {
   ui = document.createElement('div'); ui.id = 'touchUI'; ui.className = 'hidden';
   ui.innerHTML = `<div class="tzone" id="tzRight"></div><div class="tzone" id="tzLeft"></div>
-    <div class="tstick" id="tsLeft"><i></i></div><div class="tstick dyn hidden" id="tsRight"><i></i></div>
+    <div class="tstick" id="tsLeft"><i></i></div><div class="tstick dyn" id="tsRight"><i></i></div>
     ${BUTTONS.map(b => `<button class="tbtn ico ${b.cls}" data-id="${b.id}" data-label="${b.label}" aria-label="${b.label}">${ICONS[b.id] || (b.id.startsWith('fire') ? ICONS.fire : b.id === 'adsL' ? ICONS.ads : b.label)}</button>`).join('')}
     <div id="tHelp" class="hidden"><h3>WHAT THE BUTTONS DO</h3><div class="thGrid">${HELP.map(([i, n, d]) => `<div><span class="thI">${ICONS[i]}</span><b>${n}</b><small>${d}</small></div>`).join('')}</div><p>Left side: the move stick (push past its ring to sprint). Right side: drag anywhere to aim. Tap to close.</p></div>
     <div id="tTurn" class="hidden"><b>⟳</b>Turn your phone sideways to play</div>`;
@@ -194,7 +197,10 @@ function build() {
   const fingers = new Map(); // finger → { move(x, y), end() }
   let leftF = null, aimF = null, ox = 0, oy = 0, tx = 0, ty = 0;
   // aiming in re-centres the right stick under the thumb, so dragging from there moves the crosshair out from close in
-  recentre = () => { if (aimF === null) return; ox = tx; oy = ty; dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; rs.x = rs.y = 0; knob(dyn, rs); };
+  // the aim stick is drawn in one fixed place (he asked 2026-11-17: a consistent location), left of the right thumb's
+  // buttons; a thumb landing anywhere on the right half drives it from where it landed, so nothing jumps
+  // (placed by style.css: #tsRight, so it follows the screen turning or resizing)
+  recentre = () => { if (aimF === null) return; ox = tx; oy = ty; rs.x = rs.y = 0; knob(dyn, rs); };
   const grab = (id, x, y) => {
     if (fingers.has(id)) return; // the same finger can be announced twice
     const under = document.elementFromPoint(x, y), btn = under && under.closest && under.closest('#touchUI .tbtn');
@@ -207,15 +213,15 @@ function build() {
     if (x >= innerWidth / 2) { // right half: the aim stick appears under the thumb
       if (aimF !== null) return;
       aimF = id; aimOn = true; ox = tx = x; oy = ty = y;
-      dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; dyn.classList.remove('hidden'); rs.x = rs.y = 0; knob(dyn, rs);
+      dyn.classList.add('held'); rs.x = rs.y = 0; knob(dyn, rs);
       fingers.set(id, {
         move(x, y) {
           const Ra = R / stickSens() * TUNE.TRAVEL; // (lower sensitivity: a longer reach for the thumb; TRAVEL: extra room for fine aim, he asked)
           tx = x; ty = y; let u = (x - ox) / Ra, v = (y - oy) / Ra; const l = Math.hypot(u, v);
-          if (l > 1) { ox += (u / l) * (l - 1) * Ra; oy += (v / l) * (l - 1) * Ra; u /= l; v /= l; dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; } // the stick follows a thumb that slides past its edge
+          if (l > 1) { ox += (u / l) * (l - 1) * Ra; oy += (v / l) * (l - 1) * Ra; u /= l; v /= l; } // the centre follows a thumb that slides past the edge
           rs.x = u; rs.y = v; knob(dyn, rs);
         },
-        end() { aimF = null; aimOn = false; rs.x = rs.y = 0; dyn.classList.add('hidden'); },
+        end() { aimF = null; aimOn = false; rs.x = rs.y = 0; knob(dyn, rs); dyn.classList.remove('held'); },
       });
     } else if (y > innerHeight * 0.3) { // lower left: the move stick jumps to wherever the thumb lands
       if (leftF !== null) return;
@@ -230,6 +236,7 @@ function build() {
   const pressButton = (id, el, x0, y0) => {
     const b = BUTTONS.find(q => q.id === el.dataset.id);
     if (b.id === 'ads' || b.id === 'adsL') { setAds(!adsLatch); return; } // a tap switches aiming in on or off (either AIM)
+    if (b.id === 'use' && el.dataset.act === 'vault') { held[10] = true; el.classList.add('on'); fingers.set(id, { move() {}, end() { held[10] = false; el.classList.remove('on'); } }); return; } // ACTION as a vault: pressed while the finger is down
     if (b.id === 'use') { useEl = el; useLostT = 0; setUse(!useLatch); return; } // a tap starts using, and it carries on
     if (b.id === 'help') { const h = ui.querySelector('#tHelp'); h.classList.toggle('hidden'); return; } // the guide (tap it to close)
     if (b.b === null) { tiltLevelNow(); el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 200); return; } // ⟲ TILT: how you hold it now is level
@@ -261,13 +268,17 @@ function build() {
 }
 
 // main.js says each frame what the context buttons can do ({ use, vault, cams }); one under a finger stays until let go
-const ctxSeen = { use: 0, vault: 0, prev: 0, next: 0 };
+const ctxSeen = { use: 0, prev: 0, next: 0 };
 export function touchContext(c) {
   if (!ui || !shown) return;
   const now = performance.now();
   if (useLatch && !c.use && !c.busy) { if (!useLostT) useLostT = now; else if (now - useLostT > 600) setUse(false); } else useLostT = 0; // nothing left to use: let go
+  { // ACTION: what the prompt asks for, with its word under the picture (kept while a finger holds it)
+    const el = ui.querySelector('[data-id="use"]'), act = c.vault ? 'vault' : c.use ? 'use' : null;
+    if (act && !el.classList.contains('on') && (el.dataset.act !== act || el.dataset.w !== c.word)) { el.dataset.act = act; el.dataset.w = c.word || ''; el.innerHTML = ICONS[act] + (c.word ? `<span class="aw">${c.word}</span>` : ''); }
+  }
   for (const id in ctxSeen) {
-    if (id === 'prev' || id === 'next' ? c.cams : c[id]) ctxSeen[id] = now;
+    if (id === 'prev' || id === 'next' ? c.cams : id === 'use' ? c.use || c.vault : c[id]) ctxSeen[id] = now;
     const el = ui.querySelector(`[data-id="${id}"]`), want = now - ctxSeen[id] < 400 || el.classList.contains('on');
     if (el.classList.contains('hidden') === want) el.classList.toggle('hidden', !want);
   }
