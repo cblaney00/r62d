@@ -45,6 +45,8 @@ export function drawWheel(c, W, D) {
   const R = WHEEL_R * D, pick = wheelPick(W.dx, W.dy, D), age = Math.min(1, (performance.now() - W.t0) / 90), k = 0.82 + 0.18 * age;
   c.save(); c.translate(W.sx, W.sy); c.scale(k, k); c.globalAlpha = age;
   c.strokeStyle = 'rgba(255,255,255,0.2)'; c.lineWidth = 34 * D; c.beginPath(); c.arc(0, 0, R * 0.68, 0, 7); c.strokeStyle = 'rgba(6,9,14,0.42)'; c.stroke();
+  for (const [rr, al] of [[R * 0.68 + 17 * D, 0.3], [R * 0.68 - 17 * D, 0.16]]) { c.strokeStyle = `rgba(200,228,255,${al})`; c.lineWidth = D; c.beginPath(); c.arc(0, 0, rr, 0, 7); c.stroke(); } // glass rims (he chose the glass look 2026-11-17)
+  c.strokeStyle = 'rgba(255,255,255,0.32)'; c.lineWidth = 1.5 * D; c.beginPath(); c.arc(0, 0, R * 0.68 + 15 * D, -Math.PI * 0.85, -Math.PI * 0.15); c.stroke(); // the sheen along its top
   PINGS.forEach((P, i) => {
     const a = -Math.PI / 2 + i * Math.PI / 4, on = pick === P;
     if (on) { c.fillStyle = `rgba(${P.col},0.3)`; c.beginPath(); c.arc(0, 0, R * 1.02, a - Math.PI / 8, a + Math.PI / 8); c.arc(0, 0, R * 0.34, a + Math.PI / 8, a - Math.PI / 8, true); c.closePath(); c.fill(); }

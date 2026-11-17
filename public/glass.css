@@ -41,3 +41,49 @@
 #touchUI #tsLeft.spr { border-color: var(--gold); box-shadow: inset 0 0 22px rgba(242,193,78,0.25), 0 0 22px rgba(242,193,78,0.55); }
 #touchUI #tHelp { background-image: var(--g-sheen), var(--g-grain); background-size: auto, 160px 160px; border-color: var(--g-edge); box-shadow: var(--g-rim), var(--g-drop); }
 #touchUI #tHelp .thI { background: var(--g-dome), rgba(12,18,26,0.5); border-color: var(--g-edge); box-shadow: var(--g-rim); }
+
+/* ---------- 2. MATCH HUD (phone and computer) ---------- */
+/* the panels: the shared tint (--panel, now see-through) + sheen + grain, a lit rim and a soft shadow */
+#clock, .icons div, #objective, #killfeed div, #feed div, #hpwrap, #gadgets div, #cambar button, #scoreboard, #endscreen .board,
+#chatLog div, #viewlabel, #camTag, #tipNow, #freeHint, #outWarn, #winGo, #kcBtn, #deathCard, #coach, #tvCast .cl, .tvCard, #progress .bar, #stairPip {
+  background-image: var(--g-sheen), var(--g-grain) !important; background-size: auto, 160px 160px !important; }
+#clock, .icons div, #objective, #hpwrap, #gadgets div, #cambar button, #viewlabel, #camTag, #tipNow, #freeHint, #kcBtn, #winGo {
+  border-color: var(--g-edge); box-shadow: var(--g-rim), var(--g-drop); border-radius: 6px; }
+#objective { border-left: 3px solid var(--gold); box-shadow: var(--g-rim), var(--g-drop), -6px 0 14px -6px rgba(242,193,78,0.55); }
+#killfeed div, #feed div, #chatLog div { border: 1px solid rgba(190,220,255,0.14); border-radius: 5px; box-shadow: var(--g-rim), 0 3px 10px rgba(0,0,0,0.3); }
+#chatLog div, #feed div { background-color: rgba(10,15,22,0.55); }
+#clock { border-radius: 8px; box-shadow: var(--g-rim), var(--g-drop), 0 0 16px var(--g-glow); }
+#time { text-shadow: 0 0 12px rgba(160,210,255,0.35), 0 1px 2px #000; }
+/* team scores: coloured glass tiles that glow in their team colour (colours from Settings) */
+.sc { border-radius: 8px; background-image: var(--g-dome), var(--g-grain); background-size: auto, 160px 160px; border: 1px solid rgba(255,255,255,0.35);
+  box-shadow: var(--g-rim), 0 4px 14px rgba(0,0,0,0.35), 0 0 16px color-mix(in srgb, var(--ally) 55%, transparent); text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+.sc.enemy { box-shadow: var(--g-rim), 0 4px 14px rgba(0,0,0,0.35), 0 0 16px color-mix(in srgb, var(--enemy) 55%, transparent); }
+.icons div.ally { border-bottom: 3px solid var(--ally); box-shadow: var(--g-rim), var(--g-drop), 0 4px 10px -4px var(--ally); }
+.icons div.enemy { border-bottom: 3px solid var(--enemy); box-shadow: var(--g-rim), var(--g-drop), 0 4px 10px -4px var(--enemy); }
+/* health: a lit glass tube */
+#hpbar { border-radius: 4px; background: rgba(255,255,255,0.08); box-shadow: inset 0 1px 2px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.12); overflow: hidden; }
+#hpbar i { border-radius: 4px; background-image: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0) 60%); box-shadow: 0 0 10px rgba(255,255,255,0.45); }
+#hpbar i.low { box-shadow: 0 0 10px rgba(255,74,74,0.7); } #hpbar i.over { box-shadow: 0 0 10px rgba(109,255,154,0.6); }
+#hpnum, #ammo b { text-shadow: 0 0 14px rgba(170,215,255,0.32), 0 2px 4px rgba(0,0,0,0.7); }
+#ammo b.low { text-shadow: 0 0 14px rgba(255,74,74,0.6), 0 2px 4px rgba(0,0,0,0.7); }
+#gadgets div b, #prompt b { border-radius: 3px; background-image: linear-gradient(180deg, #fff, #d9e2ea); box-shadow: 0 0 8px rgba(255,255,255,0.35); }
+#cambar button.on { box-shadow: var(--g-rim), var(--g-drop), 0 0 14px rgba(242,193,78,0.45); }
+#progress .bar { border-radius: 4px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.6); overflow: hidden; }
+#progress .bar i { background-image: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0) 60%); box-shadow: 0 0 12px rgba(242,193,78,0.7); }
+#scoreboard, #endscreen .board { border-color: var(--g-edge); border-radius: 10px; box-shadow: var(--g-rim), 0 14px 40px rgba(0,0,0,0.5), 0 0 24px var(--g-glow); }
+#deathCard { border-radius: 8px; box-shadow: var(--g-rim), var(--g-drop), -8px 0 18px -8px var(--enemy); }
+#deathCard.team { box-shadow: var(--g-rim), var(--g-drop), -8px 0 18px -8px var(--ally); }
+#coach { border-radius: 8px; box-shadow: var(--g-rim), 0 10px 30px rgba(0,0,0,0.45), -8px 0 18px -8px rgba(242,193,78,0.6); }
+#outWarn { border-radius: 6px; box-shadow: var(--g-rim), 0 0 18px rgba(255,80,60,0.55); }
+#winGo { box-shadow: var(--g-rim), 0 0 18px rgba(242,193,78,0.45); }
+#stairPip { border-color: var(--g-edge); border-radius: 10px; box-shadow: var(--g-rim), 0 6px 24px rgba(0,0,0,0.6), 0 0 18px var(--g-glow); }
+#killcam canvas { border-color: var(--g-edge); border-radius: 8px; box-shadow: 0 0 30px var(--g-glow); }
+#tvCast .cl { border-radius: 0 6px 6px 0; box-shadow: var(--g-rim); }
+.tvCard { border-color: var(--g-edge); border-radius: 6px; box-shadow: var(--g-rim), var(--g-drop); }
+#banner .t { text-shadow: 0 0 26px rgba(160,210,255,0.35), 0 4px 30px rgba(0,0,0,0.9); }
+#leftCount b { text-shadow: 0 0 16px currentColor, 0 2px 6px #000; }
+#siteFound canvas { border-radius: 8px; box-shadow: var(--g-rim), 0 0 22px rgba(242,193,78,0.35); }
+/* Zombies: the same glass behind the points and perks */
+.zbPts { padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,120,100,0.22); background: rgba(20,10,12,0.5) var(--g-sheen); box-shadow: var(--g-rim), var(--g-drop), 0 0 16px rgba(180,30,20,0.25); }
+.zbPerks i { border-radius: 6px; background-image: var(--g-dome); }
+.zbRound { text-shadow: 0 0 22px rgba(200,30,20,0.7), 0 0 4px rgba(255,120,90,0.4), 0 2px 4px #000; }
