@@ -1022,8 +1022,9 @@ const ropeOf = () => { const me = st.me; return me && me.ro && me.ro[0] && me.ct
 const sliding = () => st.pred && (st.pred.slT > 0 || st.pred.slR > 0) && st.me && st.me.ct === 'body' && !st.tv;
 const slideAim = a => st.pred.slA + Math.max(-SLIDE.lock, Math.min(SLIDE.lock, angDiff(a, st.pred.slA)));
 function trySlide() { if (!st.pred || !st.pred.spr || st.pred.scd > 0 || !st.me || st.me.ct !== 'body') return false; st.slideReq = performance.now(); return true; }
-// he asked: sprint + S sprints too (he kept pressing it): on your body it is sent as sprint + W, where you aim
-const sprintBack = () => !!(st.me && st.me.ct === 'body' && !gpRecent() && keys.has('sprint') && keys.has('down') && !keys.has('up') && !steadying());
+// he asked: sprint + S sprints too (he kept pressing it), and (2026-11-16) sprint + A or D exactly the same: on your body
+// sprint with S, A or D (and no W) is sent as sprint + W alone, so you run where you aim
+const sprintBack = () => !!(st.me && st.me.ct === 'body' && !gpRecent() && keys.has('sprint') && (keys.has('down') || keys.has('left') || keys.has('right')) && !keys.has('up') && !steadying());
 // How much the movement keys are turned: Rotate view, Face aiming (W goes the way you face), sprint + W (he asked: where you aim).
 function moveTurn() {
   const body = st.me && st.me.ct === 'body';
@@ -1032,7 +1033,7 @@ function moveTurn() {
 }
 // Vaulting goes the way you're moving, or where you look when standing still.
 function vaultDir() {
-  const mx = (keys.has('right') || gpk.right ? 1 : 0) - (keys.has('left') || gpk.left ? 1 : 0), my = sprintBack() ? -1 : (keys.has('down') || gpk.down ? 1 : 0) - (keys.has('up') || gpk.up ? 1 : 0);
+  const mx = sprintBack() ? 0 : (keys.has('right') || gpk.right ? 1 : 0) - (keys.has('left') || gpk.left ? 1 : 0), my = sprintBack() ? -1 : (keys.has('down') || gpk.down ? 1 : 0) - (keys.has('up') || gpk.up ? 1 : 0);
   return mx || my ? Math.atan2(my, mx) + moveTurn() : st.aim;
 }
 // Read the controller once a frame and turn it into the same actions as the keyboard and mouse.
@@ -1806,9 +1807,10 @@ function drawAllies(s, me, now) {
   const box = $('allies'), show = s && me && st.id && !st.tv && (s.ph === PHASE.PREP || s.ph === PHASE.ACTION) && st.map;
   box.classList.toggle('hidden', !show); if (!show || now - (st.alT || 0) < 0.4) return; st.alT = now;
   const mates = s.players.filter(p => p.sq === me.sq && p.id !== st.id);
-  const h = mates.map(p => { const o = OPERATORS[p.op]; let where = 'waiting at spawn';
+  const ph = document.documentElement.classList.contains('touch'); // (phones: short words, so the list stays clear of the AIM button)
+  const h = mates.map(p => { const o = OPERATORS[p.op]; let where = ph ? 'at spawn' : 'waiting at spawn';
     if (!p.a) where = 'dead'; else if (p.x !== undefined) { const fl = floorAt(st.map, p.x, p.y), F = st.map.floors[Math.max(0, fl)]; where = (roomAt(st.map, p.x, p.y) || 'outside') + (st.map.floors.length > 1 ? ' · ' + F.name : ''); }
-    if (p.ct === 'drone') where += ' (on drone)'; else if (p.ct === 'cam') where += ' (on cams)';
+    if (p.ct === 'drone') where += ph ? ' · drone' : ' (on drone)'; else if (p.ct === 'cam') where += ph ? ' · cams' : ' (on cams)';
     return `<div class="${p.a ? (p.dn ? 'dn' : '') : 'dead'}"><b>${esc(p.n.replace(/^\[\w+\] /, ''))}</b> <i>${o ? esc(o.name) : ''}</i> <span>${esc(where)}</span></div>`; }).join('');
   if (box.innerHTML !== h) box.innerHTML = h;
 }
@@ -2428,7 +2430,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const ev = st.evq; st.evq = [];
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
   const k = {
-    up: keys.has('up') || gpk.up || sprintBack() ? 1 : 0, down: (keys.has('down') || gpk.down) && !sprintBack() ? 1 : 0, left: keys.has('left') || gpk.left ? 1 : 0, right: keys.has('right') || gpk.right ? 1 : 0,
+    up: keys.has('up') || gpk.up || sprintBack() ? 1 : 0, down: (keys.has('down') || gpk.down) && !sprintBack() ? 1 : 0, left: (keys.has('left') || gpk.left) && !sprintBack() ? 1 : 0, right: (keys.has('right') || gpk.right) && !sprintBack() ? 1 : 0,
     walk: keys.has('walk') || gpk.walk ? 1 : 0, sprint: (keys.has('sprint') || gpk.sprint) && performance.now() >= (st.sprintHold || 0) ? 1 : 0, slide: performance.now() - (st.slideReq ?? -1e9) < 120 ? 1 : 0, crouch: keys.has('crouch') || gpk.crouch || st.crouchT ? 1 : 0, prone: st.prone && me && me.a && !me.dn ? 1 : 0, fire: mouse.l || gpk.fire || keys.has('fire') ? 1 : 0, ads: adsHeld() || gpk.ads ? 1 : 0,
     interact: keys.has('interact') ? 1 : 0, ability: keys.has('ability') ? 1 : 0,
     lean: me && me.ct === 'body' ? leanNow() : 0, jump: performance.now() - (st.jumpReq || -1e9) < 120 ? 1 : 0,

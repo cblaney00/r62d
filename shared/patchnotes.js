@@ -74,6 +74,7 @@ export const PATCH_NOTES = [
   { d: '2026-11-16', k: 'rule', t: 'Every bomb-site room on the top floor gets its own roof hatch, and attackers go over the roof much more when one opens into the site.', v: 1 },
   { d: '2026-11-16', k: 'rule', t: 'The aim marker sits exactly on the face of what it hits (walls, crates, furniture), turns blue after 0.6 s (was 1.5 s), and a blue marker on an enemy camera, drone or gadget rings it: aiming in snaps onto it.', v: 1 },
   { d: '2026-11-16', k: 'map', t: 'Outside windows have a pane of glass over their boards, seen from every view; it shatters, loudly, the first time the window is shot, knifed, blown or smashed through.', v: 1 },
+  { d: '2026-11-16', k: 'rule', t: 'Sprint with A or D (and no W) now runs where you aim, exactly like sprint with W or S.', v: 1 },
   { d: '2026-11-16', k: 'op', id: 'crow', t: 'CROW: press the skill again to lunge once the blade is ready; a blade mark over enemies he sees shows their distance (green inside the 5 m lunge).', v: 1 },
   { d: '2026-11-16', k: 'rule', t: 'The compass points straight at the bomb on its own floor, and to the stairs or hatch that lead there from any other floor. HOIST is led up open hatches; breach charges, nitro, EMBER and DEADFALL see the hatches in their floor, HOIST the ones in the ceiling.', v: 1 },
 ];
