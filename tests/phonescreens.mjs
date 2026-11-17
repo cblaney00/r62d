@@ -56,12 +56,19 @@ async function run() {
   await tapVis('#botLevel [data-lv="1"]'); await sleep(300); await tapVis('#fillBtn'); await sleep(800);
   await tapVis('#startBtn');
   for (let i = 0; i < 60 && await phase() !== 'select'; i++) await sleep(500);
-  await sleep(1500); await check('s1-select', true);
+  await sleep(1500); await check('s1-select', true); // step 1: the spawn list and the map
+  await tapVis('#roleBar button:nth-child(3)'); await sleep(500); await tapVis('#lockBtn'); await sleep(900); await check('s1b-spawn-locked', true);
   await tapVis('#roleBar button:nth-child(2)'); await sleep(600);
   await tapVis('#opgrid .op:not(.taken):not(.banned)'); await sleep(900); await check('s2-op-picked', true);
   await tapVis('#lockBtn'); await sleep(1200); await check('s3-locked', true);
   for (let i = 0; i < 120 && await phase() !== 'prep'; i++) await sleep(500);
   await sleep(4000); await check('h1-prep');
+  // switching operator in preparation (attackers): pause, CHANGE OPERATOR, another role and operator, back to the match
+  const op0 = await js('(__r62d.st.me || {}).op');
+  await tapVis('[data-id="pause"]'); await sleep(700); await tapVis('#pSwap'); await sleep(1200); await check('h1b-switch', true);
+  await tapVis('#roleBar button:nth-child(3)'); await sleep(600); await tapVis('#opgrid .op:not(.taken):not(.banned):not(.hidden)'); await sleep(1200);
+  await check('h1c-switched', true); console.log('operator before / after switching:', op0, await js('(__r62d.st.me || {}).op'));
+  await tapVis('#lockBtn'); await sleep(800); console.log('picker closed:', await js("document.getElementById('select').classList.contains('hidden')"));
   for (let i = 0; i < 120 && await phase() !== 'action'; i++) await sleep(500);
   await sleep(4000); await check('h2-action');
 }

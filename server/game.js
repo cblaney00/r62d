@@ -250,16 +250,24 @@ export class Game {
     }
     else if (m.t === 'spawn') { // attackers choose where they start (operator select or preparation)
       const sp = this.map && this.map.atkSpawns[m.n], ok = this.side(p) === TEAM.ATK && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP);
+      if (this.phase === PHASE.SELECT && p.placed) return; // (locked in)
       if (ok && m.n === -1) p.spawn = null; // RANDOM: the team's spawn plan places them (the default)
       else if (ok && sp && Number.isInteger(m.n)) p.spawn = sp.name;
     }
     else if (m.t === 'role') { // choosing a role limits you to its operators
       const team = this.side(p), job = JOBS[team] && JOBS[team].find(j => j.id === m.r);
-      if (job && this.phase === PHASE.SELECT && !p.locked) { p.job = job.id; if (p.op && !job.ops.includes(p.op)) p.op = null; }
+      if (job && this.phase === PHASE.SELECT && !p.locked && this.placed(p)) { p.job = job.id; if (p.op && !job.ops.includes(p.op)) p.op = null; }
+      else if (job && this.phase === PHASE.PREP && team === TEAM.ATK) p.job = job.id; // (switching in preparation: the operator changes when they pick one)
     }
     else if (m.t === 'lock') { if (this.phase === PHASE.SELECT && p.op) p.locked = true; }
-    else if (m.t === 'site') { // like R6, the defenders choose which objective to defend while picking operators
-      if (this.phase === PHASE.SELECT && this.side(p) === TEAM.DEF && Number.isInteger(m.n) && m.n >= 0 && m.n < this.map.sites.length && m.n !== this.site && this.siteOpen(m.n)) {
+    else if (m.t === 'place') { // lock in the site (defenders: for the whole team) or your spawn (attackers)
+      if (this.phase === PHASE.SELECT && this.needPlace()) {
+        if (this.side(p) === TEAM.ATK) p.placed = true;
+        else if (!this.siteLk) { this.siteLk = true; this.msg(`${p.name} locked in ${this.map.sites[this.site].name}`, TEAM.DEF); }
+      }
+    }
+    else if (m.t === 'site') { // like R6, the defenders choose which objective to defend; whoever locks it in decides (no vote)
+      if (this.phase === PHASE.SELECT && this.side(p) === TEAM.DEF && !this.siteLk && Number.isInteger(m.n) && m.n >= 0 && m.n < this.map.sites.length && m.n !== this.site && this.siteOpen(m.n)) {
         this.site = m.n; this.msg(`${p.name} chose to defend ${this.map.sites[m.n].name}`, TEAM.DEF);
       }
     }
@@ -298,14 +306,26 @@ export class Game {
   }
 
   pickOp(p, op) {
-    if (this.phase !== PHASE.SELECT || !OPERATORS[op] || p.locked) return; // locked in: no changing
+    if (!OPERATORS[op]) return;
+    const prepSwap = this.phase === PHASE.PREP && this.side(p) === TEAM.ATK && p.op && op !== p.op && !this.tut; // (he asked 2026-11-16: attackers can switch in preparation; everyone is locked once the action starts)
+    if (!prepSwap && (this.phase !== PHASE.SELECT || p.locked)) return; // locked in: no changing
+    if (!this.placed(p)) return; // the site / spawn is locked in first
     if (this.banning()) return; // the ban phase comes first
     if (OPERATORS[op].team !== this.side(p)) return;
     if (p.job && jobOf(op) !== p.job) return; // only your role's operators
     if (this.isBanned(op)) return;
     for (const q of this.players.values()) if (q !== p && q.squad === p.squad && q.op === op) return;
+    if (prepSwap) { // a new operator: their gear, but the drone out and the body waiting at the spawn stay as they are
+      const keep = { staged: p.staged, droneId: p.droneId, ctrl: p.ctrl, drones: p.drones, x: p.x, y: p.y, aim: p.aim, hasDefuser: p.hasDefuser, sprints: p.sprints };
+      p.op = op; p.job = jobOf(op); this.equip(p); Object.assign(p, keep);
+      this.msg(`${p.name} switched to ${OPERATORS[op].name}`, TEAM.ATK); return;
+    }
     p.op = op; p.job = jobOf(op);
   }
+  // he asked 2026-11-16: the site (defenders, one person decides: no vote) or your spawn (attackers) is locked in before
+  // anyone picks an operator. Not in the tutorial, free play, Esports TV or the fun modes.
+  needPlace() { return !this.tut && !this.free && !this.tv && !this.arena && !this.zb; }
+  placed(p) { return !this.needPlace() || p.bot || (this.side(p) === TEAM.DEF ? !!this.siteLk : !!p.placed); }
 
   isBanned(op) { return !!this.bans && this.bans.some(b => b.op === op); }
   // ESPORTS TV bans (he asked: there were too many): before the first round each team bans 1 attacker and 1 defender
@@ -397,12 +417,14 @@ export class Game {
     this.reinforce = REINF_EACH;
     this.spawnName = this.map.atkSpawns[Math.floor(Math.random() * this.map.atkSpawns.length)].name;
     this.spawnPlan = this.makeSpawnPlan(); this.insideCache = null;
-    for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; p.locked = false; p.spawn = null; p.staged = false; p.job = null; }
+    for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; p.locked = false; p.spawn = null; p.staged = false; p.job = null; p.placed = false; }
+    this.siteLk = false;
     this.phase = PHASE.SELECT; this.timer = DUR.select;
     this.events.push({ e: 'newmap', v: this.mapVersion });
     const swapped = this.rules.swap === 'half' && this.round > 1 && this.atkSquad(this.round) !== this.atkSquad(this.round - 1) && !inOvertime(this.rules, this.score);
     this.events.push({ e: 'banner', text: inOvertime(this.rules, this.score) ? `OVERTIME · ROUND ${this.round}` : `ROUND ${this.round}`, sub: inOvertime(this.rules, this.score) ? `First to ${roundsToWin(this.rules, this.score)} · sides swap every round` : swapped ? 'Half time: sides swapped' : 'Choose your operator' });
-    if (!this.tut && !this.free) siteVote(this); // the defending bots vote on the site (a person on the team can still change it)
+    // a team of bots votes on its site; with a person on the team, the person picks and locks it in (he asked: no vote)
+    if (!this.tut && !this.free && ![...this.players.values()].some(p => !p.bot && this.side(p) === TEAM.DEF)) { siteVote(this); this.siteLk = true; }
   }
 
   siteOpen(n) { return !(this.sitesUsed || []).includes(n); }
@@ -3303,7 +3325,7 @@ export class Game {
         ef: this.efOut(p),
       });
       if (p.staged) { o.x = undefined; o.y = undefined; } // nobody else learns where a waiting attacker is
-      if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; if (p.defReq) o.dq = 1; } }
+      if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.placed(p)) o.pd = 1; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; if (p.defReq) o.dq = 1; } }
       if (p.alive && (p.sock || this.rec || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
         ga: this.free ? p.guns.map(q => q.w + ':' + attCode(q.att)) : undefined, // free play's gun menu shows what each held gun carries
         am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, lg: p.lungeUntil > this.time ? [p.lungeTarget, r1(Math.max(0, (p.lungeReady || 0) - this.time)), r1(p.lungeUntil - this.time)] : undefined, /* CROW: marked enemy, s until ready, s left */ ap: p.pierceShot ? 1 : undefined, su2: p.spotterUntil > this.time ? r1(p.spotterUntil - this.time) : undefined, gw2: p.ghillieUntil > this.time ? r1(p.ghillieUntil - this.time) : undefined, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
@@ -3340,7 +3362,7 @@ export class Game {
     const common = JSON.stringify({
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, pp: this.map.peeps && this.map.peeps.length ? this.map.peeps : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
-      site: this.site, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
+      site: this.site, slk: this.siteLk ? 1 : 0, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       tvl: this.tv ? this.botLevel : undefined, cp: this.tv ? this.colPair : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ar: arenaInfo(this), zb: zbInfo(this), ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
       bq: (this.tv || this.rules.bans) && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, (this.banRun.t ?? this.time) - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, cb, hb, ev: this.events, spots, time: r2(this.time),

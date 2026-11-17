@@ -20,6 +20,8 @@ for (let i = 0; i < 30 * 8; i++) g.tick(1 / 30);
 for (const q of g.players.values()) if (q.bot && q.squad === h.squad && q.op) fail(q.name, 'picked', q.op, 'before the human locked in');
 if (![...g.players.values()].some(q => q.bot && q.squad !== h.squad && q.op)) fail('the other team\'s bots did not pick');
 const side = g.side(h), [j1, j2] = JOBS[side];
+g.handle(h, { t: 'role', r: j1.id }); if (h.job) fail('chose a role before locking in the site / spawn');
+g.handle(h, { t: 'place' });
 g.handle(h, { t: 'role', r: j1.id });
 g.handle(h, { t: 'pick', op: j2.ops[0] });
 if (h.op) fail('picked', h.op, 'outside the role', j1.id);

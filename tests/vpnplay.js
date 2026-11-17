@@ -35,7 +35,7 @@ function client(name, lag) {
     const me = (m.players || []).find(p => p.id === c.me);
     if (m.ph === PHASE.SELECT && me && !c.locked && me.tm) { // choose any operator of my side, then lock in
       const op = Object.keys(OPERATORS).find(k => OPERATORS[k].team === me.tm && !(m.bn || []).includes(k));
-      c.send({ t: 'role', job: jobOf(op) }); c.send({ t: 'pick', op }); c.send({ t: 'lock' }); c.locked = true;
+      c.send({ t: 'place' }); c.send({ t: 'role', job: jobOf(op) }); c.send({ t: 'pick', op }); c.send({ t: 'lock' }); c.locked = true;
     }
     if (m.ph !== PHASE.SELECT) c.locked = false;
   });

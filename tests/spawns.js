@@ -25,11 +25,14 @@ for (const id of MAP_LIST) {
   g.handle(h, { t: 'lock' }); g.tick(1 / 30);
   if (g.phase !== PHASE.SELECT || h.locked) fail(id, 'locked in without an operator');
   const op = opsForTeam(side).find(o => ![...g.players.values()].some(q => q !== h && q.squad === h.squad && q.op === o));
-  g.handle(h, { t: 'pick', op });
+  g.handle(h, { t: 'pick', op }); if (h.op) fail(id, 'picked an operator before locking in the site / spawn');
   // an attacker (human or, if the human defends, a bot) chooses the last spawn
   const atk = side === 'atk' ? h : [...g.players.values()].find(q => q.bot && g.side(q) === 'atk');
   const want = spawns.length - 1;
   if (atk === h) g.handle(h, { t: 'spawn', n: want }); else atk.spawn = spawns[want].name;
+  g.handle(h, { t: 'place' }); // the site / spawn first (he asked 2026-11-16)
+  if (atk === h) { g.handle(h, { t: 'spawn', n: 0 }); if (h.spawn !== spawns[want].name) fail(id, 'spawn changed after locking it in'); }
+  g.handle(h, { t: 'pick', op }); if (h.op !== op) fail(id, 'pick after locking in the spawn / site ignored');
   g.handle(h, { t: 'lock' }); g.tick(1 / 30);
   if (!h.locked) fail(id, 'lock-in ignored');
   g.handle(h, { t: 'pick', op: opsForTeam(side).find(o => o !== op) });

@@ -1393,3 +1393,12 @@ html.touch #roleBar button { overflow: visible; }
 html.touch #selLoBody .wcard .wn { font-size: 17px; margin-bottom: 5px; } html.touch #selLoBody .wcard .wn small { display: block; margin: 1px 0 0; font-size: 10px; }
 html.touch #selLoBody .wcard p { font-size: 12px; }
 html.touchplay #banner { top: 58%; } html.touchplay #banner .t { font-size: 36px; } html.touchplay #banner .s { font-size: 14px; } /* (round titles: under the objective-found card, clear of the health and the thumbs) */
+
+/* operator select step 1 (he asked 2026-11-16): site / spawn list on the left, the map of the building on the right */
+#roleBar.place button b { font-size: 20px; } #roleBar.place button span, #roleBar.place button small { padding-left: 0; }
+#roleBar.place button.on { background: rgba(242,193,78,0.16); color: #fff; border-color: var(--gold); box-shadow: inset 3px 0 0 var(--gold); }
+#roleBar.place button:disabled { opacity: 0.35; }
+#selLoBody canvas.selMap { display: block; width: 100%; height: 100%; object-fit: contain; }
+#selLoBody:has(canvas.selMap) { overflow: hidden; padding: 6px; }
+#siteChoice.lockd button { pointer-events: none; } #siteChoice.lockd button:not(.on) { opacity: 0.4; }
+#select.resel { z-index: 60; background: #07090c; } /* switching operator in preparation: over the match */

@@ -1411,12 +1411,88 @@ function renderLobby(s) {
 }
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-// the big loadout panel beside the operator cards: your pick once you have one, before that whichever card the mouse is on
+// the big loadout panel beside the operator cards: your pick once you have one. Before that (he asked 2026-11-16: no
+// operator shown until you pick one) a map of the building: the sites to defend, or the attackers' spawns.
 function showSelLoadout(op, mine) {
-  $('loNote').textContent = mine ? '' : 'PREVIEW · CLICK THE CARD TO PICK';
+  $('loNote').textContent = ''; setText($('selLo').querySelector('.loHead').firstChild, 'LOADOUT');
   if (st.loShown === op && !st.loDirty) return;
   st.loShown = op; st.loDirty = false;
   showLoadout($('selLoBody'), { profile: st.profile, send, op });
+}
+// every floor side by side (not the roof), drawn once per map: walls light, floors dark, outside green
+function floorPics(m) {
+  if (st.flPics && st.flPics.v === st.mv) return st.flPics.list;
+  const list = [];
+  m.floors.forEach((F, f) => {
+    if (F.roof) return;
+    let x0 = m.W, y0 = m.H, x1 = 0, y1 = 0;
+    for (let k = 0; k < m.tiles.length; k++) if (m.flAt[k] === f) { const x = k % m.W, y = (k / m.W) | 0; if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+    if (x1 < x0) return;
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, img = document.createElement('canvas'); img.width = w; img.height = h;
+    const g = img.getContext('2d'), id = g.createImageData(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = (y + y0) * m.W + x + x0, t = m.tiles[k], i = (y * w + x) * 4;
+      const col = m.flAt[k] !== f ? [11, 14, 18] : t === T.GROUND ? [30, 42, 34] : t === T.HARD || t === T.SOFT || t === T.REINF || t === T.PANEL ? [150, 158, 168]
+        : t === T.STAIR ? [96, 104, 112] : t === T.OPEN || t === T.BARRI ? [120, 90, 60] : [52, 58, 66];
+      id.data[i] = col[0]; id.data[i + 1] = col[1]; id.data[i + 2] = col[2]; id.data[i + 3] = 255;
+    }
+    g.putImageData(id, 0, 0);
+    list.push({ f, name: F.name, img, x0, y0, w, h });
+  });
+  st.flPics = { v: st.mv, list };
+  return list;
+}
+function showSelMap(s, me, side) {
+  const m = st.map; if (!m) return;
+  const used = s.su || [], mates = s.players.filter(p => p.sq === me.sq);
+  const key = ['map', st.mv, side, s.site, s.slk, used.join(), me.spn, me.sr, me.pd, mates.map(p => p.spn).join()].join(':');
+  setText($('selLo').querySelector('.loHead').firstChild, 'MAP');
+  $('loNote').textContent = side === 'def' ? (s.slk ? 'THE SITE IS LOCKED IN · NOW PICK YOUR OPERATOR' : 'TAP A SITE TO CHOOSE IT') : me.pd ? 'YOUR SPAWN IS LOCKED IN · NOW PICK YOUR OPERATOR' : 'TAP A SPAWN TO START THERE';
+  if (st.loShown === key) return;
+  st.loShown = key;
+  const body = $('selLoBody');
+  let c = body.querySelector('canvas.selMap');
+  if (!c) { body.innerHTML = '<canvas class="selMap" width="1200" height="620"></canvas>'; c = body.querySelector('canvas'); }
+  const pics = floorPics(m), g = c.getContext('2d'), gap = 30, top = 40;
+  const tw = pics.reduce((a, P) => a + P.w, 0), th = Math.max(...pics.map(P => P.h));
+  const sc = Math.min((c.width - gap * (pics.length + 1)) / tw, (c.height - top - 20) / th);
+  let x = (c.width - tw * sc - gap * (pics.length - 1)) / 2;
+  const place = []; // where each floor landed
+  g.fillStyle = '#0b0e12'; g.fillRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
+  for (const P of pics) { const y = top + (th - P.h) * sc / 2; g.drawImage(P.img, x, y, P.w * sc, P.h * sc); place.push({ P, x, y });
+    g.fillStyle = '#cfd6dc'; g.font = '700 22px Barlow Condensed, sans-serif'; g.textAlign = 'center'; g.fillText(P.name.toUpperCase(), x + P.w * sc / 2, 26); x += P.w * sc + gap; }
+  const at = (wx, wy) => { const f = floorAt(m, wx, wy), L = place.find(q => q.P.f === f) || place[0]; return { x: L.x + (wx / CELL - L.P.x0) * sc, y: L.y + (wy / CELL - L.P.y0) * sc, L }; };
+  const hits = [];
+  if (side === 'def') {
+    m.sites.forEach((site, i) => {
+      const on = i === s.site, gone = used.includes(i) && !on;
+      for (const b of site.bombs) {
+        const r = m.rooms.find(q => q.name === b.room && floorAt(m, (q.x + q.w / 2) * CELL, (q.y + q.h / 2) * CELL) === floorAt(m, b.x, b.y));
+        if (r) { const a = at((r.x + 0.5) * CELL, (r.y + 0.5) * CELL); g.fillStyle = on ? 'rgba(242,193,78,0.45)' : gone ? 'rgba(120,120,120,0.15)' : 'rgba(143,200,255,0.22)'; g.fillRect(a.x - sc / 2, a.y - sc / 2, r.w * sc, r.h * sc); }
+      }
+      const a0 = at(site.bombs[0].x, site.bombs[0].y), a1 = site.bombs[1] ? at(site.bombs[1].x, site.bombs[1].y) : a0, cx = (a0.x + a1.x) / 2, cy = (a0.y + a1.y) / 2;
+      for (const [b, a] of [[site.bombs[0], a0], [site.bombs[1], a1]]) if (b) { g.fillStyle = on ? '#f2c14e' : gone ? '#555' : '#8fc8ff'; g.beginPath(); g.arc(a.x, a.y, on ? 12 : 9, 0, 7); g.fill(); g.lineWidth = 3; g.strokeStyle = '#000'; g.stroke();
+        g.fillStyle = '#000'; g.font = '800 15px Barlow Condensed, sans-serif'; g.fillText(b.id, a.x, a.y + 5); }
+      g.font = (on ? '800 24px' : '700 19px') + ' Barlow Condensed, sans-serif'; g.lineWidth = 5; g.strokeStyle = '#000'; const label = site.name.toUpperCase() + (gone ? ' (PLAYED)' : '');
+      g.strokeText(label, cx, cy - 18); g.fillStyle = on ? '#f2c14e' : gone ? '#777' : '#e8eef5'; g.fillText(label, cx, cy - 18);
+      if (!gone) hits.push({ x: cx, y: cy, n: i });
+    });
+  } else {
+    m.atkSpawns.forEach((sp, i) => {
+      const a = at(sp.x, sp.y), here = mates.filter(q => q.spn === i).length, mine = !me.sr && me.spn === i;
+      g.fillStyle = mine ? '#f2c14e' : '#ff8a3d'; g.beginPath(); g.arc(a.x, a.y, mine ? 14 : 11, 0, 7); g.fill(); g.lineWidth = 3; g.strokeStyle = '#000'; g.stroke();
+      g.textAlign = 'center'; if (here) { g.fillStyle = '#000'; g.font = '800 16px Barlow Condensed, sans-serif'; g.fillText(String(here), a.x, a.y + 6); }
+      g.font = '700 20px Barlow Condensed, sans-serif'; g.lineWidth = 5; g.strokeStyle = '#000'; const ly = a.y > c.height - 40 ? a.y - 20 : a.y + 34, lx = Math.max(70, Math.min(c.width - 70, a.x));
+      g.strokeText(sp.name.toUpperCase(), lx, ly); g.fillStyle = mine ? '#f2c14e' : '#e8e8e8'; g.fillText(sp.name.toUpperCase(), lx, ly);
+      hits.push({ x: a.x, y: a.y, n: i });
+    });
+  }
+  c.onclick = e => {
+    if (me.pd || (side === 'def' && s.slk)) return;
+    const r = c.getBoundingClientRect(), mx = (e.clientX - r.left) / r.width * c.width, my = (e.clientY - r.top) / r.height * c.height;
+    let best = null, bd = 120; for (const h of hits) { const d = Math.hypot(h.x - mx, h.y - my); if (d < bd) { bd = d; best = h; } }
+    if (best) { audio.ui(); send(side === 'def' ? { t: 'site', n: best.n } : { t: 'spawn', n: best.n }); }
+  };
 }
 // Unranked / Ranked bans (he asked, like R6): before round 1 the teams take turns banning an attacker or a defender.
 // On your team's turn you see every operator of that side and click one to ban it (the first click on the team counts);
@@ -1455,27 +1531,27 @@ function buildSelect(s) {
       const info = document.createElement('div'); info.className = 'info';
       info.innerHTML = `<div class="nm">${o.name}</div><div class="role">${o.role}</div><div class="ab">${o.ability.name}</div><div class="more">${esc(o.ability.desc)}</div>`;
       d.appendChild(info);
-      d.onmouseenter = () => { if (!document.querySelector('#opgrid .op.mine')) showSelLoadout(k, false); };
       d.onclick = () => { send({ t: 'pick', op: k }); };
       grid.appendChild(d);
     }
     st.loShown = null;
-    if (grid.firstChild) showSelLoadout(grid.firstChild.dataset.op, false);
   }
+  const placed = !!me.pd;
   const mates = s.players.filter(p => p.sq === me.sq);
   // roles (he asked; a small icon left of each name, he asked too): choose one first, then only its operators are shown. Counts show how many teammates took each.
   const jobs = JOBS[side], myJob = me.jb, rb = $('roleBar');
   const rk = [s.rd, side, myJob, me.lk, ...mates.map(p => p.jb), (s.bn || []).length].join(':'), isBan = o => !!(s.bn && s.bn.some(b => b[0] === o));
-  if (rb.dataset.k !== rk) {
-    rb.dataset.k = rk; rb.classList.toggle('choose', !myJob);
+  if (!placed) placeList(s, me, side, rb);
+  else if (rb.dataset.k !== rk) {
+    rb.dataset.k = rk; rb.classList.toggle('choose', !myJob); rb.classList.remove('place');
     rb.innerHTML = (myJob ? '' : '<div class="rbHead">CHOOSE YOUR ROLE</div>') + jobs.map(j => {
       const n = mates.filter(p => p.jb === j.id).length;
       return `<button data-r="${j.id}" class="${myJob === j.id ? 'on' : ''}" title="${esc(j.desc)}"><b>${roleIcon(j.id)}${j.name.toUpperCase()}</b>${n ? `<i>${n}</i>` : ''}`
         + (myJob ? '' : `<span>${esc(j.desc)}</span><small>${j.ops.map(o => isBan(o) ? `<s>${OPERATORS[o].name.toUpperCase()}</s>` : OPERATORS[o].name.toUpperCase()).join(' · ')}</small>`) + '</button>';
     }).join('');
-    for (const b of rb.querySelectorAll('button')) b.onclick = () => { if (st.me && st.me.lk) return; audio.ui(); send({ t: 'role', r: b.dataset.r }); };
+    for (const b of rb.querySelectorAll('button')) b.onclick = () => { if (st.me && st.me.lk && !st.reSel) return; audio.ui(); send({ t: 'role', r: b.dataset.r }); };
   }
-  $('opgrid').classList.toggle('hidden', !myJob);
+  $('opgrid').classList.toggle('hidden', !myJob || !placed);
   for (const d of document.querySelectorAll('#opgrid .op')) d.classList.toggle('hidden', !!myJob && jobOf(d.dataset.op) !== myJob);
   for (const d of document.querySelectorAll('#opgrid .op')) {
     const who = mates.find(p => p.op === d.dataset.op);
@@ -1488,12 +1564,13 @@ function buildSelect(s) {
     d.querySelector('.who').textContent = who ? who.n : '';
     d.querySelector('.who').style.display = who ? '' : 'none';
   }
-  if (st.loDirty && st.loShown && !document.querySelector('#opgrid .op.mine')) showSelLoadout(st.loShown, false);
+  if (!document.querySelector('#opgrid .op.mine')) showSelMap(s, me, side);
   $('selSide').textContent = `ROUND ${s.rd} — ${side === 'atk' ? 'ATTACK' : 'DEFENCE'}`;
   $('selSide').style.color = lighten(side === 'atk' ? COLS.atk : COLS.def);
   const site = st.map.sites[s.site];
   const spawns = st.map.atkSpawns, mySpawn = spawns[me.spn] || spawns[0];
   const sc = $('siteChoice'), used = s.su || [], dqN = s.players.filter(q => q.tm === 'atk' && q.dq).length, sk = side === 'def' ? s.rd + ':' + s.site + ':' + used.join() : 'atk:' + s.rd + ':' + me.spn + ':' + (me.sr ? 1 : 0) + ':' + (me.dq ? 1 : 0) + dqN;
+  sc.classList.toggle('hidden', !placed); sc.classList.toggle('lockd', placed && !s.tu); // (chosen in the list first; locked in after)
   if (sc.dataset.k !== sk) {
     sc.dataset.k = sk;
     // defenders pick the site; each attacker picks where they start (he asked)
@@ -1503,7 +1580,7 @@ function buildSelect(s) {
         + `<button data-dq="1" class="${me.dq ? 'on atk' : 'atk'}" title="The defuser goes to one of the attackers who asked for it (anyone, if nobody asks)">${me.dq ? '✓ ' : ''}REQUEST DEFUSER${dqN ? ` · ${dqN} ASKED` : ''}</button>`; // (he asked 2026-11-15)
     for (const b of sc.querySelectorAll('button')) b.onclick = () => { audio.ui(); send(b.dataset.dq ? { t: 'defreq', on: !me.dq } : side === 'def' ? { t: 'site', n: +b.dataset.n } : { t: 'spawn', n: +b.dataset.n }); };
   }
-  drawSpawnMap(side === 'atk' ? mates : null, me);
+  drawSpawnMap(side === 'atk' && placed ? mates : null, me);
   const mapName = st.map.name.toUpperCase();
   $('selInfo').textContent = side === 'def' ? `DEFEND: ${site.name.toUpperCase()}  ·  ${mapName}` : `SPAWN: ${mySpawn.name.toUpperCase()}  ·  OBJECTIVE UNKNOWN  ·  ${mapName}`;
   // no clock (he asked): the round starts once everyone has locked in. The tutorial still counts down for its coach.
@@ -1512,14 +1589,36 @@ function buildSelect(s) {
   else $('selTime').innerHTML = `<small>READY</small>${ready}<small>/${s.players.length}</small>`;
   const lb = $('lockBtn');
   lb.classList.toggle('hidden', !!s.tu);
-  lb.disabled = !me.op || !!me.lk;
-  lb.textContent = me.lk ? 'LOCKED IN' : me.op ? 'LOCK IN' : me.jb ? 'PICK AN OPERATOR' : 'CHOOSE A ROLE';
-  lb.classList.toggle('done', !!me.lk);
-  $('opgrid').classList.toggle('lockedIn', !!me.lk);
+  lb.disabled = st.reSel ? false : !placed ? false : !me.op || !!me.lk;
+  lb.textContent = st.reSel ? 'BACK TO THE MATCH' : !placed ? (side === 'def' ? 'LOCK IN SITE' : 'LOCK IN SPAWN') : me.lk ? 'LOCKED IN' : me.op ? 'LOCK IN' : me.jb ? 'PICK AN OPERATOR' : 'CHOOSE A ROLE';
+  lb.classList.toggle('done', !!me.lk && !st.reSel);
+  $('opgrid').classList.toggle('lockedIn', !!me.lk && !st.reSel);
+  if (st.reSel) $('selSide').textContent += ' · PREPARATION: SWITCH OPERATOR';
   $('picks').innerHTML = mates.map(p => `<span class="${p.lk ? 'lk' : ''}"><b>${esc(p.n)}</b> ${p.op ? OPERATORS[p.op].name : '…'}${p.lk ? ' ✓' : ''}</span>`).join('')
     + (humans.some(p => !p.lk) ? `<span class="wait">Waiting for ${humans.filter(p => !p.lk).map(p => esc(p.n)).join(', ')}</span>` : '');
 }
-$('lockBtn').onclick = () => { if (st.me && st.me.op && !st.me.lk) { audio.ui('lock'); send({ t: 'lock' }); } };
+$('lockBtn').onclick = () => {
+  if (st.reSel) { closeReSel(); return; }
+  if (st.me && !st.me.pd) { audio.ui('lock'); send({ t: 'place' }); return; }
+  if (st.me && st.me.op && !st.me.lk) { audio.ui('lock'); send({ t: 'lock' }); }
+};
+// step 1 of operator select (he asked 2026-11-16): the defenders pick the site (whoever locks it in decides, no vote),
+// each attacker picks a spawn; the map on the right shows them. Roles and operators come once it is locked in.
+function placeList(s, me, side, rb) {
+  const used = s.su || [], m = st.map, key = ['place', s.rd, side, s.site, used.join(), me.spn, me.sr, me.dq].join(':');
+  if (rb.dataset.k === key) return;
+  rb.dataset.k = key; rb.classList.add('choose', 'place');
+  if (side === 'def') rb.innerHTML = '<div class="rbHead">CHOOSE THE SITE TO DEFEND</div>' + m.sites.map((x, i) => {
+    const gone = used.includes(i) && i !== s.site, fl = [...new Set(x.bombs.map(b => m.floors[Math.max(0, floorAt(m, b.x, b.y))].name))].join(' + ');
+    return `<button data-n="${i}" class="${i === s.site ? 'on' : ''}" ${gone ? 'disabled' : ''}><b>${esc(x.name.toUpperCase())}</b><span>${esc(x.bombs.map(b => b.id + ': ' + b.room).join(' · '))}</span><small>${esc(fl)}${gone ? ' · ALREADY PLAYED' : ''}</small></button>`; }).join('');
+  else rb.innerHTML = '<div class="rbHead">CHOOSE YOUR SPAWN</div>' + `<button data-n="-1" class="${me.sr ? 'on' : ''}"><b>RANDOM</b><span>The team spreads out: usually two groups and one player on their own</span></button>`
+    + m.atkSpawns.map((x, i) => `<button data-n="${i}" class="${!me.sr && i === me.spn ? 'on' : ''}"><b>${esc(x.name.toUpperCase())}</b></button>`).join('')
+    + `<button data-dq="1" class="${me.dq ? 'on' : ''}"><b>${me.dq ? '✓ ' : ''}REQUEST DEFUSER</b><span>The defuser goes to one of the attackers who asked for it</span></button>`;
+  for (const b of rb.querySelectorAll('button')) b.onclick = () => { audio.ui(); send(b.dataset.dq ? { t: 'defreq', on: !(st.me && st.me.dq) } : side === 'def' ? { t: 'site', n: +b.dataset.n } : { t: 'spawn', n: +b.dataset.n }); };
+}
+// attackers can switch operator during preparation (he asked 2026-11-16): the pause menu's CHANGE OPERATOR opens the picker
+function openReSel() { $('pause').classList.add('hidden'); st.reSel = true; st.selBuilt = null; $('select').classList.add('resel'); }
+function closeReSel() { st.reSel = false; $('select').classList.remove('resel'); if (playing() && !isTouch && !st.tv) lockMouse(cv); }
 
 // A small map of the ground floor with the attacker spawns: yours ringed in gold, a number for teammates starting there.
 // Click a spawn to start there.
@@ -3664,7 +3763,9 @@ function screens(s, phase, now) {
     if (want) setMood(phase === PHASE.SELECT ? 'select' : 'menu');
   }
   countdown(s, phase);
-  show('select', joined && phase === PHASE.SELECT && !st.tv);
+  if (st.reSel && (phase !== PHASE.PREP || !st.me || st.me.tm !== 'atk')) { st.reSel = false; $('select').classList.remove('resel'); } // (locked once the action starts)
+  show('select', joined && (phase === PHASE.SELECT || (phase === PHASE.PREP && st.reSel)) && !st.tv);
+  $('pSwap').classList.toggle('hidden', !(joined && phase === PHASE.PREP && st.me && st.me.tm === 'atk' && !(s && (s.tu || s.fr))));
   show('tvDraft', !!st.tv && joined && phase === PHASE.SELECT); document.documentElement.classList.toggle('tvsel', !!st.tv && phase === PHASE.SELECT);
   document.documentElement.classList.toggle('arena', !!(s && s.ar));
   document.documentElement.classList.toggle('zombies', !!(s && s.zb)); if (s && s.zb) zbHud(s, st.me); // fun modes: no gadget slots, drone bar or team panel
@@ -3676,7 +3777,7 @@ function screens(s, phase, now) {
   st.lastHud = now;
   if (phase === PHASE.LOBBY) renderLobby(s);
   else if (phase === PHASE.SELECT) { if (st.tv) TV.tvDraft(s); else { buildSelect(s); banPick(s); } }
-  else if (phase !== PHASE.MATCH_END) hud(s);
+  else if (phase !== PHASE.MATCH_END) { hud(s); if (st.reSel) buildSelect(s); }
   $('scoreboard').classList.toggle('hidden', !keys.has('scoreboard'));
   if (keys.has('scoreboard')) $('scoreboard').innerHTML = scoreTable(s);
 }
@@ -4428,7 +4529,7 @@ function revealAll() { if (!st.unseen) return; for (const k of st.unseen) applyK
 
 // ---------------- pause menu & pages ----------------
 const OVERLAYS = ['lanDlg', 'bkPage', 'playbookPage', 'settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage', 'freeOps', 'pause', 'quitDlg'];
-function menuOpen() { return OVERLAYS.some(id => !$(id).classList.contains('hidden')); }
+function menuOpen() { return !!st.reSel || OVERLAYS.some(id => !$(id).classList.contains('hidden')); }
 function inMatch() { const p = st.last && st.last.ph; return p === PHASE.PREP || p === PHASE.ACTION || p === PHASE.ROUND_END || p === PHASE.SELECT; }
 function showOps(op) { audio.ui('open'); openOps($('opsPage'), { profile: st.profile, send, op }); }
 function showProfile() { audio.ui('open'); if (st.token) openProfile($('profilePage'), { token: st.token }); }
@@ -4460,6 +4561,7 @@ $('pQuit').onclick = () => { $('pause').classList.add('hidden'); $('quitDlg').cl
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && inMatch() && !menuOpen()) $('pause').classList.remove('hidden'); });
 $('pResume').onclick = () => $('pause').classList.add('hidden');
 $('pOps').onclick = () => showOps(st.me && st.me.op);
+$('pSwap').onclick = () => openReSel();
 $('pProf').onclick = () => showProfile();
 $('pSet').onclick = () => toggleSettings();
 $('pFs').onclick = () => { toggleFullscreen(); $('pause').classList.add('hidden'); };
