@@ -81,4 +81,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-16', k: 'mech', id: 'select', t: 'Operator select: the site (defenders, whoever locks it in decides) or your spawn (attackers) is locked in before picking an operator. Attackers can switch operator during preparation; everyone is locked once the action starts.', v: 1 },
   { d: '2026-11-16', k: 'mech', id: 'touch', t: 'Phones: after a sprint the move stick keeps turning your crosshair with you until you aim in.', v: 1 },
   { d: '2026-11-16', k: 'mech', id: 'touch', t: 'Phones: the aim stick reaches as far as a mouse (18 m from the hip, further with scopes); the view zooms out to follow.', v: 1 },
+  { d: '2026-11-16', k: 'mech', id: 'select', t: 'Operator select: picking the same operator as last round shows your loadout again instead of leaving the map up.', v: 0 },
 ];

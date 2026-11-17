@@ -1464,7 +1464,8 @@ function showSelMap(s, me, side) {
   st.loShown = key;
   const body = $('selLoBody');
   let c = body.querySelector('canvas.selMap');
-  if (!c) { body.innerHTML = '<canvas class="selMap" width="1200" height="620"></canvas>'; c = body.querySelector('canvas'); }
+  if (!c) { // (the loadout that was here is gone: forget it, or picking the same operator next round only "refreshes" it and the map stays)
+    body.innerHTML = '<canvas class="selMap" width="1200" height="620"></canvas>'; c = body.querySelector('canvas'); delete body.dataset.op; body._refresh = null; }
   const pics = floorPics(m), g = c.getContext('2d'), gap = 30, top = 40;
   const tw = pics.reduce((a, P) => a + P.w, 0), th = Math.max(...pics.map(P => P.h));
   const sc = Math.min((c.width - gap * (pics.length + 1)) / tw, (c.height - top - 20) / th);
