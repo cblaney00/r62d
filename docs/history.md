@@ -445,3 +445,12 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   drag moves the crosshair the same way on screen, a new thumb holding still moves it 0. `__r62d.scr()` added.
 - The site finder (`#compass`) is one line: an 22 px needle (18 on phones), site, floor and distance in a row; 28 px
   tall on a computer (was ~70). Now glass too.
+
+## Phone match text much smaller (2026-11-17, he asked: the rappel hints and any text that large)
+- A block of `html.touchplay` sizes at the end of style.css (#hud is also zoomed by `--hudz`, ~0.8). Measured with
+  `BIGTEXT=<file> SCENARIO=rope tests/thumbs.mjs` (lists on-screen text of 15 px or more): before, ammo 44 px, health and
+  scores 27, clock 25, operator 19, the rope hint 16; after, no words at 15 px or more, ammo 29, scores 21, health and
+  clock 19. Also smaller: round banner, CLIMB IN box (#winGo), objective-found card, players left, progress label,
+  out-of-bounds warning, end screen title, Zombies round and points, death card.
+- The phone prompt sits between the left thumb's buttons and the aim stick (left 238 px, right = the stick's left edge,
+  divided by --hudz), wrapping onto two lines. `promptText`'s `mv()`: on phones the rope hints say STICK ↕ / STICK ↔.

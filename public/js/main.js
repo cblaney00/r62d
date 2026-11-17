@@ -4099,11 +4099,12 @@ function drawBracket(ctx, gx, gy, ux, uy, tx, ty, now) { // (ux, uy: along the f
     ctx.strokeStyle = `rgb(${col})`; ctx.lineWidth = 2.4 * DPR; ctx.stroke(); ctx.lineJoin = 'miter';
 }
 function promptText(s, me) {
+  const mv = (u, d, word) => touchActive() ? `<b>STICK ${u === 'up' ? '↕' : '↔'}</b>${word}` : `<b>${label(u)}</b>/<b>${label(d)}</b>${word}`; // phones have a move stick, not W/A/S/D
   const side = me.tm, x = st.pred.x, y = st.pred.y, m = st.map;
   if (s.zb && me.a && !me.dn) { const z = zbPrompt(s, me, x, y); if (z !== null) return z; }
   if (me.ro && r3on() && me.ro[0]) { const r = m.ropes[me.ro[1]], atW = r && ropeAtWindow(r, x, y); // the 3D rope view's keys (R6's)
     const inW = atW ? (ropeWindowOpen(m, r) ? `<b>${label('vault')}</b>CLIMB IN  ·  ` : ropeWindowBoarded(m, r) ? `<b>${label('vault')}</b>SMASH IN  ·  ` : '') : '';
-    return `${inW}<b>${label('up')}</b>/<b>${label('down')}</b>UP · DOWN  ·  <b>${label('left')}</b>/<b>${label('right')}</b>ALONG  ·  <b>${label('crouch')}</b>${me.ro[5] ? 'RIGHT WAY UP' : 'UPSIDE DOWN'}  ·  <b>${label('interact')}</b>SLIDE DOWN`; }
+    return `${inW}${mv('up', 'down', 'UP · DOWN')}  ·  ${mv('left', 'right', 'ALONG')}  ·  <b>${label('crouch')}</b>${me.ro[5] ? 'RIGHT WAY UP' : 'UPSIDE DOWN'}  ·  <b>${label('interact')}</b>SLIDE DOWN`; }
   if (me.ro) { // on a rope (he asked: climb freely)
     if (!me.ro[0]) return me.ro[2] < 0 && !me.ro[4] ? 'LETTING GO…' : 'CLIMBING…';
     const r = m.ropes[me.ro[1]]; if (!r) return '';
@@ -4111,7 +4112,7 @@ function promptText(s, me) {
     const where = !r.cells.length ? (head > 0 ? 'WALL · ' + fl : 'WALL') : lvl ? `LEVEL WITH THE ${fl} WINDOW` : head < 0.5 ? `BELOW THE ${fl} WINDOW` : `ABOVE THE ${fl} WINDOW`;
     const inKey = atW && lvl ? (ropeWindowOpen(m, r) ? `  ·  <b>${label('vault')}</b>CLIMB IN` : ropeWindowBoarded(m, r) ? `  ·  <b>${label('vault')}</b>SWING IN THROUGH THE BOARDS` : '  ·  WINDOW BLOCKED') : nearW && lvl ? '  ·  MOVE IN FRONT OF THE WINDOW TO GO IN' : '';
     const top = r.roof && r.up < 0 && head > 0.85 && !lvl ? `  ·  <b>${label('vault')}</b>ONTO THE ROOF` : ''; // (only Space or F take you off a rope)
-    return `${where}${inKey}${top}  ·  <b>${label('up')}</b>/<b>${label('down')}</b>CLIMB  ·  <b>${label('left')}</b>/<b>${label('right')}</b>ALONG  ·  <b>${label('crouch')}</b>${me.ro[5] ? 'RIGHT WAY UP' : 'UPSIDE DOWN'}  ·  <b>${label('interact')}</b>SLIDE DOWN`;
+    return `${where}${inKey}${top}  ·  ${mv('up', 'down', 'CLIMB')}  ·  ${mv('left', 'right', 'ALONG')}  ·  <b>${label('crouch')}</b>${me.ro[5] ? 'RIGHT WAY UP' : 'UPSIDE DOWN'}  ·  <b>${label('interact')}</b>SLIDE DOWN`;
   }
   const down = s.players.find(p => p.a && p.dn && p.tm === side && p.id !== me.id && Math.hypot(p.x - x, p.y - y) < 26);
   if (down && !me.dn && me.ct === 'body') return `<b>${label('interact')}</b>HOLD TO REVIVE ${esc(down.n.toUpperCase())}`; // before ropes (the server puts reviving first too)

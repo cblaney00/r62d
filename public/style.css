@@ -1465,3 +1465,20 @@ html.touch body:has(#status:not(:empty)) #allies { top: calc(34% + 50px); }
 #compass .cmpTxt { flex-direction: row; align-items: baseline; gap: 8px; line-height: 1; }
 #compass .cmpSite { font-size: 14px; } #compass .cmpFl { font-size: 11px; letter-spacing: 0.1em; } #compass b { margin-top: 0; font-size: 11px; }
 html.touchplay #compass .cmpSite { font-size: 12px; } html.touchplay #compass canvas { width: 18px; height: 18px; }
+/* phones (he asked 2026-11-17: the rope hints and any other text that large much smaller): the match's words and numbers
+   on a phone. (#hud is zoomed by --hudz too, about 0.8 on a phone, so these show a little smaller still) */
+html.touchplay #prompt { font-size: 13px; letter-spacing: 0.05em; } html.touchplay #prompt b { padding: 0 4px; margin-right: 4px; }
+html.touchplay #winGo { font-size: 13px; padding: 4px 10px; letter-spacing: 0.1em; } html.touchplay #winGo.wait { font-size: 12px; } html.touchplay #winGo b { padding: 0 5px; margin-right: 6px; }
+html.touchplay #banner .t { font-size: 26px; } html.touchplay #banner .s { font-size: 12px; }
+html.touchplay #siteFound .sfT { font-size: 14px; } html.touchplay #siteFound .sfF { font-size: 19px; } html.touchplay #siteFound .sfY, html.touchplay #siteFound .sfS { font-size: 11px; }
+html.touchplay #leftCount b { font-size: 19px; }
+html.touchplay #progress { width: 220px; } html.touchplay #progress .label { font-size: 11px; }
+html.touchplay #outWarn { font-size: 13px; padding: 4px 12px; } html.touchplay #outWarn small { font-size: 11px; }
+html.touchplay #opname { font-size: 17px; } html.touchplay #opname small { font-size: 10px; }
+html.touchplay #hpnum { font-size: 24px; min-width: 44px; }
+html.touchplay #ammo b { font-size: 36px; } html.touchplay #ammo span { font-size: 17px; } html.touchplay #wname { font-size: 12px; }
+html.touchplay .sc { font-size: 26px; } html.touchplay #time { font-size: 24px; }
+html.touchplay #endscreen .t { font-size: 60px; } html.touchplay #endscreen .s { font-size: 14px; }
+html.touchplay .zbRound { font-size: 44px; } html.touchplay .zbPts div { font-size: 12px; min-width: 120px; } html.touchplay .zbPts div b { font-size: 14px; } html.touchplay .zbPts div.me b { font-size: 18px; }
+html.touchplay #deathCard { font-size: 13px; } html.touchplay #kcBtn { font-size: 12px; }
+html.touchplay #prompt { left: calc(238px / var(--hudz, 1)); right: calc((330px * var(--tz, 1) + 70px) / var(--hudz, 1)); transform: none; text-align: center; line-height: 1.45; } /* between the left thumb's buttons and the aim stick, never over it */

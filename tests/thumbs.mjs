@@ -4,6 +4,7 @@
 //   node tests/thumbs.mjs <port> <outdir> <gameUrl> [width height]
 import fs from 'node:fs';
 const [port, outDir, url, W = 914, H = 412] = process.argv.slice(2);
+const BIG = process.env.BIGTEXT ? require_big() : null; function require_big() { return fs.readFileSync(process.env.BIGTEXT, 'utf8').trim(); } // __bigText: lists on-screen text 15 px or bigger
 const TUNE_TRAVEL = 1.5; // public/js/aimstick.js TUNE.TRAVEL
 const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
 let id = 0; const waiting = new Map(), logs = [];
@@ -101,8 +102,9 @@ async function run() {
       const spot = JSON.parse(await js(`(() => { const m = __r62d.st.map, r = m.ropes.find(r => r.down < 0 && r.base && !r.wall && Math.abs(r.b - r.a) > 40) || m.ropes.find(r => r.down < 0 && r.base); const t = (r.a + r.b) / 2; return JSON.stringify({ x: r.base.x + r.tx * t, y: r.base.y + r.ty * t }); })()`));
       await js(`__r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'clearBots' })); __r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'tp', x: ${spot.x}, y: ${spot.y} })); true`); await sleep(1200);
       await tap('[data-id="use"]'); await sleep(2500);
+      if (BIG) console.log('BIG TEXT in the match:\n' + await js(BIG));
       const a0 = await P(); console.log('after ACTION at a rope:', JSON.stringify(a0), '(want rope and drag true)');
-      await shot('r1-on-rope');
+      await shot('r1-on-rope'); if (BIG) console.log('BIG TEXT on the rope:\n' + await js(BIG));
       await touch(finger('R', [R0, [R0[0] - 30, R0[1], 200], [R0[0] - 60, R0[1], 200]], 200)); await sleep(300);
       const a1 = await P(); console.log('dragged the aim thumb 60 px LEFT (want the crosshair ~120 px left on screen):', JSON.stringify(a1), 'crosshair moved', Math.round(Math.hypot(a1.ax - a0.ax, a1.ay - a0.ay)), 'world px');
       await touch(finger('R', [[R0[0] - 100, R0[1] + 40], [R0[0] - 100, R0[1] + 40, 300]], 200)); await sleep(300);
