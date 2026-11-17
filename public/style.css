@@ -1482,3 +1482,9 @@ html.touchplay #endscreen .t { font-size: 60px; } html.touchplay #endscreen .s {
 html.touchplay .zbRound { font-size: 44px; } html.touchplay .zbPts div { font-size: 12px; min-width: 120px; } html.touchplay .zbPts div b { font-size: 14px; } html.touchplay .zbPts div.me b { font-size: 18px; }
 html.touchplay #deathCard { font-size: 13px; } html.touchplay #kcBtn { font-size: 12px; }
 html.touchplay #prompt { left: calc(238px / var(--hudz, 1)); right: calc((330px * var(--tz, 1) + 70px) / var(--hudz, 1)); transform: none; text-align: center; line-height: 1.45; } /* between the left thumb's buttons and the aim stick, never over it */
+/* phones, drone / camera view (look check 2026-11-17: the arrows sat on the aim stick, the hint and list squeezed beside
+   PING): the arrows left of the stick at the bottom, the hint above them in the gap, the drone/camera list under the score */
+html.touchplay #touchUI .tbtn.t3 { right: calc(330px + 70px / var(--tz, 1)); bottom: 24px; } html.touchplay #touchUI .tbtn.t2 { right: calc(330px + 132px / var(--tz, 1)); bottom: 24px; } /* (.tbtn is zoomed by --tz) */
+html.touchplay #viewlabel { left: calc(240px / var(--hudz, 1)); right: calc((330px * var(--tz, 1) + 70px) / var(--hudz, 1)); transform: none; max-width: none; bottom: calc(92px / var(--hudz, 1)); font-size: 11px; line-height: 1.4; }
+html.touchplay #cambar { top: calc(60px / var(--hudz, 1)); bottom: auto !important; } /* (!important: free play's "above its hint bar" rule) */
+#touchUI .tbtn.t6 { top: auto; bottom: 158px; } /* ⟲ TILT: above the move stick (the top-row rule pinned it onto the objective card) */

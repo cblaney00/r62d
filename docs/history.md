@@ -454,3 +454,13 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   out-of-bounds warning, end screen title, Zombies round and points, death card.
 - The phone prompt sits between the left thumb's buttons and the aim stick (left 238 px, right = the stick's left edge,
   divided by --hudz), wrapping onto two lines. `promptText`'s `mv()`: on phones the rope hints say STICK ↕ / STICK ↔.
+
+## Sage glass; look check on phone and computer (2026-11-17, he asked)
+- "Sage green is my signature color": the glass is tinted sage instead of grey. `glass.css` `:root`: `--sage` #9caf88,
+  `--g-tint`, `--panel` rgba(20,30,23,.66), sheen/dome/rim/grain carry sage; every cool blue-grey glass colour mapped
+  to a sage one (AIM's blue kept). Role colours stay: FIRE red, AIM blue, ACTION/on gold, teams --ally/--enemy.
+- Look check (he asked: aesthetic issues on mobile and pc): screenshots of every menu page and the match at 1366x768,
+  1280x720 and a 914x412 phone (`tests/shoot.mjs` steps, `tests/thumbs.mjs` default / menus / rope). Fixed: scoreboard
+  and end board .9 solid (the map showed through); `.overlay` dim .86; phone drone/camera view: arrows (`.t2/.t3`) left
+  of the aim stick, `#viewlabel` above them between the left buttons and the stick, `#cambar` under the score
+  (`!important` over free play's "above the hint bar" rule); ⟲ TILT (`.t6`) was pinned to the top by the top-row rule.

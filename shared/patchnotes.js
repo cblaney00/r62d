@@ -93,6 +93,7 @@ export const PATCH_NOTES = [
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the aim stick gives fine aiming 50% more thumb room; the outer zone feels the same.', v: 1 },
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the crosshair stays on a pre-aimed spot while you move, aiming close to yourself no longer cuts out, the aim stick sits in one place, one ACTION button does whatever the game prompts (else PING), a JUMP button, and the defuser carrier line is no longer hidden.', v: 1 },
   { d: '2026-11-17', k: 'mech', id: 'scope', t: 'Sniper scopes: no sway within 12 m of where you aim, and less sway far out.', v: 1 },
+  { d: '2026-11-17', k: 'mech', id: 'touch', t: 'The glass look is tinted sage green. The scoreboard is easier to read, and on phones the drone and camera arrows no longer cover the aim stick.', v: 0 },
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: much smaller hints and match text (rope hints, round titles, ammo, health, scores), and rope hints say STICK instead of W/A/S/D.', v: 0 },
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: on a rope your aim thumb drags the crosshair around, like a mouse on a computer.', v: 1 },
   { d: '2026-11-17', k: 'mech', id: 'compass', t: 'The bomb-site finder under the score bar is one thin line now, so you see more of the map round you.', v: 0 },

@@ -4,14 +4,16 @@
    graphics card every frame). The frost is a tint + a sheen + a static grain picture; elements keep their own tint
    colour (style.css `background`) and get the sheen and grain added as background images on top of it. */
 :root {
-  --panel: rgba(12, 18, 26, 0.66); /* (was 0.82 opaque: glass is see-through) */
-  --g-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --g-sheen: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 38%, rgba(255,255,255,0) 58%, rgba(255,255,255,0.035) 100%);
-  --g-dome: radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.08) 42%, rgba(255,255,255,0) 66%), radial-gradient(90% 60% at 50% 110%, rgba(255,255,255,0.10), rgba(255,255,255,0) 70%);
-  --g-rim: inset 0 1px 0 rgba(255,255,255,0.30), inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 -10px 18px rgba(0,0,0,0.16);
+  --panel: rgba(20, 30, 23, 0.66); /* (was 0.82 opaque: glass is see-through) */
+  --g-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.86 0 0 0 0 0.94 0 0 0 0 0.8 0 0 0 0.11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --g-sheen: linear-gradient(180deg, rgba(226,240,214,0.17) 0%, rgba(196,222,180,0.06) 38%, rgba(156,175,136,0) 58%, rgba(156,190,136,0.06) 100%);
+  --g-dome: radial-gradient(120% 90% at 50% 0%, rgba(232,244,222,0.32) 0%, rgba(196,222,180,0.09) 42%, rgba(156,175,136,0) 66%), radial-gradient(90% 60% at 50% 110%, rgba(170,205,150,0.14), rgba(156,175,136,0) 70%);
+  --g-rim: inset 0 1px 0 rgba(228,242,218,0.34), inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 -10px 18px rgba(0,0,0,0.16);
   --g-drop: 0 6px 18px rgba(0,0,0,0.32);
-  --g-edge: rgba(190,220,255,0.24);
-  --g-glow: rgba(120,190,255,0.16);
+  --g-edge: rgba(196,218,182,0.24);
+  --sage: #9caf88; /* his signature colour (he asked 2026-11-17: tint the glass sage green, not black-to-white) */
+  --g-tint: rgba(20,30,23,0.62);
+  --g-glow: rgba(150,190,135,0.16);
 }
 
 /* ---------- 1. PHONE CONTROLS ---------- */
@@ -24,23 +26,23 @@
 #touchUI .tbtn.aim.on, #touchUI .tbtn.on { background-color: rgba(242,193,78,0.78); border-color: #ffd877; color: #000; box-shadow: var(--g-rim), 0 0 20px rgba(242,193,78,0.75), 0 0 0 3px rgba(242,193,78,0.25); }
 #touchUI .tbtn.on svg { filter: none; }
 #touchUI .tbtn.act { background-color: rgba(70,52,12,0.5); border: 2px solid rgba(242,193,78,0.9); box-shadow: var(--g-rim), 0 4px 12px rgba(0,0,0,0.35), 0 0 18px rgba(242,193,78,0.45); }
-#touchUI .tbtn.act.idle { background-color: rgba(12,18,26,0.5); border-color: rgba(242,193,78,0.45); box-shadow: var(--g-rim), 0 4px 12px rgba(0,0,0,0.35), 0 0 10px rgba(242,193,78,0.18); }
+#touchUI .tbtn.act.idle { background-color: rgba(20,30,23,0.5); border-color: rgba(242,193,78,0.45); box-shadow: var(--g-rim), 0 4px 12px rgba(0,0,0,0.35), 0 0 10px rgba(242,193,78,0.18); }
 #touchUI .tbtn.act.on { background-color: rgba(242,193,78,0.8); }
-#touchUI .tbtn.r2, #touchUI .tbtn.r3, #touchUI .tbtn.t, #touchUI .tbtn.t2, #touchUI .tbtn.t3 { background-color: rgba(12,18,26,0.45); }
+#touchUI .tbtn.r2, #touchUI .tbtn.r3, #touchUI .tbtn.t, #touchUI .tbtn.t2, #touchUI .tbtn.t3 { background-color: rgba(20,30,23,0.45); }
 #touchUI .tbtn.lean.act { background-color: rgba(242,193,78,0.35); border-color: var(--gold); box-shadow: var(--g-rim), 0 0 14px rgba(242,193,78,0.5); }
 #touchUI .tbtn.out { box-shadow: var(--g-rim); }
 #touchUI .tbtn em { background: linear-gradient(180deg, #ffe08f, #f2c14e 55%, #d9a531); border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 0 8px rgba(242,193,78,0.6), 0 1px 3px rgba(0,0,0,0.6); }
 /* the sticks: a glass ring with a lit rim, and a glass bead for the thumb */
-#touchUI .tstick { background: radial-gradient(circle at 50% 50%, rgba(12,18,26,0.08) 0%, rgba(12,18,26,0.32) 62%, rgba(140,190,240,0.10) 100%), var(--g-grain); background-size: auto, 160px 160px;
-  border: 2px solid rgba(200,225,255,0.38); box-shadow: inset 0 0 18px rgba(140,200,255,0.16), inset 0 2px 0 rgba(255,255,255,0.18), 0 0 14px rgba(120,190,255,0.14); }
-#touchUI .tstick i { background: radial-gradient(circle at 38% 30%, rgba(255,255,255,0.9) 0%, rgba(230,240,250,0.55) 22%, rgba(150,175,200,0.42) 60%, rgba(90,110,130,0.5) 100%);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.45), 0 3px 8px rgba(0,0,0,0.45), 0 0 12px rgba(160,210,255,0.35); }
-#touchUI #tsLeft.held { border-color: rgba(220,238,255,0.7); box-shadow: inset 0 0 22px rgba(140,200,255,0.26), 0 0 18px rgba(120,190,255,0.3); }
+#touchUI .tstick { background: radial-gradient(circle at 50% 50%, rgba(20,30,23,0.08) 0%, rgba(20,30,23,0.32) 62%, rgba(150,185,135,0.10) 100%), var(--g-grain); background-size: auto, 160px 160px;
+  border: 2px solid rgba(206,224,192,0.38); box-shadow: inset 0 0 18px rgba(160,200,145,0.16), inset 0 2px 0 rgba(255,255,255,0.18), 0 0 14px rgba(150,190,135,0.14); }
+#touchUI .tstick i { background: radial-gradient(circle at 38% 30%, rgba(255,255,255,0.9) 0%, rgba(232,242,226,0.55) 22%, rgba(150,172,138,0.42) 60%, rgba(86,106,80,0.5) 100%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.45), 0 3px 8px rgba(0,0,0,0.45), 0 0 12px rgba(170,205,155,0.35); }
+#touchUI #tsLeft.held { border-color: rgba(222,236,212,0.7); box-shadow: inset 0 0 22px rgba(160,200,145,0.26), 0 0 18px rgba(150,190,135,0.3); }
 #touchUI .tstick.dyn { border-color: rgba(242,193,78,0.62); box-shadow: inset 0 0 18px rgba(242,193,78,0.16), inset 0 2px 0 rgba(255,235,180,0.2), 0 0 14px rgba(242,193,78,0.18); }
 #touchUI .tstick.dyn i { background: radial-gradient(circle at 38% 30%, rgba(255,250,230,0.95) 0%, rgba(255,215,120,0.7) 26%, rgba(242,193,78,0.55) 62%, rgba(150,110,30,0.6) 100%); box-shadow: 0 0 0 1px rgba(255,235,180,0.5), 0 3px 8px rgba(0,0,0,0.45), 0 0 14px rgba(242,193,78,0.45); }
 #touchUI #tsLeft.spr { border-color: var(--gold); box-shadow: inset 0 0 22px rgba(242,193,78,0.25), 0 0 22px rgba(242,193,78,0.55); }
 #touchUI #tHelp { background-image: var(--g-sheen), var(--g-grain); background-size: auto, 160px 160px; border-color: var(--g-edge); box-shadow: var(--g-rim), var(--g-drop); }
-#touchUI #tHelp .thI { background: var(--g-dome), rgba(12,18,26,0.5); border-color: var(--g-edge); box-shadow: var(--g-rim); }
+#touchUI #tHelp .thI { background: var(--g-dome), rgba(20,30,23,0.5); border-color: var(--g-edge); box-shadow: var(--g-rim); }
 
 /* ---------- 2. MATCH HUD (phone and computer) ---------- */
 /* the panels: the shared tint (--panel, now see-through) + sheen + grain, a lit rim and a soft shadow */
@@ -50,10 +52,10 @@
 #clock, .icons div, #objective, #hpwrap, #gadgets div, #cambar button, #viewlabel, #camTag, #tipNow, #freeHint, #kcBtn, #winGo {
   border-color: var(--g-edge); box-shadow: var(--g-rim), var(--g-drop); border-radius: 6px; }
 #objective { border-left: 3px solid var(--gold); box-shadow: var(--g-rim), var(--g-drop), -6px 0 14px -6px rgba(242,193,78,0.55); }
-#killfeed div, #feed div, #chatLog div { border: 1px solid rgba(190,220,255,0.14); border-radius: 5px; box-shadow: var(--g-rim), 0 3px 10px rgba(0,0,0,0.3); }
-#chatLog div, #feed div { background-color: rgba(10,15,22,0.55); }
+#killfeed div, #feed div, #chatLog div { border: 1px solid rgba(196,218,182,0.14); border-radius: 5px; box-shadow: var(--g-rim), 0 3px 10px rgba(0,0,0,0.3); }
+#chatLog div, #feed div { background-color: rgba(17,26,20,0.55); }
 #clock { border-radius: 8px; box-shadow: var(--g-rim), var(--g-drop), 0 0 16px var(--g-glow); }
-#time { text-shadow: 0 0 12px rgba(160,210,255,0.35), 0 1px 2px #000; }
+#time { text-shadow: 0 0 12px rgba(170,205,155,0.35), 0 1px 2px #000; }
 /* team scores: coloured glass tiles that glow in their team colour (colours from Settings) */
 .sc { border-radius: 8px; background-image: var(--g-dome), var(--g-grain); background-size: auto, 160px 160px; border: 1px solid rgba(255,255,255,0.35);
   box-shadow: var(--g-rim), 0 4px 14px rgba(0,0,0,0.35), 0 0 16px color-mix(in srgb, var(--ally) 55%, transparent); text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
@@ -64,7 +66,7 @@
 #hpbar { border-radius: 4px; background: rgba(255,255,255,0.08); box-shadow: inset 0 1px 2px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.12); overflow: hidden; }
 #hpbar i { border-radius: 4px; background-image: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0) 60%); box-shadow: 0 0 10px rgba(255,255,255,0.45); }
 #hpbar i.low { box-shadow: 0 0 10px rgba(255,74,74,0.7); } #hpbar i.over { box-shadow: 0 0 10px rgba(109,255,154,0.6); }
-#hpnum, #ammo b { text-shadow: 0 0 14px rgba(170,215,255,0.32), 0 2px 4px rgba(0,0,0,0.7); }
+#hpnum, #ammo b { text-shadow: 0 0 14px rgba(178,210,162,0.32), 0 2px 4px rgba(0,0,0,0.7); }
 #ammo b.low { text-shadow: 0 0 14px rgba(255,74,74,0.6), 0 2px 4px rgba(0,0,0,0.7); }
 #gadgets div b, #prompt b { border-radius: 3px; background-image: linear-gradient(180deg, #fff, #d9e2ea); box-shadow: 0 0 8px rgba(255,255,255,0.35); }
 #cambar button.on { box-shadow: var(--g-rim), var(--g-drop), 0 0 14px rgba(242,193,78,0.45); }
@@ -80,7 +82,7 @@
 #killcam canvas { border-color: var(--g-edge); border-radius: 8px; box-shadow: 0 0 30px var(--g-glow); }
 #tvCast .cl { border-radius: 0 6px 6px 0; box-shadow: var(--g-rim); }
 .tvCard { border-color: var(--g-edge); border-radius: 6px; box-shadow: var(--g-rim), var(--g-drop); }
-#banner .t { text-shadow: 0 0 26px rgba(160,210,255,0.35), 0 4px 30px rgba(0,0,0,0.9); }
+#banner .t { text-shadow: 0 0 26px rgba(170,205,155,0.35), 0 4px 30px rgba(0,0,0,0.9); }
 #leftCount b { text-shadow: 0 0 16px currentColor, 0 2px 6px #000; }
 #siteFound canvas { border-radius: 8px; box-shadow: var(--g-rim), 0 0 22px rgba(242,193,78,0.35); }
 /* Zombies: the same glass behind the points and perks */
@@ -92,25 +94,25 @@
 /* buttons: glass tiles (a button that sets its own background elsewhere keeps it: these have the lowest weight) */
 button { background-image: var(--g-sheen), var(--g-grain); background-size: auto, 160px 160px; border-color: var(--g-edge); border-radius: 6px;
   box-shadow: var(--g-rim), 0 3px 10px rgba(0,0,0,0.28); }
-button:hover { background-color: rgba(190,220,255,0.14); background-image: var(--g-sheen), var(--g-grain); background-size: auto, 160px 160px;
-  border-color: rgba(200,228,255,0.45); box-shadow: var(--g-rim), 0 3px 12px rgba(0,0,0,0.3), 0 0 14px var(--g-glow); }
-button.primary { background-color: rgba(236,242,248,0.9); background-image: var(--g-dome), var(--g-grain); border-color: #fff; box-shadow: var(--g-rim), 0 4px 14px rgba(0,0,0,0.35), 0 0 18px rgba(200,228,255,0.35); }
-button.primary:hover { background-color: #fff; box-shadow: var(--g-rim), 0 4px 14px rgba(0,0,0,0.35), 0 0 26px rgba(220,238,255,0.6); }
+button:hover { background-color: rgba(196,218,182,0.14); background-image: var(--g-sheen), var(--g-grain); background-size: auto, 160px 160px;
+  border-color: rgba(204,224,190,0.45); box-shadow: var(--g-rim), 0 3px 12px rgba(0,0,0,0.3), 0 0 14px var(--g-glow); }
+button.primary { background-color: rgba(233,241,228,0.9); background-image: var(--g-dome), var(--g-grain); border-color: #fff; box-shadow: var(--g-rim), 0 4px 14px rgba(0,0,0,0.35), 0 0 18px rgba(204,224,190,0.35); }
+button.primary:hover { background-color: #fff; box-shadow: var(--g-rim), 0 4px 14px rgba(0,0,0,0.35), 0 0 26px rgba(222,236,212,0.6); }
 .hnav > button, .hnav > button:hover { box-shadow: none; border-radius: 0 6px 6px 0; }
 .hnav > button { background-image: none; }
 .hnav > button:hover, .hnav > button:focus-visible { background-image: linear-gradient(90deg, rgba(242,193,78,0.18), rgba(242,193,78,0) 85%), var(--g-sheen); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), -6px 0 16px -8px rgba(242,193,78,0.7); }
 .hnav > button b { text-shadow: 0 2px 10px rgba(0,0,0,0.6); } .hnav > button:hover b { text-shadow: 0 0 18px rgba(255,255,255,0.35), 0 2px 10px rgba(0,0,0,0.6); }
 #roleBar button.on, .wcard.on, #armList button.on, #cambar button.on { box-shadow: var(--g-rim), 0 0 16px rgba(242,193,78,0.45); }
 input, select, textarea { background-image: linear-gradient(180deg, rgba(0,0,0,0.2), rgba(255,255,255,0.03)); border-color: var(--g-edge); border-radius: 6px; box-shadow: inset 0 2px 6px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.08); }
-input:focus, select:focus, textarea:focus { border-color: rgba(200,228,255,0.6); box-shadow: inset 0 2px 6px rgba(0,0,0,0.45), 0 0 12px var(--g-glow); }
+input:focus, select:focus, textarea:focus { border-color: rgba(204,224,190,0.6); box-shadow: inset 0 2px 6px rgba(0,0,0,0.45), 0 0 12px var(--g-glow); }
 
 /* panels and cards: menus open over the menu background, so real frosted blur is safe here (never over a match: html.inmatch) */
 .overlay .menu, .page, #settings, .squad, .controls, .pcard, .mvp, .mine:not(.op), .rpCard, .rpEmpty, .op, .wcard, .icard, #home .joinCard, #tHelp, #rpDl .menu {
   background-image: var(--g-sheen), var(--g-grain) !important; background-size: auto, 160px 160px !important; border-color: var(--g-edge); border-radius: 10px;
   box-shadow: var(--g-rim), 0 14px 40px rgba(0,0,0,0.45), 0 0 22px var(--g-glow); }
-.page, #settings { background-color: rgba(9,13,19,0.96); } /* (big pages stay nearly solid: words behind showed through) */
+.page, #settings { background-color: rgba(13,20,15,0.96); } /* (big pages stay nearly solid: words behind showed through) */
 html:not(.inmatch) .overlay .menu, html:not(.inmatch) .pcard, html:not(.inmatch) #home .joinCard { backdrop-filter: blur(10px) saturate(1.2); }
-.op { border-radius: 8px; } .op:hover { box-shadow: var(--g-rim), 0 10px 30px rgba(0,0,0,0.45), 0 0 20px rgba(160,210,255,0.3); border-color: rgba(200,228,255,0.5); }
+.op { border-radius: 8px; } .op:hover { box-shadow: var(--g-rim), 0 10px 30px rgba(0,0,0,0.45), 0 0 20px rgba(170,205,155,0.3); border-color: rgba(204,224,190,0.5); }
 .icard { border-radius: 12px; } .icard:hover { box-shadow: var(--g-rim), 0 14px 40px rgba(0,0,0,0.5), 0 0 26px rgba(242,193,78,0.3); }
 .wcard { border-radius: 8px; } .mvp { box-shadow: var(--g-rim), 0 10px 30px rgba(0,0,0,0.45), 0 0 22px rgba(242,193,78,0.35); }
 .pagehead { background-image: var(--g-sheen); border-bottom-color: var(--g-edge); box-shadow: 0 1px 0 rgba(255,255,255,0.05), 0 8px 18px -12px rgba(0,0,0,0.6); }
@@ -123,4 +125,13 @@ html:not(.inmatch) .overlay .menu, html:not(.inmatch) .pcard, html:not(.inmatch)
 /* the loading screen: a lit glass bar */
 #loading .lbar { height: 4px; border-radius: 3px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06); }
 #loadBar { border-radius: 3px; box-shadow: 0 0 14px rgba(58,160,255,0.75); }
-#loadTitle { text-shadow: 0 0 40px rgba(120,190,255,0.25), 0 4px 30px rgba(0,0,0,0.6); }
+#loadTitle { text-shadow: 0 0 40px rgba(150,190,135,0.25), 0 4px 30px rgba(0,0,0,0.6); }
+
+/* sage tint (he asked 2026-11-17): panels and buttons that had their own grey/black tint get the sage glass colour */
+#touchUI .tbtn:not(.fire):not(.aim):not(.act):not(.on):not(.lean.act) { background-color: var(--g-tint); }
+#coach, .tvCard, #freeHint, #camTag, #viewlabel, #tipNow, #chatLog div, #feed div, #killfeed div, #kcBtn, #tvCast .cl { background-color: var(--g-tint); }
+button { background-color: rgba(156,175,136,0.11); } /* (lowest weight: buttons with their own colour keep it) */
+/* found in the look check (2026-11-17): the scoreboard and the end board sit over the busy map, so they stay nearly
+   solid sage (the map showed through the names); the dim behind full pages is darker so the home menu doesn't show */
+#scoreboard, #endscreen .board { background-color: rgba(16,25,19,0.9); }
+.overlay { background-color: rgba(5,8,6,0.86); }
