@@ -1080,7 +1080,11 @@ function pollPad(dt, view) {
   const spr = !!gp.sprint && !!st.me && st.me.ct === 'body';
   if (spr && !gpk.sprint) { st.prone = false; gpk.crouch = 0; st.leanT = 0; }
   gpk.sprint = spr ? 1 : 0;
-  if (spr && ls.l && rs.l < 0.05 && !(gp.rt > 0.35)) padAng = wrapAng(padAng + angDiff(Math.atan2(ls.y, ls.x) - (st.rot || 0), padAng) * Math.min(1, dt * 12));
+  // he asked 2026-11-16: after a sprint the move thumb keeps turning the crosshair with you (across stops too, and while
+  // firing from the hip) until you aim in; aiming in goes back to moving without turning. A thumb on the aim side wins.
+  if (spr && touchActive()) st.steer = true;
+  if (st.steer && (gp.lt > 0.35 || (st.me && st.me.ad) || !st.me || st.me.ct !== 'body' || !touchActive() || !st.last || st.last.ph !== PHASE.ACTION && st.last.ph !== PHASE.PREP)) st.steer = false;
+  if ((spr || st.steer) && ls.l > (spr ? 0 : 0.25) && rs.l < 0.05 && !(gp.rt > 0.35)) padAng = wrapAng(padAng + angDiff(Math.atan2(ls.y, ls.x) - (st.rot || 0), padAng) * Math.min(1, dt * 12));
   // left stick: 8 directions like WASD; a light push walks (silent)
   const nx = ls.l ? ls.x / ls.l : 0, ny = ls.l ? ls.y / ls.l : 0;
   gpk.right = ls.l && nx > 0.38 ? 1 : 0; gpk.left = ls.l && nx < -0.38 ? 1 : 0;

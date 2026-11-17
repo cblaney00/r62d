@@ -151,7 +151,7 @@ input { font: 600 20px var(--head); padding: 10px 14px; background: rgba(0,0,0,0
 #opgrid .op canvas { aspect-ratio: auto; height: 9vh; object-fit: cover; }
 .op { background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; cursor: pointer; transition: transform 0.12s, border-color 0.12s; position: relative; overflow: hidden; }
 .op:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.4); }
-.op.mine { border: 2px solid var(--gold); padding: 0; box-shadow: 0 0 18px rgba(242,193,78,0.35); }
+.op.mine { border-color: var(--gold); padding: 0; box-shadow: inset 0 0 0 1px var(--gold), 0 0 18px rgba(242,193,78,0.35); } /* (a thicker border made the card 2 px too narrow for its picture) */
 .op.taken { opacity: 0.35; cursor: not-allowed; }
 .op canvas { width: 100%; aspect-ratio: 1; display: block; }
 .op .info { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #c9d1d9; }
@@ -1365,8 +1365,8 @@ html.touchplay #chat { top: auto; left: auto; right: 10px; transform: none; text
 html.touchplay #chatLog div:not(:nth-last-child(-n+2)) { display: none; }
 html.touchplay #tipNow { bottom: 12px; left: 55%; max-width: 420px; font-size: 13px; padding: 6px 12px; }
 html.touchplay #cambar { left: 47%; gap: 4px; } html.touchplay #cambar .cgrp { gap: 4px; } html.touchplay #cambar button { font-size: 11px; padding: 4px 8px; } html.touchplay #cambar button small { font-size: 9px; }
-html.touchplay #hud:has(#cambar:not(:empty)) #viewlabel { bottom: 82px; }
-html.touchplay #hud:has(#cambar:not(:empty)) #tipNow { bottom: 126px; }
+html.touchplay #hud:has(#cambar:not(:empty)) #viewlabel { bottom: 92px; }
+html.touchplay #hud:has(#cambar:not(:empty)) #tipNow { bottom: 140px; }
 /* operator select + loadout on a phone: a slim header so the cards and the loadout get the height */
 html.touch #select { padding: 10px 18px 8px; gap: 8px; }
 html.touch .selhead { padding-bottom: 6px; align-items: center; }
@@ -1402,3 +1402,8 @@ html.touchplay #banner { top: 58%; } html.touchplay #banner .t { font-size: 36px
 #selLoBody:has(canvas.selMap) { overflow: hidden; padding: 6px; }
 #siteChoice.lockd button { pointer-events: none; } #siteChoice.lockd button:not(.on) { opacity: 0.4; }
 #select.resel { z-index: 60; background: #07090c; } /* switching operator in preparation: over the match */
+html.touchplay #feed { left: 50%; bottom: auto; top: 184px; transform: translateX(-50%); align-items: center; } /* (short notes: under the compass, not on the left stick) */
+html.touch #freeOps { inset: 0; } html.touch #freeOps .foHead { padding: 8px 14px; gap: 12px; } html.touch #freeOps .foHead h2 { font-size: 20px; } html.touch #freeOps .foHead span { font-size: 12px; }
+html.touch #freeOps .foOps button { min-height: 64px; } /* free play's panel on a phone: the whole screen, easy-to-tap operators */
+html.touch .op:hover, html.touch .op:hover canvas { transform: none; } /* (a mouse-hover zoom that stuck after a tap and cut the picture) */
+html.touchplay #feed { max-width: 300px; }

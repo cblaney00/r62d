@@ -193,6 +193,10 @@ function build() {
     const under = document.elementFromPoint(x, y), btn = under && under.closest && under.closest('#touchUI .tbtn');
     if (under && under.closest && under.closest('#tHelp')) { ui.querySelector('#tHelp').classList.add('hidden'); return; } // a tap closes the guide
     if (btn && !btn.classList.contains('hidden')) return pressButton(id, btn, x, y);
+    // a page button under the touch zones (free play's OPERATORS · GUNS · BOTS, the drone / camera bar): the zones take
+    // every touch, so the button never heard the tap (he couldn't switch operator in free play on a phone)
+    const pb = !btn && document.elementsFromPoint(x, y).map(e => e.closest && e.closest('#freeHint button, #cambar button, #kcBtn')).find(Boolean);
+    if (pb) { pb.click(); return; }
     if (x >= innerWidth / 2) { // right half: the aim stick appears under the thumb
       if (aimF !== null) return;
       aimF = id; ox = tx = x; oy = ty = y;

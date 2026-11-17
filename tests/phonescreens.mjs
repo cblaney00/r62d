@@ -37,9 +37,18 @@ const squish = `(() => { const out = [];
   const sq = [...document.querySelectorAll('#select button, #select .op')].filter(e => { const r = e.getBoundingClientRect(); return e.getClientRects().length && r.width && (r.height < 22 || r.width < 22); }).map(e => (e.textContent.trim().slice(0, 12) || e.className) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height));
   if (sq.length) out.push('small buttons: ' + sq.slice(0, 10).join(' | '));
   return out.join('\\n'); })()`;
+// icons (button pictures, operator portraits, gun pictures) cut by the screen edge or by the box that holds them
+const icons = `(() => { const out = [], W = innerWidth, H = innerHeight;
+  const vis = e => { for (let x = e; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05) return false; } return true; };
+  for (const e of document.querySelectorAll('svg, canvas, img')) { if (e.closest('#game, #fog, #over, #mapLayer') || e.id === 'game') continue; const r = e.getBoundingClientRect(); if (r.width < 4 || r.height < 4 || !vis(e)) continue; let sc = null; for (let x = e.parentElement; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (/auto|scroll/.test(cs.overflowY + cs.overflowX) && (x.scrollHeight > x.clientHeight + 2 || x.scrollWidth > x.clientWidth + 2)) { sc = x.getBoundingClientRect(); break; } } if (sc && (r.bottom <= sc.top || r.top >= sc.bottom || r.right <= sc.left || r.left >= sc.right || r.top < sc.top - 1 || r.bottom > sc.bottom + 1)) continue; /* (in a list you scroll: reachable) */
+    const nm = (e.closest('[data-id]') || {}).dataset?.id || (e.closest('[data-op]') || {}).dataset?.op || e.parentElement.className || e.parentElement.id;
+    if (r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1) { out.push('ICON OFF SCREEN ' + nm + ' ' + [r.left, r.top, r.right, r.bottom].map(Math.round)); continue; }
+    for (let x = e.parentElement; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.overflow === 'visible' && x.tagName !== 'BUTTON') continue; if (x.scrollHeight > x.clientHeight + 2 && /auto|scroll/.test(cs.overflowY)) break; const b = x.getBoundingClientRect();
+      if (r.left < b.left - 1 || r.top < b.top - 1 || r.right > b.right + 1 || r.bottom > b.bottom + 1) out.push('ICON CUT ' + nm + ' by ' + (x.id || x.className || x.tagName)); break; } }
+  return [...new Set(out)].join('\\n') || 'none'; })()`;
 const phase = () => js(`(__r62d.st.last || {}).ph || ''`);
 const check = async (name, sq) => { for (const [w, h] of SIZES) { tag = `${w}x${h}`; await call('browsingContext.setViewport', { context: ctx, viewport: { width: w, height: h } }); await sleep(600); await check1(name, sq); } };
-const check1 = async (name, sq) => { await shot(name); console.log(`== ${tag} ${name}\n cut-off: ${(await js(uicheck)) || 'none'}\n overlaps: ${await js(overlap)}`); if (sq) console.log(' ' + (await js(squish)).replace(/\n/g, '\n ')); };
+const check1 = async (name, sq) => { await shot(name); console.log(`== ${tag} ${name}\n cut-off: ${(await js(uicheck)) || 'none'}\n overlaps: ${await js(overlap)}\n icons: ${await js(icons)}`); if (sq) console.log(' ' + (await js(squish)).replace(/\n/g, '\n ')); };
 
 ws.onopen = async () => { try { await run(); } catch (e) { console.log('ERROR', e.message); } process.exit(0); };
 async function run() {
