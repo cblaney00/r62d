@@ -414,3 +414,22 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Limits shown (he asked: any barrier must show in the UI): `crosshair()` draws a dashed white ring with a dark edge
   at the inner limit as the crosshair nears it, and a fainter one at the end of the reach once `padReach` > 0.9.
 - Result: distance goes down to 14 px, the angle flips 0° → 180° straight across.
+
+## Glass HUD look everywhere; phone aim stick lower (2026-11-17, he asked)
+- He asked for the right joystick lower, its centre in line with RELOAD, same left-right place: `#tsRight` bottom
+  `119px * --tz - 62px` (RELOAD: bottom 96 + 23). Measured in `SCENARIO=close tests/thumbs.mjs`: both centres at y 298.
+- He asked for more life and texture in the UI, phone and computer, nothing left out; he chose "Glass HUD" (frosted
+  see-through glass, soft sheen on top, gentle glow round the edge) for everything. All in `public/glass.css` (loaded
+  after style.css; the Android and Windows builds copy all of `public/`). Recipe in its `:root`: `--g-sheen`/`--g-dome`
+  gradients, `--g-grain` (a static SVG noise tile), `--g-rim` inset highlights, `--g-glow`. Elements keep their own
+  tint colour and get the sheen + grain as background images (`!important` where style.css uses `background:`
+  shorthand). `--panel` is now 0.66 see-through; big pages and Settings stay 0.96 (words behind showed through).
+- Covered: phone buttons (FIRE red, AIM blue, ACTION gold, badges), both sticks (glass ring + bead), the help card;
+  the match HUD (clock, team score tiles glowing in --ally/--enemy, objective, health tube, ammo, gadgets, kill feed,
+  chat, camera bar, scoreboard, death card, tutorial coach, Esports TV cards, stair view, Zombies points/perks), the ping
+  wheel (rims drawn in pingwheel.js); every menu button/panel/card, inputs, Settings, page heads, XP bars, loading bar.
+- Speed rule: no `backdrop-filter` over a match. `html.inmatch` (main.js `screens`, = joined) switches the real frosted
+  blur off; it is used only on small menu panels (pause/quit dialogs, profile chip, join card) outside a match.
+- Measured in headless gamescope on his GPU, empty free play, 1600x900 High, glass on vs off (same page, the
+  stylesheet disabled), 3 rounds: 128 vs 131 fps average, 1% low 76 both (noise). With 5 bots fighting the numbers
+  swing 60-140 either way, so measure empty. `tests/uicheck.js` with glass on vs off: no new cut-off text at 1280x720.

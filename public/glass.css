@@ -108,7 +108,7 @@ input:focus, select:focus, textarea:focus { border-color: rgba(200,228,255,0.6);
 .overlay .menu, .page, #settings, .squad, .controls, .pcard, .mvp, .mine:not(.op), .rpCard, .rpEmpty, .op, .wcard, .icard, #home .joinCard, #tHelp, #rpDl .menu {
   background-image: var(--g-sheen), var(--g-grain) !important; background-size: auto, 160px 160px !important; border-color: var(--g-edge); border-radius: 10px;
   box-shadow: var(--g-rim), 0 14px 40px rgba(0,0,0,0.45), 0 0 22px var(--g-glow); }
-.page, #settings { background-color: rgba(10,15,22,0.86); }
+.page, #settings { background-color: rgba(9,13,19,0.96); } /* (big pages stay nearly solid: words behind showed through) */
 html:not(.inmatch) .overlay .menu, html:not(.inmatch) .pcard, html:not(.inmatch) #home .joinCard { backdrop-filter: blur(10px) saturate(1.2); }
 .op { border-radius: 8px; } .op:hover { box-shadow: var(--g-rim), 0 10px 30px rgba(0,0,0,0.45), 0 0 20px rgba(160,210,255,0.3); border-color: rgba(200,228,255,0.5); }
 .icard { border-radius: 12px; } .icard:hover { box-shadow: var(--g-rim), 0 14px 40px rgba(0,0,0,0.5), 0 0 26px rgba(242,193,78,0.3); }
