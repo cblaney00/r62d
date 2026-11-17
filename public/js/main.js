@@ -37,6 +37,7 @@ import { readCode, showCode } from '/shared/joincode.js';
 import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
 import * as rope3d from './rope3d.js';
 import { compassRoute as sharedRoute } from '/shared/compass.js';
+import { newStick, stepStick } from './aimstick.js';
 import { touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
 import { EYE_H } from '/shared/map.js';
@@ -1109,16 +1110,23 @@ function pollPad(dt, view) {
   // phone gyro (touch.js): turning the phone turns the aim; on top of a thumb on the aim stick too, until that thumb lets go
   const gm = gp.gyro ? gyroMode() : 'off', gy = gm === 'always' || (gm === 'ads' && (gpk.ads || (st.me && st.me.ad))) ? gp.gyro * gyroSens() * (gyroInv() ? -1 : 1) : 0;
   const onAim = st.me && (st.me.ct === 'body' || st.me.ct === 'drone') && !(view && view.kind === 'cam');
-  if (!(rs.l > 0.05)) st.gyroOff = 0;
-  if (rs.l > 0.05 && !falling && !aimReset) { // (the frame you aim in on a phone keeps the pulled-in crosshair)
+  if (!(rs.l > 0.05) && !gp.rsOn) st.gyroOff = 0;
+  // PHONE aim stick (he asked 2026-11-17: gentler, an accelerating outer zone, fine aim, everything a mouse has):
+  // public/js/aimstick.js 'steady', chosen by tests/aimstick.js with simulated human thumbs. It starts from where you aim
+  // when the thumb lands, damps thumb shake, and is calmer aimed in / steadying (the same settings as the mouse)
+  if (touchActive() && onAim && !gp.rsDir && !(view && view.kind === 'cam')) {
+    if (gp.rsOn && !aimReset) {
+      if (!st.stk) st.stk = newStick('steady', wrapAng(padAng - (st.gyroOff || 0)), padReach);
+      st.gyroOff = (st.gyroOff || 0) + gy;
+      const slow = (gpk.ads || (st.me && st.me.ad) ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1);
+      stepStick(st.stk, { x: rs.x, y: rs.y }, dt, stickSens(), slow);
+      padAng = wrapAng(st.stk.ang + st.gyroOff); padReach = st.stk.reach;
+    } else { st.stk = null; if (gy) padAng = wrapAng(padAng + gy); }
+  } else if (rs.l > 0.05 && !falling && !aimReset) { // (the frame you aim in on a phone keeps the pulled-in crosshair)
     if (view && view.kind === 'cam') { mouse.x = VW / 2 + rs.x / rs.l * VH * 0.25; mouse.y = VH / 2 + rs.y / rs.l * VH * 0.25; }
     else {
       if (onAim) st.gyroOff = (st.gyroOff || 0) + gy;
-      const want = wrapAng(Math.atan2(rs.y, rs.x) + (st.gyroOff || 0));
-      if (touchActive() && onAim) { // phone (he asked: gentler, and the same aim features as a mouse): ease towards the stick, slower aimed in / steadying
-        const k = 22 * stickSens() * (gpk.ads || (st.me && st.me.ad) ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1);
-        padAng = wrapAng(padAng + angDiff(want, padAng) * Math.min(1, dt * k));
-      } else padAng = want;
+      padAng = wrapAng(Math.atan2(rs.y, rs.x) + (st.gyroOff || 0));
       if (!gp.rsDir) padReach = rs.l;
     }
   } else if (gy && onAim) padAng = wrapAng(padAng + gy);

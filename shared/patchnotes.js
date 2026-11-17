@@ -88,4 +88,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-17', k: 'mech', id: 'loadouts', t: 'Nobody carries three or more guns of one type any more (Onyx had three LMGs: now an LMG, a shotgun and a rifle with the shield); seventeen operators got a new gun and nineteen a new sidearm.', v: 0 },
   { d: '2026-11-17', k: 'mech', id: 'zombies', t: 'Zombies: the clock shows how long you have survived, and the countdown to the next wave between rounds.', v: 0 },
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: buttons sized and placed by how often you press them, AIM on the corner of each FIRE, a gentler aim stick with its own sensitivity setting, and steady aim when scoped in with the move thumb off.', v: 1 },
+  { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the aim stick has a fine-aim inner zone and an outer zone that accelerates out to full reach, damps thumb shake, and starts from where you already aim.', v: 1 },
 ];

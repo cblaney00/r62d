@@ -353,3 +353,19 @@ phone must have every aim feature the computer has. He chose: buttons sized and 
 - Tested: `tests/thumbs.mjs` (AIM via the FIRE-side button, firing, crouch, reload, swap, drone, tilt) and
   `tests/phonescreens.mjs` at 960×411 / 760×360 (only the intended FIRE/AIM overlap left).
 - From now on he wants a GitHub release after every finished version (CLAUDE.md standing decisions).
+
+## Phone aim stick with an acceleration zone, tested with simulated human thumbs (2026-11-17, he asked)
+He asked for acceleration (a fine-aim inner zone, an outer zone that accelerates when you clearly want to go far) and
+for me to craft the best scheme for two human thumbs and a gyroscope, with a handicap for the simulated thumbs.
+- `public/js/aimstick.js`: the stick's rules as pure maths (`newStick`, `stepStick`, `reachFrom`/`stickFrom`,
+  `TUNE`), used by main.js `pollPad` on phones (`st.stk`, touch.js now reports `rsOn` while a thumb is on the stick).
+- `tests/aimstick.js`: simulated thumbs (0.2 s reaction, bell-shaped flicks 0.12-0.27 s, 12 % / 3° misjudgement,
+  corrections by eye every ~0.15 s, ~0.5 px tremor; gyro = slow, noisy wrist nudges) bring the crosshair onto an enemy
+  at 3, 8 and 15 m. `SWEEP=1` tries combinations of `TUNE`.
+- Tried: 'old' (shipped stick), 'accel' (acceleration zone only), 'hybrid' (relative fine aim with pointer-style
+  acceleration; slower for human thumbs, too many small corrections), 'steady' (acceleration zone + tremor damping).
+  Chosen 'steady': the inner 75 % of the stick covers the first 45 % of the reach (fine aim), the last 25 % climbs fast
+  to full reach; a slow thumb is followed smoothly (`CALM` 4/s, more aimed in / steadying / lower setting), a fast one
+  at once; a new touch starts from where you aim. Body held 0.2 s: 3 m 100 % (old 98 %), 8 m 79 % (old 39 %),
+  15 m 10 % (old 6 %); headshot holds at 3 m 56 % (old 0 %); shake roughly halved. Far shots still need the gyro (on
+  while aimed in by default) and aim help.

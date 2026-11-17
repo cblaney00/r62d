@@ -161,7 +161,7 @@ let releaseAll = () => {}, fireAim = false, sprintLock = false, adsLatch = false
 let useLatch = false, useEl = null, useLostT = 0;
 const setUse = on => { useLatch = on; held[0] = on; if (useEl) useEl.classList.toggle('on', on); };
 const setAds = on => { adsLatch = on; trig.lt = on ? 1 : 0; if (ui) for (const el of ui.querySelectorAll('.tbtn.aim')) el.classList.toggle('on', on); }; // AIM: tap on, tap off // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
-let ui = null, shown = false, recentre = () => {};
+let ui = null, shown = false, recentre = () => {}, aimOn = false;
 export const touchAimReset = () => recentre();
 
 function stickOf(v) { const l = Math.min(1, Math.hypot(v.x, v.y)); return l < 0.08 ? { x: 0, y: 0, l: 0 } : { x: v.x / Math.max(l, 1e-6) * l, y: v.y / Math.max(l, 1e-6) * l, l }; }
@@ -173,8 +173,7 @@ export function touchPad() {
   prevHeld = held.slice();
   const L = (ls.x || ls.y || !tiltOn()) ? ls : tiltV; // a thumb on the stick wins over tilting
   const gyro = gyroAcc; gyroAcc = 0;
-  const r0 = stickOf(rs), rc = r0.l ? Math.pow(r0.l, 1.35) / r0.l : 0; // finer control near the middle of the aim stick
-  return { name: 'Touch screen', ls: stickOf(L), rs: { x: r0.x * rc, y: r0.y * rc, l: r0.l * rc }, rsDir: fireAim, rsHeld: rs.x !== 0 || rs.y !== 0, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released, gyro };
+  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsOn: aimOn, rsDir: fireAim, rsHeld: rs.x !== 0 || rs.y !== 0, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released, gyro }; // rsOn: a thumb is on the aim stick (main.js / aimstick.js turn it into aim)
 }
 export const touchActive = () => isTouch && shown;
 
@@ -206,7 +205,7 @@ function build() {
     if (pb) { pb.click(); return; }
     if (x >= innerWidth / 2) { // right half: the aim stick appears under the thumb
       if (aimF !== null) return;
-      aimF = id; ox = tx = x; oy = ty = y;
+      aimF = id; aimOn = true; ox = tx = x; oy = ty = y;
       dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; dyn.classList.remove('hidden'); rs.x = rs.y = 0; knob(dyn, rs);
       fingers.set(id, {
         move(x, y) {
@@ -215,7 +214,7 @@ function build() {
           if (l > 1) { ox += (u / l) * (l - 1) * Ra; oy += (v / l) * (l - 1) * Ra; u /= l; v /= l; dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; } // the stick follows a thumb that slides past its edge
           rs.x = u; rs.y = v; knob(dyn, rs);
         },
-        end() { aimF = null; rs.x = rs.y = 0; dyn.classList.add('hidden'); },
+        end() { aimF = null; aimOn = false; rs.x = rs.y = 0; dyn.classList.add('hidden'); },
       });
     } else if (y > innerHeight * 0.3) { // lower left: the move stick jumps to wherever the thumb lands
       if (leftF !== null) return;
