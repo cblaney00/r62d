@@ -82,5 +82,10 @@ async function run() {
   await tapVis('[data-id="ads"]'); await sleep(400);
   await stick([L0, [L0[0] - 45, L0[1]]], 1200); const a3 = await aimDeg();
   console.log('steer: aimed in, walking left: aim', a3, '°', Math.abs(a3 - a2) < 25 ? 'OK (stayed put)' : 'FAIL');
-  await tapVis('[data-id="ads"]');
+  await tapVis('[data-id="ads"]'); await sleep(400);
+  // aim reach (he asked 2026-11-16: couldn't aim far enough on a phone): push the aim stick all the way out
+  const [vw, vh] = JSON.parse(await js("JSON.stringify([innerWidth, innerHeight])")), R0 = [Math.round(vw * 0.72), Math.round(vh * 0.5)];
+  await stick([R0, [Math.min(vw - 4, R0[0] + 120), R0[1]]], 900); await sleep(1200);
+  const far = JSON.parse(await js('JSON.stringify((() => { const s = __r62d.st, q = __r62d.padFar(); return { m: Math.round(Math.hypot(q.ax - s.pred.x, q.ay - s.pred.y) / 36 * 10) / 10, zoom: Math.round(s.zoom * 100) / 100 }; })())'));
+  console.log('aim stick pushed all the way: crosshair', far.m, 'm out (hip reach 18 m), zoom', far.zoom); await shot('f5-far-aim');
 }

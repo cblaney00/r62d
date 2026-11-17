@@ -435,6 +435,7 @@ function cursor() {
   }
   const z = st.zoom || 1, P0 = w2s(st.pred.x, st.pred.y), px = P0.x, py = P0.y;
   if (freeAimOn() && !gpRecent()) { const q = freeAimPoint(); return w2s(q.x, q.y); }
+  if (touchFar()) { const q = padPointW(); return w2s(q.ax, q.ay); }
   const cx = Math.cos(padAng + (st.asOff || 0) + (st.rot || 0)), cy = Math.sin(padAng + (st.asOff || 0) + (st.rot || 0)), m = 30 * DPR; // (asOff: the aim help's pull)
   const scoped = scopeOn(st.me);
   let d = VH * 0.07 + padReach * (VH * 0.36 + (scoped ? 0 : 4 * PX_PER_M * z)); // +4 m without a scope (he asked); shortened if it would leave the screen
@@ -450,6 +451,13 @@ function cursor() {
 // way a tick marks it and the crosshair fades if bullets can't reach it.
 // how tall (world px) the view must be to hold you and a point (dx, dy) from you, with the room kept round both
 // (80 px round you, AHEAD × 1.3 past the crosshair) and a little spare for the tilt cropping the screen edges
+// phones (he asked 2026-11-16: couldn't aim far enough): the aim stick reaches as far as a mouse does with that sight
+// (hip 18 m, scopes further) and the view slides / widens to keep it on screen, instead of stopping at the screen edge
+const touchFar = () => touchActive() && !st.tv && st.me && st.me.ct === 'body' && !((st.rt || 0) > 0.05) && st.pred;
+function padPointW() {
+  const a = padAng + (st.asOff || 0), d = AIM_MIN() + Math.max(0, Math.min(1, padReach)) * Math.max(0, reachOf(st.me) - AIM_MIN());
+  return { ax: st.pred.x + Math.cos(a) * d, ay: st.pred.y + Math.sin(a) * d };
+}
 function fitBoth(dx, dy) {
   const r = st.rot || 0, c = Math.cos(r), s = Math.sin(r), sx = Math.abs(dx * c - dy * s), sy = Math.abs(dx * s + dy * c);
   const f = 1 / 1.1, mp = (80 * DPR + AHEAD() * 1.3) / VH;
@@ -1093,7 +1101,7 @@ function pollPad(dt, view) {
   gpk.walk = st.me && st.me.ct === 'drone' ? (gp.held[1] ? 1 : 0) : ls.l && ls.l < 0.55 ? 1 : 0;
   if (gp.rt > 0.35 && !gpk.fire) mouse.wl++; // a trigger pull also counts as a click (next teammate, ping in a camera)
   const aimReset = gp.lt > 0.35 && !gpk.ads && touchActive();
-  if (aimReset) { padReach = 0.22; touchAimReset(); } // phone (he asked): aiming in pulls the crosshair in to ~2.5 m, like the mouse's aim-in reset
+  if (aimReset) { const me = st.me, R = reachOf(me, true), d = adsStart(me && me.aa ? attFromCode(me.aa).sight : 'iron', me && me.w) * PX_PER_M; padReach = touchFar() ? Math.max(0, Math.min(1, (d - AIM_MIN()) / Math.max(1, R - AIM_MIN()))) : 0.22; touchAimReset(); } // phone (he asked): aiming in pulls the crosshair in to ~2.5 m, like the mouse's aim-in reset
   gpk.fire = gp.rt > 0.35 ? 1 : 0; gpk.ads = gp.lt > 0.35 ? 1 : 0;
   if (!gpk.fire && touchActive() && autoFire()) gpk.fire = autoShot(); // phone: auto fire while the crosshair is on an enemy you see
   // right stick: aim. A stick snapping back to the middle when let go is ignored, so the aim stays put.
@@ -2432,7 +2440,13 @@ function frame(nowMs) {
   if (st.rt > 0) st.viewH *= 1 - ROPE_ADS * st.rads * st.rt;
   if (st.rt > 0) st.viewH *= 1 - (ROPE_ZOOM_NAV + (ROPE_ZOOM - ROPE_ZOOM_NAV) * st.rpk) * st.rt; // (the rope camera comes in close over your shoulder: he asked for a lot closer; before the fit below, so you and your crosshair still both show)
   const freeAim = !st.tv && view && (view.kind === 'body' || view.kind === 'drone') && padOn && freeAimOn() && !gpRecent();
-  if (freeAim) {
+  const tFar = !freeAim && view && view.kind === 'body' && touchFar();
+  if (tFar) { // (phones: the same fit as below, for the aim stick's far point)
+    const q = padPointW(), need = Math.min(FIT_MAX, fitBoth(q.ax - st.pred.x, q.ay - st.pred.y) * 1.45); // (more room: the thumb buttons cover the screen edges)
+    st.fitDown = need < (st.fitH || need) * 0.97 ? (st.fitDown || 0) + dt : 0;
+    st.fitH = !st.fitH ? need : need > st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : st.fitDown > 0.5 ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 1.5)) : st.fitH;
+    if (!locked) st.viewH = Math.max(st.viewH, st.fitH);
+  } else if (freeAim) {
     const q = freeAimPoint(), dr = view.kind === 'drone';
     st.reachW = dr ? DRONE_PING_R : reachOf(me);
     { const l = Math.hypot(aimOff.x, aimOff.y); if (l > st.reachW) { const k = (st.reachW + (dr ? 0 : (l - st.reachW) * Math.exp(-dt * 10))) / l; aimOff = { x: aimOff.x * k, y: aimOff.y * k }; } } // stopped aiming in: it glides back inside (onto a drone: at once)
@@ -2447,16 +2461,16 @@ function frame(nowMs) {
     if ((st.rads || 0) > 0.05 && st.fitH) {} else // (aimed in on a rope: the size you had stays; aiming in never pulls the view back)
     st.fitH = !st.fitH ? need : need > st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : st.fitDown > 0.5 ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 1.5)) : st.fitH;
     if (!locked) st.viewH = Math.max(st.viewH, st.fitH * (1 - ROPE_ADS * (st.rads || 0)));
-  } else st.fitH = 0;
+  } else if (!tFar) st.fitH = 0;
   st.viewH *= viewMul(); // Settings: how much of the map you see (phones the same as a computer since 2026-11-16)
   if (freeAim && (st.rt || 0) > 0.05) { const L = st.viewH * (0.82 - 0.07 * (st.rads || 0) + (1 - Math.min(1, st.rt)) * 3) + ROPE_REACH_X * PX_PER_M, l = Math.hypot(aimOff.x, aimOff.y); if (l > L) aimOff = { x: aimOff.x * L / l, y: aimOff.y * L / l }; } // (aimed in on a rope: the crosshair stays in the tight view)
   st.zoom = VH / st.viewH;
-  if (freeAim && !locked) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
-    const q = freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
+  if ((freeAim || tFar) && !locked) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
+    const q = tFar ? padPointW() : freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
     const keep = (x, y, m) => { st.cam.x = Math.min(x + hw - m, Math.max(x - hw + m, st.cam.x)); st.cam.y = Math.min(y + hh - m, Math.max(y - hh + m, st.cam.y)); };
     // (the camera's target already keeps the room, gliding, above: this only stops it slipping off at the very edge)
     if ((st.rt || 0) > 0.5) keep(q.ax, q.ay, hh * 0.42); // (on a rope: the camera slides after the crosshair, never zooming out; you may go off screen, he asked)
-    else { keep(st.pred.x, st.pred.y, 30 * DPR / st.zoom); keep(q.ax, q.ay, AHEAD() * 0.8 / st.zoom); } // (the tilt crops the screen edges a little)
+    else { keep(st.pred.x, st.pred.y, 30 * DPR / st.zoom); keep(q.ax, q.ay, tFar ? Math.min(hw, hh) * 0.5 : AHEAD() * 0.8 / st.zoom); } // (phones: the crosshair stays well inside, clear of the thumb buttons) // (the tilt crops the screen edges a little)
   }
   if (view && view.kind === 'cam' && !view.dr) { st.cam.x = view.x + Math.cos(view.ang) * st.viewH * 0.28; st.cam.y = view.y + Math.sin(view.ang) * st.viewH * 0.28; }
   const camPre = { x: st.cam.x, y: st.cam.y };
@@ -4786,7 +4800,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset }; // for automated screenshot tests
+window.__r62d = { padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset }; // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
