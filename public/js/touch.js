@@ -103,7 +103,8 @@ const BUTTONS = [
   // ACTION (he asked 2026-11-17: one button for whatever the game prompts, to cut clutter): replaces USE and VAULT. It
   // shows what it will do (PLANT, REVIVE, VAULT...) and does it: a hold action (plant, defuse, revive, reinforce, open)
   // starts with a tap and carries on; a vault or climb happens on the tap
-  { id: 'use', label: 'ACTION', b: 0, cls: 'ctx c-use act hidden' },
+  // always on screen and live (he asked): with nothing prompted it PINGs what you aim at (his choice); JUMP took PING's slot
+  { id: 'use', label: 'ACTION', b: 0, cls: 'ctx c-use act' },
   // AIM (he asked 2026-11-17): a small button on the bottom right of each FIRE, a tap on / tap off switch (both light up
   // together); the old AIM by the left thumb is gone. Sizes and places follow how often each is pressed (style.css,
   // "phone layout by priority"): FIRE and AIM biggest, then crouch / reload / swap round the right FIRE, then skill,
@@ -111,7 +112,7 @@ const BUTTONS = [
   { id: 'ads', label: 'AIM', b: 'lt', cls: 'aim aimR' }, { id: 'adsL', label: 'AIM', b: 'lt', cls: 'aim aimL' }, { id: 'crouch', label: 'CROUCH', b: 1, cls: 'r rc' },
   { id: 'reload', label: 'RELOAD', b: 2, cls: 'r r1 c1' }, { id: 'swap', label: 'SWAP', b: 3, cls: 'r r1 c2' },
   { id: 'skill', label: 'SKILL', b: 5, cls: 'r r2 c1' }, { id: 'gadget', label: 'GADGET', b: 4, cls: 'r r2 c2' },
-  { id: 'melee', label: 'MELEE', b: 11, cls: 'r r3 c1' }, { id: 'ping', label: 'PING', b: 12, cls: 'r r3 c2' },
+  { id: 'melee', label: 'MELEE', b: 11, cls: 'r r3 c1' }, { id: 'jump', label: 'JUMP', b: 10, cls: 'r r3 c2' },
   { id: 'view', label: 'DRONE / CAMS', b: 13, cls: 't t1' }, { id: 'prev', label: '◀', b: 14, cls: 't t2 hidden' }, { id: 'next', label: '▶', b: 15, cls: 't t3 hidden' },
   { id: 'tiltc', label: '⟲ TILT', b: null, cls: 't t6 hidden' }, { id: 'map', label: 'MAP', b: 22, cls: 't t7' },
   { id: 'leanL', label: '◀ LEAN', b: 20, cls: 'lean l1' }, { id: 'leanR', label: 'LEAN ▶', b: 21, cls: 'lean l2' }, { id: 'score', label: 'SCORES', b: 8, cls: 't t4' }, { id: 'pause', label: '❚❚', b: 9, cls: 't t5' },
@@ -132,6 +133,7 @@ export const ICONS = {
   skill: svg('<path d="M13 2L5 13h6l-1 9 8-11h-6z" fill="currentColor" fill-opacity=".25"/>'),
   gadget: svg('<circle cx="11" cy="14" r="6"/><path d="M11 8V5h4M15 5l3 2M13 3h-4"/>'),
   melee: svg('<path d="M14 3l7 7-9 9-3-1-1-3z"/><path d="M8 15l-5 5M6 13l5 5"/>'),
+  jump: svg('<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 20h14" stroke-width="2.6"/>'),
   ping: svg('<path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>'),
   use: svg('<path d="M9 12V5a1.5 1.5 0 0 1 3 0v6M12 10V4a1.5 1.5 0 0 1 3 0v7M15 10a1.5 1.5 0 0 1 3 0v4c0 4-3 7-6 7h-1c-3 0-4.5-2-5.5-4.5L4 13a1.5 1.5 0 0 1 2.6-1.4L9 15"/>'),
   vault: svg('<path d="M3 21h18M9 21v-5h6v5"/><path d="M4 14c2-8 14-8 16 0"/><path d="M17 11l3 3 2-4"/>'),
@@ -148,8 +150,8 @@ const HELP = [
   ['crouch', 'CROUCH', 'Tap to crouch. Hold to lie down. While sprinting: a slide.'], ['leanL', 'LEAN', 'Lean left or right round a corner: tap on, tap off.'],
   ['reload', 'RELOAD', 'Reload your gun.'], ['swap', 'SWAP', 'Switch between your guns.'],
   ['skill', 'SKILL', 'Your operator\'s ability. The number is how many are left.'], ['gadget', 'GADGET', 'Throw or place your gadget.'],
-  ['melee', 'MELEE', 'Knife hit. Breaks wooden boards.'], ['ping', 'PING', 'Mark what you aim at for your team.'],
-  ['use', 'ACTION', 'Pops up when there is something to do and says what: plant, defuse, revive, reinforce, open, climb, go through a window. One tap does it (and keeps a hold going).'],
+  ['melee', 'MELEE', 'Knife hit. Breaks wooden boards.'], ['jump', 'JUMP', 'Hop onto furniture or over low cover (through windows too).'],
+  ['use', 'ACTION', 'Says what it will do: whatever the game is prompting (plant, defuse, revive, reinforce, open, climb, go through a window), otherwise PING what you aim at for your team. One tap does it (and keeps a hold going).'],
   ['view', 'DRONE / CAMS', 'Your drones (attack) or cameras (defence).'], ['sprint', 'SPRINT', 'On a drone the crouch button sprints.'],
   ['map', 'MAP', 'The map: tap it to ping a spot.'], ['score', 'SCORES', 'Who is up and who is down.'],
   ['prev', 'PREVIOUS / NEXT', 'Flip through cameras and drones.'], ['pause', 'PAUSE', 'The pause menu.'],
@@ -236,6 +238,7 @@ function build() {
   const pressButton = (id, el, x0, y0) => {
     const b = BUTTONS.find(q => q.id === el.dataset.id);
     if (b.id === 'ads' || b.id === 'adsL') { setAds(!adsLatch); return; } // a tap switches aiming in on or off (either AIM)
+    if (b.id === 'use' && el.dataset.act === 'ping') { held[12] = true; el.classList.add('on'); fingers.set(id, { move() {}, end() { held[12] = false; el.classList.remove('on'); } }); return; } // ACTION as PING
     if (b.id === 'use' && el.dataset.act === 'vault') { held[10] = true; el.classList.add('on'); fingers.set(id, { move() {}, end() { held[10] = false; el.classList.remove('on'); } }); return; } // ACTION as a vault: pressed while the finger is down
     if (b.id === 'use') { useEl = el; useLostT = 0; setUse(!useLatch); return; } // a tap starts using, and it carries on
     if (b.id === 'help') { const h = ui.querySelector('#tHelp'); h.classList.toggle('hidden'); return; } // the guide (tap it to close)
@@ -268,17 +271,17 @@ function build() {
 }
 
 // main.js says each frame what the context buttons can do ({ use, vault, cams }); one under a finger stays until let go
-const ctxSeen = { use: 0, prev: 0, next: 0 };
+const ctxSeen = { prev: 0, next: 0 }; // (ACTION is always shown)
 export function touchContext(c) {
   if (!ui || !shown) return;
   const now = performance.now();
   if (useLatch && !c.use && !c.busy) { if (!useLostT) useLostT = now; else if (now - useLostT > 600) setUse(false); } else useLostT = 0; // nothing left to use: let go
   { // ACTION: what the prompt asks for, with its word under the picture (kept while a finger holds it)
-    const el = ui.querySelector('[data-id="use"]'), act = c.vault ? 'vault' : c.use ? 'use' : null;
-    if (act && !el.classList.contains('on') && (el.dataset.act !== act || el.dataset.w !== c.word)) { el.dataset.act = act; el.dataset.w = c.word || ''; el.innerHTML = ICONS[act] + (c.word ? `<span class="aw">${c.word}</span>` : ''); }
+    const el = ui.querySelector('[data-id="use"]'), act = c.vault ? 'vault' : c.use ? 'use' : 'ping', w = act === 'ping' ? 'PING' : c.word || '';
+    if (!el.classList.contains('on') && (el.dataset.act !== act || el.dataset.w !== w)) { el.dataset.act = act; el.dataset.w = w; el.innerHTML = ICONS[act] + (w ? `<span class="aw">${w}</span>` : ''); el.classList.toggle('idle', act === 'ping'); }
   }
   for (const id in ctxSeen) {
-    if (id === 'prev' || id === 'next' ? c.cams : id === 'use' ? c.use || c.vault : c[id]) ctxSeen[id] = now;
+    if (id === 'prev' || id === 'next' ? c.cams : c[id]) ctxSeen[id] = now;
     const el = ui.querySelector(`[data-id="${id}"]`), want = now - ctxSeen[id] < 400 || el.classList.contains('on');
     if (el.classList.contains('hidden') === want) el.classList.toggle('hidden', !want);
   }
@@ -300,7 +303,7 @@ export function setTouchVisible(on) {
   if (on === shown) return;
   if (on) { tiltLevel = null; ui.querySelector('[data-id="tiltc"]').classList.toggle('hidden', !tiltOn()); } // a match starts level
   shown = on; ui.classList.toggle('hidden', !on); document.documentElement.classList.toggle('touchplay', on); keepAwake(on);
-  if (!on) { releaseAll(); setAds(false); setUse(false); sprintLock = false; ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); ui.querySelector('#tsRight').classList.add('hidden'); }
+  if (!on) { releaseAll(); setAds(false); setUse(false); sprintLock = false; ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); }
 }
 // Menus and match text shrink to fit small screens (the game picture itself always fills the screen), times the
 // player's own size setting. Menus are laid out for ~900 px tall, the match text for ~760 (and both for the width).

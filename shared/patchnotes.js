@@ -91,4 +91,6 @@ export const PATCH_NOTES = [
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the aim stick has a fine-aim inner zone and an outer zone that accelerates out to full reach, damps thumb shake, and starts from where you already aim.', v: 1 },
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the aim stick is calmer out in its accelerating zone, so far targets (15 m) are much easier to stay on.', v: 1 },
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the aim stick gives fine aiming 50% more thumb room; the outer zone feels the same.', v: 1 },
+  { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the crosshair stays on a pre-aimed spot while you move, aiming close to yourself no longer cuts out, the aim stick sits in one place, one ACTION button does whatever the game prompts (else PING), a JUMP button, and the defuser carrier line is no longer hidden.', v: 1 },
+  { d: '2026-11-17', k: 'mech', id: 'scope', t: 'Sniper scopes: no sway within 12 m of where you aim, and less sway far out.', v: 1 },
 ];

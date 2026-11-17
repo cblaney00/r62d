@@ -381,3 +381,24 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - White slashes beside the phone buttons (he saw them): the menu buttons' parked shine (`button::after`, skewed, off
   to the left) showed because `#touchUI .tbtn` has `overflow: visible` for the count badges; hidden on touch buttons,
   with the tap ripple.
+
+## Phone combat round 3: close aim, fixed stick, pre-aim, sway, defuser line, ACTION button (2026-11-17, he asked)
+- Close-range aim cut out: the stick's dead spot (0.08 of the stick, ~10 px with the longer travel) froze the crosshair
+  near you. Now only a thumb still resting where it landed is ignored (`moved` in aimstick.js), the raw thumb vector
+  (`rsRaw`) is used, and the phone crosshair can come in to `AIM_MIN` 24 (46 on a computer).
+- The aim stick sits in one place (`#tsRight` in style.css: 330 px in from the right, 200 up, times `--tz`; faint until
+  held); a thumb anywhere on the right half drives it from where it lands. (It had been hidden for good after the first
+  return to the menus: setTouchVisible added `hidden`; removed.)
+- Scope sway (`scopeSway` in main.js): none within 12 m of the aim point, eases in to 0.007 by 30 m (was 0.011 at any
+  distance).
+- Pre-aim while moving (he: "important to pre-aim everything and that is proving very difficult while moving"): with
+  the aim thumb off the stick the crosshair stays on its spot in the world (`st.hold` in `pollPad`) while you walk,
+  strafe or crouch; sprinting or walking up to it lets go; touching the aim stick ends post-sprint steering; aiming in
+  keeps a pre-aimed spot (sniper scopes still snap out). `SCENARIO=preaim node tests/thumbs.mjs`: 0 px drift.
+- Defuser: on phones "DEFUSER CARRIER" was drawn under the ammo count; `body:has(#status:not(:empty))` moves the ammo
+  and the team list down.
+- ACTION button (he asked: one button for whatever the game prompts, to cut clutter; he chose PING as the default and
+  JUMP in PING's old slot): touch.js `use` button, always shown, live icon + word (`word` from the prompt in main.js:
+  PLANT, REVIVE, VAULT...; else PING). Hold actions latch, vault and ping are pressed while the finger is down. JUMP
+  (vault input) is a new button with its own icon. Camera arrows moved left of ACTION.
+- Next (in r6-todo): sight lines shaking while the camera moves smoothly (drones and on foot).
