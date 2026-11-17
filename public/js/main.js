@@ -3839,6 +3839,7 @@ function screens(s, phase, now) {
   $('pSwap').classList.toggle('hidden', !(joined && phase === PHASE.PREP && st.me && st.me.tm === 'atk' && !(s && (s.tu || s.fr))));
   show('tvDraft', !!st.tv && joined && phase === PHASE.SELECT); document.documentElement.classList.toggle('tvsel', !!st.tv && phase === PHASE.SELECT);
   document.documentElement.classList.toggle('arena', !!(s && s.ar));
+  document.documentElement.classList.toggle('inmatch', !!joined); // glass.css: no frosted blur over a match (the graphics card would redo it every frame)
   document.documentElement.classList.toggle('zombies', !!(s && s.zb)); if (s && s.zb) zbHud(s, st.me); // fun modes: no gadget slots, drone bar or team panel
   show('hud', joined && (phase === PHASE.PREP || phase === PHASE.ACTION || phase === PHASE.ROUND_END));
   show('endscreen', joined && (phase === PHASE.MATCH_END || st.forceEnd));
