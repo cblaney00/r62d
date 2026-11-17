@@ -96,7 +96,8 @@ async function run() {
       const off = (u, v) => Math.round(Math.hypot(u.x - v.x, u.y - v.y)); console.log('PRE-AIM spot moved', off(a, b), 'px while strafing,', off(a, c), 'px after walking right (player moved', off({ x: a.me[0], y: a.me[1] }, { x: c.me[0], y: c.me[1] }), 'px)');
       return;
     }
-    if (process.env.SCENARIO === 'close') { // he found 2026-11-17: the crosshair froze when brought close to the operator
+    if (process.env.SCENARIO === 'close') {
+      { const st = await centre('#tsRight'), rl = await centre('[data-id="reload"]'); console.log('aim stick centre', st, 'RELOAD centre', rl, '(he asked: level, so the same height)'); } // he found 2026-11-17: the crosshair froze when brought close to the operator
       await js(`window.__rec = []; (function rec() { const s = __r62d.st; if (s.pred && s.me) { const p = __r62d.padFar(), d = Math.hypot(p.ax - s.pred.x, p.ay - s.pred.y), pd = __r62d.pad(), k = s.stk; __rec.push([Math.round(performance.now()), Math.round(d), Math.round(pd.padAng * 57.3), Math.round(pd.padReach * 1000) / 1000, Math.round((s.aim || 0) * 57.3), k ? Math.round(k.ox * 100) / 100 + ',' + Math.round(k.oy * 100) / 100 : '-']); } requestAnimationFrame(rec); })(); true`);
       const Rr = 62 * TUNE_TRAVEL; // the stick's thumb travel at normal sensitivity
       const pts = [R0, [R0[0] + Rr * 0.7, R0[1], 250], [R0[0] + Rr * 0.7, R0[1], 300]]; // out to the right, then slowly back in, through the middle and out the other side

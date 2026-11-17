@@ -1450,7 +1450,7 @@ html.touch #siteFound { top: 15%; } html.touch #siteFound canvas { width: 170px;
 #touchUI .tbtn::after { display: none; } /* no menu-button shine on the phone buttons (he saw white slashes beside them: overflow is visible for the count badges, so the parked shine showed) */
 #touchUI .tbtn .ripple { display: none; }
 #touchUI #tsRight { opacity: 0.45; transition: opacity 0.15s; } #touchUI #tsRight.held { opacity: 1; } /* the aim stick sits in one place (he asked): faint until a thumb is on it */
-#touchUI #tsRight { left: auto; top: auto; right: calc(330px * var(--tz, 1) - 62px); bottom: calc(200px * var(--tz, 1) - 62px); }
+#touchUI #tsRight { left: auto; top: auto; right: calc(330px * var(--tz, 1) - 62px); bottom: calc(119px * var(--tz, 1) - 62px); } /* (he asked 2026-11-17: its centre level with RELOAD's) */
 html.touch #status:empty { display: none; } html.touch body:has(#status:not(:empty)) #br { top: 176px; } /* phones: DEFUSER CARRIER (or DOWNED) gets its own line above the ammo instead of under it (he saw it hidden) */
 html.touch body:has(#status:not(:empty)) #allies { top: calc(34% + 50px); }
 /* ACTION: the one button for whatever the game prompts (he asked 2026-11-17), its word under it */
