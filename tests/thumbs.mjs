@@ -4,6 +4,7 @@
 //   node tests/thumbs.mjs <port> <outdir> <gameUrl> [width height]
 import fs from 'node:fs';
 const [port, outDir, url, W = 914, H = 412] = process.argv.slice(2);
+const TUNE_TRAVEL = 1.5; // public/js/aimstick.js TUNE.TRAVEL
 const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
 let id = 0; const waiting = new Map(), logs = [];
 const call = (method, params) => new Promise((res, rej) => { const i = ++id; waiting.set(i, { res, rej }); ws.send(JSON.stringify({ id: i, method, params })); });
@@ -94,6 +95,18 @@ async function run() {
       await touch(finger('L', [L, [L[0] + 60, L[1], 150]], 1000)); await sleep(300); const c = await P(); console.log('after walking right 1 s', JSON.stringify(c));
       const off = (u, v) => Math.round(Math.hypot(u.x - v.x, u.y - v.y)); console.log('PRE-AIM spot moved', off(a, b), 'px while strafing,', off(a, c), 'px after walking right (player moved', off({ x: a.me[0], y: a.me[1] }, { x: c.me[0], y: c.me[1] }), 'px)');
       return;
+    }
+    if (process.env.SCENARIO === 'close') { // he found 2026-11-17: the crosshair froze when brought close to the operator
+      await js(`window.__rec = []; (function rec() { const s = __r62d.st; if (s.pred && s.me) { const p = __r62d.padFar(), d = Math.hypot(p.ax - s.pred.x, p.ay - s.pred.y), pd = __r62d.pad(), k = s.stk; __rec.push([Math.round(performance.now()), Math.round(d), Math.round(pd.padAng * 57.3), Math.round(pd.padReach * 1000) / 1000, Math.round((s.aim || 0) * 57.3), k ? Math.round(k.ox * 100) / 100 + ',' + Math.round(k.oy * 100) / 100 : '-']); } requestAnimationFrame(rec); })(); true`);
+      const Rr = 62 * TUNE_TRAVEL; // the stick's thumb travel at normal sensitivity
+      const pts = [R0, [R0[0] + Rr * 0.7, R0[1], 250], [R0[0] + Rr * 0.7, R0[1], 300]]; // out to the right, then slowly back in, through the middle and out the other side
+      for (let i = 1; i <= 14; i++) pts.push([R0[0] + Rr * (0.7 - i * 0.1), R0[1], 120]);
+      for (let i = 0; i <= 16; i++) { const a = i / 16 * Math.PI * 2; pts.push([R0[0] + Math.cos(a) * Rr * 0.1, R0[1] + Math.sin(a) * Rr * 0.1, 80]); } // a small circle right round the middle
+      pts.push([R0[0] + Rr * 0.02, R0[1] + Rr * 0.01, 200]); // and right in to the middle (the crosshair against your body: the ring shows)
+      await touch(finger('R', pts, 400)); await sleep(300);
+      const rec = JSON.parse(await js('JSON.stringify(__rec)'));
+      console.log('t(ms)  dist(px)  padAng  padReach  aimDeg  stick-o'); for (const r of rec.filter((_, i) => i % 4 === 0)) console.log(r.join('  '));
+      await shot('c1-close'); return;
     }
     let s0 = await report('start');
     if (process.env.SCENARIO === 'fix') { // the 2026-11-16 thumb fixes: AIM switch and CROUCH by the left thumb, auto fire, gyro aim

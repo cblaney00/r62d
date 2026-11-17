@@ -402,3 +402,15 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   PLANT, REVIVE, VAULT...; else PING). Hold actions latch, vault and ping are pressed while the finger is down. JUMP
   (vault input) is a new button with its own icon. Camera arrows moved left of ACTION.
 - Next (in r6-todo): sight lines shaking while the camera moves smoothly (drones and on foot).
+
+## Phone close aim: no freeze near you, limits shown (2026-11-17, he asked)
+- He found the crosshair froze when brought close to the operator. Measured with `SCENARIO=close node tests/thumbs.mjs`
+  (records distance / angle every frame while a thumb pulls in through the middle and circles it): it could not come
+  nearer than ~34 px (`AIM_MIN` 24 screen px ≈ 1 m), and the shake damping turned it so slowly near the middle that a
+  thumb crossing over made it crawl round the side (0° → 71° → 112°...) instead of crossing.
+- Now: phones use `TOUCH_MIN` = `PLAYER_R` + 5 world px (main.js), and in aimstick.js `near` (stick output under
+  0.15, i.e. within ~1 m) lets the direction follow the thumb almost at once and the length catch up faster. Kept that
+  narrow: a 0.3 zone cut 3 m head hits from 58 % to 34 % in tests/aimstick.js; at 0.15 they are 58 % again.
+- Limits shown (he asked: any barrier must show in the UI): `crosshair()` draws a dashed white ring with a dark edge
+  at the inner limit as the crosshair nears it, and a fainter one at the end of the reach once `padReach` > 0.9.
+- Result: distance goes down to 14 px, the angle flips 0° → 180° straight across.

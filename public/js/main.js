@@ -1,6 +1,6 @@
 // R62D browser client: connects to the server, predicts your movement,
 // draws the world with line-of-sight blackout, and runs the menus and HUD.
-import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL, OVERWATCH, LUNGE_M } from '/shared/constants.js';
+import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL, OVERWATCH, LUNGE_M, PLAYER_R } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
 import { roofRopeAt, hatchAtPoint, plantBomb, PLANT_R, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
@@ -161,7 +161,10 @@ let aimMode = (() => { try { const m = localStorage.getItem('r62d-aim'); return 
 // the crosshair on the wall while they are in the way; it comes back out when you aim past them.
 let aimOff = { x: 150, y: 0 };
 const AHEAD = () => Math.max(36 * DPR, VH * 0.13); // screen room always left beyond the crosshair
-const AIM_MIN = () => (touchActive() ? 24 : 46) * DPR / (st.zoom || 1), AIM_MAX = () => st.reachW || 400;
+// phones (he found 2026-11-17: the crosshair froze ~1 m from you): it comes in right to the edge of your body, and
+// pressed against that edge or the far end of its reach a faint ring shows the limit (crosshair() below)
+const TOUCH_MIN = PLAYER_R + 5;
+const AIM_MIN = () => touchActive() ? TOUCH_MIN : 46 * DPR / (st.zoom || 1), AIM_MAX = () => st.reachW || 400;
 // Close-aim dead zone (he asked 2026-11-15): the crosshair passes straight over your character (it used to stop
 // AIM_MIN short of you), but while it is within DZ_R of you your aim keeps the direction it had (st.dzAng), so a mouse
 // resting on your character never spins you round. An enemy you can see whose body is within DZ_FOE (0.5 m) of the
@@ -3743,6 +3746,15 @@ function crosshair(me, now) {
   if (fq && st.reachW) { // near the edge of your reach (he chose): a faint ring round you fades in
     const R = st.reachW * (st.zoom || 1), f = Math.max(0, Math.min(1, (Math.hypot(aimOff.x, aimOff.y) / st.reachW - 0.82) / 0.16));
     if (f > 0) { ctx.save(); ctx.globalAlpha = f * 0.35; ctx.strokeStyle = '#fff'; ctx.lineWidth = DPR; ctx.setLineDash([6 * DPR, 6 * DPR]); ctx.beginPath(); ctx.arc(px, py, R, 0, 7); ctx.stroke(); ctx.restore(); }
+  }
+  if (!fq && touchFar() && st.pred) { // phone: the crosshair's limits, shown as it nears them (he asked: any barrier must show)
+    const d = Math.hypot(m.x - px, m.y - py), z = st.zoom || 1, lo = AIM_MIN() * z, hi = Math.max(AIM_MIN() + 1, reachOf(me)) * z;
+    const fin = Math.max(0, Math.min(1, 1.3 - (d - lo) / (16 * DPR))), fout = Math.max(0, Math.min(1, (padReach - 0.9) / 0.08));
+    const ring = (r, f, dash) => { ctx.globalAlpha = f; ctx.setLineDash([dash * DPR, dash * DPR]); for (const [c, w] of [['rgba(0,0,0,0.7)', 3 * DPR], ['#fff', 1.4 * DPR]]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.stroke(); } };
+    ctx.save();
+    if (fin > 0) ring(lo, fin * 0.85, 3); // the inner limit: just outside your body
+    if (fout > 0) ring(hi, fout * 0.5, 6); // the outer limit: the end of your reach
+    ctx.restore();
   }
   if (me.mv === 3) ctx.globalAlpha = 0.3; // sprinting: gun down
   else { st.xhFade = (st.xhFade ?? 1) + ((fq && fq.stopped ? 0.45 : 1) - (st.xhFade ?? 1)) * Math.min(1, (now - (st.xhFadeT || now)) * 14); ctx.globalAlpha = st.xhFade; } // bullets stop at a wall before it: faded, gliding (no flicker past door frames)

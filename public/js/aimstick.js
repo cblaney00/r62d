@@ -58,7 +58,10 @@ export function stepStick(s, t, dt, sens = 1, slow = 1) {
     // calmer there (FAR_A for the direction, FAR_L for the distance; he asked for more hits at 15 m)
     const tl = Math.hypot(t.x, t.y), ol = Math.hypot(s.ox, s.oy), oa = Math.atan2(s.oy, s.ox), ta = Math.atan2(t.y, t.x);
     const far = smooth((Math.max(tl, ol) - T.ZONE) / (1 - T.ZONE)), fa = Math.min(1, dt * k * (1 - (1 - T.FAR_A) * far)), fl = Math.min(1, dt * k * (1 - (1 - T.FAR_L) * far));
-    const na = ol < 0.04 ? ta : oa + Math.atan2(Math.sin(ta - oa), Math.cos(ta - oa)) * fa, nl = ol + (tl - ol) * fl;
+    // close to you (he found 2026-11-17: near the operator the crosshair froze) a wobble barely moves it on screen, so the
+    // direction follows the thumb almost at once there: crossing the middle carries it over you instead of crawling round
+    const near = smooth((0.15 - Math.min(ol, tl)) / 0.1), fa2 = fa + (1 - fa) * near * 0.85;
+    const na = ol < 0.04 ? ta : oa + Math.atan2(Math.sin(ta - oa), Math.cos(ta - oa)) * fa2, nl = ol + (tl - ol) * Math.max(fl, near * 0.5 * Math.min(1, dt * 30));
     s.ox = Math.cos(na) * nl; s.oy = Math.sin(na) * nl; s.tx = t.x; s.ty = t.y;
   } else if (S.kind === 'abs') { s.ox = t.x; s.oy = t.y; }
   else {
