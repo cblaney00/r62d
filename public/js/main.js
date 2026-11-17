@@ -37,7 +37,7 @@ import { readCode, showCode } from '/shared/joincode.js';
 import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
 import * as rope3d from './rope3d.js';
 import { compassRoute as sharedRoute } from '/shared/compass.js';
-import { touchPad, touchContext, touchActive, isTrackpad, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire } from './touch.js';
+import { touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
 import { EYE_H } from '/shared/map.js';
 import { META } from '/shared/meta.js';
@@ -344,7 +344,7 @@ function adsReset() {
 // key) steadies it within about a tenth of a second, for as long as you hold it (like the AWP), and slows the mouse by
 // Settings → Steady aim sensitivity. The sway turns your real aim, so a shot goes where the reticle is.
 const adsHeld = () => mouse.r || !!st.adsTog; // right button held, or aimed in by the toggle (trackpad: aim-in key or a two-finger tap)
-const steadying = () => !!(st.me && st.me.ct === 'body' && st.me.a && sniperOn(st.me) && (adsHeld() || gpk.ads) && (keys.has('walk') || keys.has('sprint') || gpk.walk));
+const steadying = () => !!(st.me && st.me.ct === 'body' && st.me.a && sniperOn(st.me) && (adsHeld() || gpk.ads) && (keys.has('walk') || keys.has('sprint') || gpk.walk || (touchActive() && st.padStill))); // phone: scoped in with the move thumb off = steady (the computer holds Walk)
 function scopeSway(dt, me, now) {
   const on = me && me.ct === 'body' && me.a && !me.dn && sniperOn(me) && !st.tv ? Math.min(1, me.at || 0) : 0;
   const run = Math.min(1, Math.hypot(st.pred.vx || 0, st.pred.vy || 0) / BASE_SPEED);
@@ -1094,7 +1094,7 @@ function pollPad(dt, view) {
   if (st.steer && (gp.lt > 0.35 || (st.me && st.me.ad) || !st.me || st.me.ct !== 'body' || !touchActive() || !st.last || st.last.ph !== PHASE.ACTION && st.last.ph !== PHASE.PREP)) st.steer = false;
   if ((spr || st.steer) && ls.l > (spr ? 0 : 0.25) && rs.l < 0.05 && !(gp.rt > 0.35)) padAng = wrapAng(padAng + angDiff(Math.atan2(ls.y, ls.x) - (st.rot || 0), padAng) * Math.min(1, dt * 12));
   // left stick: 8 directions like WASD; a light push walks (silent)
-  const nx = ls.l ? ls.x / ls.l : 0, ny = ls.l ? ls.y / ls.l : 0;
+  const nx = ls.l ? ls.x / ls.l : 0, ny = ls.l ? ls.y / ls.l : 0; st.padStill = !ls.l;
   gpk.right = ls.l && nx > 0.38 ? 1 : 0; gpk.left = ls.l && nx < -0.38 ? 1 : 0;
   gpk.down = ls.l && ny > 0.38 ? 1 : 0; gpk.up = ls.l && ny < -0.38 ? 1 : 0;
   // on a drone, walk = sprint: held on B (a light push used to start one by accident)
@@ -1112,7 +1112,15 @@ function pollPad(dt, view) {
   if (!(rs.l > 0.05)) st.gyroOff = 0;
   if (rs.l > 0.05 && !falling && !aimReset) { // (the frame you aim in on a phone keeps the pulled-in crosshair)
     if (view && view.kind === 'cam') { mouse.x = VW / 2 + rs.x / rs.l * VH * 0.25; mouse.y = VH / 2 + rs.y / rs.l * VH * 0.25; }
-    else { if (onAim) st.gyroOff = (st.gyroOff || 0) + gy; padAng = wrapAng(Math.atan2(rs.y, rs.x) + (st.gyroOff || 0)); if (!gp.rsDir) padReach = rs.l; }
+    else {
+      if (onAim) st.gyroOff = (st.gyroOff || 0) + gy;
+      const want = wrapAng(Math.atan2(rs.y, rs.x) + (st.gyroOff || 0));
+      if (touchActive() && onAim) { // phone (he asked: gentler, and the same aim features as a mouse): ease towards the stick, slower aimed in / steadying
+        const k = 22 * stickSens() * (gpk.ads || (st.me && st.me.ad) ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1);
+        padAng = wrapAng(padAng + angDiff(want, padAng) * Math.min(1, dt * k));
+      } else padAng = want;
+      if (!gp.rsDir) padReach = rs.l;
+    }
   } else if (gy && onAim) padAng = wrapAng(padAng + gy);
   gpLastL = rs.l;
 }
@@ -4618,6 +4626,8 @@ for (const b of $('inputSeg').querySelectorAll('button')) {
   u.value = Math.round(uiScale() * 100); v.value = Math.round(viewMul() * 100); show();
   u.addEventListener('input', show); u.addEventListener('change', () => { show(); setUiScale(u.value / 100); }); // on letting go: resizing while dragging moved the slider under the mouse
   v.addEventListener('input', () => { show(); setViewMul(v.value / 100); }); }
+{ const k = $('stickSens'), show = () => { $('stickSensVal').textContent = (k.value / 100).toFixed(2); }; // phone: aim stick sensitivity (he asked: the default was too high)
+  k.value = Math.round(stickSens() * 100); show(); k.addEventListener('input', () => { show(); setStickSens(k.value / 100); }); }
 { // phone: gyro aim (off / aimed in / always, speed, invert) and auto fire, kept on this device
   const gs = $('gyroSeg'), sp = $('gyroSens'), inv = $('gyroInv'), af = $('autoFireSeg');
   const show = () => { for (const b of gs.children) b.classList.toggle('on', b.dataset.g === gyroMode()); $('gyroSensVal').textContent = Math.round(sp.value) + '%'; inv.checked = gyroInv(); for (const b of af.children) b.classList.toggle('on', (b.dataset.f === '1') === autoFire()); };

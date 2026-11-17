@@ -1411,3 +1411,39 @@ html.touch #freeOps { inset: 0; } html.touch #freeOps .foHead { padding: 8px 14p
 html.touch #freeOps .foOps button { min-height: 64px; } /* free play's panel on a phone: the whole screen, easy-to-tap operators */
 html.touch .op:hover, html.touch .op:hover canvas { transform: none; } /* (a mouse-hover zoom that stuck after a tap and cut the picture) */
 html.touchplay #feed { max-width: 300px; }
+/* ---- Phone layout by priority (he asked 2026-11-17: the buttons covered too much of the screen; size, shape and place
+   them by how often they are pressed, AIM bigger and on the bottom right of each FIRE). Sizes before --tz:
+   FIRE 76 (left 62) · AIM 44 on FIRE's corner · crouch / reload / swap 46 on an arc round the right FIRE ·
+   skill / gadget / melee / ping 38 on an outer arc · USE / VAULT 54 when they apply · top row 36 · lean 40 by the
+   move stick. Arc centres are worked out from FIRE's centre, 60 px in from the right and bottom edges. */
+#touchUI .tbtn.ico svg { width: 52%; height: 52%; }
+#touchUI .tbtn.fire.right { width: 76px; height: 76px; right: max(22px, env(safe-area-inset-right)); bottom: 22px; }
+#touchUI .tbtn.fire.left { width: 62px; height: 62px; left: max(164px, calc(env(safe-area-inset-left) + 144px)); bottom: 26px; }
+#touchUI .tbtn.aim { width: 44px; height: 44px; border-radius: 50%; z-index: 3; background: rgba(20,40,60,0.75); border: 2px solid rgba(120,190,255,0.85); }
+#touchUI .tbtn.aim.on { background: rgba(242,193,78,0.85); border-color: #f2c14e; }
+#touchUI .tbtn.aimR { right: max(8px, calc(env(safe-area-inset-right) - 14px)); bottom: 6px; }
+#touchUI .tbtn.aimL { left: max(206px, calc(env(safe-area-inset-left) + 186px)); bottom: 8px; width: 38px; height: 38px; }
+#touchUI .tbtn.r { width: 46px; height: 46px; border-radius: 50%; }
+#touchUI .tbtn.rc { right: calc(max(22px, env(safe-area-inset-right)) + 107px); bottom: 37px; } /* crouch: left of FIRE */
+#touchUI .tbtn.r1.c1 { right: calc(max(22px, env(safe-area-inset-right)) + 85px); bottom: 96px; } /* reload: up-left */
+#touchUI .tbtn.r1.c2 { right: calc(max(22px, env(safe-area-inset-right)) + 28px); bottom: 128px; } /* swap: above */
+#touchUI .tbtn.r2, #touchUI .tbtn.r3 { width: 38px; height: 38px; background: rgba(10,14,18,0.45); }
+#touchUI .tbtn.r2.c1 { right: calc(max(22px, env(safe-area-inset-right)) + 149px); bottom: 116px; } /* skill */
+#touchUI .tbtn.r2.c2 { right: calc(max(22px, env(safe-area-inset-right)) + 98px); bottom: 168px; } /* gadget */
+#touchUI .tbtn.r3.c1 { right: calc(max(22px, env(safe-area-inset-right)) + 45px); bottom: 189px; } /* melee */
+#touchUI .tbtn.r3.c2 { right: max(14px, env(safe-area-inset-right)); bottom: 189px; } /* ping */
+#touchUI .tbtn.ctx, #touchUI .tbtn.t2, #touchUI .tbtn.t3 { width: 54px; height: 54px; }
+#touchUI .tbtn.c-use, #touchUI .tbtn.t3 { right: calc(max(22px, env(safe-area-inset-right)) + 166px); bottom: 23px; }
+#touchUI .tbtn.c-vault, #touchUI .tbtn.t2 { right: calc(max(22px, env(safe-area-inset-right)) + 231px); bottom: 23px; }
+#touchUI .tbtn.lean { width: 40px; height: 40px; bottom: 186px; }
+#touchUI .tbtn.l1 { left: max(30px, env(safe-area-inset-left)); } #touchUI .tbtn.l2 { left: calc(max(30px, env(safe-area-inset-left)) + 50px); }
+#touchUI .tbtn.t { width: 36px; height: 36px; top: 6px; background: rgba(10,14,18,0.4); border-color: rgba(255,255,255,0.22); }
+#touchUI .tbtn.t5 { right: 12px; } #touchUI .tbtn.t9 { right: 54px; } #touchUI .tbtn.t4 { right: 96px; } #touchUI .tbtn.t1 { right: 138px; width: 36px; } #touchUI .tbtn.t7 { right: 180px; width: 36px; }
+#touchUI .tbtn.t9 b { font-size: 17px; }
+#touchUI .tbtn em { top: -6px; right: -6px; min-width: 18px; height: 18px; line-height: 18px; font-size: 12px; padding: 0 4px; }
+#touchUI .tbtn.t6 { bottom: 236px; } /* ⟲ TILT above the lean buttons */
+#touchUI .tbtn.t2, #touchUI .tbtn.t3 { top: auto; width: 54px; height: 54px; background: rgba(10,14,18,0.55); } /* the camera arrows stay down by FIRE */
+#touchUI .tbtn.lean { bottom: 100px; } /* by the left FIRE (above the team list it covered) */
+#touchUI .tbtn.l1 { left: max(150px, calc(env(safe-area-inset-left) + 130px)); } #touchUI .tbtn.l2 { left: max(200px, calc(env(safe-area-inset-left) + 180px)); }
+html.touch #siteFound { top: 31%; }
+html.touch #siteFound { top: 15%; } html.touch #siteFound canvas { width: 170px; height: 102px; } /* phones: a smaller floor plan so the card fits between the clock and the tip line */

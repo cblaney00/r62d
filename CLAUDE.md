@@ -38,6 +38,7 @@ going.** Every idea goes there (there is no other list), only his ideas.
 - Balance targets: attack 45–55% on every map; an operator is broken over 60% / bad under 40%.
 - GPU checks run in headless gamescope, never a window on his screen (docs/performance.md).
 - Releasing to Lando (the config pin) is never done from here; see ../CLAUDE.md.
+- He asked (2026-11-17): publish a GitHub release (`desktop/release.sh`, inside the vibe-web shell, as insideabush) after every finished version, so his phone app updates.
 
 ## Where the details are
 

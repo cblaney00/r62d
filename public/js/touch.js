@@ -61,6 +61,10 @@ export const gyroMode = () => { const m = store('r62d-gyro'); return m === 'off'
 export const gyroSens = () => Math.max(0.2, Math.min(3, +(store('r62d-gyrosens') || 1)));
 export const gyroInv = () => store('r62d-gyroinv') === '1';
 export function setGyro(m) { store('r62d-gyro', m); try { if (m !== 'off' && typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) DeviceMotionEvent.requestPermission().catch(() => {}); } catch {} }
+// aim stick sensitivity (he asked 2026-11-17: the default was too high): lower = the thumb travels further for the same
+// turn, and main.js eases the aim towards the stick (stickEase) instead of jumping
+export const stickSens = () => Math.max(0.3, Math.min(1.6, +(store('r62d-sticksens') || 0.7)));
+export const setStickSens = v => store('r62d-sticksens', String(v));
 export const setGyroSens = v => store('r62d-gyrosens', String(v)), setGyroInv = on => store('r62d-gyroinv', on ? '1' : '0');
 // Auto fire (same day): the gun shoots by itself while your crosshair is on an enemy you can see, so the right thumb only
 // has to aim (phone shooters offer the same). On by default on phones; Settings turns it off.
@@ -96,9 +100,11 @@ export const tiltLevelNow = () => { tiltLevel = grav ? { ...grav } : null; };
 const BUTTONS = [
   { id: 'fireL', label: 'FIRE', b: 'rt', cls: 'fire left' }, { id: 'fireR', label: 'FIRE', b: 'rt', cls: 'fire right' },
   { id: 'use', label: 'USE', b: 0, cls: 'ctx c-use hidden' }, { id: 'vault', label: 'VAULT', b: 10, cls: 'ctx c-vault hidden' },
-  // AIM and CROUCH sit by the left thumb (2026-11-16, a thumb-played match: on the right they meant stopping aiming and
-  // shooting in the middle of a fight); AIM is a tap on / tap off switch (holding it needed a third thumb)
-  { id: 'ads', label: 'AIM', b: 'lt', cls: 'lb lb1' }, { id: 'crouch', label: 'CROUCH', b: 1, cls: 'lb lb2' },
+  // AIM (he asked 2026-11-17): a small button on the bottom right of each FIRE, a tap on / tap off switch (both light up
+  // together); the old AIM by the left thumb is gone. Sizes and places follow how often each is pressed (style.css,
+  // "phone layout by priority"): FIRE and AIM biggest, then crouch / reload / swap round the right FIRE, then skill,
+  // gadget, melee, ping, then the top row
+  { id: 'ads', label: 'AIM', b: 'lt', cls: 'aim aimR' }, { id: 'adsL', label: 'AIM', b: 'lt', cls: 'aim aimL' }, { id: 'crouch', label: 'CROUCH', b: 1, cls: 'r rc' },
   { id: 'reload', label: 'RELOAD', b: 2, cls: 'r r1 c1' }, { id: 'swap', label: 'SWAP', b: 3, cls: 'r r1 c2' },
   { id: 'skill', label: 'SKILL', b: 5, cls: 'r r2 c1' }, { id: 'gadget', label: 'GADGET', b: 4, cls: 'r r2 c2' },
   { id: 'melee', label: 'MELEE', b: 11, cls: 'r r3 c1' }, { id: 'ping', label: 'PING', b: 12, cls: 'r r3 c2' },
@@ -134,7 +140,7 @@ export const ICONS = {
   help: '<b>?</b>',
 };
 const HELP = [
-  ['fire', 'FIRE', 'Shoot. Drag the right one to aim while you shoot.'], ['ads', 'AIM', 'Aim in: tap on, tap again to aim out.'],
+  ['fire', 'FIRE', 'Shoot. Drag the right one to aim while you shoot.'], ['ads', 'AIM', 'The small button on each FIRE: tap to aim in, tap again to aim out.'],
   ['crouch', 'CROUCH', 'Tap to crouch. Hold to lie down. While sprinting: a slide.'], ['leanL', 'LEAN', 'Lean left or right round a corner: tap on, tap off.'],
   ['reload', 'RELOAD', 'Reload your gun.'], ['swap', 'SWAP', 'Switch between your guns.'],
   ['skill', 'SKILL', 'Your operator\'s ability. The number is how many are left.'], ['gadget', 'GADGET', 'Throw or place your gadget.'],
@@ -154,7 +160,7 @@ let releaseAll = () => {}, fireAim = false, sprintLock = false, adsLatch = false
 // keeps going (plant, defuse, reinforce, revive...) until it is done, you tap again or you move with the stick
 let useLatch = false, useEl = null, useLostT = 0;
 const setUse = on => { useLatch = on; held[0] = on; if (useEl) useEl.classList.toggle('on', on); };
-const setAds = on => { adsLatch = on; trig.lt = on ? 1 : 0; if (adsEl) adsEl.classList.toggle('on', on); }; // AIM: tap on, tap off // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
+const setAds = on => { adsLatch = on; trig.lt = on ? 1 : 0; if (ui) for (const el of ui.querySelectorAll('.tbtn.aim')) el.classList.toggle('on', on); }; // AIM: tap on, tap off // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
 let ui = null, shown = false, recentre = () => {};
 export const touchAimReset = () => recentre();
 
@@ -167,7 +173,8 @@ export function touchPad() {
   prevHeld = held.slice();
   const L = (ls.x || ls.y || !tiltOn()) ? ls : tiltV; // a thumb on the stick wins over tilting
   const gyro = gyroAcc; gyroAcc = 0;
-  return { name: 'Touch screen', ls: stickOf(L), rs: stickOf(rs), rsDir: fireAim, rsHeld: rs.x !== 0 || rs.y !== 0, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released, gyro };
+  const r0 = stickOf(rs), rc = r0.l ? Math.pow(r0.l, 1.35) / r0.l : 0; // finer control near the middle of the aim stick
+  return { name: 'Touch screen', ls: stickOf(L), rs: { x: r0.x * rc, y: r0.y * rc, l: r0.l * rc }, rsDir: fireAim, rsHeld: rs.x !== 0 || rs.y !== 0, sprint: sprintLock && L === ls, lt: trig.lt, rt: trig.rt, held: held.slice(), pressed, released, gyro };
 }
 export const touchActive = () => isTouch && shown;
 
@@ -175,7 +182,7 @@ function build() {
   ui = document.createElement('div'); ui.id = 'touchUI'; ui.className = 'hidden';
   ui.innerHTML = `<div class="tzone" id="tzRight"></div><div class="tzone" id="tzLeft"></div>
     <div class="tstick" id="tsLeft"><i></i></div><div class="tstick dyn hidden" id="tsRight"><i></i></div>
-    ${BUTTONS.map(b => `<button class="tbtn ico ${b.cls}" data-id="${b.id}" data-label="${b.label}" aria-label="${b.label}">${ICONS[b.id] || (b.id.startsWith('fire') ? ICONS.fire : b.label)}</button>`).join('')}
+    ${BUTTONS.map(b => `<button class="tbtn ico ${b.cls}" data-id="${b.id}" data-label="${b.label}" aria-label="${b.label}">${ICONS[b.id] || (b.id.startsWith('fire') ? ICONS.fire : b.id === 'adsL' ? ICONS.ads : b.label)}</button>`).join('')}
     <div id="tHelp" class="hidden"><h3>WHAT THE BUTTONS DO</h3><div class="thGrid">${HELP.map(([i, n, d]) => `<div><span class="thI">${ICONS[i]}</span><b>${n}</b><small>${d}</small></div>`).join('')}</div><p>Left side: the move stick (push past its ring to sprint). Right side: drag anywhere to aim. Tap to close.</p></div>
     <div id="tTurn" class="hidden"><b>⟳</b>Turn your phone sideways to play</div>`;
   document.body.appendChild(ui);
@@ -203,8 +210,9 @@ function build() {
       dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; dyn.classList.remove('hidden'); rs.x = rs.y = 0; knob(dyn, rs);
       fingers.set(id, {
         move(x, y) {
-          tx = x; ty = y; let u = (x - ox) / R, v = (y - oy) / R; const l = Math.hypot(u, v);
-          if (l > 1) { ox += (u / l) * (l - 1) * R; oy += (v / l) * (l - 1) * R; u /= l; v /= l; dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; } // the stick follows a thumb that slides past its edge
+          const Ra = R / stickSens(); // (lower sensitivity: a longer reach for the thumb)
+          tx = x; ty = y; let u = (x - ox) / Ra, v = (y - oy) / Ra; const l = Math.hypot(u, v);
+          if (l > 1) { ox += (u / l) * (l - 1) * Ra; oy += (v / l) * (l - 1) * Ra; u /= l; v /= l; dyn.style.left = `${ox - R}px`; dyn.style.top = `${oy - R}px`; } // the stick follows a thumb that slides past its edge
           rs.x = u; rs.y = v; knob(dyn, rs);
         },
         end() { aimF = null; rs.x = rs.y = 0; dyn.classList.add('hidden'); },
@@ -221,7 +229,7 @@ function build() {
   // buttons: held while the finger that pressed them is down (wherever it slides)
   const pressButton = (id, el, x0, y0) => {
     const b = BUTTONS.find(q => q.id === el.dataset.id);
-    if (b.id === 'ads') { adsEl = el; setAds(!adsLatch); return; } // a tap switches aiming in on or off
+    if (b.id === 'ads' || b.id === 'adsL') { setAds(!adsLatch); return; } // a tap switches aiming in on or off (either AIM)
     if (b.id === 'use') { useEl = el; useLostT = 0; setUse(!useLatch); return; } // a tap starts using, and it carries on
     if (b.id === 'help') { const h = ui.querySelector('#tHelp'); h.classList.toggle('hidden'); return; } // the guide (tap it to close)
     if (b.b === null) { tiltLevelNow(); el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 200); return; } // ⟲ TILT: how you hold it now is level

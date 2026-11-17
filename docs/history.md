@@ -335,3 +335,21 @@ type (Onyx had 3 LMGs); nicer gun stat bars that keep similar guns apart; and wh
   in (`drawPics` in ops.js; the height is on `.wpic`).
 - The ? button: the phone app updates only from GitHub releases; the last one (b487) was made before the ? button
   (commit 489). A new release from this session carries everything.
+
+## Phone controls by priority, AIM on FIRE, gentler aim stick (2026-11-17, he asked)
+He found phone play hard: the picture buttons covered too much of the screen, the aim stick was too sensitive, and the
+phone must have every aim feature the computer has. He chose: buttons sized and placed by how often they are pressed
+(AIM bigger), a small AIM on the bottom right of each FIRE, the old left-thumb AIM removed.
+- Layout: the "Phone layout by priority" block at the end of style.css (sizes before `--tz`): right FIRE 76, left FIRE
+  62, AIM 44/38 on each FIRE's corner (`ads` / `adsL` in touch.js `BUTTONS`, one switch: `setAds` lights both);
+  crouch / reload / swap 46 on an arc round the right FIRE (crouch moved over from the left); skill / gadget / melee /
+  ping 38 on an outer arc; USE / VAULT and the camera arrows 54 left of crouch; top row 36; lean 40 by the left FIRE.
+  On phones the objective card sits lower with a smaller floor plan (`html.touch #siteFound`).
+- Aim stick: `stickSens()` (touch.js, `r62d-sticksens`, default 0.7, Settings "Aim stick sensitivity"): the thumb
+  travels `R / sens`, the push is curved (finer near the middle), and main.js `pollPad` eases `padAng` towards the
+  stick (rate 22 × sens, × Aiming-in sensitivity aimed in, × Steady sensitivity when steadying) instead of jumping.
+- Steady aim on phones: scoped in with the move thumb off (`st.padStill`) counts as steadying (`steadying()`), as
+  holding Walk does on a computer. Far aim, aim help, aim-in snap, lean and ping already worked on the stick.
+- Tested: `tests/thumbs.mjs` (AIM via the FIRE-side button, firing, crouch, reload, swap, drone, tilt) and
+  `tests/phonescreens.mjs` at 960×411 / 760×360 (only the intended FIRE/AIM overlap left).
+- From now on he wants a GitHub release after every finished version (CLAUDE.md standing decisions).
