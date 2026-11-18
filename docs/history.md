@@ -764,3 +764,4 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   anywhere switches back; Settings "Playing with" → "Phone + controller" (`r62d-input` = 'pad', counts as `isTouch`)
   keeps it. pollPad no longer lets a connected-but-idle controller block touch play. Android `dispatchKeyEvent`: gamepad
   keys go to the WebView and count as handled (no B → Back fallback). Tested with a stubbed `navigator.getGamepads`.
+- Outdoor zoom (he asked 2026-11-18: too far out outdoors): body view outdoors (`insideAt` false), no TV, no sniper aimed in: `want` capped at `OUT_H` 640 and `st.longV` off (so sight range 1100, not LONG_R).

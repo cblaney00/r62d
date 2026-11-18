@@ -205,7 +205,7 @@ const scopeOn = me => !!me && /scope|sniper/.test(String(me.aa || '')), sniperOn
 const reachOf = (me, ads) => aimReach(me && me.aa ? attFromCode(me.aa).sight : 'iron', ads ?? !!(me && me.ad)) * PX_PER_M;
 // Long sightlines (he asked): looking down a line more than 1.5x the normal range, the view opens right out the way you
 // face, up to LONG_H world px tall, and you see out to LONG_R. The sniper scope always gets that view while aimed in.
-const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45;
+const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45, OUT_H = 640; // OUT_H: the widest view outdoors (world px tall), sniper scope aside
 // Crispy aim (he asked 2026-11-09): the crosshair follows the mouse 1:1 in every direction, like a pointer (the old
 // sideways flick help and the 1.3x faster outward pull are gone). Past the edge of your normal view (st.trackHH, the
 // room-size view before it grows to fit the crosshair) the mouse moves it by Settings → Far aim sensitivity (0.5),
@@ -2519,6 +2519,9 @@ function frame(nowMs) {
       const norm = Math.max(560, 470 * 2 * e - m1 - m2), sniper = me && me.ad && sniperOn(me);
       st.longV = !st.tv && view.kind === 'body' && (sniper || st.farS > norm * (st.longV ? 1.3 : 1.5));
       want = Math.max(want, Math.min(st.tv ? 520 : st.longV ? LONG_H : 680, (st.farS + m1 + m2) / (2 * e))); // (TV: staring out over a yard shouldn't make a wide, empty shot)
+      // outdoors (he asked 2026-11-18: it zoomed out too much there): long sightlines open the view only a little past the
+      // biggest room view, unless a sniper scope is aimed in
+      if (!st.tv && !sniper && !insideAt(view.x, view.y)) { want = Math.min(want, OUT_H); if (st.longV) { st.longV = false; } }
       const reach = (st.viewH || want) * e; // how far the screen reaches from its middle along your aim, right now
       st.sightLead = Math.max(0, Math.min(reach - m1, st.farS - (reach - m2)));
     } else st.sightLead = 0;
