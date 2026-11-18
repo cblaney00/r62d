@@ -538,7 +538,7 @@ export function aimUpHatch(m, x, y, ax, ay) {
 // A staircase is drawn on both floors at the same spot. Anyone on its steps, or on the landing at its open end
 // (STAIR_LAND cells: the bottom landing downstairs, the top landing upstairs), also shows up on the steps of the other
 // floor (clamped to the steps), where people near that staircase can see and shoot them. Both ways, so it's fair.
-const STAIR_LAND = 2, STAIR_LOOK = 6;
+const STAIR_LAND = 3, STAIR_LOOK = 8; // (he asked 2026-11-18: the stair view a bit wider; were 2 and 6; who really sees whom is stairSees)
 const UV = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
 function stairGeo(map, s) {
   if (s._g) return s._g;
@@ -601,6 +601,31 @@ export function stairLift(map, x, y) {
   const st = map.stairs[v >> 1], g = v & 1 ? st.gb : st.ga, x0 = (g % W) * CELL, y0 = Math.floor(g / W) * CELL, w = st.w * CELL, h = st.h * CELL;
   const f = Math.max(0, Math.min(1, st.dir === 'n' ? (y0 + h - y) / h : st.dir === 's' ? (y - y0) / h : st.dir === 'w' ? (x0 + w - x) / w : (x - x0) / w)); // 0 at the bottom end, 1 at the top
   return v & 1 ? f - 1 : f;
+}
+// Seeing up and down a staircase by height (he asked 2026-11-18: climbing, you see more of the floor above the higher
+// you get; waiting at the top, a climber low on the stairs is out of sight until they come up; it stops bullets and
+// bots alike). The opening in the upper floor is the flight itself; a line between two people on the two floors must
+// pass through it: where it crosses the upper floor's level it has to be over the steps. Heights in world px: a storey
+// STOREY, eyes and the upper body by stance (standing, crouched, lying down). Positions are where they really are.
+const HOLE = 0.55; // how much of the flight (from its top) is open to the floor above: just under where a standing head clears the ceiling
+export const STOREY = 108, EYE_H3 = [58, 40, 14], BODY_H3 = [40, 28, 10];
+const stanceI = o => !o ? 0 : (o.pn || (o.pr || 0) >= 1 || o.dn || o.downed) ? 2 : (o.cr || (o.input && o.input.crouch)) ? 1 : 0;
+export const eyeH = o => EYE_H3[stanceI(o)], bodyH = o => BODY_H3[stanceI(o)];
+export function stairSees(map, si, ax, ay, ah, bx, by, bh) {
+  const s = map.stairs && map.stairs[si]; if (!s) return false;
+  const g = stairGeo(map, s), fa = floorAt(map, ax, ay), fb = floorAt(map, bx, by);
+  if (fa === fb || (fa !== s.a && fa !== s.b) || (fb !== s.a && fb !== s.b)) return true; // (not across this staircase: not its business)
+  const P = (x, y, f, h) => ({ x: f === s.a ? x + g.dx : x, y: f === s.a ? y + g.dy : y, z: (f === s.b ? STOREY : 0) + stairLift(map, x, y) * STOREY + h, lower: f === s.a });
+  // the opening is the top HOLE of the flight: the upper floor goes on over its lower part (headroom, as in real
+  // stairwells), which is what hides someone low on the stairs from the top, and the floor above from the bottom
+  const st0 = g.b.steps, f = HOLE, hole = s.dir === 'n' ? { ...st0, y1: st0.y0 + (st0.y1 - st0.y0) * f } : s.dir === 's' ? { ...st0, y0: st0.y1 - (st0.y1 - st0.y0) * f }
+    : s.dir === 'w' ? { ...st0, x1: st0.x0 + (st0.x1 - st0.x0) * f } : { ...st0, x0: st0.x1 - (st0.x1 - st0.x0) * f };
+  const A = P(ax, ay, fa, ah), B = P(bx, by, fb, bh), M = 3;
+  const over = (x, y) => x >= hole.x0 - M && x < hole.x1 + M && y >= hole.y0 - M && y < hole.y1 + M;
+  const ra = A.z - STOREY, rb = B.z - STOREY;
+  if (ra * rb > 0) { const q = ra > 0 ? (A.lower ? A : B) : (A.lower ? B : A); return over(q.x, q.y); } // (both above the floor level: the one coming up must be in the opening; both below: the one going down)
+  const t = ra === rb ? 0 : ra / (ra - rb);
+  return over(A.x + (B.x - A.x) * t, A.y + (B.y - A.y) * t);
 }
 export function stairEnds(map, i, n = 1.5) {
   const s = map.stairs[i], g = stairGeo(map, s), [ux, uy] = UV[s.dir] || UV.n;

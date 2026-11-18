@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL, OVERWATCH, LUNGE_M, PLAYER_R } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, plantBomb, PLANT_R, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, stairLift, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, plantBomb, PLANT_R, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, stairLift, stairSees, eyeH, bodyH, EYE_H3, BODY_H3, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf, hitR, fireAuto } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -2986,7 +2986,7 @@ function visionPolygon(v, sm, rays = 0) {
   const pts = [], full = v.fov >= TAU - 0.01, low = !!v.low, map = st.map, R = v.range;
   const per = rays ? (full ? rays : rays * TAU / v.fov) : (full ? 360 : 300 * TAU / 1.9) * gq.rays; // rays round a whole circle
   const M = Math.max(16, Math.round(per / 8) * 8), step = TAU / M;
-  const cast = a => Math.min(R, castSight(map, v.x, v.y, a, R, sm, false, low) + 7);
+  const cast = v.lim ? a => Math.min(R, castSight(map, v.x, v.y, a, R, sm, false, low) + 7, v.lim(a)) : a => Math.min(R, castSight(map, v.x, v.y, a, R, sm, false, low) + 7); // (the stairs view: also only as far as your eyes reach through the opening)
   let a0, a1;
   if (full) { a0 = 0; a1 = TAU; } else { a0 = v.ang - v.fov / 2; a1 = v.ang + v.fov / 2; pts.push(v.x, v.y); }
   const refine = !rays, JUMP = 18;
@@ -3224,7 +3224,7 @@ function draw(s, view, now, dt) {
     a.recoil = Math.max(0, a.recoil - dt * 12); a.melee = Math.max(0, a.melee - dt * 4);
     // up or down a staircase: they also show on the other floor's steps, to people near that staircase who can see the spot
     const gh = !isMe && stairGhost(st.map, p.x, p.y);
-    if (gh && (ally || (!p.sh && ghostSeen(gh)))) {
+    if (gh && (ally || (!p.sh && ghostSeen(gh, p)))) {
       ctx.globalAlpha = 0.9;
       drawOperator(ctx, { x: gh.x, y: gh.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
       ctx.globalAlpha = 1;
@@ -4425,7 +4425,15 @@ function stairPeek(view, me, inGame) {
   }
   if (!best) return null;
   // all round the landing (some stairs come out sideways into a corridor), centred on the open space it looks into
-  const v = { x: best.at.x, y: best.at.y, ang: best.ang, fov: Math.PI * 2, range: 330, near: 30, kind: 'stairs', up: best.up, s: best.i };
+  const v = { x: best.at.x, y: best.at.y, ang: best.ang, fov: Math.PI * 2, range: 420, near: 30, kind: 'stairs', up: best.up, s: best.i }; // (range was 330: he asked for it a bit wider)
+  // what of that floor your eyes really reach through the opening (he asked 2026-11-18: more the higher you climb, less
+  // further back from the top; stairSees): per direction out from the landing, how far a standing person would show
+  { const N = 48, lim = new Float32Array(N), eh = eyeH(me); let sum = 0;
+    for (let j = 0; j < N; j++) { const a = j / N * TAU, ca = Math.cos(a), sa = Math.sin(a); let far = 0;
+      for (let d = 0; d <= v.range; d += 12) { if (stairSees(st.map, best.i, view.x, view.y, eh, v.x + ca * d, v.y + sa * d, BODY_H3[0])) far = d; else if (d > far + 24) break; }
+      lim[j] = far > 0 ? far + 10 : 6; sum += Math.min(lim[j], 220); }
+    v.lim = a => lim[Math.round((((a % TAU) + TAU) % TAU) / TAU * N) % N];
+    v.pr = Math.max(70, Math.min(150, 50 + sum / N * 0.7)); } // the view's size follows what you can see (was always PIP_R)
   let sx = 0, sy = 0; const n = 24;
   for (let j = 0; j < n; j++) { const a = j / n * Math.PI * 2, d = Math.min(220, castSight(st.map, v.x, v.y, a, 220, null)); sx += Math.cos(a) * d; sy += Math.sin(a) * d; }
   const l = Math.hypot(sx / n, sy / n), cap = Math.min(80, l);
@@ -4442,17 +4450,17 @@ function drawStairView(s, me, now, up) {
   if (!pv || !me || !!pv.up !== up) return;
   const S = st.map.stairs[pv.s], W = st.map.W, sdx = (S.gb % W - S.ga % W) * CELL, sdy = (Math.floor(S.gb / W) - Math.floor(S.ga / W)) * CELL;
   const offX = pv.up ? -sdx : sdx, offY = pv.up ? -sdy : sdy; // the other floor -> this floor
-  const z = st.zoom || 1, px = Math.ceil(PIP_R * 2 * z);
+  const PR = pv.pr || PIP_R, z = st.zoom || 1, px = Math.ceil(PR * 2 * z);
   if (px < 8 || px > 4096) return;
   if (stairCv.width !== px) { stairCv.width = px; stairCv.height = px; }
   const c = stairCv.getContext('2d'), R = st.rend, k = R.c.width / R.Wp, sm = smokes(s);
   // drawn at the same zoom and turn as your own view, centred a little past the landing
-  const cx = pv.x + Math.cos(pv.ang) * PIP_R * 0.55, cy = pv.y + Math.sin(pv.ang) * PIP_R * 0.55, rot = st.rot || 0; // just past the end of the steps, so it never covers you on them
+  const cx = pv.x + Math.cos(pv.ang) * PR * 0.55, cy = pv.y + Math.sin(pv.ang) * PR * 0.55, rot = st.rot || 0; // just past the end of the steps, so it never covers you on them
   const F = st.map.floors[Math.max(0, floorAt(st.map, pv.x, pv.y))], fx0 = F.gx * CELL, fx1 = (F.gx + F.w) * CELL, fy1 = F.h * CELL;
   c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, px, px);
   const cs = Math.cos(rot), sn = Math.sin(rot);
   c.setTransform(z * cs, z * sn, -z * sn, z * cs, px / 2 - z * (cs * cx - sn * cy), px / 2 - z * (sn * cx + cs * cy));
-  const D = PIP_R * 1.5, x0 = Math.max(fx0, cx - D), x1 = Math.min(fx1, cx + D), y0 = Math.max(0, cy - D), y1 = Math.min(fy1, cy + D);
+  const D = PR * 1.5, x0 = Math.max(fx0, cx - D), x1 = Math.min(fx1, cx + D), y0 = Math.max(0, cy - D), y1 = Math.min(fy1, cy + D);
   if (x1 <= x0 || y1 <= y0) return;
   c.save(); c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip(); // only this floor
   R.c.drawTo(c, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0); // remembered: dulled with a plain dark wash (no filter)
@@ -4692,9 +4700,10 @@ function drawWindowMarks(s, view, now) {
     c.fillText(`▲${m.floors[r.f].name} ${word}`, x + ox * 9 + u.x * 2, y + oy * 9 + u.y * 2); c.restore();
   }
 }
-function ghostSeen(gh) {
+function ghostSeen(gh, p) {
   const sm = smokes(st.last);
-  for (const v of st.viewers || []) if (!v.off && v.kind !== 'hatch' && floorAt(st.map, v.x, v.y) === gh.fl && stairLooks(st.map, gh.s, v.x, v.y) && canSee(st.map, v, gh.x, gh.y, sm)) return true;
+  for (const v of st.viewers || []) if (!v.off && v.kind !== 'hatch' && floorAt(st.map, v.x, v.y) === gh.fl && stairLooks(st.map, gh.s, v.x, v.y) && canSee(st.map, v, gh.x, gh.y, sm)
+    && (!p || stairSees(st.map, gh.s, v.x, v.y, v.kind === 'body' && st.me ? eyeH(st.me) : EYE_H3[0], p.x, p.y, bodyH(p)))) return true; // (by height: stairSees)
   return false;
 }
 // GIMLET's peepholes (he asked): a small ragged hole in the floor from above, a pin of light in the ceiling from below

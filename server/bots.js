@@ -6,7 +6,7 @@
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, PLAYER_R, T, FL, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked, leanPoint, LEAN_PX, inBox, railBlocked, railBlockedDiag } from '../shared/physics.js';
-import { hatchNear, ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
+import { hatchNear, ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairSees, eyeH, bodyH, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
 import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess, DRILL_STYLE, drillMul } from './training.js';
@@ -536,7 +536,7 @@ export function visibleEnemy(game, p, see) {
   for (const q of game.players.values()) {
     if (!q.alive || q.staged || game.side(q) === team || q.shrouded) continue;
     const gh = stairGhost(game.map, q.x, q.y);
-    if (!gh || gh.fl !== fl || !stairLooks(game.map, gh.s, p.x, p.y)) continue;
+    if (!gh || gh.fl !== fl || !stairLooks(game.map, gh.s, p.x, p.y) || !stairSees(game.map, gh.s, p.x, p.y, eyeH(p), q.x, q.y, bodyH(q))) continue; // (by height, like people)
     const d = Math.hypot(gh.x - p.x, gh.y - p.y);
     if (d > see || d > bd || (d > 70 && Math.abs(angDiff(Math.atan2(gh.y - p.y, gh.x - p.x), p.aim)) > (p.pro ? 0.9 : 1.2))) continue;
     if (!los(game.map, p.x, p.y, gh.x, gh.y, smokes)) continue;
