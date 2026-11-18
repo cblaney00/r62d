@@ -88,7 +88,7 @@ async function run() {
       for (const t of ['pointerdown','pointerup','pointercancel']) addEventListener(t, e => { const k = t + ':' + (e.target.id || e.target.dataset.id || e.target.tagName) + ':' + e.pointerType; __ev[k] = (__ev[k] || 0) + 1; }, true);
       window.__fires = 0; const ws = __r62d.st.ws, send = ws.send.bind(ws); ws.send = d => { try { const m = JSON.parse(d); if (m.k && m.k.fire) __fires++; } catch {} return send(d); }; true`);
     const L = await centre('#tsLeft'); console.log('left stick at', L);
-    const R0 = [Math.round(W * 0.78), Math.round(H * 0.45)];
+    const R0 = (await centre('#tsRight').catch(() => null)) || [Math.round(W * 0.78), Math.round(H * 0.45)]; // (the aim stick's own place: it sits in one fixed spot since 2026-11-17, with buttons round it)
     if (process.env.SCENARIO === 'preaim') { // he asked 2026-11-17: pre-aim while moving. Aim at a spot, let go, strafe: the crosshair should stay on the spot
       const P = () => js('JSON.stringify((p => ({ x: Math.round(p.ax), y: Math.round(p.ay), me: [Math.round(__r62d.st.pred.x), Math.round(__r62d.st.pred.y)] }))(__r62d.padFar()))').then(JSON.parse);
       await touch(finger('R', [R0, [R0[0] + 45, R0[1] - 10, 250]], 300)); await sleep(400); const a = await P(); console.log('aimed and let go', JSON.stringify(a));
@@ -98,7 +98,7 @@ async function run() {
       return;
     }
     if (process.env.SCENARIO === 'rope') { // he asked 2026-11-17: on a rope the phone's aim drags the crosshair, like a mouse
-      const P = () => js('JSON.stringify((() => { const s = __r62d.st, c = __r62d.freeAimPoint(), m = s.me || {}; return { rope: !!(m.ro && m.ro[0]), drag: !!s.rdOn, ax: Math.round(c.ax), ay: Math.round(c.ay), aim: Math.round(s.aim * 57.3), scr: __r62d.scr() }; })())').then(JSON.parse);
+      const P = () => js('JSON.stringify((() => { const s = __r62d.st, c = __r62d.freeAimPoint(), m = s.me || {}; return { rope: !!(m.ro && m.ro[0]), drag: !!s.rdOn, ax: Math.round(c.ax), ay: Math.round(c.ay), aim: Math.round(s.aim * 57.3), scr: __r62d.scr(), ao: [Math.round(__r62d.aimOff().x), Math.round(__r62d.aimOff().y)], rl: s.rdLast }; })())').then(JSON.parse);
       const spot = JSON.parse(await js(`(() => { const m = __r62d.st.map, r = m.ropes.find(r => r.down < 0 && r.base && !r.wall && Math.abs(r.b - r.a) > 40) || m.ropes.find(r => r.down < 0 && r.base); const t = (r.a + r.b) / 2; return JSON.stringify({ x: r.base.x + r.tx * t, y: r.base.y + r.ty * t }); })()`));
       await js(`__r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'clearBots' })); __r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'tp', x: ${spot.x}, y: ${spot.y} })); true`); await sleep(1200);
       await tap('[data-id="use"]'); await sleep(2500);
