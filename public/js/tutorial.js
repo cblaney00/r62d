@@ -8,7 +8,7 @@ import { PHASE } from '/shared/constants.js';
 import { roomAt } from '/shared/map.js';
 import { OPERATORS, JOBS } from '/shared/operators.js';
 import { keyName, bindsFor, label } from './keys.js';
-import { isTouch } from './touch.js';
+import { isTouch, fireRings } from './touch.js';
 
 const ORDER = [PHASE.SELECT, PHASE.PREP, PHASE.ACTION];
 const K = id => `<kbd>${isTouch ? label(id) : keyName(bindsFor(id)[0])}</kbd>`; // on a phone: the touch button's name
@@ -42,8 +42,8 @@ const STEPS = [
   { part: 0, ph: PHASE.ACTION, cont: true, t: 'Moving and shooting', b: () => isTouch ? `
     The <b>left stick</b> moves: push it all the way to run (loud), a light push walks (silent). ${K('crouch')} is silent too and
     more accurate. Put your <b>right thumb</b> anywhere on the right half to aim: drag the way you want to look, further to look
-    further. <b>FIRE</b> shoots, and you can slide your thumb on it to aim while shooting; hold ${K('ads')} for tighter shots and a
-    wider view. ${K('interact')} and ${K('vault')} pop up when there is something to use or climb. ${K('melee')}, ${K('ability')} and ${K('gadget')} do what they say.` : `
+    further. ${fireRings() ? "<b>Slide either thumb past its stick's edge</b> onto the red ring to shoot (the aim thumb keeps steering); <b>tap the aim stick</b> quickly to aim in for tighter shots and a wider view, and again to aim out. <b>Double-tap and hold</b> the move stick to sprint." : `<b>FIRE</b> shoots, and you can slide your thumb on it to aim while shooting; tap ${K('ads')} for tighter shots and a
+    wider view.`} ${K('interact')} and ${K('vault')} pop up when there is something to use or climb. ${K('melee')}, ${K('ability')} and ${K('gadget')} do what they say.` : `
     ${K('up')}${K('left')}${K('down')}${K('right')} runs (loud); hold ${K('sprint')} to sprint even faster, and crouch while
     sprinting for a power slide. Hold ${K('walk')} to walk and ${K('crouch')} to crouch: both silent and more accurate.
     ${K('leanL')} / ${K('leanR')} lean round corners. Move the mouse to aim, <b>left click</b> to shoot, <b>right click</b> to aim in (tighter shots, wider view).

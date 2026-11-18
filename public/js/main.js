@@ -38,7 +38,7 @@ import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
 import * as rope3d from './rope3d.js';
 import { compassRoute as sharedRoute } from '/shared/compass.js';
 import { newStick, stepStick } from './aimstick.js';
-import { touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire } from './touch.js';
+import { touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
 import { EYE_H } from '/shared/map.js';
 import { META } from '/shared/meta.js';
@@ -4698,6 +4698,7 @@ for (const b of $('inputSeg').querySelectorAll('button')) {
   sp.value = Math.round(gyroSens() * 100); show();
   for (const b of gs.children) b.onclick = () => { audio.ui(); setGyro(b.dataset.g); show(); };
   for (const b of af.children) b.onclick = () => { audio.ui(); setAutoFire(b.dataset.f === '1'); show(); };
+  { const fs = $('fireSeg'), sh = () => { for (const b of fs.children) b.classList.toggle('on', (b.dataset.r === '1') === fireRings()); }; sh(); for (const b of fs.children) b.onclick = () => { audio.ui(); setFireRings(b.dataset.r === '1'); sh(); }; } // phone: fire rings or FIRE buttons
   sp.addEventListener('input', () => { setGyroSens(sp.value / 100); show(); }); inv.addEventListener('change', () => { setGyroInv(inv.checked); show(); }); }
 { // phone: tilt to move (on/off + dead zone), kept on this device
   const seg = $('tiltSeg'), dz = $('tiltDz'), show = () => { for (const b of seg.children) b.classList.toggle('on', (b.dataset.t === '1') === tiltOn()); $('tiltDzVal').textContent = dz.value + '°'; };
@@ -4845,6 +4846,7 @@ const TIPS = [
   'Cameras see a cone: aim them with the mouse and switch with {leanL} and {leanR}.',
   'Change your loadout for every operator on the Operators page.',
   'Smashed barricades leave splinters that crack underfoot.',
+  'On a phone: slide either thumb past its stick\'s edge onto the red ring to shoot, tap the aim stick to aim in, and double-tap and hold the move stick to sprint.',
 ];
 const tipText = t => t.replace(/\{(\w+)\}/g, (_, id) => label(id)); // tips name your own keys
 let tipI = Math.floor(Math.random() * TIPS.length);

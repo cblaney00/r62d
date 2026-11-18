@@ -18,13 +18,14 @@ const probe = `(async () => {
   for (const b of ui.querySelectorAll('.tbtn')) { const id = b.dataset.id; if (id === 'tiltc' && mode !== 'tilt') continue; if (/^(ads|adsL|leanL|leanR)$/.test(id) && mode === 'cams') continue; if (/^(prev|next)$/.test(id) && mode !== 'cams') continue; b.classList.remove('hidden'); }
 
   const els = [...ui.querySelectorAll('.tbtn:not(.hidden), #tsLeft, #tsRight')].filter(e => e.getBoundingClientRect().width > 0); if (els.length < 5) return 'NOT SHOWN (' + els.length + ') touch=' + T.isTouch + ' ' + getComputedStyle(ui).display;
-  const R = e => { const r = e.getBoundingClientRect(); return { n: e.dataset.id || e.id, l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, round: getComputedStyle(e).borderRadius.includes('50%') }; };
+  const R = e => { const r = e.getBoundingClientRect(), ring = /^ts/.test(e.id) && ui.classList.contains('rings') ? (62 + 14 + 3) / 62 : 1, cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, hw = r.width / 2 * ring, hh = r.height / 2 * ring; // a stick counts with its fire ring
+    return { n: e.dataset.id || e.id, l: cx - hw, t: cy - hh, r: cx + hw, b: cy + hh, w: hw * 2, round: /^ts/.test(e.id) || getComputedStyle(e).borderRadius.includes('50%') }; };
   const rs = els.map(R), out = [];
   for (const a of rs) if (a.l < 0 || a.t < 0 || a.r > innerWidth || a.b > innerHeight) out.push('OFF ' + a.n + ' ' + [a.l,a.t,a.r,a.b].map(Math.round));
   // gap between shapes: circles treated as circles
   const gap = (a, b) => { if (a.round && b.round) { const d = Math.hypot((a.l+a.r)/2-(b.l+b.r)/2, (a.t+a.b)/2-(b.t+b.b)/2); return d - a.w/2 - b.w/2; }
     const dx = Math.max(a.l - b.r, b.l - a.r, 0), dy = Math.max(a.t - b.b, b.t - a.b, 0); return dx || dy ? Math.hypot(dx, dy) : -Math.min(a.r - b.l, b.r - a.l, a.b - b.t, b.b - a.t); };
-  for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) { const g = gap(rs[i], rs[j]); const sticks = /^ts/.test(rs[i].n) || /^ts/.test(rs[j].n); if (g < (sticks ? 0 : 6)) out.push((g < 0 ? 'OVERLAP ' : 'CLOSE ') + rs[i].n + ' & ' + rs[j].n + ' gap ' + Math.round(g)); }
+  for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) { const g = gap(rs[i], rs[j]); const sticks = /^ts/.test(rs[i].n) || /^ts/.test(rs[j].n); if (g < (sticks ? 2 : 6)) out.push((g < 0 ? 'OVERLAP ' : 'CLOSE ') + rs[i].n + ' & ' + rs[j].n + ' gap ' + Math.round(g)); }
   return out.join('\\n') || 'ok';
 })()`;
 ws.onopen = async () => {

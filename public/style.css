@@ -1488,3 +1488,14 @@ html.touchplay #touchUI .tbtn.t3 { right: calc(330px + 70px / var(--tz, 1)); bot
 html.touchplay #viewlabel { left: calc(240px / var(--hudz, 1)); right: calc((330px * var(--tz, 1) + 70px) / var(--hudz, 1)); transform: none; max-width: none; bottom: calc(92px / var(--hudz, 1)); font-size: 11px; line-height: 1.4; }
 html.touchplay #cambar { top: calc(60px / var(--hudz, 1)); bottom: auto !important; } /* (!important: free play's "above its hint bar" rule) */
 #touchUI .tbtn.t6 { top: auto; bottom: 158px; } /* ⟲ TILT: above the move stick (the top-row rule pinned it onto the objective card) */
+/* Fire rings round both phone sticks (he asked 2026-11-17, touch.js FIRE_IN): a thin red ring just outside each stick;
+   slide a thumb onto it to shoot, and it glows while you do. The aim stick turns blue while aimed in (a quick tap). */
+#touchUI.rings .tstick::before { content: ''; position: absolute; inset: -14px; border-radius: 50%; pointer-events: none;
+  border: 3px solid rgba(235,80,64,0.42); box-shadow: inset 0 0 10px rgba(235,80,64,0.18), 0 0 8px rgba(235,80,64,0.15);
+  transition: border-color 0.08s, box-shadow 0.08s, background 0.08s; }
+#touchUI.rings .tstick.firing::before { border-color: rgba(255,96,74,0.95); background: rgba(210,50,38,0.18);
+  box-shadow: inset 0 0 16px rgba(255,80,60,0.45), 0 0 18px rgba(255,70,50,0.6); }
+#touchUI.rings .tstick.firing i { box-shadow: 0 0 0 2px rgba(255,120,100,0.9), 0 0 14px rgba(255,70,50,0.7); }
+#touchUI #tsRight.aimed { opacity: 1; border-color: rgba(120,190,255,0.95); box-shadow: inset 0 0 18px rgba(120,190,255,0.3), 0 0 16px rgba(120,190,255,0.45); }
+#touchUI #tsRight.aimed i { background: radial-gradient(circle at 38% 30%, rgba(235,246,255,0.95) 0%, rgba(140,200,255,0.75) 30%, rgba(60,130,210,0.65) 100%); }
+#touchUI.rings .tbtn.l1 { left: max(180px, calc(env(safe-area-inset-left) + 160px)); } #touchUI.rings .tbtn.l2 { left: max(230px, calc(env(safe-area-inset-left) + 210px)); } /* lean: clear of the move stick's ring (the left FIRE's place is free now) */

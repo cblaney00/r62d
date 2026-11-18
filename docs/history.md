@@ -473,3 +473,13 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - `tests/phonebuttons.mjs <port> <url>` (set up like thumbs.mjs): every button shown at once on 7 phone/tablet sizes,
   on a body (lean lit either way, ACTION with a word, tilt) and on cameras; prints buttons that overlap, sit under 6 px
   apart or leave the screen. Expected: only AIM on FIRE's corner (on purpose) and the 6 px top row.
+
+## Phone fire rings (2026-11-17, his idea)
+- FIRE ×2 and AIM ×2 gone on phones: a red ring round each stick (`#touchUI.rings .tstick::before`, glows with `.firing`).
+  A thumb past `FIRE_IN` (1.12 × the stick's travel) shoots until back under `FIRE_OUT` (1.0). He picked: quick tap on
+  the aim stick = aim in/out; double-tap and hold the move stick = sprint (the edge push sprint is Buttons mode only).
+- Lesson: the aim stick is absolute (distance = reach), so a flick through its far zone threw the crosshair to ~2.3× its
+  distance (257 → 600 px in the test). The distance is now taken from 120 ms before reaching the ring.
+- Lean buttons moved right in Rings mode (they touched the move stick's ring); ring inset 14 px so the aim ring clears ACTION.
+- Tests: `SCENARIO=rings node tests/thumbs.mjs` (shots on each ring, steady distance, aim turns, tap aim in/out, landing on the
+  ring, double-tap sprint, two thumbs); `tests/phonebuttons.mjs` counts the rings; phonefree/thumbmatch use Buttons mode.

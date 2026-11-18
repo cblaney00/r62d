@@ -55,7 +55,7 @@ async function run() {
   ctx = (await call('browsingContext.create', { type: 'tab' })).context;
   await call('browsingContext.setViewport', { context: ctx, viewport: { width: +W, height: +H } });
   await call('browsingContext.navigate', { context: ctx, url, wait: 'complete' }); await sleep(1500);
-  await js(`localStorage.setItem('r62d-name', 'Thumbs'); localStorage.removeItem('r62d-penv'); location.reload(); true`); await sleep(3000);
+  await js(`localStorage.setItem('r62d-name', 'Thumbs'); localStorage.setItem('r62d-fire', 'buttons'); /* (this test presses the FIRE / AIM buttons: the Settings choice; tests/thumbs.mjs SCENARIO=rings covers the fire rings) */ localStorage.removeItem('r62d-penv'); location.reload(); true`); await sleep(3000);
   for (let i = 0; i < 20 && !(await js("!!document.getElementById('splash')")); i++) await sleep(500);
   for (let i = 0; i < 6 && await js("!document.getElementById('splash').classList.contains('hidden')"); i++) { await touch(finger([[W / 2, H / 2], [W / 2, H / 2]])); await sleep(1500); }
   await js(`document.exitFullscreen && document.exitFullscreen().catch(() => {}); Element.prototype.requestFullscreen = () => Promise.reject(); true`); await sleep(500);
