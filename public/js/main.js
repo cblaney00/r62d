@@ -65,7 +65,9 @@ let DPR = 1, VW = 0, VH = 0;
 
 // Graphics quality (saved per computer): how many pixels get drawn and how many extras are added.
 const GFX = {
-  low:    { scale: 0.6,  fog: 0.3,  parts: 0.35, smoke: 7,  shade: false, rays: 0.5, map: 1.25, grey: 0.75, raised: false },
+  // Low looks like Medium (he asked 2026-11-18: the old Low was too ugly to play on a phone): the same picture, a few
+  // fewer particles and smoke puffs. (The old Low was scale 0.6, fog 0.3, flat lighting, map 1.25, no raised walls.)
+  low:    { scale: 0.8,  fog: 0.4,  parts: 0.4,  smoke: 8,  shade: true, rays: 0.7, map: 2, grey: 1 },
   medium: { scale: 0.8,  fog: 0.4,  parts: 0.6,  smoke: 11, shade: true, rays: 0.7, map: 2, grey: 1 },
   high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1, map: 2.5, grey: 1.5 }, // (no soft blurred edges: with the tilt they cost a third of the frame on his GPU)
   ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2, map: 3, grey: 1.5, blur: true },
@@ -77,7 +79,7 @@ if (!GFX[gfxName] && gfxName !== 'auto') gfxName = 'auto';
 let autoLevel = (() => {
   try { const s = localStorage.getItem('r62d-gfx-auto'); if (GFX[s]) return s; } catch {}
   const weak = (navigator.hardwareConcurrency || 4) <= 4 || (navigator.deviceMemory && navigator.deviceMemory <= 4);
-  return weak || isTouch ? 'medium' : 'high'; // phones start at Medium (map pictures at High take a lot of a phone browser's memory)
+  return isTouch ? 'low' : weak ? 'medium' : 'high'; // phones start at Low (since 2026-11-18 it looks like Medium, a little lighter; map pictures at High take a lot of a phone browser's memory)
 })();
 const gfxLevel = () => (gfxName === 'auto' ? autoLevel : gfxName);
 let gq = GFX[gfxLevel()];
@@ -1307,7 +1309,7 @@ const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'sprint', 'walk',
   ['MENUS & FREE PLAY', ['settings', 'pause', 'opNext', 'opPrev', 'opGrid']]];
 const xh = { dynamic: true }; // (the reticle is the gun's sight now, not a setting: drawReticle in crosshair.js)
 // graphics: fullscreen switch + quality presets
-const GFX_HINT = { auto: 'Auto — picks the quality for this computer and lowers it by itself if the game can\'t keep up.', low: 'Low — for weak computers: fewer pixels, fewer particles, flat lighting.', medium: 'Medium — a little softer picture, runs well on most computers.', high: 'High — full sharpness. Recommended.', ultra: 'Ultra — extra-sharp, smoothest edges and most effects. Needs a strong computer.' };
+const GFX_HINT = { auto: 'Auto — picks the quality for this computer and lowers it by itself if the game can\'t keep up.', low: 'Low — the Medium picture with fewer particles and smoke: lightest on phones.', medium: 'Medium — a little softer picture, runs well on most computers.', high: 'High — full sharpness. Recommended.', ultra: 'Ultra — extra-sharp, smoothest edges and most effects. Needs a strong computer.' };
 let appWin = false; // play.sh's window on this desktop answers /api/window
 const winSwitch = () => appWin || !!(window.r62dApp && window.r62dApp.toggleFull);
 const appFull = () => innerWidth >= screen.width - 1 && innerHeight >= screen.height - 1;
@@ -2335,8 +2337,14 @@ function menuRest(nowMs) {
   if (!covered) return false;
   lastT = nowMs; screens(s, ph, nowMs / 1000); return true;
 }
+// Phones draw at most 60 frames a second (he asked 2026-11-18: a Samsung A35 got warm after a few minutes; its screen
+// runs at 120, so the game drew twice as much as needed). Computers are not limited.
+const FRAME_MIN = isTouch ? 1000 / 60 - 2 : 0;
+let frameAt = 0;
 function frame(nowMs) {
   requestAnimationFrame(frame);
+  if (FRAME_MIN && nowMs - frameAt < FRAME_MIN) return;
+  frameAt = nowMs;
   if (menuRest(nowMs)) return;
   const rawGap = nowMs - lastT, dt = Math.min(0.05, rawGap / 1000); lastT = nowMs;
   const now = nowMs / 1000;

@@ -668,3 +668,6 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Crosshair size (he asked, 2026-11-18): `drawReticle` (crosshair.js) is 20% smaller and takes a size `sz`; main.js
   `xhSize` = view part (`XH_REF_H` 470 × REST_ZOOM / viewH, 0.45..1: shrinks only past the widest resting view) ×
   distance part (1 within 3 m, −2.5%/m, down to 0.55). The gap is NOT scaled: still the true cone (his pick).
+- Phone heat / Low (he asked, 2026-11-18: Samsung A35 warm after a few minutes; old Low unplayable): `FRAME_MIN` in
+  main.js skips frames on phones past 60/s (the A35 screen is 120 Hz). `GFX.low` = Medium's picture (scale 0.8, fog
+  0.4, shading, map 2, raised walls) with parts 0.4 / smoke 8; Auto starts phones on Low.
