@@ -1063,6 +1063,7 @@ function trySlide() { if (!st.pred || !st.pred.spr || st.pred.scd > 0 || !st.me 
 // sprint with S, A or D (and no W) is sent as sprint + W alone, so you run where you aim
 // Sprint on a computer (he asked 2026-11-18: 8-directional, never following the mouse; W+A sprints north-west): the keys pick one
 // of the eight directions on the screen and you turn to face it and sprint that way; the world angle, or null
+const SPRINT_TURN_VIS = 24; // how fast what you see turns after a sprint-direction snap (per second; ~0.1 s to get there)
 function sprintDiag() {
   const me = st.me;
   if (isTouch || gpRecent() || !me || me.ct !== 'body' || !me.a || me.dn || !keys.has('sprint') || steadying() || st.tv) return null;
@@ -2414,7 +2415,7 @@ function frame(nowMs) {
       view = b && b.pe ? { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: 1.9, range: 520, near: 6, kind: 'drone', bird: 1 } : { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: b ? 260 : 230, near: 0, kind: 'drone', low: !b, bird: b ? 1 : 0 };
     }
     else if (ctrl === 'cam') { const c = s.ents.find(e => e.id === me.fi); if (c) view = feedView(c, me); }
-    else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: st.longV ? LONG_R : 1100, near: 26, kind: 'body', low: (st.pred.pr || 0) >= 1, eye: EYE_STANCE[(st.pred.pr || 0) >= 1 ? 2 : me.cr ? 1 : 0] + (st.pred.up ? furnTopAt(st.map, st.pred.x, st.pred.y) : 0) }; } // you see from your (leaning) head, at your eyes' height (furniture.js)
+    else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aimVis ?? st.aim, fov: fovFor(me), range: st.longV ? LONG_R : 1100, near: 26, kind: 'body', low: (st.pred.pr || 0) >= 1, eye: EYE_STANCE[(st.pred.pr || 0) >= 1 ? 2 : me.cr ? 1 : 0] + (st.pred.up ? furnTopAt(st.map, st.pred.x, st.pred.y) : 0) }; } // you see from your (leaning) head, at your eyes' height (furniture.js)
     if (view && view.kind === 'body' && me.ro && me.ro[0] && !me.ro[8] && st.map.ropes[me.ro[1]]) { const r = st.map.ropes[me.ro[1]]; view.ang = r.out; view.fov = Math.PI * 0.98; view.near = 6; } // on a rope, not level with a window: you see out, not in (he chose R6's rule)
   } else if (inGame && me) {
     let mates = s.players.filter(p => p.a && p.sq === me.sq && p.id !== me.id);
@@ -2464,7 +2465,15 @@ function frame(nowMs) {
     { const R = ropeOf(); if (R) st.aim = ropeAimLimit(R, st.aim); }
     if (r3on() && rope3d.active()) { const a = rope3d.aim(); if (a) { st.aim = a.ang; aimOff = { x: a.x - st.pred.x, y: a.y - st.pred.y }; st.r3aim = a; } } else st.r3aim = null; // the 3D rope view: where its crosshair is
     if (now < (st.dazeUntil || 0)) st.aim += Math.sin(now * 6.3) * 0.05 + Math.sin(now * 2.1) * 0.04; // dazed: the aim sways
-    if (view.kind === 'body') { const d = sprintDiag(); if (d !== null) st.aim = d; } // sprinting a screen diagonal: you face the way you run (the crosshair comes back when you stop)
+    if (view.kind === 'body') { const d = sprintDiag(); if (d !== null) st.aim = d; // sprinting a screen diagonal: you face the way you run (the crosshair comes back when you stop)
+      // (he asked 2026-11-18: the sprint turn stays instant underneath, but looks smoother) a picked sprint direction, or
+      // letting go of it, glides what you SEE (your body, your sight cone) round in about a tenth of a second; st.aim
+      // (what the server and the gun go by) still snaps. Shooting or aiming in ends the glide at once.
+      const dk = d === null ? null : Math.round(d * 100); if (dk !== st.sprDk) { st.sprDk = dk; if (st.aimVis != null) st.visGlide = now + 0.35; }
+      if (mouse.l || keys.has('fire') || adsHeld()) st.visGlide = 0;
+      if (st.aimVis == null || now >= (st.visGlide || 0)) st.aimVis = st.aim;
+      else { const df = angDiff(st.aim, st.aimVis); st.aimVis += df * (1 - Math.exp(-dt * SPRINT_TURN_VIS)); if (Math.abs(df) < 0.01) { st.aimVis = st.aim; st.visGlide = 0; } }
+    } else st.aimVis = null;
   } else if (view && view.kind === 'cam') {
     if (st.lastCam !== view.cam.id) { // switching cameras: start from that camera's current direction
       st.lastCam = view.cam.id; st.aim = view.cam.ag || 0; view.ang = st.aim; audio.foley('camSwitch');
@@ -3258,7 +3267,7 @@ function draw(s, view, now, dt) {
     const isMe = me && sp.id === me.id;
     let p = isMe ? { ...sp } : interp(sp.id, 'players');
     if (!p || p.x === undefined) continue;
-    if (isMe && me.ct === 'body') { p.x = st.pred.x; p.y = st.pred.y; p.ag = st.aim; p.gt = st.pred.gait; }
+    if (isMe && me.ct === 'body') { p.x = st.pred.x; p.y = st.pred.y; p.ag = st.aimVis ?? st.aim; p.gt = st.pred.gait; }
     const ally = p.tm === side;
     const a = anim(p.id);
     const moved = Math.hypot(p.x - a.lx, p.y - a.ly);

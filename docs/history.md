@@ -777,3 +777,6 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 
 ## 2026-11-18 — less squish on a rope
 - He asked: the view squishes vertically a little less when climbing a wall on a rope. `ROPE_TILT` (main.js) 34 → 25 degrees; look.js `tilt.update` `calm` now divides by 25 so the rope view's lean stays as calm as before.
+
+## 2026-11-18 — smoother-looking sprint turns
+- He asked: sprinting snaps your direction at once; keep how it works but make it look smoother. `st.aim` still snaps (server `k.sa`, the gun); a new `st.aimVis` (main.js, after `sprintDiag`) glides at `SPRINT_TURN_VIS` 24/s for 0.35 s after the sprint direction is picked, changed or let go, and is what your own body (`p.ag`) and your sight cone (`view.ang`) use. Shooting or aiming in ends the glide. Checked in a hidden browser: aim 0 → -45 at once, the drawn facing 0 → -31 → -41 → -45.
