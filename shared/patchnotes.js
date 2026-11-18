@@ -119,4 +119,6 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'bots', t: 'Every bot is its own person: ten per rank from Copper to Champion, no name twice, each with their own play style (lobby: hover or tap a bot) and habits: rushers, anchors, flankers, roof lovers, wallbangers.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'pickup', t: 'Hold Use on a gadget you placed (wire, claymore, shield, traps, cameras, covers, stations...) to pick it back up and place it again. Not once it has gone off or been damaged, never a teammate\'s.', v: 0 },
   { d: '2026-11-18', k: 'op', id: 'wraith', t: 'Wraith\'s Pulse Scanner: one scan (up to 4 s) from a full charge, then 50 s to charge back to 100%. It used to allow two scans and refill in about 23 s.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'look', t: 'Lying down: two real legs, flat like a sniper when you crawl forward or sitting up with legs out when you tap back (only a look).', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'ropes', t: 'On a rope the walls nearby show real brick, plaster and concrete, windows reflect the sky and boards show grain and nails.', v: 0 },
 ];

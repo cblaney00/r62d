@@ -633,3 +633,11 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   `blaney/homelab-r62d-on`). That is a config change for Lando. Game side: `/api/addr` now puts `R62D_PUBLIC_URL` (the
   NixOS module sets it to http://192.168.1.76:6262) first with its own join code; before, the homelab showed its own
   unreachable 192.168.100.x address and code.
+
+## Prone poses, rope wall surfaces (2026-11-18, he asked)
+- Lying down: `lyingLegs` (sprites.js) draws two real legs; server `p.pose` ('snipe'/'sit' from moving forward/back
+  against the aim) → snapshot `pn` 1/2; client blends `a.sitK`, `legRoom` shortens legs at walls. `tests/pronepose.js`.
+- Rope view, part 1: `ropeLook` + `drawTex` (look.js) fill outside faces within 12 cells of the rope with pattern tiles
+  (brick, plaster, concrete, glass, boards) mapped per face. Not done yet: the hanging operator, the ground/grass near
+  the wall foot, and the "swoop through the frame" window entry (his pick); `tests` helpers in the scratchpad were
+  mkrope/mkhang (rope shots: tp to a rope, F, W/S; climb-in needs moving in front of the window first).

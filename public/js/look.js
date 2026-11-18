@@ -8,6 +8,77 @@ import { cellBelow, cellAbove } from '/shared/map.js';
 import { hash } from './textures.js';
 
 export const looks = { light: true }; // switched by Settings → Screen → Room lighting (main.js)
+// On a rope (he asked 2026-11-18: the rappel view should feel as premium as the rest): the outside walls, windows and
+// boards near the rope get real surfaces, not only lines. main.js sets this each frame (on: how far into the rope view).
+export const ropeLook = { on: 0, x: 0, y: 0, r: 0 };
+const TEXD = new Set(['b', 'p', 'c', 'g', 'w', 's']);
+// The surfaces, as tiles that repeat: 2 canvas px per world px along the wall (u), 256 px for one storey up it (v; v 0 at
+// the top of the storey, 256 at its foot). Drawn over the face's own lit colour, so mostly see-through light and shade.
+let SURF = null;
+function surfaces() {
+  if (SURF) return SURF;
+  const mk = (w, h, f) => { const c = document.createElement('canvas'); c.width = w; c.height = h; f(c.getContext('2d'), w, h); return c; };
+  const R = (a, b, k) => hash(a, b, k);
+  const grime = (x, w, h, a) => { const g = x.createLinearGradient(0, h * 0.72, 0, h); g.addColorStop(0, 'rgba(24,20,16,0)'); g.addColorStop(1, `rgba(24,20,16,${a})`); x.fillStyle = g; x.fillRect(0, h * 0.72, w, h * 0.28); }; // dirt splashed up from the ground
+  const speck = (x, w, h, n, a, s) => { for (let i = 0; i < n; i++) { const l = R(i, s, 1) < 0.5; x.fillStyle = l ? `rgba(255,250,240,${a})` : `rgba(10,8,6,${a})`; x.fillRect(R(i, s, 2) * w, R(i, s, 3) * h, 1 + R(i, s, 4) * 1.5, 1 + R(i, s, 5) * 1.5); } };
+  SURF = {
+    b: mk(128, 256, (x, w, h) => { // brick: 14 courses a storey, stretcher bond, each brick its own tone, recessed mortar
+      const n = 14, ch = h / n, bw = 32;
+      for (let r = 0; r < n; r++) for (let i = -1; i < w / bw + 1; i++) {
+        const ox = (r & 1) * bw / 2, X = i * bw + ox, v = R(i & 3, r, 7) - 0.5, tone = v > 0 ? `rgba(255,226,196,${(v * 0.22).toFixed(3)})` : `rgba(30,12,6,${(-v * 0.3).toFixed(3)})`;
+        x.fillStyle = tone; x.fillRect(X + 1.5, r * ch + 1.5, bw - 3, ch - 3);
+        x.fillStyle = 'rgba(255,240,220,0.10)'; x.fillRect(X + 1.5, r * ch + 1.5, bw - 3, 1.2); // its lit top edge
+        x.fillStyle = 'rgba(20,10,6,0.22)'; x.fillRect(X + 1.5, r * ch + ch - 2.6, bw - 3, 1.1); // and its shaded underside
+      }
+      x.fillStyle = 'rgba(196,186,168,0.30)'; for (let r = 0; r <= n; r++) x.fillRect(0, r * ch - 0.8, w, 1.6); // mortar courses
+      for (let r = 0; r < n; r++) for (let i = 0; i <= w / bw + 1; i++) x.fillRect(i * bw + (r & 1) * bw / 2 - 0.8, r * ch, 1.6, ch);
+      speck(x, w, h, 500, 0.08, 3); grime(x, w, h, 0.32);
+    }),
+    p: mk(128, 256, (x, w, h) => { // plaster: a fine grain, soft patches, rain streaks running down
+      speck(x, w, h, 1400, 0.05, 5);
+      for (let i = 0; i < 5; i++) { const g = x.createRadialGradient(R(i, 1, 9) * w, R(i, 2, 9) * h, 0, R(i, 1, 9) * w, R(i, 2, 9) * h, 20 + R(i, 3, 9) * 40); g.addColorStop(0, `rgba(${R(i, 4, 9) < 0.5 ? '255,250,240' : '30,26,20'},0.07)`); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); }
+      for (let i = 0; i < 4; i++) { const X = R(i, 7, 11) * w, g = x.createLinearGradient(0, h * 0.35, 0, h * 0.9); g.addColorStop(0, 'rgba(40,36,30,0.16)'); g.addColorStop(1, 'rgba(40,36,30,0)'); x.fillStyle = g; x.fillRect(X, h * 0.35, 2 + R(i, 8, 11) * 3, h * 0.55); }
+      grime(x, w, h, 0.26);
+    }),
+    c: mk(128, 256, (x, w, h) => { // concrete: board-formed panels, their joints, tie holes, pores
+      speck(x, w, h, 1800, 0.06, 7);
+      for (let i = 0; i < 9; i++) { x.fillStyle = `rgba(${i & 1 ? '255,255,250' : '0,0,0'},0.035)`; x.fillRect(0, i * h / 9, w, h / 9); } // the boards' marks
+      x.fillStyle = 'rgba(20,20,22,0.3)'; x.fillRect(0, h * 0.34, w, 1.4); x.fillRect(0, h * 0.67, w, 1.4); x.fillRect(w - 1.4, 0, 1.4, h);
+      for (const yy of [0.18, 0.5, 0.83]) for (const xx of [0.25, 0.75]) { x.fillStyle = 'rgba(15,15,18,0.45)'; x.beginPath(); x.arc(xx * w, yy * h, 2.4, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,0.12)'; x.beginPath(); x.arc(xx * w + 0.6, yy * h + 0.8, 1.2, 0, 7); x.fill(); }
+      grime(x, w, h, 0.3);
+    }),
+    g: mk(128, 256, (x, w, h) => { // glass: the dark room behind, a soft glow low in it, the sky in the pane, a clean diagonal glint
+      const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(150,180,205,0.30)'); g.addColorStop(0.45, 'rgba(40,52,66,0.25)'); g.addColorStop(1, 'rgba(12,14,18,0.35)'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+      const r = x.createRadialGradient(w * 0.5, h * 0.95, 0, w * 0.5, h * 0.95, h * 0.5); r.addColorStop(0, 'rgba(255,200,140,0.10)'); r.addColorStop(1, 'rgba(255,200,140,0)'); x.fillStyle = r; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w * 0.3, 0); x.transform(1, 0, -0.55, 1, 0, 0); const s = x.createLinearGradient(0, 0, 40, 0); s.addColorStop(0, 'rgba(230,240,255,0)'); s.addColorStop(0.5, 'rgba(230,240,255,0.22)'); s.addColorStop(1, 'rgba(230,240,255,0)'); x.fillStyle = s; x.fillRect(0, 0, 40, h); x.fillRect(56, 0, 12, h); x.restore();
+    }),
+    w: mk(64, 256, (x, w, h) => { // boards: four planks of their own width and tone, grain, gaps and nails at the ends
+      const cuts = [0, 0.27, 0.52, 0.77, 1];
+      for (let i = 0; i < 4; i++) { const y0 = cuts[i] * h, y1 = cuts[i + 1] * h, v = R(i, 3, 13) - 0.5;
+        x.fillStyle = v > 0 ? `rgba(255,220,170,${(v * 0.25).toFixed(3)})` : `rgba(40,20,6,${(-v * 0.3).toFixed(3)})`; x.fillRect(0, y0, w, y1 - y0);
+        for (let j = 0; j < 7; j++) { x.fillStyle = `rgba(40,22,8,${(0.08 + R(i, j, 14) * 0.1).toFixed(3)})`; x.fillRect(0, y0 + 3 + R(i, j, 15) * (y1 - y0 - 6), w, 1); } // grain
+        x.fillStyle = 'rgba(255,230,190,0.16)'; x.fillRect(0, y0 + 1, w, 1.5); x.fillStyle = 'rgba(10,5,2,0.55)'; x.fillRect(0, y1 - 2, w, 2); // lit edge, the gap under it
+        for (const nx of [4, w - 6]) { x.fillStyle = 'rgba(30,30,32,0.85)'; x.beginPath(); x.arc(nx, (y0 + y1) / 2, 1.9, 0, 7); x.fill(); x.fillStyle = 'rgba(200,200,205,0.5)'; x.beginPath(); x.arc(nx - 0.5, (y0 + y1) / 2 - 0.5, 0.8, 0, 7); x.fill(); } }
+    }),
+  };
+  SURF.s = SURF.c; // a sill: stone, like the concrete
+  return SURF;
+}
+const PATS = new WeakMap();
+// the near outside faces with their surface (G.tex, gathered in raisedFrame): one fill each, the tile mapped onto the
+// face by the three corners (the faces are thin, so one flat mapping fits them within a pixel)
+function drawTex(ctx, list, up) {
+  let P = PATS.get(ctx); if (!P) { const S = surfaces(); P = {}; for (const k in S) P[k] = ctx.createPattern(S[k], 'repeat'); PATS.set(ctx, P); }
+  for (const F of list) {
+    const pat = P[F.d]; if (!pat || !pat.setTransform) continue;
+    const z0 = F.f0 || 0, z1 = F.f, s0 = F.nx ? F.ay : F.ax, s1 = F.nx ? F.by : F.bx, ds = s1 - s0; if (Math.abs(ds) < 0.5 || z1 - z0 < 0.01) continue;
+    const A0 = up(F.ax, F.ay, z0), B0 = up(F.bx, F.by, z0), A1 = up(F.ax, F.ay, z1), B1 = up(F.bx, F.by, z1);
+    const Ux = (B0[0] - A0[0]) / ds, Uy = (B0[1] - A0[1]) / ds, Vx = (A1[0] - A0[0]) / (z1 - z0), Vy = (A1[1] - A0[1]) / (z1 - z0);
+    // pattern (u, v) → u / 2 world px along the wall, z = 1 - v / 256 of a storey (whole storeys line up: the tile repeats)
+    pat.setTransform(new DOMMatrix([Ux / 2, Uy / 2, -Vx / 256, -Vy / 256, A0[0] - Ux * s0 - Vx * (z0 - 1), A0[1] - Uy * s0 - Vy * (z0 - 1)]));
+    ctx.fillStyle = pat; ctx.beginPath(); ctx.moveTo(A0[0], A0[1]); ctx.lineTo(B0[0], B0[1]); ctx.lineTo(B1[0], B1[1]); ctx.lineTo(A1[0], A1[1]); ctx.closePath(); ctx.fill();
+  }
+}
 
 // One perspective for everything (he asked 2026-11-14: all assets stay 2D art but must look 3D as the camera tilts, the
 // same way the walls do). Something at height z (floor heights: a wall is 1 = 3.2 m) shows pushed away from the eye
@@ -482,7 +553,7 @@ export function seenGrid(polys, m, spots = []) {
 // distance from the eye (BAND world px), each with its tall things and its walls; the storeys below (fac) and above (up)
 // apart. Each holds everything (for the greyed copy) and, when seen is given, only the pieces whose own spot is seen.
 const BAND = 48;
-const coll = () => ({ paths: new Map(), lowTops: new Map(), topPaths: new Map(), tops: [], under: [], holes: null, dark: null, light: null, glint: null, n: 0 });
+const coll = () => ({ paths: new Map(), lowTops: new Map(), topPaths: new Map(), tops: [], under: [], holes: null, dark: null, light: null, glint: null, tex: null, n: 0 });
 export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false, seen = null, spots = null) { // spots: round areas (world px) whose outside wall pieces show whole (the wall a climber hangs on) // above: also the storeys over this floor (rope camera)
   const K = kept(R, m), cx = cam.x, cy = cam.y, up = (x, y, f) => [x + (x - cx) * h * f, y + (y - cy) * h * f];
   x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(m.W - 1, x1); y1 = Math.min(m.H - 1, y1);
@@ -497,7 +568,9 @@ export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false, seen = 
     let p = G.paths.get(F.c); if (!p) G.paths.set(F.c, p = new Path2D());
     const [ux, uy] = up(F.ax, F.ay, F.f), [vx, vy] = up(F.bx, F.by, F.f);
     if (F.f0) { const [a1, b1] = up(F.ax, F.ay, F.f0), [a2, b2] = up(F.bx, F.by, F.f0); p.moveTo(a1, b1); p.lineTo(a2, b2); } else { p.moveTo(F.ax, F.ay); p.lineTo(F.bx, F.by); } p.lineTo(vx, vy); p.lineTo(ux, uy); p.closePath(); // (a piece off the floor, like a window's lintel, starts at f0)
-    if (F.d) deco(G, F, up); G.n++;
+    const tx = ropeLook.on > 0.05 && TEXD.has(F.d) && (F.e || F.d === 'g' || F.d === 'w' || F.d === 's') && Math.hypot(F.px - ropeLook.x, F.py - ropeLook.y) < ropeLook.r;
+    if (tx) (G.tex || (G.tex = [])).push(F); // near the rope: its surface (drawTex)
+    if (F.d && !(tx && F.d === 'b')) deco(G, F, up); G.n++;
     if (F.hl) { const P = G.holes || (G.holes = new Path2D()); for (const [t, z] of F.hl) { const [hx, hy] = up(F.ax + (F.bx - F.ax) * t, F.ay + (F.by - F.ay) * t, z); P.moveTo(hx + 0.9, hy); P.arc(hx, hy, 0.9, 0, 6.3); } }
   };
   const addTop = (G, r) => {
@@ -590,6 +663,7 @@ function drawColl(ctx, G, pic, R, h, up, plain) {
   const picTop = r => { const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f; pic.drawTo(ctx, X * S, Y * S, w * S, CELL * S, tx, ty, w * s, CELL * s); };
   for (const r of G.under) picTop(r); // boards in windows and doorways: before the faces, so the wall above them covers them from the side
   for (const [c, p] of G.paths) { ctx.fillStyle = c; ctx.fill(p); }
+  if (G.tex && !plain) { const a = ctx.globalAlpha; ctx.globalAlpha = a * Math.min(1, ropeLook.on * 1.5); drawTex(ctx, G.tex, up); ctx.globalAlpha = a; } // near the rope: brick, plaster, glass, boards
   if (G.dark && !plain) { ctx.lineWidth = 0.6; ctx.strokeStyle = 'rgba(20,16,14,0.32)'; ctx.stroke(G.dark); ctx.strokeStyle = 'rgba(235,228,214,0.32)'; ctx.stroke(G.light); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(210,230,250,0.22)'; ctx.stroke(G.glint); }
   if (G.holes) { ctx.fillStyle = 'rgba(9,7,5,0.95)'; ctx.fill(G.holes); if (!plain) { ctx.lineWidth = 0.4; ctx.strokeStyle = 'rgba(230,190,130,0.55)'; ctx.stroke(G.holes); } } // bullet holes in boards: dark punctures with a splintered light rim (you see and shoot through them, as on the map)
   for (const [c, T2] of G.topPaths) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); } // wall tops: plain colour

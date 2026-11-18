@@ -8,7 +8,7 @@ import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DR
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf, hitR, fireAuto } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
-import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, setPersp, liftOf, liftBody, persp, lifted, withPersp, furnTop, wallIns } from './look.js';
+import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, ropeLook, setPersp, liftOf, liftBody, persp, lifted, withPersp, furnTop, wallIns } from './look.js';
 const addL = (a, b) => [a[0] + b[0], a[1] + b[1]];
 import { S, setMapScale } from './textures.js';
 import { COLS, rgba, lighten, squadCol, setCols, SWATCHES, okHex, DEFAULT_COLS } from './teamcol.js';
@@ -3299,6 +3299,7 @@ function draw(s, view, now, dt) {
   // flat (full up to RAISE_FULL world px tall, none past RAISE_NONE): there they are a few pixels, and on his graphics
   // card any raised-wall drawing over a whole far view halved the frame rate (he asked 2026-11-09: no lag at any zoom)
   let rf = null; // this frame's raised walls, worked out once for both passes (look.js keeps the pieces between frames)
+  { const onR = !!(st.me && st.me.ro && st.me.ro[0]); ropeLook.on = onR ? st.rt || 0 : 0; ropeLook.x = st.pred.x; ropeLook.y = st.pred.y; ropeLook.r = 12 * CELL; } // (the walls near you on a rope get their surfaces)
   const raise = inGame && RH > 0.002 && rOn ? (c, pass) => { // pass 'fog' (all, greyed by #fog) or 'lit'
     const t0 = performance.now(), rm = st.rend.map;
     if (!rf) {
