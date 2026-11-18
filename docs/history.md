@@ -726,3 +726,4 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   Harbor 58, Villa 40, Lodge 35 (as before within noise; Villa and Lodge were already defence-sided).
 - Operator select (he asked): clicking a site / spawn (list or map) sends the choice and `place` at once; `#lockBtn`
   hidden in that step, so LOCK IN is only for the operator + loadout step.
+- HOIST (he asked): `hatchToBlast`: the grapple under a shut (not reinforced) hatch calls `breakHatch`, a frag-kind 'boom' (grenade loud) and noise, then climbs (+0.5 s); reinforced: deny, no charge. Bots too. `node tests/hoisthatch.js`.

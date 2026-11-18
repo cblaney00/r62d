@@ -139,4 +139,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'map', id: 'embassy', t: 'The Embassy: two breakable walls into each site room (was one) and one barricade per defender a round (was unlimited), for the attackers (40% of rounds before).', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'stairsight', t: 'Seeing up and down stairs goes by height: the floor above covers the lower part of every staircase, so from the top you see the whole flight only near its edge, and climbing you see more of the floor above the higher you get. It stops bullets the same way.', v: -1 },
   { d: '2026-11-18', k: 'map', id: 'stairland', t: 'Every map: furniture cleared off the space at both ends of each staircase, and crate stacks near the stair landings that could be watched from far away.', v: 0 },
+  { d: '2026-11-18', k: 'op', id: 'hoist', t: 'HOIST: under a shut hatch his grapple charge blows it open first (as loud as a grenade) and he climbs up through it; a reinforced hatch stops it.', v: 1 },
 ];

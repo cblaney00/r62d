@@ -1324,6 +1324,14 @@ export class Game {
     }
     return null;
   }
+  // HOIST (he asked 2026-11-18): a shut hatch right above you that his grapple charge can blow open (not one the
+  // defenders reinforced: that one comes back as { reinforced: true })
+  hatchToBlast(p) {
+    const m = this.map, fl = floorAt(m, p.x, p.y);
+    let best = null, bd = GRAPPLE_REACH;
+    for (const h of m.hatches) { if (h.peep || hatchOpen(m, h) || floorAt(m, h.bx, h.by) !== fl) continue; const d = Math.hypot(h.bx - p.x, h.by - p.y); if (d <= bd) { bd = d; best = h; } }
+    return best && m.tiles[best.cells[0]] === T.HATCHR ? { reinforced: true, h: best } : best;
+  }
   // LOCKJAW: the shut hatch at your feet (on top) or right above you (underneath)
   hatchToRig(p) {
     const shut = h => h && !h.peep && !hatchOpen(this.map, h) && !this.ents.some(e => e.type === 'htrap' && e.rig === h.id);
@@ -2219,9 +2227,14 @@ export class Game {
       used(); this.events.push({ e: 'snd', s: 'place', x: r1(x), y: r1(y) }); this.noise(x, y, team, 260);
     }
     else if (id === 'grapple') { // HOIST (he asked): up through an open hatch above you, or onto the roof from an outside wall
-      const to = this.grappleTarget(p);
+      let to = this.grappleTarget(p), blast = 0;
+      if (!to) { // under a shut hatch: the charge on the hook blows it open first (as loud as a grenade), then up he goes
+        const h = this.hatchToBlast(p);
+        if (h && h.reinforced) { this.events.push({ e: 'deny', id: p.id, why: 'That hatch is reinforced: the grapple charge can\'t break it' }); return; }
+        if (h) { this.breakHatch(h.id); this.events.push({ e: 'boom', x: r1(h.x), y: r1(h.y), r: 26, kind: 'frag' }); this.events.push({ e: 'boom', x: r1(h.bx), y: r1(h.by), r: 18, kind: 'stun' }); this.noise(h.bx, h.by, p, 900); to = this.grappleTarget(p); blast = 0.5; }
+      }
       if (!to) { this.events.push({ e: 'deny', id: p.id, why: 'Stand under an open hatch, or outside facing the building\'s wall, to grapple up' }); return; }
-      p.grapple = { t: 0, dur: to.roof ? GRAPPLE_ROOF : GRAPPLE_T, x: to.x, y: to.y, sx: p.x, sy: p.y }; p.adsT = 0; p.reloadT = 0;
+      p.grapple = { t: 0, dur: (to.roof ? GRAPPLE_ROOF : GRAPPLE_T) + blast, x: to.x, y: to.y, sx: p.x, sy: p.y }; p.adsT = 0; p.reloadT = 0;
       used(); this.events.push({ e: 'snd', s: 'rope', x: r1(p.x), y: r1(p.y), id: p.id }); this.noise(p.x, p.y, team, 420);
     }
     else if (id === 'htrap') { // LOCKJAW (he asked): rig a shut hatch; the first attacker to open it or come through is stunned and spotted

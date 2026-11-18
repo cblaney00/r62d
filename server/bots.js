@@ -1268,7 +1268,7 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
     if (!!(p.input && p.input.crouch) === gl.down) { useAbility(); done(6); ai.drillGoal = null; teamSay(game, p, gl.down ? 'Peephole over the objective.' : 'Peephole under the objective.', 'drill'); }
     return true;
   }
-  if (abId === 'grapple') { if (!enemy && ok() && lb.f > lp.f && !p.grapple && game.grappleTarget(p) && Math.random() < dt * 2) { useAbility(); done(5); } return; }
+  if (abId === 'grapple') { if (!enemy && ok() && lb.f > lp.f && !p.grapple && (game.grappleTarget(p) || (() => { const h = game.hatchToBlast(p); return h && !h.reinforced; })()) && Math.random() < dt * 2) { useAbility(); done(5); } return; }
   if (abId === 'htrap') { if (ok() && game.phase === PHASE.PREP && game.hatchToRig(p)) { useAbility(); done(3); } return; }
   if (abId === 'dropcharge') {
     if (ok() && heard && game.phase === PHASE.ACTION) { const h = localPos(game.map, ai.heard.x, ai.heard.y); if (h.f === lp.f - 1 && Math.hypot(h.x - lp.x, h.y - lp.y) < 3 * PX_PER_M && game.floorCharge(p)) { useAbility(); done(8); } }
