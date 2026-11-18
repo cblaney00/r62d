@@ -502,6 +502,7 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   window the menus shrink to 80% (laid out for 900 tall), so 11–13 px print showed at 8–10 px; on phones menus shrink to
   0.56–0.64 and text showed at 4–9 px (the free play panel and pause menu were shrunk twice: inside #hud, and the
   pause/quit `.overlay` and its `.menu` both zoomed).
+- Follow-up (he asked): the corner buttons (fullscreen/settings/leave) keep their old size (#corner left out of the floor); free play's panel has a bigger floor (`#freeOps { --minpx: 15px }`, 13 on phones).
 - Fix: every font size in style.css is `max(<size>, var(--mf))`. `--mf` is 0 except inside the menu panels (end of
   style.css), where it is `--minpx` (12.5 px PC, 12 px touch) divided by the menu zoom, so the HUD and phone buttons are
   untouched. `small`/`kbd` get the floor too. New CSS must keep the `max(…, var(--mf))` form.

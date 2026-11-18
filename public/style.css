@@ -1537,11 +1537,11 @@ html.touchplay.firerings:has(#touchUI [data-id="next"]:not(.hidden)) #chatLog di
    phone buttons keep their own sizes. tests/textsize.mjs lists any text that still ends up too small. */
 :root { --minpx: 12.5px; --minz: 0.6; --mf: 0px; }
 html.touch { --minpx: 12px; --minz: 0.5; }
-#lobby, #splash > *, #select, #endscreen, .overlay > *, #settings, #pause, #quitDlg, #loading > *, #corner, #help, #conn, #freeOps, #tutInfo, .tutInfo {
+#lobby, #splash > *, #select, #endscreen, .overlay > *, #settings, #pause, #quitDlg, #loading > *, #help, #conn, #freeOps, #tutInfo, .tutInfo {
   --mf: calc(var(--minpx) / max(var(--uiz, 1), var(--minz))); font-size: max(1em, var(--mf)); /* (text with no size of its own) */
 }
-html:not(.fitui) #lobby, html:not(.fitui) #splash > *, html:not(.fitui) #select, html:not(.fitui) #endscreen, html:not(.fitui) .overlay > *, html:not(.fitui) #settings, html:not(.fitui) #pause, html:not(.fitui) #quitDlg, html:not(.fitui) #loading > *, html:not(.fitui) #corner, html:not(.fitui) #help, html:not(.fitui) #conn, html:not(.fitui) #freeOps { --mf: var(--minpx); }
-:where(#lobby, #splash, #select, #endscreen, .overlay, #settings, #corner, #help, #conn, #freeOps) :is(small, sub, sup, kbd) { font-size: max(0.83em, var(--mf)); } /* (the browser's own "smaller" for these) */
+html:not(.fitui) #lobby, html:not(.fitui) #splash > *, html:not(.fitui) #select, html:not(.fitui) #endscreen, html:not(.fitui) .overlay > *, html:not(.fitui) #settings, html:not(.fitui) #pause, html:not(.fitui) #quitDlg, html:not(.fitui) #loading > *, html:not(.fitui) #help, html:not(.fitui) #conn, html:not(.fitui) #freeOps { --mf: var(--minpx); }
+:where(#lobby, #splash, #select, #endscreen, .overlay, #settings, #help, #conn, #freeOps) :is(small, sub, sup, kbd) { font-size: max(0.83em, var(--mf)); } /* (the browser's own "smaller" for these) */
 /* With the bigger small print: free play's panel scrolls as one page (its title and CLOSE stay on top) and long gun
    rows wrap; on a phone Settings fills the screen instead of a small box in the middle */
 #freeOps { overflow-y: auto; overscroll-behavior: contain; }
@@ -1555,3 +1555,6 @@ html.touch #settings .srow { flex-wrap: wrap; row-gap: 8px; } html.touch #settin
 #pause .menu > *, #quitDlg .menu > * { flex-shrink: 0; } /* (the menu scrolls when it is taller than the screen; its buttons keep their height) */
 html.touch #freeOps .foOps { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
 html.touch #mapPick b { white-space: normal; letter-spacing: 0.02em; line-height: 1.1; }
+/* Free play's operators / guns / god mode panel (he asked 2026-11-17: its text was still barely readable): bigger
+   small print there than in the other menus. The corner buttons (fullscreen, settings, leave) keep their old size. */
+#freeOps { --minpx: 15px; } html.touch #freeOps { --minpx: 13px; }
