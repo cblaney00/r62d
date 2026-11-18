@@ -286,7 +286,9 @@ export function touchContext(c) {
     const el = ui.querySelector(`[data-id="${id}"]`), want = now - ctxSeen[id] < 400 || el.classList.contains('on');
     if (el.classList.contains('hidden') === want) el.classList.toggle('hidden', !want);
   }
-  for (const [id, d] of [['leanL', -1], ['leanR', 1]]) { const el = ui.querySelector(`[data-id="${id}"]`); el.classList.toggle('hidden', !c.body); el.classList.toggle('act', c.lean === d); } // lean: only on your own body; lit while leaning that way
+  for (const [id, d] of [['leanL', -1], ['leanR', 1]]) { const el = ui.querySelector(`[data-id="${id}"]`); el.classList.toggle('hidden', !c.body); el.classList.toggle('leaning', c.lean === d); } // lean: only on your own body; lit while leaning that way
+  if (!c.body && adsLatch) setAds(false); for (const el of ui.querySelectorAll('.tbtn.aim')) if (el.classList.contains('hidden') === !!c.body) el.classList.toggle('hidden', !c.body); // AIM: only on your own body too (it does nothing on a drone or camera, and the camera arrows need its place on small phones)
+  // (the lit lean is 'leaning', not 'act': 'act' is ACTION's class, and it moved the lean button onto ACTION beside FIRE)
   const cr = ui.querySelector('[data-id="crouch"]'), cl = c.drone ? 'sprint' : 'crouch'; // on a drone the crouch button sprints
   if (cr.dataset.ic !== cl) { cr.dataset.ic = cl; cr.innerHTML = ICONS[cl]; cr.setAttribute('aria-label', cl.toUpperCase()); }
   for (const [id, n] of [['skill', c.badge.skill], ['gadget', c.badge.gadget], ['view', c.badge.view]]) { // how many are left, on the button itself

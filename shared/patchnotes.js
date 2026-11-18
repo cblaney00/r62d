@@ -99,4 +99,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-17', k: 'mech', id: 'compass', t: 'The bomb-site finder under the score bar is one thin line now, so you see more of the map round you.', v: 0 },
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'A new glass look everywhere: buttons, sticks, the match HUD and every menu are frosted glass with a soft sheen and a glow. On phones the aim stick sits lower, level with RELOAD.', v: 0 },
   { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: the crosshair no longer stops about 1 m from you: it comes right in to your body and swings straight across when your thumb crosses the middle; a dashed ring shows its inner and outer limits when you reach them.', v: 1 },
+  { d: '2026-11-17', k: 'mech', id: 'touch', t: 'Phones: a lit LEAN button no longer jumps onto the ACTION button beside FIRE; AIM hides on drones and cameras (it does nothing there), so the camera arrows never sit on it, and the two arrows no longer touch on tablets.', v: 0 },
 ];

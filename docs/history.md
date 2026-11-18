@@ -464,3 +464,12 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   and end board .9 solid (the map showed through); `.overlay` dim .86; phone drone/camera view: arrows (`.t2/.t3`) left
   of the aim stick, `#viewlabel` above them between the left buttons and the stick, `#cambar` under the score
   (`!important` over free play's "above the hint bar" rule); ⟲ TILT (`.t6`) was pinned to the top by the top-row rule.
+
+## Phone buttons on top of each other (2026-11-17, he asked: the "cancel lean" button conflicts with FIRE)
+- The lit lean button got the class `act`, which is ACTION's class: its size and place rule moved the lean button onto
+  ACTION, right beside the right FIRE. Now it is `leaning` (touch.js `touchContext`, style.css `.tbtn.lean.leaning`).
+- Both AIM buttons hide when you are not on your own body (drone, camera, downed; the server only aims on a body). On a
+  667x375 phone the camera ◀ sat on the left AIM. The ▶ to ◀ gap (`.t2`) is zoomed with --tz, so they don't touch on tablets.
+- `tests/phonebuttons.mjs <port> <url>` (set up like thumbs.mjs): every button shown at once on 7 phone/tablet sizes,
+  on a body (lean lit either way, ACTION with a word, tilt) and on cameras; prints buttons that overlap, sit under 6 px
+  apart or leave the screen. Expected: only AIM on FIRE's corner (on purpose) and the 6 px top row.

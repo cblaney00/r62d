@@ -30,6 +30,7 @@ several fingers at once) at 914×412 and prints position / aim / shots after eac
    `user_pref("dom.w3c_touch_events.enabled", 1);`, started headless with `--remote-debugging-port 9333`.
 3. `node tests/thumbs.mjs 9333 <outdir> http://localhost:6263/` — free play by thumb; `SCENARIO=more` sprint/slide/lie down/lean/map; `SCENARIO=tut` taps through the
    tutorial, `SCENARIO=menus` opens every menu page (and shoots in the Armory).
+`tests/phonebuttons.mjs 9333 http://localhost:6263/` (same setup): every phone button shown at once on 7 screen sizes; lists overlaps.
 Don't `pkill -f` a pattern that also appears in the same shell command line (it kills that shell); put it in a script.
 
 ## The pro teams are the test subjects

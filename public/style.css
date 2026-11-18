@@ -761,7 +761,7 @@ html.touch #pause .menu, html.touch #quitDlg .menu { zoom: 1.15; }
 #touchUI .tbtn.t2 { right: calc(max(20px, env(safe-area-inset-right)) + 198px); } #touchUI .tbtn.t3 { right: calc(max(20px, env(safe-area-inset-right)) + 104px); }
 #touchUI .tbtn.t7 { right: 290px; width: 64px; } /* MAP */
 #touchUI .tbtn.lean { top: auto; bottom: 122px; height: 40px; width: 84px; font-size: 14px; } #touchUI .tbtn.l1 { left: calc(max(20px, env(safe-area-inset-left)) + 140px); } #touchUI .tbtn.l2 { left: calc(max(20px, env(safe-area-inset-left)) + 232px); } /* above the left FIRE */
-#touchUI .tbtn.lean.act { background: rgba(242,193,78,0.35); border-color: var(--gold); }
+#touchUI .tbtn.lean.leaning { background: rgba(242,193,78,0.35); border-color: var(--gold); }
 #touchUI .tbtn.lb { top: auto; bottom: 168px; height: 42px; width: 84px; font-size: 14px; } #touchUI .tbtn.lb1 { left: calc(max(20px, env(safe-area-inset-left)) + 140px); } #touchUI .tbtn.lb2 { left: calc(max(20px, env(safe-area-inset-left)) + 232px); } /* AIM, CROUCH: above LEAN, for the left thumb */
 #touchUI #tsLeft.spr { border-color: var(--gold); box-shadow: 0 0 18px rgba(242,193,78,0.45); } #touchUI #tsLeft.spr::after { content: 'SPRINT'; position: absolute; left: 0; right: 0; top: -22px; text-align: center; font: 800 13px var(--head); letter-spacing: 0.2em; color: var(--gold); }
 #touchUI .tbtn.t4 { right: 72px; width: 80px; } #touchUI .tbtn.t5 { right: 20px; width: 44px; }
@@ -1484,7 +1484,7 @@ html.touchplay #deathCard { font-size: 13px; } html.touchplay #kcBtn { font-size
 html.touchplay #prompt { left: calc(238px / var(--hudz, 1)); right: calc((330px * var(--tz, 1) + 70px) / var(--hudz, 1)); transform: none; text-align: center; line-height: 1.45; } /* between the left thumb's buttons and the aim stick, never over it */
 /* phones, drone / camera view (look check 2026-11-17: the arrows sat on the aim stick, the hint and list squeezed beside
    PING): the arrows left of the stick at the bottom, the hint above them in the gap, the drone/camera list under the score */
-html.touchplay #touchUI .tbtn.t3 { right: calc(330px + 70px / var(--tz, 1)); bottom: 24px; } html.touchplay #touchUI .tbtn.t2 { right: calc(330px + 132px / var(--tz, 1)); bottom: 24px; } /* (.tbtn is zoomed by --tz) */
+html.touchplay #touchUI .tbtn.t3 { right: calc(330px + 70px / var(--tz, 1)); bottom: 24px; } html.touchplay #touchUI .tbtn.t2 { right: calc(330px + 70px / var(--tz, 1) + 62px); bottom: 24px; } /* (.tbtn is zoomed by --tz; the 62 px gap is zoomed with it, so ◀ and ▶ never touch on a tablet) */
 html.touchplay #viewlabel { left: calc(240px / var(--hudz, 1)); right: calc((330px * var(--tz, 1) + 70px) / var(--hudz, 1)); transform: none; max-width: none; bottom: calc(92px / var(--hudz, 1)); font-size: 11px; line-height: 1.4; }
 html.touchplay #cambar { top: calc(60px / var(--hudz, 1)); bottom: auto !important; } /* (!important: free play's "above its hint bar" rule) */
 #touchUI .tbtn.t6 { top: auto; bottom: 158px; } /* ⟲ TILT: above the move stick (the top-row rule pinned it onto the objective card) */
