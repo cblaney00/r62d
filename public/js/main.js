@@ -1577,7 +1577,7 @@ function showSelMap(s, me, side) {
     if (me.pd || (side === 'def' && s.slk)) return;
     const r = c.getBoundingClientRect(), mx = (e.clientX - r.left) / r.width * c.width, my = (e.clientY - r.top) / r.height * c.height;
     let best = null, bd = 120; for (const h of hits) { const d = Math.hypot(h.x - mx, h.y - my); if (d < bd) { bd = d; best = h; } }
-    if (best) { audio.ui(); send(side === 'def' ? { t: 'site', n: best.n } : { t: 'spawn', n: best.n }); }
+    if (best) { audio.ui('lock'); send(side === 'def' ? { t: 'site', n: best.n } : { t: 'spawn', n: best.n }); send({ t: 'place' }); } // (he asked 2026-11-18: a click is the choice, no LOCK IN for it)
   };
 }
 // Unranked / Ranked bans (he asked, like R6): before round 1 the teams take turns banning an attacker or a defender.
@@ -1676,7 +1676,7 @@ function buildSelect(s) {
   if (s.tu) $('selTime').textContent = Math.ceil(s.tm);
   else $('selTime').innerHTML = `<small>READY</small>${ready}<small>/${s.players.length}</small>`;
   const lb = $('lockBtn');
-  lb.classList.toggle('hidden', !!s.tu);
+  lb.classList.toggle('hidden', !!s.tu || (!placed && !st.reSel)); // (the site / spawn step needs no button: a click chooses)
   lb.disabled = st.reSel ? false : !placed ? false : !me.op || !!me.lk;
   lb.textContent = st.reSel ? 'BACK TO THE MATCH' : !placed ? (side === 'def' ? 'LOCK IN SITE' : 'LOCK IN SPAWN') : me.lk ? 'LOCKED IN' : me.op ? 'LOCK IN' : me.jb ? 'PICK AN OPERATOR' : 'CHOOSE A ROLE';
   lb.classList.toggle('done', !!me.lk && !st.reSel);
@@ -1702,7 +1702,8 @@ function placeList(s, me, side, rb) {
   else rb.innerHTML = '<div class="rbHead">CHOOSE YOUR SPAWN</div>' + `<button data-n="-1" class="${me.sr ? 'on' : ''}"><b>RANDOM</b><span>The team spreads out: usually two groups and one player on their own</span></button>`
     + m.atkSpawns.map((x, i) => `<button data-n="${i}" class="${!me.sr && i === me.spn ? 'on' : ''}"><b>${esc(x.name.toUpperCase())}</b></button>`).join('')
     + `<button data-dq="1" class="${me.dq ? 'on' : ''}"><b>${me.dq ? '✓ ' : ''}REQUEST DEFUSER</b><span>The defuser goes to one of the attackers who asked for it</span></button>`;
-  for (const b of rb.querySelectorAll('button')) b.onclick = () => { audio.ui(); send(b.dataset.dq ? { t: 'defreq', on: !(st.me && st.me.dq) } : side === 'def' ? { t: 'site', n: +b.dataset.n } : { t: 'spawn', n: +b.dataset.n }); };
+  // (he asked 2026-11-18: clicking a site or spawn is the choice and moves on; only the operator and loadout step has a LOCK IN)
+  for (const b of rb.querySelectorAll('button')) b.onclick = () => { if (b.dataset.dq) { audio.ui(); send({ t: 'defreq', on: !(st.me && st.me.dq) }); return; } audio.ui('lock'); send(side === 'def' ? { t: 'site', n: +b.dataset.n } : { t: 'spawn', n: +b.dataset.n }); send({ t: 'place' }); };
 }
 // attackers can switch operator during preparation (he asked 2026-11-16): the pause menu's CHANGE OPERATOR opens the picker
 function openReSel() { $('pause').classList.add('hidden'); st.reSel = true; st.selBuilt = null; $('select').classList.add('resel'); }

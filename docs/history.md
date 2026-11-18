@@ -721,3 +721,8 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   2x2 crate stacks 4-8 cells out where they cut most lines (worst landings 1109 → 589 far spots). Embassy after: 47%
   (133 rounds). Left: 26 stair ends with a wall 2-3 rows ahead (4 could take a doorway: Harbor 2 top, Villa 4/7 top,
   Lodge 5 top) — asked him.
+- Doorways (he chose) straight ahead of the four stair tops that had a wall 2 rows ahead: Harbor stair 2 (U.door 67-69,28),
+  Villa stair 4 (U.door 44-45,41) and 7 (G.door 2-3,29), Lodge stair 5 (U.door 47-48,42). ~62 rounds each after:
+  Harbor 58, Villa 40, Lodge 35 (as before within noise; Villa and Lodge were already defence-sided).
+- Operator select (he asked): clicking a site / spawn (list or map) sends the choice and `place` at once; `#lockBtn`
+  hidden in that step, so LOCK IN is only for the operator + loadout step.
