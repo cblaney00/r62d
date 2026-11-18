@@ -144,7 +144,7 @@ only add to this file if it is a rule every session needs.
 - **Tests:** `node tests/abilities.js` has every operator use their ability in a live match; `node tests/oldops.js` (first 30) and `node tests/newops.js` (the 21 added) check each skill does what its description says.
   `node tests/sim.js` plays a bot-only match on every map (must print PASS; `--only <id>` for one).
   `node tests/reach.js` checks a body can reach every floor cell and every drone hole passes a drone but not a body.
-  `node tests/stairs.js` walks a body up and down every staircase with real physics + bot path finding.
+  `node tests/stairs.js` walks a body up and down every staircase with real physics + bot path finding; `node tests/stairsides.js` checks the stair rails (on only at the open end, sides only by a jump: `stairEdges` in physics.js).
   `node tests/pickup.js` (picking your own gadgets back up), `node tests/botroster.js` (the 70 bots, WRAITH's charge).
   `node tests/wsjoin.js`: game updates compressed once for everyone still unpack to exactly each player's text.
   `node tests/balance.js 12` is the balance report (see docs/balance.md for how to read it and past changes).

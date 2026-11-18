@@ -588,6 +588,20 @@ export function stairLooks(map, i, x, y) {
   return inR(g.a.look, x, y) || inR(g.b.look, x, y);
 }
 // The middle of each landing, n cells out from the stairs: bottom (downstairs) and top (upstairs). For tests and bots.
+// How far up (or down) a staircase someone at x, y has climbed, in storeys (he asked 2026-11-18: on the stairs a body
+// should show that it is rising or sinking): the lower floor's flight rises from 0 at its bottom step to 1 at its top
+// (where it sends you up); the upper floor's sinks from 0 at its top to -1 at its bottom (where it sends you down), so
+// the height carries on smoothly across the change of floor. 0 off the stairs.
+export function stairLift(map, x, y) {
+  const W = map.W, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); if (cx < 0 || cy < 0 || cx >= W || cy >= map.H) return 0;
+  let L = map._lift;
+  if (!L) { L = new Int16Array(W * map.H).fill(-1); (map.stairs || []).forEach((st, i) => { for (const [g, up] of [[st.ga, 0], [st.gb, 1]]) { const x0 = g % W, y0 = Math.floor(g / W); for (let yy = 0; yy < st.h; yy++) for (let xx = 0; xx < st.w; xx++) L[(y0 + yy) * W + x0 + xx] = i * 2 + up; } });
+    Object.defineProperty(map, '_lift', { value: L, configurable: true }); }
+  const v = L[cy * W + cx]; if (v < 0) return 0;
+  const st = map.stairs[v >> 1], g = v & 1 ? st.gb : st.ga, x0 = (g % W) * CELL, y0 = Math.floor(g / W) * CELL, w = st.w * CELL, h = st.h * CELL;
+  const f = Math.max(0, Math.min(1, st.dir === 'n' ? (y0 + h - y) / h : st.dir === 's' ? (y - y0) / h : st.dir === 'w' ? (x0 + w - x) / w : (x - x0) / w)); // 0 at the bottom end, 1 at the top
+  return v & 1 ? f - 1 : f;
+}
 export function stairEnds(map, i, n = 1.5) {
   const s = map.stairs[i], g = stairGeo(map, s), [ux, uy] = UV[s.dir] || UV.n;
   const ca = { x: (g.a.steps.x0 + g.a.steps.x1) / 2, y: (g.a.steps.y0 + g.a.steps.y1) / 2 }, cb = { x: (g.b.steps.x0 + g.b.steps.x1) / 2, y: (g.b.steps.y0 + g.b.steps.y1) / 2 };

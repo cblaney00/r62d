@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL, OVERWATCH, LUNGE_M, PLAYER_R } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, plantBomb, PLANT_R, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, plantBomb, PLANT_R, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, stairLift, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf, hitR, fireAuto } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -205,6 +205,7 @@ const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45;
 // sideways flick help and the 1.3x faster outward pull are gone). Past the edge of your normal view (st.trackHH, the
 // room-size view before it grows to fit the crosshair) the mouse moves it by Settings → Far aim sensitivity (0.5),
 // the same both ways, blended in over 1 m. Aiming in never puts it nearer than ADS_SNAP_MIN (he asked: 2 m).
+const STAIR_RISE = 0.6; // how high the top of a flight lifts a body, in wall heights (the stair look, stairLift)
 const ADS_SNAP_MIN = 2 * PX_PER_M;
 const ROPE_DRAG = 2; // phone rope drag: crosshair px per thumb px at the normal aim stick setting
 // Held wall (he asked 2026-11-09): keep the orange marker (bullets stop at a wall before the crosshair) on the same wall
@@ -3258,20 +3259,27 @@ function draw(s, view, now, dt) {
     const hangW = p.rp === 1 || p.rp === 3 ? hangWall(p) : undefined; // on a rope: drawn hanging against the wall
     // up on furniture: standing on its top (0.28 of a wall up, like the raised desk under them), drawn again above the raised furniture later
     const fTop = elv ? furnTop(st.map, p.x, p.y) || 0.28 : 0; // (each kind of furniture its own height: look.js FURN)
-    const upDraw = c => { const ez = elv ? fTop + (elv > 1 ? 0.1 : 0) : 0;
+    // on a staircase (he asked 2026-11-18: show rising or sinking, with the same marker as furniture): sl is how far up
+    // (+) or down (-) the flight they are, in storeys; climbing, the furniture look grows with it (shadow further out,
+    // ring, bigger); going down, they sink: drawn smaller, below the floor, a dark ring and no shadow
+    const sl = elv || hangW !== undefined ? 0 : stairLift(st.map, p.x, p.y), sa = Math.abs(sl), slz = sl * STAIR_RISE;
+    const upDraw = c => { const ez = elv ? fTop + (elv > 1 ? 0.1 : 0) : slz;
       if (elv) { c.save(); c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.ellipse(p.x + 3, p.y + 5, 11, 9, 0, 0, 7); c.fill(); c.restore(); }
+      else if (sl > 0.04) { c.save(); c.fillStyle = `rgba(0,0,0,${0.12 + 0.23 * sl})`; c.beginPath(); c.ellipse(p.x + 1 + 4 * sl, p.y + 2 + 6 * sl, 9 + 2 * sl, 7 + 2 * sl, 0, 0, 7); c.fill(); c.restore(); }
       lifted(c, p.x, p.y, ez, () => {
       if (elv) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1; c.setLineDash([3, 2]); c.beginPath(); c.arc(p.x, p.y, 15.5, 0, 7); c.stroke(); c.restore();
         c.save(); c.translate(p.x, p.y); c.scale(1.12, 1.12); c.translate(-p.x, -p.y); }
+      else if (sa > 0.04) { const k = sl > 0 ? 1 + 0.14 * sl : 1 - 0.16 * sa; c.save(); c.strokeStyle = sl > 0 ? `rgba(255,255,255,${0.25 + 0.45 * sl})` : `rgba(10,12,14,${0.3 + 0.4 * sa})`; c.lineWidth = 1; c.setLineDash(sl > 0 ? [3, 2] : [2, 2]); c.beginPath(); c.arc(p.x, p.y, 15.5 * k, 0, 7); c.stroke(); c.restore();
+        c.save(); c.translate(p.x, p.y); c.scale(k, k); c.translate(-p.x, -p.y); }
     drawOperator(c, {
       hang: hangW !== undefined ? (p.rp === 3 ? 'inv' : 'up') : null, wallA: hangW, zb: hangW !== undefined ? ((isMe ? st.ropeH : p.rz) ?? 0.5) - 0.55 : 0,
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, sit: a.sitK, legR: a.legR, legF: a.legF, slide: p.sd, downed: p.dn,
       sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
-      if (elv) c.restore(); }); };
-    upDraw(ctx); if ((elv || hangW !== undefined) && persp.h) (st.upDraws || (st.upDraws = [])).push(upDraw);
+      if (elv || sa > 0.04) c.restore(); }); };
+    upDraw(ctx); if ((elv || hangW !== undefined || slz > 0.3) && persp.h) (st.upDraws || (st.upDraws = [])).push(upDraw);
     else if (persp.h) (st.ghostDraws || (st.ghostDraws = [])).push(upDraw); // (shown faintly again over the raised walls)
-    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? fTop : 0, lb = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.37 * zk)), lh = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.49 * zk)); // (drawn standing up: rings and head zones where they show)
+    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? fTop : slz, lb = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.37 * zk)), lh = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.49 * zk)); // (drawn standing up: rings and head zones where they show)
     drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x + lb[0], y: p.y + lb[1] });
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x + lh[0], y: p.y + lh[1] });
     if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see

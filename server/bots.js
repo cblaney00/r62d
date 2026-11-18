@@ -5,7 +5,7 @@
 // (game.botLevel, Easy / Normal / Hard / Expert) changes how fast they react and how well they aim, not what they know:
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, PLAYER_R, T, FL, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
-import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked, leanPoint, LEAN_PX, inBox } from '../shared/physics.js';
+import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked, leanPoint, LEAN_PX, inBox, railBlocked, railBlockedDiag } from '../shared/physics.js';
 import { hatchNear, ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
@@ -503,6 +503,7 @@ function findPath(map, sx, sy, gx, gy, avoid, drone = false, def = false, inside
       const dx = DIR8X[di], dy = DIR8Y[di], nx = x + dx, ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
       const nk = ny * W + nx;
+      if (!drone && (dx && dy ? railBlockedDiag(map, k, dx, dy) : railBlocked(map, k, dx, dy))) continue; // stair rails: onto a flight only at its open end (bots never jump)
       if (dx && dy && (drone ? droneCost(y * W + nx) === Infinity || droneCost(ny * W + x) === Infinity : blocksMove(map.tiles[y * W + nx]) || blocksMove(map.tiles[ny * W + x]))) continue;
       const c = cost(nk); if (c === Infinity) continue;
       const ng = G[k] + c * (dx && dy ? 1.414 : 1);

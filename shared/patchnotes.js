@@ -132,4 +132,6 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'all', t: 'Graphics: Low now looks like Medium (sharper picture, lighting, raised walls), with a few fewer particles and smoke puffs.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: the HUD, menus and buttons keep clear of rounded screen corners and the camera hole.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: smaller buttons (the sticks stay the same) and the aim stick nearer the corner, so more of the middle of the screen is open.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'stairs', t: 'Stairs have rails: going up you get on only at the bottom step, and nobody steps on or off a staircase from the side (a jump still crosses).', v: -1 },
+  { d: '2026-11-18', k: 'mech', id: 'stairlook', t: 'On a staircase people show how high they are: rising (bigger, a light ring and a shadow) going up, sinking (smaller, a dark ring) going down.', v: 0 },
 ];

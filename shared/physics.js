@@ -91,15 +91,50 @@ function resolve(map, o, r, blockFn) {
 
 // standing on (or jumping onto) furniture (he asked): low furniture and wall stubs can be stood on; drop ledges and windows can't
 export const standable = (map, k) => map.tiles[k] === T.LOW && map.floor[k] !== FL.VOID;
-export function moveCircle(map, o, dx, dy, r, drone = false, up = false) {
+// Stair rails (he asked 2026-11-18): going up, a flight is entered only at its bottom step, and nobody steps on or off
+// its sides partway (on or off the side only by jumping). Each flight is on both floors: the lower floor's copy is open
+// only at its bottom end (its top row sends you up), the upper floor's only at its top end (its bottom row sends you
+// down). Kept per cell as the sides you can't cross: 1 north, 2 south, 4 west, 8 east (for bodies and bot paths alike).
+const SIDE = { n: 1, s: 2, w: 4, e: 8 }, BACK = { n: 's', s: 'n', w: 'e', e: 'w' };
+export function stairEdges(map) {
+  if (map._rails) return map._rails;
+  const W = map.W, H = map.H, E = new Uint8Array(W * H), mark = (x, y, side) => {
+    const [dx, dy] = side === 'n' ? [0, -1] : side === 's' ? [0, 1] : side === 'w' ? [-1, 0] : [1, 0];
+    if (x >= 0 && y >= 0 && x < W && y < H) E[y * W + x] |= SIDE[side];
+    const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < W && ny < H) E[ny * W + nx] |= SIDE[BACK[side]];
+  };
+  for (const st of map.stairs || []) for (const [g, open] of [[st.ga, BACK[st.dir]], [st.gb, st.dir]]) {
+    const x0 = g % W, y0 = Math.floor(g / W), x1 = x0 + st.w - 1, y1 = y0 + st.h - 1;
+    for (const side of ['n', 's', 'w', 'e']) { if (side === open) continue;
+      if (side === 'n' || side === 's') for (let x = x0; x <= x1; x++) mark(x, side === 'n' ? y0 : y1, side);
+      else for (let y = y0; y <= y1; y++) mark(side === 'w' ? x0 : x1, y, side); }
+  }
+  Object.defineProperty(map, '_rails', { value: E, configurable: true }); // (hidden: never copied with the map)
+  return E;
+}
+// a straight step (dx or dy of ±1) out of cell k across a stair rail
+export function railBlocked(map, k, dx, dy) { const E = stairEdges(map); return !!(E[k] & (dy < 0 ? 1 : dy > 0 ? 2 : dx < 0 ? 4 : 8)); }
+// a diagonal step crosses a rail if either way round it would
+export const railBlockedDiag = (map, k, dx, dy) => railBlocked(map, k, dx, 0) || railBlocked(map, k + dx, 0, dy) || railBlocked(map, k, 0, dy) || railBlocked(map, k + dy * map.W, dx, 0);
+// the body's centre may not cross a rail: a step that would is taken back on that axis (so you slide along the rail)
+function railStop(map, o, ox, oy) {
+  const W = map.W, E = stairEdges(map), cx0 = Math.floor(ox / CELL), cy0 = Math.floor(oy / CELL), cx1 = Math.floor(o.x / CELL), cy1 = Math.floor(o.y / CELL);
+  if (cx1 !== cx0) { const d = cx1 > cx0 ? 1 : -1; for (let c = cx0; c !== cx1; c += d) if (E[cy0 * W + c] & (d > 0 ? 8 : 4)) { o.x = ox; break; } }
+  const cx = Math.floor(o.x / CELL);
+  if (cy1 !== cy0) { const d = cy1 > cy0 ? 1 : -1; for (let c = cy0; c !== cy1; c += d) if (E[c * W + cx] & (d > 0 ? 2 : 1)) { o.y = oy; break; } }
+}
+export function moveCircle(map, o, dx, dy, r, drone = false, up = false, rails = false) {
   // drones also slip through the drone holes at the foot of plain walls (gone once the wall is reinforced)
   const body = bodyBlocks(map);
   // MAGPIE's bird (drone === 'bird') flies over low furniture, wall stubs and window sills
   const fn = drone ? (t, k) => blocksDrone(t) && !(drone === 'bird' && t === T.LOW) && !((t === T.SOFT || t === T.HARD) && map.dhole && map.dhole[k]) && !underAt(map, k, t) : up ? (t, k) => body(t, k) && !standable(map, k) : body;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (r * 0.5)));
+  rails = rails && map.stairs && map.stairs.length;
   for (let s = 0; s < steps; s++) {
-    o.x += dx / steps; resolve(map, o, r, fn); pushCovers(map, o, r);
-    o.y += dy / steps; resolve(map, o, r, fn); pushCovers(map, o, r);
+    let ox = o.x, oy = o.y;
+    o.x += dx / steps; resolve(map, o, r, fn); pushCovers(map, o, r); if (rails) railStop(map, o, ox, oy);
+    ox = o.x; oy = o.y;
+    o.y += dy / steps; resolve(map, o, r, fn); pushCovers(map, o, r); if (rails) railStop(map, o, ox, oy);
   }
 }
 
@@ -205,7 +240,7 @@ function stepMoveFree(map, o, input, dt, mods) {
     if (input.jump && !(o.air > 0) && !o.jcd && !mods.downed && !input.crouch && !o.pr && !(o.slT > 0)) { o.air = JUMP_T; o.jcd = JUMP_T + 0.35; }
   }
   const wasAir = o.air > 0;
-  moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? DRONE_R : PLAYER_R, mods.bird ? 'bird' : !!mods.drone, !mods.drone && (wasAir || !!o.up));
+  moveCircle(map, o, o.vx * dt, o.vy * dt, mods.drone ? DRONE_R : PLAYER_R, mods.bird ? 'bird' : !!mods.drone, !mods.drone && (wasAir || !!o.up), !mods.drone && !wasAir); // (stair rails: a jump crosses them)
   if (!mods.drone) {
     if (wasAir) { o.air -= dt; if (o.air <= 0) { o.air = 0; o.up = standable(map, Math.floor(o.y / CELL) * map.W + Math.floor(o.x / CELL)); o.landed = true; } }
     else if (o.up && !standable(map, Math.floor(o.y / CELL) * map.W + Math.floor(o.x / CELL))) o.up = false; // stepped off: back on the floor

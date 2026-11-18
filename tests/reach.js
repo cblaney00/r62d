@@ -1,9 +1,9 @@
 // Can a body actually walk everywhere? Flood-fills body-centre positions (every 2 px) from outside on
 // every map with real collision (PLAYER_R against blocksMove) and lists floor cells nobody can stand
 // in, per room. Usage: node tests/reach.js [--r 7] [--map villa] [--drone]
-import { CELL, PLAYER_R, DRONE_R, T, blocksMove, blocksDrone } from '../shared/constants.js';
+import { CELL, PLAYER_R, DRONE_R, T, FL, blocksMove, blocksDrone } from '../shared/constants.js';
 import { MAP_LIST, buildMap } from '../shared/map.js';
-import { moveCircle, circleBlocked } from '../shared/physics.js';
+import { moveCircle, circleBlocked, railBlocked } from '../shared/physics.js';
 
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : d; };
 const drone = process.argv.includes('--drone');
@@ -13,22 +13,31 @@ let bad = 0;
 for (const id of only ? [only] : MAP_LIST) {
   const m = buildMap(id), GW = m.W * CELL / S, GH = m.H * CELL / S;
   const blk = drone ? (t, k) => blocksDrone(t) && !(m.dhole && m.dhole[k]) : t => blocksMove(t);
-  const fits = (px, py) => !circleBlocked(m, px, py, R, blk); // sloped and curved walls by their real shape
+  // (2026-11-18) a second pass as someone who jumps: over low furniture and stair rails (Space), for nooks only a jump reaches
+  const flood = jump => {
+  const blkJ = jump ? (t, k) => blk(t, k) && !(t === T.LOW && m.floor[k] !== FL.VOID) : blk;
+  const fits = (px, py) => !circleBlocked(m, px, py, R, blkJ); // sloped and curved walls by their real shape
   const seen = new Uint8Array(GW * GH), q = [];
   const add = (gx, gy) => { if (gx < 0 || gy < 0 || gx >= GW || gy >= GH) return; const i = gy * GW + gx; if (seen[i]) return; if (!fits(gx * S + S / 2, gy * S + S / 2)) { seen[i] = 2; return; } seen[i] = 1; q.push(i); };
   for (let k = 0; k < m.W * m.H; k++) if (m.tiles[k] === T.GROUND) { const cx = k % m.W, cy = (k / m.W) | 0; add((cx * CELL + 8) / S | 0, (cy * CELL + 8) / S | 0); }
   while (q.length) {
     const i = q.pop(), gx = i % GW, gy = (i / GW) | 0;
-    add(gx + 1, gy); add(gx - 1, gy); add(gx, gy + 1); add(gx, gy - 1);
+    // (stair rails, 2026-11-18: a body crosses into or out of a flight only at its open end)
+    const cellOf = (x, y) => ((y * S) / CELL | 0) * m.W + ((x * S) / CELL | 0), k0 = cellOf(gx, gy);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k1 = cellOf(gx + dx, gy + dy); if (!drone && !jump && k1 !== k0 && railBlocked(m, k0, dx, dy)) continue; add(gx + dx, gy + dy); }
     const k = ((gy * S) / CELL | 0) * m.W + ((gx * S) / CELL | 0), pk = m.portal[k];
     if (pk >= 0) { const ox = (pk % m.W - k % m.W) * CELL / S, oy = (((pk / m.W) | 0) - ((k / m.W) | 0)) * CELL / S; add(gx + ox, gy + oy); }
   }
+  return seen; };
+  const seen = flood(false), seenJ = drone ? seen : flood(true); let jumpOnly = 0;
   // a floor cell counts as reachable if any body centre inside it was reached
   const out = {};
   for (const r of m.rooms) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) {
     const k = y * m.W + x; if (blocksMove(m.tiles[k])) continue;
     let ok = false;
     for (let sy = 0; sy < CELL / S && !ok; sy++) for (let sx = 0; sx < CELL / S && !ok; sx++) if (seen[((y * CELL) / S + sy) * GW + (x * CELL) / S + sx] === 1) ok = true;
+    if (!ok) { let j = false; for (let sy = 0; sy < CELL / S && !j; sy++) for (let sx = 0; sx < CELL / S && !j; sx++) if (seenJ[((y * CELL) / S + sy) * GW + (x * CELL) / S + sx] === 1) j = true;
+      if (j) { jumpOnly++; console.log(`   (only by a jump: ${m.floors[m.flAt[k]].name} ${r.name} ${x - m.floors[m.flAt[k]].gx + m.floors[m.flAt[k]].x0},${y + m.floors[m.flAt[k]].y0})`); continue; } }
     if (!ok) { const key = `${m.floors[m.flAt[k]].name} ${r.name}`; (out[key] ||= []).push(`${x - m.floors[m.flAt[k]].gx + m.floors[m.flAt[k]].x0},${y + m.floors[m.flAt[k]].y0}`); }
   }
   // every drone hole lets a drone through and stops a body

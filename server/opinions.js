@@ -19,7 +19,7 @@ const ROLE_HATES = { entry: ['speed', 'headaim', 'hitbox', 'trails'], intel: ['d
 const MECH_WHY = { speed: 'every entry takes so long the defence is always set', trails: 'every shot I take gives my spot away', hitbox: 'the first bullet decides too much and nobody can be pixel-perfect every time',
   sound: 'I can\'t track a slow walker through a wall any more', runout: 'you can\'t make a play outside without the whole team knowing', defuser: 'one dropped defuser and the round is over',
   softwalls: 'there is almost nothing left to open', reinforce: 'you need twice the walls to hold a site', drones: 'one stray bullet and my intel is gone',
-  fog: 'my team\'s eyes don\'t help me any more', headaim: 'heads are so small that taps don\'t land', ropeexit: 'once you are on a rope you are stuck there', drones2: '' };
+  fog: 'my team\'s eyes don\'t help me any more', stairs: 'I can\'t cut onto a staircase from the side any more', headaim: 'heads are so small that taps don\'t land', ropeexit: 'once you are on a rope you are stuck there', drones2: '' };
 const notesFor = id => PATCH_NOTES.filter(n => n.id === id);
 const when = n => n ? ` (since the ${n.d.slice(5).replace('-', '/')} patch: ${n.t.charAt(0).toLowerCase() + n.t.slice(1).replace(/\.$/, '')})` : '';
 // a small steady lean of each pro's own (so ten people looking at the same numbers don't all say the same thing)
