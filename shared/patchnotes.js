@@ -155,4 +155,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'op', id: 'hoist', t: 'HOIST: picks a Breach Charge or a Stun Grenade (smoke is no longer one of his choices).', v: 1 },
   { d: '2026-11-18', k: 'mech', id: 'swoopbox', t: 'Climbing in through a window off a rope: no more white window outline growing from the middle of the screen (the camera move stays).', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'farfast', t: 'Far aim speed: once the crosshair is 7 m or more from you the mouse moves it 20% quicker (Settings: −50% to +150%, and the distance), shown by a faint ring round you. The old slowdown near the screen edge is gone.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'farfast2', t: 'Far aim speed works with every way of aiming (all mouse styles, trackpad, phone, controller) and has an On / Off switch in Settings.', v: 0 },
 ];

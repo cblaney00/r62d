@@ -15,7 +15,7 @@
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i); if (!k || !k.startsWith('r62dfs:') || !k.endsWith('/profiles.json')) continue;
         const p = JSON.parse(localStorage.getItem(k));
-        for (const v of Object.values(p || {})) if (v && v.settings) for (const f of ['binds', 'bindsVersion', 'sens', 'adsSens', 'steadySens', 'farFast', 'farFastM', 'aim', 'aimV', 'lean']) delete v.settings[f];
+        for (const v of Object.values(p || {})) if (v && v.settings) for (const f of ['binds', 'bindsVersion', 'sens', 'adsSens', 'steadySens', 'farFast', 'farFastM', 'farOn', 'aim', 'aimV', 'lean']) delete v.settings[f];
         localStorage.setItem(k, JSON.stringify(p));
       }
     }

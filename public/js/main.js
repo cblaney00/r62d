@@ -254,8 +254,25 @@ const BODY_CAP = 300; // world px: people stand up at most as tall as this far f
 const EYE_BACK = 0.75, RAISE_H = 0.06; // RAISE_H: how much a wall (1 = 3.2 m) stands up per world px from the eye; // how far below the middle of the screen the eye sits, in view heights (draw())
 const RAISE_FULL = 760, RAISE_NONE = 1150; // raised walls sink flat between these view heights (world px), see draw()
 // Far aim speed (he asked 2026-11-18): once the crosshair is FAR_M metres or more from you (Settings, 7 to start) the mouse
-// moves it at farFast (1.20x to start), aimed in or not; the ring in crosshair() shows where that starts
+// moves it at farFast (1.20x to start), aimed in or not; the ring in crosshair() shows where that starts. Then (he asked):
+// every way of aiming (all mouse styles, trackpad, phone stick and rope drag, controller), with an On/Off switch (#farOn).
+// A mouse or phone stick moves the aim, so it is scaled by farMul(); a controller stick points it, so padCurve() makes
+// the stick's tilt past the ring move the crosshair farFast times as far (full tilt still reaches the end)
 const farFast = () => { const v = +(($('farFast') || {}).value ?? 20); return Number.isFinite(v) ? Math.max(0.1, 1 + v / 100) : 1.2; }; // the setting is a % change: +20 quicker, -30 slower (he asked: it can be negative)
+const farOn = () => !$('farOn') || $('farOn').checked;
+function aimDistW() { // how far from you (world px) the crosshair is
+  if (!st.pred) return 0;
+  if (freeLive()) return Math.hypot(aimOff.x, aimOff.y);
+  const c = cursor(), q = screenToWorld(c.x, c.y); return Math.hypot(q.x - st.pred.x, q.y - st.pred.y);
+}
+const farMul = () => farOn() && st.me && st.me.ct === 'body' && aimDistW() >= farFastPx() ? farFast() : 1;
+function padCurve(l) {
+  const k = farOn() ? farFast() : 1; if (k === 1 || !(st.me && st.me.ct === 'body')) return l;
+  const z = st.zoom || 1, rr = (farFastPx() * z - VH * 0.07) / (VH * 0.36 + (scopeOn(st.me) ? 0 : 4 * PX_PER_M * z)); // the ring as a stick tilt (cursor()'s reach)
+  if (!(rr > 0 && rr < 1)) return l;
+  const a = (1 - rr + k * rr) / k, p = rr / a; // inside the ring a per tilt, past it k times that, full tilt = full reach
+  return l < p ? a * l : Math.min(1, rr + k * a * (l - p));
+}
 const farFastPx = () => { const v = +($('farFastM') || {}).value; return (v > 0 ? v : 7) * PX_PER_M; };
 // Locked camera (his idea, 2026-11-09; like League of Legends / Age of Mythology): the camLock key (L) switches between
 // the normal following camera and one that stays where it is, at the size it had. Pushing the crosshair (or the cursor)
@@ -1187,7 +1204,7 @@ function pollPad(dt, view) {
     if (want) {
       const p = gp.rsPx;
       if (p && st.rdLast && st.rdLast.n === p.n) { // the same finger moved: the crosshair moves with it (faster than 1:1: a thumb's room is small)
-        const slow = (gpk.ads || st.me.ad ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1), k = ROPE_DRAG * (stickSens() / 0.7) * slow * DPR;
+        const slow = (gpk.ads || st.me.ad ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1) * farMul(), k = ROPE_DRAG * (stickSens() / 0.7) * slow * DPR;
         const dx = (p.x - st.rdLast.x) * k, dy = (p.y - st.rdLast.y) * k; if (dx || dy) { st.aimMoveT = performance.now(); freeMove(dx, dy); }
       }
       st.rdLast = p; gpLastL = rs.l; return;
@@ -1202,7 +1219,7 @@ function pollPad(dt, view) {
       st.hold = null;
       if (!st.stk) st.stk = newStick('steady', wrapAng(padAng - (st.gyroOff || 0)), padReach);
       st.gyroOff = (st.gyroOff || 0) + gy;
-      const slow = (gpk.ads || (st.me && st.me.ad) ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1);
+      const slow = (gpk.ads || (st.me && st.me.ad) ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1) * farMul(); // (past the far aim ring: its own speed)
       stepStick(st.stk, gp.rsRaw || { x: rs.x, y: rs.y }, dt, stickSens(), slow);
       padAng = wrapAng(st.stk.ang + st.gyroOff); padReach = st.stk.reach;
     } else {
@@ -1224,7 +1241,7 @@ function pollPad(dt, view) {
     else {
       if (onAim) st.gyroOff = (st.gyroOff || 0) + gy;
       padAng = wrapAng(Math.atan2(rs.y, rs.x) + (st.gyroOff || 0));
-      if (!gp.rsDir) padReach = rs.l;
+      if (!gp.rsDir) padReach = padCurve(rs.l); // (past the far aim ring the tilt goes further)
     }
   } else if (gy && onAim) padAng = wrapAng(padAng + gy);
   gpLastL = rs.l;
@@ -1242,9 +1259,9 @@ cv.addEventListener('mousemove', e => {
     if (st.mDrag && st.camLock) { const z = st.zoom || 1; st.camLock.x -= e.movementX * DPR / z; st.camLock.y -= e.movementY * DPR / z; st.camLock.free = true; st.mDrag.d += Math.abs(e.movementX) + Math.abs(e.movementY); return; } // grab the map: your aim stays put
     const ads = adsHeld() && st.me && st.me.a && st.me.ct === 'body';
     st.aimMoveT = performance.now();
-    const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1) * DPR * (assistTgt ? ASSIST.slow : 1); // aim help: slower over an enemy
+    const k = ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1) * (steadying() ? $('steadySens').value / 100 : 1) * DPR * (assistTgt ? ASSIST.slow : 1) * farMul(); // aim help: slower over an enemy; past the far aim ring: its own speed (every aiming style)
     if (r3on()) { rope3d.look(e.movementX * k / DPR, e.movementY * k / DPR); return; } // the 3D rope view turns instead
-    if (padOn && freeAimOn()) { const f = Math.hypot(aimOff.x, aimOff.y) >= farFastPx() ? farFast() : 1; freeMove(e.movementX * k * f, e.movementY * k * f); return; } // (past the far aim ring: its own speed)
+    if (padOn && freeAimOn()) { freeMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'pad') { padMove(e.movementX * k, e.movementY * k); return; }
     if (padOn && aimMode === 'face') { faceMove(e.movementX * k, e.movementY * k, ads); return; }
     if (padOn && (aimMode === 'turn' || aimMode === 'spin')) { turnMove(e.movementX * k, e.movementY * k); return; }
@@ -3945,7 +3962,7 @@ function crosshair(me, now) {
     const R = st.reachW * (st.zoom || 1), f = Math.max(0, Math.min(1, (Math.hypot(aimOff.x, aimOff.y) / st.reachW - 0.82) / 0.16));
     if (f > 0) { ctx.save(); ctx.globalAlpha = f * 0.35; ctx.strokeStyle = '#fff'; ctx.lineWidth = DPR; ctx.setLineDash([6 * DPR, 6 * DPR]); ctx.beginPath(); ctx.arc(px, py, R, 0, 7); ctx.stroke(); ctx.restore(); }
   }
-  if (fq && padOn && !touchActive() && me.ct === 'body') drawFastRing(ctx, px, py, farFastPx() * (st.zoom || 1), Math.hypot(aimOff.x, aimOff.y) >= farFastPx(), DPR); // the far aim ring (mouse only)
+  if (farOn() && me.ct === 'body' && me.a && st.pred) drawFastRing(ctx, px, py, farFastPx() * (st.zoom || 1), aimDistW() >= farFastPx(), DPR); // the far aim ring (every aiming style)
   if (!fq && touchFar() && st.pred) { // phone: the crosshair's limits, shown as it nears them (he asked: any barrier must show)
     const d = Math.hypot(m.x - px, m.y - py), z = st.zoom || 1, lo = AIM_MIN() * z, hi = Math.max(AIM_MIN() + 1, reachOf(me)) * z;
     const fin = Math.max(0, Math.min(1, 1.3 - (d - lo) / (16 * DPR))), fout = Math.max(0, Math.min(1, (padReach - 0.9) / 0.08));
@@ -5005,7 +5022,7 @@ function setTab(tab) {
   if (NEEDS_NAME.has(tab) && !st.token) { askName(tab); return; }
   if (tab === 'ops') { showOps(); return; }
   if (tab === 'profile') { showProfile(); return; }
-  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR, steady: () => $('steadySens').value / 100, fast: () => [farFast(), farFastPx()], low: () => gfxLevel() === 'low' }); return; }
+  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR, steady: () => $('steadySens').value / 100, fast: () => farOn() ? [farFast(), farFastPx()] : null, low: () => gfxLevel() === 'low' }); return; }
   if (tab === 'maps') { audio.ui('open'); openMapInfo($('mapsPage')); return; }
   if (tab === 'knowledge') { audio.ui('open'); openKnowledge($('bkPage')); return; }
   if (tab === 'playbook') { audio.ui('open'); trainInfo(); openPlaybook($('playbookPage')); return; }
@@ -5122,8 +5139,8 @@ window.__r62d = { padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
-  try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value, +$('steadySens').value, 0, +$('farFast').value, +$('farFastM').value])); localStorage.setItem('r62d-sensv', String(SENS_V)); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sv: SENS_V, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, farFast: +$('farFast').value, farFastM: +$('farFastM').value, aim: aimMode, aimV: 2, xh, lean: leanMode, cols: { ...COLS } };
+  try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value, +$('steadySens').value, 0, +$('farFast').value, +$('farFastM').value, $('farOn').checked ? 1 : 0])); localStorage.setItem('r62d-sensv', String(SENS_V)); } catch {}
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sv: SENS_V, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, farFast: +$('farFast').value, farFastM: +$('farFastM').value, farOn: $('farOn').checked ? 1 : 0, aim: aimMode, aimV: 2, xh, lean: leanMode, cols: { ...COLS } };
 }
 let saveTimer = 0;
 // Settings → COLOURS (he asked 2026-11-14): ready colours + a custom picker for each (teamcol.js)
@@ -5148,6 +5165,7 @@ function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else if (s.binds && s.bindsVersion === 4) { applyBinds(s.binds, 4); setTimeout(saveSettings, 500); } else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
   const sensOld = s.sv !== SENS_V; if (sensOld) setTimeout(saveSettings, 500); // saved before the new mouse defaults: everyone starts on them once
   for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens', 'steadySens', 'farFast', 'farFastM']) if (typeof s[k] === 'number' && !(sensOld && /ens$/.test(k))) $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
+  if (typeof s.farOn === 'number') $('farOn').checked = !!s.farOn; // (the far aim speed switch)
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.lean) setLean(s.lean, false);
   if (s.cols) { setCols(s.cols); renderCols(); }
@@ -5174,8 +5192,9 @@ setInterval(() => { if (document.pointerLockElement && document.pointerLockEleme
 $('pResume').addEventListener('click', () => { if (playing() && !isTouch && !st.tv) lockMouse(cv); }); // TV: nothing to aim, keep the mouse free // a phone has no mouse to capture (asking anyway re-opened this menu)
 const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; $('steadySensVal').textContent = ($('steadySens').value / 100).toFixed(2) + '×'; $('farFastVal').textContent = (+$('farFast').value > 0 ? '+' : '') + $('farFast').value + '%'; $('farFastMVal').textContent = (+$('farFastM').value).toFixed(1) + ' m'; };
 for (const id of ['sens', 'adsSens', 'steadySens', 'farFast', 'farFastM']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
+$('farOn').addEventListener('change', saveSettings); // the far aim speed's On/Off switch
 // (he asked 2026-11-18: the mouse 30% quicker by default, 1.00 → 1.30, and everyone moved onto it once: SENS_V)
-try { const v = localStorage.getItem('r62d-sensv') === String(SENS_V) ? JSON.parse(localStorage.getItem('r62d-sens') || 'null') : null; if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; if (v[2]) $('steadySens').value = v[2]; if (v[4] != null) $('farFast').value = v[4]; if (v[5]) $('farFastM').value = v[5]; } } catch {}
+try { const v = localStorage.getItem('r62d-sensv') === String(SENS_V) ? JSON.parse(localStorage.getItem('r62d-sens') || 'null') : null; if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; if (v[2]) $('steadySens').value = v[2]; if (v[4] != null) $('farFast').value = v[4]; if (v[5]) $('farFastM').value = v[5]; if (v[6] != null) $('farOn').checked = !!v[6]; } } catch {}
 showSens();
 // Every slider in Settings also has a box to type the number into (he asked). It shows the number the way the
 // slider's label did (sensitivity as 1.00, not 100) and keeps up when settings are loaded from the profile.

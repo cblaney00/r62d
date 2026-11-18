@@ -45,7 +45,7 @@ export function openArmory(el, opts) {
     if (document.pointerLockElement === cv) {
       const k = O.sens(S.mouse.r) * (steadying() ? O.steady() : 1) * dpr;
       if (O.mode() === 'cursor') { S.mouse.x = Math.max(0, Math.min(cv.width, S.mouse.x + e.movementX * k)); S.mouse.y = Math.max(0, Math.min(cv.height, S.mouse.y + e.movementY * k)); }
-      else { const F = O.fast ? O.fast() : [1, Infinity], f = Math.hypot(S.aim.x, S.aim.y) >= F[1] ? F[0] : 1; freeMove(e.movementX * k * f, e.movementY * k * f); } // (past the far aim ring: its own speed, as in a match)
+      else { const F = (O.fast && O.fast()) || [1, Infinity], f = Math.hypot(S.aim.x, S.aim.y) >= F[1] ? F[0] : 1; freeMove(e.movementX * k * f, e.movementY * k * f); } // (past the far aim ring: its own speed, as in a match)
     } else { const r = cv.getBoundingClientRect(); S.mouse.x = (e.clientX - r.left) * dpr; S.mouse.y = (e.clientY - r.top) * dpr; }
   };
   cv.onmousedown = e => {
@@ -345,7 +345,7 @@ function draw(cv, dt) {
   const cone = spreadCone(w, modsOf(S.w), { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot, modsOf(S.w)) }), xh = O.xh();
   if (S.adsT > 0.05) drawSightLook(c, attOf(S.w).sight, x, y, Math.min(1, S.adsT), dpr, lensR(cv));
   veil(S.adsT > 0.3 && sniper() ? { x, y } : null, cv);
-  if (O.fast && O.mode() !== 'cursor') { const F = O.fast(); drawFastRing(c, O0.x, O0.y, F[1] * z, Math.hypot(S.aim.x, S.aim.y) >= F[1], dpr); } // the far aim ring
+  if (O.fast && O.fast() && O.mode() !== 'cursor') { const F = O.fast(); drawFastRing(c, O0.x, O0.y, F[1] * z, Math.hypot(S.aim.x, S.aim.y) >= F[1], dpr); } // the far aim ring
   if (!(sniper() && S.adsT > 0.6)) drawReticle(c, attOf(S.w).sight, x, y, Math.tan(cone) * Math.hypot(Q.x - O0.x, Q.y - O0.y) / dpr, dpr);
   const dm = q.d / M;
   if (dm >= 8) {
