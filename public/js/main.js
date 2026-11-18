@@ -1834,14 +1834,8 @@ const WALKISH = new Set([T.FLOOR, T.GROUND, T.STAIR, T.OPEN, T.HATCH, T.HATCHR, 
 // dazed, down, flashed. Drawn on #over, or on the 3D rope view's own layer (#r3fx) while that view is up.
 function screenFx(c, me, now, from) {
   const W = c.canvas.width, H = c.canvas.height;
-  if (st.swoop && st.swoopScr) { // the window's frame sweeping past the screen's edges, a soft darkening round them as you cross
-    const w = swoopT(), T = w.T, [sx, sy] = st.swoopScr;
-    const g = Math.pow(sstep(T / w.c), 1.6), k = 1 + 7 * g, a = 0.75 * Math.min(1, T / 0.08) * (1 - sstep((T - w.c * 0.55) / (w.c * 0.5)));
-    const cx = sx, cy = sy, hw = W * 0.07 * k, hh = H * 0.09 * k, r = Math.min(hw, hh) * 0.06; // (on the window itself, as you go through it)
-    if (a > 0.01) { c.save(); c.lineJoin = 'round';
-      c.strokeStyle = `rgba(14,16,18,${(a * 0.55).toFixed(3)})`; c.lineWidth = (5 + 9 * g) * DPR; c.beginPath(); c.roundRect(cx - hw, cy - hh, hw * 2, hh * 2, r); c.stroke(); // the frame's depth
-      c.strokeStyle = `rgba(236,232,222,${(a * 0.75).toFixed(3)})`; c.lineWidth = (1.6 + 3 * g) * DPR; c.beginPath(); c.roundRect(cx - hw - 2 * DPR, cy - hh - 2 * DPR, hw * 2 + 4 * DPR, hh * 2 + 4 * DPR, r); c.stroke(); // its lit edge
-      c.restore(); }
+  if (st.swoop) { // a soft darkening round the screen's edges as you cross (the window-frame outline growing from the middle is gone: he asked 2026-11-18)
+    const w = swoopT(), T = w.T;
     const v = Math.sin(Math.PI * Math.min(1, T / w.end)) * 0.4;
     if (v > 0.01) { const vg = c.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.85); vg.addColorStop(0, 'rgba(6,8,10,0)'); vg.addColorStop(1, `rgba(6,8,10,${v.toFixed(3)})`); c.fillStyle = vg; c.fillRect(0, 0, W, H); }
   }
@@ -3694,7 +3688,6 @@ function draw(s, view, now, dt) {
   tq = pfa('markers', tq);
   // --- screen-space effects ---
   st.meScr = [(TA * st.pred.x + TC * st.pred.y + ox) / VW, (TB * st.pred.x + TD * st.pred.y + oy) / VH]; // (tests: where you are on the screen, 0..1)
-  if (st.swoop) st.swoopScr = [TA * st.swoop.x + TC * st.swoop.y + ox, TB * st.swoop.x + TD * st.swoop.y + oy]; // (where the window is on the screen)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (view && view.kind === 'drone') droneOverlay(now, ents);
   if (view && view.kind === 'cam') { if (view.dr) droneOverlay(now, ents, view.cam); else camOverlay(view, now); }
