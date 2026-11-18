@@ -1,5 +1,5 @@
-// Paste into a tests/shoot.mjs "js" step (newlines removed) in a free play match: how far the sight shape's edges move
-// between frames while only the view turns (body: a 1.9 rad cone; drone: a full circle), old way vs now. Now must print 0.00.
+/* Paste into a tests/shoot.mjs "js" step (newlines removed) in a free play match: how far the sight shape's edges move
+between frames while only the view turns (body: a 1.9 rad cone; drone: a full circle), old way vs now. Now must print 0.00. */
 (async () => {
   const { castSight } = await import('/shared/physics.js');
   const st = __r62d.st, m = st.map, me = { x: st.pred.x, y: st.pred.y };

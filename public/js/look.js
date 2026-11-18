@@ -207,8 +207,8 @@ function boardLook(m, k, X, Y, dx, dy, f0, f) {
 // it there), a leg at each corner up to the underside of the top, and the top's thin edge; the top itself is the picture
 function legsOf(P, f, G, x, y, B) {
   const [X0, Y0, X1, Y1] = B, ft = f * 0.78, s = Math.max(1.1, Math.min(1.8, Math.min(X1 - X0, Y1 - Y0) / 7)), e = 1, poly = [X0, Y0, X1, Y0, X1, Y1, X0, Y1];
-  G.tops.push({ x: P.x, y: P.y, n: P.w, f: 0.0001, g: 1, tc: 'rgba(8,9,11,0.62)', low: true, sh: [poly] }); // the shadow under it: its own shape, no bigger
-  for (let yy = P.y; yy < P.y + P.h; yy++) G.tops.push({ x: P.x, y: yy, n: P.w, f, g: 1, sh: [poly] }); // its top: its own picture, cut to it
+  G.tops.push({ x: P.x, y: P.y, n: P.w, rows: P.h, f: 0.0001, g: 1, tc: 'rgba(8,9,11,0.62)', low: true, rc: B }); // the shadow under it: its own shape, no bigger
+  G.tops.push({ x: P.x, y: P.y, n: P.w, rows: P.h, f, g: 1, rc: B }); // its top: that rectangle of its picture (a plain copy: a cut-out shape costs the graphics card far more)
   const box = (ax, ay, bx, by, f0, f1, rgb) => {
     for (const [dx, dy, lt] of FACES) {
       const c = `rgb(${rgb[0] * lt | 0},${rgb[1] * lt | 0},${rgb[2] * lt | 0})`;
@@ -243,13 +243,13 @@ function railOf(P, f, G) {
 }
 // solid furniture (a couch, a counter, a shelf...): a block the size of its own picture, not of its cells
 function solidOf(P, f, G, B, rgb) {
-  const [X0, Y0, X1, Y1] = B, poly = [X0, Y0, X1, Y0, X1, Y1, X0, Y1];
+  const [X0, Y0, X1, Y1] = B;
   for (const [dx, dy, lt] of FACES) {
     const c = `rgb(${rgb[0] * lt | 0},${rgb[1] * lt | 0},${rgb[2] * lt | 0})`;
     if (dx) { const ex = dx > 0 ? X1 : X0, x = Math.floor((ex - dx * 0.5) / CELL), y = Math.floor((Y0 + Y1) / 2 / CELL); G.faces.push({ ax: ex, ay: Y0, bx: ex, by: Y1, nx: dx, ny: 0, px: ex, py: Y0, f, x, y, c }); }
     else { const ey = dy > 0 ? Y1 : Y0, x = Math.floor((X0 + X1) / 2 / CELL), y = Math.floor((ey - dy * 0.5) / CELL); G.faces.push({ ax: X0, ay: ey, bx: X1, by: ey, nx: 0, ny: dy, px: X0, py: ey, f, x, y, c }); }
   }
-  for (let yy = P.y; yy < P.y + P.h; yy++) G.tops.push({ x: P.x, y: yy, n: P.w, f, g: 1, sh: [poly] });
+  G.tops.push({ x: P.x, y: P.y, n: P.w, rows: P.h, f, g: 1, rc: B });
 }
 function vehOf(P, f, G) {
   const [a, e, cut, col] = VEH[P.kind](P), hor = P.w > P.h, ix = hor ? e : a, iy = hor ? a : e;
@@ -265,7 +265,7 @@ function vehOf(P, f, G) {
     G.faces.push({ ax, ay, bx, by, nx, ny, px: mx, py: my, f: wheels, f0: 0, x, y, c: 'rgb(22,22,24)' }); // tyres and the dark underside
     G.faces.push({ ax, ay, bx, by, nx, ny, px: mx, py: my, f, f0: wheels, x, y, c: sh(lt) });
   }
-  for (let yy = P.y; yy < P.y + P.h; yy++) G.tops.push({ x: P.x, y: yy, n: P.w, f, g: 1, sh: [poly] }); // its top: its own picture, cut to the body
+  G.tops.push({ x: P.x, y: P.y, n: P.w, rows: P.h, f, g: 1, sh: [poly] }); // its top: its own picture, cut to the body
 }
 // The sides of an outside staircase standing up (he asked 2026-11-15: outside stairs should fit the building): a fire
 // escape's or timber flight's handrail on posts, the Embassy steps' stone cheek walls; not against a wall, not a ramp.
@@ -506,6 +506,7 @@ export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false, seen = 
     let T2 = TP.get(r.tc); if (!T2) TP.set(r.tc, T2 = { p: null, r: [] });
     const sc = 1 + h * r.f;
     if (r.sh) { const p = T2.p || (T2.p = new Path2D()); for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? p.lineTo(a, b) : p.moveTo(a, b); } p.closePath(); } }
+    else if (r.rc) { const [a, b, c, d] = r.rc, [tx, ty] = up(a, b, r.f); T2.r.push(tx, ty, (c - a) * sc, (d - b) * sc); }
     else { const iW = r.iW || 0, iN = r.iN || 0, [tx, ty] = up(r.x * CELL + iW, r.y * CELL + iN, r.f); T2.r.push(tx, ty, (r.n * CELL - iW - (r.iE || 0)) * sc, (CELL - iN - (r.iS || 0)) * sc); } // plain rectangles (in from open floor: WALL_INS): far cheaper on the graphics card than one big shape
     G.n++;
   };
@@ -526,10 +527,11 @@ export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false, seen = 
       }
       if (g === 2) continue;
       for (const r of B[g].tops) {
-        if (!whole && (r.y < y0 || r.y > y1 || r.x + r.n - 1 < x0 || r.x > x1)) continue;
-        let lit = false; if (seen) for (let q = 0; q < r.n && !lit; q++) lit = seen.at(r.x + q, r.y);
+        const rw = r.rows || 1; // (a piece of furniture: one top for all its rows)
+        if (!whole && (r.y + rw - 1 < y0 || r.y > y1 || r.x + r.n - 1 < x0 || r.x > x1)) continue;
+        let lit = false; if (seen) for (let w = 0; w < rw && !lit; w++) for (let q = 0; q < r.n && !lit; q++) lit = seen.at(r.x + q, r.y + w);
         if (g === 0 && spots && inSpot(r.x, r.y) && airBy(r.y * m.W + r.x)) { addTop(fac.all, r); if (lit) addTop(fac.lit, r); continue; }
-        const Bd = band((r.x + r.n / 2) * CELL, (r.y + 0.5) * CELL); addTop(Bd.all[g === 1 ? 0 : 1], r); if (lit) addTop(Bd.lit[g === 1 ? 0 : 1], r);
+        const Bd = band((r.x + r.n / 2) * CELL, (r.y + rw / 2) * CELL); addTop(Bd.all[g === 1 ? 0 : 1], r); if (lit) addTop(Bd.lit[g === 1 ? 0 : 1], r);
       }
     }
   }
@@ -592,9 +594,10 @@ function drawColl(ctx, G, pic, R, h, up, plain) {
   if (G.holes) { ctx.fillStyle = 'rgba(9,7,5,0.95)'; ctx.fill(G.holes); if (!plain) { ctx.lineWidth = 0.4; ctx.strokeStyle = 'rgba(230,190,130,0.55)'; ctx.stroke(G.holes); } } // bullet holes in boards: dark punctures with a splintered light rim (you see and shoot through them, as on the map)
   for (const [c, T2] of G.topPaths) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); } // wall tops: plain colour
   for (const r of G.tops) { // cars, crates, shelves: their tops from the map picture
+    if (r.rc) { const [a, b, c, d] = r.rc, [tx, ty] = up(a, b, r.f), s = 1 + h * r.f; pic.drawTo(ctx, a * S, b * S, (c - a) * S, (d - b) * S, tx, ty, (c - a) * s, (d - b) * s); continue; } // furniture: its own rectangle
     const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f;
     if (r.sh) { ctx.save(); ctx.beginPath(); for (const P of r.sh) { for (let i = 0; i < P.length; i += 2) { const [a, b] = up(P[i], P[i + 1], r.f); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); } ctx.closePath(); } ctx.clip(); }
-    pic.drawTo(ctx, X * S, Y * S, w * S, CELL * S, tx, ty, w * s, CELL * s);
+    const hh = (r.rows || 1) * CELL; pic.drawTo(ctx, X * S, Y * S, w * S, hh * S, tx, ty, w * s, hh * s);
     if (r.sh) ctx.restore();
   }
 }
