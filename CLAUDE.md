@@ -74,6 +74,7 @@ only add to this file if it is a rule every session needs.
   doors/windows on a shared wall go AFTER the wing's `box`; never run a shape through
   furniture, doors or stairs. `node tests/reach.js`, `tests/openings.js` must pass.
 - Tests import `tests/_tmpdata.js` first so they never write to the real `data/`.
+- Test browser profiles in /tmp (`r62d-ff.*`, `r62d-gpu.*`, `r62d-gs.*`) are 140-270 MB each: delete each one when its run ends (they piled up to 104 GB by 2026-11-18). Never chown `/tmp/claude-0` (it must stay root-owned or new Claude chats refuse to start).
 - Menu text has a minimum size (he asked 2026-11-17): write every font size in style.css as `max(<size>, var(--mf))` (see the end of style.css); `tests/textsize.mjs` must list 0 small text for `pc` and `phone`.
 - Node is not on PATH in a plain session: run tests through
   `nix develop /home/insideabush/nixos-config#vibe-web --command ...` (a failing `node` hides in grep).

@@ -1564,3 +1564,34 @@ html.touch #mapPick b { white-space: normal; letter-spacing: 0.02em; line-height
 /* Free play's operators / guns / god mode panel (he asked 2026-11-17: its text was still barely readable): bigger
    small print there than in the other menus. The corner buttons (fullscreen, settings, leave) keep their old size. */
 #freeOps { --minpx: 15px; } html.touch #freeOps { --minpx: 13px; }
+/* Operator select (he asked 2026-11-18): the role cards show what each operator looks like; on a phone all five roles
+   fit side by side without scrolling while you choose; LOCK IN stays on the screen; role tabs never cut their names */
+#roleBar.choose .rbOps { display: flex; flex-wrap: wrap; gap: 6px; padding-left: calc(1.4em * 22 / 15 + 9px); margin-top: 4px; }
+#roleBar.choose .rbOp { display: flex; flex-direction: column; align-items: center; width: 54px; gap: 2px; }
+#roleBar.choose .rbOp canvas { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.04); }
+#roleBar.choose .rbOp em { font: 700 max(10px, var(--mf)) var(--head); font-style: normal; letter-spacing: 0.04em; color: #cfd6dc; white-space: nowrap; }
+#roleBar.choose .rbOp.ban { opacity: 0.35; } #roleBar.choose .rbOp.ban em { text-decoration: line-through; }
+#roleBar:not(.choose):not(.place) button { flex: 1 1 auto; min-width: 0; padding: 7px 3px; letter-spacing: 0.03em; white-space: nowrap; }
+#roleBar:not(.choose):not(.place) button b { gap: 4px; } #roleBar:not(.choose):not(.place) .rIcon { width: 1em; height: 1em; }
+.selhead > div:first-child { flex: 1 1 auto; min-width: 0; } .selRight { flex: none; } #spawnMap { flex: 0 1 auto; min-width: 0; }
+html.touch #siteChoice { flex-wrap: wrap; } html.touch #spawnMap { max-width: 22vw; height: auto; aspect-ratio: 210 / 112; }
+#select.roleChoose #selLo { display: none; }
+#select.roleChoose .selLeft { width: 100%; }
+#roleBar.choose:not(.place) { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; overflow: hidden; align-content: start; }
+#roleBar.choose .rbHead { grid-column: 1 / -1; }
+#roleBar.choose button { align-content: start; } #roleBar.choose button span { padding-left: 0; } #roleBar.choose .rbOps { padding-left: 0; justify-content: center; gap: 8px 4px; } #roleBar.choose .rbOp { width: calc(33.3% - 3px); } #roleBar.choose .rbOp canvas { width: 72px; height: 72px; }
+html.touch #roleBar.choose:not(.place) { gap: 6px; }
+html.touch #roleBar.choose button { align-content: start; padding: 6px 7px; }
+html.touch #roleBar.choose button span { padding-left: 0; line-height: 1.2; }
+html.touch #roleBar.choose .rbOps { padding-left: 0; gap: 3px; justify-content: center; }
+html.touch #roleBar.choose .rbOp { width: calc(33.3% - 2px); }
+html.touch #roleBar.choose .rbOp canvas { width: 56px; height: 56px; }
+html.touch #roleBar.choose .rbOp em { font-size: max(9px, var(--mf)); max-width: 100%; overflow: hidden; text-overflow: clip; }
+/* (the spawn list shares #roleBar: .choose.place keeps its own column layout) */
+#roleBar.choose.place .rbOps { display: none; }
+/* phone operator cards (he found only names showing on a small phone): the picture always keeps its room, the role line
+   gives way, the name and skill stay on one line each */
+html.touch .selLeft #opgrid .op canvas { flex: 1 1 auto; min-height: 46%; }
+html.touch #opgrid .op .role { display: none; }
+html.touch #opgrid .op .nm, html.touch #opgrid .op .ab { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.touch #roleBar:not(.choose):not(.place) button { padding: 6px 2px; letter-spacing: 0; } html.touch #roleBar:not(.choose):not(.place) .rIcon { display: none; }

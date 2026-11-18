@@ -558,3 +558,16 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   and android/build.sh copy his `pro-training.json` into the build as `server/pro-seed.json` (gitignored, never
   committed); `seedTraining` (server/training.js) uses it when it has more rounds than the local knowledge; phones fetch
   it in public/phone/server.js. Tested: an empty data folder starts with 47,651 rounds, 842 drills, 10 pros' views.
+
+## Operator select fixes, phone and computer (2026-11-18, he asked)
+- Role chooser (`#roleBar.choose`): each role card shows every operator's portrait (`.rbOps`/`.rbOp`, `portraitCached`)
+  instead of a list of names; while choosing (`#select.roleChoose`, set in main.js) the big map hides and the five roles
+  sit side by side (grid), on PC and phones, so nothing scrolls. `.choose.place` (the spawn list shares #roleBar) keeps
+  its column.
+- Phone op cards lost their picture at 760x360 (text squeezed the canvas): picture keeps >= 46%, role line hidden on
+  touch, name/skill one line. LOCK IN was off screen at 760x360: header left side shrinks, spawn chips wrap, small map
+  max 22vw. Role tabs cut "BREACHER" (PC 1280, phones): tabs size to their text, tighter spacing, no icon on phones.
+- Swept with tests/phonescreens.mjs (2 phone sizes), tests/textsize.mjs (all menus, 4 sizes; now skips #corner, which he
+  wants kept small) and PC select shots: no new cut-offs (the loading screen's drifting picture is expected).
+- Also found /tmp/claude-0 chowned to insideabush (new Claude chats refused to start) and 104 GB of leftover test
+  browser profiles in /tmp; fixed and cleaned, rule added to CLAUDE.md.

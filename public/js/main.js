@@ -1602,11 +1602,13 @@ function buildSelect(s) {
     rb.innerHTML = (myJob ? '' : '<div class="rbHead">CHOOSE YOUR ROLE</div>') + jobs.map(j => {
       const n = mates.filter(p => p.jb === j.id).length;
       return `<button data-r="${j.id}" class="${myJob === j.id ? 'on' : ''}" title="${esc(j.desc)}"><b>${roleIcon(j.id)}${j.name.toUpperCase()}</b>${n ? `<i>${n}</i>` : ''}`
-        + (myJob ? '' : `<span>${esc(j.desc)}</span><small>${j.ops.map(o => isBan(o) ? `<s>${OPERATORS[o].name.toUpperCase()}</s>` : OPERATORS[o].name.toUpperCase()).join(' · ')}</small>`) + '</button>';
+        + (myJob ? '' : `<span>${esc(j.desc)}</span><div class="rbOps">${j.ops.map(o => `<div class="rbOp${isBan(o) ? ' ban' : ''}" data-op="${o}"><canvas width="96" height="96"></canvas><em>${esc(OPERATORS[o].name.toUpperCase())}</em></div>`).join('')}</div>`) + '</button>';
     }).join('');
     for (const b of rb.querySelectorAll('button')) b.onclick = () => { if (st.me && st.me.lk && !st.reSel) return; audio.ui(); send({ t: 'role', r: b.dataset.r }); };
+    for (const c of rb.querySelectorAll('.rbOp canvas')) portraitCached(c, c.parentElement.dataset.op);
   }
   $('opgrid').classList.toggle('hidden', !myJob || !placed);
+  $('select').classList.toggle('roleChoose', placed && !myJob); // (phones: the roles take the whole width while you choose one)
   for (const d of document.querySelectorAll('#opgrid .op')) d.classList.toggle('hidden', !!myJob && jobOf(d.dataset.op) !== myJob);
   for (const d of document.querySelectorAll('#opgrid .op')) {
     const who = mates.find(p => p.op === d.dataset.op);

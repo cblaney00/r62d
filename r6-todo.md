@@ -9,6 +9,8 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 
 ## Done
+- [x] i noticed that when i go to pick operators in quick match in mobile (probably the other modes too) it doesnt show a picture of the characters when you go to select them, as in, it only shows their name not what they look like. i also noticed the lock in button is cut off the screen, look into other problems that might show up of this same type throughout the menus in both the mobile and computer versions
+- [x] the role selector also only shows the top few roles, thats not a screen that you should need to scroll down, but it may have to be reorganized on mobile
 - [x] lets slow down the movement of both walking and sprinting 13%
 - [x] i think we should pull all of the ads reticle snap distances toward the operator a bit more, iron sights feels too far, but i also think the 2x and sniper scope are too close so maybe just space out the reticles more
 - [x] oh also pressing escape should hit the close button when the free play operator and gun switch menu is active, it keeps pausing my game instead

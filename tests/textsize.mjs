@@ -22,7 +22,7 @@ const small = `(() => { const MIN = ${MIN}, seen = new Map(); window.RULES = ${!
   const zoomOf = e => { let z = 1; for (let x = e; x; x = x.parentElement) z *= parseFloat(getComputedStyle(x).zoom) || 1; return z; };
   const name = e => (e.id ? '#' + e.id : e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\\s+/)[0] : '')) + ' in ' + (e.closest('[id]') || {}).id;
   for (const e of document.body.querySelectorAll('*')) {
-    if (/^(CANVAS|SCRIPT|STYLE|OPTION)$/.test(e.tagName) || (e.closest('#touchUI, #hud, #chat, #game, #over, #fog') && !e.closest('#freeOps, #pause'))) continue;
+    if (/^(CANVAS|SCRIPT|STYLE|OPTION)$/.test(e.tagName) || ((e.closest('#touchUI, #hud, #chat, #game, #over, #fog') && !e.closest('#freeOps, #pause')) || e.closest('#corner'))) continue;
     if (![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
     const r = e.getBoundingClientRect(); if (!r.width || !r.height || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth || !vis(e)) continue;
     const cx = Math.min(innerWidth - 1, Math.max(0, r.left + Math.min(r.width / 2, 8))), cy = Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2)), top = document.elementFromPoint(cx, cy);
