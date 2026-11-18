@@ -2430,6 +2430,15 @@ function frame(nowMs) {
   $('clickIn').classList.toggle('hidden', !(playing() && !st.tv && !menuOpen() && document.pointerLockElement !== cv && !gpRecent() && $('pause').classList.contains('hidden')));
   // Until you click into the game (or after tabbing out) the mouse isn't captured: your aim simply stays where it was.
   // (It used to follow the loose pointer, and the camera sliding after it made everything bounce — he noticed.)
+  // Spawning (he asked 2026-11-18: everyone always spawns like this): the crosshair starts 2 m straight above you on the
+  // screen, whatever the aiming mode, each time you come alive, each new round and each change of operator
+  { const k = !st.tv && me && me.a && !me.dn && me.ct === 'body' && s ? `${s.rd}|${me.op}` : null;
+    if (k && k !== st.spawnKey) {
+      const a = -Math.PI / 2 - (st.rot || 0), d = 2 * PX_PER_M;
+      aimOff = { x: Math.cos(a) * d, y: Math.sin(a) * d }; padAng = a; st.aim = a; st.dzAng = a;
+      mouse.x = VW / 2; mouse.y = VH / 2 - d * (st.zoom || 1); // (Cursor mode: the pointer itself, you being in the middle as you spawn)
+    }
+    st.spawnKey = k; }
   if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone')) {
     const c = cursor(), mw = screenToWorld(c.x, c.y);
     st.aim = freeLive() ? aimAng() : Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x); // (Crosshair mode: its own direction, held in the close dead zone)
