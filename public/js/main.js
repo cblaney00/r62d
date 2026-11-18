@@ -176,6 +176,10 @@ const AIM_MIN = () => touchActive() ? TOUCH_MIN : 46 * DPR / (st.zoom || 1), AIM
 // resting on your character never spins you round. An enemy you can see whose body is within DZ_FOE (0.5 m) of the
 // crosshair switches it off (he chose: near the crosshair), so someone right in front of you can still be hit.
 const DZ_R = () => 46 * DPR / (st.zoom || 1), DZ_FOE = 0.5 * PX_PER_M;
+// he asked (2026-11-18): a crosshair already within 2 m of an enemy you can see stays where it is when you aim in, so
+// putting it on someone before aiming in is never undone; anywhere else aiming in still goes to the sight's distance
+const ADS_KEEP = 2 * PX_PER_M;
+function nearFoe(x, y) { for (const p of st.foesSeen || []) if (Math.hypot(p.x - x, p.y - y) <= ADS_KEEP) return true; return false; }
 function dzLive() {
   const x = st.pred.x + aimOff.x, y = st.pred.y + aimOff.y;
   for (const p of st.foesSeen || []) if (Math.hypot(p.x - x, p.y - y) <= DZ_FOE + hitR(p.op)) return true;
@@ -332,6 +336,7 @@ function freeMove(dx, dy) {
 // aiming in: the crosshair goes to the orange tick if a wall stops bullets on the way (he asked; never nearer than 2 m), else to its sight's distance
 function adsReset() {
   if (st.me && st.me.ro && st.me.ro[0]) return; // on a rope: aiming in leaves the crosshair where it is (no snapping onto walls)
+  if (nearFoe(st.pred.x + aimOff.x, st.pred.y + aimOff.y)) return; // on (within 2 m of) an enemy you see: it stays
   const a0 = aimAng(), ux = Math.cos(a0), uy = Math.sin(a0); let d = adsStart(st.me && st.me.aa ? attFromCode(st.me.aa).sight : 'iron', st.me && st.me.w) * PX_PER_M; // gun first, then sight (he asked)
   // a set distance per sight, whatever distance you were at (he asked); a nearer wall stops it, but not the edge of a
   // doorway: if 2 of 5 lines spread over ±2.5° get through, it goes the full distance (no jumping onto door frames)
@@ -1131,6 +1136,8 @@ function pollPad(dt, view) {
   if (gp.rt > 0.35 && !gpk.fire) mouse.wl++; // a trigger pull also counts as a click (next teammate, ping in a camera)
   const aimReset = gp.lt > 0.35 && !gpk.ads && touchActive();
   if (aimReset && st.hold && !sniperOn(st.me)) touchAimReset(); // a pre-aimed spot stays put when you aim in (sniper scopes still snap out)
+  else if (aimReset && (() => { const q = padPointW(); return nearFoe(q.ax, q.ay); })()) { // within 2 m of an enemy you see: the crosshair stays on that spot (any sight)
+    const q = padPointW(), d = Math.hypot(q.ax - st.pred.x, q.ay - st.pred.y), R = reachOf(st.me, true); padReach = Math.max(0, Math.min(1, (d - AIM_MIN()) / Math.max(1, R - AIM_MIN()))); touchAimReset(); }
   else if (aimReset) { st.hold = null; const me = st.me, R = reachOf(me, true), d = adsStart(me && me.aa ? attFromCode(me.aa).sight : 'iron', me && me.w) * PX_PER_M; padReach = touchFar() ? Math.max(0, Math.min(1, (d - AIM_MIN()) / Math.max(1, R - AIM_MIN()))) : 0.22; touchAimReset(); } // phone (he asked): aiming in pulls the crosshair in to ~2.5 m, like the mouse's aim-in reset
   gpk.fire = gp.rt > 0.35 ? 1 : 0; gpk.ads = gp.lt > 0.35 ? 1 : 0;
   if (!gpk.fire && touchActive() && autoFire()) gpk.fire = autoShot(); // phone: auto fire while the crosshair is on an enemy you see
@@ -4951,6 +4958,7 @@ function updateCard() {
 const TIPS = [
   'Put a trap, camera, shield or wire in the wrong spot? Hold {interact} on it to pick it back up and place it again. Only your own, never a teammate\'s.',
   'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',
+  'Aiming in moves your crosshair out to your sight\'s distance, unless it is already on an enemy you can see (within 2 m): then it stays right where you put it.',
   'Walk ({walk}) or crouch ({crouch}) to move without footsteps — just like CS2.',
   'Crouch while sprinting to power slide. You can only shoot forward from the hip until you are back up.',
   'Hold sprint and forward to run where you aim, whichever way the screen faces. It is very loud, and your gun takes a moment to come up.',
