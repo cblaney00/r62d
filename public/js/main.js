@@ -4147,7 +4147,7 @@ function hud(s) {
   setHTML('gadgets',
     `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : me.scd ? `${ab.name} ready in ${Math.ceil(me.scd)}s` : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : me.ap ? 'Piercing round loaded' : me.su2 ? `Spotting ${Math.ceil(me.su2)}s · aim in` : me.gw2 ? `Ghillie ${Math.ceil(me.gw2)}s` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
     `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>${label('gadget')}</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +
-    (side === 'atk' ? `<div class="${s.ph === PHASE.ACTION && !(me.dr > 0) ? 'out' : ''}"><b>${label('drone')}</b>${s.ph === PHASE.ACTION ? 'Put out a drone' : 'Drone'}<em>${s.ph === PHASE.ACTION ? me.dr ?? 0 : ''}</em></div><div><b>${label('view')}</b>Cams &amp; drones</div>` // (he asked 2026-11-18: the key for a new drone shows here too)
+    (side === 'atk' ? (() => { const dr = `<div class="${s.ph === PHASE.ACTION && !(me.dr > 0) ? 'out' : ''}"><b>${label('drone')}</b>${s.ph === PHASE.ACTION ? 'Put out a drone' : 'Drone'}<em>${s.ph === PHASE.ACTION ? me.dr ?? 0 : ''}</em></div>`, cams = `<div><b>${label('view')}</b>Cams &amp; drones</div>`; return isTouch ? dr + cams : cams + dr; })() // (he asked 2026-11-18: the key for a new drone shows here too; on a computer Cams & drones first, he asked the same day)
       : `<div><b>${label('view')}</b>${viewName}</div>`));
   // view label
   let vl = '';
@@ -5103,8 +5103,8 @@ window.__r62d = { padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
-  try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value, +$('steadySens').value, +$('farSens').value])); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, farSens: +$('farSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode, cols: { ...COLS } };
+  try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value, +$('steadySens').value, +$('farSens').value])); localStorage.setItem('r62d-sensv', String(SENS_V)); } catch {}
+  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sv: SENS_V, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, farSens: +$('farSens').value, aim: aimMode, aimV: 2, xh, lean: leanMode, cols: { ...COLS } };
 }
 let saveTimer = 0;
 // Settings → COLOURS (he asked 2026-11-14): ready colours + a custom picker for each (teamcol.js)
@@ -5120,13 +5120,15 @@ function renderCols() {
 }
 renderCols();
 $('colsReset').onclick = () => { audio.ui(); setCols(DEFAULT_COLS); renderCols(); saveSettings(); };
+const SENS_V = 2;
 function saveSettings() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => { if (st.token) send({ t: 'settings', s: currentSettings() }); }, 400);
 }
 function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else if (s.binds && s.bindsVersion === 4) { applyBinds(s.binds, 4); setTimeout(saveSettings, 500); } else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
-  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens', 'steadySens', 'farSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
+  const sensOld = s.sv !== SENS_V; if (sensOld) setTimeout(saveSettings, 500); // saved before the new mouse defaults: everyone starts on them once
+  for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens', 'steadySens', 'farSens']) if (typeof s[k] === 'number' && !(sensOld && /ens$/.test(k))) $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.lean) setLean(s.lean, false);
   if (s.cols) { setCols(s.cols); renderCols(); }
@@ -5153,7 +5155,8 @@ setInterval(() => { if (document.pointerLockElement && document.pointerLockEleme
 $('pResume').addEventListener('click', () => { if (playing() && !isTouch && !st.tv) lockMouse(cv); }); // TV: nothing to aim, keep the mouse free // a phone has no mouse to capture (asking anyway re-opened this menu)
 const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; $('steadySensVal').textContent = ($('steadySens').value / 100).toFixed(2) + '×'; $('farSensVal').textContent = ($('farSens').value / 100).toFixed(2) + '×'; };
 for (const id of ['sens', 'adsSens', 'steadySens', 'farSens']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
-try { const v = JSON.parse(localStorage.getItem('r62d-sens') || 'null'); if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; if (v[2]) $('steadySens').value = v[2]; if (v[3]) $('farSens').value = v[3]; } } catch {}
+// (he asked 2026-11-18: the mouse 30% quicker by default, 1.00 → 1.30, and everyone moved onto it once: SENS_V)
+try { const v = localStorage.getItem('r62d-sensv') === String(SENS_V) ? JSON.parse(localStorage.getItem('r62d-sens') || 'null') : null; if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; if (v[2]) $('steadySens').value = v[2]; if (v[3]) $('farSens').value = v[3]; } } catch {}
 showSens();
 // Every slider in Settings also has a box to type the number into (he asked). It shows the number the way the
 // slider's label did (sensitivity as 1.00, not 100) and keeps up when settings are loaded from the profile.
@@ -5181,7 +5184,7 @@ function setAim(m, save = true) {
   for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
   if (m !== 'cursor') { padAng = st.aim || 0; padReach = 0.6; }
   if (m === 'free') aimOff = { x: Math.cos(st.aim || 0) * 150, y: Math.sin(st.aim || 0) * 150 };
-  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', face: 'Face: the map stays still and the mouse turns your character. W walks the way you face, A and D step sideways, S steps back. Aiming in locks you to a narrow 30° area until you let go. Mouse up / down moves the crosshair further / nearer.', classic: 'Crosshair Classic: the first Crosshair mode. The crosshair moves the way your mouse moves and stays with you; the further out it is, the more mouse it takes to turn (like a pointer round a circle). Aiming in leaves it where it is.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Hold sprint and W to sprint toward the crosshair. Push it past the edge of the screen to look further: it goes anywhere you can see. Pull it through your character to turn round: while it is over your character your aim stays as it was (unless an enemy is right by the crosshair), so resting the mouse there never spins you.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
+  $('aimHint').textContent = { spin: 'Rotate: like an FPS. The view turns with you so you always face up the screen. Mouse left / right turns, up / down moves the crosshair further / nearer, W always walks forward.', face: 'Face: the map stays still and the mouse turns your character. W walks the way you face, A and D step sideways, S steps back. Aiming in locks you to a narrow 30° area until you let go. Mouse up / down moves the crosshair further / nearer.', classic: 'Crosshair Classic: the first Crosshair mode. The crosshair moves the way your mouse moves and stays with you; the further out it is, the more mouse it takes to turn (like a pointer round a circle). Aiming in leaves it where it is.', free: 'Crosshair: the crosshair moves the way your mouse moves and stays with you as you walk. Hold sprint with the move keys to sprint that way on the screen (8 directions). Push it past the edge of the screen to look further: it goes anywhere you can see. Pull it through your character to turn round: while it is over your character your aim stays as it was (unless an enemy is right by the crosshair), so resting the mouse there never spins you.', pad: 'Aim pad: the ring on the right is a joystick for the mouse. Circle it to turn, push out to look further, go through the middle to turn round.',
     turn: 'Turn: like an FPS. Mouse left / right turns you, mouse up / down moves the crosshair further / nearer.',
     cursor: 'Cursor: you aim at wherever the mouse pointer is.' }[m];
   if (save) saveSettings();

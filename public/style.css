@@ -244,7 +244,7 @@ tr.me { color: var(--gold); } tr.dead { opacity: 0.5; }
 #conn { position: absolute; inset: 0; display: grid; place-items: center; font: 700 max(28px, var(--mf)) var(--head); letter-spacing: 0.2em; background: rgba(0,0,0,0.85); pointer-events: auto; }
 
 /* ---------- settings ---------- */
-#settings { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(1000px, 96vw); height: min(660px, 92vh); display: grid; grid-template-columns: 210px 1fr;
+#settings { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(1200px, 96vw); height: min(792px, 92vh); display: grid; grid-template-columns: 240px 1fr; /* he asked 2026-11-18: about 20% bigger (was 1000 × 660, 210) */
   background: rgba(10,13,18,0.97); border: 1px solid var(--line); pointer-events: auto; z-index: 5; }
 #settings.hidden { display: none; }
 #settings .setSide { display: flex; flex-direction: column; gap: 4px; padding: 20px 0; border-right: 1px solid var(--line); background: rgba(255,255,255,0.025); min-height: 0; }
