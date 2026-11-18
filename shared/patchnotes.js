@@ -105,4 +105,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-17', k: 'gun', id: 'sniper', t: 'Sniper scope: a clear lane now runs from you to the scope through the darkened screen, so anything in the bullet\'s path shows.', v: 0 },
   { d: '2026-11-17', k: 'mech', id: 'reticle', t: 'The crosshair is now the reticle of the sight on the gun you have out (iron sights, red dot, holo, 1.5× prism, 2× scope, sniper), a little see-through; the Crosshair settings page is gone.', v: 0 },
   { d: '2026-11-17', k: 'gun', id: 'looks', t: 'New looks for five guns that looked like others: Tandem Carbine (sand, skeleton stock), Auger AP SMG (no stock, orange band), Trestle LMG (wood, pan magazine on top), Heron Marksman (steel blue, thumbhole stock), Needle Target Pistol (long target barrel, wooden grip).', v: 0 },
+  { d: '2026-11-17', k: 'mech', id: 'menus', t: 'Esc closes free play\'s operators and guns panel (and other menus) without pausing the game straight after.', v: 0 },
 ];

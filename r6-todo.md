@@ -9,6 +9,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 
 ## Done
+- [x] oh also pressing escape should hit the close button when the free play operator and gun switch menu is active, it keeps pausing my game instead
 - [x] the sentry carbine and tandem carbine look nearly identical, change the tandem carbine's model. the lark and auger have the same issue, the ox belt fed and the trestle as well, the longbow and the heron, the vex .50 and the needle target pistol too
 - [x] lets also have the reticle no longer be customizable, the reticle should resemble the reticle of the type of sights you are using on the weapon that you currently have out
     - all the reticles should be easy to see and non intrusive, some level of opacity to them, not too big or small

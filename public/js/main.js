@@ -974,6 +974,11 @@ addEventListener('keydown', e => {
   if (!(typing && COPY_KEYS.has(e.code))) e.preventDefault();
 }, { capture: true });
 let rebinding = null;
+// Esc closing a menu must not then pause the game (he found it with free play's operators panel): taking the mouse back
+// while Esc is still down let the browser read that same Esc as "let go of the mouse", and losing the mouse pauses.
+addEventListener('keydown', e => { if (e.code === 'Escape') st.escDown = true; }, { capture: true });
+addEventListener('keyup', e => { if (e.code === 'Escape') { st.escDown = false; st.escAt = performance.now() / 1000; } }, { capture: true });
+addEventListener('blur', () => { st.escDown = false; });
 addEventListener('keydown', e => {
   if (rebinding) { e.preventDefault(); if (e.code !== 'Escape') setBind(rebinding.id, rebinding.slot, e.code); rebinding = null; renderSettings(); return; }
   if (e.code === 'Escape' && document.activeElement && document.activeElement.tagName === 'INPUT') document.activeElement.blur();
@@ -2340,7 +2345,7 @@ function frame(nowMs) {
   // he asked: no click needed to take the mouse when a match starts. Browsers only allow it soon after a click (any menu
   // click counts; the desktop app's Firefox remembers it for the day, play.sh) or in full screen; else CLICK TO TAKE CONTROL shows
   if (playing() && !st.tv && !isTouch && !menuOpen() && $('pause').classList.contains('hidden') && document.pointerLockElement !== cv && !gpRecent() &&
-      document.hasFocus() && (st.autoLockN || 0) < 3 && now - (st.autoLockT || -1e9) > 1.5) { st.autoLockT = now; st.autoLockN = (st.autoLockN || 0) + 1; lockMouse(cv); }
+      document.hasFocus() && !st.escDown && now - (st.escAt || -1e9) > 0.4 && (st.autoLockN || 0) < 3 && now - (st.autoLockT || -1e9) > 1.5) { st.autoLockT = now; st.autoLockN = (st.autoLockN || 0) + 1; lockMouse(cv); }
   if (!playing()) st.autoLockN = 0; // a few tries per match; the browser said no: the click-in sign stays
   $('clickIn').classList.toggle('hidden', !(playing() && !st.tv && !menuOpen() && document.pointerLockElement !== cv && !gpRecent() && $('pause').classList.contains('hidden')));
   // Until you click into the game (or after tabbing out) the mouse isn't captured: your aim simply stays where it was.
@@ -4618,6 +4623,7 @@ function showOps(op) { audio.ui('open'); openOps($('opsPage'), { profile: st.pro
 function showProfile() { audio.ui('open'); if (st.token) openProfile($('profilePage'), { token: st.token }); }
 // Esc closes whatever is open, otherwise opens/closes the pause menu during a match.
 function escape() {
+  st.escAt = performance.now() / 1000; // (the mouse is not taken back until Esc is let go: see the auto-lock in frame)
   if (!$('armoryPage').classList.contains('hidden') && armoryHoldsEsc()) return; // Esc first lets go of the captured mouse, as in a match
   for (const id of ['settings', 'opsPage', 'profilePage', 'armoryPage', 'mapsPage', 'freeOps', 'lanDlg', 'playbookPage', 'bkPage']) if (!$(id).classList.contains('hidden')) {
     if (id === 'opsPage') closeOps($(id)); else if (id === 'armoryPage') closeArmory($(id)); else if (id === 'mapsPage') closeMapInfo($(id)); else if (id === 'playbookPage') closePlaybook($(id)); else if (id === 'bkPage') closeKnowledge($(id)); else $(id).classList.add('hidden');

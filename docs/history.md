@@ -530,3 +530,8 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   stock, vented `shroud`), Auger (no stock, orange `stripe` band, curved mag), Trestle (olive + wood, new `pan` magazine on
   top, also in hand in sprites.js), Heron (steel blue, black thumbhole stock, brake), Needle (black, new `target` long thin
   barrel with a weight, wooden grip). Checked side by side in a test browser.
+
+## Esc closes the free play panel without pausing (2026-11-17, he asked)
+- Esc closed #freeOps, but the auto mouse-capture in `frame` took the mouse back on the next frame while Esc was still
+  down; the browser read that Esc as "let go of the mouse", and `pointerlockchange` opened the pause menu. Now the
+  auto-capture waits until Esc is released (`st.escDown`) and 0.4 s more (`st.escAt`). Checked in a test browser.
