@@ -57,7 +57,7 @@ export function wallIns(m, k) {
 export function lightMap(map) {
   const W = map.W, H = map.H, N = W * H, room = new Int16Array(N).fill(-1);
   map.rooms.forEach((r, i) => { for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) room[y * W + x] = i; });
-  const tile = k => map.tiles[k], passes = k => { const t = tile(k); return !SOLID.has(t) && t !== T.TALL && t !== T.VOID && t !== T.DSHIELD; };
+  const tile = k => map.tiles[k], passes = k => { const t = tile(k); return !SOLID.has(t) && t !== T.VOID && t !== T.DSHIELD; }; // (over furniture too: the floor round a table is lit like the rest)
   const L = new Float32Array(N), lamp = new Float32Array(N);
   for (let k = 0; k < N; k++) L[k] = room[k] >= 0 ? 0.64 : 1; // (0.4 made insides too dark and blue, he said)
   const seen = new Int32Array(N).fill(-1); let stamp = 0;
@@ -85,7 +85,7 @@ export function lightMap(map) {
   const lv = new Float32Array(N); for (let k = 0; k < N; k++) lv[k] = room[k] >= 0 ? Math.min(1.2, L[k] + lamp[k]) : -1;
   const lvAt = (n, k) => n >= 0 && n < N && lv[n] >= 0 ? lv[n] : lv[k];
   const grad = k => [lvAt(k + 1, k) - lvAt(k - 1, k), lvAt(k + W, k) - lvAt(k - W, k)];
-  const raised = n => { const t = tile(n); return SOLID.has(t) || t === T.TALL || t === T.LOW || t === T.DSHIELD; };
+  const raised = n => { const t = tile(n); return SOLID.has(t) || t === T.DSHIELD; }; // (furniture casts its own shadow, the shape of the piece)
   // a soft contact shadow on the floor beside anything standing, on the side away from the light (the light comes from
   // the brighter side, so the thing between the light and the floor shades it); stretched smooth over the floor
   const shadow = new Float32Array(N);
@@ -205,9 +205,10 @@ function boardLook(m, k, X, Y, dx, dy, f0, f) {
 }
 // a table, desk, bench or railing on legs (FURN 'legs'): a soft shadow on the floor under it (it covers the flat picture of
 // it there), a leg at each corner up to the underside of the top, and the top's thin edge; the top itself is the picture
-function legsOf(P, f, G, x, y) {
-  const X0 = P.x * CELL, Y0 = P.y * CELL, X1 = (P.x + P.w) * CELL, Y1 = (P.y + P.h) * CELL, ft = f * 0.78, s = Math.max(1.1, Math.min(1.8, Math.min(X1 - X0, Y1 - Y0) / 7)), e = 1;
-  for (let yy = P.y; yy < P.y + P.h; yy++) G.tops.push({ x: P.x, y: yy, n: P.w, f: 0.0001, g: 1, tc: 'rgba(8,9,11,0.62)', low: true });
+function legsOf(P, f, G, x, y, B) {
+  const [X0, Y0, X1, Y1] = B, ft = f * 0.78, s = Math.max(1.1, Math.min(1.8, Math.min(X1 - X0, Y1 - Y0) / 7)), e = 1, poly = [X0, Y0, X1, Y0, X1, Y1, X0, Y1];
+  G.tops.push({ x: P.x, y: P.y, n: P.w, f: 0.0001, g: 1, tc: 'rgba(8,9,11,0.62)', low: true, sh: [poly] }); // the shadow under it: its own shape, no bigger
+  for (let yy = P.y; yy < P.y + P.h; yy++) G.tops.push({ x: P.x, y: yy, n: P.w, f, g: 1, sh: [poly] }); // its top: its own picture, cut to it
   const box = (ax, ay, bx, by, f0, f1, rgb) => {
     for (const [dx, dy, lt] of FACES) {
       const c = `rgb(${rgb[0] * lt | 0},${rgb[1] * lt | 0},${rgb[2] * lt | 0})`;
@@ -239,6 +240,16 @@ function railOf(P, f, G) {
   if (hor) box(X, cy - b, X + P.w * CELL, cy + b, f - 0.04, f, [125, 132, 139]); else box(cx - b, Y, cx + b, Y + P.h * CELL, f - 0.04, f, [125, 132, 139]);
   for (let i = 0; i <= n; i++) { const px = hor ? Math.min(X + i * CELL, X + P.w * CELL - p / 2) : cx, py = hor ? cy : Math.min(Y + i * CELL, Y + P.h * CELL - p / 2);
     box(Math.max(X, px - p / 2), Math.max(Y, py - p / 2), Math.max(X, px - p / 2) + p, Math.max(Y, py - p / 2) + p, 0, f - 0.04, [74, 80, 86]); }
+}
+// solid furniture (a couch, a counter, a shelf...): a block the size of its own picture, not of its cells
+function solidOf(P, f, G, B, rgb) {
+  const [X0, Y0, X1, Y1] = B, poly = [X0, Y0, X1, Y0, X1, Y1, X0, Y1];
+  for (const [dx, dy, lt] of FACES) {
+    const c = `rgb(${rgb[0] * lt | 0},${rgb[1] * lt | 0},${rgb[2] * lt | 0})`;
+    if (dx) { const ex = dx > 0 ? X1 : X0, x = Math.floor((ex - dx * 0.5) / CELL), y = Math.floor((Y0 + Y1) / 2 / CELL); G.faces.push({ ax: ex, ay: Y0, bx: ex, by: Y1, nx: dx, ny: 0, px: ex, py: Y0, f, x, y, c }); }
+    else { const ey = dy > 0 ? Y1 : Y0, x = Math.floor((X0 + X1) / 2 / CELL), y = Math.floor((ey - dy * 0.5) / CELL); G.faces.push({ ax: X0, ay: ey, bx: X1, by: ey, nx: 0, ny: dy, px: X0, py: ey, f, x, y, c }); }
+  }
+  for (let yy = P.y; yy < P.y + P.h; yy++) G.tops.push({ x: P.x, y: yy, n: P.w, f, g: 1, sh: [poly] });
 }
 function vehOf(P, f, G) {
   const [a, e, cut, col] = VEH[P.kind](P), hor = P.w > P.h, ix = hor ? e : a, iy = hor ? a : e;
@@ -301,9 +312,14 @@ function block(R, m, bx, by) {
       const t = m.tiles[k], base = FU && FU.col ? FU.col : t === T.SOFT && m.mat && m.mat[k] === MAT.BRICK ? BRICK : SIDE[t] || SIDE[T.HARD], X = x * CELL, Y = y * CELL;
       if (FU && FU.p.kind === 'railing') { if (FU.p.x === x && FU.p.y === y) railOf(FU.p, f, out[1]); continue; } // a railing: a rail on posts (its cells lifted whole looked like a slab)
       if (FU && VEH[FU.p.kind]) { if (FU.p.x === x && FU.p.y === y) vehOf(FU.p, f, out[1]); continue; } // a vehicle: its own body, once
-      if (FU && FU.legs) { // on legs: no block; once per piece (at its top-left cell) its legs, its thin top edge and a soft shadow under it
-        if (FU.p.x === x && FU.p.y === y) legsOf(FU.p, f, out[1], x, y);
-        if (!run) run = { x, y, n: 0, f, g, tc, iN, iS, iW: 0 }; run.n++; run.iE = 0;
+      if (FU && FU.legs) { // on legs: no block; once per piece (at its top-left cell) its legs, its thin top edge, its top and a soft shadow under it
+        if (run) { out[run.g].tops.push(run); run = null; }
+        if (FU.p.x === x && FU.p.y === y) legsOf(FU.p, f, out[1], x, y, R.body ? R.body(FU.p) : [X, Y, X + FU.p.w * CELL, Y + FU.p.h * CELL]);
+        continue;
+      }
+      if (FU && FU.col && FU.p.kind !== 'crates' && FU.p.kind !== 'pillar' && R.body) { // solid: one block the size of its picture, once
+        if (run) { out[run.g].tops.push(run); run = null; }
+        if (FU.p.x === x && FU.p.y === y) solidOf(FU.p, f, out[1], R.body(FU.p), FU.col);
         continue;
       }
       const col = lt => `rgb(${base[0] * lt | 0},${base[1] * lt | 0},${base[2] * lt | 0})`, faces = out[g].faces;
@@ -568,7 +584,7 @@ function deco(G, F, up) {
 function drawColl(ctx, G, pic, R, h, up, plain) {
   if (!G.n) return;
   const S = pic.width / R.Wp;
-  for (const [c, T2] of G.lowTops) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); }
+  for (const [c, T2] of G.lowTops) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); }
   const picTop = r => { const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f; pic.drawTo(ctx, X * S, Y * S, w * S, CELL * S, tx, ty, w * s, CELL * s); };
   for (const r of G.under) picTop(r); // boards in windows and doorways: before the faces, so the wall above them covers them from the side
   for (const [c, p] of G.paths) { ctx.fillStyle = c; ctx.fill(p); }

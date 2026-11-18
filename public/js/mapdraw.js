@@ -64,6 +64,7 @@ export class Tiled {
 export class MapRenderer {
   constructor(map, baseTiles, scale) { // scale: picture pixels per world pixel (default: the graphics setting's)
     this.map = map; this.base = baseTiles; this.S = scale || S;
+    this.body = p => propBody(p, map); // (look.js raises furniture by this: the piece itself, not its cells)
     this.Wp = map.W * CELL; this.Hp = map.H * CELL;
     this.c = new Tiled(Math.ceil(this.Wp * this.S), Math.ceil(this.Hp * this.S)); // the map picture (shown by mount)
     this.ctx = this.dctx = this.c.tiles[0].ctx; // set to each piece in turn while drawing (onTiles)
@@ -388,7 +389,7 @@ export class MapRenderer {
     // soft contact shadows on the floor beside walls
     for (let y = ey0; y <= ey1; y++) for (let x = ex0; x <= ex1; x++) {
       const t = this.t(x, y);
-      if (!SOLID.has(t) && t !== T.TALL) continue;
+      if (!SOLID.has(t)) continue; // (furniture casts its own shadow, the shape of the piece: drawProp's shadowRect)
       const X0 = x * CELL, Y0 = y * CELL, sh = this.sh(x, y);
       if (sh) { // a sloped or curved wall casts its own shape
         for (const [ox, oy, a] of [[1, 2, 0.26], [2.5, 4.5, 0.12]]) {
@@ -828,6 +829,27 @@ export const STAIR_STY = {
 };
 const CAR_COLORS = ['#8c1d1d', '#1d3f73', '#d8d8d4', '#2c2c2e', '#5e6a72', '#3d5b3a', '#b48a2c'];
 
+// The part of a piece's picture that is the thing itself (not its shadow, not the floor showing round it), in world px
+// [x0, y0, x1, y1], measured once from the picture: what look.js raises (he asked 2026-11-18: no more floor lifted
+// round tables, couches and cars). Falls back to its whole cells.
+const BODY = new WeakMap();
+let bodyCv = null;
+export function propBody(p, m) {
+  let b = BODY.get(p); if (b) return b;
+  const X = p.x * CELL, Y = p.y * CELL, W = p.w * CELL, H = p.h * CELL, k = 2, w = W * k, h = H * k;
+  b = [X, Y, X + W, Y + H];
+  try {
+    if (!bodyCv) bodyCv = document.createElement('canvas');
+    if (bodyCv.width < w) bodyCv.width = w; if (bodyCv.height < h) bodyCv.height = h;
+    const c = bodyCv.getContext('2d', { willReadFrequently: true });
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, w, h); c.setTransform(k, 0, 0, k, -X * k, -Y * k);
+    drawProp(c, p, m); c.setTransform(1, 0, 0, 1, 0, 0);
+    const d = c.getImageData(0, 0, w, h).data; let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 150) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 >= x0 && (x1 - x0) > 3 && (y1 - y0) > 3) b = [X + x0 / k, Y + y0 / k, X + (x1 + 1) / k, Y + (y1 + 1) / k];
+  } catch { /* (no canvas: whole cells) */ }
+  BODY.set(p, b); return b;
+}
 export function drawProp(ctx, p, m) {
   const X = p.x * CELL, Y = p.y * CELL, W = p.w * CELL, H = p.h * CELL;
   const h = (i) => hash(p.x, p.y, i);

@@ -2931,18 +2931,36 @@ function playerFoley(p, a, moved, own, dt) {
 }
 
 // ---------------- drawing ----------------
+// Sight shape. The rays sit on a grid fixed to the map (not to your aim), so turning or dragging the view
+// leaves every ray where it was and the shadow edges stay still (he saw them shake). Where two rays land far
+// apart (a door frame, a wall corner) the edge is found by halving the gap, so it sits on the real corner.
+const TAU = Math.PI * 2;
 function visionPolygon(v, sm, rays = 0) {
-  const pts = [];
-  const full = v.fov >= Math.PI * 2 - 0.01;
-  const n = rays || Math.round((full ? 360 : 300) * gq.rays);
-  if (!full) pts.push(v.x, v.y);
-  for (let i = 0; i <= n; i++) {
-    const a = v.ang - v.fov / 2 + v.fov * i / n;
-    const d = Math.min(v.range, castSight(st.map, v.x, v.y, a, v.range, sm, false, !!v.low) + 7);
-    pts.push(v.x + Math.cos(a) * d, v.y + Math.sin(a) * d);
+  const pts = [], full = v.fov >= TAU - 0.01, low = !!v.low, map = st.map, R = v.range;
+  const per = rays ? (full ? rays : rays * TAU / v.fov) : (full ? 360 : 300 * TAU / 1.9) * gq.rays; // rays round a whole circle
+  const M = Math.max(16, Math.round(per / 8) * 8), step = TAU / M;
+  const cast = a => Math.min(R, castSight(map, v.x, v.y, a, R, sm, false, low) + 7);
+  let a0, a1;
+  if (full) { a0 = 0; a1 = TAU; } else { a0 = v.ang - v.fov / 2; a1 = v.ang + v.fov / 2; pts.push(v.x, v.y); }
+  const refine = !rays, JUMP = 18;
+  let pa = a0, pd = cast(a0);
+  pts.push(v.x + Math.cos(pa) * pd, v.y + Math.sin(pa) * pd);
+  for (let k = Math.floor(a0 / step) + 1; ; k++) {
+    let a = k * step, last = false;
+    if (a >= a1 - 1e-6) { a = a1; last = true; }
+    const d = cast(a);
+    if (refine && Math.abs(d - pd) > JUMP) { // an edge between these two rays: find it
+      let lo = pa, hi = a, dl = pd, dh = d;
+      for (let i = 0; i < 5; i++) { const m = (lo + hi) / 2, dm = cast(m); if (Math.abs(dm - dl) < Math.abs(dm - dh)) { lo = m; dl = dm; } else { hi = m; dh = dm; } }
+      pts.push(v.x + Math.cos(lo) * dl, v.y + Math.sin(lo) * dl, v.x + Math.cos(hi) * dh, v.y + Math.sin(hi) * dh);
+    }
+    if (!(full && last)) pts.push(v.x + Math.cos(a) * d, v.y + Math.sin(a) * d);
+    pa = a; pd = d;
+    if (last) break;
   }
   return pts;
 }
+window.__r62dVis = (v, sm, r) => visionPolygon(v, sm || [], r || 0); // (tests/sightjitter.mjs)
 function nearPolygon(v, sm) {
   const pts = [];
   for (let i = 0; i <= 64; i++) {
