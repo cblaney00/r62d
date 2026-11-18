@@ -1061,14 +1061,14 @@ const slideAim = a => st.pred.slA + Math.max(-SLIDE.lock, Math.min(SLIDE.lock, a
 function trySlide() { if (!st.pred || !st.pred.spr || st.pred.scd > 0 || !st.me || st.me.ct !== 'body') return false; st.slideReq = performance.now(); return true; }
 // he asked: sprint + S sprints too (he kept pressing it), and (2026-11-16) sprint + A or D exactly the same: on your body
 // sprint with S, A or D (and no W) is sent as sprint + W alone, so you run where you aim
-// Sprint + two direction keys on a computer (he asked 2026-11-18: W+A sprints north-west, no strafe run): the keys pick one
+// Sprint on a computer (he asked 2026-11-18: 8-directional, never following the mouse; W+A sprints north-west): the keys pick one
 // of the eight directions on the screen and you turn to face it and sprint that way; the world angle, or null
 function sprintDiag() {
   const me = st.me;
   if (isTouch || gpRecent() || !me || me.ct !== 'body' || !me.a || me.dn || !keys.has('sprint') || steadying() || st.tv) return null;
   if (mouse.l || keys.has('fire') || adsHeld() || keys.has('crouch') || st.prone || performance.now() < (st.sprintHold || 0) || sliding() || ropeOf()) return null;
   const mx = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0), my = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0);
-  return mx && my ? Math.atan2(my, mx) - (st.rot || 0) : null;
+  return mx || my ? Math.atan2(my, mx) - (st.rot || 0) : null; // (he asked again 2026-11-18: never by the mouse on a computer, 8 directions from the keys alone, one key too)
 }
 const sprintBack = () => !!(st.me && st.me.ct === 'body' && !gpRecent() && keys.has('sprint') && (keys.has('down') || keys.has('left') || keys.has('right')) && !keys.has('up') && !steadying() && sprintDiag() === null);
 // How much the movement keys are turned: Rotate view, Face aiming (W goes the way you face), sprint + W (he asked: where you aim).
@@ -3311,6 +3311,7 @@ function draw(s, view, now, dt) {
     drawOperator(c, {
       hang: hangW !== undefined ? (p.rp === 3 ? 'inv' : 'up') : null, wallA: hangW, zb: hangW !== undefined ? ((isMe ? st.ropeH : p.rz) ?? 0.5) - 0.55 : 0,
       x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, sit: a.sitK, legR: a.legR, legF: a.legF, slide: p.sd, downed: p.dn,
+      vault: isMe ? (me.vt && st.vault ? Math.min(1, (performance.now() / 1000 - st.vault.t0) / me.vt[5]) : null) : p.vl ?? null, // climbing over: gun in one hand, the other on the sill
       sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
       if (elv || sa > 0.04) c.restore(); }); };
@@ -5040,7 +5041,7 @@ const TIPS = [
   'Aiming in moves your crosshair out to your sight\'s distance, unless it is already on an enemy you can see (within 2 m): then it stays right where you put it.',
   'Walk ({walk}) or crouch ({crouch}) to move without footsteps — just like CS2.',
   'Crouch while sprinting to power slide. You can only shoot forward from the hip until you are back up.',
-  'Hold sprint and forward to run where you aim, whichever way the screen faces. It is very loud, and your gun takes a moment to come up.',
+  (isTouch ? 'Hold sprint and forward to run where you aim, whichever way the screen faces. It is very loud, and your gun takes a moment to come up.' : 'Hold sprint with the move keys to run that way on the screen, in 8 directions (W+A runs up-left). It is very loud, and your gun takes a moment to come up.'),
   'Stop before you shoot: running ruins your accuracy. Crouching still is the most accurate.',
   'Broken glass under windows crunches loudly — listen for it.',
   'Defenders: reinforce the walls of the objective room before the action phase starts.',

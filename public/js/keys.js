@@ -5,7 +5,7 @@ export const ACTIONS = [
   ['down', 'Move back', 'KeyS', 'ArrowDown'],
   ['left', 'Move left', 'KeyA', 'ArrowLeft'],
   ['right', 'Move right', 'KeyD', 'ArrowRight'],
-  ['sprint', 'Sprint — with Move forward: runs where you aim; with two move keys (W+A, S+D…): runs that way on the screen. Very loud, gun down (hold)', 'AltLeft', ''],
+  ['sprint', 'Sprint — with the move keys: runs that way on the screen (8 directions, W+A = up-left), not where you aim. Very loud, gun down (hold)', 'AltLeft', ''],
   ['walk', 'Walk — silent (hold)', 'ShiftLeft', ''],
   ['crouch', 'Crouch — silent, most accurate (hold). While sprinting: power slide', 'ControlLeft', ''],
   ['crouchTap', 'Crouch on / off (one tap). While sprinting: power slide', '', ''],

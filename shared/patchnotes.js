@@ -148,4 +148,6 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'outzoom', t: 'Outdoors the view opens out only a little past a big room (it used to zoom far out down long sightlines); a sniper scope aimed in still gets the wide view.', v: -1 },
   { d: '2026-11-18', k: 'mech', id: 'sprintdiag', t: 'Computer: sprint with two move keys (W+A, S+D...) turns you to sprint that way on the screen, no more strafe running.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'spawnaim', t: 'Everyone spawns with the crosshair 2 m straight above them (each life, round and operator change).', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'sprint8', t: 'Computer: sprinting goes by the move keys alone, 8 directions on the screen, never toward the mouse.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'winvault', t: 'Climbing through a window takes 15% less time; climbers plainly hold the gun down in one hand meanwhile.', v: 1 },
 ];

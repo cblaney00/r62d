@@ -32,7 +32,7 @@ const SPRINT_RAISE = 0.3, SPRINT_LOUD = 520; // seconds to get the gun back up a
 const ROPE_SLIDE = 0.3; // s per storey sliding down when you let go (2026-11-15, he asked: faster, to help attackers; was 0.45)
 const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, sprint: 0, sa: 0, crouch: 0, prone: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0, rw: 0, rv: 0, inv: 0 }; // rw / rv / inv: the 3D rope view's along-the-wall, up/down and upside-down keys
 const JAM_R = 90;
-const VAULT_TIME = 0.6, VAULT_RECOVER = 0.35; // climbing over (no shooting, gun down), then a moment before you can aim again
+const VAULT_TIME = 0.6, VAULT_RECOVER = 0.35, WIN_VAULT = 0.85; // WIN_VAULT: through a window 15% quicker (he asked 2026-11-18) // climbing over (no shooting, gun down), then a moment before you can aim again
 const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free play's switching order
 
 // R62D_FAST=1 shortens the menus, for quick testing.
@@ -1779,7 +1779,7 @@ export class Game {
       if (smash && !ropeWindowBoarded(this.map, r)) return false; // reinforced or blocked: no way in here
       if (smash) { for (const k of r.cells) if (this.map.tiles[k] === T.BARRI) this.destroyCell(k); this.noise(p.x, p.y, this.side(p), 700); }
       p.rope = null;
-      p.vault = { x0: p.x, y0: p.y, x1: r.inside.x, y1: r.inside.y, t: 0, dur: VAULT_TIME * 1.3 };
+      p.vault = { x0: p.x, y0: p.y, x1: r.inside.x, y1: r.inside.y, t: 0, dur: VAULT_TIME * 1.3 * WIN_VAULT, win: 1 };
       this.noise(p.x, p.y, this.side(p), 320);
       this.events.push({ e: 'snd', s: 'vault', x: r1(p.x), y: r1(p.y), id: p.id });
       return true;
@@ -1790,7 +1790,7 @@ export class Game {
       const r = this.phase === PHASE.ACTION && this.side(p) === TEAM.ATK && !this.zb && !this.arena && ropeOutAt(this.map, p.x, p.y, ang);
       if (r) {
         if (r.cells.some(k => this.map.tiles[k] === T.BARRI)) { for (const k of r.cells) if (this.map.tiles[k] === T.BARRI) this.destroyCell(k); this.noise(p.x, p.y, this.side(p), 700); }
-        p.vault = { x0: p.x, y0: p.y, x1: r.hang.x, y1: r.hang.y, t: 0, dur: VAULT_TIME * 1.3, rope: r.i };
+        p.vault = { x0: p.x, y0: p.y, x1: r.hang.x, y1: r.hang.y, t: 0, dur: VAULT_TIME * 1.3 * WIN_VAULT, rope: r.i, win: 1 };
         p.reloadT = 0; p.adsT = 0; p.scanning = false; p.bracing = false;
         this.noise(p.x, p.y, this.side(p), 320);
         this.events.push({ e: 'snd', s: 'vault', x: r1(p.x), y: r1(p.y), id: p.id });
@@ -1802,7 +1802,8 @@ export class Game {
     if (this.zb && zbBlocksVault(this, p, to)) return false; // ZOMBIES: people can't climb out of the windows
     if (this.phase === PHASE.PREP && this.prepBox && this.side(p) === TEAM.DEF && !inBox(this.map, this.prepBox, to.x, to.y)) return false; // defenders in preparation: no climbing out of the allowed area (prepBox)
     const d = Math.hypot(to.x - p.x, to.y - p.y);
-    p.vault = { x0: p.x, y0: p.y, x1: to.x, y1: to.y, t: 0, dur: VAULT_TIME * (0.8 + 0.2 * d / 40) };
+    const win = this.map.tiles[to.k] === T.OPEN; // (through a window, not over a desk or a wall stub)
+    p.vault = { x0: p.x, y0: p.y, x1: to.x, y1: to.y, t: 0, dur: VAULT_TIME * (0.8 + 0.2 * d / 40) * (win ? WIN_VAULT : 1), win: win ? 1 : 0 };
     p.reloadT = 0; p.adsT = 0; p.scanning = false; p.bracing = false;
     this.noise(p.x, p.y, this.side(p), 320);
     this.events.push({ e: 'snd', s: 'vault', x: r1(p.x), y: r1(p.y), id: p.id });
@@ -3407,7 +3408,7 @@ export class Game {
         ct: p.ctrl, cf: this.tv && p.ctrl === 'cam' ? p.feedId : undefined, // ESPORTS TV: which camera they are looking through
         bu: p.busy ? { k: p.busy.k, p: r2(p.busy.t / p.busy.dur) } : p.grapple ? { k: 'grapple', p: r2(p.grapple.t / p.grapple.dur) } : null, df: p.hasDefuser ? 1 : 0,
         gh: p.ghillieUntil > this.time ? 1 : undefined, // MOSS's ghillie (no glint), PERCH's bipod
-        gt: r2(p.gait || 0), mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch || p.pr || p.slR > 0 ? 1 : 0, sd: p.slT > 0 ? 1 : undefined, pn: p.pr >= 1 ? (p.pose === 'sit' ? 2 : 1) : undefined, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, au: p.ctrl === 'body' && !p.downed && !p.rope && aimUpHatch(this.map, p.x, p.y, p.aimX, p.aimY) ? 1 : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
+        gt: r2(p.gait || 0), vl: p.vault ? r2(Math.min(1, p.vault.t / p.vault.dur)) : undefined, mv: p.moving, so: p.bracing && this.time < (p.shieldDownUntil || 0) ? 2 : undefined, sa: p.bracing && p.aside ? r2(p.aside) : undefined, ad: p.input.ads ? 1 : 0, cr: p.input.crouch || p.pr || p.slR > 0 ? 1 : 0, sd: p.slT > 0 ? 1 : undefined, pn: p.pr >= 1 ? (p.pose === 'sit' ? 2 : 1) : undefined, wk: p.input.walk ? 1 : 0,br: p.bracing ? 1 : 0, ri: p.riot && !p.riotBroken ? p.riot : undefined, au: p.ctrl === 'body' && !p.downed && !p.rope && aimUpHatch(this.map, p.x, p.y, p.aimX, p.aimY) ? 1 : undefined, sb: p.shieldMode === 'gun' ? 1 : 0, sw: p.switchUntil > this.time ? 1 : 0, sc: p.scanning ? 1 : 0,
         aa: g && g.att ? attCode(g.att) : '',
         si: this.ghost(p) || p.shrouded ? 1 : 0, sh: p.shrouded ? 1 : 0, ln: p.lancing ? 1 : 0, bo: this.time < (p.boostUntil || 0) ? 1 : 0,
         dz: this.time < (p.dazeUntil || 0) ? 1 : 0,

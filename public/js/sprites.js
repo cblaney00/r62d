@@ -472,7 +472,14 @@ export function drawOperator(ctx, p, t) {
   const up = p.up > 0.02 ? Math.min(1, p.up) : 0; // aiming up through a hatch (he asked, pose only): seen from above the raised gun and arms look short
   if (up) { ctx.translate(-1.5 * up, 0); ctx.scale(1 - 0.55 * up, 1 + 0.08 * up); }
   const gc = acc.has('gloves') ? tc : '#1f1f20', glove = (x, y) => { ell(ctx, x, y, 1.7, 1.6, gc); };
-  if (shield) { // the shield hand holds the grip on the inside of the shield, wherever it has swung to (he asked)
+  const vlt = p.vault !== null && p.vault !== undefined && !shield ? Math.max(0, Math.min(1, p.vault)) : null;
+  if (vlt !== null) { // climbing over (he asked 2026-11-18: plainly can't fight meanwhile): the gun hangs down at the side in one
+    // hand, muzzle to the floor, and the free hand is planted on the sill ahead, pushing; it stays put as the body passes over it
+    ctx.save(); ctx.translate(-0.5, 6.4 * bw); ctx.rotate(1.25); drawGun(ctx, p.w, 0); ctx.restore();
+    limb(ctx, [-0.5, 7.2 * bw, 0.8, 8.4 * bw, 1.6, 6.6 * bw], 3.2, u.cloth); glove(1.6, 6.6 * bw);
+    const e = vlt * vlt * (3 - 2 * vlt), hx = 12 - 16 * e, hy = -2.5 - 1.5 * Math.sin(e * Math.PI);
+    limb(ctx, [-0.5, -7 * bw, (hx - 0.5) / 2 + 2, -8.6 * bw, hx, hy], 3.2, u.cloth); glove(hx, hy);
+  } else if (shield) { // the shield hand holds the grip on the inside of the shield, wherever it has swung to (he asked)
     const sp = p.shieldPose || { rot: 0 }, ga = sp.rot - 0.45, hx = -2 + 10.6 * Math.cos(ga), hy = 10.6 * Math.sin(ga);
     const sx = -0.5, sy = -7 * bw, ex = (sx + hx) / 2 + Math.cos(ga - 1.2) * 2.2, ey = (sy + hy) / 2 + Math.sin(ga - 1.2) * 2.2;
     limb(ctx, [-0.5, 7 * bw, 3, 6.5, 8.5 - rec, 2.6], 3.1, u.cloth); drawGun(ctx, p.w, rec); glove(8.5 - rec, 2.6);
@@ -486,7 +493,7 @@ export function drawOperator(ctx, p, t) {
     limb(ctx, [-0.5, -7 * bw, 4, -6.5, 4 + L * 0.52 - rec, 0.9], 3.2, u.cloth);
     glove(5.5 - rec, 2.6); glove(4 + L * 0.52 - rec, 0.9);
   }
-  if (up && WEAPONS[p.w] && !shield) { // the muzzle points at you: its dark bore and a bright rim at the gun's front
+  if (up && WEAPONS[p.w] && !shield && vlt === null) { // the muzzle points at you: its dark bore and a bright rim at the gun's front
     const mx = (pistol ? 7.5 : 4 + L) - rec, r = 0.9 + 0.7 * up;
     ctx.save(); ctx.translate(mx, 1.2); ctx.scale(1 / (1 - 0.55 * up), 1);
     ctx.fillStyle = '#0b0c0e'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
@@ -494,7 +501,7 @@ export function drawOperator(ctx, p, t) {
   }
   if (id === 'dart') { box(ctx, 5 + L * 0.2, -4.8, 3.5, 1.8, 0.5, '#2b3a38'); ctx.fillStyle = '#4fb3a9'; ctx.fillRect(7.6 + L * 0.2, -4.4, 0.8, 0.8); }
   if (id === 'scan') { box(ctx, 4 + L * 0.2, -5.4, 3.6, 2.2, 0.5, '#1d2030'); ctx.fillStyle = p.scan ? '#a0b0ff' : '#4656c0'; ctx.fillRect(4.6 + L * 0.2, -4.9, 2.4, 1.2); }
-  if (p.flash && WEAPONS[p.w]) {
+  if (p.flash && WEAPONS[p.w] && vlt === null) {
     const mx = 4 + L - rec + 2.2;
     ctx.globalCompositeOperation = 'lighter';
     const g = ctx.createRadialGradient(mx, 1.5, 0, mx, 1.5, 10); g.addColorStop(0, 'rgba(255,240,190,0.95)'); g.addColorStop(0.35, 'rgba(255,170,60,0.6)'); g.addColorStop(1, 'rgba(255,120,20,0)');
