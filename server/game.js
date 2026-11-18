@@ -3418,9 +3418,11 @@ export class Game {
       players, ents, cells, holes, cb, hb, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];
-    for (const p of this.players.values()) if (p.sock && p.sock.open) p.sock.send('{"t":"snap","you":"' + p.id + '",' + (mine.has(p.id) ? '"mine":' + mine.get(p.id) + ',' : '') + common.slice(1));
+    // (the long shared end is compressed once for everyone: server/ws.js sendJoined; other sockets, a phone's or a test's, get the plain text)
+    const tail = common.slice(1), share = {}, out = (sk, head) => sk.sendJoined ? sk.sendJoined(head, tail, share) : sk.send(head + tail);
+    for (const p of this.players.values()) if (p.sock && p.sock.open) out(p.sock, '{"t":"snap","you":"' + p.id + '",' + (mine.has(p.id) ? '"mine":' + mine.get(p.id) + ',' : ''));
     if (this.rec) recFrame(this, common, mine);
-    if (this.tv) { const f = this.tv.follow, msg = '{"t":"snap","tv":1,"you":' + JSON.stringify(f) + ',' + (f && mine.has(f) ? '"mine":' + mine.get(f) + ',' : '') + common.slice(1); for (const sk of this.tv.socks) if (sk.open) sk.send(msg); }
+    if (this.tv) { const f = this.tv.follow, head = '{"t":"snap","tv":1,"you":' + JSON.stringify(f) + ',' + (f && mine.has(f) ? '"mine":' + mine.get(f) + ',' : ''); for (const sk of this.tv.socks) if (sk.open) out(sk, head); }
   }
 }
 // every shot's line, for the killcam (kept 6 s)

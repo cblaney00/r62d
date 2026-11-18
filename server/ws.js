@@ -8,6 +8,9 @@ import { EventEmitter } from 'node:events';
 
 const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
+// compressed the way sendJoined wants it: a sync flush at the end, kept (each socket strips it from the whole message)
+export const zipPart = str => zlib.deflateRawSync(Buffer.from(str, 'utf8'), { level: 3, finishFlush: zlib.constants.Z_SYNC_FLUSH });
+
 export class Socket extends EventEmitter {
   constructor(sock, deflate = false) {
     super();
@@ -69,6 +72,15 @@ export class Socket extends EventEmitter {
       return this.frame(0x1, data.subarray(0, data.length - 4), true);
     }
     this.frame(0x1, data);
+  }
+  // A message whose long end is the same for many players (a game update: only its start, who you are and your own
+  // ammo etc., differs): `share` is one object per message for every socket, which keeps that end compressed once. Compressed data
+  // that ends in a sync flush can be followed by more of it and is still one message, so only the short start is
+  // compressed here (it was the whole ~6 KB update for every player, 20 times a second: as much work as the game itself).
+  sendJoined(head, tail, share) {
+    if (!this.deflate || head.length + tail.length <= 256) return this.send(head + tail);
+    const z = Buffer.concat([zlib.deflateRawSync(Buffer.from(head, 'utf8'), { level: 3, finishFlush: zlib.constants.Z_SYNC_FLUSH }), share.z || (share.z = zipPart(tail))]);
+    this.frame(0x1, z.subarray(0, z.length - 4), true);
   }
   close() {
     if (!this.open) return;
