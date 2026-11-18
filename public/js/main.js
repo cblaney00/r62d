@@ -340,7 +340,7 @@ function adsReset() {
     const m0 = q0.mk, to = Math.min(reachOf(st.me, true), Math.max(AIM_MIN(), ADS_SNAP_MIN, m0 && m0.person ? m0.person.d + RING_R : m0 ? m0.d : q0.see)); // a person: onto them
     aimOff = { x: ux * to, y: uy * to }; return;
   }
-  if (sn) { const ds = []; for (let i = -2; i <= 2; i++) ds.push(castSight(st.map, st.pred.x, st.pred.y, a + i * 0.022, reachOf(st.me, true), null)); ds.sort((p, q) => q - p); d = Math.max(AIM_MIN(), ds[1] - 4); }
+  if (sn) { const ds = []; for (let i = -2; i <= 2; i++) ds.push(castSight(st.map, st.pred.x, st.pred.y, a + i * 0.011, reachOf(st.me, true), null)); ds.sort((p, q) => q - p); d = Math.max(AIM_MIN(), ds[1] - 4); }
   const keep = st.reachW; st.reachW = Math.max(keep || 0, d);
   aimOff = { x: ux * d, y: uy * d };
   const q = freeAimPoint();

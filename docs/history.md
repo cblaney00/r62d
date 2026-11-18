@@ -535,3 +535,9 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Esc closed #freeOps, but the auto mouse-capture in `frame` took the mouse back on the next frame while Esc was still
   down; the browser read that Esc as "let go of the mouse", and `pointerlockchange` opened the pause menu. Now the
   auto-capture waits until Esc is released (`st.escDown`) and 0.4 s more (`st.escAt`). Checked in a test browser.
+
+## Aim-in distances spaced out (2026-11-17, he asked)
+- Iron sights felt too far, the 2x and sniper too close: `ADS_GUN`/`ADS_OWN` (shared/operators.js) 15% nearer,
+  `ADS_SIGHT` stretch widened (reddot 1.15, holo 1.35, prism 1.8, scope 2.5; was 1.1/1.25/1.5/1.8). K4: iron 5.1 m,
+  red dot 5.9, holo 6.9, prism 9.2, 2x 12.8 (was 6 / 6.6 / 7.5 / 9 / 10.8). Sniper: its 5 sight lines fan ±1.3° instead
+  of ±2.5° (main.js `adsReset`), so a door frame cuts it short less often.

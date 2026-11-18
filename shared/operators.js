@@ -588,9 +588,11 @@ export function gunMods(w, a) {
 // (he asked 2026-11-09, later): the distance now depends on the gun AND the sight, the gun much more: the gun gives
 // the distance with iron sights (ADS_GUN per class, ADS_OWN for a few guns that differ from their class), the sight
 // stretches it (ADS_SIGHT, at most 1.8x; the gun spans 2-11 m, 5.5x)
-export const ADS_GUN = { Shotgun: 2.5, MP: 3, Pistol: 3.5, SMG: 4.5, AR: 6, LMG: 7, DMR: 9 };
-export const ADS_OWN = { stub: 2, anvil: 5, bison: 4.5, heron: 8, pike: 11, saker: 11, verdict: 7, quill: 4.5, ranger: 6, mammoth: 12, needle: 5, ferret: 4 };
-export const ADS_SIGHT = { iron: 1, reddot: 1.1, holo: 1.25, prism: 1.5, scope: 1.8 };
+// (he asked 2026-11-17: iron sights felt too far, the 2x and sniper too close: "space out the reticles more"): the gun
+// distances 15% nearer, the sight stretch widened from 1.8x to 2.5x; the sniper's sight lines fan out half as wide (main.js)
+export const ADS_GUN = { Shotgun: 2.1, MP: 2.6, Pistol: 3, SMG: 3.8, AR: 5.1, LMG: 6, DMR: 7.6 };
+export const ADS_OWN = { stub: 1.7, anvil: 4.2, bison: 3.8, heron: 6.8, pike: 9.4, saker: 9.4, verdict: 6, quill: 3.8, ranger: 5.1, mammoth: 10.2, needle: 4.2, ferret: 3.4 };
+export const ADS_SIGHT = { iron: 1, reddot: 1.15, holo: 1.35, prism: 1.8, scope: 2.5 };
 export const ADS_START = { sniper: 64 }; // the sniper scope: as far as you can see (main.js adsReset), up to its reach
 export const adsStart = (sight, w) => { const g = WEAPONS[w]; return (ADS_OWN[w] ?? (g && ADS_GUN[g.cls]) ?? ADS_GUN.AR) * (ADS_SIGHT[sight] || 1); };
 // how far the crosshair can be pulled out from you, in metres, the same all the way round (he asked: a circle, bigger
