@@ -48,3 +48,8 @@ Profile, Operators, free play with its operators / guns panel, and the pause men
 914×412 + 760×360 (`phone`, needs the phone Firefox profile above), saves screenshots, and lists text whose on-screen
 size (font size × menu zoom) is under `MIN` (12; use `MIN=11.9` on phones) plus the tests/uicheck.js cut-offs.
 `RULES=1` adds the CSS rule each small size came from. Must print `TOTAL small-text kinds: 0`.
+
+## Clean up the test browser
+A Firefox test profile in /tmp is 140-270 MB, and they piled up to 104 GB (found 2026-11-18). After a run: kill the
+browser, wait until no process still uses the profile (`pgrep -u insideabush -f r62d-ff` empty), then `rm -rf` it; a
+profile deleted while Firefox is still closing comes back half-written.

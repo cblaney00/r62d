@@ -333,9 +333,12 @@ export function quietZap(x, y) {
 }
 // A window pane shattering (he asked 2026-11-16): a sharp crack, the pane bursting, then shards tinkling down for most
 // of a second. Loud: heard through the building like other breaking glass (range 1100).
+// breaking glass close by (he asked 2026-11-18: too loud for the one who broke it, keep how it carries): about half as
+// loud at your feet, back to full by ~5.5 m (200 px), so from further away nothing changes
+const glassNear = (x, y) => { const d = distTo(x, y).d; return d >= 200 ? 1 : 0.45 + 0.55 * (d / 200); };
 export function shatter(x, y) {
   C = 'impacts';
-  const g = out(x, y, 0.75, 1100, 0.3); if (!g) return;
+  const g = out(x, y, 0.75 * glassNear(x, y), 1100, 0.3); if (!g) return;
   const t = ac.currentTime;
   noise(g, t, 0.05, 'highpass', 2500, 0.7, 1.0); // the crack
   noise(g, t + 0.005, 0.22, 'bandpass', 4200, 0.8, 0.8, 0.002); // the pane bursting
@@ -345,7 +348,7 @@ export function shatter(x, y) {
 }
 export function impact(mat, x, y) {
   C = 'impacts';
-  const g = out(x, y, mat === 'glass' ? 0.55 : 0.4, mat === 'glass' ? 1100 : 650, 0.2); if (!g) return; // breaking glass carries
+  const g = out(x, y, mat === 'glass' ? 0.55 * glassNear(x, y) : 0.4, mat === 'glass' ? 1100 : 650, 0.2); if (!g) return; // breaking glass carries (softer right beside you)
   const t = ac.currentTime + rnd(0, 0.01);
   switch (mat) {
     case 'drywall': noise(g, t, 0.1, 'bandpass', 900, 0.8, 0.8); noise(g, t, 0.25, 'highpass', 3000, 0.5, 0.15, 0.02); break;

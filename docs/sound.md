@@ -51,3 +51,4 @@ Measured after (measureMix, master fixed; footsteps vary ±3 dB from run to run)
 | Enemy rifle 150px / 600px | -14.4 / -18.8 | -18.2 / -25.9 |
 | Frag at 100px | -10.8 | -15.5 |
 | Enemy run (wood, 150px) / own step / mag in | -24 / -25.8 / -29.3 | unchanged (within noise) |
+- 2026-11-18 (he asked): breaking glass (`shatter`, `impact('glass')`) is ×0.45 at your feet rising to full at 200 px (`glassNear`), so it carries the same but is softer for whoever broke it.

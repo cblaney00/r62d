@@ -110,4 +110,6 @@ export const PATCH_NOTES = [
   { d: '2026-11-17', k: 'mech', id: 'move', t: 'Everyone moves 13% slower: jogging 2.6 → 2.26 m/s, sprinting 4.2 → 3.65, walking with Shift 1.4 → 1.22. Crouching, aiming in and sliding are unchanged.', v: 0 },
   { d: '2026-11-17', k: 'mech', id: 'pros', t: 'Phones and new Windows programs now get the pros\' practice knowledge with each release (their pros used to start blank).', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'select', t: 'Operator select: the role cards show every operator\'s picture and all five roles sit side by side (no scrolling, phones too); phone operator cards always show the picture; LOCK IN and the role tabs no longer get cut off.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'sound', t: 'Breaking glass is about half as loud right beside you (back to full by ~5 m), so it carries as far as before but no longer blasts the one who broke it.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'load', t: 'The game starts faster: map pictures are kept on your device and the sounds are made in the background (no PREPARING SOUNDS screen).', v: 0 },
 ];
