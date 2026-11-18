@@ -541,3 +541,7 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   `ADS_SIGHT` stretch widened (reddot 1.15, holo 1.35, prism 1.8, scope 2.5; was 1.1/1.25/1.5/1.8). K4: iron 5.1 m,
   red dot 5.9, holo 6.9, prism 9.2, 2x 12.8 (was 6 / 6.6 / 7.5 / 9 / 10.8). Sniper: its 5 sight lines fan ±1.3° instead
   of ±2.5° (main.js `adsReset`), so a door frame cuts it short less often.
+
+## Movement 13% slower (2026-11-17, he asked)
+- `M_S` in shared/physics.js: run 2.6 → 2.262, sprint 4.2 → 3.654, Shift-walk 1.4 → 1.218 m/s (crouch, ADS, prone,
+  slide, drones untouched). `tests/stairs.js` PASS, `tests/sim.js --only harbor` PASS.

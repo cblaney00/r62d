@@ -108,7 +108,8 @@ export function moveCircle(map, o, dx, dy, r, drone = false, up = false) {
 //   running (the default, like CS2 — no sprint) is a tactical jog with a gun up, 2.6 m/s for a 2-speed
 //   operator (2.3 heavy, 3.0 light); walking (Shift) 1.4 m/s, a normal walk; aiming down sights 1.5 m/s;
 //   crouch-walking 0.9 m/s; crawling while downed 0.5 m/s; a drone 3.2 m/s, a little quicker than a jog.
-export const M_S = { sprint: 4.2, run: 2.6, walk: 1.4, ads: 1.5, crouch: 0.9, prone: 0.9, downed: 0.5, drone: 3.2, rope: 1.0 };
+// (he asked 2026-11-17: walking and sprinting 13% slower: run 2.6 → 2.26, sprint 4.2 → 3.65, Shift-walk 1.4 → 1.22)
+export const M_S = { sprint: 3.654, run: 2.262, walk: 1.218, ads: 1.5, crouch: 0.9, prone: 0.9, downed: 0.5, drone: 3.2, rope: 1.0 };
 // lying down (C, he asked: a quick drop, crawl as fast as a crouch, aim like a crouch): o.pr goes 0 → 1 in PRONE_T seconds
 export const PRONE_T = 0.3;
 export const isProne = o => (o.pr || 0) >= 1;

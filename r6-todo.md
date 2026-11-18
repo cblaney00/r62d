@@ -9,6 +9,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 
 ## Done
+- [x] lets slow down the movement of both walking and sprinting 13%
 - [x] i think we should pull all of the ads reticle snap distances toward the operator a bit more, iron sights feels too far, but i also think the 2x and sniper scope are too close so maybe just space out the reticles more
 - [x] oh also pressing escape should hit the close button when the free play operator and gun switch menu is active, it keeps pausing my game instead
 - [x] the sentry carbine and tandem carbine look nearly identical, change the tandem carbine's model. the lark and auger have the same issue, the ox belt fed and the trestle as well, the longbow and the heron, the vex .50 and the needle target pistol too
