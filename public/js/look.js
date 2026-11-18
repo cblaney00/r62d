@@ -703,7 +703,7 @@ export const tilt = {
   update(dt, vx, vy, shake, W, H) {
     if (!this.el) this.el = document.getElementById('world');
     if (!this.on) { if (this.M) { this.el.style.transform = ''; this.M = null; } return; }
-    const calm = 1 - Math.min(1, this.extra / 34) * 0.85; // (on a rope the camera slides along the wall: little lean, it made the steep view sway)
+    const calm = 1 - Math.min(1, this.extra / 25) * 0.85; // (on a rope the camera slides along the wall: little lean, it made the steep view sway)
     const tx = this.lean ? Math.max(-1, Math.min(1, -vy / 140)) * 1.1 * calm : 0, ty = this.lean ? Math.max(-1, Math.min(1, vx / 140)) * 1.3 * calm : 0;
     const g = Math.min(1, dt * 3.5); this.ax += (tx - this.ax) * g; this.ay += (ty - this.ay) * g;
     // the kick is a spring: pushed by shots and blasts, it swings back and settles

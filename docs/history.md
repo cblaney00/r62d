@@ -774,3 +774,6 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - HUD (he asked 2026-11-18): on a computer Cams & drones before Put out a drone in `#gadgets`; phones as before.
 - Xbox layout (he asked 2026-11-18: lean on a controller, everything doable, R6's layout): gamepad.js `XBOX_ACTIONS` for a real controller (`gp === real` in pollPad; the phone's buttons keep `PAD_ACTIONS`), `PAD_HELP` rewritten (Settings table). pollPad: `st.padA` keeps what a press meant until release; L3/R3 = `padSprint`/melee, with LT held `leanL`/`leanR`; D-pad left/right = map/drone on the body, camPrev/camNext otherwise; X `reloadUse` (tap reload, held 0.28 s use); `st.padSpr` stays on until the stick lets go, LT/RT, crouch. Tested with a stubbed controller: L3 → mv 3, off on stop; LT+L3 → lean -6.
 - HOIST (he asked 2026-11-18): LOADOUTS gadgets `['breach', 'stun']` (was stun / smoke).
+
+## 2026-11-18 — less squish on a rope
+- He asked: the view squishes vertically a little less when climbing a wall on a rope. `ROPE_TILT` (main.js) 34 → 25 degrees; look.js `tilt.update` `calm` now divides by 25 so the rope view's lean stays as calm as before.

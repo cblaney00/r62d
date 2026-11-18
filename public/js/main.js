@@ -1887,7 +1887,7 @@ function ptsPopups(c, x, y, now) {
 // R3_OUT s (inside the climb-in), so you can shoot as soon as you're through.
 const ROPE_ENV = 420, ROPE_REACH_X = 8; // ROPE_REACH_X: metres the crosshair may go past the rope view (he asked: it felt trapped) // world px: the rope camera's size before its zooms (fixed: nothing you look at changes it)
 const ROPE_ZOOM = 0.38, ROPE_ZOOM_NAV = 0.12, ROPE_SIDE = 0.12, ROPE_ADS = 0.1; // ROPE_ADS: how much tighter aiming in on a rope comes in; // ROPE_ZOOM peeking into a window, ROPE_ZOOM_NAV the rest of the time; // how much closer the rope camera comes in, how far it sits to your right (view heights)
-const ROPE_TILT = 34, ROPE_TILT_WIN = 0, ROPE_RAISE = 0.1, ROPE_EYE = 1.6; // ROPE_EYE: how far behind you the rope camera's eye sits, in view heights (with ROPE_RAISE, a low over-the-shoulder angle: people on the wall stand up) // the rope camera's extra tilt (degrees) and how tall walls stand
+const ROPE_TILT = 25, ROPE_TILT_WIN = 0, ROPE_RAISE = 0.1, ROPE_EYE = 1.6; // ROPE_EYE: how far behind you the rope camera's eye sits, in view heights (with ROPE_RAISE, a low over-the-shoulder angle: people on the wall stand up) // the rope camera's extra tilt (degrees; 34 until he asked 2026-11-18 for less vertical squish climbing a wall) and how tall walls stand
 const R3_OUT = 0.45, FH3 = 3.2 * PX_PER_M;
 // which way the wall is for someone hanging at (p.x, p.y): the rope stretch they are on, facing it
 function hangWall(p) { for (const q of st.map.ropes || []) { const sx = Math.max(q.a, Math.min(q.b, (p.x - q.hang.x) * q.tx + (p.y - q.hang.y) * q.ty)); if (Math.hypot(q.hang.x + q.tx * sx - p.x, q.hang.y + q.ty * sx - p.y) < 4 && floorAt(st.map, p.x, p.y) === q.f) return q.out + Math.PI; } return undefined; }
