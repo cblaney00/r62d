@@ -510,3 +510,9 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   screen and its rows wrap; pause/quit menus scroll if taller than the screen; phone map names wrap.
 - Test: `node tests/textsize.mjs <port> <outdir> <url> pc|phone` (phone = the phone Firefox profile; `MIN=11.9` for phones,
   `RULES=1` names the CSS rule) — 0 small text on both, and its cut-off list (tests/uicheck.js) has nothing new.
+
+## Sniper scope sight line (2026-11-17, he asked)
+- Scoped in with a sniper scope, the screen outside the lens is darkened and blurred (#scopeVeil), which hid whatever
+  stood between you and the target. Now a clear lane (44 px, soft edges) runs from your operator to the lens: two extra
+  CSS mask gradients on #scopeVeil (a stripe along the line, a band from you to the lens; `mask-composite: intersect, add`),
+  their positions worked out in `scopeVeil()` (main.js). Checked in a test browser with the veil tinted red.

@@ -3683,9 +3683,17 @@ function scopeVeil(p) {
   const el = $('scopeVeil');
   if (!p || st.tv) { setCls(el, 'hidden', true); st.veilK = ''; return; }
   setCls(el, 'hidden', false); setCls(el, 'flat', gfxLevel() === 'low');
-  const k = Math.round(p.x / DPR) + ',' + Math.round(p.y / DPR) + ',' + Math.round(scopeLensR() / DPR);
+  const sx = Math.round(p.x / DPR), sy = Math.round(p.y / DPR), ox = Math.round(p.ox / DPR), oy = Math.round(p.oy / DPR);
+  const k = sx + ',' + sy + ',' + ox + ',' + oy + ',' + Math.round(scopeLensR() / DPR);
   if (st.veilK === k) return; st.veilK = k;
-  el.style.setProperty('--sx', Math.round(p.x / DPR) + 'px'); el.style.setProperty('--sy', Math.round(p.y / DPR) + 'px'); el.style.setProperty('--sr', Math.round(scopeLensR() / DPR) + 'px');
+  el.style.setProperty('--sx', sx + 'px'); el.style.setProperty('--sy', sy + 'px'); el.style.setProperty('--sr', Math.round(scopeLensR() / DPR) + 'px');
+  // the sight line (he asked): a clear lane through the veil from you to the lens, so whatever is in the way shows.
+  // Two CSS gradients: a stripe along the line (--la, its middle at --lm) and a band from you to the lens (--ba, --b0..--b1).
+  // A gradient at angle t runs through the middle of the box; a point's place along it = (P - middle)·(sin t, -cos t) + length / 2.
+  const W = innerWidth, H = innerHeight, at = (t, X, Y) => { const u = Math.sin(t), v = -Math.cos(t); return (X - W / 2) * u + (Y - H / 2) * v + (Math.abs(W * u) + Math.abs(H * v)) / 2; };
+  const a = Math.atan2(sy - oy, sx - ox), ta = a + Math.PI / 2, tn = a + Math.PI; // CSS 0deg points up; ta runs along the line, tn across it
+  el.style.setProperty('--ba', ta + 'rad'); el.style.setProperty('--b0', Math.round(at(ta, ox, oy)) + 'px'); el.style.setProperty('--b1', Math.round(at(ta, sx, sy)) + 'px');
+  el.style.setProperty('--la', tn + 'rad'); el.style.setProperty('--lm', Math.round(at(tn, ox, oy)) + 'px');
 }
 // the sniper lens magnifies (he asked): the map and people (#game) go into #lensA, the blackout into #lensF (greyed by
 // CSS like #fog), both in #scopeLens, a round box over the lens above the veil; #over is magnified in place
@@ -3746,7 +3754,7 @@ function crosshair(me, now) {
   const LM = me.at > 0.3 && me.ct === 'body' && sniperOn(me) ? lensMag(me.at) : 1, LR = scopeLensR();
   scopeLens(LM > 1.01 ? { x, y } : null, LR, LM);
   if (me.at > 0.05 && me.ct === 'body' && fxOn('sight')) sightLook(attFromCode(me.aa).sight, x, y, Math.min(1, me.at));
-  scopeVeil(me.at > 0.3 && me.ct === 'body' && sniperOn(me) ? { x, y } : null);
+  scopeVeil(me.at > 0.3 && me.ct === 'body' && sniperOn(me) ? { x, y, ox: px, oy: py } : null);
   if (me.ad && st.heads) for (const h of st.heads) {
     const H0 = w2s(h.x, h.y), H = lensPt(H0.x, H0.y, x, y, LR, LM); if (!H) continue;
     const r = Math.max(2.5 * DPR, HEAD_AIM * (st.zoom || 1)) * H.k, on = Math.hypot(x - H.x, y - H.y) <= r;

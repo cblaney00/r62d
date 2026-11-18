@@ -37,6 +37,12 @@ canvas#lensF { filter: grayscale(1) brightness(0.42) contrast(1.15); } /* (the s
 #scopeVeil, #armVeil { position: fixed; inset: 0; pointer-events: none; backdrop-filter: blur(3px) brightness(0.5); background: rgba(0,6,10,0.18);
   -webkit-mask-image: radial-gradient(circle at var(--sx, 50%) var(--sy, 50%), transparent calc(var(--sr, 200px) - 3px), #000 calc(var(--sr, 200px) + 14px));
   mask-image: radial-gradient(circle at var(--sx, 50%) var(--sy, 50%), transparent calc(var(--sr, 200px) - 3px), #000 calc(var(--sr, 200px) + 14px)); }
+#scopeVeil { /* + the sight line: clear where (in the stripe AND between you and the lens); the lens circle intersects that */
+  --lw: 22px; -webkit-mask-image: none;
+  mask-image: radial-gradient(circle at var(--sx, 50%) var(--sy, 50%), transparent calc(var(--sr, 200px) - 3px), #000 calc(var(--sr, 200px) + 14px)),
+    linear-gradient(var(--la, 0rad), #000 calc(var(--lm, -999px) - var(--lw) - 8px), transparent calc(var(--lm, -999px) - var(--lw)), transparent calc(var(--lm, -999px) + var(--lw)), #000 calc(var(--lm, -999px) + var(--lw) + 8px)),
+    linear-gradient(var(--ba, 0rad), #000 calc(var(--b0, -999px) - 10px), transparent var(--b0, -999px), transparent var(--b1, -999px), #000 calc(var(--b1, -999px) + 1px));
+  mask-composite: intersect, add; }
 #armVeil { position: absolute; inset: auto; } /* the Armory's, placed over its range by armory.js */
 #scopeVeil.flat, #armVeil.flat { backdrop-filter: none; background: rgba(0,6,10,0.5); }
 #vignette { background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.5) 100%); }
