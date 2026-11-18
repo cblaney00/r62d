@@ -39,7 +39,7 @@ import * as rope3d from './rope3d.js';
 import { compassRoute as sharedRoute } from '/shared/compass.js';
 import { newStick, stepStick, stickFrom } from './aimstick.js';
 import { onAimStart, touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings } from './touch.js';
-import { blocksSight, FL, underAt } from '/shared/constants.js';
+import { blocksSight, FL, underAt, blocksMove } from '/shared/constants.js';
 import { EYE_H } from '/shared/map.js';
 import { META } from '/shared/meta.js';
 
@@ -2974,6 +2974,12 @@ function nearPolygon(v, sm) {
 }
 function fillPoly(c, pts) { c.beginPath(); c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.closePath(); c.fill(); }
 
+// how far (body px, up to 17) legs can reach from (x, y) along angle ang before a wall: lying down, they bend up short
+function legRoom(x, y, ang) {
+  const m = st.map; if (!m) return 17; const c = Math.cos(ang), s = Math.sin(ang), px = -s, py = c;
+  for (let d = 17; d > 5; d -= 2) { let ok = true; for (const o of [-4, 0, 4]) { const X = x + c * d + px * o, Y = y + s * d + py * o, k = Math.floor(Y / CELL) * m.W + Math.floor(X / CELL); if (k < 0 || k >= m.tiles.length || blocksMove(m.tiles[k]) && m.tiles[k] !== T.LOW) { ok = false; break; } } if (ok) return d; }
+  return 5;
+}
 function droneHidden(x, y) { const m = st.map; if (!m) return false; const k = Math.floor(y / CELL) * m.W + Math.floor(x / CELL); return underAt(m, k, m.tiles[k]); }
 function drawScanBlips(now) { // WRAITH: heartbeats, fuzzy
   const me = st.me; if (!me || !me.bl || !me.sc) return;
@@ -3166,6 +3172,8 @@ function draw(s, view, now, dt) {
     a.lx = p.x; a.ly = p.y;
     playerFoley(p, a, moved, isMe, dt);
     a.mvS = (a.mvS || 0) + (Math.min(1.4, moved / Math.max(dt, 0.001) / 95) - (a.mvS || 0)) * Math.min(1, dt * 10);
+    a.sitK = (a.sitK || 0) + ((p.pn === 2 ? 1 : 0) - (a.sitK || 0)) * Math.min(1, dt * 9); // lying flat (0) ↔ sitting up (1), blended over ~0.25 s
+    if (p.pn) { a.legR = legRoom(p.x, p.y, p.ag + Math.PI); a.legF = legRoom(p.x, p.y, p.ag); } // (legs never poke through a wall: he asked)
     a.turnAmp = Math.max(0, (a.turnAmp || 0) - dt * 2.5);
     a.recoil = Math.max(0, a.recoil - dt * 12); a.melee = Math.max(0, a.melee - dt * 4);
     // up or down a staircase: they also show on the other floor's steps, to people near that staircase who can see the spot
@@ -3219,7 +3227,7 @@ function draw(s, view, now, dt) {
         c.save(); c.translate(p.x, p.y); c.scale(1.12, 1.12); c.translate(-p.x, -p.y); }
     drawOperator(c, {
       hang: hangW !== undefined ? (p.rp === 3 ? 'inv' : 'up') : null, wallA: hangW, zb: hangW !== undefined ? ((isMe ? st.ropeH : p.rz) ?? 0.5) - 0.55 : 0,
-      x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, slide: p.sd, downed: p.dn,
+      x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, Math.max(a.mvS, a.turnAmp * 0.6)), ads: p.ad, crouch: p.cr, prone: p.pn, sit: a.sitK, legR: a.legR, legF: a.legF, slide: p.sd, downed: p.dn,
       sprint: (a.sprS = (a.sprS || 0) + ((p.mv === 3 ? 1 : 0) - (a.sprS || 0)) * 0.18), up: (a.upS = (a.upS || 0) + (((isMe ? st.aimUp : p.au) ? 1 : 0) - (a.upS || 0)) * 0.2), lean: (isMe ? st.pred.lo || 0 : p.le || 0) / LEAN_PX, recoil: a.recoil, flash: now - a.flashT < 0.045, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null, scan: p.sc, melee: a.melee,
     }, now);
       if (elv) c.restore(); }); };

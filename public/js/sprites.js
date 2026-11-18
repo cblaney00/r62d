@@ -283,12 +283,7 @@ export function hipShift(p) {
 }
 function lowerBody(ctx, p, col, LZ, bw) {
   const walk = p.walk || 0, mv = Math.min(1.1, p.legs ?? 1), cr = !!p.crouch && !p.prone, sw = Math.sin(walk), L = Math.max(-1, Math.min(1, p.lean || 0)), hs = hipShift(p);
-  if (p.prone || p.slide) { // lying (or sliding feet first): one long low shape
-    const dir = p.slide ? 1 : -1, len = p.slide ? 14 : 15, k = p.prone ? Math.sin(walk) * 1.2 * mv : 0;
-    for (let i = 0; i < 3; i++) { const [lx, ly] = LZ(i * 0.03); ctx.fillStyle = shade(col, 0.75 + i * 0.12); ctx.beginPath(); ctx.ellipse(dir * len * 0.5 + lx + k * 0.3, ly / bw, len * 0.62, 4.6, 0, 0, 7); ctx.fill(); }
-    for (const s2 of [1, -1]) { const [lx, ly] = LZ(0); ell(ctx, dir * (len + 2) + lx + s2 * k, s2 * 3.2 + ly / bw, 2.2, 2.1, '#1c1b1a'); }
-    return;
-  }
+  if (p.prone || p.slide) { lyingLegs(ctx, p, col, LZ, bw, walk, mv); return; } // lying down (two poses) or a feet-first slide
   const stride = sw * (cr ? 1.8 : 3.4) * mv, side = cr ? 4.4 : 4.2;
   const feet = p.hang ? [[3.6, 3.4], [3.2, -3.6]] : cr ? [[4.5 + stride * 0.4, side], [1.5 - stride * 0.4, -side]] : [[stride, side], [-stride, -side]];
   if (L && !p.hang) for (const ft of feet) { if (Math.sign(ft[1]) === Math.sign(L)) { ft[1] += L * 2.4; ft[0] += Math.abs(L) * 1.2; } else ft[1] += L * 0.5; } // leaning: step out that way, push off the other foot
@@ -305,6 +300,41 @@ function lowerBody(ctx, p, col, LZ, bw) {
   }
   const [hx0, hy0] = lift(-1, hs, 0.23), [hx1, hy1] = lift(-1, hs, 0.31);
   column(ctx, hx0, hy0, 4.4, 6.4, hx1, hy1, 5.2, 7.4, col); // hips and seat
+}
+// Two real legs on the floor (he asked 2026-11-18: lying down looked like a mermaid's tail). sit (0..1) blends between
+// R6's two poses: flat like a sniper (legs straight back, a little apart, toes down; crawling bends one knee out to the
+// side at a time) and sitting up (legs out in front in a 45° V, knees a touch up, boots up). legR / legF: how far the
+// legs may reach behind / in front before a wall (main.js legRoom): short of room they bend up instead of poking through.
+function lyingLegs(ctx, p, col, LZ, bw, walk, mv) {
+  const sit = p.slide ? 1 : Math.max(0, Math.min(1, p.sit || 0)), flat = 1 - sit;
+  const room = (sit > 0.5 ? (p.legF ?? 17) : (p.legR ?? 17)), fit = Math.max(0.45, Math.min(1, (room - 1) / 16));
+  const at = (x, y, z) => { const [lx, ly] = LZ(z); return [x + lx, (y + ly / bw)]; };
+  const legs = [];
+  for (const s of [1, -1]) {
+    const crawl = Math.sin(walk + (s > 0 ? 0 : Math.PI)) * mv * flat, bend = Math.max(0, crawl); // one knee draws up and out at a time
+    // flat: hip (-3, ±2.6) → knee (-9.5, ±3.6) → ankle (-15.5, ±4.4); sit: hip (-2, ±2.4) → knee out along ±22.5° → ankle
+    const A = 0.3927 * s, cs = Math.cos(A), sn = Math.sin(A);
+    const L1 = (6.6 + sit * 3.6) * fit, L2 = (6.4 + sit * 3.6) * fit; // (sitting, the legs reach out past the arms)
+    const hip = [-3 - sit * 2.5, s * 2.6];
+    const kneeF = [hip[0] - L1 + bend * 2.2, s * (3.6 + bend * 2.6)], ankF = [kneeF[0] - L2 + bend * 3.2, s * (4.4 + bend * 0.8)];
+    const kneeS = [hip[0] + L1 * cs, hip[1] + L1 * sn], ankS = [kneeS[0] + L2 * cs, kneeS[1] + L2 * sn];
+    const mix = (a, b) => [a[0] * flat + b[0] * sit, a[1] * flat + b[1] * sit];
+    const knee = mix(kneeF, kneeS), ank = mix(ankF, ankS), kz = 0.03 + sit * 0.07 + bend * 0.03 + (1 - fit) * 0.08; // short of room: the knee comes up
+    legs.push({ s, hip: at(hip[0], hip[1], 0.06), knee: at(knee[0], knee[1], kz), ank: at(ank[0], ank[1], 0.03), dir: Math.atan2(ank[1] - knee[1], ank[0] - knee[0]) });
+  }
+  const away = LZ(1); legs.sort((a, b) => (b.ank[0] * away[0] + b.ank[1] * away[1]) - (a.ank[0] * away[0] + a.ank[1] * away[1]));
+  for (const g of legs) {
+    limb(ctx, [g.hip[0], g.hip[1], g.knee[0], g.knee[1], g.ank[0], g.ank[1]], 4.7, col); // thigh and shin, one trouser leg
+    ctx.strokeStyle = shade(col, 1.25); ctx.lineWidth = 1.1; ctx.lineCap = 'round'; ctx.beginPath(); // a soft highlight along the lit side
+    ctx.moveTo(g.hip[0] + LX * 1.2, g.hip[1] + LY * 1.2); ctx.lineTo(g.knee[0] + LX * 1.2, g.knee[1] + LY * 1.2); ctx.lineTo(g.ank[0] + LX * 1.1, g.ank[1] + LY * 1.1); ctx.stroke();
+    // the boot: toes down when flat (the sole shows, turned out a little), toes up when sitting (the toe cap shows)
+    ctx.save(); ctx.translate(g.ank[0], g.ank[1]); ctx.rotate(g.dir + g.s * 0.25 * (1 - sit));
+    box(ctx, -0.6, -1.9, 4.4, 3.8, 1.4, '#1c1b1a');
+    ctx.fillStyle = sit > 0.5 ? 'rgba(120,118,112,0.55)' : 'rgba(70,66,60,0.9)'; ctx.fillRect(sit > 0.5 ? 2.6 : 0.2, -1.4, sit > 0.5 ? 1.2 : 3.4, 2.8); // toe cap / tread
+    ctx.restore();
+  }
+  // the seat: flat, the hips low under the belt; sitting, a rounder seat on the floor behind the legs
+  const [sx, sy] = at(-3.2 - sit * 3.3, 0, 0.05); column(ctx, sx, sy, 4.6, 6, sx, sy, 4.8 + sit * 0.6, 6.4 + sit * 0.4, col);
 }
 const TILT = 0.42; // rad: a full lean on a rope turns the upper body this far round the hips
 export function drawOperator(ctx, p, t) {
@@ -368,6 +398,7 @@ export function drawOperator(ctx, p, t) {
     const [lx, ly] = LZ(0.41), [tx, ty] = tilt ? tiltPt(lx, ly / bw, hip[0] + 1, hip[1]) : [lx, ly / bw]; ctx.translate(tx, ty); // the top of the body at shoulder height
   }
   if (p.slide) ctx.translate(-3, 0); // sliding: the body leans back behind the legs
+  else if (p.prone && p.sit > 0.01) { ctx.translate(-6 * p.sit, 0); ctx.scale(1 - 0.12 * p.sit, 1); } // sitting up: the body back over the seat, a touch shorter (upright, seen from above)
   // ---- leaning (he asked): the legs stay planted, everything from the hips up tips to the side ----
   if (tilt) ctx.rotate(tilt);
   else if (p.lean) { const L = Math.max(-1, Math.min(1, p.lean));
