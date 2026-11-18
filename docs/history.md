@@ -571,3 +571,13 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   wants kept small) and PC select shots: no new cut-offs (the loading screen's drifting picture is expected).
 - Also found /tmp/claude-0 chowned to insideabush (new Claude chats refused to start) and 104 GB of leftover test
   browser profiles in /tmp; fixed and cleaned, rule added to CLAUDE.md.
+
+## Faster loading (2026-11-18, he asked)
+- Measured with `window.__loadTimes` (runLoading now records [title, step, ms] per step). Start, 1920x1080 headless:
+  fonts 0.2 s, title map 1.3, map pictures 1.9-2.0, guns 0.5, operators 0.3, GPU 0.1 = 4.7 s, then PREPARING SOUNDS
+  1.3 s after the first click.
+- Map pictures are kept on the device: `thumbLoad` (main.js) stores each as WebP in localStorage under
+  `r62d-thumb:<id>:<hash of tiles/floor/flAt>:<game version>` (old entries for that map removed); a changed map or a new
+  version draws afresh; no version (phone without one) = no store. Second start: map pictures 0.84 s, total 3.5 s.
+- PREPARING SOUNDS screen removed: `initAudio`'s background prewarm builds the gunshots and footsteps (now the scuffs
+  too) a few at a time while you are in the menus.

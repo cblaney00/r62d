@@ -257,8 +257,8 @@ function stepBuf(surf, pace, scuff = false) {
 export function prewarmSteps() {
   if (!ac) return;
   const jobs = [];
-  for (const s of Object.keys(SURF)) for (const p of [2, 0, 3, 1]) jobs.push([s, p]);
-  const next = () => { const j = jobs.shift(); if (!j) return; stepBuf(j[0], j[1]); setTimeout(next, 30); };
+  for (const s of Object.keys(SURF)) { for (const p of [2, 0, 3, 1]) jobs.push([s, p]); jobs.push([s, 0, true]); } // (and the scuffs: everything the old PREPARING SOUNDS screen made)
+  const next = () => { const j = jobs.shift(); if (!j) return; stepBuf(j[0], j[1], !!j[2]); setTimeout(next, 30); };
   next();
 }
 function playBuf(g, buf, rate) { const src = ac.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate; src.connect(g); src.start(ac.currentTime + rnd(0, 0.004)); }

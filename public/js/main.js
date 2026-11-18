@@ -782,9 +782,11 @@ function runLoading(title, steps, mapId = null) {
     for (let i = 0; i < steps.length; i++) {
       loadSpan = [i / steps.length, (i + 1) / steps.length];
       $('loadStep').textContent = steps[i][0]; loadPart(0);
+      const t0 = performance.now();
       await frames(2);
       await steps[i][1]();
       loadPart(1);
+      (window.__loadTimes = window.__loadTimes || []).push([title, steps[i][0], Math.round(performance.now() - t0)]); // how long each loading step took (ms), for tests
     }
     $('loadStep').textContent = 'Ready';
     await frames(6);
@@ -1400,9 +1402,9 @@ function renderControls() {
 // Little top-down pictures of each map's ground floor for the lobby's map picker.
 // The map cards in every menu (he chose): the real map picture, close up on the ground floor of the building.
 const mapThumbs = new Map(), THUMB_W = 360, THUMB_H = 214, THUMB_INSIDE = new Set([FL.WOOD, FL.TILE, FL.CARPET, FL.MARBLE, FL.SERVER]);
-function mapThumb(id) {
+function mapThumb(id, m = buildMap(id)) {
   if (mapThumbs.has(id)) return mapThumbs.get(id);
-  const m = buildMap(id), fi = Math.max(0, m.floors.findIndex(f => f.name === '1F')), F = m.floors[fi];
+  const fi = Math.max(0, m.floors.findIndex(f => f.name === '1F')), F = m.floors[fi];
   let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1, fx0 = Infinity, fy0 = Infinity, fx1 = -1, fy1 = -1;
   for (let k = 0; k < m.tiles.length; k++) if (m.flAt[k] === fi) {
     const cx = k % m.W, cy = Math.floor(k / m.W);
@@ -1422,6 +1424,17 @@ function mapThumb(id) {
   R.c.drawTo(x, sx * P, sy * P, w * P, h * P, 0, 0, THUMB_W, THUMB_H);
 mapThumbs.set(id, c); return c;
 }
+// (loading) a map picture from this device's store if it is still the same map and version, else drawn and stored
+const thumbKey = (id, m, ver) => { let h = 2166136261; for (const arr of [m.tiles, m.floor, m.flAt]) for (let i = 0; i < arr.length; i++) h = Math.imul(h ^ arr[i], 16777619); return 'r62d-thumb:' + id + ':' + (h >>> 0).toString(36) + ':' + ver; };
+async function thumbLoad(id, ver) {
+  if (mapThumbs.has(id)) return;
+  const m = buildMap(id), key = ver ? thumbKey(id, m, ver) : null;
+  let url = null; try { url = key && localStorage.getItem(key); } catch {}
+  if (url) { try { const img = new Image(); img.src = url; await img.decode(); const c = document.createElement('canvas'); c.width = THUMB_W; c.height = THUMB_H; c.getContext('2d').drawImage(img, 0, 0); mapThumbs.set(id, c); return; } catch {} }
+  const c = mapThumb(id, m);
+  if (key) try { for (const k of Object.keys(localStorage)) if (k.startsWith('r62d-thumb:' + id + ':')) localStorage.removeItem(k); localStorage.setItem(key, c.toDataURL('image/webp', 0.9)); } catch {}
+}
+const gameVer = () => fetch('/api/addr').then(r => r.json()).then(a => { const v = a && a.version && a.version.id; return v && v !== 'phone' ? v : null; }).catch(() => null);
 function renderMapPick(s) {
   const el = $('mapPick'), key = s.mp + ':' + (s.ph === PHASE.LOBBY) + ':' + s.rm + ':' + s.md;
   if (el.dataset.k === key) return;
@@ -4146,7 +4159,7 @@ $('conn').classList.add('hidden');
 runLoading('LOADING', [
   ['Loading fonts', () => document.fonts.ready],
   ['Building the map', () => loadMap(-1)], // the map drifts behind the title screen and menus
-  ['Drawing the maps', jobsStep(MAP_LIST.map(id => () => mapThumb(id)), 1)],
+  ['Drawing the maps', async () => { const ver = await gameVer(); for (let i = 0; i < MAP_LIST.length; i++) { await thumbLoad(MAP_LIST[i], ver); loadPart((i + 1) / MAP_LIST.length); await frames(1); } }],
   ['Drawing the guns', jobsStep(Object.keys(WEAPONS).flatMap(w => [[270, 84], [210, 74], [150, 49], [160, 50], [300, 100]].map(([a, b]) => () => gunPicture(w, {}, a, b))), 8)],
   ['Drawing the operators', jobsStep(Object.keys(OPERATORS).map(k => () => portraitCached(document.createElement('canvas'), k)), 6)],
   ['Getting the graphics card ready', () => frames(6)],
@@ -4730,7 +4743,8 @@ $('splash').addEventListener('pointerup', e => { if (e.pointerType === 'touch') 
 $('splash').addEventListener('click', () => {
   if (st.started) return;
   audio.initAudio(); audio.ui('open');
-  runLoading('PREPARING SOUNDS', [['Recording gunshots and footsteps', jobsStep(audio.soundJobs(), 6)]]); // built now, not the first time you hear them
+  // (the gunshot and footstep recordings are built in the background now, a few at a time, while you are in the menus:
+  // initAudio's prewarm; there used to be a PREPARING SOUNDS screen here, 1.3 s every start)
   if (!document.fullscreenElement && !inApp()) document.documentElement.requestFullscreen().catch(() => {});
   st.started = true; updateNav();
   let saved = ''; try { saved = localStorage.getItem('r62d-name') || ''; } catch {}
