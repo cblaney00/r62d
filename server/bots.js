@@ -1270,7 +1270,20 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
     if (!!(p.input && p.input.crouch) === gl.down) { useAbility(); done(6); ai.drillGoal = null; teamSay(game, p, gl.down ? 'Peephole over the objective.' : 'Peephole under the objective.', 'drill'); }
     return true;
   }
-  if (abId === 'grapple') { if (!enemy && ok() && lb.f > lp.f && !p.grapple && (game.grappleTarget(p) || (() => { const h = game.hatchToBlast(p); return h && !h.reinforced; })()) && Math.random() < dt * 2) { useAbility(); done(5); } return; }
+  if (abId === 'grapple') {
+    if (enemy || !ok() || !(lb.f > lp.f) || p.grapple || p.abilityCount <= 0) return;
+    if ((game.grappleTarget(p) || (() => { const h = game.hatchToBlast(p); return h && !h.reinforced; })()) && Math.random() < dt * 2) { useAbility(); done(5); ai.hoistTo = null; return; }
+    // (2026-11-18: in practice the pros never met a shut hatch, so they said take the charge out) the site is upstairs:
+    // now and then HOIST goes looking for a shut, unreinforced hatch up into the site's floor, blows it and climbs
+    if (ai.hoistTo === undefined) {
+      const m = game.map, want = Math.random() < (p.pro ? 0.8 : 0.25 + 0.06 * lvlOf(game, p));
+      const hs = want ? m.hatches.filter(h => !h.peep && m.tiles[h.cells[0]] === T.HATCH && floorAt(m, h.bx, h.by) === floorAt(m, p.x, p.y) && localPos(m, h.x, h.y).f > lp.f && localPos(m, h.x, h.y).f <= lb.f && Math.hypot(h.bx - p.x, h.by - p.y) < 30 * PX_PER_M) : []; // (any one up toward the site's floor)
+      const sc = h => Math.hypot(h.bx - p.x, h.by - p.y) + (localPos(m, h.x, h.y).f === lb.f ? 0 : 6 * PX_PER_M) + Math.hypot(h.x - bomb.x, h.y - bomb.y) * 0.3;
+      hs.sort((x, y) => sc(x) - sc(y)); ai.hoistTo = hs[0] || null;
+    }
+    const h = ai.hoistTo; if (!h || game.map.tiles[h.cells[0]] !== T.HATCH) { ai.hoistTo = null; return; }
+    moveTo(game, p, inp, { x: h.bx, y: h.by }, dt); return true;
+  }
   if (abId === 'htrap') { if (ok() && game.phase === PHASE.PREP && game.hatchToRig(p)) { useAbility(); done(3); } return; }
   if (abId === 'dropcharge') {
     if (ok() && heard && game.phase === PHASE.ACTION) { const h = localPos(game.map, ai.heard.x, ai.heard.y); if (h.f === lp.f - 1 && Math.hypot(h.x - lp.x, h.y - lp.y) < 3 * PX_PER_M && game.floorCharge(p)) { useAbility(); done(8); } }
@@ -2714,10 +2727,14 @@ function proAct(game, p, inp, dt, team) {
   const rot = st.rotate && game.time > st.rotate.t + (ROTATE_DELAY[name] ?? 0) && p.pro.pl.jobs.def !== 'anchor' ? st.rotate : null;
   const roaming = action && j.roam && el < (j.until || 0) + (TIMING[name] || 0) && !rot;
   if (!roaming && (ai.reposT = (ai.reposT ?? 16 + Math.random() * 14) - dt) <= 0) { ai.reposT = 18 + Math.random() * 16; ai.spreadOff = { x: Math.round((Math.random() - 0.5) * 4), y: Math.round((Math.random() - 0.5) * 4) }; ai.spread = null; } // a new angle now and then
-  const spot = roaming ? (ai.roamAt || (ai.roamAt = game.freeSpotNear(j.roam.x, j.roam.y, 50))) : spreadSpot(game, p, rot ? rot.at : j.hold, 72, rot ? rot.w.pos : j.watch); // defenders don't bunch either
+  // (2026-11-18: the pros never used the rat spots, so their suggestions said take them out) now and then, while the
+  // site isn't under attack, a pro holds a rat spot near their plan's hold instead: one look a round, by their own lean
+  if (!roaming && !rot && action && ai.ratTry === undefined) { ai.ratTry = Math.random() < (p.pro && PRO_PERSONA[name] ? 0.08 + 0.12 * PRO_PERSONA[name][1] : 0.1); if (ai.ratTry) { const r = ratHold(game, p); if (r && Math.hypot(r.at.x - j.hold.x, r.at.y - j.hold.y) < 14 * CELL) { ai.ratAt = r; feat(p, 'rat'); } } }
+  if (ai.ratAt && (rot || roaming || game.planted)) ai.ratAt = null;
+  const spot = ai.ratAt ? ai.ratAt.at : roaming ? (ai.roamAt || (ai.roamAt = game.freeSpotNear(j.roam.x, j.roam.y, 50))) : spreadSpot(game, p, rot ? rot.at : j.hold, 72, rot ? rot.w.pos : j.watch); // defenders don't bunch either
   if (!near(p, spot, 14)) { moveTo(game, p, inp, spot, dt, true); if (roaming && near(p, spot, 200)) inp.walk = 1; return true; }
   if (!roaming && !rot && !ai.offF) { ai.offF = 1; feat(p, 'offAngle'); } // the plan's holds are the off-angles on the ways in (siteIntel)
-  watch(rot ? rot.w.pos : j.watch, !roaming); return true;
+  watch(ai.ratAt ? ai.ratAt.watch : rot ? rot.w.pos : j.watch, !roaming); return true;
 }
 
 // FUN MODES (server/arena.js): bots hunt. They fight whoever they see (same reaction and aim as their rank), knife when

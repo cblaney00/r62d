@@ -60,7 +60,7 @@ while (Date.now() < until && left > 0) {
               const pl = g.players.get(id), side = pl && g.side(pl) === TEAM.ATK ? 'atk' : 'def', T = (P.tend || (P.tend = {}))[side] || (P.tend[side] = {});
               const mates = [...g.players.values()].filter(q => q.squad === r.sq), up = mates.filter(q => q.alive && !q.downed);
               const inc = (k, v) => { if (v) T[k] = (T[k] || 0) + v; };
-              inc('r', 1); inc('w', win); inc('k', r.k); inc('d', r.d); inc('hs', r.hs); inc('fk', r.fk); inc('fd', r.fd); inc('dist', Math.round(r.dist));
+              inc('r', 1); inc('op_' + r.op, 1); inc('w', win); // (op_<id>: rounds on each operator, so an operator's own mechanic is judged by that operator's rounds) inc('k', r.k); inc('d', r.d); inc('hs', r.hs); inc('fk', r.fk); inc('fd', r.fd); inc('dist', Math.round(r.dist));
               inc('sv', pl && pl.alive && !pl.downed ? 1 : 0); inc('cl', win && up.length === 1 && up[0] === pl && mates.length - 1 >= 3 ? 1 : 0);
               for (const [f, v] of Object.entries((pl && pl.feat) || {})) inc(f, v);
             }

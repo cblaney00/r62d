@@ -16,6 +16,14 @@
 - **Views**: `server/opinions.js` `formOpinions` after each session (server.js / practice.js): each pro picks the
   worst operator / gun (vs its own kind) / attachment / map / rule, weighted by role, style and a personal quirk,
   logged in `training.opinions[name]` (last 40).
-- Shown in BALL KNOWLEDGE (tabs GUNS, ATTACHMENTS, MAPS, DRILLS, PRO TAKES with the patch notes) and on each pro's
+- **Ideas** (he asked 2026-11-18: suggestions from people who grew up with the game): `formSuggestions` (opinions.js,
+  run by `formOpinions`): each pro puts forward one change, a HOLE (a bomb site one side wins over 64% / under 36% of
+  25+ rounds, `training.plans`; an operator whose team wins 7+ points under the side average, `opx`; a map where 20%+
+  of rounds end on the clock, `training.ends`) or something to TAKE OUT (a mechanic in `MECH` that happens under 1.5
+  times per 100 player-rounds on this version, `training.featV`, judged once there are 300). Weighted by role
+  (`ROLE_CARES`), style and a quirk, fewer when others already said it; opened in their own voice (`CARE`). Logged in
+  `training.suggestions[name]` (last 20), shown in BALL KNOWLEDGE → PRO IDEAS (most-backed first). New habits counted:
+  `droneCheck`, `hatchBlast`, `stairKill`.
+- Shown in BALL KNOWLEDGE (tabs GUNS, ATTACHMENTS, MAPS, DRILLS, PRO TAKES with the patch notes), PRO IDEAS and on each pro's
   PLAYBOOK page (THE WORST THING IN THE GAME, IN THE DRILLS).
 - Tests: `node tests/drills.js [n]`; a throwaway practice: `R62D_DATA=<tmp> node server/practice.js 40`.
