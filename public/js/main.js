@@ -4119,7 +4119,8 @@ function hud(s) {
   setHTML('gadgets',
     `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : me.scd ? `${ab.name} ready in ${Math.ceil(me.scd)}s` : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : me.ap ? 'Piercing round loaded' : me.su2 ? `Spotting ${Math.ceil(me.su2)}s · aim in` : me.gw2 ? `Ghillie ${Math.ceil(me.gw2)}s` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
     `<div class="${me.gc <= 0 && !me.ni ? 'out' : ''}"><b>${label('gadget')}</b>${me.ni ? 'Detonate Nitro' : g.name}<em>${me.ni ? '!' : me.gc}</em></div>` +
-    `<div><b>${label('view')}</b>${viewName}</div>`);
+    (side === 'atk' ? `<div class="${s.ph === PHASE.ACTION && !(me.dr > 0) ? 'out' : ''}"><b>${label('drone')}</b>${s.ph === PHASE.ACTION ? 'Put out a drone' : 'Drone'}<em>${s.ph === PHASE.ACTION ? me.dr ?? 0 : ''}</em></div><div><b>${label('view')}</b>Cams &amp; drones</div>` // (he asked 2026-11-18: the key for a new drone shows here too)
+      : `<div><b>${label('view')}</b>${viewName}</div>`));
   // view label
   let vl = '';
   const myBird = me.ct === 'drone' ? s.ents.find(e => e.id === me.did && e.ty === 'bird') : null;
