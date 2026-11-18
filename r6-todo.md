@@ -5,10 +5,15 @@ finished it gets ticked and moved to **Done**, then work continues on the next o
 Only ideas he asks for go in **To do** (added to the bottom). Claude never adds its own suggestions here.
 
 ## To do
-- [ ] make sure the sightlines dont shake while smoothly dragging the camera around, they seem to do this with both drones and regular operator view and it is very horrible and annoying and needs to not happen, if we have to rework how you draw the sight lines that is fine if it is faster and doesnt affect how the game is played
 
+- [ ] make sure the sightlines dont shake while smoothly dragging the camera around, they seem to do this with both drones and regular operator view and it is very horrible and annoying and needs to not happen, if we have to rework how you draw the sight lines that is fine if it is faster and doesnt affect how the game is played
+- [ ] lando and i tried to connect to r62d on the homelab and the ip wasn't working, he said we'd have to really look into this one because both of our computers are saying it should be working
+- [ ] please make every bot in the game its own individual and not repeat names across the non-pro ranks. they should each have their own personality and play style, there should be 10 per rank, they wont get their own profile like the pros but it will give the ranked play some context if you know certain players tendencies or how they usually play
+- [ ] make it so that most placed character abilities (if they are equipment, gadget, or something of that nature) can be picked back up and placed in a better position by the character who placed it (you cant move your teammates equipment or gadgets)
+- [ ] there are still tables and stuff that look like the floor is elevated, the floors need to be seamless around all furniture and cars and everything else that has edges which could be inconsistent with the surrounding area
 
 ## Done
+- [x] the reticle should not jump around when moving it with the right joystick, it should be a smooth pickup from where the reticle currently is
 - [x] on mobile if the left joystick is quickly flicked to start moving another direction then it will cancel the lock on effect that the aim has and switch to aim+walk until the right joystick is touched again (which will reenable the lock on effect
 - [x] also glass breaking is probably appropriately loud for the purposes of people hearing the sound from a ways away but its definitely too loud for the person that broke the window, lets tune down that effect for people closeby but keep the way it carries
 - [x] hey can we make the game load a bit faster?

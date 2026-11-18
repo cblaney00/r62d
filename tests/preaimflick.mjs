@@ -27,9 +27,9 @@ async function run() {
     for (let i = 0; i < 6 && await js("!document.getElementById('splash').classList.contains('hidden')"); i++) { await act(drag('t', [[W / 2, H / 2], [W / 2, H / 2]], 30, 0)); await sleep(1200); }
     await js(`document.querySelector('[data-tab="free"]').click(); true`); await sleep(800);
     await js(`document.getElementById('freeGo').click(); true`); await sleep(9000);
-    const L0 = [110, Math.round(H * 0.72)], R0 = [Math.round(W * 0.72), Math.round(H * 0.5)];
+    const L0 = [110, Math.round(H * 0.72)], R0 = JSON.parse(await js(`(() => { const r = document.getElementById('tsRight').getBoundingClientRect(); return JSON.stringify(r.width ? [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)] : [${Math.round(W * 0.72)}, ${Math.round(H * 0.5)}]); })()`)); // (the aim stick's own place: the rings layout puts buttons round it)
     // aim: right thumb drags a little to the right and lets go
-    await act(drag('R', [R0, [R0[0] + 40, R0[1] - 10]], 200, 150)); await sleep(500);
+    await act(drag('R', [R0, [R0[0] + 130, R0[1] - 30]], 300, 150)); await sleep(500); // aim well out
     console.log(`${mode}: after aiming`, await state());
     // walk a bit, then quick flicks of the move stick in new directions (fast, far, thumb lifted between)
     await act(drag('L', [L0, [L0[0] + 45, L0[1]]], 120, 500)); console.log(`${mode}: walking`, await state());
@@ -37,6 +37,13 @@ async function run() {
     await sleep(300); const s = JSON.parse(await state());
     const ok = s.hold && !s.steer; if (!ok) fails++;
     console.log(`${mode}: after 4 quick flicks`, JSON.stringify(s), ok ? 'OK (still locked on)' : 'FAIL (lock dropped)');
+    // smooth pickup (he asked 2026-11-18): a thumb landing somewhere else on the aim side and moving 25 px moves the reticle only that much (it used to jump towards where the thumb sits on the stick)
+    const far = () => js(`JSON.stringify((() => { const q = __r62d.padFar(); return { x: q.ax, y: q.ay }; })())`).then(JSON.parse);
+    for (const [lx, ly] of [[R0[0], R0[1]], [R0[0] - 15, R0[1] + 10]]) {
+      const before = await far(); await act(drag('R', [[lx, ly], [lx + 25, ly]], 250, 150)); await sleep(200); const after = await far();
+      const d = Math.round(Math.hypot(after.x - before.x, after.y - before.y)); const ok2 = d < 120; if (!ok2) fails++;
+      console.log(`${mode}: thumb landed ${lx - R0[0]},${ly - R0[1]} px off and moved 25 px: reticle moved ${d} px`, ok2 ? 'OK (smooth pickup)' : 'FAIL (jumped)');
+    }
   }
   console.log(fails ? `FAIL ${fails}` : 'PASS');
 }

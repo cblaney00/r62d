@@ -37,8 +37,8 @@ import { readCode, showCode } from '/shared/joincode.js';
 import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
 import * as rope3d from './rope3d.js';
 import { compassRoute as sharedRoute } from '/shared/compass.js';
-import { newStick, stepStick } from './aimstick.js';
-import { touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings } from './touch.js';
+import { newStick, stepStick, stickFrom } from './aimstick.js';
+import { onAimStart, touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings } from './touch.js';
 import { blocksSight, FL, underAt } from '/shared/constants.js';
 import { EYE_H } from '/shared/map.js';
 import { META } from '/shared/meta.js';
@@ -1080,6 +1080,9 @@ function autoShot() {
   }
   return 0;
 }
+// where the phone aim stick picks up from when a thumb lands on it (he asked 2026-11-18: no jump): the aim now, in the
+// stick's own terms (the same as newStick starts from)
+onAimStart(() => { if (!st.me || st.me.ct !== 'body') return null; const a = wrapAng(padAng - (st.gyroOff || 0)), l = stickFrom(padReach, 'zone'); return { x: Math.cos(a) * l, y: Math.sin(a) * l }; });
 function pollPad(dt, view) {
   const gp = readPad() || touchPad(); // a real controller first, else the phone's touch controls (touch.js)
   if (!gp) { if (gpName) { for (const k in gpk) gpk[k] = 0; gpName = ''; renderSettings(); } return; }

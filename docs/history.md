@@ -589,3 +589,14 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - New `tests/preaimflick.mjs` (rings + buttons: aim, walk, 4 quick flicks → still `hold`, no `steer`): PASS.
   `tests/phonefree.mjs` needed a scrollIntoView before tapping an operator (the panel scrolls as one page since
   2026-11-17); its steer-after-sprint checks pass.
+
+## Phone aim stick: smooth pickup (2026-11-18, he asked)
+- The aim stick is absolute ('steady' scheme): its centre was put under the landing thumb, i.e. "aim close to me", so the
+  first move sent the reticle racing from where it was towards that (measured: ~400 px for a 25 px thumb move after
+  aiming far out). Now touch.js places the stick's centre so the landing spot already is the current aim
+  (`onAimStart` hook from main.js: padAng/padReach as a stick vector via `stickFrom`); after that it is the same stick.
+  The quick-tap aim-in is measured from the landing point (lx, ly). The knob shows where you aim.
+- (Tried first: an offset that melts away with thumb travel in aimstick.js; it dragged the reticle sideways as it
+  melted — dropped.)
+- Tests: `tests/preaimflick.mjs` now also checks pickup (25 px thumb → ~25 px reticle, was ~400) in rings and buttons;
+  `SCENARIO=rings tests/thumbs.mjs` all as wanted.

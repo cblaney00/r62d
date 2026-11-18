@@ -180,6 +180,7 @@ const setAds = on => { adsLatch = on; trig.lt = on ? 1 : 0; if (ui) { for (const
 // fire rings: each thumb on a ring counts as one finger on the trigger, like a FIRE button did
 const trigger = on => { tc.rt = Math.max(0, tc.rt + (on ? 1 : -1)); trig.rt = tc.rt ? 1 : 0; };
 let lastLeftTap = 0; // when a quick tap on the move stick last ended (a second one straight after sprints) // AIM: tap on, tap off // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
+let aimStart = () => null; export function onAimStart(f) { aimStart = f; } // main.js: where you aim now, as a stick vector (length 0..1)
 let ui = null, shown = false, recentre = () => {}, aimOn = false, aimPx = null, aimPxN = 0; // aimPx: the aiming finger (aim stick or dragged FIRE) in screen px; aimPxN changes with each new finger
 export const touchAimReset = () => recentre();
 
@@ -254,12 +255,16 @@ function build() {
       if (aimF !== null) return;
       aimF = id; aimOn = true; ox = tx = x; oy = ty = y; aimPx = { x, y }; aimPxN++;
       const K = rings ? STICK.KNOB : R; // (with the rings the held stick covers its ring, so the knob travels further)
-      dyn.classList.add('held'); rs.x = rs.y = 0; knob(dyn, rs, K);
-      const t0 = performance.now(); let mv = 0;
+      dyn.classList.add('held'); rs.x = rs.y = 0;
+      // a smooth pickup (he asked 2026-11-18: the reticle jumped when the thumb landed): the stick's centre is put so that
+      // the landing spot already means where you aim now; from there it is the same stick as always, whole range and all
+      { const o = aimStart(); if (o && Math.hypot(o.x, o.y) > 0.02) { const Ra = R / stickSens() * TUNE.TRAVEL; ox = x - o.x * Ra; oy = y - o.y * Ra; rs.x = o.x; rs.y = o.y; } }
+      knob(dyn, rs, K);
+      const t0 = performance.now(), lx = x, ly = y; let mv = 0; // (lx, ly: where the thumb landed; a quick tap is measured from there)
       fingers.set(id, {
         move(x, y) {
           const Ra = R / stickSens() * TUNE.TRAVEL; // (lower sensitivity: a longer reach for the thumb; TRAVEL: extra room for fine aim, he asked)
-          tx = x; ty = y; aimPx = { x, y }; mv = Math.max(mv, Math.hypot(x - ox, y - oy)); let u = (x - ox) / Ra, v = (y - oy) / Ra; const l = Math.hypot(u, v);
+          tx = x; ty = y; aimPx = { x, y }; mv = Math.max(mv, Math.hypot(x - lx, y - ly)); let u = (x - ox) / Ra, v = (y - oy) / Ra; const l = Math.hypot(u, v);
           if (l > 1) { ox += (u / l) * (l - 1) * Ra; oy += (v / l) * (l - 1) * Ra; u /= l; v /= l; } // the centre follows a thumb that slides past the edge
           rs.x = u; rs.y = v; knob(dyn, rs, K);
         },
