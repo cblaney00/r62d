@@ -73,13 +73,15 @@ export function lensPt(px, py, x, y, r, M) {
 // a thin dark edge so it shows on light floors and dark rooms, mid-sized. 'spread' (screen px before scale) opens it up
 // as the gun gets less accurate (moving, spraying, hip fire); k = device pixel ratio.
 export const SIGHT_NAMES = { iron: 'Iron sights', reddot: 'Red dot', holo: 'Holo', prism: '1.5× prism', scope: '2× scope', sniper: 'Sniper scope' };
-export function drawReticle(ctx, sight, x, y, spread, k) {
+// sz = how big the shapes are (main.js: smaller when zoomed out and further from you, he asked 2026-11-18); the gap g
+// is not scaled by it, so it still shows exactly where the next bullet can land (his pick).
+export function drawReticle(ctx, sight, x, y, spread, k, sz = 1) {
   x = Math.round(x) + 0.5; y = Math.round(y) + 0.5;
-  const g = Math.max(0, spread) * k, A = 0.82; k *= 1.35; // (sizes below are a third bigger than a plain pixel: mid-sized) // g = how far it opens up
+  const g = Math.max(0, spread) * k, A = 0.82, ek = k * Math.max(0.6, 0.8 * sz); k *= 1.35 * 0.8 * sz; // (a third bigger than a plain pixel, then 20% smaller: he asked 2026-11-18) // g = how far it opens up, ek = the dark edge
   const edge = 'rgba(0,0,0,0.55)';
   // every shape is drawn twice: a wider dark stroke under, then the colour
   const both = (col, w, path, fill) => { ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.strokeStyle = edge; ctx.lineWidth = w * k + 2 * k / 1.35; ctx.beginPath(); path(); ctx.stroke(); if (fill) { ctx.fillStyle = edge; ctx.fill(); }
+    ctx.strokeStyle = edge; ctx.lineWidth = w * k + 2 * ek; ctx.beginPath(); path(); ctx.stroke(); if (fill) { ctx.fillStyle = edge; ctx.fill(); }
     ctx.strokeStyle = col; ctx.lineWidth = w * k; ctx.beginPath(); path(); ctx.stroke(); if (fill) { ctx.fillStyle = col; ctx.fill(); } };
   const dot = (col, r) => both(col, 0.01, () => ctx.arc(x, y, r * k, 0, 7), true);
   ctx.save(); ctx.globalAlpha = A;

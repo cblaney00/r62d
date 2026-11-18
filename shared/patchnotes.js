@@ -127,4 +127,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: no keyboard key hints in prompts, tips, gadget slots or the free play bar.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'bots', t: 'Bots no longer get stuck on the roof: they step in close enough to break a roof hatch, a bot that reaches the roof on its own makes a plan, and they wait at most 25 s over a hatch or beside a window before going in.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: "How much of the map you see" now starts at 70% (closer in) and goes from 40% to 120%.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'all', t: 'Crosshair: every sight 20% smaller; it shrinks as it moves away from you and no longer looks bigger when the view zooms out. Its gap still shows exactly where the next bullet can land.', v: 0 },
 ];

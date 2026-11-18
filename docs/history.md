@@ -665,3 +665,6 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Phone zoom (he asked, 2026-11-18): on phones "How much of the map you see" starts at 70% and goes 40-120%
   (`VIEW_RANGE` in touch.js, saved as `r62d-view-phone` so phones with an old saved value get the new start too).
   Computers unchanged (80-200%, 100%).
+- Crosshair size (he asked, 2026-11-18): `drawReticle` (crosshair.js) is 20% smaller and takes a size `sz`; main.js
+  `xhSize` = view part (`XH_REF_H` 470 × REST_ZOOM / viewH, 0.45..1: shrinks only past the widest resting view) ×
+  distance part (1 within 3 m, −2.5%/m, down to 0.55). The gap is NOT scaled: still the true cone (his pick).

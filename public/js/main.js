@@ -3764,6 +3764,15 @@ function gunHeat(me, w, now) {
   return Math.max(srv, own);
 }
 
+// how big the reticle's shapes are (he asked 2026-11-18): it no longer looks bigger as the view zooms out (it shrinks
+// with the view past the widest normal resting view), and it shrinks as it moves away from you: full size within 3 m,
+// down to 55% from 21 m. Its gap is not scaled (crosshair.js drawReticle).
+const XH_REF_H = 470 * REST_ZOOM;
+function xhSize(x, y, px, py) {
+  const z = st.zoom || 1, zk = Math.max(0.45, Math.min(1, XH_REF_H / (st.viewH || XH_REF_H)));
+  const dm = Math.hypot(x - px, y - py) / z / PX_PER_M;
+  return zk * Math.max(0.55, 1 - Math.max(0, dm - 3) * 0.025);
+}
 const sightLook = (sight, x, y, k) => drawSightLook(ctx, sight, x, y, k, DPR, scopeLensR()); // in crosshair.js, shared with the Armory
 // the sniper's clear lens, in canvas px, and the blurred, dimmed view round it (#scopeVeil; its CSS only changes when it
 // moves a pixel, so the browser isn't asked to redo the blur's mask every frame for nothing)
@@ -3876,7 +3885,7 @@ function crosshair(me, now) {
   if (me.mv === 3) ctx.globalAlpha = 0.3; // sprinting: gun down
   else { st.xhFade = (st.xhFade ?? 1) + ((fq && fq.stopped ? 0.45 : 1) - (st.xhFade ?? 1)) * Math.min(1, (now - (st.xhFadeT || now)) * 14); ctx.globalAlpha = st.xhFade; } // bullets stop at a wall before it: faded, gliding (no flicker past door frames)
   st.xhFadeT = now;
-  if (!(sniperOn(me) && me.at > 0.6 && me.ct === 'body')) drawReticle(ctx, attFromCode(me.aa).sight, x, y, spread, DPR); // the reticle of the sight on your gun (the sniper lens reticle takes over)
+  if (!(sniperOn(me) && me.at > 0.6 && me.ct === 'body')) drawReticle(ctx, attFromCode(me.aa).sight, x, y, spread, DPR, xhSize(x, y, px, py)); // the reticle of the sight on your gun (the sniper lens reticle takes over)
   ctx.globalAlpha = 1;
   // points popups under the crosshair (he asked, R6-style): newest at the top, each fades after a couple of seconds
   ptsPopups(ctx, x, y, now);
