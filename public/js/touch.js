@@ -50,9 +50,14 @@ export function setInputChoice(c) { store('r62d-input', c); location.reload(); }
 // Settings that phones especially need (he asked: adjustable): how big the menus and match text are (1 = fit the
 // screen), and how much of the map you see (bigger = further zoomed out). Kept on this device.
 export const uiScale = () => Math.max(0.7, Math.min(1.6, +(store('r62d-uiscale') || 1)));
-export const viewMul = () => Math.max(0.8, Math.min(2, +(store('r62d-view') || 1))); // (phones the same as a computer: he asked 2026-11-16; they used to start at 1.35, further out)
+// (phones the same as a computer: he asked 2026-11-16; they used to start at 1.35, further out)
+// Phones (he asked 2026-11-18): start at 70% and go from 40% to 120%, kept under their own name so the new start
+// takes effect on phones that already had a value saved. Computers stay 80-200%, starting at 100%.
+export const VIEW_RANGE = isTouch ? [40, 120, 70] : [80, 200, 100];
+const VIEW_KEY = isTouch ? 'r62d-view-phone' : 'r62d-view';
+export const viewMul = () => Math.max(VIEW_RANGE[0] / 100, Math.min(VIEW_RANGE[1] / 100, +(store(VIEW_KEY) || VIEW_RANGE[2] / 100)));
 export function setUiScale(v) { store('r62d-uiscale', String(v)); fitUi(); }
-export function setViewMul(v) { store('r62d-view', String(v)); }
+export function setViewMul(v) { store(VIEW_KEY, String(v)); }
 
 // Tilt to move (he asked; phones only): tip the phone the way you want to walk. A small tilt past the dead zone walks
 // (silently), a bigger one runs; the stick still works too (a thumb on it wins). "Level" is however you hold the phone

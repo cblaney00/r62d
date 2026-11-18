@@ -38,7 +38,7 @@ import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
 import * as rope3d from './rope3d.js';
 import { compassRoute as sharedRoute } from '/shared/compass.js';
 import { newStick, stepStick, stickFrom } from './aimstick.js';
-import { onAimStart, touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings } from './touch.js';
+import { onAimStart, touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, VIEW_RANGE, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings } from './touch.js';
 import { blocksSight, FL, underAt, blocksMove } from '/shared/constants.js';
 import { EYE_H } from '/shared/map.js';
 import { META } from '/shared/meta.js';
@@ -4786,7 +4786,7 @@ for (const b of $('inputSeg').querySelectorAll('button')) {
   b.onclick = () => { if (b.dataset.c !== cur) setInputChoice(b.dataset.c); };
 }
 { const u = $('uiScale'), v = $('viewMul'), show = () => { $('uiScaleVal').textContent = u.value + '%'; $('viewMulVal').textContent = v.value + '%'; };
-  u.value = Math.round(uiScale() * 100); v.value = Math.round(viewMul() * 100); show();
+  v.min = VIEW_RANGE[0]; v.max = VIEW_RANGE[1]; u.value = Math.round(uiScale() * 100); v.value = Math.round(viewMul() * 100); show();
   u.addEventListener('input', show); u.addEventListener('change', () => { show(); setUiScale(u.value / 100); }); // on letting go: resizing while dragging moved the slider under the mouse
   v.addEventListener('input', () => { show(); setViewMul(v.value / 100); }); }
 { const k = $('stickSens'), show = () => { $('stickSensVal').textContent = (k.value / 100).toFixed(2); }; // phone: aim stick sensitivity (he asked: the default was too high)

@@ -662,3 +662,6 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   or beside a window up to ~50 s: capped at 25 s. tests/stuckbots.js prints each stuck bot's plan; what is left is a
   PERCH sniper holding an angle (by design). The phone rope-drag "0 px" was the test's thumb landing on a button
   (tests/thumbs.mjs now uses the aim stick's real place): drag works.
+- Phone zoom (he asked, 2026-11-18): on phones "How much of the map you see" starts at 70% and goes 40-120%
+  (`VIEW_RANGE` in touch.js, saved as `r62d-view-phone` so phones with an old saved value get the new start too).
+  Computers unchanged (80-200%, 100%).
