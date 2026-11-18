@@ -287,12 +287,17 @@ export function walkRay(x0, y0, dx, dy, maxT, cb) {
 // Distance a ray travels before something opaque (or a smoke cloud) stops it. soft = true: soft walls and
 // barricades don't stop it (bullets go through them), so it ends at the first wall a bullet can't pass.
 // low = true: the eye is at floor level (a drone, or someone lying down), so it sees under tables, desks and cars (map.under).
+// (2026-11-18, he asked: by height) low may also be the eye's height in world px: furniture (map.fTop, shared/furniture.js)
+// stops the ray only if it is at least as tall as the eye and the eye isn't down in the gap under it
+export const EYE_STAND = 58, EYE_LOW = 9;
 export function castSight(map, x0, y0, ang, maxD, smokes, soft = false, low = false) {
   const dx = Math.cos(ang), dy = Math.sin(ang);
   const startCx = Math.floor(x0 / CELL), startCy = Math.floor(y0 / CELL);
+  const eye = typeof low === 'number' ? low : low ? EYE_LOW : EYE_STAND, FT = map.fTop;
   let exact = -1;
   let d = walkRay(x0, y0, dx, dy, maxD, (cx, cy) => {
     const t = tileAt(map, cx, cy);
+    if (FT && (t === T.LOW || t === T.TALL)) { const k = cy * map.W + cx, tp = FT[k]; if (!tp || eye >= tp || eye < map.fGap[k] || (cx === startCx && cy === startCy)) return false; return true; }
     if (!blocksSight(t) || (soft && (t === T.SOFT || t === T.BARRI)) || (low && underAt(map, cy * map.W + cx, t))) return false;
     const sh = shapeAt(map, cx, cy);
     if (sh) { // an angled or curved bit of wall: only its solid part stops sight
@@ -370,8 +375,10 @@ export function canSee(map, v, px, py, smokes) {
   if (d > v.range) return false;
   if (d > v.near && Math.abs(angDiff(Math.atan2(py - v.y, px - v.x), v.ang)) > v.fov / 2 + 0.05) return false;
   if (v.mask) { const k = v.mask; if (k.lim && (px < k.lim.x0 || px > k.lim.x1 || py < k.lim.y0 || py > k.lim.y1)) return false; const X = k.ex + k.f * (px - k.ex), Y = k.ey + k.f * (py - k.ey); if (X < k.x0 || X > k.x1 || Y < k.y0 || Y > k.y1) return false; } // through a hatch: only the patch the opening lets you see (map.js hatchSight)
-  return los(map, v.x, v.y, px, py, smokes);
+  return los(map, v.x, v.y, px, py, smokes, viewEye(v));
 }
+// a view's eye height (world px): set on the view, else by kind (a camera up on the wall, a drone at the floor)
+export const viewEye = v => v.eye ?? (v.low ? EYE_LOW : v.kind === 'cam' ? 86 : v.kind === 'drone' ? 5 : EYE_STAND);
 
 // The first non-floor cell a player is facing (used for reinforcing, barricading, placing charges).
 export function facingCell(map, px, py, aim, reach) {

@@ -147,6 +147,7 @@ only add to this file if it is a rule every session needs.
   `node tests/stairs.js` walks a body up and down every staircase with real physics + bot path finding; `node tests/stairsides.js` checks the stair rails (on only at the open end, sides only by a jump: `stairEdges` in physics.js).
   `node tests/pickup.js` (picking your own gadgets back up), `node tests/botroster.js` (the 70 bots, WRAITH's charge).
   `node tests/wsjoin.js`: game updates compressed once for everyone still unpack to exactly each player's text.
+  `node tests/furniture.js`: seeing and shooting by height over and under furniture (shared/furniture.js `FURN_H`, `furnLine`; castSight takes an eye height).
   `node tests/balance.js 12` is the balance report (see docs/balance.md for how to read it and past changes).
   `tests/shoot.mjs` drives a hidden Firefox (run as insideabush, via WebDriver BiDi,
   `--remote-debugging-port`) to take screenshots; see `docs/testing.md`.

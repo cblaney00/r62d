@@ -29,7 +29,8 @@ import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
 const rankTag = i => i == null ? '' : `<span class="rankTag" style="color:${RANK_COL[i]};border-color:${RANK_COL[i]}">${RANKS[i].toUpperCase()}</span>`;
 import { ACTIONS, PRESETS, applyPreset, actionFor, bindsFor, setBind, resetBinds, keyName, label, getBinds, applyBinds, onBindsChange, BINDS_VERSION, lockMouse } from './keys.js';
-import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX } from '/shared/physics.js';
+import { walkRay, tileAt, findVault, standable, leanPoint, LEAN_PX, viewEye } from '/shared/physics.js';
+import { furnLine, furnTopAt, EYE_STANCE, HEAD_STANCE, stanceOf } from '/shared/furniture.js';
 import { createCoach } from './tutorial.js';
 import * as RP from './replay.js';
 import { drawQr } from './qr.js';
@@ -2381,7 +2382,7 @@ function frame(nowMs) {
       view = b && b.pe ? { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: 1.9, range: 520, near: 6, kind: 'drone', bird: 1 } : { x: st.pred.x, y: st.pred.y, ang: st.aim, fov: Math.PI * 2, range: b ? 260 : 230, near: 0, kind: 'drone', low: !b, bird: b ? 1 : 0 };
     }
     else if (ctrl === 'cam') { const c = s.ents.find(e => e.id === me.fi); if (c) view = feedView(c, me); }
-    else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: st.longV ? LONG_R : 1100, near: 26, kind: 'body', low: (st.pred.pr || 0) >= 1 }; } // you see from your (leaning) head
+    else { const e = leanPoint(st.map, st.pred.x, st.pred.y, st.aim, st.pred.lo || 0); view = { x: e.x, y: e.y, ang: st.aim, fov: fovFor(me), range: st.longV ? LONG_R : 1100, near: 26, kind: 'body', low: (st.pred.pr || 0) >= 1, eye: EYE_STANCE[(st.pred.pr || 0) >= 1 ? 2 : me.cr ? 1 : 0] + (st.pred.up ? furnTopAt(st.map, st.pred.x, st.pred.y) : 0) }; } // you see from your (leaning) head, at your eyes' height (furniture.js)
     if (view && view.kind === 'body' && me.ro && me.ro[0] && !me.ro[8] && st.map.ropes[me.ro[1]]) { const r = st.map.ropes[me.ro[1]]; view.ang = r.out; view.fov = Math.PI * 0.98; view.near = 6; } // on a rope, not level with a window: you see out, not in (he chose R6's rule)
   } else if (inGame && me) {
     let mates = s.players.filter(p => p.a && p.sq === me.sq && p.id !== me.id);
@@ -2984,7 +2985,7 @@ function playerFoley(p, a, moved, own, dt) {
 // apart (a door frame, a wall corner) the edge is found by halving the gap, so it sits on the real corner.
 const TAU = Math.PI * 2;
 function visionPolygon(v, sm, rays = 0) {
-  const pts = [], full = v.fov >= TAU - 0.01, low = !!v.low, map = st.map, R = v.range;
+  const pts = [], full = v.fov >= TAU - 0.01, low = v.eye ?? !!v.low, map = st.map, R = v.range; // (an eye height where the view has one: furniture by height)
   const per = rays ? (full ? rays : rays * TAU / v.fov) : (full ? 360 : 300 * TAU / 1.9) * gq.rays; // rays round a whole circle
   const M = Math.max(16, Math.round(per / 8) * 8), step = TAU / M;
   const cast = v.lim ? a => Math.min(R, castSight(map, v.x, v.y, a, R, sm, false, low) + 7, v.lim(a)) : a => Math.min(R, castSight(map, v.x, v.y, a, R, sm, false, low) + 7); // (the stairs view: also only as far as your eyes reach through the opening)
@@ -3250,6 +3251,7 @@ function draw(s, view, now, dt) {
     }
     // Silent Shroud: drones and cameras can't see her, only eyes can
     let vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
+    if (vis && !ally && !isMe && view && st.map.fTop) vis = teamSees(p.x, p.y, HEAD_STANCE[stanceOf(p)] + (p.el === 1 ? furnTopAt(st.map, p.x, p.y) : 0)); // (by height: the top of them must show over the furniture between)
     if (vis && !ally && !isMe && p.rp && !p.ry && view && p.rr !== undefined && st.map.ropes[p.rr]) { const r = st.map.ropes[p.rr]; if ((view.x - p.x) * -Math.cos(r.out) + (view.y - p.y) * -Math.sin(r.out) > 6 && floorAt(st.map, view.x, view.y) === r.f) vis = false; } // off-level on a rope: hidden from inside (only the rope gives them away)
     if (st.tv) (st.tvPos || (st.tvPos = new Map())).set(p.id, { x: p.x, y: p.y, p });
     if (!vis) { // ESPORTS TV (he asked): everyone's outline shows through walls; only the followed player's sight is live
@@ -4726,9 +4728,9 @@ function teamSeesBody(x, y) { // seen by someone's own eyes (not a drone, camera
   for (const v of st.viewers || []) if (!v.off && v.kind !== 'drone' && v.kind !== 'cam' && canSee(st.map, v, x, y, sm)) return true;
   return false;
 }
-function teamSees(x, y) {
+function teamSees(x, y, h) { // h: the height (world px) that has to show, by furniture (shared/furniture.js); none: the floor there
   const sm = smokes(st.last);
-  for (const v of st.viewers || []) if (!v.off && canSee(st.map, v, x, y, sm)) return true;
+  for (const v of st.viewers || []) if (!v.off && canSee(st.map, v, x, y, sm) && (h === undefined || furnLine(st.map, v.x, v.y, viewEye(v), x, y, h).see)) return true;
   return false;
 }
 // Is this map cell (often a wall, which blocks the line itself) visible to the team?

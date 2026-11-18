@@ -1,6 +1,7 @@
 // All maps. Each map file builds its floors with the kit in mapkit.js.
 import { CELL, T, FL } from './constants.js';
 import { castSight, angDiff, los } from './physics.js';
+import { buildFurniture } from './furniture.js';
 import { build as harbor } from './maps/harbor.js';
 import { build as villa } from './maps/villa.js';
 import { build as depot } from './maps/depot.js';
@@ -48,6 +49,7 @@ function copyOf(v, memo) {
 function buildFresh(id) {
   const m = MAPS[id].build();
   stairRoom(m);
+  buildFurniture(m); // (how tall each thing is, for seeing and shooting by height: shared/furniture.js)
   addCams(m);
   addRopes(m);
   addRoofEdges(m);

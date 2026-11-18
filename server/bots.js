@@ -9,6 +9,8 @@ import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, r
 import { hatchNear, ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairSees, eyeH, bodyH, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
+import { furnLine, furnTopAt, EYE_STANCE, HEAD_STANCE, stanceOf } from '../shared/furniture.js';
+const eyeOfBody = (game, p) => EYE_STANCE[stanceOf(p)] + (p.up ? furnTopAt(game.map, p.x, p.y) : 0); // a body's eyes above the floor (on furniture: higher)
 import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess, DRILL_STYLE, drillMul } from './training.js';
 import { compose, LINES, FUN, WAYS } from '../shared/comms.js';
 import { ROSTER, habit } from '../shared/botroster.js';
@@ -528,7 +530,8 @@ export function visibleEnemy(game, p, see) {
     if (d > see || d > bd) continue;
     const a = Math.atan2(q.y - p.y, q.x - p.x);
     if (d > 70 && Math.abs(angDiff(a, p.aim)) > (p.pro ? 0.9 : 1.2)) continue; // pros: a human 103° view
-    if (!los(game.map, p.x, p.y, q.x, q.y, smokes)) continue;
+    if (!los(game.map, p.x, p.y, q.x, q.y, smokes, eyeOfBody(game, p))) continue;
+    if (game.map.fTop && !furnLine(game.map, p.x, p.y, eyeOfBody(game, p), q.x, q.y, HEAD_STANCE[stanceOf(q)] + (q.up ? furnTopAt(game.map, q.x, q.y) : 0)).see) continue; // (by height: furniture between hides them, shared/furniture.js)
     best = q; bd = d;
   }
   // up or down a staircase: someone on its steps or landing shows on this floor's steps too
@@ -1104,16 +1107,21 @@ export function botThink(game, p, dt) {
     else {
       // he asked: defenders wander a little: every so often, while nothing is heard, a new spot round the site
       if (!heardRecently && game.time > (ai.holdT || 0)) { // (map knowledge: an off-angle on a way in, else somewhere round the bomb)
-        const rat = Math.random() < (p.pro ? 0.15 : 0.25) ? ratHold(game, p) : null; // a rat spot (he asked): tucked in a corner nook, waiting for someone who doesn't clear it
+        const rat = !ai.ratRolled && (ai.ratRolled = 1) && Math.random() < RAT_P * 1.5 ? ratHold(game, p) : null; // (x1.5: some rolls find no free spot near the site; he chose 2026-11-18: 6-7% of defender-rounds is fine) // a rat spot (he asked): tucked in a corner nook, waiting for someone who doesn't clear it (one roll a round: he asked 2026-11-18 for 8-12% of defenders a round)
         const kh = !rat && Math.random() < know(game, p).angles ? knownHold(game, p) : null;
-        if (rat) { ai.hold = rat.at; ai.watch = rat.watch; ai.holdT = game.time + 25 + Math.random() * 20; feat(p, 'rat'); }
-        else { ai.hold = kh ? kh.at : nearBomb(game, site, ai.role === 'anchor' ? 60 : 100); ai.watch = kh ? kh.watch : null; ai.holdT = game.time + 10 + Math.random() * 18; if (kh) feat(p, 'offAngle'); } }
+        if (rat) { ai.hold = rat.at; ai.watch = rat.watch; ai.holdT = game.time + 35 + Math.random() * 25; ai.ratHere = 1; feat(p, 'rat'); }
+        else { ai.ratHere = 0; ai.hold = kh ? kh.at : nearBomb(game, site, ai.role === 'anchor' ? 60 : 100); ai.watch = kh ? kh.watch : null; ai.holdT = game.time + 10 + Math.random() * 18; if (kh) feat(p, 'offAngle'); } }
       goal = ai.hold || (ai.hold = nearBomb(game, site, 70));
+      // (he asked 2026-11-18) from Platinum up a defender waits for information: stays on the hold longer and, hearing
+      // someone, turns to the sound and lets them come instead of going to look
+      if (p.pro || lvlOf(game, p) >= 4) { if (ai.holdT && !ai.patientT) { ai.holdT += 12; ai.patientT = 1; } if (heardRecently && ai.heard) ai.watch = { x: ai.heard.x, y: ai.heard.y }; }
+      if (ai.holdT && game.time > ai.holdT) ai.patientT = 0;
     }
   }
   if (act) { if (!ai.actSaid) { ai.actSaid = true; talk(game, p, act === 'plant' ? 'plant' : 'defuse', {}, act); } inp.interact = 1; inp.crouch = 1; return; }
   if (!goal) return;
   const toGoal = Math.hypot(goal.x - p.x, goal.y - p.y);
+  if (ai.ratHere && goal === ai.hold && toGoal < 14 && !game.planted) inp.crouch = 1; // tucked in, low behind whatever is there (furniture hides by height now)
 
   // --- defensive gas: throw it at a noise near the site, set it off when someone walks in ---
   if (!atk && abId === 'gas' && action) {
@@ -1780,6 +1788,7 @@ function spacingMate(game, p, next) {
 // checked, with time left and a drone to hand (one in the pocket, or theirs still out near), first gets out of that
 // room's sight, then drives a drone in and looks, then carries on. From Platinum up they do it properly (most times,
 // hidden first, a proper look); Silver and Gold now and then, where they stand, a quick look; Copper and Bronze never.
+const RAT_P = 0.11; // a defender's chance to hold a rat spot in a round (he asked 2026-11-18: 8-12%)
 const CHK_GAP = [0, 0, 40, 30, 16, 14, 12, 12]; // seconds between checks, by rank (0: never)
 function checkDrone(game, p, ai, inp, dt, heard) {
   const lvl = p.pro ? 7 : lvlOf(game, p), good = lvl >= 4, C = ai.chk;
@@ -2729,10 +2738,11 @@ function proAct(game, p, inp, dt, team) {
   if (!roaming && (ai.reposT = (ai.reposT ?? 16 + Math.random() * 14) - dt) <= 0) { ai.reposT = 18 + Math.random() * 16; ai.spreadOff = { x: Math.round((Math.random() - 0.5) * 4), y: Math.round((Math.random() - 0.5) * 4) }; ai.spread = null; } // a new angle now and then
   // (2026-11-18: the pros never used the rat spots, so their suggestions said take them out) now and then, while the
   // site isn't under attack, a pro holds a rat spot near their plan's hold instead: one look a round, by their own lean
-  if (!roaming && !rot && action && ai.ratTry === undefined) { ai.ratTry = Math.random() < (p.pro && PRO_PERSONA[name] ? 0.08 + 0.12 * PRO_PERSONA[name][1] : 0.1); if (ai.ratTry) { const r = ratHold(game, p); if (r && Math.hypot(r.at.x - j.hold.x, r.at.y - j.hold.y) < 14 * CELL) { ai.ratAt = r; feat(p, 'rat'); } } }
+  if (!roaming && !rot && action && ai.ratTry === undefined) { ai.ratTry = Math.random() < (PRO_PERSONA[name] ? RAT_P * (0.6 + 0.8 * PRO_PERSONA[name][1]) : RAT_P) * 1.4; if (ai.ratTry) { const r = ratHold(game, p); if (r && Math.hypot(r.at.x - j.hold.x, r.at.y - j.hold.y) < 26 * CELL) { ai.ratAt = r; feat(p, 'rat'); } } } // (the patient ones more; some rolls find no spot, hence the 1.4)
   if (ai.ratAt && (rot || roaming || game.planted)) ai.ratAt = null;
   const spot = ai.ratAt ? ai.ratAt.at : roaming ? (ai.roamAt || (ai.roamAt = game.freeSpotNear(j.roam.x, j.roam.y, 50))) : spreadSpot(game, p, rot ? rot.at : j.hold, 72, rot ? rot.w.pos : j.watch); // defenders don't bunch either
   if (!near(p, spot, 14)) { moveTo(game, p, inp, spot, dt, true); if (roaming && near(p, spot, 200)) inp.walk = 1; return true; }
+  if (ai.ratAt && !game.planted) inp.crouch = 1; // tucked in, low
   if (!roaming && !rot && !ai.offF) { ai.offF = 1; feat(p, 'offAngle'); } // the plan's holds are the off-angles on the ways in (siteIntel)
   watch(ai.ratAt ? ai.ratAt.watch : rot ? rot.w.pos : j.watch, !roaming); return true;
 }

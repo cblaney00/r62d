@@ -1,12 +1,13 @@
 // The authoritative match: lobby, rounds, movement, shooting, gadgets, objective.
 import { CELL, PHASE, DUR, BARRICADES_EACH, T, FL, TEAM, CELL_HP, HOLE_ONLY, HOLE_MAX, WIN_ROUNDS, MAX_PLAYERS, TEAM_SIZE, PLAYER_R, BOT_LEVELS, PRO_LEVEL, DEFAULT_LEVEL, MAT, stopsBullet, underAt, penBullet, blocksDrone, blocksMove, blocksSight, other, DRONE_SPRINT, PX_PER_M, SWARM, OVERWATCH , LUNGE_M } from '../shared/constants.js';
 import { plantBomb, floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, hatchOpen } from '../shared/map.js';
-import { localPos, buildMap, windowGlass, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairSees, eyeH, bodyH, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ropeAimLimit, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
+import { localPos, buildMap, windowGlass, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairSees, eyeH, bodyH, STOREY, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ropeAimLimit, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers , inBox } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
 import { arenaThink, drillThink, defSetup, botThink, botPickOp, botPrep, assignPros, botIdentity, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
+import { furnTopAt, EYE_STANCE, CHEST_STANCE, stanceOf } from '../shared/furniture.js';
 import { arenaStart, arenaTick, arenaKill, arenaDamage, arenaSpeed, arenaEndMatch, arenaPlayer, arenaInfo } from './arena.js';
 import { zbSurge, zbDev, ZB, zbDown, zbUp, zbReviveTime, zbSlideEnd, zbStart, zbTick, zombieThink, zbSpeed, zbDamage, zbKill, zbCanGoDown, zbReloadMul, zbBlocksVault, zbUse, zbEnd, zbPlayer, zbInfo } from './zombies.js';
 import { MODES, CLASSIC, DEFAULT_MODE, attackSquad, roundsToWin, inOvertime } from '../shared/modes.js';
@@ -1195,6 +1196,11 @@ export class Game {
     const pen = penOf(this.shotW && this.shotW.cls === cls ? this.shotW : { cls });
     const sx = Math.floor(x0 / CELL), sy = Math.floor(y0 / CELL), up = fl > (this.map.groundFloor ?? 99);
     let winK = -1; this.winCarry = null;
+    // heights from the building's ground (storeys + stance), so a shot out of an upper window comes down to the target and one up at a
+    // window comes up; each piece of furniture is judged at its own floor's level
+    const FT = this.map.fTop, M3 = this.map, ht = o => o && o.up ? furnTopAt(M3, o.x, o.y) : 0, lvl = (x, y) => { const f = M3.floors[floorAt(M3, x, y)]; return f ? (f.i || 0) * STOREY : 0; };
+    const h0 = src && src.input ? EYE_STANCE[stanceOf(src)] + ht(src) + lvl(src.x, src.y) : EYE_STANCE[0] + lvl(x0, y0);
+    const h1 = best && best.q ? CHEST_STANCE[stanceOf(best.q)] + ht(best.q) + lvl(best.q.x, best.q.y) : h0; // (a miss carries on level)
     walkRay(x0, y0, dx, dy, bestT, (cx, cy, t) => {
       const k = cy * this.map.W + cx, tile = tileAt(this.map, cx, cy);
       if (up) { // out of an upper window: the rest of the shot carries on down on the ground floor (shotOutWindow)
@@ -1206,6 +1212,17 @@ export class Game {
       if (sh) { const h = rayShape(sh, x0, y0, dx, dy); if (h === null || h > bestT) return false; t = h; } // angled/curved wall: only its solid part
       else if (cx === sx && cy === sy) return false;
       if (stopsBullet(tile) && tracerWall > 0 && tile !== T.VOID) { tracerWall--; mult *= this.pierceNow ? (pierced++ ? 1 : PIERCE_DMG) : 0.75; pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) }); return false; }
+      // furniture by height (he asked 2026-11-18; shared/furniture.js): the bullet runs from the shooter's eyes to the
+      // target's chest; where it passes a piece of furniture between its gap and its top, solid things stop it and the
+      // rest let part of the damage through (no hole: shooting through furniture never opens a sight line)
+      if (FT && (tile === T.LOW || tile === T.TALL)) {
+        const tp = FT[k], gp = this.map.fGap[k], pp = this.map.fPen[k], h = h0 + (h1 - h0) * Math.min(1, t / Math.max(1, bestT)) - (M3.floors[M3.flAt[k]] ? (M3.floors[M3.flAt[k]].i || 0) * STOREY : 0);
+        if (!tp) { if (pp < 100) mult *= pp / 100; return false; } // (railings, fences, glass: shot through)
+        if (h <= gp || h >= tp) return false; // over it, or under it
+        if (!pp) { stopT = t; kind = 'prop'; best = null; return true; }
+        mult *= pp / 100; pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wood', x: r1(x0 + dx * t), y: r1(y0 + dy * t) });
+        return false;
+      }
       if (src && src.pr >= 1 && underAt(this.map, k, tile)) return false; // lying down: shoots under the car / table it sees under
       if (stopsBullet(tile) && this.map.holes[k] && throughHole(this.map, k, x0, y0, dx, dy)) return false; // through a lance hole
       if (stopsBullet(tile)) { stopT = t; kind = tile === T.TALL ? 'prop' : 'hard'; best = null; return true; }

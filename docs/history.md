@@ -741,3 +741,14 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   and HOIST never met a shut hatch (now `hoistTo`: seeks one up toward an upstairs site; forced test 4/8 rounds). 1,400
   practice rounds on this version (600 + 800, ~4 min each). First ideas: School 3F Clock Room and Lodge 2F Games Room
   too hard for attack (33%), Dust A and Embassy B Vault too easy (64-67%), take out scope glare (0.1 per 100).
+- Heights (he asked: no seeing over counters / chest-high things crouched, clearly under beds and tables lying down,
+  by each thing's real size; he chose: bullets follow, some furniture can be shot through; no sight holes from it):
+  shared/furniture.js `FURN_H` (top, gap, pen, see-through per prop kind, metres) → `map.fTop/fGap/fPen` (buildFresh);
+  castSight's `low` may be an eye height (`EYE_STAND` 58, `EYE_LOW` 9; `viewEye(v)`: body views get `eye` by stance, cams
+  86, drones 5); `furnLine` for people (client `teamSees(x, y, h)` with `HEAD_STANCE`, bots `visibleEnemy`); hitscan:
+  bullet from the shooter's eyes to the target's chest, heights from the building's ground (storeys) so window and hatch
+  shots work; solid stops, the rest `mult *= pen` (no hole). Unowned LOW cells are all ledges over air: see-through.
+  `node tests/furniture.js`. Embassy 43, Harbor 48, Villa 40 after (pros, ~60 rounds).
+- Defenders (he asked): one rat roll a round (`RAT_P` 0.11; non-pros ×1.5, pros by patience), crouched at the spot;
+  ~6-7% of defender-rounds (he said that is fine). Platinum+ non-pro defenders stay +12 s on a hold and turn to what
+  they hear (`ai.watch` = the noise). `tests/feeds.js` clears the borrowed bot's own drones first.
