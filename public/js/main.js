@@ -4438,6 +4438,9 @@ function stairPeek(view, me, inGame) {
       lim[j] = far > 0 ? far + 10 : 6; sum += Math.min(lim[j], 220); }
     v.lim = a => lim[Math.round((((a % TAU) + TAU) % TAU) / TAU * N) % N];
     v.pr = Math.max(70, Math.min(150, 50 + sum / N * 0.7)); } // the view's size follows what you can see (was always PIP_R)
+  // how far along the flight you are, 0 at its near end to 1 where it takes you to the other floor (he asked
+  // 2026-11-18: larger and smooth, as if you merge into the next floor): the view grows, softens and comes to its real size
+  { const lift = stairLift(st.map, view.x, view.y); v.t = sstep(best.up ? Math.max(0, lift) : Math.max(0, -lift)); v.pr *= 1 + 1.2 * v.t; }
   let sx = 0, sy = 0; const n = 24;
   for (let j = 0; j < n; j++) { const a = j / n * Math.PI * 2, d = Math.min(220, castSight(st.map, v.x, v.y, a, 220, null)); sx += Math.cos(a) * d; sy += Math.sin(a) * d; }
   const l = Math.hypot(sx / n, sy / n), cap = Math.min(80, l);
@@ -4449,13 +4452,32 @@ function stairPeek(view, me, inGame) {
 // can see, the other floor's landing is drawn right where the steps lead, in the map, fading out at its edges.
 // Floors sit side by side in the map grid, so it is that floor's picture moved by the staircase's offset.
 const stairCv = document.createElement('canvas');
+// The inside of the building on floor fi (he saw 2026-11-18: Harbor's lobby stairs showed a sliver of grass past the
+// outer wall from 2F): every cell that is not outdoor ground or open air; angled/curved wall cells by their solid parts.
+let insideMemo = { m: null, p: [] };
+function insidePath(fi) {
+  const m = st.map; if (insideMemo.m !== m) insideMemo = { m, p: [] };
+  if (insideMemo.p[fi]) return insideMemo.p[fi];
+  const F = m.floors[fi], p = new Path2D(), W = m.W, y0 = F.gy || 0;
+  const inside = k => m.tiles[k] !== T.GROUND && m.tiles[k] !== T.VOID && m.floor[k] !== FL.VOID;
+  for (let y = y0; y < y0 + F.h; y++) {
+    let a = -1;
+    for (let x = F.gx; x <= F.gx + F.w; x++) {
+      const k = y * W + x, sh = x < F.gx + F.w && m.shape && m.shape[k], ok = x < F.gx + F.w && !sh && inside(k);
+      if (ok && a < 0) a = x; else if (!ok && a >= 0) { p.rect(a * CELL, y * CELL, (x - a) * CELL, CELL); a = -1; }
+      if (sh) for (const q of sh) { p.moveTo(q[0], q[1]); for (let i = 2; i < q.length; i += 2) p.lineTo(q[i], q[i + 1]); p.closePath(); }
+    }
+  }
+  return (insideMemo.p[fi] = p);
+}
+const insideAt = (x, y) => { const m = st.map, k = Math.floor(y / CELL) * m.W + Math.floor(x / CELL); return m.tiles[k] !== T.GROUND && m.tiles[k] !== T.VOID && m.floor[k] !== FL.VOID; };
 function drawStairView(s, me, now, up) {
   const pv = fxOn('pip') ? st.pip : null;
   if (!pv || !me || !!pv.up !== up) return;
   const S = st.map.stairs[pv.s], W = st.map.W, sdx = (S.gb % W - S.ga % W) * CELL, sdy = (Math.floor(S.gb / W) - Math.floor(S.ga / W)) * CELL;
   const offX = pv.up ? -sdx : sdx, offY = pv.up ? -sdy : sdy; // the other floor -> this floor
-  const PR = pv.pr || PIP_R, z = st.zoom || 1, px = Math.ceil(PR * 2 * z);
-  if (px < 8 || px > 4096) return;
+  const t = pv.t || 0, PR = pv.pr || PIP_R, z = st.zoom || 1, want = PR * 2 * z, q = Math.min(1, 2048 / want), zc = z * q, px = Math.ceil(want * q); // (a big view is drawn at most 2048 px and stretched: frame rate)
+  if (px < 8) return;
   if (stairCv.width !== px) { stairCv.width = px; stairCv.height = px; }
   const c = stairCv.getContext('2d'), R = st.rend, k = R.c.width / R.Wp, sm = smokes(s);
   // drawn at the same zoom and turn as your own view, centred a little past the landing
@@ -4463,12 +4485,12 @@ function drawStairView(s, me, now, up) {
   const F = st.map.floors[Math.max(0, floorAt(st.map, pv.x, pv.y))], fx0 = F.gx * CELL, fx1 = (F.gx + F.w) * CELL, fy1 = F.h * CELL;
   c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, px, px);
   const cs = Math.cos(rot), sn = Math.sin(rot);
-  c.setTransform(z * cs, z * sn, -z * sn, z * cs, px / 2 - z * (cs * cx - sn * cy), px / 2 - z * (sn * cx + cs * cy));
+  c.setTransform(zc * cs, zc * sn, -zc * sn, zc * cs, px / 2 - zc * (cs * cx - sn * cy), px / 2 - zc * (sn * cx + cs * cy));
   const D = PR * 1.5, x0 = Math.max(fx0, cx - D), x1 = Math.min(fx1, cx + D), y0 = Math.max(0, cy - D), y1 = Math.min(fy1, cy + D);
   if (x1 <= x0 || y1 <= y0) return;
   c.save(); c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip(); // only this floor
   R.c.drawTo(c, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k, x0, y0, x1 - x0, y1 - y0); // remembered: dulled with a plain dark wash (no filter)
-  c.fillStyle = 'rgba(28,30,32,0.68)'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+  c.fillStyle = `rgba(28,30,32,${(0.68 * (1 - 0.35 * t)).toFixed(3)})`; c.fillRect(x0, y0, x1 - x0, y1 - y0); // (a little brighter the nearer you are to it)
   c.save(); c.beginPath(); // what the landing can see right now, in colour
   const poly = visionPolygon(pv, sm, 160), near = nearPolygon(pv, sm);
   for (const pts of [poly, near]) { c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.closePath(); }
@@ -4495,29 +4517,45 @@ function drawStairView(s, me, now, up) {
     drawOperator(c, { x: p.x, y: p.y, aim: p.ag, op: p.op, w: p.w, ally, ring: tvRing(p), walk: a.walk, legs: Math.min(1.2, a.mvS || 0), ads: p.ad, crouch: p.cr, prone: p.pn, downed: p.dn, recoil: a.recoil, reload: p.rl > 0, brace: p.br, riot: p.ri, shieldPose: p.br ? shieldPose(p.gt, p.mv >= 2, false, p.so === 2, p.sa || 0, riotArc(p.ri, p.cr, !p.mv)) : null }, now);
   }
   c.restore();
-  // soft round edge, so it melts into this floor's map
-  c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'destination-in';
-  const gr = c.createRadialGradient(px / 2, px / 2, px * 0.3, px / 2, px / 2, px / 2);
+  // only the strip where the steps carry on (he asked 2026-11-15: polish the stairs' outdoor view; a round patch spread
+  // over the floor round the stairs' end, grass or carpet circles beside the steps): the other floor's stair width plus
+  // 2 cells each side, from a cell back on the steps to STAIR_SEE cells past their end, as a stairwell would show it.
+  // (he asked 2026-11-18: larger and smooth, merging into the next floor) the further along the flight, the bigger it
+  // gets (up to 5 cells each side and 10 past the end), and its edges fade softly instead of a hard cut.
+  const og = pv.up ? S.gb : S.ga, X0 = (og % W) * CELL, Y0 = Math.floor(og / W) * CELL, X1 = X0 + S.w * CELL, Y1 = Y0 + S.h * CELL;
+  const ux = Math.round(Math.cos(pv.ang)), uy = Math.round(Math.sin(pv.ang)), far0 = STAIR_SEE * CELL, far = (STAIR_SEE + 6 * t) * CELL, sd = (2 + 3 * t) * CELL;
+  const qx0 = ux ? (ux > 0 ? X1 - CELL : X0 - far) : X0 - sd, qx1 = ux ? (ux > 0 ? X1 + far : X0 + CELL) : X1 + sd; // (cells each side: some stairs come out sideways)
+  const qy0 = uy ? (uy > 0 ? Y1 - CELL : Y0 - far) : Y0 - sd, qy1 = uy ? (uy > 0 ? Y1 + far : Y0 + CELL) : Y1 + sd;
+  c.globalCompositeOperation = 'destination-in'; c.fillStyle = '#000';
+  // indoors stairs show only the inside of the building there (he saw a sliver of grass past Harbor's lobby wall from
+  // 2F), plus any outdoors the landing really sees through a door or window right now
+  if (insideAt(pv.x, pv.y)) {
+    const U = new Path2D(insidePath(Math.max(0, floorAt(st.map, pv.x, pv.y))));
+    for (const pts of [poly, near]) { let a2 = 0; const n = pts.length; for (let i = 0; i < n; i += 2) { const j = (i + 2) % n; a2 += pts[i] * pts[j + 1] - pts[j] * pts[i + 1]; }
+      const at = i => a2 >= 0 ? i : n - 2 - i; U.moveTo(pts[at(0)], pts[at(0) + 1]); for (let i = 2; i < n; i += 2) U.lineTo(pts[at(i)], pts[at(i) + 1]); U.closePath(); } // (all one winding, so they add up)
+    c.fill(U, 'nonzero');
+  }
+  // soft edges: along the steps (a short fade where it starts on them, a long one at its far end) and at the sides
+  const F2 = 1.5 * CELL, fade = (ax, ay, bx, by, f0, f1) => { const g = c.createLinearGradient(ax, ay, bx, by), L = Math.hypot(bx - ax, by - ay) || 1, a = Math.min(0.45, f0 / L), b = Math.min(0.45, f1 / L);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(a, '#000'); g.addColorStop(1 - b, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(qx0, qy0, qx1 - qx0, qy1 - qy0); };
+  const sA = { x: ux > 0 ? qx0 : ux < 0 ? qx1 : 0, y: uy > 0 ? qy0 : uy < 0 ? qy1 : 0 }, sB = { x: ux > 0 ? qx1 : ux < 0 ? qx0 : 0, y: uy > 0 ? qy1 : uy < 0 ? qy0 : 0 };
+  fade(sA.x, sA.y, sB.x, sB.y, CELL * 0.5, F2 * (1 + t)); // along
+  if (ux) fade(0, qy0, 0, qy1, F2, F2); else fade(qx0, 0, qx1, 0, F2, F2); // across
+  // and a round edge on the canvas itself, so nothing ever ends square
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  const gr = c.createRadialGradient(px / 2, px / 2, px * 0.42, px / 2, px / 2, px / 2);
   gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
   c.fillStyle = gr; c.fillRect(0, 0, px, px); c.globalCompositeOperation = 'source-over';
-  // onto the top layer, where the steps lead on this floor
-  const kp = persp.h ? (pv.up ? 1 + persp.h : Math.max(0.05, 1 - persp.h)) : 1, ex = st.pred.x, ey = st.pred.y; // a storey up drawn grown toward you, down shrunk (like the walls)
-  const P = w2s(ex + (cx + offX - ex) * kp, ey + (cy + offY - ey) * kp), pk = px * kp;
-  // only the strip where the steps carry on (he asked 2026-11-15: polish the stairs' outdoor view; a round patch spread
-  // over the floor round the stairs' end, grass or carpet circles beside the steps): the other floor's stair width plus two
-  // cells each side, from a cell back on the steps to STAIR_SEE cells past their end, as a stairwell would show it
-  const og = pv.up ? S.gb : S.ga, X0 = (og % W) * CELL, Y0 = Math.floor(og / W) * CELL, X1 = X0 + S.w * CELL, Y1 = Y0 + S.h * CELL;
-  const ux = Math.round(Math.cos(pv.ang)), uy = Math.round(Math.sin(pv.ang)), far = STAIR_SEE * CELL;
-  const qx0 = ux ? (ux > 0 ? X1 - CELL : X0 - far) : X0 - 2 * CELL, qx1 = ux ? (ux > 0 ? X1 + far : X0 + CELL) : X1 + 2 * CELL; // (2 cells each side: some stairs come out sideways)
-  const qy0 = uy ? (uy > 0 ? Y1 - CELL : Y0 - far) : Y0 - 2 * CELL, qy1 = uy ? (uy > 0 ? Y1 + far : Y0 + CELL) : Y1 + 2 * CELL;
+  // onto the top layer, where the steps lead on this floor: a storey up drawn grown toward you, down shrunk (like the
+  // walls), coming to its real size as you reach the step that takes you there, so the change of floor doesn't jump
+  const kp0 = persp.h ? (pv.up ? 1 + persp.h : Math.max(0.05, 1 - persp.h)) : 1, kp = kp0 + (1 - kp0) * t, ex = st.pred.x, ey = st.pred.y;
+  const P = w2s(ex + (cx + offX - ex) * kp, ey + (cy + offY - ey) * kp), pk = want * kp;
   const toS = (x, y) => w2s(ex + (x + offX - ex) * kp, ey + (y + offY - ey) * kp);
-  const Q = [toS(qx0, qy0), toS(qx1, qy0), toS(qx1, qy1), toS(qx0, qy1)];
   octx.save(); octx.setTransform(1, 0, 0, 1, 0, 0);
-  octx.beginPath(); Q.forEach((q, i) => i ? octx.lineTo(q.x, q.y) : octx.moveTo(q.x, q.y)); octx.closePath(); octx.save(); octx.clip();
-  octx.drawImage(stairCv, P.x - pk / 2, P.y - pk / 2, pk, pk); octx.restore();
+  octx.drawImage(stairCv, P.x - pk / 2, P.y - pk / 2, pk, pk);
   octx.font = `700 ${Math.round(12 * DPR)}px Barlow, sans-serif`; octx.textAlign = 'center';
-  octx.fillStyle = 'rgba(255,255,255,0.7)'; octx.strokeStyle = 'rgba(0,0,0,0.8)'; octx.lineWidth = 3 * DPR;
-  const L = pv.up ? '▲ UPSTAIRS' : '▼ DOWNSTAIRS', fe = toS((ux ? (ux > 0 ? X1 + far * 0.8 : X0 - far * 0.8) : (X0 + X1) / 2), (uy ? (uy > 0 ? Y1 + far * 0.8 : Y0 - far * 0.8) : (Y0 + Y1) / 2)); // (at the far end of the strip, clear of the map's own stair signs)
+  octx.fillStyle = `rgba(255,255,255,${(0.7 * (1 - 0.6 * t)).toFixed(3)})`; octx.strokeStyle = `rgba(0,0,0,${(0.8 * (1 - 0.6 * t)).toFixed(3)})`; octx.lineWidth = 3 * DPR;
+  const L = pv.up ? '▲ UPSTAIRS' : '▼ DOWNSTAIRS', fe = toS((ux ? (ux > 0 ? X1 + CELL * 1.2 : X0 - CELL * 1.2) : (X0 + X1) / 2), (uy ? (uy > 0 ? Y1 + CELL * 1.2 : Y0 - CELL * 1.2) : (Y0 + Y1) / 2)); // (on the landing just past the steps: further out it could sit past an outer wall)
   octx.strokeText(L, fe.x, fe.y); octx.fillText(L, fe.x, fe.y);
   octx.restore();
 }

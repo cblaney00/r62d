@@ -752,3 +752,10 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Defenders (he asked): one rat roll a round (`RAT_P` 0.11; non-pros ×1.5, pros by patience), crouched at the spot;
   ~6-7% of defender-rounds (he said that is fine). Platinum+ non-pro defenders stay +12 s on a hold and turn to what
   they hear (`ai.watch` = the noise). `tests/feeds.js` clears the borrowed bot's own drones first.
+- Stairs view (he asked 2026-11-18: Harbor lobby stairs showed a sliver of grass from 2F; then larger and smooth, as if
+  merging into the next floor): `insidePath(fi)` (main.js, cached per map/floor: cells not GROUND/VOID, shaped wall
+  cells by their solid parts) masks the view of an indoor stair (`insideAt` at the landing) to the building plus the
+  landing's live vision polygons (wound one way so they add up). `stairPeek` sets `v.t` (smoothstep of `stairLift`
+  along the flight) and grows `v.pr` ×(1+1.2t); `drawStairView` grows the strip (4→10 cells past the end, 2→5 each
+  side), soft edges by two `destination-in` linear gradients (no hard quad clip), wash 0.68→0.44, `kp` eases to 1 by
+  the last step, canvas capped at 2048 px. Label on the landing (1.2 cells out). Screenshots: Harbor stair 1 from 2F.
