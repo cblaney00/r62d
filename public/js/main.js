@@ -1396,7 +1396,7 @@ function renderControls() {
   const rows = [[`${L('up')}${L('left')}${L('down')}${L('right')}`, 'Move'], ['Mouse', 'Aim'], ['Left click', 'Shoot'], ['Right click', 'Aim down sights'],
     [L('sprint'), 'Sprint (loud); crouch while sprinting = power slide'], [L('walk'), 'Walk (silent)'], [bindsFor('crouch')[0] ? L('crouch') : L('crouchTap'), bindsFor('crouch')[0] ? 'Crouch (hold, silent)' : 'Crouch (tap, silent)'], [L('prone'), 'Lie down / get up'],
     [L('leanL') + ' / ' + L('leanR'), 'Lean left / right'], [L('vault'), 'Jump, vault windows and low walls; on a rope: swing in'], [L('reload'), 'Reload'],
-    [L('interact') + ' (hold)', 'Reinforce, barricade, plant, defuse, revive'], [L('ability'), 'Operator skill'],
+    [L('interact') + ' (hold)', 'Reinforce, barricade, plant, defuse, revive, pick up your own gadget'], [L('ability'), 'Operator skill'],
     [L('gadget'), 'Secondary gadget'], [L('melee'), 'Melee'], [L('drone'), 'Put out / drive your drone'], [L('view'), 'Team drones & cameras (' + L('leanL') + ' / ' + L('leanR') + ' switch)'], [L('spot') + ' · Middle click', 'Ping (enemies, gadgets, walls, doors, places)'],
     [L('wheel') + ' (hold, drag)', 'Ping wheel'], [L('map'), 'Map: click it to ping'],
     [L('interact') + ' at a rope', 'Clip onto an outside wall (attack): ' + L('up') + ' / ' + L('down') + ' climb, ' + L('interact') + ' slide down'], [L('camLock') + ' · ' + L('camCentre'), 'Lock the camera · centre it'], [`${L('primary')} / ${L('secondary')} · Wheel`, 'Switch weapon'], [L('scoreboard'), 'Scoreboard']];
@@ -1477,9 +1477,11 @@ function renderLobby(s) {
   for (const sq of [0, 1]) {
     const ul = document.querySelector(`#sq${sq} ul`);
     const list = s.players.filter(p => p.sq === sq);
-    const html = list.map(p => `<li class="${p.id === s.you ? 'me' : ''}"><span>${esc(p.n)}</span>${p.b ? '<span class="bot">BOT</span>' : rankTag(p.rn)}</li>`).join('') +
+    const html = list.map(p => p.b && p.bs ? `<li class="botLi${st.botOpen === p.n ? ' open' : ''}" data-bn="${esc(p.n)}" title="${esc(p.bs)}"><span>${esc(p.n)}</span><span>${rankTag(p.br)}<span class="bot">BOT</span></span><i class="botStyle">${esc(p.bs)}</i></li>` // (an everyday bot: hover or tap for how they play)
+      : `<li class="${p.id === s.you ? 'me' : ''}"><span>${esc(p.n)}</span>${p.b ? '<span class="bot">BOT</span>' : rankTag(p.rn)}</li>`).join('') +
       Array(Math.max(0, 5 - list.length)).fill('<li style="opacity:.3"><span>— empty —</span></li>').join('');
     if (ul.innerHTML !== html) ul.innerHTML = html;
+    if (!ul.dataset.tap) { ul.dataset.tap = 1; ul.addEventListener('click', e => { const li = e.target.closest('li.botLi'); if (!li) return; st.botOpen = st.botOpen === li.dataset.bn ? null : li.dataset.bn; for (const o of document.querySelectorAll('li.botLi')) o.classList.toggle('open', o.dataset.bn === st.botOpen); }); }
   }
 }
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -4038,7 +4040,7 @@ function hud(s) {
   // interaction
   if (me.bu) {
     $('progress').style.display = 'block';
-    $('progress').querySelector('.label').textContent = { plant: 'PLANTING DEFUSER', defuse: 'DISABLING DEFUSER', revive: 'REVIVING', reinforce: 'REINFORCING', barricade: 'BARRICADING' }[me.bu.k] || '';
+    $('progress').querySelector('.label').textContent = { plant: 'PLANTING DEFUSER', defuse: 'DISABLING DEFUSER', revive: 'REVIVING', reinforce: 'REINFORCING', barricade: 'BARRICADING', pickup: 'PICKING UP' }[me.bu.k] || '';
     $('progress').querySelector('i').style.width = me.bu.p * 100 + '%';
     setHTML('prompt', '');
   } else {
@@ -4158,6 +4160,7 @@ function promptText(s, me) {
     if (b) return `<b>${label('interact')}</b>HOLD TO PLANT DEFUSER (BOMB ${b.id})`;
   }
   if (side === 'def' && s.pl && Math.hypot(s.pl.x - x, s.pl.y - y) < 30) return '<b>' + label('interact') + '</b>HOLD TO DISABLE DEFUSER';
+  if (me.pk && me.ct === 'body' && !me.dn) return `<b>${label('interact')}</b>HOLD TO PICK UP ${esc(String(me.pk).toUpperCase())}`; // your own gadget (the server works out which: mine.pk)
   const f = facingCell(m, x, y, st.aim, 28);
   if (side === 'def' && f) {
     if (f.t === T.SOFT && s.rf > 0) return `<b>${label('interact')}</b>HOLD TO REINFORCE WALL (${s.rf} LEFT)`;
@@ -4857,6 +4860,7 @@ function updateCard() {
   $('pcXp').style.width = (L.into / L.need * 100) + '%'; $('pcXpText').innerHTML = `LEVEL ${L.level} · ${L.into} / ${L.need} XP ${rankTag(p.rank)} <span style="opacity:.6">${p.mmr ?? ''} MMR</span>`;
 }
 const TIPS = [
+  'Put a trap, camera, shield or wire in the wrong spot? Hold {interact} on it to pick it back up and place it again. Only your own, never a teammate\'s.',
   'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',
   'Walk ({walk}) or crouch ({crouch}) to move without footsteps — just like CS2.',
   'Crouch while sprinting to power slide. You can only shoot forward from the hip until you are back up.',

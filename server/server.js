@@ -88,7 +88,12 @@ function api(req, res) {
       const homelab = dev === 'wg-homelab' || a.address.startsWith('10.10.0.'), vpn = homelab || /^(wg|tun|tap|tailscale|zt|nordlynx|proton|mullvad)/.test(dev), wifi = /^wl/.test(dev);
       urls.push({ url: `http://${a.address}:${PORT}`, code: makeCode(a.address, PORT), vpn, homelab, net: homelab ? 'homelab VPN' : vpn ? `VPN (${dev})` : wifi ? 'Wi-Fi' : 'cable' });
     }
-    const rank = u => (u.homelab ? 0 : u.vpn ? 1 : u.net === 'Wi-Fi' ? 3 : 2);
+    const rank = u => (u.pub ? -1 : u.homelab ? 0 : u.vpn ? 1 : u.net === 'Wi-Fi' ? 3 : 2);
+    // R62D_PUBLIC_URL: the address players really reach this server at, when it is not one of its own (Lando's
+    // mini-server sits behind the homelab firewall: its own address, 192.168.100.x, is one nobody can reach; players use
+    // http://192.168.1.76:6262). It goes first, with its own join code (found 2026-11-18: the homelab showed the wrong one).
+    const pub = process.env.R62D_PUBLIC_URL; if (pub) try { const pu = new URL(pub), pp = +pu.port || PORT;
+      urls.unshift({ url: `http://${pu.hostname}:${pp}`, code: /^\d+\.\d+\.\d+\.\d+$/.test(pu.hostname) ? makeCode(pu.hostname, pp) : undefined, vpn: true, homelab: true, pub: true, net: 'homelab' }); } catch {}
     urls.sort((a, b) => rank(a) - rank(b));
     res.setHeader('Access-Control-Allow-Origin', '*'); // JOIN on a friend's copy checks this game is here before going to it
     return json(200, { urls, host: os.hostname(), version: VERSION, port: PORT, players: humans(), local: BIND === '127.0.0.1' });

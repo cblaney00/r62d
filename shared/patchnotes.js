@@ -114,4 +114,9 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'load', t: 'The game starts faster: map pictures are kept on your device and the sounds are made in the background (no PREPARING SOUNDS screen).', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: a quick flick of the move stick no longer drops your locked-on aim; only a real sprint (held a third of a second) does.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: the aim stick picks up from where the reticle already is; it no longer jumps when your thumb lands and moves.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'sight', t: 'Sightlines no longer shake when you turn or drag the view: the edges of what you see stay put on the walls and corners (operators, drones and cameras). A touch faster to draw too.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'look', t: 'Tables, couches, beds, counters, shelves and other furniture stand up as their own shape: the floor round them stays flat (it used to look raised).', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'bots', t: 'Every bot is its own person: ten per rank from Copper to Champion, no name twice, each with their own play style (lobby: hover or tap a bot) and habits: rushers, anchors, flankers, roof lovers, wallbangers.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'pickup', t: 'Hold Use on a gadget you placed (wire, claymore, shield, traps, cameras, covers, stations...) to pick it back up and place it again. Not once it has gone off or been damaged, never a teammate\'s.', v: 0 },
+  { d: '2026-11-18', k: 'op', id: 'wraith', t: 'Wraith\'s Pulse Scanner: one scan (up to 4 s) from a full charge, then 50 s to charge back to 100%. It used to allow two scans and refill in about 23 s.', v: 0 },
 ];

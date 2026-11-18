@@ -48,7 +48,7 @@ const STEPS = [
     sprinting for a power slide. Hold ${K('walk')} to walk and ${K('crouch')} to crouch: both silent and more accurate.
     ${K('leanL')} / ${K('leanR')} lean round corners. Move the mouse to aim, <b>left click</b> to shoot, <b>right click</b> to aim in (tighter shots, wider view).
     The first shot goes exactly on the crosshair once you stand still. ${K('interact')} uses things, ${K('melee')} is melee,
-    ${K('ability')} your operator's skill and ${K('gadget')} your gadget.` },
+    ${K('ability')} your operator's skill and ${K('gadget')} your gadget. Put a gadget in the wrong spot? Hold ${K('interact')} on it to pick it back up.` },
   { part: 0, ph: PHASE.ACTION, t: 'Break in', b: c => `
     Go to <b>${siteName(c)}</b> (follow the yellow markers). Windows start boarded and some walls are soft: shoot,
     melee (${K('melee')}) or blow them open, or <b>vault</b> a low wall or open window with ${K('vault')}. Upstairs?

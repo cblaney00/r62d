@@ -11,6 +11,7 @@ import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, 
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
 import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess, DRILL_STYLE, drillMul } from './training.js';
 import { compose, LINES, FUN, WAYS } from '../shared/comms.js';
+import { ROSTER, habit } from '../shared/botroster.js';
 import { parseCommand } from '../shared/commands.js';
 
 // Per skill level. react: seconds before the first shot at someone who surprised them (plus up to reactX more);
@@ -33,7 +34,7 @@ const skill = (game, p) => p.pro ? proSkill(p) : SKILL[lvlOf(game, p)]; // p.lev
 
 // A bot's personality stays with it all match: aggr = how pushy, patience = how long it waits and watches.
 function persona(p) {
-  return p.persona || (p.persona = { aggr: Math.random(), patience: Math.random() });
+  return p.persona || (p.persona = p.bio ? { aggr: p.bio.a, patience: p.bio.p } : { aggr: Math.random(), patience: Math.random() }); // (everyday bots: their own, from the roster)
 }
 
 // The job for this round. Bots on a side split the roles between them; the order shifts every round.
@@ -41,7 +42,21 @@ const ROLES = { [TEAM.ATK]: ['entry', 'support', 'flank', 'intel', 'entry'], [TE
 function roleFor(game, p, team) {
   const mates = [...game.players.values()].filter(q => q.bot && game.side(q) === team).sort((a, b) => +a.id.slice(1) - +b.id.slice(1));
   const list = ROLES[team];
-  return list[(Math.max(0, mates.indexOf(p)) + (game.round || 0)) % list.length];
+  const def = list[(Math.max(0, mates.indexOf(p)) + (game.round || 0)) % list.length], like = p.bio && p.bio.r[team === TEAM.ATK ? 0 : 1];
+  if (like && list.includes(like) && hash01(p.id, game.round || 0) < 0.65) return like; // most rounds, the job they like (from the roster)
+  return def;
+}
+const hash01 = (id, r) => { let h = 2166136261; for (const c of String(id) + ':' + r) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return ((h >>> 0) % 1000) / 1000; };
+// Each everyday bot is someone from the roster of its rank (shared/botroster.js): a name nobody else in the game has,
+// a way of playing. Picked again when the rank changes.
+export function botIdentity(game, b) {
+  if (b.dummyAt || (b.name || '').startsWith('DUMMY')) return;
+  const lv = Math.max(0, Math.min(TOP_BOT, b.level ?? game.botLevel ?? DEFAULT_LEVEL));
+  if (b.bio && b.bioLv === lv) return;
+  const used = new Set([...game.players.values()].filter(q => q !== b).flatMap(q => [q.name, q.baseName]));
+  const free = ROSTER[lv].filter(e => !used.has('[BOT] ' + e.n)), any = free.length ? free : ROSTER.flat().filter(e => !used.has('[BOT] ' + e.n));
+  const e = any[Math.floor(Math.random() * any.length)]; if (!e) return;
+  b.bio = e; b.bioLv = lv; b.baseName = '[BOT] ' + e.n; if (!b.pro) { b.name = b.baseName; b.persona = null; }
 }
 
 // ESPORTS TV viewer requests (he asked): a requested operator of this side is played every round by the bot with its role
@@ -169,6 +184,8 @@ export function botPickOp(game, p) {
   const roles = JOBS[team].filter(j => j.ops.some(o => free.includes(o))).map(j => ({ j, w: 1 / Math.pow(1 + (count[j.id] || 0), 2.5) }));
   let r = Math.random() * roles.reduce((a, x) => a + x.w, 0), job = roles[roles.length - 1].j;
   for (const x of roles) if ((r -= x.w) <= 0) { job = x.j; break; }
+  const fav = p.bio && p.bio.o.filter(o => free.includes(o));
+  if (fav && fav.length && Math.random() < 0.55) { const o = fav[Math.floor(Math.random() * fav.length)]; p.job = jobOf(o); game.pickOp(p, o); if (p.op === o) return; p.job = null; } // their favourite, most of the time
   const pool = free.filter(o => job.ops.includes(o));
   p.job = job.id; // the bot's role this round (a role left over from last round made the pick bounce: he saw a bot never lock in)
   game.pickOp(p, pool[Math.floor(Math.random() * pool.length)]);
@@ -857,7 +874,7 @@ export function botThink(game, p, dt) {
     // loud noises (gunfire, blasts, sirens) are heard through the whole building, a floor up or down too, unless it is huge
     const r = n.r >= 900 && fd <= 1 ? Math.max(n.r, 2400 - fd * 600) : n.r * (fd === 0 ? 1 : 0.5);
     const hd = Math.hypot(ln.x - lp.x, ln.y - lp.y);
-    if (hd < r * (p.pro ? 0.8 : EAR[lvlOf(game, p)])) { if (p.pro) { const e = hd * 0.22 + (floorAt(map, n.x, n.y) === floorAt(map, p.x, p.y) ? 0 : 60), a = Math.random() * 6.28, rr = Math.random() * e; ai.heard = { x: n.x + Math.cos(a) * rr, y: n.y + Math.sin(a) * rr, t: n.t }; } else ai.heard = { x: n.x, y: n.y, t: n.t }; } // pros hear like people: roughly where, not exactly
+    if (hd < r * (p.pro ? 0.8 : EAR[lvlOf(game, p)] * habit(p, 'e'))) { if (p.pro) { const e = hd * 0.22 + (floorAt(map, n.x, n.y) === floorAt(map, p.x, p.y) ? 0 : 60), a = Math.random() * 6.28, rr = Math.random() * e; ai.heard = { x: n.x + Math.cos(a) * rr, y: n.y + Math.sin(a) * rr, t: n.t }; } else ai.heard = { x: n.x, y: n.y, t: n.t }; } // pros hear like people: roughly where, not exactly
   }
   // --- team intel: an enemy a teammate (or camera) spotted close by is worth turning to face, once in a while ---
   if ((p.pro || lvlOf(game, p) >= 2) && (!ai.heard || game.time - ai.heard.t > 3)) for (const id of game.spots[team].keys()) { // (Copper and Bronze don't follow the callouts)
@@ -877,7 +894,7 @@ export function botThink(game, p, dt) {
   if (abId === 'shroud') { const want = heardRecently && p.battery > 1.5 && !p.downed; inp.ability = want !== !!p.shrouded && !(p.prevInput && p.prevInput.ability) ? 1 : 0; } // go dark while enemies are close by (a toggle: press to switch)
   if (abId === 'scan' && action && !p.downed) { // a few seconds of scanning when something is heard, or every so often
     ai.scanT = (ai.scanT ?? 8 + Math.random() * 10) - dt;
-    if ((heardRecently || ai.scanT < 0) && p.battery > 1) { inp.ability = 1; if (ai.scanT < -3) ai.scanT = 15 + Math.random() * 15; }
+    if ((heardRecently || ai.scanT < 0) && p.battery >= OPERATORS[p.op].ability.battery - 1e-6) { inp.ability = 1; if (ai.scanT < -3) ai.scanT = 15 + Math.random() * 15; }
     if (p.scanBlips && p.scanBlips.size) { const z = [...p.scanBlips.values()][0]; ai.heard = { x: z.x, y: z.y, t: game.time }; ai.heardSaid = game.time; talk(game, p, 'scanHit', { place: place(game, z.x, z.y) }, 'scan'); }
   }
 
@@ -1364,7 +1381,7 @@ function roofPick(game, p) {
       const lvl = team.some(q => q.pro) ? 7 : lvlOf(game, p);
       const hoist = team.some(q => q.op === 'hoist' && q.abilityCount > 0); // HOIST (2026-11-10): the grapple makes the roof a real option
       const into = best && site.rooms && site.rooms.includes(best.siteRoom); // a hatch straight into the site (2026-11-16): the roof is the main way up
-      const chance = into ? Math.max(ROOF_SITE[lvl], ROOF_CHANCE[lvl]) : ROOF_CHANCE[lvl];
+      const tr = team.reduce((a, q) => a + habit(q, 'r'), 0) / Math.max(1, team.length), chance = Math.min(0.95, (into ? Math.max(ROOF_SITE[lvl], ROOF_CHANCE[lvl]) : ROOF_CHANCE[lvl]) * tr); // (some bots love the roof)
       if (rope && team.length >= 2 && Math.random() < (hoist ? Math.max(0.75, chance) : chance)) {
         const pref = q => q.op === 'hoist' && q.abilityCount > 0 ? -1 : (q.pro ? ROOF_JOBS.includes(q.pro.pl.jobs.atk) : ['flank', 'intel'].includes(q.ai && q.ai.role)) ? 0 : 1;
         const ids = team.filter(q => !q.hasDefuser).sort((a, b) => pref(a) - pref(b) || Math.random() - 0.5).slice(0, (lvl >= 5 || (into && lvl >= 3)) && team.length >= 4 ? 2 : 1).map(q => q.id);
@@ -1388,7 +1405,7 @@ function windowPick(game, p) {
     const site = m.sites[game.site], inSite = (x, y) => { const rn = roomAt(m, x, y); return rn && site.rooms.includes(rn); };
     const cands = (m.ropes || []).filter(r => r.cells.length && r.inside && inSite(r.inside.x, r.inside.y));
     const team = [...game.players.values()].filter(q => q.bot && q.alive && q.squad === p.squad && !q.hasDefuser);
-    const lvl = team.some(q => q.pro) ? 7 : lvlOf(game, p), odds = game.windowChance ?? WIN_CHANCE[lvl];
+    const lvl = team.some(q => q.pro) ? 7 : lvlOf(game, p), odds = game.windowChance ?? Math.min(0.95, WIN_CHANCE[lvl] * team.reduce((a, q) => a + habit(q, 'n'), 0) / Math.max(1, team.length));
     if (cands.length && team.length >= 2 && Math.random() < odds) {
       const rope = cands[Math.floor(Math.random() * cands.length)];
       const ids = team.sort(() => Math.random() - 0.5).slice(0, lvl >= 5 && team.length >= 4 ? 2 : 1).map(q => q.id);
@@ -1929,7 +1946,7 @@ function rankHabits(game, p, inp, dt, team, site, gun) {
   // wandering off alone (Copper, Bronze): a random room away from the site for a while, as if it forgot the plan
   if (!p.pro && ai.wander === undefined) {
     ai.wander = null;
-    if (Math.random() < WANDER[lvl] && !p.hasDefuser) {
+    if (Math.random() < WANDER[lvl] * habit(p, 'w') && !p.hasDefuser) {
       const rooms = m.rooms.filter(r => !site.rooms.includes(r.name));
       const r = rooms[Math.floor(Math.random() * rooms.length)];
       if (r) ai.wander = { at: game.freeSpotNear((r.x + r.w / 2) * CELL, (r.y + r.h / 2) * CELL, Math.min(r.w, r.h) * CELL * 0.3), until: game.time + 20 + Math.random() * 25 };
@@ -1943,7 +1960,7 @@ function rankHabits(game, p, inp, dt, team, site, gun) {
   // crosshair already on that spot; Copper and Bronze charge in running (and loud)
   const tr = game.proTrade && game.proTrade[p.squad];
   if (!p.pro && tr && game.time - tr.t < 4 && Math.hypot(tr.x - p.x, tr.y - p.y) < 320 && !(team === TEAM.ATK && p.hasDefuser)) {
-    if (ai.tradeT !== tr.t) { ai.tradeT = tr.t; ai.trading = Math.random() < TRADE[lvl]; }
+    if (ai.tradeT !== tr.t) { ai.tradeT = tr.t; ai.trading = Math.random() < TRADE[lvl] * habit(p, 't'); }
     if (ai.trading && tr.from && Math.hypot(tr.from.x - p.x, tr.from.y - p.y) > 24) {
       moveTo(game, p, inp, tr.from, dt);
       if (lvl >= 2) { const pt = angleOn(game, p, tr.from) || tr.from; turnTo(p, Math.atan2(pt.y - p.y, pt.x - p.x), skill(game, p).turn, dt); inp.walk = Math.hypot(tr.x - p.x, tr.y - p.y) < 120 ? 1 : 0; }
@@ -1951,7 +1968,7 @@ function rankHabits(game, p, inp, dt, team, site, gun) {
     }
   }
   // through the wall: an enemy the team has spotted, close, behind one or two soft walls (no concrete) → a burst through
-  const W = gun && WEAPONS[gun.w], wb = p.pro ? 0.9 : WALLBANG[lvl];
+  const W = gun && WEAPONS[gun.w], wb = p.pro ? 0.9 : Math.min(1, WALLBANG[lvl] * habit(p, 'b'));
   if (wb && W && gun.ammo > 0 && penOf(W) >= 0.4 && !p.reloadT) {
     if (ai.wbUntil > game.time && ai.wbAt) {
       const q = game.players.get(ai.wbAt);
@@ -2064,7 +2081,7 @@ export const __findPath = (...a) => findPath(...a); // for tests
 // ======================================================================================================================
 // how often someone strafe-peeks in a fight (he asked: a hard skill, not something everyone does all the time)
 const PEEK = PRO_PEEK, PEEK_LVL = [0.02, 0.03, 0.06, 0.09, 0.12, 0.18, 0.22];
-function peekSkill(game, p) { return p.pro ? (PEEK[p.pro.pl.name] ?? 0.06) * drillMul(p.pro.pl.name, 'strafe') : PEEK_LVL[lvlOf(game, p)]; } // (pros: their drill style moves it)
+function peekSkill(game, p) { return p.pro ? (PEEK[p.pro.pl.name] ?? 0.06) * drillMul(p.pro.pl.name, 'strafe') : PEEK_LVL[lvlOf(game, p)] * habit(p, 'k'); } // (pros: their drill style moves it)
 const PERSONA = PRO_PERSONA, TIMING = PRO_TIMING, ROTATE_DELAY = PRO_ROTATE; // (in shared/pros.js: the PLAYBOOK shows them)
 // The pros talk (he asked: you can see what they say, an insight into their thoughts; not everything is said, but a
 // change of plan always is, and specific information has to be spoken because pings are limited). A line goes to their
@@ -2344,9 +2361,11 @@ export function assignPros(game) {
     const bots = [...game.players.values()].filter(q => q.bot && q.squad === squad).sort((a, b) => +a.id.slice(1) - +b.id.slice(1));
     const team = PRO_TEAMS[squad];
     bots.forEach((b, i) => {
+      botIdentity(game, b);
       if (!b.baseName) b.baseName = b.name;
       if (on && i < team.players.length) setPro(b, squad, i);
       else if (b.pro) { b.pro = null; b.name = b.baseName; b.persona = null; }
+      if (!b.pro) b.rk = b.bioLv; // (the lobby shows their rank)
     });
   }
 }
@@ -2646,7 +2665,7 @@ export function arenaThink(game, p, dt) {
   const team = game.side(p);
   for (const n of game.noises || []) {
     if (n.team === team || game.time - n.t > 1.5 || (ai.heard && ai.heard.t >= n.t)) continue;
-    if (Math.hypot(n.x - p.x, n.y - p.y) < n.r * EAR[lvlOf(game, p)] && floorAt(game.map, n.x, n.y) === floorAt(game.map, p.x, p.y)) ai.heard = { x: n.x, y: n.y, t: game.time };
+    if (Math.hypot(n.x - p.x, n.y - p.y) < n.r * EAR[lvlOf(game, p)] * habit(p, 'e') && floorAt(game.map, n.x, n.y) === floorAt(game.map, p.x, p.y)) ai.heard = { x: n.x, y: n.y, t: game.time };
   }
   const enemy = visibleEnemy(game, p, S.see);
   if (enemy) {

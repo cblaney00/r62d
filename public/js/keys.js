@@ -10,7 +10,7 @@ export const ACTIONS = [
   ['crouch', 'Crouch — silent, most accurate (hold). While sprinting: power slide', 'ControlLeft', ''],
   ['crouchTap', 'Crouch on / off (one tap). While sprinting: power slide', '', ''],
   ['prone', 'Lie down / get up — sees under tables and cars', 'KeyC', ''],
-  ['interact', 'Use — reinforce, barricade, plant, defuse, revive (hold)', 'KeyF', ''],
+  ['interact', 'Use — reinforce, barricade, plant, defuse, revive, pick up your gadget (hold)', 'KeyF', ''],
   ['leanL', 'Lean left (hold) — on drones / cameras: previous feed', 'KeyQ', ''],
   ['leanR', 'Lean right (hold) — on drones / cameras: next feed', 'KeyE', ''],
   ['reload', 'Reload', 'KeyR', ''],

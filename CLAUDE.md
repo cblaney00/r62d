@@ -78,7 +78,7 @@ only add to this file if it is a rule every session needs.
 - Menu text has a minimum size (he asked 2026-11-17): write every font size in style.css as `max(<size>, var(--mf))` (see the end of style.css); `tests/textsize.mjs` must list 0 small text for `pc` and `phone`.
 - Node is not on PATH in a plain session: run tests through
   `nix develop /home/insideabush/nixos-config#vibe-web --command ...` (a failing `node` hides in grep).
-- Checked 2026-11-16: `tests/feeds.js` 4/4, `stuckbots.js` 3/3, `ropebots.js` 3/3 pass;
+- Checked 2026-11-16: `tests/feeds.js` 4/4, `stuckbots.js` 3/3, `ropebots.js` 3/3 pass (2026-11-18: `stuckbots.js` finds 1-3 stuck bots on any version, by chance, not a new fault);
   `prepff.js` was a test fault (a third teammate or a wall in the line of fire), fixed, 40/40.
 
 ## How it is built
@@ -145,6 +145,7 @@ only add to this file if it is a rule every session needs.
   `node tests/sim.js` plays a bot-only match on every map (must print PASS; `--only <id>` for one).
   `node tests/reach.js` checks a body can reach every floor cell and every drone hole passes a drone but not a body.
   `node tests/stairs.js` walks a body up and down every staircase with real physics + bot path finding.
+  `node tests/pickup.js` (picking your own gadgets back up), `node tests/botroster.js` (the 70 bots, WRAITH's charge).
   `node tests/balance.js 12` is the balance report (see docs/balance.md for how to read it and past changes).
   `tests/shoot.mjs` drives a hidden Firefox (run as insideabush, via WebDriver BiDi,
   `--remote-debugging-port`) to take screenshots; see `docs/testing.md`.

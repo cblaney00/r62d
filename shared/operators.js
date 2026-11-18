@@ -246,7 +246,7 @@ export const OPERATORS = {
              ability: { id: 'stim', name: 'Stim Pistol', count: 3, desc: 'Shoot a teammate to heal them (or revive them if they are down). With nobody in your sights, it heals you. Passive: if downed, gets back up by himself after 12 seconds.' },
              gadget: 'wire', gadgetCount: 2, color: '#f2f2f2', helmet: '#7a2b2b', look: 'helmet' },
   wraith:  { team: 'def', name: 'WRAITH',  role: 'Intel Roamer',  armor: 3, primary: 'lark', secondary: 'vex50',
-             ability: { id: 'scan', name: 'Pulse Scanner', count: 0, battery: 8, desc: 'Press to start scanning and again to stop (up to 4 seconds at a time). While scanning, only you see a fuzzy heartbeat blip near each attacker in range, through walls: no name, no facing, up to 1.5 m off. You cannot shoot meanwhile, and they hear a warning ping.' },
+             ability: { id: 'scan', name: 'Pulse Scanner', count: 0, battery: 4, desc: 'At full charge, press to start scanning and again to stop (up to 4 seconds). Each scan uses the whole charge, which takes 50 seconds to fill back up. While scanning, only you see a fuzzy heartbeat blip near each attacker in range, through walls: no name, no facing, up to 1.5 m off. You cannot shoot meanwhile, and they hear a warning ping.' },
              gadget: 'impact', gadgetCount: 2, color: '#6c7cf0', helmet: '#3c4260', look: 'mask' },
   bramble : { team: 'def', name: 'BRAMBLE', role: 'Trapper', armor: 2, primary: 'wasp', secondary: 'sparrow',
              ability: {id: "prox",name: "Proximity Charge",count: 2,desc: "Hide a charge by a door or window. When an attacker comes close it beeps once, then explodes."},

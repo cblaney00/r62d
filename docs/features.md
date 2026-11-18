@@ -129,3 +129,10 @@ His wishes so far:
 
 - Ball Knowledge balance (he asked 2026-11-10): Patch Watch calls an operator broken over 60% and really bad under 40%, only after 500 rounds (`BROKEN`/`REALLY_BAD`/`SURE` in knowledge.js); 40-60% is fine (bans exist, a meta is OK). Changes so far: NAIL 4 piercing rounds at 55%, CROW lunge 1 s / 5 m, HOIST climbs 1.2 / 2.2 s, pros throw GLINT's sonar, every limited attacker skill +1 use (`ATK_SKILL_BONUS` in shared/operators.js), RIVET battery 18, FERRO swing 2 s, BULWARK bash 1 s and a K4 Carbine as his only gun. Trained pros still win ~40% on attack (untrained ~50%): see docs/balance.md.
 
+- Everyday bots are people (he asked 2026-11-18): `shared/botroster.js`, ten per rank Copper–Champion, silly names low and
+  handles high (his pick), no name twice; each has a style line (lobby: hover or tap) and habits on top of the rank
+  (`habit`, `botIdentity` in bots.js). Pros keep their own teams and profiles.
+- Pick your gadget back up (he asked 2026-11-18): hold Use on your own placed gadget (~1 s, any time) to get it back;
+  not once it has gone off or been damaged, never a teammate's (`PICKUP`, `pickTarget`, `pickUp` in game.js).
+- Sight shape (2026-11-18): rays on a map-fixed grid with edge finding, so the edges never shake as the view turns
+  (`visionPolygon`); furniture stands up as its own picture's rectangle (`propBody`, look.js `solidOf`/`legsOf`).

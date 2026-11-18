@@ -83,6 +83,9 @@ input { font: 600 max(20px, var(--mf)) var(--head); padding: 10px 14px; backgrou
 .squad li { font: 600 max(18px, var(--mf)) var(--head); padding: 5px 8px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
 .squad li.me { color: var(--gold); }
 .squad li .bot { color: var(--dim); font-size: max(14px, var(--mf)); }
+.squad li.botLi { flex-wrap: wrap; cursor: help; } .squad li.botLi .rankTag { margin-right: 6px; }
+.squad li .botStyle { display: none; flex-basis: 100%; font: italic 500 max(13px, var(--mf)) var(--body, sans-serif); color: var(--dim); padding-top: 2px; }
+.squad li.botLi:hover .botStyle, .squad li.botLi.open .botStyle { display: block; }
 .row { display: flex; gap: 8px; } .row.center { justify-content: center; margin-top: 16px; }
 .hint { text-align: center; color: var(--dim); font-size: max(14px, var(--mf)); }
 .controls { background: var(--panel); border: 1px solid var(--line); padding: 12px 18px; max-width: 760px; }

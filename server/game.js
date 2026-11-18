@@ -5,7 +5,7 @@ import { localPos, buildMap, windowGlass, roomAt, wallMount, MAPS, MAP_LIST, ope
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers , inBox } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
-import { arenaThink, drillThink, defSetup, botThink, botPickOp, botPrep, assignPros, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
+import { arenaThink, drillThink, defSetup, botThink, botPickOp, botPrep, assignPros, botIdentity, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { arenaStart, arenaTick, arenaKill, arenaDamage, arenaSpeed, arenaEndMatch, arenaPlayer, arenaInfo } from './arena.js';
 import { zbSurge, zbDev, ZB, zbDown, zbUp, zbReviveTime, zbSlideEnd, zbStart, zbTick, zombieThink, zbSpeed, zbDamage, zbKill, zbCanGoDown, zbReloadMul, zbBlocksVault, zbUse, zbEnd, zbPlayer, zbInfo } from './zombies.js';
@@ -23,8 +23,7 @@ const DART_MAX = 8 * PX_PER_M, DART_SPEED = 700; // KESTREL's thrown dart
 const ROPE_HEAD0 = 0.56, ROPE_LEVEL = [0.26, 0.74], ROPE_INV = 0.45; // on a rope: head height off the ground when you start (floors), the window band, upside down lowers your head
 const r1 = v => Math.round(v * 10) / 10;
 const r2 = v => Math.round(v * 100) / 100;
-// everyday bots: their own names, never a pro's (he asked) or a gun's
-const BOT_NAMES = ['Dusty', 'Pickles', 'Gerald', 'Noodle', 'Biscuit', 'Lenny', 'Toast', 'Wobbles', 'Mittens', 'Chonk', 'Sprout', 'Tumbleweed'];
+// everyday bots: each one someone from the roster of their rank (shared/botroster.js, botIdentity in bots.js)
 const HTRAP_R = 2.5 * PX_PER_M;
 // HOIST's climbs were 1.6 / 3 s until Ball Knowledge 2026-11-10 (39% of rounds won)
 const DRILL_T = 3, GRAPPLE_T = 1.2, GRAPPLE_ROOF = 2.2, GRAPPLE_REACH = 2.2 * PX_PER_M, DROP_T = 2; // GIMLET's drill, HOIST's climbs, DEADFALL's fuse (s)
@@ -45,6 +44,13 @@ const LANCE_STEP = 0.5; // RIVET: seconds per burnt-through point (the first is 
 const HAMMER_CD = 2; // was 4, then 2.5 (he asked: Ferro stronger; 2026-11-10 attackers' skills stronger as a whole)
 const WINDUP_T = 0.5, SETUP_T = 1.2;
 const REVIVE_REACH = 34; // see startInteract
+// Picking your own gadgets back up (he asked 2026-11-18: hold Use on it, any time, not once it has gone off or been
+// damaged; never a teammate's). ent type → [the ability it came from, or 'g' for your gadget]; the deployable shield
+// (map tiles, not an ent) is tracked in p.shields. Anything thrown, timed, through a wall or flying is not on the list.
+const PICKUP = { wire: 'g', claymore: 'g', prox: 'prox', concuss: 'concuss', clamp: 'clamp', sensor: 'sensor', plates: 'plates', cam: 'turret', grid: 'grid',
+  jammer: 'jammer', mine: 'mine', alarm: 'alarm', pace: 'pace', radar: 'radar', station: 'station', catcher: 'catcher', cover: 'cover' };
+const PICKUP_KEEP = ['pool', 'c', 'life']; // what it had left (a heal station's pool, a catcher's catches...) goes with it to where you put it next
+const PICKUP_T = 1, PICKUP_REACH = 30;
 const EF_FIELD = { blind: 'stunUntil', stun: 'stunUntil', slow: 'slowUntil', snare: 'clampUntil', daze: 'dazeUntil', deaf: 'deafUntil' };
 const THROWN_G = new Set(['smoke', 'frag', 'stun', 'impact', 'nitro']), PLACED_G = new Set(['breach', 'claymore', 'wire', 'dshield']);
 const THROWN_AB = new Set(['emp', 'sonar', 'stickycam', 'gas', 'flare', 'medkit', 'echobox']);
@@ -56,6 +62,7 @@ const MAX_BANS = 8; // he asked: at most 8 banned operators in a match
 const BAN_GAP = 2.6;
 const BAN_TURN = 15; // Unranked / Ranked: seconds a team with people on it gets for each ban // seconds between Esports TV bans, long enough to read each one
 
+const SCAN_RECHARGE = 50; // s from empty to a full charge (WRAITH, he asked 2026-11-18)
 const SCAN_BEAT = 0.8, SCAN_BLUR = 1.5 * PX_PER_M; // WRAITH's scanner: a new blip per heartbeat, this far off the real spot at most
 // aimed in through the sniper scope (the Pike's and Saker's one-shot body kill needs it, he asked)
 const REINF_HALF = 1;
@@ -287,10 +294,8 @@ export class Game {
     if (this.players.size >= MAX_PLAYERS) return;
     if (squad !== 0 && squad !== 1) squad = this.squadCount(0) <= this.squadCount(1) ? 0 : 1;
     if (this.squadCount(squad) >= TEAM_SIZE) return;
-    const used = new Set([...this.players.values()].map(q => q.name));
-    const name = BOT_NAMES.find(n => !used.has('[BOT] ' + n)) || 'Bot';
-    const b = this.blankPlayer('[BOT] ' + name, true, squad);
-    this.players.set(b.id, b);
+    const b = this.blankPlayer('[BOT] Bot', true, squad);
+    this.players.set(b.id, b); botIdentity(this, b);
     if (this.phase !== PHASE.LOBBY && this.phase !== PHASE.SELECT) b.alive = false;
     assignPros(this); // at Pro skill, bots are the pro teams' players
   }
@@ -583,7 +588,7 @@ export class Game {
     p.adsT = 0; p.rc = 0; p.shots = 0; p.rcDir = Math.random() < 0.5 ? 1 : -1; p.viewTime = null;
     p.barri = o.team === TEAM.DEF ? BARRICADES_EACH : 0;
     p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
-    p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false;
+    p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false; p.shields = []; p.stash = {}; // (shields and leftovers to pick back up: this round, this operator)
     p.rope = null; p.pinged = null; p.sprints = DRONE_SPRINT.charges; p.sprintUntil = 0; p.sprintCd = 0;
     p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0; p.ef = null; p.staged = false;
     p.downedBy = null; p.nitroId = null; p.ai = {};
@@ -822,7 +827,7 @@ export class Game {
     if (op.ability.id === 'scan') {
       // a toggle (he asked): press to start, press again to stop; it stops by itself after 4 s or when the battery runs out
       const press = inp.ability && !p.scanIn; p.scanIn = !!inp.ability;
-      if (press) { if (p.scanOn) p.scanOn = false; else if (p.battery > 0 && p.ctrl === 'body') { p.scanOn = true; p.scanRun = 0; } }
+      if (press) { if (p.scanOn) p.scanOn = false; else if (p.battery >= op.ability.battery - 1e-6 && p.ctrl === 'body') { p.scanOn = true; p.scanRun = 0; } } // only from a full charge (he asked: one scan every 50 s)
       if (p.scanOn && p.battery > 0 && p.ctrl === 'body' && (p.scanRun || 0) < 4) {
         p.scanning = true; p.battery = Math.max(0, p.battery - dt); p.scanRun = (p.scanRun || 0) + dt;
         for (const q of this.players.values())
@@ -832,7 +837,7 @@ export class Game {
             if (!z || this.time - z.t > SCAN_BEAT) { const a = Math.random() * 6.283, r = (0.4 + Math.random() * 0.6) * SCAN_BLUR; z = { t: this.time, x: q.x + Math.cos(a) * r, y: q.y + Math.sin(a) * r }; b.set(q.id, z); }
             if (!(q.scanWarnT > this.time)) { q.scanWarnT = this.time + 2; this.events.push({ e: 'scanned', id: q.id }); } // ...and they hear it
           }
-      } else { p.scanOn = false; p.scanning = false; p.scanRun = 0; p.battery = Math.min(op.ability.battery, p.battery + dt * 0.35); }
+      } else { if (p.scanning) p.battery = 0; p.scanOn = false; p.scanning = false; p.scanRun = 0; p.battery = Math.min(op.ability.battery, p.battery + dt * op.ability.battery / SCAN_RECHARGE); } // a scan, however short, uses the whole charge; back to 100% in 50 s
       if (p.scanBlips) for (const [id, z] of p.scanBlips) if (this.time - z.t > SCAN_BEAT + 0.1 || !p.scanning) p.scanBlips.delete(id);
     }
 
@@ -1554,6 +1559,7 @@ export class Game {
     for (const q of this.players.values())
       if (q !== p && q.alive && q.downed && this.side(q) === team && Math.hypot(q.x - p.x, q.y - p.y) < REVIVE_REACH)
         return { k: 'revive', t: 0, dur: DUR.revive * (this.zb ? zbReviveTime(this, p) : 1), target: q.id };
+    { const pk = this.pickTarget(p); if (pk) return { k: 'pickup', t: 0, dur: PICKUP_T, ent: pk.e && pk.e.id, sh: pk.sh, what: pk.name }; }
     if (team === TEAM.DEF && (this.phase === PHASE.PREP || this.phase === PHASE.ACTION)) {
       const f = this.facingCell(p, 28); // the same reach as the on-screen prompt
       if (f && f.t === T.SOFT && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (p.op === 'girder' ? 0.5 : 1), cell: f.k };
@@ -1562,6 +1568,43 @@ export class Game {
       if (h && this.map.tiles[h.cells[0]] === T.HATCH && this.reinforce > 0) return { k: 'reinforce', t: 0, dur: DUR.reinforce * (p.op === 'girder' ? 0.5 : 1), hatch: h.id };
     }
     return null;
+  }
+
+  // your own placed gadget within reach in front of you, still whole: { e, name } or { sh (index into p.shields), name }
+  pickTarget(p) {
+    if (p.ctrl !== 'body' || p.downed || p.rope || this.phase === PHASE.LOBBY || this.phase === PHASE.SELECT || this.phase === PHASE.END) return null;
+    const op = OPERATORS[p.op]; if (!op) return null;
+    const front = (x, y) => { const d = Math.hypot(x - p.x, y - p.y); if (d > PICKUP_REACH) return -1; return d < 12 || Math.abs(angDiff(Math.atan2(y - p.y, x - p.x), p.aim)) < 1.1 ? d : -1; };
+    let best = null, bd = 1e9;
+    for (const e of this.ents) {
+      const src = PICKUP[e.type]; if (!src || e.owner !== p.id) continue;
+      if (e.type === 'cam' && !e.tu) continue; // (a thrown sticky camera is not)
+      if (src === 'g' ? (p.gadget || op.gadget) !== e.type : op.ability.id !== src) continue; // (only back into what you carry now)
+      if (e.type === 'cover' && e.chp < 300) continue; // damaged
+      if (e.hp !== undefined && e.hp < 1 || e.dead || e.fired) continue;
+      const d = front(e.x, e.y); if (d >= 0 && d < bd) { bd = d; best = { e, name: src === 'g' ? GADGETS[e.type].name : op.ability.name }; }
+    }
+    if ((p.gadget || op.gadget) === 'dshield' && p.shields) p.shields.forEach((s, i) => {
+      if (!s.ks.every(k => this.map.tiles[k] === T.DSHIELD && this.map.hp[k] >= CELL_HP[T.DSHIELD])) return; // broken or shot: stays
+      const d = front(s.x, s.y); if (d >= 0 && d < bd) { bd = d; best = { sh: i, name: GADGETS.dshield.name }; }
+    });
+    return best;
+  }
+  pickUp(p, b) {
+    const op = OPERATORS[p.op], pk = this.pickTarget(p);
+    if (!pk || (b.ent !== undefined && (!pk.e || pk.e.id !== b.ent)) || (b.sh !== undefined && pk.sh !== b.sh)) return; // (it moved, broke or went off meanwhile)
+    if (pk.e) {
+      const e = pk.e, src = PICKUP[e.type];
+      this.removeEnt(e); if (e.type === 'cover') this.syncCovers();
+      if (src === 'g') p.gadgetCount++; else { p.abilityCount++; const keep = {}; for (const k of PICKUP_KEEP) if (e[k] !== undefined) keep[k] = e[k]; (p.stash || (p.stash = {}))[e.type] = keep; }
+    } else {
+      const s = p.shields[pk.sh]; p.shields.splice(pk.sh, 1);
+      s.ks.forEach((k, i) => { this.map.tiles[k] = s.was[i]; this.map.hp[k] = 0; this.changed.add(k); });
+      p.gadgetCount++;
+    }
+    this.events.push({ e: 'snd', s: 'place', x: r1(p.x), y: r1(p.y) });
+    this.events.push({ e: 'deny', id: p.id, why: pk.name.toUpperCase() + ' PICKED UP' });
+    void op;
   }
 
   continueInteract(p, dt) {
@@ -1589,6 +1632,7 @@ export class Game {
       if (this.map.tiles[this.map.hatches[b.hatch].cells[0]] === T.HATCH && this.reinforce > 0) { this.reinforceHatch(b.hatch); this.reinforce--; this.pts(p, 15, 'HATCH REINFORCED'); }
     } else if (b.k === 'reinforce') {
       if (this.map.tiles[b.cell] === T.SOFT && this.reinforce > 0) { this.reinforceWall(b.cell); this.reinforce--; this.pts(p, 15, 'WALL REINFORCED'); if (this.tut && !p.bot) this.tut.info.reinf++; }
+    } else if (b.k === 'pickup') { this.pickUp(p, b);
     } else if (b.k === 'barricade') {
       if (p.barri > 0 && this.barricade(this.map.openId[b.cell], T.BARRI)) { p.barri--; this.pts(p, 5, 'BARRICADE'); if (this.tut && !p.bot) this.tut.info.barri++; }
     }
@@ -2020,7 +2064,7 @@ export class Game {
     const ca = Math.cos(p.aim), sa = Math.sin(p.aim);
     const place = (type, dist, extra = {}) => { // set something down just in front of you, if there's floor there
       const pos = this.freeSpotNear(p.x + ca * dist, p.y + sa * dist, 4);
-      const e = { id: this.eid(), type, x: pos.x, y: pos.y, ang: p.aim, team, owner: p.id, hp: 1, ...extra };
+      const e = { id: this.eid(), type, x: pos.x, y: pos.y, ang: p.aim, team, owner: p.id, hp: 1, ...extra, ...(p.stash && p.stash[type]) }; if (p.stash) delete p.stash[type]; // (picked up earlier: what it had left)
       this.ents.push(e); used(); this.events.push({ e: 'snd', s: 'place', x: r1(pos.x), y: r1(pos.y) });
       return e;
     };
@@ -2324,7 +2368,9 @@ export class Game {
     const cx = Math.floor(fx / CELL), cy = Math.floor(fy / CELL);
     const ks = [[cx, cy], [cx + across[0], cy + across[1]]].map(([x, y]) => y * this.map.W + x);
     if (ks.some(k => { const t = this.map.tiles[k]; return (t !== T.FLOOR && t !== T.GROUND) || this.cellOccupied(k); })) return false;
+    const was = ks.map(k => this.map.tiles[k]);
     for (const k of ks) { this.map.tiles[k] = T.DSHIELD; this.map.hp[k] = CELL_HP[T.DSHIELD]; this.changed.add(k); }
+    (p.shields || (p.shields = [])).push({ ks, was, x: (cx + 0.5 + across[0] / 2) * CELL, y: (cy + 0.5 + across[1] / 2) * CELL }); // (so its owner can pick it back up)
     this.events.push({ e: 'snd', s: 'panel', x: r1(fx), y: r1(fy) });
     return true;
   }
@@ -2600,8 +2646,8 @@ export class Game {
       // that stands still 3 m in front of you, facing you, and comes back to the same spot 3 s after it goes down.
       const dummy = m.a === 'dummy', squad = dummy || m.side !== 'team' ? 1 - p.squad : p.squad;
       const used = new Set([...this.players.values()].map(q => q.name));
-      let name; if (dummy) { let i = 1; while (used.has('DUMMY ' + i)) i++; name = 'DUMMY ' + i; } else name = '[BOT] ' + (BOT_NAMES.find(n => !used.has('[BOT] ' + n)) || 'Bot');
-      const b = this.blankPlayer(name, true, squad); this.players.set(b.id, b);
+      let name; if (dummy) { let i = 1; while (used.has('DUMMY ' + i)) i++; name = 'DUMMY ' + i; } else name = '[BOT] Bot';
+      const b = this.blankPlayer(name, true, squad); this.players.set(b.id, b); if (!dummy) botIdentity(this, b);
       if (dummy) { const at = this.freeSpotNear(p.x + Math.cos(p.aim) * 3 * PX_PER_M, p.y + Math.sin(p.aim) * 3 * PX_PER_M, 30); b.hold = true; b.dummyAt = at; }
       this.freeSpawn(b, true);
       if (dummy) this.dummyPlace(b, p);
@@ -3310,7 +3356,7 @@ export class Game {
       const g = p.guns[p.slot];
       const o = {
         id: p.id, n: p.name, b: p.bot ? 1 : 0, sq: p.squad, ar: this.arena ? arenaPlayer(this, p) : undefined, zb: this.zb ? zbPlayer(this, p) : undefined, tm: this.round ? this.side(p) : (p.squad === 0 ? 'atk' : 'def'),
-        op: p.op, a: p.alive ? 1 : 0, bt: p.bot ? 1 : undefined, rn: p.bot || !p.token ? undefined : rankOf(p.mmr), k: p.kills, d: p.deaths, sc: p.score || 0, ms: p.rtt,
+        op: p.op, a: p.alive ? 1 : 0, bt: p.bot ? 1 : undefined, rn: p.bot || !p.token ? undefined : rankOf(p.mmr), br: p.bot && p.bio && !p.pro && this.phase === PHASE.LOBBY ? p.bioLv : undefined, bs: p.bot && p.bio && !p.pro && this.phase === PHASE.LOBBY ? p.bio.s : undefined, /* a bot's rank and how they play, for the lobby */ k: p.kills, d: p.deaths, sc: p.score || 0, ms: p.rtt,
       };
       if (p.alive) Object.assign(o, {
         dn: p.downed ? 1 : 0, hp: Math.ceil(p.hp), mhp: p.maxHp, x: r1(p.x), y: r1(p.y), ag: r2(p.aim), sg: p.staged ? 1 : undefined,
@@ -3328,7 +3374,7 @@ export class Game {
       if (this.phase === PHASE.SELECT || this.phase === PHASE.PREP) { o.lk = p.locked ? 1 : 0; o.jb = p.job || undefined; if (this.placed(p)) o.pd = 1; if (this.side(p) === TEAM.ATK) { o.spn = this.map.atkSpawns.indexOf(this.spawnOf(p)); if (!p.spawn) o.sr = 1; if (p.defReq) o.dq = 1; } }
       if (p.alive && (p.sock || this.rec || (this.tv && p.id === this.tv.follow))) mine.set(p.id, JSON.stringify({
         ga: this.free ? p.guns.map(q => q.w + ':' + attCode(q.att)) : undefined, // free play's gun menu shows what each held gun carries
-        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, lg: p.lungeUntil > this.time ? [p.lungeTarget, r1(Math.max(0, (p.lungeReady || 0) - this.time)), r1(p.lungeUntil - this.time)] : undefined, /* CROW: marked enemy, s until ready, s left */ ap: p.pierceShot ? 1 : undefined, su2: p.spotterUntil > this.time ? r1(p.spotterUntil - this.time) : undefined, gw2: p.ghillieUntil > this.time ? r1(p.ghillieUntil - this.time) : undefined, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
+        am: g ? g.ammo : 0, rs: g ? g.reserve : 0, ac: p.abilityCount, pk: (() => { const t = !p.busy && p.alive && this.pickTarget(p); return t ? t.name : undefined; })(), /* the gadget of yours you could pick up */ lg: p.lungeUntil > this.time ? [p.lungeTarget, r1(Math.max(0, (p.lungeReady || 0) - this.time)), r1(p.lungeUntil - this.time)] : undefined, /* CROW: marked enemy, s until ready, s left */ ap: p.pierceShot ? 1 : undefined, su2: p.spotterUntil > this.time ? r1(p.spotterUntil - this.time) : undefined, gw2: p.ghillieUntil > this.time ? r1(p.ghillieUntil - this.time) : undefined, gc: p.gadgetCount, bx: p.barri, pr: r1(Math.max(0, (p.pingReady || 0) - this.time)), bl: p.scanning && p.scanBlips ? [...p.scanBlips.values()].map(z => [r1(z.x), r1(z.y), r2(this.time - z.t)]) : undefined, gd: p.gadget, dr: p.drones, fi: p.ctrl === 'cam' ? p.feedId : null, did: p.droneId,
         vx: r1(p.vx || 0), vy: r1(p.vy || 0), rc: Math.round((p.rc || 0) * 10000) / 10000, sh: p.shots || 0, at: r2(p.adsT || 0),
         bat: r1(p.battery), ro: p.rope ? [p.rope.st === 'hang' ? 1 : 0, p.rope.r, p.rope.to, r2(p.rope.t / p.rope.dur), p.rope.climb ? 1 : 0, p.rope.inv ? 1 : 0, p.rope.from ?? -1, r2(p.rope.h ?? 0.5), this.ropeLevel(p) ? 1 : 0] : undefined, ds: p.sprints, dsl: r2(Math.max(0, (p.sprintUntil || 0) - this.time)), dsc: r2(Math.max(0, (p.sprintCd || 0) - this.time)), st: r2(Math.max(0, p.stunUntil - this.time)), ls: p.lastSeq, ni: p.nitroId ? 1 : 0,
         ...(p.staged ? { x: r1(this.spawnOf(p).x), y: r1(this.spawnOf(p).y) } : {}),

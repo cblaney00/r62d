@@ -60,7 +60,7 @@ fresh(); setup(d, 'lynx', X, Y, 0); use(d); ticks(1.6); setup(a, 'ember', X + 10
 fresh(); setup(d, 'solace', X, Y, 0); setup(d2, 'lynx', X + 100, Y, 0); d2.hp = 40; use(d); ok(d2.hp > 40, 'SOLACE stim did not heal a teammate'); d2.downed = true; use(d); ok(!d2.downed, 'SOLACE stim did not revive');
 fresh(); setup(d, 'wraith', X, Y, 0); setup(a, 'ember', X + 100, Y, 0); g.events = []; d.hold = { ability: 1 }; ticks(0.5, d); ok(d.scanning, 'WRAITH did not scan while holding');
 ok(g.events.some(e => e.e === 'scanned' && e.id === a.id), 'the scanned attacker was not warned'); ticks(4, d); ok(!d.scanning, 'WRAITH scanned for more than 4 s in one go');
-d.hold = null; ticks(0.2, d); d.hold = { ability: 1 }; ticks(0.3, d); ok(d.scanning, 'WRAITH could not scan again after letting go'); d.hold = null;
+d.hold = null; ticks(0.2, d); d.hold = { ability: 1 }; ticks(0.3, d); ok(!d.scanning, 'WRAITH scanned again before the charge was full (he asked 2026-11-18: one scan per 50 s)'); d.hold = null; ticks(50, d); d.hold = { ability: 1 }; ticks(0.3, d); ok(d.scanning, 'WRAITH could not scan again once charged'); d.hold = null;
 fresh(); setup(d, 'bramble', X, Y, 0); use(d); ticks(1.6); setup(a, 'ember', X + 30, Y, 0); a.hp = a.maxHp = 500; ticks(1.2); ok(a.hp < 500, 'BRAMBLE proximity charge did not go off');
 fresh(); setup(d, 'kite', X, Y, 0); use(d); ok(g.ents.some(e => e.type === 'cam' && e.tu), 'KITE did not place a turret camera');
 fresh(); setup(d, 'gravel', X, Y, 0); use(d); ticks(1.6); setup(a, 'ember', X + 20, Y, 0); ticks(0.2); ok(a.dazeUntil > g.time, 'GRAVEL daze mine did not daze');

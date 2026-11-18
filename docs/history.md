@@ -600,3 +600,36 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   melted — dropped.)
 - Tests: `tests/preaimflick.mjs` now also checks pickup (25 px thumb → ~25 px reticle, was ~400) in rings and buttons;
   `SCENARIO=rings tests/thumbs.mjs` all as wanted.
+
+## Steady sightlines, flat floors round furniture, bots as people, pick-up, WRAITH, homelab (2026-11-18, he asked)
+- **Sightlines shook** while the view moved: `visionPolygon` (main.js) spaced its rays from `v.ang` (your aim), so turning
+  or dragging the camera under a still cursor moved every ray and the shadow edges crawled (drones too: their full circle
+  started at the aim). Now the rays sit on a grid fixed to the map (`k·2π/M`, same density as before) plus exact rays at
+  the cone's edges, and where two neighbouring rays land > 18 px apart the edge is found by halving the gap 5 times
+  (only your own view). `tests/sightjitter.js` (a shoot.mjs step): edge movement per frame while only turning, old vs new:
+  body 0.05 → 0.00 px, drone 8.99 → 0.00 px; 0.12 ms a frame for the shape. `window.__r62dVis` is its hook.
+- **Floor looked raised round furniture**: tables (`legs`) and solid furniture lifted their whole cells' picture, floor
+  margin included. Now `propBody` (mapdraw.js, `R.body`) measures each piece's own picture once (opaque pixels, not its
+  shadow) and look.js raises only that rectangle: `legsOf` (legs, edge and the dark shadow under it on the piece's own
+  outline) and the new `solidOf` (a block of that size). Tops are one plain rectangle copy per piece (`r.rc`, `r.rows`):
+  a clipped shape per row cost the graphics card 10% (measured). Crates and pillars keep their cells (they fill them).
+  The cell-edge contact shadows by furniture (mapdraw regionPart) and the lamp light stopping at furniture cells
+  (`lightMap` passes / raised) are gone: each piece casts its own shadowRect. GPU (headless gamescope, High):
+  Villa 111 → 117 fps, Lodge 88 → 106 fps while turning.
+- **Bots**: `shared/botroster.js` — 70 everyday bots, ten per rank (silly names low, handles high: his pick), each with a
+  style line, aggr/patience and habit multipliers (`habit(p, k)`: wander, trade, wallbang, ear, peek, roof, window), a
+  favourite job per side (`roleFor`, 65% of rounds) and favourite operators (`botPickOp`, 55%). `botIdentity` (bots.js)
+  picks an unused one of the bot's rank and again when the rank changes (from `assignPros`). The lobby shows a bot's
+  rank and, on hover or tap, its style (`br`/`bs` in the snapshot, lobby only). `tests/botroster.js`.
+- **Pick-up** (his rules: hold Use ~1 s, any time, own gadgets only, not once gone off or damaged): `PICKUP` in game.js,
+  `pickTarget`/`pickUp`, busy kind `pickup`; the shield is tracked in `p.shields` (tiles go back to what they were); a
+  station's pool, a catcher's catches etc. go with it (`p.stash`) to where it is placed next. `mine.pk` tells the client
+  (prompt "HOLD TO PICK UP ..."). `tests/pickup.js`: 18 kinds, PASS; a teammate never sees the prompt.
+- **WRAITH** (he found it): battery 8 with 4 s scans let him scan twice, and it refilled in ~23 s. Now battery 4: a scan
+  starts only from full, any scan empties it, `SCAN_RECHARGE` 50 s back to full; bots wait for a full charge.
+- **Homelab "IP not working"**: nothing in the game blocks anyone (listens on 0.0.0.0, no address checks). From his PC on
+  the VPN, 192.168.1.76:6262 answered "connection refused": the R62D service on Lando's mini-server is switched off
+  (`r62d.enable = false` in nixos-config hosts/mini-server/homelab.nix on main; turning it on is on the unmerged branch
+  `blaney/homelab-r62d-on`). That is a config change for Lando. Game side: `/api/addr` now puts `R62D_PUBLIC_URL` (the
+  NixOS module sets it to http://192.168.1.76:6262) first with its own join code; before, the homelab showed its own
+  unreachable 192.168.100.x address and code.
