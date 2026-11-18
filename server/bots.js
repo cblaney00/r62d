@@ -1773,7 +1773,7 @@ function checkDrone(game, p, ai, inp, dt, heard) {
   if (!CHK_GAP[lvl] || game.tut || game.free || game.arena || game.zb) return false;
   if (C && C.st === 'hide') { // on the way to where the room can't see them
     if (heard || game.time > C.t + 5 || Math.hypot(C.hide.x - p.x, C.hide.y - p.y) < 8) {
-      C.st = 'drone'; C.hp0 = p.hp; C.until = game.time + (good ? 6 + Math.random() * 3 : 2.5 + Math.random() * 2);
+      C.st = 'drone'; C.hp0 = p.hp; feat(p, 'droneCheck'); C.until = game.time + (good ? 6 + Math.random() * 3 : 2.5 + Math.random() * 2);
       const own = game.ent(p.droneId);
       if (p.drones > 0 && !(own && Math.hypot(own.x - p.x, own.y - p.y) < 6 * PX_PER_M)) game.droneKey(p); else if (own) game.watch(p, own);
       if (p.ctrl !== 'drone') { C.st = 'done'; return false; }

@@ -2,7 +2,7 @@
 // Every plan and operator gets tried (exploring, not just the favourites); each round's result is sent back.
 import { parentPort, workerData } from 'node:worker_threads';
 import { Game } from './game.js';
-import { buildMap, MAP_LIST } from '../shared/map.js';
+import { buildMap, MAP_LIST, floorAt, stairLooks } from '../shared/map.js';
 import { OPERATORS, WEAPONS } from '../shared/operators.js';
 import { PHASE, TEAM } from '../shared/constants.js';
 import { planKey, opKey, gunKey, attKey, training } from './training.js';
@@ -33,13 +33,14 @@ while (Date.now() < until && left > 0) {
     t += dt; await breather();
     if (rs) for (const e of g.events) if (e.e === 'kill' && e.killer && e.killer !== e.victim) {
       const k = g.players.get(e.killer), v = g.players.get(e.victim); if (!k || !v || !k.op || g.side(k) === g.side(v)) continue;
+      if (floorAt(g.map, k.x, k.y) !== floorAt(g.map, v.x, v.y) && (g.map.stairs || []).some((s, i) => stairLooks(g.map, i, k.x, k.y))) { const F = k.feat || (k.feat = {}); F.stairKill = (F.stairKill || 0) + 1; } // a kill up or down a staircase (the new stair rules, 2026-11-18)
       const a = rs[k.id], b = rs[v.id]; if (a) { a.dist += Math.hypot(k.x - v.x, k.y - v.y); if (!rs.first && b) b.fd++; a.k++; if (a.g2 && e.w === a.g2n) a.k2++; if (!GUNS.has(e.w)) a.sk++; if (e.hs) a.hs++; if (!rs.first) { rs.first = 1; a.fk++; } } if (b) b.d++;
     }
     g.events = [];
     if (g.phase !== last) {
       if (g.phase === PHASE.PREP) { rs = {}; for (const p of g.players.values()) if (p.op) { const g1 = p.guns[0], g2 = p.guns[1]; p.feat = {}; rs[p.id] = { dist: 0, fd: 0, op: p.op, sq: p.squad, ab: OPERATORS[p.op].ability.count, k: 0, d: 0, sk: 0, hs: 0, fk: 0, k2: 0, pro: p.pro && p.pro.pl.name, g1: p.riot || (g1 && g1.w), a1: !p.riot && g1 && g1.att, g2: g2 && g2.w, a2: g2 && g2.att, g2n: g2 && WEAPONS[g2.w].name }; } }
       if (g.phase === PHASE.ROUND_END && g.winner !== null && g.winner !== undefined) {
-        const res = { plans: {}, ops: {}, rounds: 1 };
+        const res = { plans: {}, ops: {}, rounds: 1, ends: { [id]: { [g.reason || '?']: 1 } } }; // (how each round ended, per map: the pros' suggestions read it)
         for (const sq of [0, 1]) {
           const st = (g.proState || {})[sq], win = g.winner === sq ? 1 : 0, mate = [...g.players.values()].find(p => p.squad === sq);
           const side = mate && g.side(mate) === TEAM.ATK ? 'atk' : 'def';

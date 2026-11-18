@@ -104,7 +104,7 @@ function api(req, res) {
     return;
   }
   if (u.pathname === '/api/meta') return json(200, META); // the pros' preferred loadouts: every browser's defaults
-  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, guns: training.guns, att: training.att, pro: training.pro, drills: training.drills, opinions: training.opinions, running: !!trainer, session: trainer ? trainer.rounds : 0, current: PLAY_VERSION });
+  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, guns: training.guns, att: training.att, pro: training.pro, drills: training.drills, opinions: training.opinions, suggestions: training.suggestions, ends: training.ends, running: !!trainer, session: trainer ? trainer.rounds : 0, current: PLAY_VERSION });
   if (u.pathname === '/api/train' && req.method === 'POST') { const r = trainCheck(true); return json(200, { running: !!trainer, why: r || '' }); } // TRAIN THE PROS button
   // REPLAYS (server/replays.js): the newest 3, a download, and opening a downloaded file again
   if (u.pathname === '/api/replays') return json(200, { list: listReplays() });

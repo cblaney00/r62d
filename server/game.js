@@ -2234,7 +2234,7 @@ export class Game {
       if (!to) { // under a shut hatch: the charge on the hook blows it open first (as loud as a grenade), then up he goes
         const h = this.hatchToBlast(p);
         if (h && h.reinforced) { this.events.push({ e: 'deny', id: p.id, why: 'That hatch is reinforced: the grapple charge can\'t break it' }); return; }
-        if (h) { this.breakHatch(h.id); this.events.push({ e: 'boom', x: r1(h.x), y: r1(h.y), r: 26, kind: 'frag' }); this.events.push({ e: 'boom', x: r1(h.bx), y: r1(h.by), r: 18, kind: 'stun' }); this.noise(h.bx, h.by, p, 900); to = this.grappleTarget(p); blast = 0.5; }
+        if (h) { const F = p.feat || (p.feat = {}); F.hatchBlast = (F.hatchBlast || 0) + 1; this.breakHatch(h.id); this.events.push({ e: 'boom', x: r1(h.x), y: r1(h.y), r: 26, kind: 'frag' }); this.events.push({ e: 'boom', x: r1(h.bx), y: r1(h.by), r: 18, kind: 'stun' }); this.noise(h.bx, h.by, p, 900); to = this.grappleTarget(p); blast = 0.5; }
       }
       if (!to) { this.events.push({ e: 'deny', id: p.id, why: 'Stand under an open hatch, or outside facing the building\'s wall, to grapple up' }); return; }
       p.grapple = { t: 0, dur: (to.roof ? GRAPPLE_ROOF : GRAPPLE_T) + blast, x: to.x, y: to.y, sx: p.x, sy: p.y }; p.adsT = 0; p.reloadT = 0;

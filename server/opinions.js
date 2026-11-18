@@ -7,7 +7,7 @@ import { training } from './training.js';
 import { PATCH_NOTES } from '../shared/patchnotes.js';
 import { PRO_TEAMS, PRO_PERSONA, JOB_NAME } from '../shared/pros.js';
 import { OPERATORS, WEAPONS, ATTACH, SIDEARMS, gunSide } from '../shared/operators.js';
-import { MAPS, MAP_LIST } from '../shared/map.js';
+import { MAPS, MAP_LIST, buildMap } from '../shared/map.js';
 
 const pct = x => Math.round(x * 100) + '%';
 const LOG_MAX = 40;
@@ -92,6 +92,7 @@ function candidates(pl) {
 
 // every pro forms (or keeps) their view; a log line is added each session, marked when it changed
 export function formOpinions(version) {
+  try { formSuggestions(version); } catch (e) { console.log('pro suggestions failed:', e.message); }
   const O = training.opinions || (training.opinions = {}), session = (training.sessions = (training.sessions || 0) + 1);
   for (const team of PRO_TEAMS) for (const pl of team.players) {
     const c = candidates(pl); if (!c.length) continue;
@@ -100,6 +101,75 @@ export function formOpinions(version) {
     const log = O[pl.name] || (O[pl.name] = []), last = log[log.length - 1], pick = last && c.find(x => x.kind === last.kind && x.id === last.id && x.sc > c[0].sc * 0.85) || c[0]; // a view is not dropped for a slightly stronger one
     log.push({ at: Date.now(), v: version, s: session, kind: pick.kind, id: pick.id, text: pick.text, changed: !last || last.kind !== pick.kind || last.id !== pick.id ? 1 : 0, runner: c.find(x => x !== pick) ? c.find(x => x !== pick).text : '' });
     if (log.length > LOG_MAX) log.splice(0, log.length - LOG_MAX);
+  }
+  return O;
+}
+
+// ---------------- suggestions (he asked 2026-11-18) ----------------
+// Besides the worst thing in the game, every pro now puts forward one change after each practice: a HOLE (something the
+// numbers say is missing or lopsided: a bomb site one side nearly always wins, an operator with nothing to offer, rounds
+// that keep running out the clock) or something to TAKE OUT (a mechanic that hardly ever happens, so it is one more
+// thing to learn for nothing). They talk like people who grew up with the game and want it around for years.
+// Logged in training.suggestions[name] (last 20), shown in BALL KNOWLEDGE → PRO IDEAS.
+const CARE = [ // how each one opens (picked by a steady quirk of their name)
+  'I\'ve played this since I was a kid, so I\'ll say it straight:', 'I grew up on this game and I want my kids to play it:', 'This game raised me, and that\'s why this one bugs me:',
+  'I\'ve been here since the first patch and I still love it, so hear me out:', 'I want this game around for another twenty years, so:', 'Honestly, as someone who learned to aim in this game:',
+  'My first ranked game was on this, and I still care too much, so:', 'Ten thousand hours in, here\'s what I\'d fix first:', 'Every player I coach asks me about this, and they\'re right:', 'Love this game. That\'s why I\'ll say it:',
+];
+// the habits practice counts (bots.js feat, train-worker.js), by what they are in the game
+const MECH = { rappel: 'rappelling to the site windows', roof: 'going in from the roof', rat: 'the rat spots', slide: 'the power slide', prone: 'lying down', vault: 'vaulting',
+  wallbang: 'shooting through walls', glare: 'scope glare', feeds: 'watching team camera feeds', droneCheck: 'droning a room before going in', hatchBlast: 'HOIST\'s hatch charge', stairKill: 'fights up and down the stairs' };
+const ROLE_CARES = { entry: ['clock', 'site', 'slide'], intel: ['droneCheck', 'feeds', 'glare'], breach: ['site', 'wallbang', 'hatchBlast'], support: ['op', 'clock'], flank: ['rappel', 'roof', 'rat'],
+  anchor: ['site', 'stairKill', 'rat'], trapper: ['site', 'feeds'], roamer: ['stairKill', 'rat', 'clock'] };
+function ideas(pl) {
+  const out = [], cares = new Set([...(ROLE_CARES[pl.jobs.atk] || []), ...(ROLE_CARES[pl.jobs.def] || [])]), [aggr, patience] = PRO_PERSONA[pl.name] || [0.5, 0.5];
+  const w = id => cares.has(id) ? 1.4 : 1;
+  // holes: a bomb site one side nearly always wins
+  const sites = {};
+  for (const [k, r] of Object.entries(training.plans || {})) { const [m, si, side] = k.split('|'); if (!MAPS[m] || !MAP_LIST.includes(m)) continue; const x = sites[m + '|' + si] || (sites[m + '|' + si] = { m, si: +si, n: 0, aw: 0 }); if (side === 'atk') { x.n += r.n; x.aw += r.w; } }
+  for (const x of Object.values(sites)) {
+    if (x.n < 25) continue; const a = (x.aw + 1) / (x.n + 2), off = Math.abs(a - 0.5); if (off < 0.14) continue;
+    const site = buildSiteName(x.m, x.si); if (!site) continue;
+    out.push({ kind: 'hole', id: 'site:' + x.m + ':' + x.si, s: off * 3 * Math.min(1, x.n / 60) * w('site'), why: `attack wins ${pct(a)} of ${x.n} practice rounds there`,
+      text: `${site} on ${MAPS[x.m].name} is a hole: ${a > 0.5 ? 'the defence can\'t hold it. It needs one more wall the defenders can reinforce, or a rotation in that the attackers can\'t watch from outside' : 'attackers almost never get in. It needs a second way in that isn\'t a long hallway, or a breakable wall they can open'}.` });
+  }
+  // holes: an operator the team does worse with than without, and who gets little done
+  const all = Object.entries(training.opx || {}).filter(([op, x]) => OPERATORS[op] && x[0] >= 40), side = {};
+  for (const [op, x] of all) { const t = OPERATORS[op].team, a = side[t] || (side[t] = [0, 0]); a[0] += x[0]; a[1] += x[1]; }
+  for (const [op, x] of all) {
+    const sa = side[OPERATORS[op].team], avg = sa[1] / Math.max(1, sa[0]), wr = (x[1] + 1) / (x[0] + 2), kpr = x[2] / x[0]; if (wr > avg - 0.07) continue;
+    out.push({ kind: 'hole', id: 'op:' + op, s: (avg - wr) * 4 * Math.min(1, x[0] / 120) * w('op'), why: `the team with ${OPERATORS[op].name} wins ${pct(wr)} of rounds, ${Math.round((avg - wr) * 100)} points under the average, ${kpr.toFixed(2)} kills a round`,
+      text: `${OPERATORS[op].name} has a hole in the kit: picking them makes your team worse right now. Give them one thing only they can do, or people will stop playing them and they\'ll be gone in all but name.` });
+  }
+  // holes: rounds that run out the clock (nobody can get the defuser in)
+  for (const [m, e] of Object.entries(training.ends || {})) {
+    if (!MAPS[m] || !MAP_LIST.includes(m)) continue; const n = Object.values(e).reduce((a, b) => a + b, 0), t = (e['Time ran out'] || 0) / Math.max(1, n); if (n < 25 || t < 0.2) continue;
+    out.push({ kind: 'hole', id: 'clock:' + m, s: (t - 0.15) * 3 * (0.7 + aggr * 0.6) * w('clock'), why: `${pct(t)} of ${n} practice rounds there end on the clock`,
+      text: `On ${MAPS[m].name} too many rounds just run out the clock. When nobody can get the defuser down, both sides wait and it stops being fun to watch or play. One more way onto the sites, or a shorter round there.` });
+  }
+  // take out: a mechanic hardly anyone ever uses
+  // (judged on this version's practice only, once there are 300 player-rounds: a new feature starts at nothing)
+  const V = training.featV || {}, use = {}, rounds = { n: V.r || 0 }; for (const f of Object.keys(MECH)) use[f] = V[f] || 0;
+  if (rounds.n >= 300) for (const [f, name] of Object.entries(MECH)) {
+    const per = use[f] / rounds.n * 100; if (per >= 1.5) continue; // (a player does it at least once every ~70 rounds: it is part of the game)
+    out.push({ kind: 'remove', id: 'mech:' + f, s: (1.5 - per) * 0.5 * (0.6 + patience * 0.5) * w(f), why: `it happens ${per.toFixed(1)} times every hundred rounds a player`,
+      text: `Take out ${name}, or make it worth doing: it hardly ever happens. Every mechanic is one more thing a new player has to learn, and this one gives almost nothing back. A cleaner game is a better game.` });
+  }
+  return out;
+}
+const SITE_NAMES = {}; // bomb site names per map (a built map is a quick copy: shared/map.js)
+const buildSiteName = (m, si) => { const S = SITE_NAMES[m] || (SITE_NAMES[m] = buildMap(m).sites.map(x => x.name)); return S[si]; };
+export function formSuggestions(version) {
+  const O = training.suggestions || (training.suggestions = {}), session = training.sessions || 0, said = {};
+  for (const team of PRO_TEAMS) for (const pl of team.players) {
+    const c = ideas(pl); if (!c.length) continue;
+    for (const x of c) x.sc = x.s * (0.75 + 0.5 * quirk(pl.name, 'idea' + x.id)) / (1 + 0.6 * (said[x.id] || 0)); // (a few agree; the rest bring their own: ten people don't all say one thing)
+    c.sort((a, b) => b.sc - a.sc);
+    const log = O[pl.name] || (O[pl.name] = []), last = log[log.length - 1], pick = last && c.find(x => x.id === last.id && x.sc > c[0].sc * 0.85) || c[0];
+    said[pick.id] = (said[pick.id] || 0) + 1;
+    const intro = CARE[Math.floor(quirk(pl.name, 'care') * CARE.length)];
+    log.push({ at: Date.now(), v: version, s: session, kind: pick.kind, id: pick.id, text: `${intro} ${pick.text}`, why: pick.why, changed: !last || last.id !== pick.id ? 1 : 0 });
+    if (log.length > 20) log.splice(0, log.length - 20);
   }
   return O;
 }

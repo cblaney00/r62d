@@ -41,7 +41,7 @@ export function api(pathname, q, method) {
   }
   if (pathname === '/api/addr') return [200, { urls: [], host: 'this phone', version: VERSION, port: 0, players: 1, local: true, phone: true }];
   if (pathname === '/api/meta') return [200, META];
-  if (pathname === '/api/training') return [200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, guns: training.guns, att: training.att, pro: training.pro, drills: training.drills, opinions: training.opinions, running: false, session: 0, current: training.version }];
+  if (pathname === '/api/training') return [200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, guns: training.guns, att: training.att, pro: training.pro, drills: training.drills, opinions: training.opinions, suggestions: training.suggestions, ends: training.ends, running: false, session: 0, current: training.version }];
   if (pathname === '/api/train') return [200, { running: false, why: 'pros practise on a computer, not on a phone' }];
   if (pathname === '/api/replays') return [200, { list: [], phone: true }];
   if (pathname === '/api/replay/open') return [200, { error: 'Replays play on a computer, not on a phone.' }];

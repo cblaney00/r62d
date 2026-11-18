@@ -1615,3 +1615,5 @@ html.touch #ui { inset: var(--st) var(--sr) var(--sb) var(--sl); }
 html.touch #touchUI.rings .tbtn.poly, html.touch #touchUI.rings #tsLeft:not(.held), html.touch #touchUI.rings #tsRight {
   margin: calc(var(--st) / var(--tz, 1)) calc(var(--sr) / var(--tz, 1)) calc(var(--sb) / var(--tz, 1)) calc(var(--sl) / var(--tz, 1)); }
 html.touch #touchUI:not(.rings) .tbtn.t { margin-top: max(0px, calc(var(--st) - 8px)); margin-right: max(0px, calc(var(--sr) - 12px)); }
+/* PRO IDEAS (he asked 2026-11-18): section titles across the whole grid */
+#bkPage .bkGrid h4.bkSec { grid-column: 1 / -1; margin: 8px 0 0; font: 800 max(13px, var(--mf)) var(--head); letter-spacing: 0.16em; color: var(--sage, #9db48a); }

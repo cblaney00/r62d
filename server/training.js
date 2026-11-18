@@ -58,7 +58,9 @@ export function addResults(res) {
   for (const [op, a] of Object.entries(res.opx || {})) { const x = training.opx[op] || (training.opx[op] = a.map(() => 0)); a.forEach((v, i) => { x[i] = (x[i] || 0) + v; }); }
   for (const kind of ['guns', 'att']) for (const [k, a] of Object.entries(res[kind] || {})) addRec(training[kind], k, a);
   for (const [name, P] of Object.entries(res.pro || {})) { const T = training.pro[name] || (training.pro[name] = { ops: {}, guns: {}, att: {} }); for (const kind of ['ops', 'guns', 'att']) for (const [k, a] of Object.entries(P[kind] || {})) addRec(T[kind], k, a);
+    for (const t of Object.values(P.tend || {})) { const V = training.featV || (training.featV = {}); for (const [k, v] of Object.entries(t)) V[k] = (V[k] || 0) + v; } // (this version only: what the pros' suggestions judge a mechanic by)
     for (const [side, t] of Object.entries(P.tend || {})) { const x = (T.tend || (T.tend = {}))[side] || (T.tend[side] = {}); for (const [k, v] of Object.entries(t)) x[k] = (x[k] || 0) + v; } } // tendencies (PLAYBOOK player pages): plain counts per side
+  for (const [m, e] of Object.entries(res.ends || {})) { const T = (training.ends || (training.ends = {}))[m] || (training.ends[m] = {}); for (const [why, n] of Object.entries(e)) T[why] = (T[why] || 0) + n; }
   training.rounds += res.rounds || 0; training.verRounds = (training.verRounds || 0) + (res.rounds || 0);
 }
 // PRO DRILLS (server/drills.js): a session's drills added up (per pro: points, kills, shots, reactions...; per fight
@@ -88,13 +90,14 @@ export function drillMul(name, knob) { const S = training.drills.style[name]; if
 // a new version of the game makes the old lessons less sure: keep them, but at half weight
 export function newVersion(version) {
   if (training.version === version) return;
-  training.version = version; training.verRounds = 0;
+  training.version = version; training.verRounds = 0; training.featV = {};
   for (const kind of ['plans', 'ops']) for (const r of Object.values(training[kind])) { r.n = Math.round(r.n / 2); r.w = Math.round(r.w / 2); }
   const half = x => x.forEach((v, i) => { x[i] = Math.round(v / 2); });
   for (const x of Object.values(training.opx || {})) half(x);
   for (const kind of ['guns', 'att']) for (const x of Object.values(training[kind])) half(x);
   { const T = training.drills; T.n = Math.round(T.n / 2); for (const p of Object.values(T.pro)) for (const k in p) p[k] = Math.round(p[k] / 2); for (const x of Object.values(T.feats)) half(x); for (const x of Object.values(T.kinds)) for (const k in x) x[k] = Math.round(x[k] / 2); }
   for (const P of Object.values(training.pro)) { for (const kind of ['ops', 'guns', 'att']) for (const x of Object.values(P[kind] || {})) half(x); for (const t of Object.values(P.tend || {})) for (const k of Object.keys(t)) t[k] = Math.round(t[k] / 2); }
+  for (const e of Object.values(training.ends || {})) for (const k in e) e[k] = Math.round(e[k] / 2); // (how rounds ended, too)
   forgetReworked();
 }
 // Guns remade so much that their old results mean nothing (he asked 2026-11-17: shotguns were bad, get the pros using

@@ -65,7 +65,7 @@ function patchWatch() {
 }
 // the sections (he asked 2026-11-14: Ball Knowledge also about guns, attachments, maps and anything worth watching;
 // the pro drills and each pro's take on the worst thing in the game)
-const TABS = [['ops', 'OPERATORS'], ['guns', 'GUNS'], ['att', 'ATTACHMENTS'], ['maps', 'MAPS'], ['drills', 'DRILLS'], ['takes', 'PRO TAKES']];
+const TABS = [['ops', 'OPERATORS'], ['guns', 'GUNS'], ['att', 'ATTACHMENTS'], ['maps', 'MAPS'], ['drills', 'DRILLS'], ['takes', 'PRO TAKES'], ['ideas', 'PRO IDEAS']];
 function render(el) {
   el.querySelector('.bkTabs').innerHTML = TABS.map(([k, n]) => `<button data-t="${k}" class="${S.tab === k ? 'on' : ''}">${n}</button>`).join('');
   for (const b of el.querySelectorAll('.bkTabs button')) b.onclick = () => { S.tab = b.dataset.t; S.open = null; render(el); };
@@ -188,12 +188,25 @@ function renderTakes() {
     return card(`[${esc(t.tag)}] ${esc(pl.name)}`, `after ${log.length} practice session${log.length === 1 ? '' : 's'}`, 'THE WORST THING IN THE GAME', `<p class="bkTake">“${esc(cur.text)}”</p>${cur.runner ? `<p class="hint">Close second: ${esc(cur.runner)}</p>` : ''}${hist ? `<h5>HOW THE VIEW MOVED</h5><ul class="bkLog">${hist}</ul>` : ''}`, t.colour); });
   return cards.join('');
 }
+// what each pro would change (he asked 2026-11-18: holes in the game and mechanics to take out, from people who grew up
+// with it): the ideas most of them back first, then each pro's own, with how it moved over their practice sessions
+function renderIdeas() {
+  const O = (S.data || {}).suggestions || {}, all = PRO_TEAMS.flatMap(t => t.players.map(pl => ({ pl, t, cur: (O[pl.name] || []).slice(-1)[0] })));
+  const by = {}; for (const x of all) if (x.cur) (by[x.cur.id] || (by[x.cur.id] = [])).push(x);
+  const top = Object.values(by).sort((a, b) => b.length - a.length).slice(0, 3).map(g => card(g[0].cur.kind === 'remove' ? 'TAKE IT OUT' : 'A HOLE IN THE GAME', `backed by ${g.length} pro${g.length === 1 ? '' : 's'}`, g.map(x => esc(x.pl.name)).join(', '),
+    `<p class="bkTake">${esc(g[0].cur.text.replace(/^[^:]*:\s*/, ''))}</p><p class="hint">Why: ${esc(g[0].cur.why || '')}</p>`, g[0].cur.kind === 'remove' ? '#f2c14e' : '#ff7a5a'));
+  const cards = all.map(({ pl, t, cur }) => { const log = O[pl.name] || [];
+    if (!cur) return card(`[${esc(t.tag)}] ${esc(pl.name)}`, '', 'no idea yet', '<p class="hint">Forms after their next practice session.</p>', t.colour);
+    const hist = log.filter(x => x.changed).slice(-4).reverse().map(x => `<li><small>session ${x.s} · ${new Date(x.at).toLocaleDateString()}</small> ${esc(x.text.replace(/^[^:]*:\s*/, ''))}</li>`).join('');
+    return card(`[${esc(t.tag)}] ${esc(pl.name)}`, cur.kind === 'remove' ? 'would take something out' : 'found a hole', 'WHAT I WOULD CHANGE', `<p class="bkTake">“${esc(cur.text)}”</p><p class="hint">Why: ${esc(cur.why || '')}</p>${hist ? `<h5>EARLIER IDEAS</h5><ul class="bkLog">${hist}</ul>` : ''}`, t.colour); });
+  return (top.length ? '<h4 class="bkSec">WHAT MOST OF THEM WOULD CHANGE</h4>' + top.join('') + '<h4 class="bkSec">EACH PRO</h4>' : '') + cards.join('');
+}
 function renderMore(el) {
   const d = S.data;
-  el.querySelector('.bkInfo').textContent = !d ? 'Loading…' : S.tab === 'drills' ? 'One-minute practice gunfights the pros play to sharpen single skills.' : S.tab === 'takes' ? 'Every pro knows every patch; this is their view after each practice.' : `From ${d.rounds || 0} rounds of pro practice.`;
+  el.querySelector('.bkInfo').textContent = !d ? 'Loading…' : S.tab === 'drills' ? 'One-minute practice gunfights the pros play to sharpen single skills.' : S.tab === 'takes' ? 'Every pro knows every patch; this is their view after each practice.' : S.tab === 'ideas' ? 'They grew up with this game: after each practice every pro puts forward one change, a hole to fill or a mechanic to take out.' : `From ${d.rounds || 0} rounds of pro practice.`;
   const grid = el.querySelector('.bkGrid');
-  grid.innerHTML = !d ? '' : ({ guns: renderGuns, att: renderAtt, maps: renderMaps, drills: renderDrills, takes: renderTakes })[S.tab]();
+  grid.innerHTML = !d ? '' : ({ guns: renderGuns, att: renderAtt, maps: renderMaps, drills: renderDrills, takes: renderTakes, ideas: renderIdeas })[S.tab]();
   // the side panel: what the pros know (every patch, newest first) on PRO TAKES, else the usual patch watch
-  el.querySelector('.bkPatch').innerHTML = S.tab === 'takes' ? '<h4>PATCH NOTES</h4>' + PATCH_NOTES.slice().reverse().map(n => `<div class="${n.v > 0 ? 'cold' : n.v < 0 ? 'hot' : ''}"><small>${n.d}</small> ${esc(n.t)}</div>`).join('')
+  el.querySelector('.bkPatch').innerHTML = S.tab === 'takes' || S.tab === 'ideas' ? '<h4>PATCH NOTES</h4>' + PATCH_NOTES.slice().reverse().map(n => `<div class="${n.v > 0 ? 'cold' : n.v < 0 ? 'hot' : ''}"><small>${n.d}</small> ${esc(n.t)}</div>`).join('')
     : '<h4>PATCH WATCH</h4>' + (((d && patchWatch()) || []).slice(0, 14).map(p => `<div class="${p.hot ? 'hot' : 'cold'}">${p.txt}</div>`).join('') || '<p class="hint">Nothing looks broken right now.</p>');
 }
