@@ -759,3 +759,8 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   along the flight) and grows `v.pr` ×(1+1.2t); `drawStairView` grows the strip (4→10 cells past the end, 2→5 each
   side), soft edges by two `destination-in` linear gradients (no hard quad clip), wash 0.68→0.44, `kp` eases to 1 by
   the last step, canvas capped at 2048 px. Label on the landing (1.2 cells out). Screenshots: Harbor stair 1 from 2F.
+- Phone + controller (he asked 2026-11-18): touch.js `padPlay()`/`usePadNow()`: on a touch device any real controller
+  input (pollPad `realOn`) switches to it (`setTouchVisible` keeps the buttons hidden, feed note), a `touchstart`
+  anywhere switches back; Settings "Playing with" → "Phone + controller" (`r62d-input` = 'pad', counts as `isTouch`)
+  keeps it. pollPad no longer lets a connected-but-idle controller block touch play. Android `dispatchKeyEvent`: gamepad
+  keys go to the WebView and count as handled (no B → Back fallback). Tested with a stubbed `navigator.getGamepads`.

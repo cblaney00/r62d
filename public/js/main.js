@@ -39,7 +39,7 @@ import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
 import * as rope3d from './rope3d.js';
 import { compassRoute as sharedRoute } from '/shared/compass.js';
 import { newStick, stepStick, stickFrom } from './aimstick.js';
-import { onAimStart, touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, VIEW_RANGE, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings } from './touch.js';
+import { onAimStart, touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, VIEW_RANGE, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings, padPlay, usePadNow } from './touch.js';
 import { blocksSight, FL, underAt, blocksMove } from '/shared/constants.js';
 import { EYE_H } from '/shared/map.js';
 import { META } from '/shared/meta.js';
@@ -1093,7 +1093,11 @@ function autoShot() {
 // stick's own terms (the same as newStick starts from)
 onAimStart(() => { if (!st.me || st.me.ct !== 'body') return null; const a = wrapAng(padAng - (st.gyroOff || 0)), l = stickFrom(padReach, 'zone'); return { x: Math.cos(a) * l, y: Math.sin(a) * l }; });
 function pollPad(dt, view) {
-  const gp = readPad() || touchPad(); // a real controller first, else the phone's touch controls (touch.js)
+  // a real controller first, else the phone's touch controls (touch.js). On a phone the controller counts once it is
+  // used (and until the screen is touched), so a controller left connected doesn't stop touch play
+  const real = readPad(), realOn = real && (real.ls.l || real.rs.l || real.lt > 0.2 || real.rt > 0.2 || real.held.some(Boolean));
+  if (realOn && usePadNow()) addFeed('🎮 Controller: buttons on the screen hidden (touch the screen to bring them back)');
+  const gp = real && (!isTouch || padPlay()) ? real : touchPad();
   if (!gp) { if (gpName) { for (const k in gpk) gpk[k] = 0; gpName = ''; renderSettings(); } return; }
   if (!gpName) { gpName = gp.name; renderSettings(); }
   const { ls, rs } = gp;
@@ -4126,7 +4130,7 @@ function hud(s) {
   const myBird = me.ct === 'drone' ? s.ents.find(e => e.id === me.did && e.ty === 'bird') : null;
   if (myBird) vl = myBird.pe ? `YOUR BIRD · LANDED · <b>${label('reload')}</b> AUTO PING: ${myBird.au ? 'ON (pings the first attacker it sees, then flashes and is gone)' : 'OFF (only watches)'} · <b>${label('interact')}</b> TAKE OFF · <b>${label('ability')}</b> SWARM`
     : `YOUR BIRD · FLIES OVER FURNITURE · <b>${label('interact')}</b> LAND ON A WALL · <b>${label('ability')}</b> SWARM · ${label('view')} TO EXIT`;
-  else if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); const sp = me.dsl > 0 ? `SPRINTING ${me.dsl.toFixed(1)}s` : !me.ds ? 'NO SPRINTS LEFT' : me.dsc > 0 ? `SPRINT IN ${Math.ceil(me.dsc)}s (${me.ds} LEFT)` : `${gpRecent() ? (isTouch ? 'SPRINT' : 'B') : label('walk')}: SPRINT (${me.ds} LEFT)`.replace('SPRINT: SPRINT', 'HOLD SPRINT');
+  else if (me.ct === 'drone') { const d = s.ents.find(e => e.id === me.did); const sp = me.dsl > 0 ? `SPRINTING ${me.dsl.toFixed(1)}s` : !me.ds ? 'NO SPRINTS LEFT' : me.dsc > 0 ? `SPRINT IN ${Math.ceil(me.dsc)}s (${me.ds} LEFT)` : `${gpRecent() ? (isTouch && !padPlay() ? 'SPRINT' : 'B') : label('walk')}: SPRINT (${me.ds} LEFT)`.replace('SPRINT: SPRINT', 'HOLD SPRINT');
     vl = d && d.j ? 'DRONE JAMMED' : isTouch ? `YOUR DRONE · ${sp} · PING TO MARK · ◀ ▶ TEAM DRONES` : `YOUR DRONE · ${sp} · CLICK OR ${label('spot')} TO PING · ${label('leanL')} ${label('leanR')}: TEAM FEEDS · ${label('drone')} TO EXIT`; }
   else if (me.ct === 'cam') {
     const list = feedList(s, me), c = list.find(e => e.id === me.fi);
@@ -4865,7 +4869,7 @@ if (needsInputChoice) {
   for (const b of $('inputChoice').querySelectorAll('button')) b.addEventListener('click', e => { e.stopPropagation(); setInputChoice(b.dataset.c); });
 }
 for (const b of $('inputSeg').querySelectorAll('button')) {
-  const cur = isTouch ? 'touch' : isTrackpad ? 'trackpad' : 'desk';
+  const cur = isTouch ? ((() => { try { return localStorage.getItem('r62d-input'); } catch { return null; } })() === 'pad' ? 'pad' : 'touch') : isTrackpad ? 'trackpad' : 'desk';
   b.classList.toggle('on', b.dataset.c === cur);
   b.onclick = () => { if (b.dataset.c !== cur) setInputChoice(b.dataset.c); };
 }

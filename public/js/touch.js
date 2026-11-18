@@ -42,7 +42,15 @@ const sniff = () => {
 };
 const forced = /[?&]touch=1/.test(location.search) ? 'touch' : /[?&]touch=0/.test(location.search) ? 'desk' : null;
 const chosen = forced || store('r62d-input'), sniffed = sniff();
-export const isTouch = (chosen || (sniffed === 'touch' ? 'touch' : 'desk')) === 'touch';
+export const isTouch = ['touch', 'pad'].includes(chosen || (sniffed === 'touch' ? 'touch' : 'desk'));
+// Phone + controller (he asked 2026-11-18: a phone in a controller attachment should switch to the controller, or have
+// it as a mode): chosen 'pad' = always the controller, no buttons on the screen. Otherwise a phone switches by itself:
+// any controller input hides the touch buttons, a touch on the screen brings them back.
+const padChoice = chosen === 'pad';
+let phonePad = isTouch && padChoice;
+export const padPlay = () => phonePad;
+export function usePadNow() { if (!isTouch || phonePad) return false; phonePad = true; return true; }
+try { addEventListener('touchstart', () => { if (phonePad && !padChoice) phonePad = false; }, { capture: true, passive: true }); } catch {}
 // Laptop trackpad (he asked, for a friend who may only have a trackpad or a phone): keyboard and mouse rules, plus a
 // shoot key, aiming in as a toggle and aim help (main.js `assistOn`)
 export const isTrackpad = !isTouch && chosen === 'trackpad';
@@ -385,6 +393,7 @@ export function touchContext(c) {
 // main.js calls this every frame: show the controls only while playing (not in menus)
 export function setTouchVisible(on) {
   if (!isTouch) return;
+  on = on && !phonePad; // (playing a phone with a controller: no buttons on the screen)
   if (!ui) build();
   const upright = innerHeight > innerWidth;
   ui.querySelector('#tTurn').classList.toggle('hidden', !(on && upright));

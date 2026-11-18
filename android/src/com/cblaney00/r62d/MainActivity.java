@@ -14,6 +14,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.DisplayCutout;
+import android.view.InputDevice;
+import android.view.KeyEvent;
 import android.view.RoundedCorner;
 import android.view.View;
 import android.view.WindowInsets;
@@ -246,6 +248,14 @@ public class MainActivity extends Activity {
     } catch (Exception ex) {}
   }
 
+  // a controller (he asked 2026-11-18: a phone in a controller attachment): its buttons go to the page (the browser's
+  // controller support reads them) and count as handled, so Android never turns an unused one, B above all, into Back
+  @Override public boolean dispatchKeyEvent(KeyEvent e) {
+    int s = e.getSource();
+    boolean pad = (s & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD || (s & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK;
+    if (pad && e.getKeyCode() != KeyEvent.KEYCODE_BACK) { super.dispatchKeyEvent(e); return true; }
+    return super.dispatchKeyEvent(e);
+  }
   // the phone's Back button: on the start page it closes the app, in the game it is Esc (pause menu, or back a page)
   @Override public void onBackPressed() {
     String u = web.getUrl();
