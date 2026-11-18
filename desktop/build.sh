@@ -22,6 +22,7 @@ rm -f "$OUT/resources/default_app.asar"
 
 APP="$OUT/resources/app"; mkdir -p "$APP"
 cp -r server shared public desktop "$APP/"
+SEED=${R62D_DATA:-$HOME/.local/share/r62d/data}/pro-training.json; [ -f "$SEED" ] && cp "$SEED" "$APP/server/pro-seed.json" # the pros' knowledge as released (server/training.js seedTraining)
 rm -f "$APP/desktop/build.sh" "$APP/desktop/release.sh" "$APP/desktop/seticon.mjs"
 cat > "$APP/package.json" <<'EOF'
 { "name": "r62d", "productName": "R62D", "type": "module", "main": "desktop/main.js" }

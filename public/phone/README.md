@@ -11,7 +11,7 @@ server code runs inside the app's web view, in the same page as the game:
   runs the usual `Game` loop (lobby, free play, tutorials, Esports TV) and answers the menus' `/api/` calls.
 - `node/*.js` stand in for Node: `fs` keeps files in localStorage (`r62dfs:<path>`; profiles, match history, practice
   numbers), `path`, `url`, `crypto` (random ids, a fingerprint), `zlib` (replays are off on a phone: too big).
-- Not on a phone: hosting friends, replays, pro practice (the pros play without practice numbers), the TRAIN button.
+- Not on a phone: hosting friends, replays, pro practice, the TRAIN button. The pros play with what they knew at the release: android/build.sh packs a copy of his pros' knowledge as `server/pro-seed.json` (also in the Windows update pack), loaded by `seedTraining` when it has more practice than the phone.
 - If a server file starts using another Node module, add a stand-in here, or the phone fails to start a match.
 - The app runs a pack whose `desktop/build.json` has `android` ≤ its APP_LEVEL (`ANDROID` in desktop/build.sh). Raise
   both together when the app must change for a new pack; older apps then show "get the new app".

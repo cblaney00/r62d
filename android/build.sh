@@ -23,6 +23,7 @@ sed "s/@CODE@/$n/; s/@NAME@/$name/" android/AndroidManifest.xml > "$W/AndroidMan
 # the whole game built in (PLAY ON THIS PHONE works offline from the first start; newer packs are downloaded by the app)
 mkdir -p "$W/assets/game/desktop"; cp -r server shared public "$W/assets/game/"
 rm -f "$W/assets/game/server/train-worker.js" "$W/assets/game/server/practice.js"
+SEED=${R62D_DATA:-$HOME/.local/share/r62d/data}/pro-training.json; [ -f "$SEED" ] && cp "$SEED" "$W/assets/game/server/pro-seed.json" # the pros' knowledge as released (public/phone/server.js)
 ANDROID=$(sed -n 's/^ANDROID=\([0-9]*\).*/\1/p' desktop/build.sh)
 echo "{ \"version\": \"$(git log -1 --format=%h)\", \"date\": \"$(git log -1 --format=%cs)\", \"n\": $n, \"android\": $ANDROID }" > "$W/assets/game/desktop/build.json"
 

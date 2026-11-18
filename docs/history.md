@@ -552,3 +552,9 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   found; a throwaway rerun and the second session each added the full 300): after a practice, check `drills.n` grew by
   60 per thread. Pros' takes: Dust Town (attack 61%) and Embassy (59%) worst maps, the 2× scope on the Trestle LMG too
   good, bodies too thin, bullet trails.
+
+## Phones and Windows get the pros' knowledge (2026-11-17, he asked: "release ... so mobile gets it")
+- Practice only ran on his computer; phones (no practice) and new Windows programs had blank pros. Now desktop/build.sh
+  and android/build.sh copy his `pro-training.json` into the build as `server/pro-seed.json` (gitignored, never
+  committed); `seedTraining` (server/training.js) uses it when it has more rounds than the local knowledge; phones fetch
+  it in public/phone/server.js. Tested: an empty data folder starts with 47,651 rounds, 842 drills, 10 pros' views.

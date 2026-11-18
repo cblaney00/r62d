@@ -4,12 +4,14 @@
 // phone: the pros play with what they know from the release). See public/phone/README.md.
 import { Game } from '/server/game.js';
 import { store, publicProfile } from '/server/store.js';
-import { training } from '/server/training.js';
+import { training, seedTraining } from '/server/training.js';
 import { META } from '/shared/meta.js';
 import { TICK_RATE, SNAP_RATE } from '/shared/constants.js';
 
 const VERSION = { id: (window.r62dApp && r62dApp.gameVersion && r62dApp.gameVersion()) || 'phone', date: '' };
 const game = new Game();
+// the pros' knowledge from the release (server/pro-seed.json, packed by android/build.sh), when it beats what this phone has
+fetch('/server/pro-seed.json').then(r => r.ok ? r.json() : null).then(j => { for (const k of ['guns', 'att', 'pro', 'opinions']) if (j && !j[k]) j[k] = {}; if (j && !j.drills) j.drills = training.drills; seedTraining(j); }).catch(() => {});
 const tutorials = new Set();
 
 // a socket the Game can use: open, send(text), on('message' | 'close')

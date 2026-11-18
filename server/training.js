@@ -11,6 +11,11 @@ const FILE = path.join(DIR, 'pro-training.json');
 export const training = { version: null, at: 0, rounds: 0, verRounds: 0, plans: {}, ops: {}, opx: {}, guns: {}, att: {}, pro: {} }; // opx: per operator, all maps (BALL KNOWLEDGE)
 export const ROUNDS_PER_VERSION = 200; // he asked: 200 practice rounds per update is enough
 try { Object.assign(training, JSON.parse(fs.readFileSync(FILE, 'utf8'))); } catch {}
+// What the pros knew when this version was released (he asked 2026-11-17: phones get the practice too). The release
+// builds put a copy of his pros' knowledge next to this file (desktop/build.sh, android/build.sh; never in git); a copy
+// with more practice than this computer's own is used instead. Phones read it in public/phone/server.js (seedTraining).
+export function seedTraining(seed) { if (seed && (seed.rounds || 0) > (training.rounds || 0)) { Object.assign(training, seed); return true; } return false; }
+try { seedTraining(JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'pro-seed.json'), 'utf8'))); } catch {}
 for (const k of ['guns', 'att', 'pro', 'opinions']) if (!training[k]) training[k] = {};
 if (!training.drills) training.drills = { n: 0, kinds: {}, pro: {}, feats: {}, style: {} };
 // skill uses were counted wrong before (defender bots set their traps before the count started, and bots never
