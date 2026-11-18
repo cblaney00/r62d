@@ -217,6 +217,7 @@ export function build() {
   G.prop('railing', 35, 41, 1, 6, T.LOW); G.prop('railing', 39, 41, 1, 6, T.LOW); G.prop('railing', 36, 41, 3, 1, T.LOW);
   U.prop('railing', 35, 43, 1, 6, T.LOW); U.prop('railing', 39, 43, 1, 6, T.LOW); U.prop('railing', 36, 48, 3, 1, T.LOW);
   stair(0, 1, 67, 30, 3, 6, 'n', FL.WOOD);            // meeting room -> records
+  U.door(67, 28, 69, 28); // (he asked 2026-11-18: roomier stair entrances) a doorway straight ahead of the top of these stairs
   G.prop('railing', 66, 29, 1, 6, T.LOW); G.prop('railing', 67, 29, 3, 1, T.LOW);
   U.prop('railing', 66, 31, 1, 6, T.LOW); U.prop('railing', 67, 36, 3, 1, T.LOW);
   stair(0, 1, 72, 39, 2, 6, 'n', FL.CONCRETE, 'steel');        // outside fire escape -> 2F landing

@@ -146,6 +146,7 @@ export function build() {
   stair(0, 1, 62, 33, 2, 6, 'n', FL.WOOD, 'timber');              // outside steps -> east balcony (Office)
   stair(0, 1, 8, 39, 2, 6, 'n', FL.WOOD, 'timber');               // outside steps -> west balcony (Games Room)
   stair(0, 1, 47, 44, 2, 6, 'n', FL.WOOD, 'timber');               // outside steps -> balcony
+  U.door(47, 42, 48, 42); // (he asked 2026-11-18: roomier stair entrances) a doorway straight ahead of the top of these steps
   G.prop('railing', 47, 43, 2, 1, T.LOW); G.prop('railing', 46, 43, 1, 6, T.LOW); G.prop('railing', 49, 43, 1, 6, T.LOW);
 
   const g = G.c, u = U.c;

@@ -169,6 +169,7 @@ export function build() {
   stair(0, 1, 62, 11, 4, 3, 'e', FL.CONCRETE, 'ramp');         // garage ramp (outside, east)
   G.prop('railing', 62, 10, 4, 1, T.LOW); G.prop('railing', 62, 14, 4, 1, T.LOW);
   stair(1, 2, 44, 43, 2, 6, 'n', FL.MARBLE);           // terrace steps -> balcony
+  U.door(44, 41, 45, 41); // (he asked 2026-11-18: roomier stair entrances) a doorway straight ahead of the top of these steps
   stair(1, 2, 27, 6, 6, 2, 'w', FL.MARBLE, 'stone');    // stone steps from the front path up to the north terrace
   G.prop('railing', 43, 42, 1, 6, T.LOW); G.prop('railing', 46, 42, 1, 6, T.LOW); G.prop('railing', 44, 42, 2, 1, T.LOW);
 
@@ -176,6 +177,7 @@ export function build() {
   G.prop('railing', -21, 24, 5, 1, T.LOW); G.prop('railing', -21, 27, 5, 1, T.LOW);
   U.prop('railing', -21, 24, 5, 1, T.LOW); U.prop('railing', -21, 27, 5, 1, T.LOW);
   stair(0, 1, 2, 31, 2, 5, 'n', FL.CONCRETE);          // workshop -> bar
+  G.door(2, 29, 3, 29); // (he asked 2026-11-18: roomier stair entrances) a doorway straight ahead of the top of these stairs
   B.prop('railing', 1, 30, 1, 6, T.LOW); B.prop('railing', 4, 30, 1, 6, T.LOW); B.prop('railing', 2, 30, 2, 1, T.LOW);
   G.prop('railing', 1, 31, 1, 5, T.LOW); G.prop('railing', 4, 31, 1, 5, T.LOW); G.prop('railing', 2, 36, 2, 1, T.LOW);
 
