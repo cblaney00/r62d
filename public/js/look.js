@@ -62,6 +62,11 @@ function surfaces() {
     }),
   };
   SURF.s = SURF.c; // a sill: stone, like the concrete
+  SURF.t = mk(128, 128, (x, w, h) => { // the tops of walls (coping): weathered stone, soft stains, a joint every few metres
+    speck(x, w, h, 900, 0.07, 9);
+    for (let i = 0; i < 6; i++) { const X = R(i, 1, 17) * w, Y = R(i, 2, 17) * h, r = 10 + R(i, 3, 17) * 26, g = x.createRadialGradient(X, Y, 0, X, Y, r); g.addColorStop(0, `rgba(${R(i, 4, 17) < 0.6 ? '30,28,24' : '255,252,244'},0.08)`); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); }
+    x.fillStyle = 'rgba(20,20,20,0.22)'; x.fillRect(w - 1.2, 0, 1.2, h); x.fillRect(0, h - 1.2, w, 1.2); // joints
+  });
   return SURF;
 }
 const PATS = new WeakMap();
@@ -568,7 +573,7 @@ export function raisedFrame(R, m, cam, h, x0, y0, x1, y1, above = false, seen = 
     let p = G.paths.get(F.c); if (!p) G.paths.set(F.c, p = new Path2D());
     const [ux, uy] = up(F.ax, F.ay, F.f), [vx, vy] = up(F.bx, F.by, F.f);
     if (F.f0) { const [a1, b1] = up(F.ax, F.ay, F.f0), [a2, b2] = up(F.bx, F.by, F.f0); p.moveTo(a1, b1); p.lineTo(a2, b2); } else { p.moveTo(F.ax, F.ay); p.lineTo(F.bx, F.by); } p.lineTo(vx, vy); p.lineTo(ux, uy); p.closePath(); // (a piece off the floor, like a window's lintel, starts at f0)
-    const tx = ropeLook.on > 0.05 && TEXD.has(F.d) && (F.e || F.d === 'g' || F.d === 'w' || F.d === 's') && Math.hypot(F.px - ropeLook.x, F.py - ropeLook.y) < ropeLook.r;
+    const tx = ropeLook.on > 0.05 && TEXD.has(F.d) && (F.e || F.d === 'g' || F.d === 'w' || F.d === 's' || F.d === 'p') && Math.hypot(F.px - ropeLook.x, F.py - ropeLook.y) < ropeLook.r;
     if (tx) (G.tex || (G.tex = [])).push(F); // near the rope: its surface (drawTex)
     if (F.d && !(tx && F.d === 'b')) deco(G, F, up); G.n++;
     if (F.hl) { const P = G.holes || (G.holes = new Path2D()); for (const [t, z] of F.hl) { const [hx, hy] = up(F.ax + (F.bx - F.ax) * t, F.ay + (F.by - F.ay) * t, z); P.moveTo(hx + 0.9, hy); P.arc(hx, hy, 0.9, 0, 6.3); } }
@@ -667,6 +672,11 @@ function drawColl(ctx, G, pic, R, h, up, plain) {
   if (G.dark && !plain) { ctx.lineWidth = 0.6; ctx.strokeStyle = 'rgba(20,16,14,0.32)'; ctx.stroke(G.dark); ctx.strokeStyle = 'rgba(235,228,214,0.32)'; ctx.stroke(G.light); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(210,230,250,0.22)'; ctx.stroke(G.glint); }
   if (G.holes) { ctx.fillStyle = 'rgba(9,7,5,0.95)'; ctx.fill(G.holes); if (!plain) { ctx.lineWidth = 0.4; ctx.strokeStyle = 'rgba(230,190,130,0.55)'; ctx.stroke(G.holes); } } // bullet holes in boards: dark punctures with a splintered light rim (you see and shoot through them, as on the map)
   for (const [c, T2] of G.topPaths) { ctx.fillStyle = c; const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); } // wall tops: plain colour
+  if (ropeLook.on > 0.05 && !plain && G.topPaths.size) { // on a rope: the tops weathered too (one fill per colour, the tile fixed to the map)
+    let P = PATS.get(ctx); if (!P) { drawTex(ctx, [], null); P = PATS.get(ctx); }
+    const pt = P.t; if (pt && pt.setTransform) { pt.setTransform(new DOMMatrix([0.25, 0, 0, 0.25, 0, 0])); const a = ctx.globalAlpha; ctx.globalAlpha = a * Math.min(1, ropeLook.on * 1.5); ctx.fillStyle = pt;
+      for (const [, T2] of G.topPaths) { const q = T2.r; for (let i = 0; i < q.length; i += 4) ctx.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]); if (T2.p) ctx.fill(T2.p); }
+      ctx.globalAlpha = a; } }
   for (const r of G.tops) { // cars, crates, shelves: their tops from the map picture
     if (r.rc) { const [a, b, c, d] = r.rc, [tx, ty] = up(a, b, r.f), s = 1 + h * r.f; pic.drawTo(ctx, a * S, b * S, (c - a) * S, (d - b) * S, tx, ty, (c - a) * s, (d - b) * s); continue; } // furniture: its own rectangle
     const X = r.x * CELL, Y = r.y * CELL, w = r.n * CELL, [tx, ty] = up(X, Y, r.f), s = 1 + h * r.f;

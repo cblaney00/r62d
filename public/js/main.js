@@ -10,7 +10,7 @@ import { gunPicture } from './gunart.js';
 import { MapRenderer } from './mapdraw.js';
 import { tilt, raisedFrame, drawRaised, sightClip, addSpots, seenGrid, looks, ropeLook, setPersp, liftOf, liftBody, persp, lifted, withPersp, furnTop, wallIns } from './look.js';
 const addL = (a, b) => [a[0] + b[0], a[1] + b[1]];
-import { S, setMapScale } from './textures.js';
+import { S, setMapScale, hash } from './textures.js';
 import { COLS, rgba, lighten, squadCol, setCols, SWATCHES, okHex, DEFAULT_COLS } from './teamcol.js';
 import { column, drawZombie, drawOperator, drawDrone, drawCam, drawGadget, drawBomb, portrait, setShading, drawBird, drawSwarm } from './sprites.js';
 import { openKillcam, killcamOpen } from './killcam.js';
@@ -1789,6 +1789,17 @@ const WALKISH = new Set([T.FLOOR, T.GROUND, T.STAIR, T.OPEN, T.HATCH, T.HATCHR, 
 // dazed, down, flashed. Drawn on #over, or on the 3D rope view's own layer (#r3fx) while that view is up.
 function screenFx(c, me, now, from) {
   const W = c.canvas.width, H = c.canvas.height;
+  if (st.swoop && st.swoopScr) { // the window's frame sweeping past the screen's edges, a soft darkening round them as you cross
+    const T = performance.now() / 1000 - st.swoop.t0, [sx, sy] = st.swoopScr;
+    const g = Math.pow(sstep(T / SWOOP_HOLD), 1.4), k = 1 + 8 * g, a = 0.8 * (1 - sstep((T - 0.08) / (SWOOP_HOLD - 0.02)));
+    const cx = sx + (W / 2 - sx) * g, cy = sy + (H / 2 - sy) * g, hw = W * 0.075 * k, hh = H * 0.1 * k, r = Math.min(hw, hh) * 0.06;
+    if (a > 0.01) { c.save(); c.lineJoin = 'round';
+      c.strokeStyle = `rgba(14,16,18,${(a * 0.55).toFixed(3)})`; c.lineWidth = (5 + 9 * g) * DPR; c.beginPath(); c.roundRect(cx - hw, cy - hh, hw * 2, hh * 2, r); c.stroke(); // the frame's depth
+      c.strokeStyle = `rgba(236,232,222,${(a * 0.75).toFixed(3)})`; c.lineWidth = (1.6 + 3 * g) * DPR; c.beginPath(); c.roundRect(cx - hw - 2 * DPR, cy - hh - 2 * DPR, hw * 2 + 4 * DPR, hh * 2 + 4 * DPR, r); c.stroke(); // its lit edge
+      c.restore(); }
+    const v = Math.sin(Math.PI * Math.min(1, T / SWOOP_END)) * 0.42;
+    if (v > 0.01) { const vg = c.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.85); vg.addColorStop(0, 'rgba(6,8,10,0)'); vg.addColorStop(1, `rgba(6,8,10,${v.toFixed(3)})`); c.fillStyle = vg; c.fillRect(0, 0, W, H); }
+  }
   if (me && me.a && me.sc) { c.fillStyle = 'rgba(70,90,255,0.12)'; c.fillRect(0, 0, W, H); }
   const hurtK = Math.max(0, 1 - (now - st.hurtT) / 0.8);
   if (hurtK > 0 && fxOn('hurt')) {
@@ -1846,8 +1857,18 @@ function ropeFace() { // which way you face on a rope (into the wall), or null
   const ro = me.ro, R = st.map.ropes, ri = ro[0] ? ro[1] : ro[2] >= 0 ? ro[2] : ro[6] >= 0 ? ro[6] : -1;
   return R[ri] ? R[ri].out + Math.PI : null;
 }
+// Climbing in through a window off a rope (he chose 2026-11-18: "swoop through the frame"): the view pushes in at the
+// window as its frame grows past the screen's edges (0-0.35 s), holds a beat as you cross it (to 0.5 s), then eases down
+// into the normal view from above (to 1.2 s). Only the camera: the climb itself keeps the server's timing.
+const SWOOP_IN = 0.35, SWOOP_HOLD = 0.5, SWOOP_END = 1.2;
+const sstep = s => s <= 0 ? 0 : s >= 1 ? 1 : s * s * (3 - 2 * s);
 function ropeCam(dt) {
   const f = ropeFace(); if (f != null) st.rtFace = f;
+  if (st.swoop && f == null) { const T = performance.now() / 1000 - st.swoop.t0;
+    if (T < SWOOP_END) { st.rt = T < SWOOP_HOLD ? Math.max(st.rt || 0, 0.999) : 1 - sstep((T - SWOOP_HOLD) / (SWOOP_END - SWOOP_HOLD));
+      st.swoopZ = T < SWOOP_IN ? sstep(T / SWOOP_IN) : T < SWOOP_HOLD ? 1 : 1 - sstep((T - SWOOP_HOLD) / (SWOOP_END - SWOOP_HOLD)); return st.rt; }
+    st.swoop = null; st.rt = 0; }
+  st.swoopZ = 0;
   const want = f != null ? 1 : 0; st.rt = st.rt || 0;
   st.rt += (want - st.rt) * (1 - Math.exp(-dt * (want ? 4.5 : 1.9))); if (st.rt < 0.002 && !want) st.rt = 0; // (letting go, or climbing in at a window, glides back slowly: he asked for smooth transitions in)
   return st.rt;
@@ -2506,6 +2527,7 @@ function frame(nowMs) {
   // leaned your head into the window, and the crosshair stays on screen instead of pulling the view back
   st.rads = (st.rads || 0) + ((me && me.ad && (st.rt || 0) > 0.5 ? 1 : 0) - (st.rads || 0)) * (1 - Math.exp(-dt * 6));
   if (st.rt > 0) st.viewH *= 1 - ROPE_ADS * st.rads * st.rt;
+  if (st.swoopZ) st.viewH *= 1 - 0.22 * st.swoopZ; // (the swoop pushes in at the window)
   if (st.rt > 0) st.viewH *= 1 - (ROPE_ZOOM_NAV + (ROPE_ZOOM - ROPE_ZOOM_NAV) * st.rpk) * st.rt; // (the rope camera comes in close over your shoulder: he asked for a lot closer; before the fit below, so you and your crosshair still both show)
   const freeAim = !st.tv && view && (view.kind === 'body' || view.kind === 'drone') && freeLive();
   const tFar = !freeAim && view && view.kind === 'body' && touchFar();
@@ -2663,7 +2685,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   }
   if (me.vt && ctrl === 'body') {
     const [x0, y0, x1, y1, t, dur] = me.vt, nowS = performance.now() / 1000;
-    if (!st.vault || st.vault.x0 !== x0 || st.vault.y0 !== y0) st.vault = { x0, y0, t0: nowS - t };
+    if (!st.vault || st.vault.x0 !== x0 || st.vault.y0 !== y0) { st.vault = { x0, y0, t0: nowS - t }; if ((st.rt || 0) > 0.3) st.swoop = { t0: nowS - t, x: x0 + (x1 - x0) * 0.45, y: y0 + (y1 - y0) * 0.45 }; } // in through a window off a rope: the swoop (ropeCam, screenFx)
     const f = Math.min(1, (nowS - st.vault.t0) / dur), e = f * f * (3 - 2 * f);
     st.pred.x = x0 + (x1 - x0) * e; st.pred.y = y0 + (y1 - y0) * e;
   } else st.vault = null;
@@ -3313,6 +3335,7 @@ function draw(s, view, now, dt) {
     const pk = pass === 'fog' ? fog.width / VW * z : z, pic = st.rend.picFor(pk), upA = Math.min(1, (st.rt || 0) * 1.4);
     const sc0 = pass === 'fog' || !view ? null : sightClip(vpolys, vviews, eye, RH, rm);
     groundBelow(c, rf.ground[pass === 'fog' || !view ? 'all' : 'lit'], pic, sc0);
+    if (pass !== 'fog' && view && ropeLook.on > 0.05) groundTufts(c, sc0);
     if (pass === 'fog' || !view) { drawRaised(c, st.rend, rf, 'all', pic, !!view, upA); pfa('raise', t0); return; } // (out of sight: greyed, no surface lines)
     // in colour: only pieces whose own spot your team sees (he asked: not deep in the building, nothing through solid
     // things), the storeys below/above by that alone, this floor's also clipped to the sight shapes for a smooth edge
@@ -3329,6 +3352,28 @@ function draw(s, view, now, dt) {
     const F = m.floors[fi], p = new Path2D(), W = m.W;
     for (let y = F.gy || 0; y < (F.gy || 0) + F.h; y++) { let a = -1; for (let x = F.gx; x <= F.gx + F.w; x++) { const solid = x < F.gx + F.w && m.floor[y * W + x] !== FL.VOID; if (solid && a < 0) a = x; else if (!solid && a >= 0) { p.rect(a * CELL, y * CELL, (x - a) * CELL, CELL); a = -1; } } }
     return (C.p[fi] = p);
+  }
+  // Grass that stands up (he asked 2026-11-18: the rappel view's ground was flat): on a rope, round the wall's foot near
+  // you, tufts of blades with real height in the same perspective as the walls, a few per grass cell (fixed by the cell,
+  // so they never flicker), darker at the root, lit at the tips, and a strip of gravel along the wall's foot.
+  function groundTufts(c, sc) {
+    const fi = floorAt(m, st.pred.x, st.pred.y), fl = fi >= 0 ? m.floors[fi] : null; if (!fl) return;
+    const storeys = fl.i - (m.groundFloor || 0), o = storeys > 0 && st.rend.below ? st.rend.below.off[fi] : { x: 0, y: 0 }; if (!o) return;
+    const P = (x, y, z) => { const f = 1 + RH * (z - storeys); return [eye.x + (x - eye.x) * f, eye.y + (y - eye.y) * f]; };
+    const W = m.W, cx0 = Math.floor(st.pred.x / CELL), cy0 = Math.floor(st.pred.y / CELL), R = 11, cols = ['#2f4520', '#4d6a30', '#6f8f45'], paths = cols.map(() => new Path2D()), grav = new Path2D();
+    for (let cy = cy0 - R; cy <= cy0 + R; cy++) for (let cx = cx0 - R; cx <= cx0 + R; cx++) {
+      const gx = cx + Math.round(o.x / CELL), gy = cy + Math.round(o.y / CELL), g = gy * W + gx; if (gx < 0 || gy < 0 || gx >= W || gy >= m.H) continue;
+      if (m.tiles[g] !== T.GROUND || (storeys > 0 && m.floor[cy * W + cx] !== FL.VOID)) continue;
+      const wallBy = [1, -1, W, -W].some(d => g + d >= 0 && g + d < m.tiles.length && m.tiles[g + d] !== T.GROUND && m.tiles[g + d] !== T.OPEN);
+      if (wallBy) for (let i = 0; i < 7; i++) { const x = (cx + hash(cx, cy, 80 + i)) * CELL, y = (cy + hash(cx, cy, 90 + i)) * CELL, [a, b] = P(x, y, 0.004); grav.moveTo(a + 0.9, b); grav.arc(a, b, 0.6 + hash(cx, cy, 100 + i) * 0.6, 0, 6.3); }
+      if (m.floor[g] !== FL.GRASS) continue;
+      for (let t = 0; t < 3; t++) { const bx = (cx + hash(cx, cy, 10 + t)) * CELL, by = (cy + hash(cx, cy, 20 + t)) * CELL, hgt = 0.025 + hash(cx, cy, 30 + t) * 0.035;
+        for (let b = 0; b < 5; b++) { const a = hash(cx, cy, 40 + t * 5 + b) * 6.28, l = 1.2 + hash(cx, cy, 60 + b) * 1.6, [x0, y0] = P(bx, by, 0), [x1, y1] = P(bx + Math.cos(a) * l, by + Math.sin(a) * l, hgt), p = paths[(t + b) % 3]; p.moveTo(x0, y0); p.quadraticCurveTo((x0 + x1) / 2 + Math.cos(a) * 0.5, (y0 + y1) / 2 + Math.sin(a) * 0.5, x1, y1); } }
+    }
+    c.save(); if (sc) c.clip(sc); c.globalAlpha = Math.min(1, ropeLook.on * 1.4); c.lineCap = 'round';
+    c.fillStyle = 'rgba(120,114,102,0.55)'; c.fill(grav);
+    cols.forEach((col, i) => { c.strokeStyle = col; c.lineWidth = 0.55 + i * 0.05; c.stroke(paths[i]); });
+    c.restore();
   }
   // the ground at the foot of an upper floor's outside walls (he saw a black strip there when starting a rappel): the
   // ground floor's own picture, moved toward the eye by the storeys between, as the walls going down are
@@ -3559,6 +3604,7 @@ function draw(s, view, now, dt) {
 
   tq = pfa('markers', tq);
   // --- screen-space effects ---
+  if (st.swoop) st.swoopScr = [TA * st.swoop.x + TC * st.swoop.y + ox, TB * st.swoop.x + TD * st.swoop.y + oy]; // (where the window is on the screen)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (view && view.kind === 'drone') droneOverlay(now, ents);
   if (view && view.kind === 'cam') { if (view.dr) droneOverlay(now, ents, view.cam); else camOverlay(view, now); }

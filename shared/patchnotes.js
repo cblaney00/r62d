@@ -121,4 +121,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'op', id: 'wraith', t: 'Wraith\'s Pulse Scanner: one scan (up to 4 s) from a full charge, then 50 s to charge back to 100%. It used to allow two scans and refill in about 23 s.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'look', t: 'Lying down: two real legs, flat like a sniper when you crawl forward or sitting up with legs out when you tap back (only a look).', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'ropes', t: 'On a rope the walls nearby show real brick, plaster and concrete, windows reflect the sky and boards show grain and nails.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'ropes', t: 'The rope view looks premium: weathered wall tops, a climber with a harness and figure-8, boots pushing off the wall, grass at the wall foot, and climbing in through a window swoops through its frame.', v: 0 },
 ];

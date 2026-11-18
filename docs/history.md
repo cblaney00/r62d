@@ -641,3 +641,10 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   (brick, plaster, concrete, glass, boards) mapped per face. Not done yet: the hanging operator, the ground/grass near
   the wall foot, and the "swoop through the frame" window entry (his pick); `tests` helpers in the scratchpad were
   mkrope/mkhang (rope shots: tp to a rope, F, W/S; climb-in needs moving in front of the window first).
+- Rope view, finished (2026-11-18): wall tops get the `SURF.t` stone tile on a rope (drawColl, one fill per colour);
+  window jambs (plaster) textured too. Climber (sprites.js hang branch): harness straps, buckle, rim light, figure-8 +
+  gold screwgate at the belay loop with the rope tail hanging below, boots pushing off in turn (`walk`). `groundTufts`
+  (main.js): standing grass blades and gravel at the wall foot within 11 cells, fixed by cell hash, same perspective as
+  the walls. Window entry swoop (his pick): `st.swoop` set when a vault starts off a rope; `ropeCam` holds then
+  smoothsteps `st.rt` (SWOOP_IN 0.35 / HOLD 0.5 / END 1.2 s), `st.swoopZ` pushes the view in, `screenFx` draws the frame
+  growing past the screen and a soft vignette. GPU (headless gamescope, Embassy rope): 135 → 136 fps, unchanged.
