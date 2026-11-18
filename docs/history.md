@@ -711,3 +711,13 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   `pingwait` message every moment their ping was cooling down (40 in 5 s): none for bots now. Looked fine: HOIST's
   grapple and hatch drops (big jumps between floors), a roof bot waiting crouched by a hatch, him walking along a stair
   rail and in at the bottom. His fps 57-120 on Medium (dips to ~60 for a few seconds twice, script 11-13 ms then).
+- Stairs by height and landings (he asked: a wider, position-based stairs view with a blind spot from the top, fewer
+  spots watching stairs, roomier entrances; he chose: like real stairs, it stops bullets and bots too): `stairSees`
+  (shared/map.js): the opening is the top `HOLE` 55% of the flight (the floor above covers the rest, as headroom
+  allows), heights `STOREY` 108, `EYE_H3` 58/40/14, `BODY_H3` 40/28/10 px. From the top, standing, the whole flight
+  shows within ~3 m of the edge; further back (or crouched ~2 m back) its bottom is out of sight; a climber at the bottom
+  sees ~2 m past the top, halfway up the whole floor. `stairRoom` (map build): furniture off the 3 rows past every open
+  stair end (railings, low walls, fixed things stay); landings with over `FAR_SPOTS` 250 far watch spots get up to two
+  2x2 crate stacks 4-8 cells out where they cut most lines (worst landings 1109 → 589 far spots). Embassy after: 47%
+  (133 rounds). Left: 26 stair ends with a wall 2-3 rows ahead (4 could take a doorway: Harbor 2 top, Villa 4/7 top,
+  Lodge 5 top) — asked him.
