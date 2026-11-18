@@ -1790,14 +1790,14 @@ const WALKISH = new Set([T.FLOOR, T.GROUND, T.STAIR, T.OPEN, T.HATCH, T.HATCHR, 
 function screenFx(c, me, now, from) {
   const W = c.canvas.width, H = c.canvas.height;
   if (st.swoop && st.swoopScr) { // the window's frame sweeping past the screen's edges, a soft darkening round them as you cross
-    const T = performance.now() / 1000 - st.swoop.t0, [sx, sy] = st.swoopScr;
-    const g = Math.pow(sstep(T / SWOOP_HOLD), 1.4), k = 1 + 8 * g, a = 0.8 * (1 - sstep((T - 0.08) / (SWOOP_HOLD - 0.02)));
-    const cx = sx + (W / 2 - sx) * g, cy = sy + (H / 2 - sy) * g, hw = W * 0.075 * k, hh = H * 0.1 * k, r = Math.min(hw, hh) * 0.06;
+    const w = swoopT(), T = w.T, [sx, sy] = st.swoopScr;
+    const g = Math.pow(sstep(T / w.c), 1.6), k = 1 + 7 * g, a = 0.75 * Math.min(1, T / 0.08) * (1 - sstep((T - w.c * 0.55) / (w.c * 0.5)));
+    const cx = sx, cy = sy, hw = W * 0.07 * k, hh = H * 0.09 * k, r = Math.min(hw, hh) * 0.06; // (on the window itself, as you go through it)
     if (a > 0.01) { c.save(); c.lineJoin = 'round';
       c.strokeStyle = `rgba(14,16,18,${(a * 0.55).toFixed(3)})`; c.lineWidth = (5 + 9 * g) * DPR; c.beginPath(); c.roundRect(cx - hw, cy - hh, hw * 2, hh * 2, r); c.stroke(); // the frame's depth
       c.strokeStyle = `rgba(236,232,222,${(a * 0.75).toFixed(3)})`; c.lineWidth = (1.6 + 3 * g) * DPR; c.beginPath(); c.roundRect(cx - hw - 2 * DPR, cy - hh - 2 * DPR, hw * 2 + 4 * DPR, hh * 2 + 4 * DPR, r); c.stroke(); // its lit edge
       c.restore(); }
-    const v = Math.sin(Math.PI * Math.min(1, T / SWOOP_END)) * 0.42;
+    const v = Math.sin(Math.PI * Math.min(1, T / w.end)) * 0.4;
     if (v > 0.01) { const vg = c.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.85); vg.addColorStop(0, 'rgba(6,8,10,0)'); vg.addColorStop(1, `rgba(6,8,10,${v.toFixed(3)})`); c.fillStyle = vg; c.fillRect(0, 0, W, H); }
   }
   if (me && me.a && me.sc) { c.fillStyle = 'rgba(70,90,255,0.12)'; c.fillRect(0, 0, W, H); }
@@ -1857,16 +1857,20 @@ function ropeFace() { // which way you face on a rope (into the wall), or null
   const ro = me.ro, R = st.map.ropes, ri = ro[0] ? ro[1] : ro[2] >= 0 ? ro[2] : ro[6] >= 0 ? ro[6] : -1;
   return R[ri] ? R[ri].out + Math.PI : null;
 }
-// Climbing in through a window off a rope (he chose 2026-11-18: "swoop through the frame"): the view pushes in at the
-// window as its frame grows past the screen's edges (0-0.35 s), holds a beat as you cross it (to 0.5 s), then eases down
-// into the normal view from above (to 1.2 s). Only the camera: the climb itself keeps the server's timing.
-const SWOOP_IN = 0.35, SWOOP_HOLD = 0.5, SWOOP_END = 1.2;
+// Climbing in through a window off a rope (he chose 2026-11-18: "swoop through the frame"; then: the view must really
+// follow the character through the window before rising to the normal view inside). While you cross (the server's
+// vault time) the camera stays the rope camera but drops in close behind you, lower and tighter, and travels through the
+// window with you as its frame grows past the screen's edges; a short beat inside; then it rises up and turns back to
+// the normal view from above (SWOOP_RISE). Only the camera: the climb keeps the server's timing.
+const SWOOP_BEAT = 0.18, SWOOP_RISE = 0.95;
+const swoopT = () => { const s = st.swoop; if (!s) return null; const T = performance.now() / 1000 - s.t0, c = s.dur || 0.78; return { T, c, hold: c + SWOOP_BEAT, end: c + SWOOP_BEAT + SWOOP_RISE }; };
 const sstep = s => s <= 0 ? 0 : s >= 1 ? 1 : s * s * (3 - 2 * s);
 function ropeCam(dt) {
   const f = ropeFace(); if (f != null) st.rtFace = f;
-  if (st.swoop && f == null) { const T = performance.now() / 1000 - st.swoop.t0;
-    if (T < SWOOP_END) { st.rt = T < SWOOP_HOLD ? Math.max(st.rt || 0, 0.999) : 1 - sstep((T - SWOOP_HOLD) / (SWOOP_END - SWOOP_HOLD));
-      st.swoopZ = T < SWOOP_IN ? sstep(T / SWOOP_IN) : T < SWOOP_HOLD ? 1 : 1 - sstep((T - SWOOP_HOLD) / (SWOOP_END - SWOOP_HOLD)); return st.rt; }
+  if (st.swoop && f == null) { const w = swoopT(), T = w.T;
+    if (T < w.end) { const rise = sstep((T - w.hold) / SWOOP_RISE);
+      st.rt = T < w.hold ? Math.max(st.rt || 0, 0.999) : 1 - rise;
+      st.swoopZ = T < w.c ? sstep(T / w.c) : T < w.hold ? 1 : 1 - rise; return st.rt; }
     st.swoop = null; st.rt = 0; }
   st.swoopZ = 0;
   const want = f != null ? 1 : 0; st.rt = st.rt || 0;
@@ -2417,7 +2421,7 @@ function frame(nowMs) {
   let cx, cy;
   if (view) {
     cx = view.x; cy = view.y;
-    if (st.rt > 0 && view.kind === 'body' && st.rtFace != null) { const vh = (st.viewH || 400) * st.rt, k = vh * (0.3 + 0.14 * (st.rpk || 0) + 0.06 * (st.rads || 0)), sd = vh * ROPE_SIDE * (1 - 0.3 * (st.rads || 0)); cx += Math.cos(st.rtFace) * k - Math.sin(st.rtFace) * sd; cy += Math.sin(st.rtFace) * k + Math.cos(st.rtFace) * sd; } // (over your right shoulder: you low and a little left) // (the rope camera: you low on the screen, the rooms ahead)
+    if (st.rt > 0 && view.kind === 'body' && st.rtFace != null) { const vh = (st.viewH || 400) * st.rt, k = vh * ((0.3 + 0.14 * (st.rpk || 0) + 0.06 * (st.rads || 0)) * (1 - 0.75 * (st.swoopZ || 0)) + 0.1 * (st.swoopZ || 0)), /* (the swoop: right on you, a little into the room) */ sd = vh * ROPE_SIDE * (1 - 0.3 * (st.rads || 0)); cx += Math.cos(st.rtFace) * k - Math.sin(st.rtFace) * sd; cy += Math.sin(st.rtFace) * k + Math.cos(st.rtFace) * sd; } // (over your right shoulder: you low and a little left) // (the rope camera: you low on the screen, the rooms ahead)
     if (view.kind === 'body') {
       // he said the view was "super bouncy" when looking round: the lead used the crosshair's place on SCREEN, which itself
       // moves with the camera (a feedback loop). Crosshair mode now leads from the aim point in the world.
@@ -2459,6 +2463,7 @@ function frame(nowMs) {
     if ((st.rt || 0) > 0.5) keepT(st.pred.x, st.pred.y, 140 * DPR / st.zoom); // on a rope the camera stays over your shoulder (the view grows to hold the crosshair instead)
     else { keepT(st.pred.x, st.pred.y, 80 * DPR / st.zoom); keepT(q.ax, q.ay, AHEAD() * 1.3 / st.zoom); } // (80: clear of the corner panels)
   }
+  if ((st.swoopZ || 0) > 0 && st.rtFace != null) { const z = st.swoopZ, vh = st.viewH || 400, tx = st.pred.x + Math.cos(st.rtFace) * vh * 0.07, ty = st.pred.y + Math.sin(st.rtFace) * vh * 0.07; cx += (tx - cx) * z; cy += (ty - cy) * z; } // the swoop: the camera stays right on you as you go through
   const locked = camLocked(view);
   if (locked) { const t = lockedTarget(dt, view); cx = t.x; cy = t.y; }
   const k = 1 - Math.exp(-dt * 14);
@@ -2527,7 +2532,7 @@ function frame(nowMs) {
   // leaned your head into the window, and the crosshair stays on screen instead of pulling the view back
   st.rads = (st.rads || 0) + ((me && me.ad && (st.rt || 0) > 0.5 ? 1 : 0) - (st.rads || 0)) * (1 - Math.exp(-dt * 6));
   if (st.rt > 0) st.viewH *= 1 - ROPE_ADS * st.rads * st.rt;
-  if (st.swoopZ) st.viewH *= 1 - 0.22 * st.swoopZ; // (the swoop pushes in at the window)
+  if (st.swoopZ) st.viewH *= 1 - 0.34 * st.swoopZ; // (the swoop comes in tight behind you)
   if (st.rt > 0) st.viewH *= 1 - (ROPE_ZOOM_NAV + (ROPE_ZOOM - ROPE_ZOOM_NAV) * st.rpk) * st.rt; // (the rope camera comes in close over your shoulder: he asked for a lot closer; before the fit below, so you and your crosshair still both show)
   const freeAim = !st.tv && view && (view.kind === 'body' || view.kind === 'drone') && freeLive();
   const tFar = !freeAim && view && view.kind === 'body' && touchFar();
@@ -2685,7 +2690,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   }
   if (me.vt && ctrl === 'body') {
     const [x0, y0, x1, y1, t, dur] = me.vt, nowS = performance.now() / 1000;
-    if (!st.vault || st.vault.x0 !== x0 || st.vault.y0 !== y0) { st.vault = { x0, y0, t0: nowS - t }; if ((st.rt || 0) > 0.3) st.swoop = { t0: nowS - t, x: x0 + (x1 - x0) * 0.45, y: y0 + (y1 - y0) * 0.45 }; } // in through a window off a rope: the swoop (ropeCam, screenFx)
+    if (!st.vault || st.vault.x0 !== x0 || st.vault.y0 !== y0) { st.vault = { x0, y0, t0: nowS - t }; if ((st.rt || 0) > 0.3) st.swoop = { t0: nowS - t, dur, x: x0 + (x1 - x0) * 0.45, y: y0 + (y1 - y0) * 0.45 }; } // in through a window off a rope: the swoop (ropeCam, screenFx)
     const f = Math.min(1, (nowS - st.vault.t0) / dur), e = f * f * (3 - 2 * f);
     st.pred.x = x0 + (x1 - x0) * e; st.pred.y = y0 + (y1 - y0) * e;
   } else st.vault = null;
@@ -3063,7 +3068,7 @@ function draw(s, view, now, dt) {
   // see it (he asked 2026-11-14: more volume): everything, you in the middle too, shows its front and its height
   const OB = (st.viewH || 400) * EYE_BACK, U0 = UP();
   let eye = { x: st.cam.x - U0.x * OB, y: st.cam.y - U0.y * OB };
-  if (st.rt > 0 && st.rtFace != null) { const E = (st.ropeBaseH || st.viewH || 400) * ROPE_EYE, k = st.rt; eye = { x: eye.x + (st.cam.x - Math.cos(st.rtFace) * E - eye.x) * k, y: eye.y + (st.cam.y - Math.sin(st.rtFace) * E - eye.y) * k }; /* (glides from the usual eye to the one behind you) */ RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, st.ropeH ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.2 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
+  if (st.rt > 0 && st.rtFace != null) { const E = (st.ropeBaseH || st.viewH || 400) * ROPE_EYE * (1 - 0.95 * (st.swoopZ || 0)), k = st.rt; /* (the swoop: the eye drops in close behind you, so the frame passes round you) */ eye = { x: eye.x + (st.cam.x - Math.cos(st.rtFace) * E - eye.x) * k, y: eye.y + (st.cam.y - Math.sin(st.rtFace) * E - eye.y) * k }; /* (glides from the usual eye to the one behind you) */ RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, st.ropeH ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.2 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
   // Low graphics stays flat, except in the rope camera, which glides into its 3D look (he asked 2026-11-14)
   const rOn = fxOn('walls3d') && (gq.raised !== false || (st.rt || 0) > 0.01);
   if (gq.raised === false) RH *= st.rt || 0;
@@ -3466,7 +3471,7 @@ function draw(s, view, now, dt) {
     const p = st.pred, lp = st.tiltLast || p, k = dt > 0 ? 1 / dt : 0, vx = p && lp ? (p.x - lp.x) * k : 0, vy = p && lp ? (p.y - lp.y) * k : 0;
     st.tiltLast = p ? { x: p.x, y: p.y } : null;
     const jump = Math.hypot(vx, vy) > 600; // a floor change or respawn: no lean
-    { const me2 = st.me, r = me2 && me2.ro && me2.ro[0] && st.map.ropes[me2.ro[1]], win = !!(r && me2.ro[8] && Math.abs(ropeS(r, st.pred.x, st.pred.y)) < r.half + 14); st.rtW = (st.rtW || 0) + ((win ? 1 : 0) - (st.rtW || 0)) * (1 - Math.exp(-dt * 4)); tilt.extra = (ROPE_TILT + ROPE_TILT_WIN * st.rtW) * (st.rt || 0); } // (the extra tilt level with a window is off: ROPE_TILT_WIN 0, he said 2026-11-14 it squeezed the whole picture)
+    { const me2 = st.me, r = me2 && me2.ro && me2.ro[0] && st.map.ropes[me2.ro[1]], win = !!(r && me2.ro[8] && Math.abs(ropeS(r, st.pred.x, st.pred.y)) < r.half + 14); st.rtW = (st.rtW || 0) + ((win ? 1 : 0) - (st.rtW || 0)) * (1 - Math.exp(-dt * 4)); tilt.extra = (ROPE_TILT + ROPE_TILT_WIN * st.rtW + 9 * (st.swoopZ || 0)) * (st.rt || 0); } // (the swoop: a lower angle as you go through) // (the extra tilt level with a window is off: ROPE_TILT_WIN 0, he said 2026-11-14 it squeezed the whole picture)
     tilt.update(dt, jump ? 0 : (vx * cr - vy * sr) * z, jump ? 0 : (vx * sr + vy * cr) * z, shake, innerWidth, innerHeight);
     const de = document.documentElement; de.classList.toggle('tilt3d', tilt.on === true); de.classList.toggle('edgeblur', fxOn('blur') && gq.blur === true);
   }
@@ -3604,6 +3609,7 @@ function draw(s, view, now, dt) {
 
   tq = pfa('markers', tq);
   // --- screen-space effects ---
+  st.meScr = [(TA * st.pred.x + TC * st.pred.y + ox) / VW, (TB * st.pred.x + TD * st.pred.y + oy) / VH]; // (tests: where you are on the screen, 0..1)
   if (st.swoop) st.swoopScr = [TA * st.swoop.x + TC * st.swoop.y + ox, TB * st.swoop.x + TD * st.swoop.y + oy]; // (where the window is on the screen)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (view && view.kind === 'drone') droneOverlay(now, ents);

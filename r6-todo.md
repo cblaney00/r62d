@@ -6,6 +6,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] when the joystick is tapped on r62d in the mobile version it often registers as me already inputting a direction when i have only placed my thumb on the stick, you should not have to be precise with you first joystick touch for smooth control pickup
 
 ## Done
 - [x] lets upgrade the rappel view as a whole. the ground/grass, the operator model, the wall detail, and the window/plank detail are below par. the rest of the game has a premium feel and i want the rappel view to capture that as well. lets also give the jumping into the window view transition something unique to it. Lando liked the transition but i think it could be even better with a similar functionality. nothing tacky but i feel it could be even smoother and styled interestingly (DONE 2026-11-18: near the rope the walls show real brick, plaster and concrete with dirt at the foot, wall tops weathered stone with joints, windows reflect the sky, boards have grain, gaps and nails; the climber wears a harness with a figure-8 and the rope tail hanging from it, boots pushing off the wall in turn; grass tufts and gravel stand up at the wall foot; climbing in through a window swoops through its frame (your pick): the frame grows past the screen edges, a beat as you cross, then it eases down into the room. Checked twice for a premium look from screenshots, and no frame rate cost on his graphics card (136 fps on a rope, as before). Not yet played by him)
