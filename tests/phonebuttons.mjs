@@ -1,5 +1,6 @@
 // Phone buttons check: shows every touch button at once on several phone and tablet sizes and states (on a body with
-// lean lit, ACTION showing a word, tilt; on cameras) and prints any that overlap, sit under 6 px apart or leave the screen.
+// lean lit, ACTION showing a word, tilt; on cameras) and prints any that overlap, sit under 2.5 px apart or leave the
+// screen, measured on their real shapes (polygon pieces, sticks with their fire rings).
 // Usage like tests/thumbs.mjs: node tests/phonebuttons.mjs <port> <gameUrl>
 const [port, url] = process.argv.slice(2);
 const SIZES = [[914,412],[844,390],[800,360],[740,360],[667,375],[1024,600],[1180,820]];
@@ -18,14 +19,26 @@ const probe = `(async () => {
   for (const b of ui.querySelectorAll('.tbtn')) { const id = b.dataset.id; if (id === 'tiltc' && mode !== 'tilt') continue; if (/^(ads|adsL|leanL|leanR)$/.test(id) && mode === 'cams') continue; if (/^(prev|next)$/.test(id) && mode !== 'cams') continue; b.classList.remove('hidden'); }
 
   const els = [...ui.querySelectorAll('.tbtn:not(.hidden), #tsLeft, #tsRight')].filter(e => e.getBoundingClientRect().width > 0); if (els.length < 5) return 'NOT SHOWN (' + els.length + ') touch=' + T.isTouch + ' ' + getComputedStyle(ui).display;
-  const R = e => { const r = e.getBoundingClientRect(), ring = /^ts/.test(e.id) && ui.classList.contains('rings') ? (62 + 14 + 3) / 62 : 1, cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, hw = r.width / 2 * ring, hh = r.height / 2 * ring; // a stick counts with its fire ring
-    return { n: e.dataset.id || e.id, l: cx - hw, t: cy - hh, r: cx + hw, b: cy + hh, w: hw * 2, round: /^ts/.test(e.id) || getComputedStyle(e).borderRadius.includes('50%') }; };
-  const rs = els.map(R), out = [];
-  for (const a of rs) if (a.l < 0 || a.t < 0 || a.r > innerWidth || a.b > innerHeight) out.push('OFF ' + a.n + ' ' + [a.l,a.t,a.r,a.b].map(Math.round));
-  // gap between shapes: circles treated as circles
-  const gap = (a, b) => { if (a.round && b.round) { const d = Math.hypot((a.l+a.r)/2-(b.l+b.r)/2, (a.t+a.b)/2-(b.t+b.b)/2); return d - a.w/2 - b.w/2; }
-    const dx = Math.max(a.l - b.r, b.l - a.r, 0), dy = Math.max(a.t - b.b, b.t - a.b, 0); return dx || dy ? Math.hypot(dx, dy) : -Math.min(a.r - b.l, b.r - a.l, a.b - b.t, b.b - a.t); };
-  for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) { const g = gap(rs[i], rs[j]); const sticks = /^ts/.test(rs[i].n) || /^ts/.test(rs[j].n); if (g < (sticks ? 2 : 6)) out.push((g < 0 ? 'OVERLAP ' : 'CLOSE ') + rs[i].n + ' & ' + rs[j].n + ' gap ' + Math.round(g)); }
+  // every piece as its real shape: a stick (with its fire ring) or a round button as a circle, a polygon button as its polygon, anything else as its box
+  const shape = e => { const r = e.getBoundingClientRect(), n = e.dataset.id || e.id;
+    if (/^ts/.test(e.id)) return { n, c: [(r.left + r.right) / 2, (r.top + r.bottom) / 2], rad: r.width / 2 * (ui.classList.contains('rings') ? 88 / 60 : 1) };
+    if (e._poly) { const k = r.width / e._poly.w; return { n, p: e._poly.pts.map(q => [r.left + q[0] * k, r.top + q[1] * k]) }; }
+    if (getComputedStyle(e).borderRadius.includes('50%')) return { n, c: [(r.left + r.right) / 2, (r.top + r.bottom) / 2], rad: r.width / 2 };
+    return { n, p: [[r.left, r.top], [r.right, r.top], [r.right, r.bottom], [r.left, r.bottom]] }; };
+  const rs = els.map(shape), out = [];
+  for (const a of rs) { const pts = a.p || [[a.c[0] - a.rad, a.c[1] - a.rad], [a.c[0] + a.rad, a.c[1] + a.rad]], xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+    if (Math.min(...xs) < -0.5 || Math.min(...ys) < -0.5 || Math.max(...xs) > innerWidth + 0.5 || Math.max(...ys) > innerHeight + 0.5) out.push('OFF ' + a.n); }
+  const inside = (p, q) => { let r = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) if ((p[i][1] > q[1]) !== (p[j][1] > q[1]) && q[0] < (p[j][0] - p[i][0]) * (q[1] - p[i][1]) / (p[j][1] - p[i][1]) + p[i][0]) r = !r; return r; };
+  const segPt = (a, b, q) => { const dx = b[0] - a[0], dy = b[1] - a[1], t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(a[0] + dx * t - q[0], a[1] + dy * t - q[1]); };
+  const cross = (a, b, c, d) => { const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])); return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0; };
+  const edges = p => p.map((q, i) => [q, p[(i + 1) % p.length]]);
+  const gap = (a, b) => {
+    if (a.c && b.c) return Math.hypot(a.c[0] - b.c[0], a.c[1] - b.c[1]) - a.rad - b.rad;
+    if (a.c || b.c) { const c = a.c ? a : b, p = (a.c ? b : a).p; if (inside(p, c.c)) return -1; return Math.min(...edges(p).map(([u, v]) => segPt(u, v, c.c))) - c.rad; }
+    for (const [u, v] of edges(a.p)) for (const [s, t] of edges(b.p)) if (cross(u, v, s, t)) return -1;
+    if (inside(a.p, b.p[0]) || inside(b.p, a.p[0])) return -1;
+    let m = 1e9; for (const [u, v] of edges(a.p)) for (const q of b.p) m = Math.min(m, segPt(u, v, q)); for (const [u, v] of edges(b.p)) for (const q of a.p) m = Math.min(m, segPt(u, v, q)); return m; };
+  for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) { const g = gap(rs[i], rs[j]); if (g < 2.5) out.push((g < 0 ? 'OVERLAP ' : 'CLOSE ') + rs[i].n + ' & ' + rs[j].n + ' gap ' + Math.round(g * 10) / 10); }
   return out.join('\\n') || 'ok';
 })()`;
 ws.onopen = async () => {

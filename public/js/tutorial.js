@@ -42,7 +42,7 @@ const STEPS = [
   { part: 0, ph: PHASE.ACTION, cont: true, t: 'Moving and shooting', b: () => isTouch ? `
     The <b>left stick</b> moves: push it all the way to run (loud), a light push walks (silent). ${K('crouch')} is silent too and
     more accurate. Put your <b>right thumb</b> anywhere on the right half to aim: drag the way you want to look, further to look
-    further. ${fireRings() ? "<b>Slide either thumb past its stick's edge</b> onto the red ring to shoot (the aim thumb keeps steering); <b>tap the aim stick</b> quickly to aim in for tighter shots and a wider view, and again to aim out. <b>Double-tap and hold</b> the move stick to sprint." : `<b>FIRE</b> shoots, and you can slide your thumb on it to aim while shooting; tap ${K('ads')} for tighter shots and a
+    further. ${fireRings() ? "<b>Put a thumb down on the red ring</b> round either stick to shoot (drag on the right one to aim as you shoot; a stick you are steering never shoots); <b>tap the aim stick</b> quickly to aim in for tighter shots and a wider view, and again to aim out. <b>Double-tap and hold</b> the move stick to sprint." : `<b>FIRE</b> shoots, and you can slide your thumb on it to aim while shooting; tap ${K('ads')} for tighter shots and a
     wider view.`} ${K('interact')} and ${K('vault')} pop up when there is something to use or climb. ${K('melee')}, ${K('ability')} and ${K('gadget')} do what they say.` : `
     ${K('up')}${K('left')}${K('down')}${K('right')} runs (loud); hold ${K('sprint')} to sprint even faster, and crouch while
     sprinting for a power slide. Hold ${K('walk')} to walk and ${K('crouch')} to crouch: both silent and more accurate.

@@ -483,3 +483,15 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Lean buttons moved right in Rings mode (they touched the move stick's ring); ring inset 14 px so the aim ring clears ACTION.
 - Tests: `SCENARIO=rings node tests/thumbs.mjs` (shots on each ring, steady distance, aim turns, tap aim in/out, landing on the
   ring, double-tap sprint, two thumbs); `tests/phonebuttons.mjs` counts the rings; phonefree/thumbmatch use Buttons mode.
+
+## Fire rings v2 and polygon buttons (2026-11-17, he asked)
+- He found pulling a stick all the way shot by itself. Now a stick being steered never shoots, covers its ring while held,
+  and the ring is its own fire button (a finger put down on it). Thicker ring (28), bigger sticks (60, full run at 74).
+- New layout (his idea: fitted polygons of different sizes, most-used closest to the sticks): `public/js/touchlayout.js`.
+  Inner band round the aim stick: crouch, reload, swap, skill, gadget; outer band: jump, melee (camera arrows above them
+  on cameras); ACTION a corner piece; lean/tilt pieces round the move stick; top row interlocking hexagons.
+- Lessons: an unclipped button with its own hit test (`polyHit`) keeps count badges visible; the old HUD checker
+  (`tests/phonescreens.mjs`) compares boxes, so its button-vs-button lines are false alarms now — `tests/phonebuttons.mjs`
+  measures the real shapes. Moved for the layout: the team list clear of lean, the coach hint and chat clear of the cluster.
+- Tests: `SCENARIO=rings tests/thumbs.mjs` (a pulled stick never shoots; a finger on either ring does; drag-aim on the right
+  ring; tap aim in; double-tap sprint; two thumbs), `tests/phonebuttons.mjs` 7 sizes clean, phonefree (Buttons mode) OK.

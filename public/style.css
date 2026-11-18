@@ -1488,14 +1488,44 @@ html.touchplay #touchUI .tbtn.t3 { right: calc(330px + 70px / var(--tz, 1)); bot
 html.touchplay #viewlabel { left: calc(240px / var(--hudz, 1)); right: calc((330px * var(--tz, 1) + 70px) / var(--hudz, 1)); transform: none; max-width: none; bottom: calc(92px / var(--hudz, 1)); font-size: 11px; line-height: 1.4; }
 html.touchplay #cambar { top: calc(60px / var(--hudz, 1)); bottom: auto !important; } /* (!important: free play's "above its hint bar" rule) */
 #touchUI .tbtn.t6 { top: auto; bottom: 158px; } /* ⟲ TILT: above the move stick (the top-row rule pinned it onto the objective card) */
-/* Fire rings round both phone sticks (he asked 2026-11-17, touch.js FIRE_IN): a thin red ring just outside each stick;
-   slide a thumb onto it to shoot, and it glows while you do. The aim stick turns blue while aimed in (a quick tap). */
-#touchUI.rings .tstick::before { content: ''; position: absolute; inset: -14px; border-radius: 50%; pointer-events: none;
-  border: 3px solid rgba(235,80,64,0.42); box-shadow: inset 0 0 10px rgba(235,80,64,0.18), 0 0 8px rgba(235,80,64,0.15);
-  transition: border-color 0.08s, box-shadow 0.08s, background 0.08s; }
-#touchUI.rings .tstick.firing::before { border-color: rgba(255,96,74,0.95); background: rgba(210,50,38,0.18);
-  box-shadow: inset 0 0 16px rgba(255,80,60,0.45), 0 0 18px rgba(255,70,50,0.6); }
-#touchUI.rings .tstick.firing i { box-shadow: 0 0 0 2px rgba(255,120,100,0.9), 0 0 14px rgba(255,70,50,0.7); }
-#touchUI #tsRight.aimed { opacity: 1; border-color: rgba(120,190,255,0.95); box-shadow: inset 0 0 18px rgba(120,190,255,0.3), 0 0 16px rgba(120,190,255,0.45); }
+/* ---- Fire rings and polygon buttons (he asked 2026-11-17; geometry in public/js/touchlayout.js, sizes before --tz):
+   each stick (radius 60) has a red fire ring out to 88 (28 thick). A finger put down on the ring shoots and it glows;
+   a held stick covers its ring (the whole circle is stick) and never shoots. The aim stick turns blue while aimed in. */
+#touchUI.rings .tstick { width: 120px; height: 120px; }
+#touchUI.rings .tstick i { left: 35px; top: 35px; }
+#touchUI.rings #tsLeft { left: 40px; bottom: 40px; }
+#touchUI.rings #tsRight { zoom: var(--tz, 1); right: 190px; bottom: 80px; opacity: 0.8; }
+#touchUI.rings .tstick::before { content: ''; position: absolute; inset: -30px; border-radius: 50%; pointer-events: none;
+  border: 28px solid rgba(200,52,40,0.26); box-shadow: inset 0 0 0 2px rgba(255,112,92,0.55), 0 0 0 2px rgba(255,112,92,0.55), 0 0 10px rgba(235,80,64,0.2);
+  transition: border-color 0.08s, box-shadow 0.08s; }
+#touchUI.rings .tstick.firing::before { border-color: rgba(232,62,46,0.62); box-shadow: inset 0 0 0 2px rgba(255,150,130,0.95), 0 0 0 2px rgba(255,150,130,0.95), 0 0 22px rgba(255,70,50,0.7); }
+#touchUI.rings .tstick.held::before { border-color: rgba(20,30,23,0.3); box-shadow: 0 0 0 2px rgba(222,236,212,0.6), 0 0 16px rgba(150,190,135,0.3); } /* held: the stick covers its ring */
+#touchUI.rings .tstick.held { border-color: rgba(222,236,212,0.14) !important; box-shadow: none !important; }
+#touchUI.rings #tsLeft.spr::before { box-shadow: 0 0 0 3px var(--gold), 0 0 20px rgba(242,193,78,0.55); }
+#touchUI.rings #tsLeft.spr::after { top: -52px; }
+#touchUI.rings .tstick.dyn.held::before { box-shadow: 0 0 0 2px rgba(242,193,78,0.7), 0 0 14px rgba(242,193,78,0.25); }
+#touchUI #tsRight.aimed { opacity: 1; border-color: rgba(120,190,255,0.95) !important; box-shadow: inset 0 0 18px rgba(120,190,255,0.3), 0 0 16px rgba(120,190,255,0.45) !important; }
 #touchUI #tsRight.aimed i { background: radial-gradient(circle at 38% 30%, rgba(235,246,255,0.95) 0%, rgba(140,200,255,0.75) 30%, rgba(60,130,210,0.65) 100%); }
-#touchUI.rings .tbtn.l1 { left: max(180px, calc(env(safe-area-inset-left) + 160px)); } #touchUI.rings .tbtn.l2 { left: max(230px, calc(env(safe-area-inset-left) + 210px)); } /* lean: clear of the move stick's ring (the left FIRE's place is free now) */
+/* polygon buttons: ::before is the rim, ::after the glass inside it (2 px in); the icon sits on the shape's middle */
+#touchUI .tbtn.poly { background: none !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; padding: 0; min-width: 0; display: block; overflow: visible;
+  --pf: rgba(20,30,23,0.36); --ps: rgba(196,220,184,0.5); }
+#touchUI .tbtn.poly::before, #touchUI .tbtn.poly::after { content: ''; display: block; position: absolute; inset: 0; pointer-events: none; transform: none; opacity: 1; width: auto; height: auto; border: 0; border-radius: 0; animation: none; }
+#touchUI .tbtn.poly::before { clip-path: var(--cp); background: var(--ps); }
+#touchUI .tbtn.poly::after { clip-path: var(--ci); background: var(--g-dome), linear-gradient(var(--pf), var(--pf)); opacity: 0.85; }
+#touchUI .tbtn.poly > svg { position: absolute; left: var(--cx); top: var(--cy); width: var(--is) !important; height: var(--is) !important; transform: translate(-50%, -50%); z-index: 1; }
+#touchUI .tbtn.poly > b { position: absolute; left: var(--cx); top: var(--cy); transform: translate(-50%, -50%); z-index: 1; font-size: 16px; }
+#touchUI .tbtn.poly em { left: var(--bx); top: var(--by); right: auto; transform: translate(-50%, -50%); z-index: 2; }
+#touchUI .tbtn.poly .aw { left: var(--cx); top: calc(var(--cy) + 20px); margin: 0; z-index: 1; }
+#touchUI .tbtn.poly.on { --pf: rgba(242,193,78,0.82); --ps: #ffd877; color: #000; }
+#touchUI .tbtn.poly.act { --pf: rgba(70,52,12,0.6); --ps: rgba(242,193,78,0.95); }
+#touchUI .tbtn.poly.act.idle { --pf: rgba(20,30,23,0.5); --ps: rgba(242,193,78,0.5); }
+#touchUI .tbtn.poly.act.on { --pf: rgba(242,193,78,0.85); }
+#touchUI .tbtn.poly.leaning { --pf: rgba(242,193,78,0.4); --ps: #f2c14e; }
+#touchUI .tbtn.poly.r2, #touchUI .tbtn.poly.r3, #touchUI .tbtn.poly.t { --pf: rgba(20,30,23,0.42); --ps: rgba(196,220,184,0.42); } /* the less-pressed ones a little quieter */
+/* the match text sits between the left pieces and the aim stick's ring */
+html.touchplay.firerings #prompt, html.touchplay.firerings #viewlabel { left: calc(200px * var(--tz, 1) / var(--hudz, 1)); right: calc((340px * var(--tz, 1) + 8px) / var(--hudz, 1)); }
+html.touchplay.firerings #tipNow { left: calc(200px * var(--tz, 1) / var(--hudz, 1)); right: calc((340px * var(--tz, 1) + 8px) / var(--hudz, 1)); transform: none; max-width: none; width: fit-content; margin: 0 auto; } /* the coach's hint: between the left pieces and the aim stick's ring */
+/* team chat (pings): under the top row of hexagons, above the pieces round the aim stick (on cameras, where the arrows
+   sit higher, only the newest line) */
+html.touchplay.firerings #chat { top: calc(62px * var(--tz, 1) / var(--hudz, 1)); bottom: auto; right: 10px; }
+html.touchplay.firerings:has(#touchUI [data-id="next"]:not(.hidden)) #chatLog div:not(:last-child) { display: none; }

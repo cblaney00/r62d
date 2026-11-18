@@ -135,28 +135,33 @@ async function run() {
         console.log(`${name}: shots ${r[r.length - 1][3] - r[0][3]}, aimed in ${Math.max(...r.map(q => q[4]))}->${r[r.length - 1][4]}, sprint ${Math.max(...r.map(q => q[5]))}, moved ${Math.round(Math.hypot(r[r.length - 1][6] - r[0][6], r[r.length - 1][7] - r[0][7]))} px   (want ${want})`);
         if (process.env.ROWS) for (const q of r.filter((_, i) => i % 6 === 0)) console.log('   t', q[0] - t0, 'dist', q[1], 'aim', q[2], 'shots', q[3], 'ring', q[8]); };
       const Ra = 62 / 0.7 * 1.5, r = 62 * Math.max(0.7, Math.min(1.15, H / 430)); // the aim stick's thumb travel (normal sensitivity) and the move stick's radius
-      const at = (k, deg) => [Math.round(R0[0] + Math.cos(deg / 57.3) * Ra * k), Math.round(R0[1] + Math.sin(deg / 57.3) * Ra * k)];
+      const RA = [Math.round(W * 0.6), Math.round(H * 0.5)]; // (an empty spot left of the aim stick: R0 is on a button in this layout)
+      const at = (k, deg) => [Math.round(RA[0] + Math.cos(deg / 57.3) * Ra * k), Math.round(RA[1] + Math.sin(deg / 57.3) * Ra * k)];
       await take();
-      await touch(finger('R', [R0, [...at(0.6, 0), 250]], 500)); await sleep(300); let q = await take(); sum('A1 aim thumb out 0.6 (inside the stick)', q, 'no shots'); const d1 = q[q.length - 1][1];
-      await touch(finger('R', [R0, [...at(0.6, 0), 250], [...at(0.6, 0), 300], [...at(1.4, 0), 120], [...at(1.4, 0), 600], [...at(1.4, -30), 300], [...at(1.4, -30), 300], [...at(0.6, -30), 150]], 500)); await sleep(300);
-      q = await take(); sum('A2 ... then out onto the ring, round 30°, back in', q, 'shots, aim turns ~30°, crosshair distance stays');
+      await touch(finger('R', [RA, [...at(0.6, 0), 250]], 500)); await sleep(300); let q = await take(); sum('A1 aim thumb out 0.6 (inside the stick)', q, 'no shots'); const d1 = q[q.length - 1][1];
+      await touch(finger('R', [RA, [...at(0.6, 0), 250], [...at(0.6, 0), 300], [...at(1.4, 0), 120], [...at(1.4, 0), 600], [...at(1.4, -30), 300], [...at(1.4, -30), 300], [...at(0.6, -30), 150]], 500)); await sleep(300);
+      q = await take(); sum('A2 ... then pulled far out, round 30°, back in', q, 'NO shots: a pulled stick never shoots');
       const onRing = q.filter(x => x[8]); if (onRing.length) console.log('   crosshair distance before the ring', d1, '| on the ring', Math.min(...onRing.map(x => x[1])), '-', Math.max(...onRing.map(x => x[1])), '| aim on the ring', onRing[0][2], '->', onRing[onRing.length - 1][2], '| last frames off the ring:', q.slice(-5).map(x => x[8]).join(''));
       const st = await centre('#tsRight');
       await touch(finger('T', [st, [st[0], st[1], 60]])); await sleep(500); sum('B1 quick tap on the aim stick', await take(), 'aimed in 1');
       console.log('   aim stick lit blue:', await js("document.getElementById('tsRight').classList.contains('aimed')"));
       await touch(finger('T', [st, [st[0], st[1], 60]])); await sleep(500); sum('B2 another quick tap', await take(), 'aimed in back to 0');
-      const ringPt = [Math.round(st[0] - 62 - 12), st[1]];
+      const ringAt = async sel => JSON.parse(await js(`(() => { const b = document.querySelector('${sel}').getBoundingClientRect(), rv = b.width / 2; return JSON.stringify([Math.round(b.left + rv - rv * 74 / 60), Math.round(b.top + rv)]); })()`)); // the middle of a stick's red ring, on its left
+      const ringPt = await ringAt('#tsRight');
       await touch(finger('T', [ringPt, [ringPt[0] - 2, ringPt[1], 400]], 300)); await sleep(300); sum('B3 thumb lands straight on the drawn aim ring', await take(), 'shots');
       const up = k => [L[0], Math.round(L[1] - r * k)];
       await touch(finger('L', [L, [...up(0.6), 200]], 600)); await sleep(300); sum('C1 move thumb up 0.6', await take(), 'moves, no shots');
-      await touch(finger('L', [L, [...up(0.6), 200], [...up(1.5), 120]], 900)); await sleep(300); sum('C2 move thumb out onto its ring', await take(), 'shots, still moves');
-      await touch(finger('L', [L, [Math.round(L[0] + r * 2.2), L[1], 250]], 900)); await sleep(300); sum('D  move thumb pushed far right (old sprint push)', await take(), 'no sprint (shoots: it is the ring)');
+      await touch(finger('L', [L, [...up(0.6), 200], [...up(1.5), 120]], 900)); await sleep(300); sum('C2 move thumb pulled out over its ring', await take(), 'NO shots, still moves');
+      await touch(finger('L', [L, [Math.round(L[0] + r * 2.2), L[1], 250]], 900)); await sleep(300); sum('D  move thumb pushed far right (old sprint push)', await take(), 'no sprint, NO shots');
       await touch(finger('L', [L, [L[0], L[1], 60]])); await sleep(120);
       await touch(finger('L', [L, [Math.round(L[0] + r * 0.9), L[1], 200]], 1300)); await sleep(300); sum('E  double-tap (right) and hold the move stick', await take(), 'sprint 1, no shots');
       await touch(finger('L', [L, [Math.round(L[0] - r * 0.9), L[1], 200]], 800)); await sleep(300); sum('E2 (left) a single press later', await take(), 'sprint 0');
-      await touch(finger('L', [L, [L[0], Math.round(L[1] + r * 0.7), 200]], 1000), finger('R', [R0, [...at(0.5, 20), 200], [...at(1.4, 20), 150]], 600, 100)); await sleep(300); sum('F  both thumbs: move + aim ring', await take(), 'shots and moves');
+      await touch(finger('L', [L, [L[0], Math.round(L[1] + r * 0.7), 200]], 1000), finger('R', [ringPt, [ringPt[0] - 3, ringPt[1], 300]], 500, 100)); await sleep(300); sum('F  both thumbs: move + a finger on the aim ring', await take(), 'shots and moves');
+      const lr = await ringAt('#tsLeft');
+      await touch(finger('L', [[lr[0] + 0, lr[1]], [lr[0] + 2, lr[1], 400]], 300)); await sleep(300); sum('G  a finger put down on the move stick\'s ring', await take(), 'shots, no movement');
+      await touch(finger('R', [ringPt, [ringPt[0], ringPt[1] - 60, 300]], 400)); await sleep(300); q = await take(); sum('H  a finger on the aim ring, dragged 60 px up', q, 'shots, aim turns'); console.log('   aim', q[0][2], '->', q[q.length - 1][2]);
       await shot('k1-rings');
-      { const p = touch(finger('R', [R0, [...at(0.5, 0), 200], [...at(1.4, 0), 150]], 2500), finger('L', [L, [...up(0.5), 200]], 2500)); await sleep(1200); await shot('k2-on-ring'); await p; } // (a picture while both thumbs are down, the aim thumb on its ring)
+      { const p = touch(finger('R', [RA, [...at(0.5, 0), 200], [...at(0.9, -20), 150]], 2500), finger('L', [L, [...up(0.5), 200]], 2500)); await sleep(1200); await shot('k2-on-ring'); await p; } // (a picture while both thumbs are down: both sticks cover their rings)
       return;
     }
     let s0 = await report('start');
