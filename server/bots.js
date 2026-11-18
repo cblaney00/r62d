@@ -848,6 +848,7 @@ export function botThink(game, p, dt) {
   const inp = { up: 0, down: 0, left: 0, right: 0, walk: 0, crouch: 0, fire: 0, ads: 0, interact: 0, ability: 0 };
   p.input = inp;
   if (p.alive && p.ctrl === 'drone') {
+    if (p.ai.chk && p.ai.chk.st === 'drone') { droneCheck(game, p, dt); return; } // checking the room ahead (checkDrone)
     if (p.pro && game.phase === PHASE.ACTION) { const st = proPlan(game, p.squad, 'atk'), j = st.plan && st.plan.jobs[p.pro.pl.jobs.atk]; if (!j || !j.keepDrone || elapsedAction(game) > j.keepDrone + (TIMING[p.pro.pl.name] || 0) || game.planted) { game.toggleView(p); p.ai.droneDone = true; return; } }
     botDrone(game, p, dt); return;
   }
@@ -910,6 +911,7 @@ export function botThink(game, p, dt) {
     if (mine.length && mine.every(e => Math.hypot(e.x - p.x, e.y - p.y) > 60) && Math.random() < dt * 2) useAbility();
   }
   if (action && !p.downed && botAbility(game, p, ai, abId, enemy, heardRecently, team, site, useAbility, inp, dt)) return; // (welding: stand and hold)
+  if (action && team === TEAM.ATK && !p.downed && !enemy && checkDrone(game, p, ai, inp, dt, heardRecently)) return; // a drone into the room ahead first
   if (enemy) {
     const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
     if (ai.seen !== enemy.id) { // a surprise takes longer to react to than something they were listening for
@@ -1761,6 +1763,60 @@ function spacingMate(game, p, next) {
 // Every attacker bot drones in preparation (he asked: some never did; in fact none drove theirs). The drone heads for
 // a site room (sometimes another site first, like scouting), spots and calls out defenders it sees, then parks and
 // looks round. Stuck or slow: a new goal.
+// Droning before going in (he asked 2026-11-18): an attacker whose way leads into a room nobody on the team is in or has
+// checked, with time left and a drone to hand (one in the pocket, or theirs still out near), first gets out of that
+// room's sight, then drives a drone in and looks, then carries on. From Platinum up they do it properly (most times,
+// hidden first, a proper look); Silver and Gold now and then, where they stand, a quick look; Copper and Bronze never.
+const CHK_GAP = [0, 0, 40, 30, 16, 14, 12, 12]; // seconds between checks, by rank (0: never)
+function checkDrone(game, p, ai, inp, dt, heard) {
+  const lvl = p.pro ? 7 : lvlOf(game, p), good = lvl >= 4, C = ai.chk;
+  if (!CHK_GAP[lvl] || game.tut || game.free || game.arena || game.zb) return false;
+  if (C && C.st === 'hide') { // on the way to where the room can't see them
+    if (heard || game.time > C.t + 5 || Math.hypot(C.hide.x - p.x, C.hide.y - p.y) < 8) {
+      C.st = 'drone'; C.hp0 = p.hp; C.until = game.time + (good ? 6 + Math.random() * 3 : 2.5 + Math.random() * 2);
+      const own = game.ent(p.droneId);
+      if (p.drones > 0 && !(own && Math.hypot(own.x - p.x, own.y - p.y) < 6 * PX_PER_M)) game.droneKey(p); else if (own) game.watch(p, own);
+      if (p.ctrl !== 'drone') { C.st = 'done'; return false; }
+      ai.droneGoal = C.goal; ai.droneGoalT = 99; ai.droneFound = game.siteRevealed; ai.dPath = null;
+      return true;
+    }
+    moveTo(game, p, inp, C.hide, dt, true); inp.crouch = good ? 1 : 0; return true;
+  }
+  if (heard || game.planted || game.timer < 45 || (C && game.time < C.next)) return false;
+  const own = game.ent(p.droneId); if (p.drones <= 0 && !own) return false;
+  // the room the way leads into next
+  const map = game.map, W = map.W, path = ai.path; if (!path || path.length < 4) return false;
+  const here = roomAt(map, p.x, p.y), checked = ai.checked || (ai.checked = new Set());
+  let goal = null;
+  for (let i = 2; i < Math.min(path.length, 24) && !goal; i++) {
+    const x = (path[i] % W + 0.5) * CELL, y = (Math.floor(path[i] / W) + 0.5) * CELL, r = roomAt(map, x, y);
+    if (!r || r === here || r === 'Outside') continue;
+    if (checked.has(r) || [...game.players.values()].some(q => q.alive && q !== p && game.side(q) === TEAM.ATK && roomAt(map, q.x, q.y) === r)) return false; // (cleared already, or a teammate is in it)
+    const rm = map.rooms.find(o => o.name === r); goal = rm ? game.freeSpotNear((rm.x + rm.w / 2) * CELL, (rm.y + rm.h / 2) * CELL, Math.min(rm.w, rm.h) * CELL * 0.3) : { x, y }; goal.name = r;
+  }
+  if (!goal) return false;
+  checked.add(goal.name);
+  if (!good && Math.random() > 0.2) { ai.chk = { st: 'done', next: game.time + CHK_GAP[lvl] }; return false; } // (lower ranks: only now and then)
+  ai.chk = { st: 'hide', hide: good ? hideSpot(game, p, goal) : { x: p.x, y: p.y }, goal, t: game.time, next: game.time + CHK_GAP[lvl] + Math.random() * 6 };
+  return true;
+}
+// somewhere close the room ahead can't see: out of its line, a short straight walk away (else where they stand)
+function hideSpot(game, p, goal) {
+  const map = game.map, fl = floorAt(map, p.x, p.y), sm = game.smokeList(); let best = null, bd = Infinity;
+  if (!los(map, goal.x, goal.y, p.x, p.y, sm)) return { x: p.x, y: p.y };
+  for (const r of [22, 36, 52, 70]) for (let i = 0; i < 12; i++) {
+    const a = i / 12 * Math.PI * 2, x = p.x + Math.cos(a) * r, y = p.y + Math.sin(a) * r;
+    if (floorAt(map, x, y) !== fl || circleBlocked(map, x, y, PLAYER_R + 1, t => blocksMove(t)) || !los(map, p.x, p.y, x, y, null) || los(map, goal.x, goal.y, x, y, sm)) continue;
+    const d = r + Math.hypot(x - goal.x, y - goal.y) * 0.1; if (d < bd) { bd = d; best = { x, y }; }
+  }
+  return best || { x: p.x, y: p.y };
+}
+// driving the drone into that room, a look round, then back to the body (sooner if the body gets hurt)
+function droneCheck(game, p, dt) {
+  const ai = p.ai, C = ai.chk, d = game.ent(p.droneId);
+  if (!d || game.time > C.until || p.hp < C.hp0 || p.downed) { C.st = 'done'; if (p.ctrl === 'drone') game.droneKey(p); if (p.ctrl === 'drone') p.ctrl = 'body'; ai.droneGoal = null; ai.path = null; return; }
+  botDrone(game, p, dt);
+}
 function botDrone(game, p, dt) {
   const ai = p.ai, inp = p.input, d = game.ent(p.droneId), map = game.map, team = game.side(p);
   if (!d) return;

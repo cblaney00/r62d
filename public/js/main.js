@@ -4112,7 +4112,7 @@ function hud(s) {
   const abCount = ab.battery ? `${Math.round(me.bat / ab.battery * 100)}%` : ab.count ? me.ac : '';
   const viewName = side === 'atk' ? `Drone${s.ph === PHASE.ACTION ? ' ×' + me.dr : ''}` : 'Cameras';
   const salvoWait = ab.id === 'sticky' ? s.ents.filter(e => e.ty === 'sticky' && e.ow === me.id && e.st).length : 0; // SALVO: rounds waiting for her
-  st.tBadge = { skill: me.gi || salvoWait || me.lu ? '!' : String(abCount), gadget: me.ni ? '!' : String(me.gc ?? ''), view: side === 'atk' && s.ph === PHASE.ACTION ? String(me.dr ?? '') : '' };
+  st.tBadge = { skill: me.gi || salvoWait || me.lu ? '!' : String(abCount), gadget: me.ni ? '!' : String(me.gc ?? ''), drone: side === 'atk' && s.ph === PHASE.ACTION ? String(me.dr ?? '') : '' }; // (the count is on DRONE now: CAMS only looks)
   if (s.zb) setHTML('gadgets', `<div class="${me.gc <= 0 ? 'out' : ''}"><b>${label('gadget')}</b>${g.name}<em>${me.gc}</em></div>`); else // ZOMBIES: grenades only
   setHTML('gadgets',
     `<div class="${ab.count && me.ac <= 0 ? 'out' : ''}"><b>${label('ability')}</b>${me.gi ? 'Release the gas' : me.scd ? `${ab.name} ready in ${Math.ceil(me.scd)}s` : salvoWait ? `Detonate ${salvoWait} round${salvoWait > 1 ? 's' : ''}` : me.lu ? `Lunge ready ${Math.ceil(me.lu)}s · ${label('melee')}` : me.ap ? 'Piercing round loaded' : me.su2 ? `Spotting ${Math.ceil(me.su2)}s · aim in` : me.gw2 ? `Ghillie ${Math.ceil(me.gw2)}s` : ab.name}<em>${me.gi || salvoWait ? '!' : abCount}</em></div>` +
@@ -4150,7 +4150,7 @@ function hud(s) {
   if (isTouch) { const ph = $('prompt').innerHTML, iu = ph.indexOf('<b>' + label('interact') + '</b>'), iv = ph.indexOf('<b>' + label('vault') + '</b>'), first = iv >= 0 && (iu < 0 || iv < iu) ? 'vault' : iu >= 0 ? 'use' : null;
     // the phone's ACTION button names what it will do: the first word of the prompt after its key ("HOLD TO PLANT DEFUSER" → PLANT)
     const word = first ? ((ph.split('<b>' + label(first === 'vault' ? 'vault' : 'interact') + '</b>')[1] || '').replace(/<[^>]*>/g, ' ').replace(/^\s*(HOLD|PRESS|TAP)\s+(TO\s+)?/i, '').trim().split(/\s+/)[0] || '').toUpperCase().slice(0, 9) : '';
-    touchContext({ use: first === 'use', busy: !!me.bu, vault: first === 'vault', word, cams: me.ct !== 'body', drone: me.ct === 'drone', body: me.ct === 'body' && !me.dn, lean: st.leanT || 0, badge: st.tBadge || {} }); }
+    touchContext({ use: first === 'use', busy: !!me.bu, vault: first === 'vault', word, cams: me.ct !== 'body', drone: me.ct === 'drone', atk: side === 'atk', body: me.ct === 'body' && !me.dn, lean: st.leanT || 0, badge: st.tBadge || {} }); }
 }
 function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!el) return; if (el.innerHTML !== h) el.innerHTML = h; }
 // (he said it got laggy: the HUD rewrote about a dozen elements ten times a second even when nothing had changed)
@@ -4977,6 +4977,7 @@ const TIPS = [
   'Broken glass under windows crunches loudly — listen for it.',
   'Defenders: reinforce the walls of the objective room before the action phase starts.',
   'Attackers: use your drone in preparation to find the objective before you go in.',
+  'Attackers: you start the round with one drone in your pocket ({drone} puts it out, {view} looks through every camera and drone). Not sure a room is clear? Get out of its sight and drone it first.',
   'Bullets go through soft walls. If you can hear them, you can shoot them.',
   'A downed teammate can be revived — hold interact next to them.',
   'REPLAYS (main menu) keeps your last 3 matches: watch them like Esports TV, or download the replay file or a video.',

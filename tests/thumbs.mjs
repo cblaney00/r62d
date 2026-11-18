@@ -268,10 +268,10 @@ async function run() {
     await tap('[data-id="swap"]'); await sleep(1200); await report('tapped SWAP');
     await tap('[data-id="swap"]'); await sleep(1200);
     // 9. drone: out, drive, sprint, back
-    await tap('[data-id="view"]'); await sleep(1500); await report('tapped DRONE / CAMS');
+    await tap('[data-id="view"]'); await sleep(1500); await report('tapped CAMS');
     await shot('t7-drone');
     await touch(finger('L', [L, [L[0], L[1] - 70, 150]], 1500)); await report('drove drone up 1.5 s');
-    await tap('[data-id="view"]'); await sleep(1500); await report('tapped DRONE / CAMS again');
+    await tap('[data-id="view"]'); await sleep(1500); await report('tapped CAMS again');
     // 10. pause and resume by thumb
     await tap('[data-id="pause"]'); await sleep(800); await shot('t8-pause');
     await tap('#pause .menu button'); await sleep(800); await report('resumed from pause');

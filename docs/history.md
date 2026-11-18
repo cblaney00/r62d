@@ -727,3 +727,10 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Operator select (he asked): clicking a site / spawn (list or map) sends the choice and `place` at once; `#lockBtn`
   hidden in that step, so LOCK IN is only for the operator + loadout step.
 - HOIST (he asked): `hatchToBlast`: the grapple under a shut (not reinforced) hatch calls `breakHatch`, a frag-kind 'boom' (grenade loud) and noise, then climbs (+0.5 s); reinforced: deny, no charge. Bots too. `node tests/hoisthatch.js`.
+- Drones (he asked): attackers get `p.drones = 1` at the start of the action (was +1 on top of the spare: up to 3);
+  `putDrone` + `droneKey` (6 / phone DRONE, b 23): a drone from the pocket at your feet even with an older one out
+  (it stays as a feed); none left: take back yours; `watch` drives any drone you own (5 / phone CAMS, b 24). Controller
+  13 keeps `droneOrCams`. Bots: `checkDrone`/`hideSpot`/`droneCheck` in bots.js: the next room on their path that no
+  teammate is in or has checked, time > 45 s, a drone to hand: get out of its sight (Platinum+), drive in, look 6-9 s
+  (2.5-4.5 s below), back on hurt. Per 16 rounds: Copper 0, Silver 0.6, Platinum/Champion 4.8 checks a round, never more
+  than 2 drones out per attacker. `tests/feeds.js` follows the new 6 (was flaky on the old rule). Embassy 51%, Dust 58%.

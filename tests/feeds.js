@@ -54,7 +54,9 @@ const nDr = () => g.ents.filter(e => e.type === 'drone' && e.owner === a3.id).le
 g.event(a3, { k: 'feeds' }); if (nDr() || a3.ctrl !== 'cam') fail('5 put out a drone or did not open team feeds', nDr(), a3.ctrl);
 g.event(a3, { k: 'drone' }); if (nDr() !== 1 || a3.ctrl !== 'drone') fail('6 did not put out and drive a drone', nDr(), a3.ctrl);
 g.event(a3, { k: 'drone' }); if (a3.ctrl !== 'body') fail('6 again did not go back to the body');
-g.event(a3, { k: 'drone' }); if (nDr() !== 1 || a3.ctrl !== 'drone') fail('6 put out a second drone instead of taking the first');
+g.event(a3, { k: 'drone' }); if (nDr() !== 2 || a3.ctrl !== 'drone') fail('6 with one left in the pocket did not put out the second', nDr()); // (he asked 2026-11-18: 6 places the drone you carry)
+g.event(a3, { k: 'drone' }); g.event(a3, { k: 'drone' }); if (nDr() !== 2 || a3.ctrl !== 'drone' || a3.drones !== 0) fail('6 with none left did not take back the one out', nDr(), a3.drones);
+{ const first = g.ents.find(e => e.type === 'drone' && e.owner === a3.id && e.id !== a3.droneId); g.event(a3, { k: 'feeds' }); g.event(a3, { k: 'feeds' }); if (first) { g.event(a3, { k: 'camSet', id: first.id }); if (a3.ctrl !== 'drone' || a3.droneId !== first.id) fail('could not take back the older of your drones through the feeds'); } }
 g.event(a3, { k: 'feeds' }); if (a3.ctrl !== 'body') fail('5 on a drone did not go back to the body');
 d1.ctrl = 'body'; g.event(d1, { k: 'drone' }); if (d1.ctrl !== 'body') fail('6 did something for a defender');
 d1.ctrl = 'body'; g.event(d1, { k: 'feeds' }); if (d1.ctrl !== 'cam') fail('5 did not open defender cameras');

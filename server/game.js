@@ -544,7 +544,7 @@ export class Game {
           p.x = pos.x; p.y = pos.y; p.vx = p.vy = 0; p.staged = false;
           p.aim = Math.atan2(this.map.H * CELL / 2 - p.y, this.map.W * CELL / 2 - p.x);
         }
-        p.ctrl = 'body'; p.drones += 1;
+        p.ctrl = 'body'; p.drones = this.tut && !p.bot ? p.drones + 1 : 1; // (he asked 2026-11-18: one drone in your pocket after preparation, so at best two working ones a round with the one from preparation; it was one more on top of the spare)
       }
       else if (p.ctrl === 'cam') p.ctrl = 'body';
       p.busy = null;
@@ -1936,12 +1936,7 @@ export class Game {
       if (this.phase === PHASE.PREP) return;
       if (p.ctrl === 'drone' || p.ctrl === 'cam') { p.ctrl = 'body'; return; }
       if (p.ctrl !== 'body' || p.busy) return;
-      if (!this.ent(p.droneId) && p.drones > 0) {
-        p.drones--;
-        const pos = this.freeSpotNear(p.x + Math.cos(p.aim) * 12, p.y + Math.sin(p.aim) * 12, 10, true);
-        const d = { id: this.eid(), type: 'drone', owner: p.id, team: TEAM.ATK, x: pos.x, y: pos.y, hp: 1, ang: p.aim };
-        this.ents.push(d); p.droneId = d.id;
-      }
+      if (!this.ent(p.droneId) && p.drones > 0) this.putDrone(p);
       if (this.ent(p.droneId)) { p.ctrl = 'drone'; return; }
       const list = this.feeds(team); // no drone of your own left: watch a teammate's
       if (list.length) this.watch(p, list[0]);
@@ -1966,7 +1961,15 @@ export class Game {
     if (p.ctrl !== 'body' || p.busy || !list.length) return;
     this.watch(p, list.find(f => f.id === p.feedId) || (own && list.includes(own) ? own : list[0]));
   }
-  // 6 (he asked): put out your own drone and drive it (or take it back if it is already out); again: back to your body
+  // a drone from your pocket, put down at your feet; any older one of yours stays where it is (a feed you can take back: 5)
+  putDrone(p) {
+    p.drones--;
+    const pos = this.freeSpotNear(p.x + Math.cos(p.aim) * 12, p.y + Math.sin(p.aim) * 12, 10, true);
+    const d = { id: this.eid(), type: 'drone', owner: p.id, team: TEAM.ATK, x: pos.x, y: pos.y, hp: 1, ang: p.aim };
+    this.ents.push(d); p.droneId = d.id; p.ctrl = 'drone';
+  }
+  // 6 (he asked): put out a drone from your pocket and drive it (he asked 2026-11-18: placing one is its own key, apart
+  // from 5's cameras and drones); none left in your pocket: take back the one you have out. Again: back to your body.
   droneKey(p) {
     if (p.downed || this.side(p) !== TEAM.ATK) return;
     const own = this.ent(p.droneId);
@@ -1974,7 +1977,7 @@ export class Game {
     if (p.ctrl === 'drone') { p.ctrl = 'body'; return; }
     if (p.ctrl === 'cam') { if (own) { this.watch(p, own); return; } p.ctrl = 'body'; }
     if (p.ctrl !== 'body' || p.busy) return;
-    if (!own && p.drones > 0) this.toggleView(p); else if (own) this.watch(p, own);
+    if (p.drones > 0) this.putDrone(p); else if (own) this.watch(p, own);
   }
 
   // Everything a team can look through, flipped through with left/right or the mouse wheel:
@@ -1990,7 +1993,7 @@ export class Game {
   operates(p, c) { return c.type === 'cam' && (!c.owner || c.owner === p.id); }
   // look through a feed: your own drone you drive, anything else you only watch (and mark from)
   watch(p, f) {
-    if (f.type === 'drone' && f.id === p.droneId) { p.ctrl = 'drone'; return; }
+    if (f.type === 'drone' && (f.id === p.droneId || f.owner === p.id)) { p.droneId = f.id; p.ctrl = 'drone'; return; } // (any of your own drones: you drive it)
     if (f.type === 'bird' && f.owner === p.id) { p.droneId = f.id; p.ctrl = 'drone'; return; } // MAGPIE flies her own birds
     p.ctrl = 'cam'; p.feedId = f.id;
   }

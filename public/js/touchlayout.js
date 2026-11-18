@@ -25,7 +25,7 @@ const SPEC = [
   { id: 'leanR', at: 'bl', c: LC, r: [103, 137], a: [-25, 10], is: 18 }, { id: 'leanL', at: 'bl', c: LC, r: [103, 137], a: [-60, -25], is: 18 }, // (right of the stick, clear of the team list above it)
   { id: 'tiltc', at: 'bl', c: LC, r: [103, 137], a: [10, 38], is: 16 },
 ];
-const TOP = ['pause', 'help', 'score', 'view', 'map']; // right to left: flat-topped hexagons, every other one half a step down
+const TOP = ['pause', 'help', 'score', 'view', 'drone', 'map']; // right to left: flat-topped hexagons, every other one half a step down
 const HEX = 17; // (was 21)
 
 function sector(c, [r0, r1], [lo, hi]) { // a faceted ring piece, GAP apart from its neighbours

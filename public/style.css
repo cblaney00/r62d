@@ -1346,7 +1346,7 @@ html.rprec #rpBar { display: none; } /* (recording a video: the bar stays out of
 #touchUI .tbtn.c-use, #touchUI .tbtn.t3 { right: calc(max(20px, var(--sr)) + 92px); bottom: 28px; }
 #touchUI .tbtn.c-vault, #touchUI .tbtn.t2 { right: calc(max(20px, var(--sr)) + 164px); bottom: 28px; }
 #touchUI .tbtn.t { width: 42px; height: 42px; border-radius: 50%; top: 8px; } #touchUI .tbtn.t svg { width: 21px; height: 21px; }
-#touchUI .tbtn.t5 { right: 16px; } #touchUI .tbtn.t9 { right: 64px; } #touchUI .tbtn.t4 { right: 112px; } #touchUI .tbtn.t1 { right: 160px; width: 42px; } #touchUI .tbtn.t7 { right: 208px; width: 42px; } #touchUI .tbtn.t6 { right: auto; top: auto; bottom: 168px; width: 42px; }
+#touchUI .tbtn.t5 { right: 16px; } #touchUI .tbtn.t9 { right: 64px; } #touchUI .tbtn.t4 { right: 112px; } #touchUI .tbtn.t1 { right: 160px; width: 42px; } #touchUI .tbtn.t8 { right: 208px; width: 42px; } #touchUI .tbtn.t7 { right: 256px; width: 42px; } #touchUI .tbtn.t6 { right: auto; top: auto; bottom: 168px; width: 42px; }
 #touchUI .tbtn.t9 b { font: 800 max(20px, var(--mf)) var(--head); }
 #touchUI .tbtn.t2, #touchUI .tbtn.t3 { top: auto; }
 #touchUI #tHelp { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(820px, 94vw); max-height: 88vh; overflow: auto; z-index: 5;
@@ -1448,7 +1448,7 @@ html.touchplay #feed { max-width: 300px; }
 #touchUI .tbtn.lean { width: 40px; height: 40px; bottom: 186px; }
 #touchUI .tbtn.l1 { left: max(30px, var(--sl)); } #touchUI .tbtn.l2 { left: calc(max(30px, var(--sl)) + 50px); }
 #touchUI .tbtn.t { width: 36px; height: 36px; top: 6px; background: rgba(10,14,18,0.4); border-color: rgba(255,255,255,0.22); }
-#touchUI .tbtn.t5 { right: 12px; } #touchUI .tbtn.t9 { right: 54px; } #touchUI .tbtn.t4 { right: 96px; } #touchUI .tbtn.t1 { right: 138px; width: 36px; } #touchUI .tbtn.t7 { right: 180px; width: 36px; }
+#touchUI .tbtn.t5 { right: 12px; } #touchUI .tbtn.t9 { right: 54px; } #touchUI .tbtn.t4 { right: 96px; } #touchUI .tbtn.t1 { right: 138px; width: 36px; } #touchUI .tbtn.t8 { right: 180px; width: 36px; } #touchUI .tbtn.t7 { right: 222px; width: 36px; }
 #touchUI .tbtn.t9 b { font-size: max(17px, var(--mf)); }
 #touchUI .tbtn em { top: -6px; right: -6px; min-width: 18px; height: 18px; line-height: 18px; font-size: max(12px, var(--mf)); padding: 0 4px; }
 #touchUI .tbtn.t6 { bottom: 236px; } /* ⟲ TILT above the lean buttons */

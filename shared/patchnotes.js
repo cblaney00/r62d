@@ -140,4 +140,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'stairsight', t: 'Seeing up and down stairs goes by height: the floor above covers the lower part of every staircase, so from the top you see the whole flight only near its edge, and climbing you see more of the floor above the higher you get. It stops bullets the same way.', v: -1 },
   { d: '2026-11-18', k: 'map', id: 'stairland', t: 'Every map: furniture cleared off the space at both ends of each staircase, and crate stacks near the stair landings that could be watched from far away.', v: 0 },
   { d: '2026-11-18', k: 'op', id: 'hoist', t: 'HOIST: under a shut hatch his grapple charge blows it open first (as loud as a grenade) and he climbs up through it; a reinforced hatch stops it.', v: 1 },
+  { d: '2026-11-18', k: 'mech', id: 'drones', t: 'Drones: one in your pocket after preparation (at best two working drones a round with the one from preparation); 6 / DRONE puts it out, 5 / CAMS looks through cameras and drones (any of yours you drive). Bots drone a room before going in, properly from Platinum up.', v: 0 },
 ];

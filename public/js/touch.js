@@ -129,7 +129,7 @@ const BUTTONS = [
   { id: 'reload', label: 'RELOAD', b: 2, cls: 'r r1 c1' }, { id: 'swap', label: 'SWAP', b: 3, cls: 'r r1 c2' },
   { id: 'skill', label: 'SKILL', b: 5, cls: 'r r2 c1' }, { id: 'gadget', label: 'GADGET', b: 4, cls: 'r r2 c2' },
   { id: 'melee', label: 'MELEE', b: 11, cls: 'r r3 c1' }, { id: 'jump', label: 'JUMP', b: 10, cls: 'r r3 c2' },
-  { id: 'view', label: 'DRONE / CAMS', b: 13, cls: 't t1' }, { id: 'prev', label: '◀', b: 14, cls: 't t2 hidden' }, { id: 'next', label: '▶', b: 15, cls: 't t3 hidden' },
+  { id: 'view', label: 'CAMS', b: 24, cls: 't t1' }, { id: 'drone', label: 'DRONE', b: 23, cls: 't t8' }, { id: 'prev', label: '◀', b: 14, cls: 't t2 hidden' }, { id: 'next', label: '▶', b: 15, cls: 't t3 hidden' },
   { id: 'tiltc', label: '⟲ TILT', b: null, cls: 't t6 hidden' }, { id: 'map', label: 'MAP', b: 22, cls: 't t7' },
   { id: 'leanL', label: '◀ LEAN', b: 20, cls: 'lean l1' }, { id: 'leanR', label: 'LEAN ▶', b: 21, cls: 'lean l2' }, { id: 'score', label: 'SCORES', b: 8, cls: 't t4' }, { id: 'pause', label: '❚❚', b: 9, cls: 't t5' },
   { id: 'help', label: '?', b: null, cls: 't t9' }, // the guide to the pictures
@@ -155,6 +155,7 @@ export const ICONS = {
   vault: svg('<path d="M3 21h18M9 21v-5h6v5"/><path d="M4 14c2-8 14-8 16 0"/><path d="M17 11l3 3 2-4"/>'),
   map: svg('<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>'),
   view: svg('<rect x="3" y="7" width="12" height="10" rx="2"/><path d="M15 11l6-3v8l-6-3z"/>'),
+  drone: svg('<rect x="8" y="9" width="8" height="6" rx="1.5"/><circle cx="5" cy="7" r="2.2"/><circle cx="19" cy="7" r="2.2"/><circle cx="5" cy="17" r="2.2"/><circle cx="19" cy="17" r="2.2"/><path d="M7 8.5l1.5 1.5M17 8.5l-1.5 1.5M7 15.5l1.5-1.5M17 15.5l-1.5-1.5"/>'),
   score: svg('<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/>'),
   pause: svg('<path d="M8 5v14M16 5v14" stroke-width="3"/>'),
   prev: svg('<path d="M15 5l-7 7 7 7" stroke-width="2.6"/>'), next: svg('<path d="M9 5l7 7-7 7" stroke-width="2.6"/>'),
@@ -169,12 +170,12 @@ const HELP = () => [ // (a function: it follows the fire rings setting)
   ['skill', 'SKILL', 'Your operator\'s ability. The number is how many are left.'], ['gadget', 'GADGET', 'Throw or place your gadget.'],
   ['melee', 'MELEE', 'Knife hit. Breaks wooden boards.'], ['jump', 'JUMP', 'Hop onto furniture or over low cover (through windows too).'],
   ['use', 'ACTION', 'Says what it will do: whatever the game is prompting (plant, defuse, revive, reinforce, open, climb, go through a window), otherwise PING what you aim at for your team. One tap does it (and keeps a hold going).'],
-  ['view', 'DRONE / CAMS', 'Your drones (attack) or cameras (defence).'], ['sprint', 'SPRINT', fireRings() ? 'Double-tap the move stick and keep your thumb down; let go to stop. On a drone the crouch button sprints.' : 'Push the move stick past its edge. On a drone the crouch button sprints.'],
+  ['view', 'CAMS', 'Look through your team\'s cameras and drones (any drone of your own you drive). Tap again: back to your body.'], ['drone', 'DRONE', 'Attack: put out the drone you carry and drive it; none left: take back the one you have out. The number is how many you carry.'], ['sprint', 'SPRINT', fireRings() ? 'Double-tap the move stick and keep your thumb down; let go to stop. On a drone the crouch button sprints.' : 'Push the move stick past its edge. On a drone the crouch button sprints.'],
   ['map', 'MAP', 'The map: tap it to ping a spot.'], ['score', 'SCORES', 'Who is up and who is down.'],
   ['prev', 'PREVIOUS / NEXT', 'Flip through cameras and drones.'], ['pause', 'PAUSE', 'The pause menu.'],
   ['tiltc', 'LEVEL', 'Tilt to move: how you hold the phone now is level.'],
 ];
-const N = 23;
+const N = 25; // (23 DRONE, 24 CAMS: he asked 2026-11-18)
 const held = new Array(N).fill(false), trig = { lt: 0, rt: 0 }, tc = { lt: 0, rt: 0 }; // tc: fingers on each trigger button
 let prevHeld = new Array(N).fill(false);
 const ls = { x: 0, y: 0 }, rs = { x: 0, y: 0 };
@@ -374,7 +375,8 @@ export function touchContext(c) {
   // (the lit lean is 'leaning', not 'act': 'act' is ACTION's class, and it moved the lean button onto ACTION beside FIRE)
   const cr = ui.querySelector('[data-id="crouch"]'), cl = c.drone ? 'sprint' : 'crouch'; // on a drone the crouch button sprints
   if (cr.dataset.ic !== cl) { cr.dataset.ic = cl; cr.innerHTML = ICONS[cl]; cr.setAttribute('aria-label', cl.toUpperCase()); }
-  for (const [id, n] of [['skill', c.badge.skill], ['gadget', c.badge.gadget], ['view', c.badge.view]]) { // how many are left, on the button itself
+  { const dr = ui.querySelector('[data-id="drone"]'); if (dr && dr.classList.contains('hidden') === !!c.atk) dr.classList.toggle('hidden', !c.atk); } // DRONE: attackers only
+  for (const [id, n] of [['skill', c.badge.skill], ['gadget', c.badge.gadget], ['drone', c.badge.drone]]) { // how many are left, on the button itself
     const el = ui.querySelector(`[data-id="${id}"]`), h = (ICONS[id] || el.dataset.label) + (n ? `<em>${n}</em>` : '');
     if (el.innerHTML !== h) { el.innerHTML = h; el.classList.toggle('out', n === '0' || n === '0%'); }
   }

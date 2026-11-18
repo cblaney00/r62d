@@ -20,8 +20,8 @@ export const ACTIONS = [
   ['secondary', 'Secondary weapon', 'Digit2', ''],
   ['gadget', 'Gadget / grenade', 'KeyG', ''],
   ['ability', 'Operator skill', 'Digit4', 'KeyZ'],
-  ['view', 'Team drones & cameras (look only at teammates\' drones)', 'Digit5', ''],
-  ['drone', 'Put out your drone / drive it (attack)', 'Digit6', ''],
+  ['view', 'Team cameras & drones: look through them (a drone of your own you drive)', 'Digit5', ''],
+  ['drone', 'Put out the drone you carry and drive it (attack; none left: take back the one you have out)', 'Digit6', ''],
   ['melee', 'Melee (knife)', 'Digit3', 'KeyV'],
   ['vault', 'Jump (onto furniture) — vaults windows and wall stubs', 'Space', ''],
   ['spot', 'Ping what is under your aim (enemy, gadget, wall, door, place)', 'KeyT', ''],
@@ -104,7 +104,7 @@ export function keyName(code) {
     .replace('Arrow', '').replace('Control', 'Ctrl').replace('Bracket', ' Bracket');
 }
 // on a phone the prompts name the touch button instead of a key (touch.js buttons)
-const TOUCH_NAMES = { interact: 'USE', vault: 'VAULT', melee: 'MELEE', ability: 'SKILL', gadget: 'GADGET', reload: 'RELOAD', spot: 'PING', crouch: 'CROUCH', ads: 'AIM', walk: 'a light push', view: 'DRONE / CAMS', drone: 'DRONE / CAMS', scoreboard: 'SCORES', sprint: 'a double-tap and hold on the move stick', prone: 'a long press on CROUCH', crouchTap: 'CROUCH', leanL: '◀ LEAN', leanR: 'LEAN ▶', map: 'MAP', primary: 'SWAP', secondary: 'SWAP' };
+const TOUCH_NAMES = { interact: 'USE', vault: 'VAULT', melee: 'MELEE', ability: 'SKILL', gadget: 'GADGET', reload: 'RELOAD', spot: 'PING', crouch: 'CROUCH', ads: 'AIM', walk: 'a light push', view: 'CAMS', drone: 'DRONE', scoreboard: 'SCORES', sprint: 'a double-tap and hold on the move stick', prone: 'a long press on CROUCH', crouchTap: 'CROUCH', leanL: '◀ LEAN', leanR: 'LEAN ▶', map: 'MAP', primary: 'SWAP', secondary: 'SWAP' };
 export const label = id => (isTouch && TOUCH_NAMES[id]) || keyName((binds[id] || [])[0]);
 loadBinds();
 // Capture the mouse for aiming, asking for raw movement where the browser allows it (no system mouse acceleration,
