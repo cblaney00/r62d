@@ -47,6 +47,7 @@ function copyOf(v, memo) {
 }
 function buildFresh(id) {
   const m = MAPS[id].build();
+  stairRoom(m);
   addCams(m);
   addRopes(m);
   addRoofEdges(m);
@@ -325,6 +326,79 @@ function addOutCams(m) {
 // cheapest to fix get containers / dumpsters (tall: they block sight and bullets) between them and the windows that
 // watch them; the rest stay exposed on purpose. Same pieces every round (no randomness). m.yard = the report.
 const APPROACH = 9, SAFE = 0.3;
+// Stair landings (he asked 2026-11-18: fewer spots that can watch the stairs, roomier entrances to them). For each open
+// end of every flight (lower floor: its bottom, upper floor: its top) the landing is the 3 rows past it, a cell wider
+// than the stairs each side. Furniture there goes (railings, low walls and fixed things stay). A landing that can be
+// watched from far (over FAR_SPOTS floor cells more than 8 m off with a clear line) gets up to two crate stacks 4-8
+// cells out, each where it cuts the most of those lines, always with a free cell all round it (it never closes a way).
+const STAY = new Set(['railing', 'wall', 'pier', 'gatehouse', 'shelter', 'fountain', 'tank', 'container', 'bus', 'booth', 'reception', 'counter', 'hedge']);
+const FAR_SPOTS = 250;
+function stairLandings(m) {
+  const W = m.W, out = [], UVs = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
+  for (const st of m.stairs || []) for (const [g, lower] of [[st.ga, true], [st.gb, false]]) {
+    const x0 = g % W, y0 = Math.floor(g / W), x1 = x0 + st.w - 1, y1 = y0 + st.h - 1;
+    const side = lower ? { n: 's', s: 'n', e: 'w', w: 'e' }[st.dir] : st.dir, [ux, uy] = UVs[side], cells = [];
+    for (let r = 1; r <= 3; r++) for (let c = -1; c <= (ux ? st.h : st.w); c++) {
+      const cx = ux ? (ux < 0 ? x0 - r : x1 + r) : x0 + c, cy = uy ? (uy < 0 ? y0 - r : y1 + r) : y0 + c;
+      if (cx >= 0 && cy >= 0 && cx < W && cy < m.H) cells.push(cy * W + cx);
+    }
+    const lx = (ux ? (ux < 0 ? x0 - 1.5 : x1 + 2.5) : (x0 + x1 + 1) / 2) * CELL, ly = (uy ? (uy < 0 ? y0 - 1.5 : y1 + 2.5) : (y0 + y1 + 1) / 2) * CELL;
+    out.push({ cells, lx, ly, fl: m.flAt[Math.floor(ly / CELL) * W + Math.floor(lx / CELL)] });
+  }
+  return out;
+}
+function stairRoom(m) {
+  const W = m.W, H = m.H, N = W * H, L = stairLandings(m);
+  // 1. furniture out of every stair entrance
+  const owner = new Int32Array(N).fill(-1);
+  m.props.forEach((p, i) => { for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) owner[y * W + x] = i; });
+  const gone = new Set();
+  for (const l of L) for (const k of l.cells) { const i = owner[k]; if (i >= 0 && !STAY.has(m.props[i].kind) && (m.tiles[k] === T.LOW || m.tiles[k] === T.TALL)) gone.add(i); }
+  for (const i of gone) { const p = m.props[i];
+    for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) { const k = y * W + x; if (m.tiles[k] !== T.LOW && m.tiles[k] !== T.TALL) continue;
+      let g = 0, f = 0; for (const d of [1, -1, W, -W, W + 1, W - 1, -W + 1, -W - 1]) { const t = m.tiles[k + d]; if (t === T.GROUND) g++; else if (t === T.FLOOR) f++; }
+      m.tiles[k] = g > f ? T.GROUND : T.FLOOR; owner[k] = -1; } }
+  if (gone.size) m.props = m.props.filter((_, i) => !gone.has(i));
+  // 2. cover for the landings watched from far
+  const entrance = new Uint8Array(N); for (const l of L) for (const k of l.cells) entrance[k] = 1;
+  const plain = k => (m.tiles[k] === T.FLOOR || m.tiles[k] === T.GROUND) && !(m.shape && m.shape[k]) && m.portal[k] < 0 && !(m.openId && m.openId[k] >= 0) && !(m.hatchAt && m.hatchAt[k] >= 0) && !(m.hatchBelow && m.hatchBelow[k] >= 0);
+  const R = 25 * 36;
+  for (const l of L) {
+    if (l.fl === undefined) continue;
+    const far = [];
+    for (let cy = Math.max(1, Math.floor((l.ly - R) / CELL)); cy < Math.min(H - 1, (l.ly + R) / CELL); cy++) for (let cx = Math.max(1, Math.floor((l.lx - R) / CELL)); cx < Math.min(W - 1, (l.lx + R) / CELL); cx++) {
+      const k = cy * W + cx; if (!plain(k) || m.flAt[k] !== l.fl) continue;
+      const px = (cx + 0.5) * CELL, py = (cy + 0.5) * CELL, d = Math.hypot(px - l.lx, py - l.ly); if (d < 8 * 36 || d > R) continue;
+      if (los(m, px, py, l.lx, l.ly, null)) far.push([px, py]);
+    }
+    for (let n = 0; n < 2 && far.length > FAR_SPOTS; n++) {
+      let best = null, bs = 0;
+      const lcx = Math.floor(l.lx / CELL), lcy = Math.floor(l.ly / CELL);
+      for (let cy = lcy - 9; cy <= lcy + 8; cy++) for (let cx = lcx - 9; cx <= lcx + 8; cx++) {
+        const dc = Math.hypot(cx + 1 - l.lx / CELL, cy + 1 - l.ly / CELL); if (dc < 4 || dc > 8) continue;
+        let ok = true; for (let y = cy - 1; y <= cy + 2 && ok; y++) for (let x = cx - 1; x <= cx + 2 && ok; x++) { const k = y * W + x; if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1 || !plain(k) || entrance[k] || m.flAt[k] !== l.fl || owner[k] >= 0) ok = false; }
+        if (!ok) continue;
+        const bx0 = cx * CELL, by0 = cy * CELL, bx1 = bx0 + 2 * CELL, by1 = by0 + 2 * CELL; let cut = 0;
+        for (const [px, py] of far) if (segBox(px, py, l.lx, l.ly, bx0, by0, bx1, by1)) cut++;
+        if (cut > bs) { bs = cut; best = [cx, cy, bx0, by0, bx1, by1]; }
+      }
+      if (!best || bs < far.length * 0.12) break;
+      const [cx, cy, bx0, by0, bx1, by1] = best;
+      m.props.push({ kind: 'crates', x: cx, y: cy, w: 2, h: 2, rot: 0 });
+      for (let y = cy; y < cy + 2; y++) for (let x = cx; x < cx + 2; x++) { m.tiles[y * W + x] = T.TALL; owner[y * W + x] = m.props.length - 1; }
+      for (let i = far.length - 1; i >= 0; i--) if (segBox(far[i][0], far[i][1], l.lx, l.ly, bx0, by0, bx1, by1)) far.splice(i, 1);
+    }
+  }
+}
+// does the segment (x0,y0)-(x1,y1) pass through the box?
+function segBox(x0, y0, x1, y1, bx0, by0, bx1, by1) {
+  let t0 = 0, t1 = 1; const dx = x1 - x0, dy = y1 - y0;
+  for (const [p, q] of [[-dx, x0 - bx0], [dx, bx1 - x0], [-dy, y0 - by0], [dy, by1 - y0]]) {
+    if (p === 0) { if (q < 0) return false; continue; }
+    const r = q / p; if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
+  }
+  return true;
+}
 function addYardCover(m) {
   const W = m.W, gi = m.groundFloor; if (gi === undefined) return;
   const G = m.floors[gi], at = k => ({ x: (k % W + 0.5) * CELL, y: (Math.floor(k / W) + 0.5) * CELL });
