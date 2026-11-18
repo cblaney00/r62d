@@ -8,6 +8,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 
 ## Done
+- [x] (he asked 2026-11-18) scale down all the UI buttons except the joysticks; with the extra space, make the centre of the screen have more viewing area uninterrupted by buttons (DONE 2026-11-18: the buttons round the sticks are about a quarter thinner, their pictures and the top row smaller, and the aim stick with its buttons sits nearer the corner. Not yet played by him)
 - [x] (he asked 2026-11-18) some phones have rounded corners (his Flip 7) or a camera hole in the screen: make sure the game doesn't cut anything off in the corners or put anything in the camera hole's way (DONE 2026-11-18: the HUD, menus and buttons keep clear of both; the phone app measures the real hole and corners (needs the new app), browsers know the hole. Checked with a pretend hole and corners: nothing in the way)
 - [x] (he asked 2026-11-18) on a Samsung A35 the game runs well for a few minutes then gets a bit hot: make it lighter; Low was unplayable for his girlfriend, Medium is fine, so the look of Medium is the new Low (DONE 2026-11-18: phones draw at most 60 frames a second (the A35 screen runs at 120); Low now has Medium's picture with fewer particles and smoke, and phones start on Low. Not yet played by him)
 - [x] (he asked 2026-11-18) make the default mobile zoom 70% and allow 40% to 120% (DONE 2026-11-18: phones only; computers stay 80-200%)

@@ -131,4 +131,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: the game draws at most 60 frames a second, so phones with fast screens stay cooler; phones start on Low.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'all', t: 'Graphics: Low now looks like Medium (sharper picture, lighting, raised walls), with a few fewer particles and smoke puffs.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: the HUD, menus and buttons keep clear of rounded screen corners and the camera hole.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: smaller buttons (the sticks stay the same) and the aim stick nearer the corner, so more of the middle of the screen is open.', v: 0 },
 ];

@@ -9,24 +9,24 @@
 // Buttons are not clipped (count badges may stick out); polyHit() decides which shape a finger is in.
 const D = Math.PI / 180;
 export const STICK = { VR: 60, RING: 88, KNOB: 70 }; // stick radius, fire ring's outer radius, how far the knob travels while held
-const RC = { x: -250, y: -140 }; // the aim stick's centre, from the bottom-right corner (style.css #touchUI.rings #tsRight)
+const RC = { x: -232, y: -128 }; // (he asked 2026-11-18: buttons smaller, sticks the same, the middle of the screen more open: thinner bands, the aim stick 18 px nearer the corner) the aim stick's centre, from the bottom-right corner (style.css #touchUI.rings #tsRight)
 const LC = { x: 100, y: -100 }; // the move stick's resting centre, from the bottom-left corner (#tsLeft)
-const B1 = [94, 150], B2 = [156, 196], GAP = 5; // (B2 ends at 196 so the team chat fits under the top row)
+const B1 = [94, 136], B2 = [140, 172], GAP = 4; // (were 94-150 and 156-196)
 const SPEC = [
-  { id: 'crouch', at: 'br', c: RC, r: B1, a: [15, 55], is: 26 },
-  { id: 'reload', at: 'br', c: RC, r: B1, a: [-25, 15], is: 26 },
-  { id: 'swap', at: 'br', c: RC, r: B1, a: [-62, -25], is: 24 },
-  { id: 'skill', at: 'br', c: RC, r: B1, a: [-98, -62], is: 22 },
-  { id: 'gadget', at: 'br', c: RC, r: B1, a: [-134, -98], is: 22 },
-  { id: 'use', at: 'br', c: RC, r: [156, 260], a: [8, 62], is: 30, clip: 6 }, // ACTION: the corner piece
-  { id: 'jump', at: 'br', c: RC, r: B2, a: [-30, 8], is: 21 },
-  { id: 'melee', at: 'br', c: RC, r: B2, a: [-66, -30], is: 21 },
-  { id: 'next', at: 'br', c: RC, r: B2, a: [-100, -66], is: 22 }, { id: 'prev', at: 'br', c: RC, r: B2, a: [-134, -100], is: 22 },
-  { id: 'leanR', at: 'bl', c: LC, r: [94, 142], a: [-25, 10], is: 22 }, { id: 'leanL', at: 'bl', c: LC, r: [94, 142], a: [-60, -25], is: 22 }, // (right of the stick, clear of the team list above it)
-  { id: 'tiltc', at: 'bl', c: LC, r: [94, 142], a: [10, 38], is: 20 },
+  { id: 'crouch', at: 'br', c: RC, r: B1, a: [15, 55], is: 21 },
+  { id: 'reload', at: 'br', c: RC, r: B1, a: [-25, 15], is: 21 },
+  { id: 'swap', at: 'br', c: RC, r: B1, a: [-62, -25], is: 20 },
+  { id: 'skill', at: 'br', c: RC, r: B1, a: [-98, -62], is: 18 },
+  { id: 'gadget', at: 'br', c: RC, r: B1, a: [-134, -98], is: 18 },
+  { id: 'use', at: 'br', c: RC, r: [140, 236], a: [8, 62], is: 26, clip: 6 }, // ACTION: the corner piece
+  { id: 'jump', at: 'br', c: RC, r: B2, a: [-30, 8], is: 17 },
+  { id: 'melee', at: 'br', c: RC, r: B2, a: [-66, -30], is: 17 },
+  { id: 'next', at: 'br', c: RC, r: B2, a: [-100, -66], is: 18 }, { id: 'prev', at: 'br', c: RC, r: B2, a: [-134, -100], is: 18 },
+  { id: 'leanR', at: 'bl', c: LC, r: [94, 128], a: [-25, 10], is: 18 }, { id: 'leanL', at: 'bl', c: LC, r: [94, 128], a: [-60, -25], is: 18 }, // (right of the stick, clear of the team list above it)
+  { id: 'tiltc', at: 'bl', c: LC, r: [94, 128], a: [10, 38], is: 16 },
 ];
 const TOP = ['pause', 'help', 'score', 'view', 'map']; // right to left: flat-topped hexagons, every other one half a step down
-const HEX = 21;
+const HEX = 17; // (was 21)
 
 function sector(c, [r0, r1], [lo, hi]) { // a faceted ring piece, GAP apart from its neighbours
   const ri = r0 + GAP / 2, ro = r1 - GAP / 2, n = Math.max(1, Math.ceil((hi - lo) / 18)), pts = [];
@@ -78,7 +78,7 @@ export function layoutTouch(ui) {
     place(el, p, sp.at, sp.is);
   }
   TOP.forEach((id, i) => { const el = ui.querySelector(`[data-id="${id}"]`); if (!el) return; const h = HEX * Math.sqrt(3) / 2;
-    place(el, hex(-(8 + HEX) - i * HEX * 1.5 - i * 2, 6 + h + (i % 2) * (h + 1), HEX - 1.5), 'tr', 19); });
+    place(el, hex(-(8 + HEX) - i * HEX * 1.5 - i * 2, 6 + h + (i % 2) * (h + 1), HEX - 1.5), 'tr', 16); });
 }
 
 // which polygon button (shown) a screen point is in, or null

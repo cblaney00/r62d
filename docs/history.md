@@ -677,3 +677,7 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   strip and 0.3 × each rounded corner's radius as `r62dApp.insets()` / `onInsets()` (touch.js `applyInsets`); needs
   the new APK, older apps fall back to env() + 8 px. `CUTOUT=l,t,r,b,R node tests/phonescreens.mjs ...` paints the
   hole and corners on the screenshots and lists anything in them (34,0,0,0,40: none).
+- Smaller phone buttons (he asked, 2026-11-18: everything but the sticks smaller, the middle more open): touchlayout.js
+  bands B1 94-136 / B2 140-172 (were 94-150 / 156-196), ACTION 140-236, lean 94-128, icons ×0.82, top hexagons 17
+  (was 21); the aim stick centre RC (-232,-128) (was -250,-140; `#tsRight` right 172 / bottom 68 to match).
+  tests/phonebuttons.mjs: no overlaps on 4 sizes.
