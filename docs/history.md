@@ -765,3 +765,4 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   keeps it. pollPad no longer lets a connected-but-idle controller block touch play. Android `dispatchKeyEvent`: gamepad
   keys go to the WebView and count as handled (no B → Back fallback). Tested with a stubbed `navigator.getGamepads`.
 - Outdoor zoom (he asked 2026-11-18: too far out outdoors): body view outdoors (`insideAt` false), no TV, no sniper aimed in: `want` capped at `OUT_H` 640 and `st.longV` off (so sight range 1100, not LONG_R).
+- Diagonal sprint (he asked 2026-11-18, he chose screen directions): `sprintDiag()` in main.js (computer only, not on a controller/phone): sprint + one vertical + one horizontal key = a screen angle; `moveTurn` keeps the keys screen-relative, `sprintBack` steps aside, and the frame's aim is set to that angle so you face it and the server's sprint check (`sa` within 60°) passes. Tested: W+A → aim -135°, moved equally NW, sprinting every frame.

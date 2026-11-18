@@ -1061,10 +1061,20 @@ const slideAim = a => st.pred.slA + Math.max(-SLIDE.lock, Math.min(SLIDE.lock, a
 function trySlide() { if (!st.pred || !st.pred.spr || st.pred.scd > 0 || !st.me || st.me.ct !== 'body') return false; st.slideReq = performance.now(); return true; }
 // he asked: sprint + S sprints too (he kept pressing it), and (2026-11-16) sprint + A or D exactly the same: on your body
 // sprint with S, A or D (and no W) is sent as sprint + W alone, so you run where you aim
-const sprintBack = () => !!(st.me && st.me.ct === 'body' && !gpRecent() && keys.has('sprint') && (keys.has('down') || keys.has('left') || keys.has('right')) && !keys.has('up') && !steadying());
+// Sprint + two direction keys on a computer (he asked 2026-11-18: W+A sprints north-west, no strafe run): the keys pick one
+// of the eight directions on the screen and you turn to face it and sprint that way; the world angle, or null
+function sprintDiag() {
+  const me = st.me;
+  if (isTouch || gpRecent() || !me || me.ct !== 'body' || !me.a || me.dn || !keys.has('sprint') || steadying() || st.tv) return null;
+  if (mouse.l || keys.has('fire') || adsHeld() || keys.has('crouch') || st.prone || performance.now() < (st.sprintHold || 0) || sliding() || ropeOf()) return null;
+  const mx = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0), my = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0);
+  return mx && my ? Math.atan2(my, mx) - (st.rot || 0) : null;
+}
+const sprintBack = () => !!(st.me && st.me.ct === 'body' && !gpRecent() && keys.has('sprint') && (keys.has('down') || keys.has('left') || keys.has('right')) && !keys.has('up') && !steadying() && sprintDiag() === null);
 // How much the movement keys are turned: Rotate view, Face aiming (W goes the way you face), sprint + W (he asked: where you aim).
 function moveTurn() {
   const body = st.me && st.me.ct === 'body';
+  if (sprintDiag() !== null) return -(st.rot || 0); // (sprinting a screen diagonal: the keys as on the screen)
   if (body && !gpRecent() && (aimMode === 'face' || (keys.has('sprint') && (keys.has('up') || sprintBack()) && !steadying()))) return st.aim + Math.PI / 2;
   return -(st.rot || 0);
 }
@@ -2427,6 +2437,7 @@ function frame(nowMs) {
     { const R = ropeOf(); if (R) st.aim = ropeAimLimit(R, st.aim); }
     if (r3on() && rope3d.active()) { const a = rope3d.aim(); if (a) { st.aim = a.ang; aimOff = { x: a.x - st.pred.x, y: a.y - st.pred.y }; st.r3aim = a; } } else st.r3aim = null; // the 3D rope view: where its crosshair is
     if (now < (st.dazeUntil || 0)) st.aim += Math.sin(now * 6.3) * 0.05 + Math.sin(now * 2.1) * 0.04; // dazed: the aim sways
+    if (view.kind === 'body') { const d = sprintDiag(); if (d !== null) st.aim = d; } // sprinting a screen diagonal: you face the way you run (the crosshair comes back when you stop)
   } else if (view && view.kind === 'cam') {
     if (st.lastCam !== view.cam.id) { // switching cameras: start from that camera's current direction
       st.lastCam = view.cam.id; st.aim = view.cam.ag || 0; view.ang = st.aim; audio.foley('camSwitch');

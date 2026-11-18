@@ -146,4 +146,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'stairview', t: 'Stairs view: the further down or up the steps you are, the bigger the view of the other floor gets, with soft edges, until it is at its real size on the last step; indoor stairs no longer show a sliver of outside past the wall.', v: 1 },
   { d: '2026-11-18', k: 'mech', id: 'phonepad', t: 'Phones play with a controller: using one hides the buttons on the screen (touch to bring them back), or pick Phone + controller in Settings.', v: 1 },
   { d: '2026-11-18', k: 'mech', id: 'outzoom', t: 'Outdoors the view opens out only a little past a big room (it used to zoom far out down long sightlines); a sniper scope aimed in still gets the wide view.', v: -1 },
+  { d: '2026-11-18', k: 'mech', id: 'sprintdiag', t: 'Computer: sprint with two move keys (W+A, S+D...) turns you to sprint that way on the screen, no more strafe running.', v: 0 },
 ];
