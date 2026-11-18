@@ -14,6 +14,7 @@ const SPRINT_PUSH = 1.45; // (FIRE buttons setting) the move thumb this far out 
 // joysticks so the players can naturally flick either finger right next to the joystick to shoot"; then: a pulled
 // stick must never shoot, and it covers its ring while held): a finger put down on a ring shoots (build(): ringFire). His choices: a quick tap on the aim stick aims in / out; sprint is a
 // double-tap and hold on the move stick (its edge shoots now). The old FIRE buttons stay as a Settings choice.
+const MOVE_SETTLE = 150, MOVE_SLIP = 12, MOVE_DEAD = 0.14; // the move thumb's settling time (ms) and slide (px), and the dead zone (share of a full push)
 const MOVE_R = 74; // (fire rings) how far the move thumb pushes for a full run (was R, 62: he asked for a bigger stick)
 const TAP_MS = 250, TAP_PX = 12, DOUBLE_MS = 300; // a quick tap; two of them for sprint
 export const fireRings = () => store('r62d-fire') !== 'buttons';
@@ -224,7 +225,7 @@ function build() {
   // shoots, however far it goes, and while held the stick covers its ring. The ring is a fire button of its own: a
   // finger put down ON the ring of a stick nobody is holding shoots (the right one can be dragged to aim as it shoots,
   // like the old right FIRE).
-  const onRingOf = (el, x, y) => { if (el.classList.contains('held')) return false; const b = el.getBoundingClientRect(), rv = b.width / 2, d = Math.hypot(x - b.left - rv, y - b.top - rv); return d > rv * 0.97 && d < rv * STICK.RING / STICK.VR + 6; };
+  const onRingOf = (el, x, y) => { if (el.classList.contains('held')) return false; const b = el.getBoundingClientRect(), rv = b.width / 2, d = Math.hypot(x - b.left - rv, y - b.top - rv); return d > rv * 1.1 && d < rv * STICK.RING / STICK.VR + 6; }; // (clearly outside the stick: a thumb landing near its edge steers, it doesn't shoot)
   const ringFire = (id, el, x0, y0, drag) => {
     trigger(true); el.classList.add('firing'); let fx = x0, fy = y0, dragAim = false;
     fingers.set(id, {
@@ -260,10 +261,13 @@ function build() {
       // the landing spot already means where you aim now; from there it is the same stick as always, whole range and all
       { const o = aimStart(); if (o && Math.hypot(o.x, o.y) > 0.02) { const Ra = R / stickSens() * TUNE.TRAVEL; ox = x - o.x * Ra; oy = y - o.y * Ra; rs.x = o.x; rs.y = o.y; } }
       knob(dyn, rs, K);
-      const t0 = performance.now(), lx = x, ly = y; let mv = 0; // (lx, ly: where the thumb landed; a quick tap is measured from there)
+      const t0 = performance.now(), lx = x, ly = y; let mv = 0, settled = false; // (lx, ly: where the thumb landed; a quick tap is measured from there)
       fingers.set(id, {
         move(x, y) {
           const Ra = R / stickSens() * TUNE.TRAVEL; // (lower sensitivity: a longer reach for the thumb; TRAVEL: extra room for fine aim, he asked)
+          // a thumb settling as it lands (he asked 2026-11-18: the aim stick moved the aim before he meant to): for its first
+          // MOVE_SETTLE ms, while it stays within MOVE_SLIP px, the stick's centre moves with it, so the aim stays put
+          if (!settled) { if (performance.now() - t0 < MOVE_SETTLE && Math.hypot(x - lx, y - ly) < MOVE_SLIP * tz()) { ox += x - tx; oy += y - ty; } else settled = true; }
           tx = x; ty = y; aimPx = { x, y }; mv = Math.max(mv, Math.hypot(x - lx, y - ly)); let u = (x - ox) / Ra, v = (y - oy) / Ra; const l = Math.hypot(u, v);
           if (l > 1) { ox += (u / l) * (l - 1) * Ra; oy += (v / l) * (l - 1) * Ra; u /= l; v /= l; } // the centre follows a thumb that slides past the edge
           rs.x = u; rs.y = v; knob(dyn, rs, K);
@@ -276,12 +280,16 @@ function build() {
     } else if (y > innerHeight * 0.3) { // lower left: the move stick jumps to wherever the thumb lands
       if (leftF !== null) return;
       // (with the rings the stick is a bit bigger, he asked: a longer push for a full run, and it covers its ring while held)
-      leftF = id; const z = tz(), r = (rings ? MOVE_R : R) * z, half = rings ? STICK.VR : 62, K = rings ? STICK.KNOB : R, cx = x, cy = y, t0 = performance.now(); let mv = 0;
+      leftF = id; const z = tz(), r = (rings ? MOVE_R : R) * z, half = rings ? STICK.VR : 62, K = rings ? STICK.KNOB : R, t0 = performance.now(); let cx = x, cy = y, mv = 0, settled = false;
       base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; base.style.bottom = 'auto'; base.classList.add('held');
       if (rings && t0 - lastLeftTap < DOUBLE_MS) { setAds(false); sprintLock = true; } // double-tap and hold: sprint until you let go (his choice)
       lastLeftTap = 0;
+      // A thumb put down is not a push (he asked 2026-11-18: landing on the stick often walked already): while it settles
+      // (its first MOVE_SETTLE ms, or until it travels MOVE_SLIP px) the stick's centre slides along under it, and after
+      // that a small dead zone in the middle walks nowhere, the push growing smoothly from its edge.
       const move = (x, y) => {
-        let u = (x - cx) / r, v = (y - cy) / r; const l = Math.hypot(u, v); mv = Math.max(mv, l * r); if (l > 0.4 && useLatch) setUse(false);
+        if (!settled) { const now = performance.now(), d = Math.hypot(x - cx, y - cy); if (now - t0 < MOVE_SETTLE && d < MOVE_SLIP * z) { cx = x; cy = y; base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; } else settled = true; }
+        let u = (x - cx) / r, v = (y - cy) / r; const l0 = Math.hypot(u, v), dz = l0 < MOVE_DEAD ? 0 : (l0 - MOVE_DEAD) / (1 - MOVE_DEAD) / l0; u *= dz; v *= dz; const l = Math.hypot(u, v); mv = Math.max(mv, l * r); if (l > 0.4 && useLatch) setUse(false);
         if (!rings) { if (l >= SPRINT_PUSH) { if (!sprintLock) setAds(false); sprintLock = true; } else if (l < 0.6) sprintLock = false; } // (FIRE buttons: push past the ring to sprint, like phone shooters)
         base.classList.toggle('spr', sprintLock); if (l > 1) { u /= l; v /= l; } ls.x = u; ls.y = v; knob(base, ls, K);
       };
