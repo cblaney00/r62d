@@ -545,3 +545,10 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 ## Movement 13% slower (2026-11-17, he asked)
 - `M_S` in shared/physics.js: run 2.6 → 2.262, sprint 4.2 → 3.654, Shift-walk 1.4 → 1.218 m/s (crouch, ADS, prone,
   slide, drones untouched). `tests/stairs.js` PASS, `tests/sim.js --only harbor` PASS.
+
+## Pro practice on the slower-movement version (2026-11-17, he asked)
+- Two `server/practice.js 600` sessions on the real data (backup: `pro-training.json.before-2026-11-17-practice`):
+  1200 rounds on this version, drills 483 → 842. The first session only added 60 drills (one thread's worth, cause not
+  found; a throwaway rerun and the second session each added the full 300): after a practice, check `drills.n` grew by
+  60 per thread. Pros' takes: Dust Town (attack 61%) and Embassy (59%) worst maps, the 2× scope on the Trestle LMG too
+  good, bodies too thin, bullet trails.
