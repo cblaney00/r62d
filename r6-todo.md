@@ -6,10 +6,10 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 - [ ] make sure the sightlines dont shake while smoothly dragging the camera around, they seem to do this with both drones and regular operator view and it is very horrible and annoying and needs to not happen, if we have to rework how you draw the sight lines that is fine if it is faster and doesnt affect how the game is played
-- [ ] the sentry carbine and tandem carbine look nearly identical, change the tandem carbine's model. the lark and auger have the same issue, the ox belt fed and the trestle as well, the longbow and the heron, the vex .50 and the needle target pistol too
 
 
 ## Done
+- [x] the sentry carbine and tandem carbine look nearly identical, change the tandem carbine's model. the lark and auger have the same issue, the ox belt fed and the trestle as well, the longbow and the heron, the vex .50 and the needle target pistol too
 - [x] lets also have the reticle no longer be customizable, the reticle should resemble the reticle of the type of sights you are using on the weapon that you currently have out
     - all the reticles should be easy to see and non intrusive, some level of opacity to them, not too big or small
 - [x] the sniper scope should havea sight line extending from the operator to the sniper scope so the player can see everything in the way of the sniper view

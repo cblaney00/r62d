@@ -524,3 +524,9 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   way, a little see-through (82%), not too big or small (×1.35 a pixel, dark edge). Spread still opens them up.
 - Settings → CROSSHAIR page removed (old saved `xh` profiles are ignored). The holo ring, prism chevron and 2× scope ticks
   are gone from `drawSightLook` (on the reticle now); its red-dot bloom, scope edge darkening and sniper lens reticle stay.
+
+## Look-alike guns redrawn (2026-11-17, he asked)
+- Five pairs looked nearly the same; the second of each got a new picture (`G` in gunart.js): Tandem (sand, new `skeleton`
+  stock, vented `shroud`), Auger (no stock, orange `stripe` band, curved mag), Trestle (olive + wood, new `pan` magazine on
+  top, also in hand in sprites.js), Heron (steel blue, black thumbhole stock, brake), Needle (black, new `target` long thin
+  barrel with a weight, wooden grip). Checked side by side in a test browser.

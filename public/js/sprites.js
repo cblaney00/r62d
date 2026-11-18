@@ -249,7 +249,8 @@ function drawGun(ctx, wkey, recoil) {
   if (g.mag === 'drum') { ctx.fillStyle = '#3c4147'; ctx.beginPath(); ctx.arc(x0 + L * 0.34, 4.4, 2.5, 0, 7); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 0.5; ctx.stroke(); }
   else if (g.mag === 'bullpup') box(ctx, x0 + L * 0.06, 2.7, 2.3, 3.6, 0.5, '#24272b');
   else if (w.cls === 'AR' || w.cls === 'SMG' || w.cls === 'MP') { box(ctx, x0 + L * 0.32, 2.7, 2.3, w.cls === 'MP' ? 2.8 : 3.6, 0.5, '#24272b'); }
-  if (w.cls === 'LMG' && g.mag !== 'drum') { box(ctx, x0 + L * 0.26, 2.5, 5, 4.4, 0.8, '#3d4030'); cap(ctx, x0 + L * 0.7, 2.2, x0 + L * 0.45, 3.6, 0.6, '#222'); }
+  if (g.mag === 'pan') { ctx.fillStyle = '#4a4e3a'; ctx.beginPath(); ctx.arc(x0 + L * 0.3, 1.35, 3.2, 0, 7); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 0.5; ctx.stroke(); } // the Trestle's flat pan magazine on top
+  else if (w.cls === 'LMG' && g.mag !== 'drum') { box(ctx, x0 + L * 0.26, 2.5, 5, 4.4, 0.8, '#3d4030'); cap(ctx, x0 + L * 0.7, 2.2, x0 + L * 0.45, 3.6, 0.6, '#222'); }
   if (g.mag === 'belt') { ctx.fillStyle = '#b08a3e'; for (let i = 0; i < 4; i++) ctx.fillRect(x0 + L * 0.26 - 1 - i * 1.1, 4.6 + i * 0.5, 0.7, 1.6); } // brass belt
   if (w.cls === 'Shotgun' && g.pump) { box(ctx, x0 + L * 0.5, -0.1, 5, 3.1, 0.8, '#6a4628'); ctx.fillStyle = 'rgba(0,0,0,0.4)'; for (let i = 0; i < 4; i++) ctx.fillRect(x0 + L * 0.5 + 0.6 + i * 1.1, 0.1, 0.4, 2.7); }
   if (w.cls === 'DMR') {
