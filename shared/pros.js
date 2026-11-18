@@ -102,13 +102,22 @@ function flood(m, starts) {
 // round it, and the spots defenders hold.
 // worked out once per map build (a new one each round) and site: the plans and the bots ask for it several times a round
 const INTEL = new WeakMap();
+// A round's map is a fresh copy of the same map (buildMap): while it still matches the untouched one, what was worked
+// out for that one is used again (this was three quarters of the hitch at each round start).
+const same = (a, b) => { for (const f of ['tiles', 'hp', 'portal']) { const x = a[f], y = b[f]; if (!x || !y || x.length !== y.length) return false; for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false; } return true; };
 export function siteIntel(m, si) {
-  let c = INTEL.get(m); if (!c) INTEL.set(m, c = {});
+  let c = INTEL.get(m);
+  if (!c) { const p = m.pristine; if (p && same(m, p)) { c = INTEL.get(p); if (!c) INTEL.set(p, c = {}); } else c = {}; INTEL.set(m, c); }
   return c[si] || (c[si] = siteIntel0(m, si));
 }
 function siteIntel0(m, si) {
-  const site = m.sites[si], inSite = inRooms(m, site.rooms), W = m.W;
-  const at = k => inSite(k % W, Math.floor(k / W));
+  const site = m.sites[si], inSite = inRooms(m, site.rooms), W = m.W, N = m.tiles.length;
+  // the site's cells, worked out once (asking the room list for every cell of the map, for every way in, was most of
+  // the hitch at each round start): a mask for "is this cell in the site", and the list in map order
+  const mask = new Uint8Array(N), siteCells = [];
+  for (const r of m.rooms) if (site.rooms.includes(r.name)) for (let y = Math.max(0, Math.ceil(r.y)); y < r.y + r.h; y++) for (let x = Math.max(0, Math.ceil(r.x)); x < Math.min(W, r.x + r.w); x++) { const k = y * W + x; if (k < N && !mask[k]) { mask[k] = 1; siteCells.push(k); } }
+  siteCells.sort((a, b) => a - b);
+  const at = k => mask[k] === 1;
   const spawns = (m.atkSpawns || []).map(s => ({ ...s, k: Math.floor(s.y / CELL) * W + Math.floor(s.x / CELL) }));
   const dist = flood(m, spawns.map(s => s.k));
   const ways = [];
@@ -147,7 +156,7 @@ function siteIntel0(m, si) {
     }
     cand.sort((a, b) => a.s - b.s); if (cand[0]) w.stack = cand[0].c;
     const holds = [];
-    for (let k = 0; k < m.tiles.length; k++) {
+    for (const k of siteCells) {
       if (!at(k) || m.tiles[k] !== T.FLOOR) continue;
       const c = cxy(m, k), d = Math.hypot(c.x - w.pos.x, c.y - w.pos.y) / CELL; if (d < 3 || d > 9) continue;
       if (!los(m, c.x, c.y, w.pos.x, w.pos.y, null)) continue;

@@ -24,9 +24,28 @@ export const MAPS = {
 };
 export const MAP_LIST = Object.keys(MAPS).filter(k => !MAPS[k].zombie); // (the zombies town is not a normal map)
 
+// Building a map takes 25-75 ms and always gives the same result, yet every round starts from a fresh one (the server and
+// every browser: a freeze at each round start, twice over on a phone, where both run in one page). So each map is built
+// once and every call gets its own copy (~2 ms): typed arrays copied, objects and arrays copied with what they share
+// still shared, functions (the decor painters) kept as they are.
 const cache = new Map();
 export function buildMap(id = 'harbor') {
   if (!MAPS[id]) id = 'harbor';
+  let m0 = cache.get(id); if (!m0) cache.set(id, m0 = buildFresh(id));
+  const m = copyOf(m0, new Map());
+  Object.defineProperty(m, 'pristine', { value: m0 }); // (hidden: the untouched map it was copied from, for work that only needs doing once per map, e.g. siteIntel in pros.js)
+  return m;
+}
+function copyOf(v, memo) {
+  if (v === null || typeof v !== 'object') return v;
+  let c = memo.get(v); if (c) return c;
+  if (ArrayBuffer.isView(v)) c = v.slice();
+  else if (v instanceof Map) { c = new Map(); memo.set(v, c); for (const [a, b] of v) c.set(copyOf(a, memo), copyOf(b, memo)); return c; }
+  else if (v instanceof Set) { c = new Set(); memo.set(v, c); for (const a of v) c.add(copyOf(a, memo)); return c; }
+  else { c = Array.isArray(v) ? new Array(v.length) : {}; memo.set(v, c); for (const k of Object.keys(v)) c[k] = copyOf(v[k], memo); return c; }
+  memo.set(v, c); return c;
+}
+function buildFresh(id) {
   const m = MAPS[id].build();
   addCams(m);
   addRopes(m);
