@@ -6,7 +6,7 @@
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, PLAYER_R, T, FL, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked, leanPoint, LEAN_PX, inBox } from '../shared/physics.js';
-import { ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
+import { hatchNear, ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
 import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess, DRILL_STYLE, drillMul } from './training.js';
@@ -1391,6 +1391,16 @@ function roofPick(game, p) {
     R.sq[p.squad] = plan;
   }
   const plan = R.sq[p.squad];
+  // up on the roof without being part of the plan (a HOIST grapple, a wander up a rope): join it, or make one of your own
+  // to the nearest open hatch (stuckbots found a HOIST standing on the roof the rest of the round)
+  if (m.roofFloor !== undefined && floorAt(m, p.x, p.y) === m.roofFloor && !(plan && plan.ids.includes(p.id))) {
+    if (plan) { plan.ids.push(p.id); return plan; }
+    R.own = R.own || {}; if (R.own[p.id] !== undefined) return R.own[p.id];
+    const top = r => { while (r.up >= 0) r = m.ropes[r.up]; return r.roof ? r : null; }, d = (x, y) => Math.hypot(x - p.x, y - p.y);
+    const h = (m.hatches || []).filter(h => h.roof && m.tiles[h.cells[0]] !== T.HATCHR).sort((a, b) => d(a.x, a.y) - d(b.x, b.y))[0];
+    const rope = m.ropes.filter(r => r.down < 0 && top(r)).sort((a, b) => d(top(a).roof.x, top(a).roof.y) - d(top(b).roof.x, top(b).roof.y))[0];
+    return (R.own[p.id] = h && rope ? { h, rope, top: top(rope), ids: [p.id], dropAt: elapsedAction(game) + 12 } : null);
+  }
   return plan && plan.ids.includes(p.id) ? plan : null;
 }
 // Rappelling to a window (he asked 2026-11-13: bots test the new rope play): once a round an attacking team may send one
@@ -1449,7 +1459,7 @@ function windowPlay(game, p, inp, dt) {
     return true;
   }
   ai.wSeen = null;
-  if (st.s === 'hang' && (late || elapsedAction(game) > plan.goAt)) { st.s = 'in'; log({ e: 'go' }); }
+  if (st.s === 'hang' && (late || elapsedAction(game) > plan.goAt || game.time - (st.hangT ?? game.time) > 25)) { st.s = 'in'; log({ e: 'go' }); } // (at most 25 s beside the window: longer looked stuck, stuckbots found)
   if (st.s === 'in') { // to the window's middle, then through it (smashing the boards)
     if (!win) { press('interact'); return true; } // (a plain wall: let go)
     if (st.inv) { inp.inv = prev.inv ? 0 : 1; st.inv = false; return true; }
@@ -1507,7 +1517,7 @@ function roofPlay(game, p, inp, dt) {
   })());
   if (st.s === 'open') {
     if (tile === T.HATCHR) { st.s = 'leave'; teamSay(game, p, 'Roof hatch is reinforced, coming down.', 'roofR'); return true; }
-    if (tile === T.HATCH) { if (Math.hypot(edge.x - p.x, edge.y - p.y) > 8) { moveTo(game, p, inp, edge, dt); return true; } aimAt(p, h.x, h.y); inp.crouch = 1; if (p.meleeCd <= 0) game.event(p, { k: 'melee' }); return true; }
+    if (tile === T.HATCH) { if (Math.hypot(edge.x - p.x, edge.y - p.y) > 8) { moveTo(game, p, inp, edge, dt); return true; } aimAt(p, h.x, h.y); if (hatchNear(m, p.x, p.y, Math.atan2(h.y - p.y, h.x - p.x), 14) !== h) { moveTo(game, p, inp, { x: h.x, y: h.y }, dt); return true; } inp.crouch = 1; if (p.meleeCd <= 0) game.event(p, { k: 'melee' }); return true; } // (step in until a swing reaches it: from the edge spot it could miss forever, stuckbots found)
     st.s = 'util';
   }
   if (st.s === 'util') { // a grenade down the hole first
@@ -1519,7 +1529,8 @@ function roofPlay(game, p, inp, dt) {
   }
   if (st.s === 'hold') { // lie at the edge looking down until the team goes in
     const goAt = p.pro ? (() => { const ps = proPlan(game, p.squad, 'atk'); return ps && ps.go ? ps.go : R.dropAt; })() : R.dropAt;
-    if (elapsedAction(game) < goAt) {
+    st.holdT = st.holdT ?? game.time;
+    if (elapsedAction(game) < goAt && game.time - st.holdT < 25) { // (at most 25 s over the hole: longer looked stuck and wasted the round, stuckbots found)
       if (Math.hypot(edge.x - p.x, edge.y - p.y) > 8) { moveTo(game, p, inp, edge, dt); return true; }
       inp.prone = 1; turnTo(p, Math.atan2(h.y - p.y, h.x - p.x), skill(game, p).turn, dt); return true;
     }

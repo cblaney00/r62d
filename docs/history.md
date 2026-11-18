@@ -656,3 +656,9 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Phone stick settle (MOVE_SETTLE 150 ms / MOVE_SLIP 12 px / MOVE_DEAD 0.14, ring only beyond 1.1 stick radii) and no key
   chips on phones (style.css end). Found, not caused by this: tests/thumbs.mjs SCENARIO=rope reports the rope aim drag
   moving the crosshair 0 px, also with the stick code from before (to look into).
+- Bugs found on the way, fixed (2026-11-18, he asked): roof bots swung at a roof hatch from the edge spot out of melee
+  reach (14 px) forever: they now step in until `hatchNear` reaches it. A bot on the roof outside the squad's roof plan
+  (a HOIST grapple) stood there all round: `roofPick` now adds it to the plan or makes its own. Bots held over a hatch
+  or beside a window up to ~50 s: capped at 25 s. tests/stuckbots.js prints each stuck bot's plan; what is left is a
+  PERCH sniper holding an angle (by design). The phone rope-drag "0 px" was the test's thumb landing on a button
+  (tests/thumbs.mjs now uses the aim stick's real place): drag works.
