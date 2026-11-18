@@ -734,3 +734,10 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   teammate is in or has checked, time > 45 s, a drone to hand: get out of its sight (Platinum+), drive in, look 6-9 s
   (2.5-4.5 s below), back on hurt. Per 16 rounds: Copper 0, Silver 0.6, Platinum/Champion 4.8 checks a round, never more
   than 2 drones out per attacker. `tests/feeds.js` follows the new 6 (was flaky on the old rule). Embassy 51%, Dust 58%.
+- Pro ideas (he asked): `formSuggestions` in opinions.js (see docs/drills.md "Ideas"), BALL KNOWLEDGE → PRO IDEAS
+  (`renderIdeas`: most-backed first, then each pro). Practice counts `droneCheck`, `hatchBlast`, `stairKill`, `op_<id>`
+  rounds and round endings (`training.ends`, `training.featV` per version). Practice found two bot gaps the ideas would
+  have blamed on the game: pro defenders never used rat spots (now `ratTry` in their hold, ~1.2 per 100 player-rounds)
+  and HOIST never met a shut hatch (now `hoistTo`: seeks one up toward an upstairs site; forced test 4/8 rounds). 1,400
+  practice rounds on this version (600 + 800, ~4 min each). First ideas: School 3F Clock Room and Lodge 2F Games Room
+  too hard for attack (33%), Dust A and Embassy B Vault too easy (64-67%), take out scope glare (0.1 per 100).

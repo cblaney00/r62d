@@ -119,7 +119,8 @@ const CARE = [ // how each one opens (picked by a steady quirk of their name)
 // the habits practice counts (bots.js feat, train-worker.js), by what they are in the game
 const MECH = { rappel: 'rappelling to the site windows', roof: 'going in from the roof', rat: 'the rat spots', slide: 'the power slide', prone: 'lying down', vault: 'vaulting',
   wallbang: 'shooting through walls', glare: 'scope glare', feeds: 'watching team camera feeds', droneCheck: 'droning a room before going in', hatchBlast: 'HOIST\'s hatch charge', stairKill: 'fights up and down the stairs' };
-const MECH_OP = { hatchBlast: 'hoist' }; // mechanics only one operator has: judged by that operator's rounds
+const MECH_OP = { hatchBlast: 'hoist' };
+const MECH_CORE = new Set(['stairKill', 'feeds']); // part of how the game is built: can't come out, only be made worth doing // mechanics only one operator has: judged by that operator's rounds
 const ROLE_CARES = { entry: ['clock', 'site', 'slide'], intel: ['droneCheck', 'feeds', 'glare'], breach: ['site', 'wallbang', 'hatchBlast'], support: ['op', 'clock'], flank: ['rappel', 'roof', 'rat'],
   anchor: ['site', 'stairKill', 'rat'], trapper: ['site', 'feeds'], roamer: ['stairKill', 'rat', 'clock'] };
 function ideas(pl) {
@@ -155,7 +156,8 @@ function ideas(pl) {
     const opR = MECH_OP[f] ? V['op_' + MECH_OP[f]] || 0 : rounds.n; if (MECH_OP[f] && opR < 40) continue; // (not enough rounds on that operator yet)
     const per = use[f] / opR * 100; if (per >= 1.5) continue; // (a player does it at least once every ~70 rounds: it is part of the game)
     out.push({ kind: 'remove', id: 'mech:' + f, s: (1.5 - per) * 0.5 * (0.6 + patience * 0.5) * w(f), why: MECH_OP[f] ? `${OPERATORS[MECH_OP[f]].name} uses it ${per.toFixed(1)} times every hundred rounds they play` : `it happens ${per.toFixed(1)} times every hundred rounds a player`,
-      text: `Take out ${name}, or make it worth doing: it hardly ever happens. Every mechanic is one more thing a new player has to learn, and this one gives almost nothing back. A cleaner game is a better game.` });
+      text: MECH_CORE.has(f) ? `${name.charAt(0).toUpperCase() + name.slice(1)} hardly ever happen. That should be one of the best parts of this game. Give people a reason to take that fight, or it might as well not be there.`
+        : `Take out ${name}, or make it worth doing: it hardly ever happens. Every mechanic is one more thing a new player has to learn, and this one gives almost nothing back. A cleaner game is a better game.` });
   }
   return out;
 }
