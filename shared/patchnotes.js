@@ -123,4 +123,6 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'ropes', t: 'On a rope the walls nearby show real brick, plaster and concrete, windows reflect the sky and boards show grain and nails.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'ropes', t: 'The rope view looks premium: weathered wall tops, a climber with a harness and figure-8, boots pushing off the wall, grass at the wall foot, and climbing in through a window swoops through its frame.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: putting your thumb on either stick no longer counts as a push; the stick settles under your thumb first, and the move stick has a small dead zone.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'ropes', t: 'Climbing in through a window: the camera follows you through the frame, close behind you, then rises into the normal view.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: no keyboard key hints in prompts, tips, gadget slots or the free play bar.', v: 0 },
 ];

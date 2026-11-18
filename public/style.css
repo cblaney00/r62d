@@ -1598,3 +1598,7 @@ html.touch .selLeft #opgrid .op canvas { flex: 1 1 auto; min-height: 46%; }
 html.touch #opgrid .op .role { display: none; }
 html.touch #opgrid .op .nm, html.touch #opgrid .op .ab { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.touch #roleBar:not(.choose):not(.place) button { padding: 6px 2px; letter-spacing: 0; } html.touch #roleBar:not(.choose):not(.place) .rIcon { display: none; }
+/* Phones show no key hints (he asked 2026-11-18: no need to know the keyboard on a phone, and less clutter): the key
+   chips in the prompts, the window hint, the gadget slots, the tips and the free play bar are hidden; the words stay.
+   (main.js still reads the prompt's chips for the ACTION button's word.) */
+html.touch #prompt b, html.touch #winGo b, html.touch #gadgets b, html.touch #tipNow kbd, html.touch #freeHint kbd, html.touch .keyGroup { display: none !important; }

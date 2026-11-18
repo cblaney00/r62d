@@ -1871,7 +1871,7 @@ function ropeCam(dt) {
     if (T < w.end) { const rise = sstep((T - w.hold) / SWOOP_RISE);
       st.rt = T < w.hold ? Math.max(st.rt || 0, 0.999) : 1 - rise;
       st.swoopZ = T < w.c ? sstep(T / w.c) : T < w.hold ? 1 : 1 - rise; return st.rt; }
-    st.swoop = null; st.rt = 0; }
+    st.swoop = null; st.rt = 0; st.swoopTail = performance.now() / 1000 + 1.6; } // (then the camera eases to its usual spot, no snap)
   st.swoopZ = 0;
   const want = f != null ? 1 : 0; st.rt = st.rt || 0;
   st.rt += (want - st.rt) * (1 - Math.exp(-dt * (want ? 4.5 : 1.9))); if (st.rt < 0.002 && !want) st.rt = 0; // (letting go, or climbing in at a window, glides back slowly: he asked for smooth transitions in)
@@ -2466,9 +2466,9 @@ function frame(nowMs) {
   if ((st.swoopZ || 0) > 0 && st.rtFace != null) { const z = st.swoopZ, vh = st.viewH || 400, tx = st.pred.x + Math.cos(st.rtFace) * vh * 0.07, ty = st.pred.y + Math.sin(st.rtFace) * vh * 0.07; cx += (tx - cx) * z; cy += (ty - cy) * z; } // the swoop: the camera stays right on you as you go through
   const locked = camLocked(view);
   if (locked) { const t = lockedTarget(dt, view); cx = t.x; cy = t.y; }
-  const k = 1 - Math.exp(-dt * 14);
+  const k = 1 - Math.exp(-dt * (st.swoopTail > performance.now() / 1000 ? 3.5 : 14)); // (just after the window swoop: a slow glide to the usual spot)
   if (locked) { st.cam.x = cx; st.cam.y = cy; } else
-  if (Math.hypot(cx - st.cam.x, cy - st.cam.y) > 420) { st.cam.x = cx; st.cam.y = cy; if (view) st.leadV = null; } // spawned, new round: be there at once
+  if (Math.hypot(cx - st.cam.x, cy - st.cam.y) > 420 && !(st.swoopTail > performance.now() / 1000)) { st.cam.x = cx; st.cam.y = cy; if (view) st.leadV = null; } // spawned, new round: be there at once (not just after the window swoop: that glides)
   st.cam.x += (cx - st.cam.x) * k; st.cam.y += (cy - st.cam.y) * k;
   if (view && view.kind !== 'body') { st.cam.x = cx; st.cam.y = cy; }
   // zoom: close in tight rooms, wider outside or when looking down a long sightline
@@ -2560,6 +2560,7 @@ function frame(nowMs) {
   st.viewH *= viewMul(); // Settings: how much of the map you see (phones the same as a computer since 2026-11-16)
   if (freeAim && (st.rt || 0) > 0.05) { const L = st.viewH * (0.82 - 0.07 * (st.rads || 0) + (1 - Math.min(1, st.rt)) * 3) + ROPE_REACH_X * PX_PER_M, l = Math.hypot(aimOff.x, aimOff.y); if (l > L) aimOff = { x: aimOff.x * L / l, y: aimOff.y * L / l }; } // (aimed in on a rope: the crosshair stays in the tight view)
   st.zoom = VH / st.viewH;
+  const camA = { x: st.cam.x, y: st.cam.y }, tailK = st.swoopTail > performance.now() / 1000 ? Math.min(1, dt * 5 + Math.max(0, 1 - (st.swoopTail - performance.now() / 1000) / 0.9) ** 2) : 1; // (just after the window swoop the limits below ease in instead of jumping)
   if ((freeAim || tFar) && !locked) { // keep you and the crosshair on screen: pushing it at the edge slides the view along
     const q = tFar ? padPointW() : freeAimPoint(), hw = VW / 2 / st.zoom, hh = VH / 2 / st.zoom;
     const keep = (x, y, m) => { st.cam.x = Math.min(x + hw - m, Math.max(x - hw + m, st.cam.x)); st.cam.y = Math.min(y + hh - m, Math.max(y - hh + m, st.cam.y)); };
@@ -2607,6 +2608,7 @@ function frame(nowMs) {
       if (locked) aimOff = { x: aimOff.x + w.x - q.ax, y: aimOff.y + w.y - q.ay }; // locked camera: the crosshair stops at the screen edge (and pans the view, lockedTarget)
       else { st.cam.x += q.ax - w.x; st.cam.y += q.ay - w.y; } }
   }
+  if (tailK < 1) { st.cam.x = camA.x + (st.cam.x - camA.x) * tailK; st.cam.y = camA.y + (st.cam.y - camA.y) * tailK; }
   if (view) { audio.setListener(view.x, view.y); st.listen = { x: view.x, y: view.y }; }
 
   let t1 = pfa('logic', T0);
@@ -3067,6 +3069,7 @@ function draw(s, view, now, dt) {
   // the eye (the point things stand up away from) sits below the screen, as a camera tilted like the world layers would
   // see it (he asked 2026-11-14: more volume): everything, you in the middle too, shows its front and its height
   const OB = (st.viewH || 400) * EYE_BACK, U0 = UP();
+  if (st.swoop && st.rtFace != null) { const w = Math.min(1, (st.swoopZ || 0) * 2.5), vh = st.viewH || 400, tx = st.pred.x + Math.cos(st.rtFace) * vh * 0.3 * st.rt, ty = st.pred.y + Math.sin(st.rtFace) * vh * 0.3 * st.rt; st.cam.x += (tx - st.cam.x) * w; st.cam.y += (ty - st.cam.y) * w; } // the swoop: the view stays on you all the way through, and while it turns back upright
   let eye = { x: st.cam.x - U0.x * OB, y: st.cam.y - U0.y * OB };
   if (st.rt > 0 && st.rtFace != null) { const E = (st.ropeBaseH || st.viewH || 400) * ROPE_EYE * (1 - 0.95 * (st.swoopZ || 0)), k = st.rt; /* (the swoop: the eye drops in close behind you, so the frame passes round you) */ eye = { x: eye.x + (st.cam.x - Math.cos(st.rtFace) * E - eye.x) * k, y: eye.y + (st.cam.y - Math.sin(st.rtFace) * E - eye.y) * k }; /* (glides from the usual eye to the one behind you) */ RH += (ROPE_RAISE - RH) * st.rt; const me0 = st.me, hh = me0 && me0.ro && me0.ro[0] ? Math.max(0, Math.min(1, st.ropeH ?? 0.5)) : 0.5; RH *= 1 + (0.5 - hh) * 0.2 * st.rt; } // (on a rope: low on the wall the walls look taller, high up you look down over them)
   // Low graphics stays flat, except in the rope camera, which glides into its 3D look (he asked 2026-11-14)

@@ -648,3 +648,11 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   the walls. Window entry swoop (his pick): `st.swoop` set when a vault starts off a rope; `ropeCam` holds then
   smoothsteps `st.rt` (SWOOP_IN 0.35 / HOLD 0.5 / END 1.2 s), `st.swoopZ` pushes the view in, `screenFx` draws the frame
   growing past the screen and a soft vignette. GPU (headless gamescope, Embassy rope): 135 → 136 fps, unchanged.
+- Window swoop, take two (he said 10% of the execution): `swoopT()`; while crossing (the server's vault time) the rope
+  eye comes in to 5% of its distance (`ROPE_EYE * (1 - 0.95 swoopZ)`), +9° tilt, view 34% tighter, and the camera is
+  pinned on you (st.cam blended to you + 0.3 view heights into the room, before the eye, while `st.swoop`); a 0.18 s beat;
+  then a 0.95 s rise (rt smoothstep). After it `st.swoopTail` 1.6 s: slow follow (3.5/s), no 420 px snap, and the camera
+  limits after the follow ease in (`camA`/`tailK`). Measured with `st.meScr` (your screen spot, 0..1): centred through.
+- Phone stick settle (MOVE_SETTLE 150 ms / MOVE_SLIP 12 px / MOVE_DEAD 0.14, ring only beyond 1.1 stick radii) and no key
+  chips on phones (style.css end). Found, not caused by this: tests/thumbs.mjs SCENARIO=rope reports the rope aim drag
+  moving the crosshair 0 px, also with the stick code from before (to look into).
