@@ -6,9 +6,9 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
-- [ ] run ball knowledge fixes when it comes to the pro takes
 
 ## Done
+- [x] run ball knowledge fixes when it comes to the pro takes (DONE 2026-11-18: checked with ~120 bot rounds a map: Dust Town 54% attack = fine; The Embassy was 40%, the other way, so he chose to move it only with breakable walls by the sites (2 per site room, was 1) and barricades per defender a round (1 on the Embassy, a per-map setting; other maps unlimited): 48% now; Ox Belt-Fed damage 36 → 33)
 - [x] if the aiming reticle is within 2m of a visible enemy then it will not snap to the default distance for the sight and instead stay where it is when ADS is engaged, this is to prevent disincentivizing good cursor placement when the gun is not aimed in (DONE 2026-11-18: in Crosshair mode and on phones, aiming in leaves the crosshair where it is when it is within 2 m of an enemy you can see, any sight; elsewhere it snaps out as before)
 - [x] the stairs should only be accessible only from the bottom most stair if going upstairs unless the operator jumps (DONE 2026-11-18: every staircase has rails: on only at the bottom step going up (top step coming down), no stepping on or off the sides partway, a jump (Space) still crosses; bots plan the same way; he chose: sides blocked both ways)
 - [x] (he asked 2026-11-18) on the stairs the character should show that they are elevated or dis-elevated, using and adding to the current elevation UI feature (DONE 2026-11-18: climbing, the furniture look grows with the height: bigger, a light dashed ring, a shadow further out; going down they sink: smaller, a dark ring, no shadow; smooth across the change of floor)

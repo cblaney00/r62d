@@ -203,7 +203,9 @@ export function makeMap({ id, name, floors }) {
   // shooting through walls). The rest become solid concrete.
   // Same choice every round (it hashes the map id). map.hardened marks the walls this turned solid.
   const hardened = new Uint8Array(N);
-  const hardenWalls = (sites) => {
+  // siteSoft (a map's own setting, he asked 2026-11-18 for the Embassy's balance): how many breakable walls each site
+  // room keeps besides the one to its partner room (1 unless the map says otherwise)
+  const hardenWalls = (sites, siteSoft = 1) => {
     const rid = new Int16Array(N).fill(-1);
     rooms.forEach((r, i) => { for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) rid[y * W + x] = i; });
     const wallish = t => t === T.SOFT || t === T.HARD || t === T.REINF || t === T.BARRI || t === T.PANEL;
@@ -231,7 +233,7 @@ export function makeMap({ id, name, floors }) {
         const mine = [...walls.keys()].filter(key => !decided.has(key) && (walls.get(key).a === r || walls.get(key).b === r));
         // inside walls first (rotations and pushes), then outside ones; longer walls before short stubs
         mine.sort((p, q) => (walls.get(p).a < 0) - (walls.get(q).a < 0) || walls.get(q).cells.length - walls.get(p).cells.length || hash(p) - hash(q));
-        const keep = mine.filter(key => walls.get(key).cells.length >= 3).slice(0, 1);
+        const keep = mine.filter(key => walls.get(key).cells.length >= 3).slice(0, siteSoft);
         for (const key of mine) { decided.add(key); if (keep.includes(key)) soft.add(key); }
       }
     }
@@ -574,7 +576,7 @@ export function makeMap({ id, name, floors }) {
       }
     }
     siteWindows(extra && extra.sites);
-    hardenWalls(extra && extra.sites);
+    hardenWalls(extra && extra.sites, (extra && extra.siteSoft) ?? 1);
     windowJambs();
     droneHoles();
     buildRoof();

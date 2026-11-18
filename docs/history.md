@@ -688,3 +688,18 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Phone sticks (fire rings): `zoneOf` in touch.js: only the sticks themselves aim/move; on the red ring or up to `NEAR_RING` 26 px outside it shoots (outside the aim ring: no drag aim); anywhere else nothing. Knobs start in the middle (aim: `k0`/`aimKnob`, the smooth pickup kept; move stick no longer jumps under the thumb). Sticks 10% bigger (`STICK` 66/97/77, `MOVE_R` 81, CSS 132 px), button bands moved out 9 px. `SCENARIO=zones node tests/thumbs.mjs` checks all of it (PASS).
 - Round-start hitch (code review): `buildMap` built every map from scratch each round (23-149 ms, server and every browser; twice on a phone). Now built once per map and deep-copied (`copyOf`, 0.5-1.7 ms; copies proven equal to fresh builds). `siteIntel0` (pros.js) asked the room list for every map cell per way in: now a site cell mask/list, 30.5 → 6.2 ms per site, identical results. Server ticks over 33 ms per match: 3 → 0-1.
 - Game updates (code review, same day): the snapshot's shared end (everything after a player's `you`/`mine`) is compressed once per broadcast and joined to each player's small compressed start (`Socket.sendJoined` in server/ws.js; raw deflate ending in a sync flush can be concatenated). 0.82 → 0.28 ms per update for 10 players, no client change; `node tests/wsjoin.js`. Browser per-frame tidy-ups were measured and left (drawing dominates). Table in docs/performance.md.
+
+## 2026-11-18 (evening): stair rails, stair height look, aiming in near enemies, the pros' takes
+- Stair rails (he asked; he chose sides blocked both ways): `stairEdges`/`railBlocked` in shared/physics.js: per cell
+  the sides a body may not cross (1 n, 2 s, 4 w, 8 e): a flight's long sides and its closed end on each floor (lower
+  floor open at the bottom, upper at the top); `moveCircle(..., rails)` takes a step back on that axis unless airborne
+  (a jump crosses). Bots: `findPath` skips rail crossings. `tests/stairsides.js` (217 tries), `tests/reach.js` floods
+  with rails and lists nooks only a jump reaches (School 2F Library 33,17). Windows beside a flight: still a vault.
+- Stair height (he asked: show rising / sinking, adding to the furniture look): `stairLift(map, x, y)` (shared/map.js)
+  gives storeys climbed (lower copy 0 → 1, upper copy 0 → -1, smooth across the floor change); main.js draws it with the
+  furniture marker scaled by height (`STAIR_RISE` 0.6 walls): rising = bigger, light ring, shadow; sinking = smaller,
+  dark ring.
+- Aiming in (he asked): `nearFoe`/`ADS_KEEP` (2 m): in `adsReset` (Crosshair mode) and the phone `aimReset` branch, a
+  crosshair within 2 m of an enemy you see stays put (any sight). Checked in a browser: 0.8 m / 1.8 m off stays, away
+  snaps out (1.7 → 9.2 m). The phone path is only syntax-checked plus the same helper.
+- The pros' takes: see docs/balance.md (Dust fine, Embassy 40 → 48% with `siteSoft`/`barricades` map settings, Ox 36 → 33).

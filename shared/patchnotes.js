@@ -135,4 +135,6 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'stairs', t: 'Stairs have rails: going up you get on only at the bottom step, and nobody steps on or off a staircase from the side (a jump still crosses).', v: -1 },
   { d: '2026-11-18', k: 'mech', id: 'stairlook', t: 'On a staircase people show how high they are: rising (bigger, a light ring and a shadow) going up, sinking (smaller, a dark ring) going down.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'adskeep', t: 'Aiming in keeps your crosshair where it is when it is already within 2 m of an enemy you can see (elsewhere it still goes out to the sight\'s distance).', v: 1 },
+  { d: '2026-11-18', k: 'gun', id: 'ox', t: 'Ox Belt-Fed: damage 36 → 33 (it led every attack gun in kills a round).', v: -1 },
+  { d: '2026-11-18', k: 'map', id: 'embassy', t: 'The Embassy: two breakable walls into each site room (was one) and one barricade per defender a round (was unlimited), for the attackers (40% of rounds before).', v: 0 },
 ];

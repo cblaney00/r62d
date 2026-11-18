@@ -27,7 +27,7 @@ going.** Every idea goes there (there is no other list), only his ideas.
 ## Standing decisions (his; don't undo without asking)
 
 - Crosshair aiming mode is the default; other modes stay in Settings → Mouse & Aim.
-- Friendly fire always on (not in preparation). Unlimited barricades. Prep 30 s, action 2:40.
+- Friendly fire always on (not in preparation). Unlimited barricades, except where a map sets its own number a round (`barricades` in the map file; he chose 2026-11-18: The Embassy 1, other maps unlimited). Prep 30 s, action 2:40.
 - Out of sight = grey remembered map; only what YOU look through is live colour.
 - Fewer alert marks: no off-screen ! marks. He does NOT want the aim marker past the crosshair.
 - Voice is scrapped (text chat, ping wheel, map instead); don't bring it back unless he asks.

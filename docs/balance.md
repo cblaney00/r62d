@@ -134,3 +134,12 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
   (2F Ambassador 49), Lodge 41 (2F Games Room 30), School 40 (2F Principal Office 30, 2F Computer Lab 35), Dust 50.
   Villa is the map that needs work (all its sites); upstairs sites mostly fine now except Lodge Games Room, School 2F,
   Depot Control Room. Balance parked here 2026-11-16 (he asked: back seat).
+
+## 2026-11-18: the pros' takes checked, the Embassy moved (trained pros, `tests/probe.js 7 15 <map>` ×2, ~120 rounds a map, ±9%)
+- The pros' takes said Dust Town (66%) and The Embassy (64%) favour attack and the Ox Belt-Fed is broken. Measured
+  now: Dust Town 54% (A Spice Bazaar 58, B Water Works 51) = fine, left alone; The Embassy 40% (Reception Hall 32,
+  2F Ambassador Office 30) = the other way. Their map views came from older practice and will catch up after the next.
+- Ox Belt-Fed damage 36 → 33 (1.00 kills a round in practice vs 0.94 for the next attack gun, 75 rounds: a light cut).
+- The Embassy, only with the two levers he chose: `siteSoft: 2` (breakable walls each site room keeps besides the one
+  to its partner, mapkit.js `hardenWalls`; was 1) and `barricades: 1` (per defender a round, game.js; was unlimited;
+  bots used 0.7 a round, max 2, so this one bites people more than bots). Attack 40 → 48% (sites 52 / 38 / 55 / 48).

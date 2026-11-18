@@ -586,7 +586,7 @@ export class Game {
     });
     p.slot = 0; p.fireCd = 0; p.reloadT = 0; p.bloom = 0; p.vx = 0; p.vy = 0; p.gait = 0;
     p.adsT = 0; p.rc = 0; p.shots = 0; p.rcDir = Math.random() < 0.5 ? 1 : -1; p.viewTime = null;
-    p.barri = o.team === TEAM.DEF ? BARRICADES_EACH : 0;
+    p.barri = o.team === TEAM.DEF ? (this.map.barricades ?? BARRICADES_EACH) : 0; // (a map may set its own number a round, he asked 2026-11-18: map.barricades)
     p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false; p.shields = []; p.stash = {}; // (shields and leftovers to pick back up: this round, this operator)
     p.rope = null; p.pinged = null; p.sprints = DRONE_SPRINT.charges; p.sprintUntil = 0; p.sprintCd = 0;

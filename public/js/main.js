@@ -4260,7 +4260,8 @@ function promptText(s, me) {
   const f = facingCell(m, x, y, st.aim, 28);
   if (side === 'def' && f) {
     if (f.t === T.SOFT && s.rf > 0) return `<b>${label('interact')}</b>HOLD TO REINFORCE WALL (${s.rf} LEFT)`;
-    if (f.t === T.OPEN && m.openId[f.k] >= 0) return `<b>${label('interact')}</b>HOLD TO BARRICADE` + `${me.op === 'mason' && me.ac > 0 ? '  ·  <b>' + label('ability') + '</b>ARMOR PANEL' : ''}`;
+    if (f.t === T.OPEN && m.openId[f.k] >= 0 && me.bx === 0) return 'NO BARRICADES LEFT THIS ROUND'; // (a map with its own number a round: map.barricades)
+    if (f.t === T.OPEN && m.openId[f.k] >= 0) return `<b>${label('interact')}</b>HOLD TO BARRICADE${me.bx > 0 && me.bx < 50 ? ` (${me.bx} LEFT)` : ''}` + `${me.op === 'mason' && me.ac > 0 ? '  ·  <b>' + label('ability') + '</b>ARMOR PANEL' : ''}`;
     if (f.t === T.BARRI && me.op === 'mason' && me.ac > 0) return '<b>' + label('ability') + '</b>ARMOR PANEL';
     if (f.t === T.OPEN && m.openId[f.k] >= 0 && me.op === 'girder' && me.ac > 0 && s.ph === PHASE.ACTION) return `<b>${label('interact')}</b>HOLD TO BARRICADE  ·  <b>${label('ability')}</b>STEEL BRACE`;
   }

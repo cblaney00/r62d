@@ -35,7 +35,7 @@ export const WEAPONS = {
              pen: 0.6, kickMul: 1.3, fall: { from: 150, to: 500, min: 0.45 }, trait: 'One heavy slug: accurate, huge damage and smashes walls, but very slow to fire.' },
   stub:    { name: 'Stub Sawn-off', cls: 'Shotgun', mode: 'double-barrel', dmg: 23, rpm: 300, mag: 2, reserve: 20, reload: 2.4, spread: 0.2, ads: 0.14, bloom: 0, auto: false, pellets: 9, range: 340, len: 9, choke: 1.9,
              fall: { from: 60, to: 250, min: 0.15 }, trait: 'A sidearm with two barrels: blow holes in walls and hatches, or end a fight at arm\'s length.' },
-  ox:      { name: 'Ox Belt-Fed', cls: 'LMG', dmg: 36, rpm: 480, mag: 100, reserve: 100, reload: 6.0, spread: 0.10, ads: 0.022, bloom: 0.009, auto: true, pellets: 1, range: 1200, len: 18,
+  ox:      { name: 'Ox Belt-Fed', cls: 'LMG', dmg: 33, /* (36 → 33, 2026-11-18: the pros' takes, 1.00 kills a round vs 0.71 for the other attack guns) */ rpm: 480, mag: 100, reserve: 100, reload: 6.0, spread: 0.10, ads: 0.022, bloom: 0.009, auto: true, pellets: 1, range: 1200, len: 18,
              adsMul: 1.35, kickMul: 1.3, swayMul: 0.5, trait: '100 rounds that hit like a battle rifle and climb straight up, but it fires slowly, is very slow to aim and takes an age to reload.' },
   drummer: { name: 'Drummer LMG', cls: 'LMG', dmg: 21, rpm: 800, mag: 60, reserve: 180, reload: 3.6, spread: 0.085, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 1050, len: 16,
              adsMul: 0.8, kickMul: 0.8, swayMul: 1.5, trait: 'A light, fast-firing LMG that hoses a doorway: quick to aim and reload for its kind, but its soft bullets wander side to side.' },

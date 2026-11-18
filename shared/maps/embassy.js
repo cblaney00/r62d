@@ -187,6 +187,7 @@ export function build() {
 
   const b = B.c, g = G.c, u = U.c;
   return finish({
+    siteSoft: 2, barricades: 1, // (he asked 2026-11-18: the Embassy toward 50% attack only with breakable walls by the sites and barricades a round; was 1 and unlimited)
     sites: [
       { name: 'B Vault / Server Farm', bombs: [{ id: 'A', ...b(42, 16), room: 'Vault' }, { id: 'B', ...b(60, 18), room: 'Server Farm' }], rooms: ['Vault', 'Server Farm'] },
       { name: 'Reception Hall / Security Office', bombs: [{ id: 'A', ...g(38, 20), room: 'Reception Hall' }, { id: 'B', ...g(56, 19), room: 'Security Office' }], rooms: ['Reception Hall', 'Security Office'] },
