@@ -285,14 +285,14 @@ function lowerBody(ctx, p, col, LZ, bw) {
   const walk = p.walk || 0, mv = Math.min(1.1, p.legs ?? 1), cr = !!p.crouch && !p.prone, sw = Math.sin(walk), L = Math.max(-1, Math.min(1, p.lean || 0)), hs = hipShift(p);
   if (p.prone || p.slide) { lyingLegs(ctx, p, col, LZ, bw, walk, mv); return; } // lying down (two poses) or a feet-first slide
   const stride = sw * (cr ? 1.8 : 3.4) * mv, side = cr ? 4.4 : 4.2;
-  const feet = p.hang ? [[3.6, 3.4], [3.2, -3.6]] : cr ? [[4.5 + stride * 0.4, side], [1.5 - stride * 0.4, -side]] : [[stride, side], [-stride, -side]];
+  const feet = p.hang ? [[3.6 + Math.max(0, Math.sin(walk)) * 0.8 * mv, 3.4], [3.2 + Math.max(0, -Math.sin(walk)) * 0.8 * mv, -3.6]] : cr ? [[4.5 + stride * 0.4, side], [1.5 - stride * 0.4, -side]] : [[stride, side], [-stride, -side]];
   if (L && !p.hang) for (const ft of feet) { if (Math.sign(ft[1]) === Math.sign(L)) { ft[1] += L * 2.4; ft[0] += Math.abs(L) * 1.2; } else ft[1] += L * 0.5; } // leaning: step out that way, push off the other foot
   else if (L && p.hang) for (const ft of feet) ft[1] -= L * 1.5; // on a rope: the feet walk the wall the other way to push the body out
   const lift = (x, y, z) => { const [lx, ly] = LZ(z); return [x + lx, y + ly / bw]; };
   // the leg further from the eye first, so the nearer one covers it
   const away = LZ(1); feet.sort((a, b) => (b[0] * away[0] + b[1] * away[1]) - (a[0] * away[0] + a[1] * away[1]));
   for (const [fx, fy] of feet) {
-    const lift2 = p.hang ? (fy > 0 ? 0.13 : 0.10) : cr ? 0.06 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) : 0.035 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) * mv; // the stepping foot comes off the floor a little
+    const lift2 = p.hang ? (fy > 0 ? 0.13 : 0.10) + 0.05 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) * mv : cr ? 0.06 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) : 0.035 * Math.max(0, Math.sin(walk + (fy > 0 ? 0 : Math.PI))) * mv; // the stepping foot comes off the floor a little
     const [bx0, by0] = lift(fx + 1, fy, lift2), [bx1, by1] = lift(fx + 1, fy, lift2 + 0.04);
     column(ctx, bx0, by0, 3, 2.2, bx1, by1, 2.8, 2.1, '#1c1b1a'); // boot
     const hy = (fy > 0 ? 2.6 : -2.6) + hs, [lx0, ly0] = lift(fx + 0.4, fy, lift2 + 0.035), [lx1, ly1] = lift(-1, hy, 0.27);
@@ -421,7 +421,16 @@ export function drawOperator(ctx, p, t) {
   if (acc.has('pack') && PACK[p.op] !== 'none') { box(ctx, -12, -1.6, 2.6, 3.2, 0.6, tc, false); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.3; ctx.strokeRect(-12, -1.6, 2.6, 3.2); }
 
   // ---- torso & plate carrier ----
-  if (hang && persp.h) { ell(ctx, -1, 0, 5.8, 8.6, u.cloth); box(ctx, -5.8, -5.4, 9, 10.8, 2.6, u.vest); } // the shoulders and back plate from behind
+  if (hang && persp.h) { ell(ctx, -1, 0, 5.8, 8.6, u.cloth); box(ctx, -5.8, -5.4, 9, 10.8, 2.6, u.vest); // the shoulders and back plate from behind
+    // a climbing harness over it (he asked 2026-11-18: a premium rappel view): shoulder straps down the back to the
+    // waist belt, a buckle where they cross, and a thin rim of sky light down one edge of the plate
+    const [l0x, l0y] = LZ(0.41), at = z => { const [x, y] = LZ(z); return [x - l0x, (y - l0y) / bw]; }, [bx, by] = at(0.31);
+    ctx.lineCap = 'round';
+    for (const s of [-1, 1]) { ctx.strokeStyle = '#121314'; ctx.lineWidth = 2.1; ctx.beginPath(); ctx.moveTo(-1.5, s * 5.6); ctx.lineTo(-4.6 + bx * 0.5, s * 2.2 + by * 0.5); ctx.lineTo(-4 + bx, s * 1.4 + by); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(-1.5, s * 5.2); ctx.lineTo(-4.6 + bx * 0.5, s * 1.9 + by * 0.5); ctx.stroke(); }
+    box(ctx, -5.6 + bx * 0.5, -1.3 + by * 0.5, 2.4, 2.6, 0.5, '#6d7278'); // the buckle
+    ctx.strokeStyle = 'rgba(225,235,255,0.35)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(-5.4, -5); ctx.lineTo(2.8, -5.2); ctx.stroke(); // rim light
+  }
   else drawTorso(ctx, p.op, o, u, sh);
   { // side trim (he asked): a wide armband on each shoulder, attackers orange and defenders blue, plus this operator's own accents
     if (acc.has('vest')) { ctx.fillStyle = tc; ctx.fillRect(-5.4, -5.6 * sh, 1.7, 11.2 * sh); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-3.7, -5.6 * sh, 0.35, 11.2 * sh); }
@@ -444,7 +453,11 @@ export function drawOperator(ctx, p, t) {
     const [ax, ay] = LZ(0.38), [hx, hy] = LZ(inv ? 0.31 : 0.29), [wx, wy] = LZ(inv ? 0.1 : 0.62);
     const cx = 3.2 + hx - ax, cy = hy - ay, tx = 6 + wx - ax, ty = wy - ay;
     ctx.strokeStyle = '#c8b27a'; ctx.lineWidth = 0.9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.quadraticCurveTo((cx + tx) / 2 + 1, (cy + ty) / 2, tx, ty); ctx.stroke();
-    ell(ctx, cx, cy, 1, 1, '#b8bcc2'); // the carabiner
+    // the figure-8 descender at the belay loop, and the rope's tail hanging down from it under the climber
+    const [bx2, by2] = LZ(inv ? 0.55 : 0.04), lx = 4 + bx2 - ax, ly = by2 - ay, sw = Math.sin((t || 0) * 1.3) * 0.6;
+    ctx.strokeStyle = '#a8925e'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.quadraticCurveTo((cx + lx) / 2 + sw, (cy + ly) / 2 + 1, lx + sw, ly); ctx.stroke();
+    ctx.strokeStyle = '#c9ced4'; ctx.lineWidth = 0.55; ctx.beginPath(); ctx.arc(cx, cy - 0.7, 0.75, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy + 0.9, 1.05, 0, 7); ctx.stroke(); // (the 8)
+    ell(ctx, cx - 1.1, cy, 0.6, 0.6, '#d8a62a'); // the screwgate, gold
     ctx.rotate(p.aim - bodyA);
   }
   // ---- weapon & arms ----
