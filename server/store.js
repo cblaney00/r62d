@@ -144,6 +144,12 @@ class Store {
 }
 
 export const store = new Store();
+// Saves are written every 3 s; when the game's server stops (closing the game, the Windows program quitting) whatever
+// changed since is written first, so nothing on this device is lost (he asked 2026-11-18). (A phone: public/phone/server.js.)
+if (typeof process !== 'undefined' && typeof process.on === 'function') {
+  process.on('exit', () => { try { store.flush(); } catch {} });
+  for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => process.exit(0));
+}
 // a kill the killcam found something wrong with (he asked: "!" and the info saved): one file each in data/bugs
 let bugN = 0;
 store.saveBug = rec => {

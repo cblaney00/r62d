@@ -21,7 +21,7 @@ async function run() {
   let fails = 0;
   for (const mode of ['rings', 'buttons']) {
     await call('browsingContext.navigate', { context: ctx, url, wait: 'complete' }); await sleep(1200);
-    await js(`localStorage.setItem('r62d-name', 'Thumbs'); localStorage.setItem('r62d-fire', '${mode}'); localStorage.removeItem('r62d-penv'); Element.prototype.requestFullscreen = () => Promise.reject(); true`);
+    await js(`localStorage.setItem('r62d-name', 'Thumbs'); localStorage.setItem('r62d-ctrlreset-1', '1'); /* (the phone's one-time controls reset of 2026-11-18 must not undo this) */ localStorage.setItem('r62d-fire', '${mode}'); localStorage.removeItem('r62d-penv'); Element.prototype.requestFullscreen = () => Promise.reject(); true`);
     await call('browsingContext.navigate', { context: ctx, url, wait: 'complete' }); await sleep(3000);
     await js(`Element.prototype.requestFullscreen = () => Promise.reject(); true`);
     for (let i = 0; i < 6 && await js("!document.getElementById('splash').classList.contains('hidden')"); i++) { await act(drag('t', [[W / 2, H / 2], [W / 2, H / 2]], 30, 0)); await sleep(1200); }

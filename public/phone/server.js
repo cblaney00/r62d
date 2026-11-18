@@ -10,6 +10,11 @@ import { TICK_RATE, SNAP_RATE } from '/shared/constants.js';
 
 const VERSION = { id: (window.r62dApp && r62dApp.gameVersion && r62dApp.gameVersion()) || 'phone', date: '' };
 const game = new Game();
+// he asked (2026-11-18): the game saves on the phone itself. Saves are written every 3 s; when the app is put away or
+// closed (the phone may end it without warning) whatever changed since is written straight away.
+const saveNow = () => { try { store.flush(); } catch {} };
+addEventListener('pagehide', saveNow);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNow(); });
 // the pros' knowledge from the release (server/pro-seed.json, packed by android/build.sh), when it beats what this phone has
 fetch('/server/pro-seed.json').then(r => r.ok ? r.json() : null).then(j => { for (const k of ['guns', 'att', 'pro', 'opinions']) if (j && !j[k]) j[k] = {}; if (j && !j.drills) j.drills = training.drills; seedTraining(j); }).catch(() => {});
 const tutorials = new Set();

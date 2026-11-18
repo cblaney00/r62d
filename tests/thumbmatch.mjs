@@ -50,7 +50,7 @@ async function run() {
   await call('browsingContext.setViewport', { context: ctx, viewport: { width: +W, height: +H } });
   await call('browsingContext.navigate', { context: ctx, url, wait: 'complete' });
   await sleep(1500);
-  await js(`localStorage.setItem('r62d-name', 'Thumbs'); localStorage.setItem('r62d-fire', 'buttons'); /* (presses the FIRE button: the Settings choice; SCENARIO=rings in tests/thumbs.mjs covers the rings) */ localStorage.setItem('r62d-penv', '{"R62D_FAST":"1"}'); location.reload(); true`); await sleep(3000);
+  await js(`localStorage.setItem('r62d-name', 'Thumbs'); localStorage.setItem('r62d-ctrlreset-1', '1'); /* (the phone's one-time controls reset of 2026-11-18 must not undo this) */ localStorage.setItem('r62d-fire', 'buttons'); /* (presses the FIRE button: the Settings choice; SCENARIO=rings in tests/thumbs.mjs covers the rings) */ localStorage.setItem('r62d-penv', '{"R62D_FAST":"1"}'); location.reload(); true`); await sleep(3000);
   for (let i = 0; i < 20 && !(await js("!!document.getElementById('splash')")); i++) await sleep(500);
   for (let i = 0; i < 6 && await js("!document.getElementById('splash').classList.contains('hidden')"); i++) { await touch(finger('t', [[W / 2, H / 2], [W / 2, H / 2, 60]])); await sleep(1500); } // the title screen: tap until it opens
   await js(`document.exitFullscreen && document.exitFullscreen().catch(() => {}); Element.prototype.requestFullscreen = () => Promise.reject(); true`); await sleep(500);

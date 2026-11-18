@@ -4,6 +4,23 @@
 (() => {
   window.__PENV = {}; // the server's process.env (the app rewrites process.env to this)
   try { const t = localStorage.getItem('r62d-penv'); if (t) { Object.assign(__PENV, JSON.parse(t)); window.process = window.process || { env: __PENV }; } } catch {} // (tests only: e.g. {"R62D_FAST": "1"})
+  // he asked (2026-11-18): his controls back to the defaults, on the phone too. Once per phone: keys, sensitivity, aim and
+  // lean mode, and the touch controls (stick speed, gyro, tilt, button size, fire mode) are forgotten here and in the
+  // phone's profiles, so the game starts from its defaults and saves them. Volumes, crosshair and colours stay.
+  try {
+    const played = () => { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('r62dfs:') && k.endsWith('/profiles.json')) return true; } return false; };
+    if (!localStorage.getItem('r62d-ctrlreset-1') && played()) { // (a phone that never played here has nothing to reset)
+      for (const k of ['r62d-keys-v5', 'r62d-sens', 'r62d-aim', 'r62d-aim2', 'r62d-lean', 'r62d-autofire', 'r62d-fire', 'r62d-gyro', 'r62d-gyroinv',
+        'r62d-gyrosens', 'r62d-input', 'r62d-sticksens', 'r62d-tilt', 'r62d-tiltdz', 'r62d-uiscale']) localStorage.removeItem(k);
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i); if (!k || !k.startsWith('r62dfs:') || !k.endsWith('/profiles.json')) continue;
+        const p = JSON.parse(localStorage.getItem(k));
+        for (const v of Object.values(p || {})) if (v && v.settings) for (const f of ['binds', 'bindsVersion', 'sens', 'adsSens', 'steadySens', 'farSens', 'aim', 'aimV', 'lean']) delete v.settings[f];
+        localStorage.setItem(k, JSON.stringify(p));
+      }
+    }
+    localStorage.setItem('r62d-ctrlreset-1', '1');
+  } catch {}
   let srv = null;
   const server = () => srv || (srv = import('/phone/server.js'));
   const later = f => setTimeout(f, 0); // (messages arrive on their own turn, like a network)
