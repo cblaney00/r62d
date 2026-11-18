@@ -74,6 +74,7 @@ only add to this file if it is a rule every session needs.
   doors/windows on a shared wall go AFTER the wing's `box`; never run a shape through
   furniture, doors or stairs. `node tests/reach.js`, `tests/openings.js` must pass.
 - Tests import `tests/_tmpdata.js` first so they never write to the real `data/`.
+- Menu text has a minimum size (he asked 2026-11-17): write every font size in style.css as `max(<size>, var(--mf))` (see the end of style.css); `tests/textsize.mjs` must list 0 small text for `pc` and `phone`.
 - Node is not on PATH in a plain session: run tests through
   `nix develop /home/insideabush/nixos-config#vibe-web --command ...` (a failing `node` hides in grep).
 - Checked 2026-11-16: `tests/feeds.js` 4/4, `stuckbots.js` 3/3, `ropebots.js` 3/3 pass;

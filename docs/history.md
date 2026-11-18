@@ -495,3 +495,17 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   measures the real shapes. Moved for the layout: the team list clear of lean, the coach hint and chat clear of the cluster.
 - Tests: `SCENARIO=rings tests/thumbs.mjs` (a pulled stick never shoots; a finger on either ring does; drag-aim on the right
   ring; tap aim in; double-tap sprint; two thumbs), `tests/phonebuttons.mjs` 7 sizes clean, phonefree (Buttons mode) OK.
+
+## Readable small print in every menu (2026-11-17, he asked)
+- He asked that no text in the menus, the options and free play's operators / guns / god mode panel be too small to read,
+  on every version (phones may differ from the PC). Measured first with the new `tests/textsize.mjs`: at his 1280×720
+  window the menus shrink to 80% (laid out for 900 tall), so 11–13 px print showed at 8–10 px; on phones menus shrink to
+  0.56–0.64 and text showed at 4–9 px (the free play panel and pause menu were shrunk twice: inside #hud, and the
+  pause/quit `.overlay` and its `.menu` both zoomed).
+- Fix: every font size in style.css is `max(<size>, var(--mf))`. `--mf` is 0 except inside the menu panels (end of
+  style.css), where it is `--minpx` (12.5 px PC, 12 px touch) divided by the menu zoom, so the HUD and phone buttons are
+  untouched. `small`/`kbd` get the floor too. New CSS must keep the `max(…, var(--mf))` form.
+- Layout follow-ups: free play panel scrolls as one page (sticky title/CLOSE), gun rows wrap; phone Settings fills the
+  screen and its rows wrap; pause/quit menus scroll if taller than the screen; phone map names wrap.
+- Test: `node tests/textsize.mjs <port> <outdir> <url> pc|phone` (phone = the phone Firefox profile; `MIN=11.9` for phones,
+  `RULES=1` names the CSS rule) — 0 small text on both, and its cut-off list (tests/uicheck.js) has nothing new.

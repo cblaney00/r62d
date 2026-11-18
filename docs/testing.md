@@ -41,3 +41,10 @@ beating Expert bots over N maps.
 
 ## Cut-off check
 `tests/uicheck.js` is a snippet for a `tests/shoot.mjs` "js" step (newlines removed): it lists text past the window or clipped by its box. Run it on every menu page and HUD screen at 1280×720 and 1920×1080. Closed Ball Knowledge cards report CLIPPED on purpose (they fade out; click opens them). Close pages with their CLOSE/DONE buttons (`getClientRects`, not `offsetParent`: they are fixed), the pause menu with RESUME.
+
+## Text size check
+`tests/textsize.mjs <port> <outdir> <url> pc|phone` opens the title, home, every lobby page, Settings (every page),
+Profile, Operators, free play with its operators / guns panel, and the pause menu at 1280×720 + 1920×1080 (`pc`) or
+914×412 + 760×360 (`phone`, needs the phone Firefox profile above), saves screenshots, and lists text whose on-screen
+size (font size × menu zoom) is under `MIN` (12; use `MIN=11.9` on phones) plus the tests/uicheck.js cut-offs.
+`RULES=1` adds the CSS rule each small size came from. Must print `TOTAL small-text kinds: 0`.
