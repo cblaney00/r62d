@@ -671,3 +671,9 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Phone heat / Low (he asked, 2026-11-18: Samsung A35 warm after a few minutes; old Low unplayable): `FRAME_MIN` in
   main.js skips frames on phones past 60/s (the A35 screen is 120 Hz). `GFX.low` = Medium's picture (scale 0.8, fog
   0.4, shading, map 2, raised walls) with parts 0.4 / smoke 8; Auto starts phones on Low.
+- Rounded corners and the camera hole (he asked, 2026-11-18, Flip 7): style.css end: `--sl/--sr/--st/--sb` = max(8 px on
+  phones, env(safe-area-inset-*), the app's measured `--as*`); `html.touch #ui` is inset by them; ring-layout touch
+  pieces and sticks get a margin of them (÷ --tz). Android `measureInsets()` (MainActivity) sends the cutout's safe
+  strip and 0.3 × each rounded corner's radius as `r62dApp.insets()` / `onInsets()` (touch.js `applyInsets`); needs
+  the new APK, older apps fall back to env() + 8 px. `CUTOUT=l,t,r,b,R node tests/phonescreens.mjs ...` paints the
+  hole and corners on the screenshots and lists anything in them (34,0,0,0,40: none).

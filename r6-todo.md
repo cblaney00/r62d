@@ -8,6 +8,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 
 ## Done
+- [x] (he asked 2026-11-18) some phones have rounded corners (his Flip 7) or a camera hole in the screen: make sure the game doesn't cut anything off in the corners or put anything in the camera hole's way (DONE 2026-11-18: the HUD, menus and buttons keep clear of both; the phone app measures the real hole and corners (needs the new app), browsers know the hole. Checked with a pretend hole and corners: nothing in the way)
 - [x] (he asked 2026-11-18) on a Samsung A35 the game runs well for a few minutes then gets a bit hot: make it lighter; Low was unplayable for his girlfriend, Medium is fine, so the look of Medium is the new Low (DONE 2026-11-18: phones draw at most 60 frames a second (the A35 screen runs at 120); Low now has Medium's picture with fewer particles and smoke, and phones start on Low. Not yet played by him)
 - [x] (he asked 2026-11-18) make the default mobile zoom 70% and allow 40% to 120% (DONE 2026-11-18: phones only; computers stay 80-200%)
 - [x] (he asked 2026-11-18) the crosshair shouldn't "get bigger" as you zoom out, scale all the reticles down 20%, and the crosshair shrinks as it moves away from the player (DONE 2026-11-18: 20% smaller everywhere; shrinks with the view when zoomed out past the normal view and from 3 m away, down to about half far off; its gap still shows exactly where bullets can land (his pick). Not yet played by him)

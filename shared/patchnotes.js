@@ -130,4 +130,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'all', t: 'Crosshair: every sight 20% smaller; it shrinks as it moves away from you and no longer looks bigger when the view zooms out. Its gap still shows exactly where the next bullet can land.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: the game draws at most 60 frames a second, so phones with fast screens stay cooler; phones start on Low.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'all', t: 'Graphics: Low now looks like Medium (sharper picture, lighting, raised walls), with a few fewer particles and smoke puffs.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: the HUD, menus and buttons keep clear of rounded screen corners and the camera hole.', v: 0 },
 ];

@@ -13,6 +13,8 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.DisplayCutout;
+import android.view.RoundedCorner;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -58,6 +60,7 @@ public class MainActivity extends Activity {
   volatile File packDir = null;  // null = the pack built into the app (assets/game)
   volatile int packN = 0;        // its build number
   volatile String packVer = "", status = "", needApp = "";
+  volatile String insets = "{}"; // the screen edges to keep clear, in page pixels (measureInsets)
   File readyDir = null; int readyN = 0; String readyVer = ""; // a newer pack downloaded while you were playing: used next PLAY
 
   @Override protected void onCreate(Bundle saved) {
@@ -73,6 +76,7 @@ public class MainActivity extends Activity {
     s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
     s.setUserAgentString(s.getUserAgentString() + " R62D-Android");
     web.addJavascriptInterface(new Bridge(), "r62dApp");
+    web.addOnLayoutChangeListener((v, a, b, c, d, e, f, g, h) -> measureInsets()); // turning the phone moves the camera hole
     web.setWebChromeClient(new WebChromeClient());
     web.setWebViewClient(new WebViewClient() {
       @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
@@ -222,7 +226,25 @@ public class MainActivity extends Activity {
     }
     if (Build.VERSION.SDK_INT >= 28) getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
   }
-  @Override public void onWindowFocusChanged(boolean has) { super.onWindowFocusChanged(has); if (has) hideBars(); }
+  @Override public void onWindowFocusChanged(boolean has) { super.onWindowFocusChanged(has); if (has) { hideBars(); measureInsets(); } }
+  // The camera hole and the rounded screen corners (he asked 2026-11-18): how far in from each edge the game keeps its
+  // buttons and text. The hole: Android's safe strip on that side. A rounded corner of radius r cuts off a square
+  // 0.3 r deep from both edges next to it. In page (CSS) pixels; the page asks with insets() and hears onInsets().
+  void measureInsets() {
+    try {
+      WindowInsets w = getWindow().getDecorView().getRootWindowInsets(); if (w == null) return;
+      float d = getResources().getDisplayMetrics().density, l = 0, t = 0, r = 0, b = 0;
+      if (Build.VERSION.SDK_INT >= 28) { DisplayCutout c = w.getDisplayCutout(); if (c != null) { l = c.getSafeInsetLeft(); t = c.getSafeInsetTop(); r = c.getSafeInsetRight(); b = c.getSafeInsetBottom(); } }
+      if (Build.VERSION.SDK_INT >= 31) {
+        RoundedCorner tl = w.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT), tr = w.getRoundedCorner(RoundedCorner.POSITION_TOP_RIGHT),
+          bl = w.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT), br = w.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_RIGHT);
+        float k = 0.3f, a = tl == null ? 0 : tl.getRadius() * k, e = tr == null ? 0 : tr.getRadius() * k, f = bl == null ? 0 : bl.getRadius() * k, g = br == null ? 0 : br.getRadius() * k;
+        l = Math.max(l, Math.max(a, f)); r = Math.max(r, Math.max(e, g)); t = Math.max(t, Math.max(a, e)); b = Math.max(b, Math.max(f, g));
+      }
+      String n = new JSONObject().put("l", l / d).put("t", t / d).put("r", r / d).put("b", b / d).toString();
+      if (!n.equals(insets)) { insets = n; web.evaluateJavascript("window.onInsets && onInsets()", null); }
+    } catch (Exception ex) {}
+  }
 
   // the phone's Back button: on the start page it closes the app, in the game it is Esc (pause menu, or back a page)
   @Override public void onBackPressed() {
@@ -244,6 +266,7 @@ public class MainActivity extends Activity {
     @JavascriptInterface public String pack() {
       try { return new JSONObject().put("n", packN).put("version", packVer).put("status", status).put("needApp", needApp).put("app", APP_LEVEL).toString(); } catch (Exception e) { return "{}"; }
     }
+    @JavascriptInterface public String insets() { return insets; }
     @JavascriptInterface public String gameVersion() { return packVer + (packN > 0 ? " (build " + packN + ")" : ""); }
     // the phone's own addresses, so the start page knows which networks to look for games on: "ip/prefix ip/prefix"
     @JavascriptInterface public String nets() {

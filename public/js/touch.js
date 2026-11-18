@@ -392,6 +392,12 @@ function fitUi() {
   document.documentElement.classList.toggle('fitui', isTouch || fit < 1 || s !== 1);
 }
 if (isTouch) document.documentElement.classList.add('touch');
+// the phone app's measured camera hole and rounded corners (style.css --sl..): page px to keep clear from each edge
+function applyInsets() {
+  let o = {}; try { if (window.r62dApp && window.r62dApp.insets) o = JSON.parse(window.r62dApp.insets()) || {}; } catch {}
+  for (const k of ['l', 't', 'r', 'b']) document.documentElement.style.setProperty('--as' + k, Math.round(+o[k] || 0) + 'px');
+}
+window.onInsets = applyInsets; applyInsets(); addEventListener('resize', () => setTimeout(applyInsets, 150));
 fitUi(); addEventListener('resize', fitUi);
 addEventListener('touchend', goFull, true); addEventListener('click', goFull, true);
 

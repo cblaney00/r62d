@@ -46,9 +46,33 @@ const icons = `(() => { const out = [], W = innerWidth, H = innerHeight;
     for (let x = e.parentElement; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.overflow === 'visible' && x.tagName !== 'BUTTON') continue; if (x.scrollHeight > x.clientHeight + 2 && /auto|scroll/.test(cs.overflowY)) break; const b = x.getBoundingClientRect();
       if (r.left < b.left - 1 || r.top < b.top - 1 || r.right > b.right + 1 || r.bottom > b.bottom + 1) out.push('ICON CUT ' + nm + ' by ' + (x.id || x.className || x.tagName)); break; } }
   return [...new Set(out)].join('\\n') || 'none'; })()`;
+// CUTOUT="l,t,r,b,R" (he asked 2026-11-18: rounded corners, the camera hole): pretends the phone app measured a camera
+// hole strip of l/t/r/b px and corners of radius R, paints them black on the screenshots (the hole as a dot in the
+// middle of the widest strip), and lists HUD pieces and buttons inside a strip or a corner's cut-off part
+const CUT = process.env.CUTOUT ? process.env.CUTOUT.split(',').map(Number) : null;
+const cutSet = () => CUT ? js(`(() => { const [l, t, r, b, R] = ${JSON.stringify(CUT)}, k = 0.3 * R, d = document;
+  window.r62dApp = Object.assign(window.r62dApp || {}, { insets: () => JSON.stringify({ l: Math.max(l, k), t: Math.max(t, k), r: Math.max(r, k), b: Math.max(b, k) }) }); window.onInsets && onInsets();
+  let m = d.getElementById('cutMask'); if (!m) { m = d.createElement('div'); m.id = 'cutMask'; d.body.appendChild(m); }
+  m.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:99999;border-radius:' + R + 'px;box-shadow:0 0 0 200px #000';
+  const w = Math.max(l, t, r, b), side = [l, t, r, b].indexOf(w), hole = d.getElementById('cutHole') || d.body.appendChild(Object.assign(d.createElement('div'), { id: 'cutHole' }));
+  const pos = [['left:' + (w / 2 - 6) + 'px;top:calc(50% - 6px)'], ['top:' + (w / 2 - 6) + 'px;left:calc(50% - 6px)'], ['right:' + (w / 2 - 6) + 'px;top:calc(50% - 6px)'], ['bottom:' + (w / 2 - 6) + 'px;left:calc(50% - 6px)']][side];
+  hole.style.cssText = 'position:fixed;width:12px;height:12px;border-radius:50%;background:#000;box-shadow:0 0 0 2px #222;pointer-events:none;z-index:99999;' + pos;
+  return true; })()`) : null;
+const clear = () => js(`(() => { const [l, t, r, b, R] = ${JSON.stringify(CUT)}, W = innerWidth, H = innerHeight, out = [];
+  const vis = e => { for (let x = e; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05) return false; } return true; };
+  const name = e => e.id ? '#' + e.id : (e.dataset.id ? 'btn:' + e.dataset.id : String(e.className).slice(0, 30));
+  const inCorner = (x, y) => { const cx = x < R ? R : x > W - R ? W - R : null, cy = y < R ? R : y > H - R ? H - R : null; return cx !== null && cy !== null && Math.hypot(x - cx, y - cy) > R; };
+  const els = [...document.querySelectorAll('#hud *, #touchUI .tbtn, #touchUI #tsLeft, #touchUI #tsRight, #chat, #select button, #select .op, #lobby button, .overlay:not(.hidden) button, #settings button')].filter(e => { const q = e.getBoundingClientRect(); return q.width > 2 && q.height > 2 && vis(e) && (e.children.length === 0 || e.matches('button, .tbtn, #tsLeft, #tsRight')); });
+  for (const e of els) { const q = e.getBoundingClientRect(); const bad = [];
+    if (l && q.left < l - 1 && q.right > 0) bad.push('hole strip L'); if (r && q.right > W - r + 1 && q.left < W) bad.push('hole strip R');
+    if (t && q.top < t - 1) bad.push('hole strip T'); if (b && q.bottom > H - b + 1) bad.push('hole strip B');
+    const p = e.closest('.poly') ? 4 : 0; // (polygon buttons: only their box corners can be tested; allow a little)
+    for (const [x, y] of [[q.left + p, q.top + p], [q.right - p, q.top + p], [q.left + p, q.bottom - p], [q.right - p, q.bottom - p]]) if (inCorner(x, y)) { bad.push('rounded corner'); break; }
+    if (bad.length) out.push(name(e) + ' ' + bad.join('+') + ' ' + [q.left, q.top, q.right, q.bottom].map(Math.round)); }
+  return [...new Set(out)].slice(0, 30).join('\\n ') || 'none'; })()`);
 const phase = () => js(`(__r62d.st.last || {}).ph || ''`);
 const check = async (name, sq) => { for (const [w, h] of SIZES) { tag = `${w}x${h}`; await call('browsingContext.setViewport', { context: ctx, viewport: { width: w, height: h } }); await sleep(600); await check1(name, sq); } };
-const check1 = async (name, sq) => { await shot(name); console.log(`== ${tag} ${name}\n cut-off: ${(await js(uicheck)) || 'none'}\n overlaps: ${await js(overlap)}\n icons: ${await js(icons)}`); if (sq) console.log(' ' + (await js(squish)).replace(/\n/g, '\n ')); };
+const check1 = async (name, sq) => { await cutSet(); await sleep(300); await shot(name); if (CUT) console.log(`== ${tag} ${name} in the way of the hole/corners:\n ${await js('0') === 0 ? await clear() : ''}`); console.log(`== ${tag} ${name}\n cut-off: ${(await js(uicheck)) || 'none'}\n overlaps: ${await js(overlap)}\n icons: ${await js(icons)}`); if (sq) console.log(' ' + (await js(squish)).replace(/\n/g, '\n ')); };
 
 ws.onopen = async () => { try { await run(); } catch (e) { console.log('ERROR', e.message); } process.exit(0); };
 async function run() {
