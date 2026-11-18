@@ -2449,8 +2449,9 @@ export class Game {
   // The swarm goes for the attacker drone in sight (within SWARM.reach) closest to where you aim (from your body) or to the
   // bird you fly. It chases it; the drone escapes by getting SWARM.lose metres further ahead than it started, by
   // staying out of the swarm's sight for SWARM.blind s, or by outlasting it. Caught: held SWARM.grab s, then it is a bird.
-  releaseSwarm(p, from) {
-    if (p.abilityCount <= 0) return;
+  // the drone a swarm released from `from` would chase (null: none), also asked by the bots before they try (a bot
+  // watching a drone it couldn't take tried 55 times a minute, seen in his match 2026-11-18)
+  swarmPick(p, from) {
     const sm = this.smokeList(), fl = floorAt(this.map, from.x, from.y), body = from === p;
     let best = null, bs = Infinity;
     for (const d of this.ents) {
@@ -2461,6 +2462,11 @@ export class Game {
       if (body && off > 1.2) continue; // from your body: roughly where you look
       const sc = dist + off * 200; if (sc < bs) { bs = sc; best = d; }
     }
+    return best;
+  }
+  releaseSwarm(p, from) {
+    if (p.abilityCount <= 0) return;
+    const best = this.swarmPick(p, from);
     if (!best) { this.events.push({ e: 'deny', id: p.id, why: `No attacker drone in sight within ${SWARM.reach} m` }); return; }
     p.abilityCount--;
     const dist = Math.hypot(best.x - from.x, best.y - from.y);
@@ -2567,7 +2573,7 @@ export class Game {
   markOk(p) {
     if (!p.alive || (this.phase !== PHASE.PREP && this.phase !== PHASE.ACTION)) return false;
     const now = this.time;
-    if (now < (p.pingReady || 0)) { this.events.push({ e: 'pingwait', to: p.id, t: r1(p.pingReady - now) }); return false; }
+    if (now < (p.pingReady || 0)) { if (!p.bot) this.events.push({ e: 'pingwait', to: p.id, t: r1(p.pingReady - now) }); return false; } // (a bot asks every moment it sees someone: no message for it, 40 in 5 s in his match)
     const quiet = now - (p.pingLast ?? -99);
     p.pingLevel = Math.max(0, (p.pingLevel || 0) - Math.floor(Math.max(0, quiet - (p.pingWait || 0)) / 8));
     p.pingWait = Math.min(20, [0, 1, 2, 4, 8, 16][p.pingLevel] ?? 20);

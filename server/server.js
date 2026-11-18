@@ -160,7 +160,8 @@ const step = () => {
   while (acc >= dt) {
     acc -= dt; game.tick(dt); for (const g of tutorials) if (!held(g)) g.tick(dt);
     snapAcc += dt;
-    if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = 0; game.broadcast(); for (const g of tutorials) if (!g.heldUntil) g.broadcast(); for (const v of replayViews) v.tick(); }
+    // (keeps the remainder: resetting to 0 sent only every 2nd tick, 15 updates a second instead of 20, seen in his match 2026-11-18)
+    if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = Math.min(snapAcc - 1 / SNAP_RATE, 1 / SNAP_RATE); game.broadcast(); for (const g of tutorials) if (!g.heldUntil) g.broadcast(); for (const v of replayViews) v.tick(); }
   }
 };
 setTimeout(loop, 1000 / TICK_RATE);

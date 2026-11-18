@@ -6,6 +6,7 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] (he asked 2026-11-18) fix the top and bottom of stair view to be a bit wider and dynamic based on the position of the character on all axis (including up and down the stairs): as a player walks up a stairs they should be able to see more as they get higher up and less as they go down, same for how the other perspective views the stairs, so there will be a blind spot where the stairs moves out of view of the person looking at it waiting for someone to come up. also there should be less wide angles around stairs in the maps and less cramped entrances to stairs as well
 
 ## Done
 - [x] run ball knowledge fixes when it comes to the pro takes (DONE 2026-11-18: checked with ~120 bot rounds a map: Dust Town 54% attack = fine; The Embassy was 40%, the other way, so he chose to move it only with breakable walls by the sites (2 per site room, was 1) and barricades per defender a round (1 on the Embassy, a per-map setting; other maps unlimited): 48% now; Ox Belt-Fed damage 36 → 33)

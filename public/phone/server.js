@@ -61,7 +61,7 @@ const step = () => {
   while (acc >= dt) {
     acc -= dt; game.tick(dt); for (const g of tutorials) g.tick(dt);
     snapAcc += dt;
-    if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = 0; game.broadcast(); for (const g of tutorials) g.broadcast(); }
+    if (snapAcc >= 1 / SNAP_RATE - 1e-6) { snapAcc = Math.min(snapAcc - 1 / SNAP_RATE, 1 / SNAP_RATE); game.broadcast(); for (const g of tutorials) g.broadcast(); } // (keeps the remainder: 20 updates a second, not 15)
   }
 };
 const loop = () => { try { step(); } catch (e) { console.error('phone server:', e); } finally { setTimeout(loop, Math.max(1, (1 / TICK_RATE - acc) * 1000)); } };

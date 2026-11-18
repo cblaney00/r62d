@@ -703,3 +703,11 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   crosshair within 2 m of an enemy you see stays put (any sight). Checked in a browser: 0.8 m / 1.8 m off stays, away
   snaps out (1.7 → 9.2 m). The phone path is only syntax-checked plus the same helper.
 - The pros' takes: see docs/balance.md (Dust fine, Embassy 40 → 48% with `siteSoft`/`barricades` map settings, Ox 36 → 33).
+- From his played match (replay mwmebdy29wqh, Harbor, checked frame by frame with a scratch analyser: teleports, bodies in
+  walls, rail crossings, stuck bots, health, game-time gaps; plus his /api/perf reports): (1) game updates went out
+  15 a second, not 20: server.js and phone server.js reset `snapAcc` to 0 and lost the remainder; now it is kept
+  (a real browser: 45 → 60 in 3 s). (2) MAGPIE bots tried the swarm on drones it couldn't take (other floor, smoke, already
+  chased): 113 refusals in 6 matches → 0; `swarmPick` is shared by `releaseSwarm` and the bot. (3) Bots got a
+  `pingwait` message every moment their ping was cooling down (40 in 5 s): none for bots now. Looked fine: HOIST's
+  grapple and hatch drops (big jumps between floors), a roof bot waiting crouched by a hatch, him walking along a stair
+  rail and in at the bottom. His fps 57-120 on Medium (dips to ~60 for a few seconds twice, script 11-13 ms then).

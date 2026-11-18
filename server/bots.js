@@ -978,7 +978,7 @@ export function botThink(game, p, dt) {
     ai.droneReact += dt;
     const want = Math.atan2(drone.y - p.y, drone.x - p.x);
     turnTo(p, want, S.turn, dt);
-    if (drone.type === 'drone' && abId === 'swarm' && p.abilityCount > 0 && Math.hypot(drone.x - p.x, drone.y - p.y) < SWARM.reach * PX_PER_M * 0.9) { // MAGPIE: take it over
+    if (drone.type === 'drone' && abId === 'swarm' && p.abilityCount > 0 && Math.hypot(drone.x - p.x, drone.y - p.y) < SWARM.reach * PX_PER_M * 0.9 && game.swarmPick(p, p) === drone) { // MAGPIE: take it over (only one the swarm can really take: else she shoots it)
       if (ai.droneReact > 0 && Math.abs(angDiff(want, p.aim)) < 0.4) { useAbility(); teamSay(game, p, `Swarm on the drone ${place(game, drone.x, drone.y) || 'here'}, don't shoot it`, 'mgG' + drone.id); }
       return;
     }
