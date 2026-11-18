@@ -3,7 +3,7 @@ import { TUNE } from './aimstick.js';
 import { layoutTouch, polyHit, STICK } from './touchlayout.js';
 // (main.js pollPad reads touchPad() when no real controller is plugged in), so every rule stays the same.
 //   Left thumb: a fixed stick to move (a light push walks, silently).
-//   Right half of the screen: a stick that appears wherever your thumb lands (he asked): drag to aim, further to
+//   Right: the aim stick (with fire rings only a thumb on the stick itself aims; on or just outside the ring shoots): drag to aim, further to
 //   look further ahead. A red fire ring round each stick (put a thumb down on it), so you can shoot with either thumb.
 //   Small buttons along the right edge and top: aim in, crouch, use (hold), reload, swap, skill, gadget, melee,
 //   vault, ping, drone/cameras, previous/next camera, scoreboard (hold) and pause.
@@ -15,7 +15,8 @@ const SPRINT_PUSH = 1.45; // (FIRE buttons setting) the move thumb this far out 
 // stick must never shoot, and it covers its ring while held): a finger put down on a ring shoots (build(): ringFire). His choices: a quick tap on the aim stick aims in / out; sprint is a
 // double-tap and hold on the move stick (its edge shoots now). The old FIRE buttons stay as a Settings choice.
 const MOVE_SETTLE = 150, MOVE_SLIP = 12, MOVE_DEAD = 0.14; // the move thumb's settling time (ms) and slide (px), and the dead zone (share of a full push)
-const MOVE_R = 74; // (fire rings) how far the move thumb pushes for a full run (was R, 62: he asked for a bigger stick)
+const NEAR_RING = 26; // (fire rings) how far past the red ring a thumb still shoots (design px)
+const MOVE_R = 81; // (fire rings) how far the move thumb pushes for a full run (was R, 62: he asked for a bigger stick)
 const TAP_MS = 250, TAP_PX = 12, DOUBLE_MS = 300; // a quick tap; two of them for sprint
 export const fireRings = () => store('r62d-fire') !== 'buttons';
 export function setFireRings(on) { store('r62d-fire', on ? 'rings' : 'buttons'); if (ui) { releaseAll(); ui.remove(); ui = null; shown = false; } } // rebuilt with the other buttons when the match shows them
@@ -161,7 +162,7 @@ export const ICONS = {
   help: '<b>?</b>',
 };
 const HELP = () => [ // (a function: it follows the fire rings setting)
-  ...(fireRings() ? [['fire', 'SHOOT', 'Put a thumb down on the red ring round either stick: you shoot while it stays down. Drag on the right ring to aim while you shoot. A stick you are steering never shoots.'], ['ads', 'AIM IN', 'Tap the aim stick quickly (no drag) to aim in; tap again to aim out. It turns blue while aimed in.']]
+  ...(fireRings() ? [['fire', 'SHOOT', 'Put a thumb down on the red ring round either stick, or just outside it: you shoot while it stays down. Drag on the right ring to aim while you shoot. A stick you are steering never shoots.'], ['ads', 'AIM IN', 'Tap the aim stick quickly (no drag) to aim in; tap again to aim out. It turns blue while aimed in.']]
     : [['fire', 'FIRE', 'Shoot. Drag the right one to aim while you shoot.'], ['ads', 'AIM', 'The small button on each FIRE: tap to aim in, tap again to aim out.']]),
   ['crouch', 'CROUCH', 'Tap to crouch. Hold to lie down. While sprinting: a slide.'], ['leanL', 'LEAN', 'Lean left or right round a corner: tap on, tap off.'],
   ['reload', 'RELOAD', 'Reload your gun.'], ['swap', 'SWAP', 'Switch between your guns.'],
@@ -223,14 +224,23 @@ function build() {
   let leftF = null, aimF = null, ox = 0, oy = 0, tx = 0, ty = 0;
   // aiming in re-centres the right stick under the thumb, so dragging from there moves the crosshair out from close in
   // the aim stick is drawn in one fixed place (he asked 2026-11-17: a consistent location), left of the right thumb's
-  // buttons; a thumb landing anywhere on the right half drives it from where it landed, so nothing jumps
+  // buttons; a thumb landing on it drives it from where it landed, so nothing jumps (FIRE buttons setting: anywhere on the right half)
   // (placed by style.css: #tsRight, so it follows the screen turning or resizing)
-  recentre = () => { if (aimF === null) return; ox = tx; oy = ty; rs.x = rs.y = 0; knob(dyn, rs, rings ? STICK.KNOB : R); };
+  // he asked (2026-11-18): a thumb put on a stick shows as touching its middle, the knob moving from there, never jumping
+  // to where the touch landed. The aim stick's value still starts from where you aim now (the smooth pickup below); only
+  // its knob is drawn from that start (k0).
+  let k0 = { x: 0, y: 0 };
+  const aimKnob = K => { let u = rs.x - k0.x, v = rs.y - k0.y; const l = Math.hypot(u, v); if (l > 1) { u /= l; v /= l; } knob(dyn, { x: u, y: v }, K); };
+  recentre = () => { if (aimF === null) return; ox = tx; oy = ty; rs.x = rs.y = 0; k0 = { x: 0, y: 0 }; aimKnob(rings ? STICK.KNOB : R); };
   // Fire rings (he asked again 2026-11-17: pulling a stick all the way shot by itself): a thumb steering a stick never
   // shoots, however far it goes, and while held the stick covers its ring. The ring is a fire button of its own: a
   // finger put down ON the ring of a stick nobody is holding shoots (the right one can be dragged to aim as it shoots,
   // like the old right FIRE).
-  const onRingOf = (el, x, y) => { if (el.classList.contains('held')) return false; const b = el.getBoundingClientRect(), rv = b.width / 2, d = Math.hypot(x - b.left - rv, y - b.top - rv); return d > rv * 1.1 && d < rv * STICK.RING / STICK.VR + 6; }; // (clearly outside the stick: a thumb landing near its edge steers, it doesn't shoot)
+  // where a finger landed round a stick nobody is holding (he asked 2026-11-18: only the sticks themselves aim and move;
+  // a thumb just outside the red ring shoots instead of starting a stick there, anywhere else does nothing):
+  // 'stick' inside it, 'ring' on its red ring, 'near' just outside the ring (NEAR_RING design px), else null
+  const zoneOf = (el, x, y) => { if (el.classList.contains('held')) return null; const b = el.getBoundingClientRect(), rv = b.width / 2, u = rv / STICK.VR, d = Math.hypot(x - b.left - rv, y - b.top - rv), ro = STICK.RING * u;
+    return d <= rv * 1.1 ? 'stick' : d < ro + 6 * u ? 'ring' : d < ro + NEAR_RING * u ? 'near' : null; }; // (clearly outside the stick: a thumb landing near its edge steers, it doesn't shoot)
   const ringFire = (id, el, x0, y0, drag) => {
     trigger(true); el.classList.add('firing'); let fx = x0, fy = y0, dragAim = false;
     fingers.set(id, {
@@ -255,9 +265,12 @@ function build() {
     // every touch, so the button never heard the tap (he couldn't switch operator in free play on a phone)
     const pb = !btn && document.elementsFromPoint(x, y).map(e => e.closest && e.closest('#freeHint button, #cambar button, #kcBtn')).find(Boolean);
     if (pb) { pb.click(); return; }
-    if (rings && onRingOf(dyn, x, y)) return ringFire(id, dyn, x, y, true);
-    if (rings && leftF === null && onRingOf(base, x, y)) return ringFire(id, base, x, y, false);
-    if (x >= innerWidth / 2) { // right half: the aim stick appears under the thumb
+    const zr = rings ? zoneOf(dyn, x, y) : null, zl = rings && leftF === null ? zoneOf(base, x, y) : null;
+    if (zr === 'ring') return ringFire(id, dyn, x, y, true); // (on the aim stick's ring: drag to aim as you shoot)
+    if (zl === 'ring' || zl === 'near') return ringFire(id, base, x, y, false);
+    if (zr === 'near') return ringFire(id, dyn, x, y, false); // (outside the ring: shoots, never aims)
+    const side = rings ? (zr === 'stick' ? 'R' : zl === 'stick' ? 'L' : null) : x >= innerWidth / 2 ? 'R' : y > innerHeight * 0.3 ? 'L' : null;
+    if (side === 'R') { // right half: the aim stick appears under the thumb
       if (aimF !== null) return;
       aimF = id; aimOn = true; ox = tx = x; oy = ty = y; aimPx = { x, y }; aimPxN++;
       const K = rings ? STICK.KNOB : R; // (with the rings the held stick covers its ring, so the knob travels further)
@@ -265,7 +278,7 @@ function build() {
       // a smooth pickup (he asked 2026-11-18: the reticle jumped when the thumb landed): the stick's centre is put so that
       // the landing spot already means where you aim now; from there it is the same stick as always, whole range and all
       { const o = aimStart(); if (o && Math.hypot(o.x, o.y) > 0.02) { const Ra = R / stickSens() * TUNE.TRAVEL; ox = x - o.x * Ra; oy = y - o.y * Ra; rs.x = o.x; rs.y = o.y; } }
-      knob(dyn, rs, K);
+      k0 = { x: rs.x, y: rs.y }; aimKnob(K); // (the knob in the middle)
       const t0 = performance.now(), lx = x, ly = y; let mv = 0, settled = false; // (lx, ly: where the thumb landed; a quick tap is measured from there)
       fingers.set(id, {
         move(x, y) {
@@ -275,25 +288,25 @@ function build() {
           if (!settled) { if (performance.now() - t0 < MOVE_SETTLE && Math.hypot(x - lx, y - ly) < MOVE_SLIP * tz()) { ox += x - tx; oy += y - ty; } else settled = true; }
           tx = x; ty = y; aimPx = { x, y }; mv = Math.max(mv, Math.hypot(x - lx, y - ly)); let u = (x - ox) / Ra, v = (y - oy) / Ra; const l = Math.hypot(u, v);
           if (l > 1) { ox += (u / l) * (l - 1) * Ra; oy += (v / l) * (l - 1) * Ra; u /= l; v /= l; } // the centre follows a thumb that slides past the edge
-          rs.x = u; rs.y = v; knob(dyn, rs, K);
+          rs.x = u; rs.y = v; aimKnob(K);
         },
         end() {
           if (rings && performance.now() - t0 < TAP_MS && mv < TAP_PX) setAds(!adsLatch); // a quick tap aims in / out (his choice)
-          aimF = null; aimOn = false; aimPx = null; rs.x = rs.y = 0; knob(dyn, rs, K); dyn.classList.remove('held');
+          aimF = null; aimOn = false; aimPx = null; rs.x = rs.y = 0; k0 = { x: 0, y: 0 }; knob(dyn, rs, K); dyn.classList.remove('held');
         },
       });
-    } else if (y > innerHeight * 0.3) { // lower left: the move stick jumps to wherever the thumb lands
+    } else if (side === 'L') { // the move stick (FIRE buttons setting: it jumps to wherever the thumb lands on the lower left)
       if (leftF !== null) return;
       // (with the rings the stick is a bit bigger, he asked: a longer push for a full run, and it covers its ring while held)
       leftF = id; const z = tz(), r = (rings ? MOVE_R : R) * z, half = rings ? STICK.VR : 62, K = rings ? STICK.KNOB : R, t0 = performance.now(); let cx = x, cy = y, mv = 0, settled = false;
-      base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; base.style.bottom = 'auto'; base.classList.add('held');
+      if (!rings) { base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; base.style.bottom = 'auto'; } base.classList.add('held'); // (fire rings: the stick stays put, the knob starts in its middle)
       if (rings && t0 - lastLeftTap < DOUBLE_MS) { setAds(false); sprintLock = true; } // double-tap and hold: sprint until you let go (his choice)
       lastLeftTap = 0;
       // A thumb put down is not a push (he asked 2026-11-18: landing on the stick often walked already): while it settles
       // (its first MOVE_SETTLE ms, or until it travels MOVE_SLIP px) the stick's centre slides along under it, and after
       // that a small dead zone in the middle walks nowhere, the push growing smoothly from its edge.
       const move = (x, y) => {
-        if (!settled) { const now = performance.now(), d = Math.hypot(x - cx, y - cy); if (now - t0 < MOVE_SETTLE && d < MOVE_SLIP * z) { cx = x; cy = y; base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; } else settled = true; }
+        if (!settled) { const now = performance.now(), d = Math.hypot(x - cx, y - cy); if (now - t0 < MOVE_SETTLE && d < MOVE_SLIP * z) { cx = x; cy = y; if (!rings) { base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; } } else settled = true; }
         let u = (x - cx) / r, v = (y - cy) / r; const l0 = Math.hypot(u, v), dz = l0 < MOVE_DEAD ? 0 : (l0 - MOVE_DEAD) / (1 - MOVE_DEAD) / l0; u *= dz; v *= dz; const l = Math.hypot(u, v); mv = Math.max(mv, l * r); if (l > 0.4 && useLatch) setUse(false);
         if (!rings) { if (l >= SPRINT_PUSH) { if (!sprintLock) setAds(false); sprintLock = true; } else if (l < 0.6) sprintLock = false; } // (FIRE buttons: push past the ring to sprint, like phone shooters)
         base.classList.toggle('spr', sprintLock); if (l > 1) { u /= l; v /= l; } ls.x = u; ls.y = v; knob(base, ls, K);

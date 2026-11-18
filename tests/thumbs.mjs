@@ -126,6 +126,26 @@ async function run() {
       console.log('t(ms)  dist(px)  padAng  padReach  aimDeg  stick-o'); for (const r of rec.filter((_, i) => i % 4 === 0)) console.log(r.join('  '));
       await shot('c1-close'); return;
     }
+    if (process.env.SCENARIO === 'zones') { // he asked 2026-11-18: only the sticks aim and move; on or just outside a red ring shoots; elsewhere nothing; a thumb put on a stick shows its knob in the middle
+      await js("localStorage.setItem('r62d-autofire', '0'); __r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'clearBots' })); true"); await sleep(800);
+      const geo = async sel => JSON.parse(await js(`(() => { const b = document.querySelector('${sel}').getBoundingClientRect(), rv = b.width / 2; return JSON.stringify({ x: b.left + rv, y: b.top + rv, rv, u: rv / 66 }); })()`));
+      const knobAt = sel => js(`(() => { const m = (document.querySelector('${sel} i').style.transform || '').match(/-?[\\d.]+/g) || [0, 0]; const v = Math.round(Math.hypot(+m[0] || 0, +(m[1] || 0))); return Number.isFinite(v) ? v : String(document.querySelector('${sel} i').style.transform); })()`);
+      const look = async () => JSON.parse(await js('JSON.stringify({ f: window.__fires, aim: Math.round(__r62d.st.aim * 57.3), x: Math.round(__r62d.st.pred.x), y: Math.round(__r62d.st.pred.y), held: document.querySelector("#tsRight").classList.contains("held") || document.querySelector("#tsLeft").classList.contains("held") })'));
+      let bad = 0; const check = (name, ok, info) => { if (!ok) bad++; console.log((ok ? 'ok   ' : 'FAIL ') + name, JSON.stringify(info)); };
+      const run1 = async (name, pts, hold, want) => { const a = await look(); await js('window.__fires = 0'); const p = touch(finger('Z', pts, hold)); await sleep(150); const mid = await look(); await p; await sleep(300); const b = await look();
+        const moved = Math.round(Math.hypot(b.x - a.x, b.y - a.y)), turned = Math.abs(((b.aim - a.aim + 540) % 360) - 180); want({ shots: b.f, moved, turned, held: mid.held }, name); };
+      const R = await geo('#tsRight'), Lg = await geo('#tsLeft');
+      for (const [name, pt] of [['far from both sticks (screen middle, top)', [Math.round(W * 0.55), Math.round(H * 0.25)]], ['right half, well clear of the aim ring', [Math.round(R.x - 97 * R.u - 60 * R.u), Math.round(R.y - 30)]], ['lower left, well clear of the move ring', [Math.round(Lg.x + 160 * Lg.u), Math.round(Lg.y - 120 * Lg.u)]]])
+        await run1(name, [pt, [pt[0] + 40, pt[1] - 20, 300]], 400, (r, n) => check(n + ': nothing happens', r.shots === 0 && r.moved === 0 && r.turned === 0 && !r.held, r));
+      { const pt = [Math.round(R.x - (97 + 14) * R.u), Math.round(R.y)]; await run1('just outside the aim ring', [pt, [pt[0] - 30, pt[1] - 30, 300]], 300, (r, n) => check(n + ': shoots, never aims', r.shots > 0 && r.turned === 0 && !r.held, r)); }
+      { const pt = [Math.round(Lg.x), Math.round(Lg.y - (97 + 14) * Lg.u)]; await run1('just outside the move ring', [pt, [pt[0], pt[1] - 20, 300]], 300, (r, n) => check(n + ': shoots, never moves', r.shots > 0 && r.moved === 0 && !r.held, r)); }
+      for (const [sel, g] of [['#tsRight', R], ['#tsLeft', Lg]]) { // knob in the middle when a thumb lands off-centre on the stick
+        const pt = [Math.round(g.x + 34 * g.u), Math.round(g.y + 20 * g.u)]; const p = touch(finger('K', [pt, [pt[0], pt[1], 200]], 300)); await sleep(120); const k0 = await knobAt(sel); await p; await sleep(200);
+        check(sel + ' thumb lands 40 px off its middle: knob starts in the middle', k0 <= 2, { knobPx: k0 }); }
+      { const pt = [Math.round(Lg.x), Math.round(Lg.y)]; let best = null; for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) { await run1('on the move stick, pushed', [pt, [Math.round(pt[0] + dx * 60 * Lg.u), Math.round(pt[1] + dy * 60 * Lg.u), 200]], 800, r => { if (!best || r.moved > best.moved) best = r; }); if (best.moved > 0) break; } check('on the move stick, pushed (4 ways, a wall may block one): walks, no shots', best.moved > 0 && best.shots === 0, best); }
+      { const pt = [Math.round(R.x), Math.round(R.y)]; await run1('on the aim stick, dragged up', [pt, [pt[0], Math.round(pt[1] - 50 * R.u), 300]], 400, (r, n) => check(n + ': aims, no shots', r.turned > 0 && r.shots === 0, r)); }
+      console.log(bad ? `FAIL zones (${bad})` : 'PASS zones');
+    }
     if (process.env.SCENARIO === 'rings') { // he asked 2026-11-17: fire rings round both sticks, a quick tap on the aim stick aims in, double-tap and hold the move stick sprints
       await js("localStorage.setItem('r62d-autofire', '0'); __r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'clearBots' })); true"); await sleep(800);
       console.log('FIRE / AIM buttons on screen:', await js("document.querySelectorAll('#touchUI .tbtn.fire, #touchUI .tbtn.aim').length"), '(want 0)');
@@ -135,7 +155,7 @@ async function run() {
         console.log(`${name}: shots ${r[r.length - 1][3] - r[0][3]}, aimed in ${Math.max(...r.map(q => q[4]))}->${r[r.length - 1][4]}, sprint ${Math.max(...r.map(q => q[5]))}, moved ${Math.round(Math.hypot(r[r.length - 1][6] - r[0][6], r[r.length - 1][7] - r[0][7]))} px   (want ${want})`);
         if (process.env.ROWS) for (const q of r.filter((_, i) => i % 6 === 0)) console.log('   t', q[0] - t0, 'dist', q[1], 'aim', q[2], 'shots', q[3], 'ring', q[8]); };
       const Ra = 62 / 0.7 * 1.5, r = 62 * Math.max(0.7, Math.min(1.15, H / 430)); // the aim stick's thumb travel (normal sensitivity) and the move stick's radius
-      const RA = [Math.round(W * 0.6), Math.round(H * 0.5)]; // (an empty spot left of the aim stick: R0 is on a button in this layout)
+      const RA = await centre('#tsRight'); // (he asked 2026-11-18: only the stick itself aims, so the aim thumb starts on it)
       const at = (k, deg) => [Math.round(RA[0] + Math.cos(deg / 57.3) * Ra * k), Math.round(RA[1] + Math.sin(deg / 57.3) * Ra * k)];
       await take();
       await touch(finger('R', [RA, [...at(0.6, 0), 250]], 500)); await sleep(300); let q = await take(); sum('A1 aim thumb out 0.6 (inside the stick)', q, 'no shots'); const d1 = q[q.length - 1][1];

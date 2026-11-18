@@ -4964,7 +4964,7 @@ const TIPS = [
   'Cameras see a cone: aim them with the mouse and switch with {leanL} and {leanR}.',
   'Change your loadout for every operator on the Operators page.',
   'Smashed barricades leave splinters that crack underfoot.',
-  'On a phone: put a thumb down on the red ring round either stick to shoot, tap the aim stick to aim in, and double-tap and hold the move stick to sprint.',
+  'On a phone: put a thumb down on (or just outside) the red ring round either stick to shoot; only the sticks themselves move and aim, tap the aim stick to aim in, and double-tap and hold the move stick to sprint.',
 ];
 const tipText = t => t.replace(/\{(\w+)\}/g, (_, id) => label(id)); // tips name your own keys
 let tipI = Math.floor(Math.random() * TIPS.length);

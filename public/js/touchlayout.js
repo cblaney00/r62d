@@ -8,22 +8,22 @@
 //  - the top row is a strip of interlocking hexagons
 // Buttons are not clipped (count badges may stick out); polyHit() decides which shape a finger is in.
 const D = Math.PI / 180;
-export const STICK = { VR: 60, RING: 88, KNOB: 70 }; // stick radius, fire ring's outer radius, how far the knob travels while held
+export const STICK = { VR: 66, RING: 97, KNOB: 77 }; // (he asked 2026-11-18: both sticks 10% bigger; were 60, 88, 70) // stick radius, fire ring's outer radius, how far the knob travels while held
 const RC = { x: -232, y: -128 }; // (he asked 2026-11-18: buttons smaller, sticks the same, the middle of the screen more open: thinner bands, the aim stick 18 px nearer the corner) the aim stick's centre, from the bottom-right corner (style.css #touchUI.rings #tsRight)
 const LC = { x: 100, y: -100 }; // the move stick's resting centre, from the bottom-left corner (#tsLeft)
-const B1 = [94, 136], B2 = [140, 172], GAP = 4; // (were 94-150 and 156-196)
+const B1 = [103, 145], B2 = [149, 181], GAP = 4; // (moved out 9 px round the bigger sticks, 2026-11-18; were 94-136 and 140-172) // (were 94-150 and 156-196)
 const SPEC = [
   { id: 'crouch', at: 'br', c: RC, r: B1, a: [15, 55], is: 21 },
   { id: 'reload', at: 'br', c: RC, r: B1, a: [-25, 15], is: 21 },
   { id: 'swap', at: 'br', c: RC, r: B1, a: [-62, -25], is: 20 },
   { id: 'skill', at: 'br', c: RC, r: B1, a: [-98, -62], is: 18 },
   { id: 'gadget', at: 'br', c: RC, r: B1, a: [-134, -98], is: 18 },
-  { id: 'use', at: 'br', c: RC, r: [140, 236], a: [8, 62], is: 26, clip: 6 }, // ACTION: the corner piece
+  { id: 'use', at: 'br', c: RC, r: [149, 245], a: [8, 62], is: 26, clip: 6 }, // ACTION: the corner piece
   { id: 'jump', at: 'br', c: RC, r: B2, a: [-30, 8], is: 17 },
   { id: 'melee', at: 'br', c: RC, r: B2, a: [-66, -30], is: 17 },
   { id: 'next', at: 'br', c: RC, r: B2, a: [-100, -66], is: 18 }, { id: 'prev', at: 'br', c: RC, r: B2, a: [-134, -100], is: 18 },
-  { id: 'leanR', at: 'bl', c: LC, r: [94, 128], a: [-25, 10], is: 18 }, { id: 'leanL', at: 'bl', c: LC, r: [94, 128], a: [-60, -25], is: 18 }, // (right of the stick, clear of the team list above it)
-  { id: 'tiltc', at: 'bl', c: LC, r: [94, 128], a: [10, 38], is: 16 },
+  { id: 'leanR', at: 'bl', c: LC, r: [103, 137], a: [-25, 10], is: 18 }, { id: 'leanL', at: 'bl', c: LC, r: [103, 137], a: [-60, -25], is: 18 }, // (right of the stick, clear of the team list above it)
+  { id: 'tiltc', at: 'bl', c: LC, r: [103, 137], a: [10, 38], is: 16 },
 ];
 const TOP = ['pause', 'help', 'score', 'view', 'map']; // right to left: flat-topped hexagons, every other one half a step down
 const HEX = 17; // (was 21)
