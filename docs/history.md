@@ -783,3 +783,8 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 
 ## 2026-11-18 — no white box on the window swoop
 - He asked: climbing in through a window, a white rectangle starts small in the middle and grows to the screen's edges; remove it, keep the transition. main.js `screenFx`: the two window-frame outline strokes (and `st.swoopScr`, only used by them) are gone; the camera swoop and the soft edge darkening stay.
+
+## 2026-11-18 — far aim speed past a ring
+- He asked: from 7 m out a separate aim speed, +20% to start, both adjustable, a ring showing where it starts, aimed in or not; then: it can be negative. main.js `farFast()` (Settings `#farFast`, a % change −50..150, default 20 → ×1.2) and `farFastPx()` (`#farFastM`, 2–20 m, default 7) scale the mouse in the mousemove `freeMove` branch when `hypot(aimOff)` ≥ the ring (pointer-locked mouse only, not sticks or touch). crosshair.js `drawFastRing` (dashed sage, brighter when out past it) drawn in `crosshair()` and in the Armory (`O.fast`). Saved like the other sensitivities (localStorage `r62d-sens` slots 4–5, profile `farFast`/`farFastM`, phone shim list).
+- He chose to remove the old Far aim sensitivity (`farSens`, ×0.5 past the normal view via `trackR`, both gone; armory.js too): it cancelled the new speed-up near the screen edge.
+- Checked in a hidden browser (pointer lock stubbed): the same mouse move from 4 m → 11.0 px, from 9 m → 13.2 px (×1.2); at −30% 5.8 vs 8.7 px inside.

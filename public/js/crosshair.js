@@ -75,6 +75,15 @@ export function lensPt(px, py, x, y, r, M) {
 export const SIGHT_NAMES = { iron: 'Iron sights', reddot: 'Red dot', holo: 'Holo', prism: '1.5× prism', scope: '2× scope', sniper: 'Sniper scope' };
 // sz = how big the shapes are (main.js: smaller when zoomed out and further from you, he asked 2026-11-18); the gap g
 // is not scaled by it, so it still shows exactly where the next bullet can land (his pick).
+// The far aim ring (he asked 2026-11-18): round you at the "Far aim speed from" distance; past it the mouse moves the
+// crosshair at the "Far aim speed" setting. Faint and dashed; a little brighter while the crosshair is out past it.
+export function drawFastRing(ctx, x, y, R, out, k) {
+  if (!(R > 4)) return;
+  ctx.save(); ctx.setLineDash([5 * k, 7 * k]);
+  ctx.globalAlpha = out ? 0.5 : 0.28; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 2.6 * k; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.stroke();
+  ctx.globalAlpha = out ? 0.75 : 0.42; ctx.strokeStyle = '#a9c4a2'; ctx.lineWidth = 1.2 * k; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.stroke();
+  ctx.restore();
+}
 export function drawReticle(ctx, sight, x, y, spread, k, sz = 1) {
   x = Math.round(x) + 0.5; y = Math.round(y) + 0.5;
   const g = Math.max(0, spread) * k, A = 0.82, ek = k * Math.max(0.6, 0.8 * sz); k *= 1.35 * 0.8 * sz; // (a third bigger than a plain pixel, then 20% smaller: he asked 2026-11-18) // g = how far it opens up, ek = the dark edge

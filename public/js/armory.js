@@ -4,7 +4,7 @@
 // match (he asked): the mouse is captured on the first click, the crosshair moves with your sensitivity and aiming mode,
 // it is your own crosshair, distances are real metres, the view widens when you aim in and follows the crosshair out.
 import { PX_PER_M } from '/shared/constants.js';
-import { drawReticle, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
+import { drawReticle, drawSightLook, magnify, lensPt, lensMag, drawFastRing } from './crosshair.js';
 import { lockMouse } from './keys.js';
 import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, mainPellet, aimedDamage, shotOffset, recoilStep, recoilMax, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
 import { drawTrail, TRAIL_LIFE } from './fx.js';
@@ -45,7 +45,7 @@ export function openArmory(el, opts) {
     if (document.pointerLockElement === cv) {
       const k = O.sens(S.mouse.r) * (steadying() ? O.steady() : 1) * dpr;
       if (O.mode() === 'cursor') { S.mouse.x = Math.max(0, Math.min(cv.width, S.mouse.x + e.movementX * k)); S.mouse.y = Math.max(0, Math.min(cv.height, S.mouse.y + e.movementY * k)); }
-      else freeMove(e.movementX * k, e.movementY * k);
+      else { const F = O.fast ? O.fast() : [1, Infinity], f = Math.hypot(S.aim.x, S.aim.y) >= F[1] ? F[0] : 1; freeMove(e.movementX * k * f, e.movementY * k * f); } // (past the far aim ring: its own speed, as in a match)
     } else { const r = cv.getBoundingClientRect(); S.mouse.x = (e.clientX - r.left) * dpr; S.mouse.y = (e.clientY - r.top) * dpr; }
   };
   cv.onmousedown = e => {
@@ -185,10 +185,9 @@ function veil(p, cv) { // the blurred, dimmed range round the clear lens (#armVe
   Object.assign(el.style, { left: cv.offsetLeft + 'px', top: cv.offsetTop + 'px', width: cv.offsetWidth + 'px', height: cv.offsetHeight + 'px' });
   el.style.setProperty('--sx', Math.round(p.x / dpr) + 'px'); el.style.setProperty('--sy', Math.round(p.y / dpr) + 'px'); el.style.setProperty('--sr', Math.round(lensR(cv) / dpr) + 'px');
 }
-function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): 1:1 every way, slower past the normal view
+function freeMove(dx, dy) { // the match's Crosshair mode (main.js freeMove): 1:1 every way (the far aim speed past the ring is applied by the caller)
   const z = S.z || 1; dx /= z; dy /= z;
   const o = S.aim, l0 = Math.hypot(o.x, o.y) || 1, ux = o.x / l0, uy = o.y / l0, lo = aimMin(), hi = aimMax();
-  if (O.mode() === 'free' && O.far && S.trackHH) { const hh = S.trackHH, hw = hh * (S.aspect || 16 / 9), c = Math.abs(ux), s = Math.abs(uy); const tr = Math.min(c > 0.01 ? hw / c : Infinity, s > 0.01 ? hh / s : Infinity) - hh * 0.26; if (l0 > tr) { const m = 1 + (O.far() - 1) * Math.min(1, (l0 - tr) / PX_PER_M); dx *= m; dy *= m; } }
   if (l0 >= lo) S.dzA = Math.atan2(uy, ux); // (the match's close dead zone: the aim keeps this way while the crosshair is over you)
   let l, a;
   if (l0 < 2 * lo) { const nx = o.x + dx, ny = o.y + dy; l = Math.hypot(nx, ny); a = l > 1e-6 ? Math.atan2(ny, nx) : Math.atan2(uy, ux); } // near you: plain x/y, straight over your character
@@ -346,6 +345,7 @@ function draw(cv, dt) {
   const cone = spreadCone(w, modsOf(S.w), { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot, modsOf(S.w)) }), xh = O.xh();
   if (S.adsT > 0.05) drawSightLook(c, attOf(S.w).sight, x, y, Math.min(1, S.adsT), dpr, lensR(cv));
   veil(S.adsT > 0.3 && sniper() ? { x, y } : null, cv);
+  if (O.fast && O.mode() !== 'cursor') { const F = O.fast(); drawFastRing(c, O0.x, O0.y, F[1] * z, Math.hypot(S.aim.x, S.aim.y) >= F[1], dpr); } // the far aim ring
   if (!(sniper() && S.adsT > 0.6)) drawReticle(c, attOf(S.w).sight, x, y, Math.tan(cone) * Math.hypot(Q.x - O0.x, Q.y - O0.y) / dpr, dpr);
   const dm = q.d / M;
   if (dm >= 8) {
