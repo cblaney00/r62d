@@ -1,15 +1,19 @@
 // Xbox controller (or any controller the browser lists as "standard"), read every frame.
-//   Left stick   move (a light push walks silently)      Right stick  aim (direction + how far ahead)
-//   RT shoot · LT aim down sights · A use (hold) · B crouch (on/off) · X reload · Y swap weapon
-//   LB gadget · RB operator skill · R3 melee · D-pad up ping · D-pad down drone/cameras
-//   D-pad left/right flip cameras · View scoreboard (hold) · Menu pause
+//   R6-style Xbox layout (XBOX_ACTIONS, PAD_HELP): RT shoot · LT aim · L3 sprint · R3 melee · LT + L3 / R3 lean ·
+//   A jump / vault · B crouch (hold: lie down) · X reload (hold: use) · Y swap · LB gadget · RB skill ·
+//   D-pad up ping · down cameras · left map · right put out a drone (on cameras: previous / next) · View scoreboard · Menu pause
 const DZ = 0.1; // only enough to ignore a worn stick resting off-centre; past it the push is rescaled from 0, so nothing jumps
-export const PAD_HELP = [
+export const PAD_HELP = [ // a real controller (he asked 2026-11-18: everything doable, laid out like Rainbow Six's Xbox controls)
   ['Move (light push = walk, silent)', 'Left stick'], ['Aim (push further = look further ahead)', 'Right stick'],
-  ['Shoot', 'RT'], ['Aim down sights', 'LT'], ['Use (hold)', 'A'], ['Crouch on / off', 'B'], ['Reload', 'X'], ['Swap weapon', 'Y'],
-  ['Gadget', 'LB'], ['Operator skill', 'RB'], ['Melee', 'Click right stick'], ['Vault', 'Click left stick'], ['Ping', 'D-pad up'], ['Drone / Cameras', 'D-pad down'],
-  ['Previous / next camera', 'D-pad left / right'], ['Scoreboard (hold)', 'View'], ['Pause', 'Menu'],
+  ['Shoot', 'RT'], ['Aim down sights', 'LT'], ['Sprint (on until you stop)', 'Click left stick'], ['Melee', 'Click right stick'],
+  ['Lean left / right', 'While aiming in (LT): click left / right stick'], ['Jump, vault, climb in', 'A'], ['Crouch on / off · hold: lie down', 'B'],
+  ['Reload · hold: use (reinforce, plant, defuse, revive)', 'X'], ['Swap weapon', 'Y'], ['Gadget', 'LB'], ['Operator skill', 'RB'],
+  ['Ping', 'D-pad up'], ['Team cameras & drones', 'D-pad down'], ['Map · on cameras: previous', 'D-pad left'], ['Put out a drone · on cameras: next', 'D-pad right'],
+  ['Scoreboard (hold)', 'View'], ['Pause', 'Menu'],
 ];
+// a real Xbox-style controller (the phone's buttons keep PAD_ACTIONS): R6's layout. 2 (X) is reload on a tap and use
+// when held; 10 / 11 (stick clicks) are sprint / melee, or lean left / right while aiming in; 14 / 15 depend on the view
+export const XBOX_ACTIONS = { 0: 'vault', 1: 'crouch', 2: 'reloadUse', 3: 'swap', 4: 'gadget', 5: 'ability', 8: 'scoreboard', 9: 'pause', 10: 'l3', 11: 'r3', 12: 'spot', 13: 'droneOrCams', 14: 'dleft', 15: 'dright' };
 // standard-layout button number → what it does (main.js turns these into game actions)
 export const PAD_ACTIONS = { 0: 'interact', 10: 'vault', 1: 'crouch', 2: 'reload', 3: 'swap', 4: 'gadget', 5: 'ability', 8: 'scoreboard', 9: 'pause', 11: 'melee', 12: 'spot', 13: 'droneOrCams', 14: 'camPrev', 15: 'camNext', 20: 'leanL', 21: 'leanR', 22: 'map', 23: 'drone', 24: 'view' }; // 20-24: phone-only buttons (touch.js; he asked 2026-11-18: DRONE puts out yours, CAMS looks through the team's, apart; a controller keeps 13 for both)
 

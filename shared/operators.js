@@ -370,7 +370,7 @@ export const LOADOUTS = {
   vapor: { primaries: ['javelin', 'heron', 'tusk'], secondaries: ['p10', 'needle', 'whisper'], gadgets: ['frag', 'stun'] },
   crow: { primaries: ['sabre', 'ferret', 'quill'], secondaries: ['p10', 'stub', 'whisper'], gadgets: ['stun', 'smoke'] },
   gimlet: { primaries: ['k4', 'quill', 'ranger'], secondaries: ['p10', 'hatchet'], gadgets: ['breach', 'claymore'] },
-  hoist: { primaries: ['ferret', 'verdict', 'heron'], secondaries: ['p10', 'whisper'], gadgets: ['stun', 'smoke'] },
+  hoist: { primaries: ['ferret', 'verdict', 'heron'], secondaries: ['p10', 'whisper'], gadgets: ['breach', 'stun'] }, // (he asked 2026-11-18: either a breach charge or a stun grenade)
   lockjaw: { primaries: ['hedge', 'auger', 'lark'], secondaries: ['couplet', 'gnat'], gadgets: ['wire', 'impact'] },
   deadfall: { primaries: ['cyclone', 'tandem', 'breaker'], secondaries: ['vex50', 'couplet'], gadgets: ['dshield', 'nitro'] },
   perch: { primaries: ['mammoth', 'pike', 'trestle'], secondaries: ['needle', 'p10'], gadgets: ['claymore', 'smoke'] },

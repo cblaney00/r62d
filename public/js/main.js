@@ -24,7 +24,7 @@ import { openPlaybook, closePlaybook } from './playbook.js';
 import { openKnowledge, closeKnowledge } from './knowledge.js';
 import { PRO_TEAMS } from '/shared/pros.js';
 import { drawReticle, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
-import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
+import { readPad, PAD_ACTIONS, PAD_HELP, XBOX_ACTIONS } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
 const rankTag = i => i == null ? '' : `<span class="rankTag" style="color:${RANK_COL[i]};border-color:${RANK_COL[i]}">${RANKS[i].toUpperCase()}</span>`;
@@ -1116,8 +1116,25 @@ function pollPad(dt, view) {
     if (gp.pressed[9]) escape();
     gpk.fire = gpk.ads = 0; return;
   }
+  // a real controller: R6's Xbox layout (XBOX_ACTIONS); what a press stood for is kept until its release (st.padA)
+  const xb = gp === real, MAP = xb ? XBOX_ACTIONS : PAD_ACTIONS, pa = st.padA || (st.padA = {}), nowP = performance.now(), ctl = st.me && st.me.ct;
   for (let i = 0; i < gp.pressed.length; i++) {
-    const a = PAD_ACTIONS[i]; if (!a) continue;
+    let a = MAP[i]; if (!a) continue;
+    if (xb && gp.pressed[i]) {
+      const aimed = gp.lt > 0.35, body = ctl === 'body';
+      if (a === 'l3') a = aimed && body ? 'leanL' : 'padSprint';
+      else if (a === 'r3') a = aimed && body ? 'leanR' : 'melee';
+      else if (a === 'dleft') a = body ? 'map' : 'camPrev';
+      else if (a === 'dright') a = body ? 'drone' : 'camNext';
+      pa[i] = a;
+    } else if (xb) a = pa[i] || a;
+    if (xb && a === 'reloadUse') { // X: a tap reloads, held it is use
+      if (gp.pressed[i]) { st.xT = nowP; st.xUse = false; }
+      if (gp.held[i] && st.xT && !st.xUse && nowP - st.xT > 280) { st.xUse = true; pressAction('interact'); }
+      if (gp.released[i]) { if (st.xUse) keys.delete('interact'); else if (st.xT) { pressAction('reload'); keys.delete('reload'); } st.xT = 0; st.xUse = false; }
+      continue;
+    }
+    if (xb && a === 'padSprint') { if (gp.pressed[i] && ctl === 'body') { st.padSpr = true; pressAction('sprint'); keys.delete('sprint'); } continue; } // on until you stop, aim in, shoot or crouch
     if (gp.pressed[i]) {
       if (a === 'crouch') { // on a drone B is sprint; sprinting: a power slide; held: lie down / get up (below)
         if (st.me && st.me.ct === 'drone') {} else if (trySlide()) {} else if (st.prone) { st.prone = false; gpk.crouch = 1; } else { gpk.crouch = gpk.crouch ? 0 : 1; st.crouchHoldT = performance.now(); }
@@ -1131,7 +1148,8 @@ function pollPad(dt, view) {
   if (!gp.held[1]) st.crouchHoldT = 0;
   else if (st.crouchHoldT && performance.now() - st.crouchHoldT > 450 && st.me && st.me.ct === 'body') { st.crouchHoldT = 0; gpk.crouch = 0; st.prone = true; }
   // phone: the move thumb pushed past its ring sprints; with no thumb aiming you turn to run that way (sprinting needs you facing roughly where you go)
-  const spr = !!gp.sprint && !!st.me && st.me.ct === 'body';
+  if (st.padSpr && (!xb || ls.l < 0.2 || gp.lt > 0.35 || gp.rt > 0.35 || gpk.crouch || st.prone || ctl !== 'body')) st.padSpr = false;
+  const spr = (!!gp.sprint || !!st.padSpr) && !!st.me && st.me.ct === 'body';
   if (spr && !gpk.sprint) { st.prone = false; gpk.crouch = 0; st.leanT = 0; }
   gpk.sprint = spr ? 1 : 0;
   // he asked 2026-11-16: after a sprint the move thumb keeps turning the crosshair with you (across stops too, and while

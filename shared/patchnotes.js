@@ -151,4 +151,6 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'sprint8', t: 'Computer: sprinting goes by the move keys alone, 8 directions on the screen, never toward the mouse.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'winvault', t: 'Climbing through a window takes 15% less time; climbers plainly hold the gun down in one hand meanwhile.', v: 1 },
   { d: '2026-11-18', k: 'mech', id: 'sens', t: 'Mouse sensitivity starts at 1.30 (was 1.00): aiming is 30% quicker for everyone, saved settings moved onto it once.', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'xbox', t: 'Controllers use the Rainbow Six Xbox layout: L3 sprint, R3 melee, LT + L3 / R3 lean, A vault, X reload (hold: use), D-pad map / drone.', v: 1 },
+  { d: '2026-11-18', k: 'op', id: 'hoist', t: 'HOIST: picks a Breach Charge or a Stun Grenade (smoke is no longer one of his choices).', v: 1 },
 ];
