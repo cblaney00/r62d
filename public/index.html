@@ -212,7 +212,7 @@
   <div id="help" class="hidden"></div>
   <div id="settings" class="hidden">
     <nav class="setSide"><h2>SETTINGS</h2>
-      <button data-p="sound">SOUND</button><button data-p="aim">MOUSE &amp; AIM</button><button data-p="keys">KEYS</button><button data-p="screen">SCREEN</button><button data-p="cols">COLOURS</button><button data-p="xhair">CROSSHAIR</button>
+      <button data-p="sound">SOUND</button><button data-p="aim">MOUSE &amp; AIM</button><button data-p="keys">KEYS</button><button data-p="screen">SCREEN</button><button data-p="cols">COLOURS</button>
       <div class="setFoot"><button id="setClose" class="primary">Done</button></div></nav>
     <div class="setBody">
     <section class="setPage" data-p="sound"><h3>SOUND</h3>
@@ -251,26 +251,14 @@
       <h4>SCREEN EFFECTS <small>click one to switch it off or on</small></h4><div id="fxList"></div>
     </section>
     <section class="setPage" data-p="cols"><h3>COLOURS</h3>
-      <p class="hint">Pick the colours that feel natural to you. They only change your own screen. (The crosshair colour is on the CROSSHAIR page; Esports TV keeps each team's own colours.)</p>
+      <p class="hint">Pick the colours that feel natural to you. They only change your own screen.</p>
       <div class="srow wide"><div class="sl"><b>Your team</b><small>Rings round your teammates, their outlines through walls, the kill feed and chat</small></div><div class="sctl"><div class="swatches" data-k="ally"></div></div></div>
       <div class="srow wide"><div class="sl"><b>Enemies</b><small>Rings round enemies, their marks and labels, the kill feed and chat</small></div><div class="sctl"><div class="swatches" data-k="enemy"></div></div></div>
       <div class="srow wide"><div class="sl"><b>Attackers' clothing</b><small>Armbands and trim on the attacking side, whichever team you are on</small></div><div class="sctl"><div class="swatches" data-k="atk"></div></div></div>
       <div class="srow wide"><div class="sl"><b>Defenders' clothing</b><small>Armbands and trim on the defending side</small></div><div class="sctl"><div class="swatches" data-k="def"></div></div></div>
       <div class="row"><button id="colsReset">Put the colours back to normal</button></div>
     </section>
-    <section class="setPage" data-p="xhair"><h3>CROSSHAIR</h3>
-    <div class="xh"><canvas id="xhPreview" width="150" height="150"></canvas>
-      <div class="xhopts">
-        <div class="xhrow"><span>Crosshair</span><span class="seg" id="xhStyle"></span></div>
-        <div class="xhrow"><span>Colour</span><span id="xhColor"></span></div>
-        <div class="xhrow"><label>Length <input type="range" id="xh_len" min="1" max="20" step="0.5"> <b id="xh_lenV"></b></label>
-          <label>Thickness <input type="range" id="xh_thick" min="0.5" max="5" step="0.5"> <b id="xh_thickV"></b></label></div>
-        <div class="xhrow"><label>Gap <input type="range" id="xh_gap" min="0" max="20" step="0.5"> <b id="xh_gapV"></b></label>
-          <label>Opacity <input type="range" id="xh_alpha" min="20" max="100" step="5"> <b id="xh_alphaV"></b></label></div>
-        <div class="xhrow"><span>Outline</span><button id="xh_outline" class="tog">ON</button><span>Opens up when moving / spraying</span><button id="xh_dynamic" class="tog">ON</button><button id="xhReset">Default</button></div>
-      </div></div>
-    </section>
-    </div>
+        </div>
   </div>
   <div id="clickIn" class="hidden">CLICK TO TAKE CONTROL</div>
   <div id="pause" class="overlay hidden"><div class="menu"><h2>PAUSED</h2><p class="hint">The match keeps running for everyone else.</p>

@@ -516,3 +516,11 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   stood between you and the target. Now a clear lane (44 px, soft edges) runs from your operator to the lens: two extra
   CSS mask gradients on #scopeVeil (a stripe along the line, a band from you to the lens; `mask-composite: intersect, add`),
   their positions worked out in `scopeVeil()` (main.js). Checked in a test browser with the veil tinted red.
+
+## Reticle = your gun's sight (2026-11-17, he asked)
+- The crosshair is no longer a setting: `drawReticle(ctx, sight, x, y, spread, k)` in crosshair.js draws the sight on
+  the gun you have out (iron sights: front post in a rear notch; red dot + faint ring; holo broken ring + dot; prism amber
+  chevron + side bars; 2× scope fine cross with range ticks; sniper adds thick posts). He asked: easy to see, not in the
+  way, a little see-through (82%), not too big or small (×1.35 a pixel, dark edge). Spread still opens them up.
+- Settings → CROSSHAIR page removed (old saved `xh` profiles are ignored). The holo ring, prism chevron and 2× scope ticks
+  are gone from `drawSightLook` (on the reticle now); its red-dot bloom, scope edge darkening and sniper lens reticle stay.

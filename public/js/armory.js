@@ -4,7 +4,7 @@
 // match (he asked): the mouse is captured on the first click, the crosshair moves with your sensitivity and aiming mode,
 // it is your own crosshair, distances are real metres, the view widens when you aim in and follows the crosshair out.
 import { PX_PER_M } from '/shared/constants.js';
-import { drawXhair, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
+import { drawReticle, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
 import { lockMouse } from './keys.js';
 import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, mainPellet, aimedDamage, shotOffset, recoilStep, recoilMax, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
 import { drawTrail, TRAIL_LIFE } from './fx.js';
@@ -346,7 +346,7 @@ function draw(cv, dt) {
   const cone = spreadCone(w, modsOf(S.w), { at: S.adsT, shots: aimHeat(w, S.shots, S.t - S.lastShot, modsOf(S.w)) }), xh = O.xh();
   if (S.adsT > 0.05) drawSightLook(c, attOf(S.w).sight, x, y, Math.min(1, S.adsT), dpr, lensR(cv));
   veil(S.adsT > 0.3 && sniper() ? { x, y } : null, cv);
-  if (xh && !(sniper() && S.adsT > 0.6)) drawXhair(c, x, y, xh, xh.dynamic ? Math.tan(cone) * Math.hypot(Q.x - O0.x, Q.y - O0.y) / dpr : 0, dpr);
+  if (!(sniper() && S.adsT > 0.6)) drawReticle(c, attOf(S.w).sight, x, y, Math.tan(cone) * Math.hypot(Q.x - O0.x, Q.y - O0.y) / dpr, dpr);
   const dm = q.d / M;
   if (dm >= 8) {
     c.font = `700 ${12 * dpr}px Barlow Condensed, sans-serif`; c.textAlign = 'left'; c.textBaseline = 'top';

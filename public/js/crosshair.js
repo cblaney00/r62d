@@ -68,6 +68,46 @@ export function lensPt(px, py, x, y, r, M) {
   return d <= r ? null : { x: px, y: py, k: 1 };
 }
 
+// The reticle (he asked 2026-11-17): not chosen in Settings any more. It looks like the sight on the gun you have out —
+// iron sights, red dot, holo, 1.5x prism, 2x scope or sniper scope — easy to see but not in the way: a little see-through,
+// a thin dark edge so it shows on light floors and dark rooms, mid-sized. 'spread' (screen px before scale) opens it up
+// as the gun gets less accurate (moving, spraying, hip fire); k = device pixel ratio.
+export const SIGHT_NAMES = { iron: 'Iron sights', reddot: 'Red dot', holo: 'Holo', prism: '1.5× prism', scope: '2× scope', sniper: 'Sniper scope' };
+export function drawReticle(ctx, sight, x, y, spread, k) {
+  x = Math.round(x) + 0.5; y = Math.round(y) + 0.5;
+  const g = Math.max(0, spread) * k, A = 0.82; k *= 1.35; // (sizes below are a third bigger than a plain pixel: mid-sized) // g = how far it opens up
+  const edge = 'rgba(0,0,0,0.55)';
+  // every shape is drawn twice: a wider dark stroke under, then the colour
+  const both = (col, w, path, fill) => { ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = edge; ctx.lineWidth = w * k + 2 * k / 1.35; ctx.beginPath(); path(); ctx.stroke(); if (fill) { ctx.fillStyle = edge; ctx.fill(); }
+    ctx.strokeStyle = col; ctx.lineWidth = w * k; ctx.beginPath(); path(); ctx.stroke(); if (fill) { ctx.fillStyle = col; ctx.fill(); } };
+  const dot = (col, r) => both(col, 0.01, () => ctx.arc(x, y, r * k, 0, 7), true);
+  ctx.save(); ctx.globalAlpha = A;
+  if (sight === 'reddot') { // a red dot, and a thin red ring that opens with the spread
+    const r = 7 * k + g;
+    ctx.globalAlpha = A * 0.55; both('rgba(255,70,60,1)', 1.3, () => ctx.arc(x, y, r, 0, 7));
+    ctx.globalAlpha = A; dot('#ff3b30', 2.3);
+  } else if (sight === 'holo') { // the holographic ring, broken at four points, round a small dot
+    const r = 10 * k + g;
+    both('#7fe6ff', 1.5, () => { for (let i = 0; i < 4; i++) { const a0 = i * Math.PI / 2 + 0.28, a1 = (i + 1) * Math.PI / 2 - 0.28; ctx.moveTo(x + Math.cos(a0) * r, y + Math.sin(a0) * r); ctx.arc(x, y, r, a0, a1); } });
+    dot('#7fe6ff', 1.6);
+  } else if (sight === 'prism') { // an amber chevron whose tip is the aim point, side bars that open with the spread
+    const s = 6 * k, o = 5 * k + g, l = 6 * k;
+    both('#ffb040', 1.6, () => { ctx.moveTo(x - s, y + s); ctx.lineTo(x, y); ctx.lineTo(x + s, y + s); ctx.moveTo(x - o, y); ctx.lineTo(x - o - l, y); ctx.moveTo(x + o, y); ctx.lineTo(x + o + l, y); });
+  } else if (sight === 'scope' || sight === 'sniper') { // a fine cross with a gap, range ticks; the sniper's adds thick posts
+    const o = 3 * k + g, l = 11 * k;
+    both('#e6f4ff', 1.3, () => { for (const [u, v] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(x + u * o, y + v * o); ctx.lineTo(x + u * (o + l), y + v * (o + l)); } });
+    both('#e6f4ff', 1, () => { for (let i = 1; i <= 2; i++) { const t = o + l * i / 3; ctx.moveTo(x - 2 * k, y + t); ctx.lineTo(x + 2 * k, y + t); } });
+    if (sight === 'sniper') both('#e6f4ff', 2.4, () => { for (const [u, v] of [[1, 0], [-1, 0], [0, 1]]) { ctx.moveTo(x + u * (o + l), y + v * (o + l)); ctx.lineTo(x + u * (o + l + 6 * k), y + v * (o + l + 6 * k)); } });
+    dot('#ff5a40', 1.1);
+  } else { // iron sights: a front post whose tip is the aim point, inside the rear notch (it opens with the spread)
+    const w = 4 * k + g, h = 7 * k;
+    both('#f2f5f0', 1.6, () => { ctx.moveTo(x, y + 1 * k); ctx.lineTo(x, y + h); ctx.moveTo(x - w - 7 * k, y); ctx.lineTo(x - w, y); ctx.lineTo(x - w, y + h); ctx.moveTo(x + w + 7 * k, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); });
+    dot('#f2f5f0', 1.1);
+  }
+  ctx.restore();
+}
+
 // each sight has its own faint look while aiming in (he asked: interesting but never in the way); nothing covers the middle
 export function drawSightLook(ctx, sight, x, y, k, d, lensR) { // d = device pixel ratio, lensR = sniper lens radius in px
   const W = ctx.canvas.width, H = ctx.canvas.height;
@@ -75,13 +115,6 @@ export function drawSightLook(ctx, sight, x, y, k, d, lensR) { // d = device pix
   if (sight === 'reddot') { // a soft red bloom round the crosshair, like the glass of the dot catching light
     const g = ctx.createRadialGradient(x, y, 4 * d, x, y, 34 * d); g.addColorStop(0, `rgba(255,60,60,${0.10 * k})`); g.addColorStop(1, 'rgba(255,60,60,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 34 * d, 0, 7); ctx.fill();
-  } else if (sight === 'holo') { // the holographic ring, broken at the four points
-    ctx.strokeStyle = `rgba(120,230,255,${0.38 * k})`; ctx.lineWidth = 1.3 * d;
-    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(x, y, 26 * d, i * Math.PI / 2 + 0.25, (i + 1) * Math.PI / 2 - 0.25); ctx.stroke(); }
-  } else if (sight === 'prism') { // an amber chevron under the crosshair and a faint etched ring
-    ctx.strokeStyle = `rgba(255,170,60,${0.6 * k})`; ctx.lineWidth = 1.6 * d;
-    ctx.beginPath(); ctx.moveTo(x - 7 * d, y + 20 * d); ctx.lineTo(x, y + 13 * d); ctx.lineTo(x + 7 * d, y + 20 * d); ctx.stroke();
-    ctx.strokeStyle = `rgba(255,170,60,${0.16 * k})`; ctx.lineWidth = d; ctx.beginPath(); ctx.arc(x, y, 44 * d, 0, 7); ctx.stroke();
   } else if (sight === 'sniper') { // a proper sniper reticle: fine cross with mil-dots, thick posts, the lens ring
     const R = lensR, a = k;
     ctx.lineCap = 'butt';
@@ -100,8 +133,6 @@ export function drawSightLook(ctx, sight, x, y, k, d, lensR) { // d = device pix
     const r = Math.hypot(W, H) / 2, g = ctx.createRadialGradient(W / 2, H / 2, r * 0.55, W / 2, H / 2, r);
     g.addColorStop(0, 'rgba(0,8,14,0)'); g.addColorStop(1, `rgba(0,8,14,${0.42 * k})`);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = `rgba(0,0,0,${0.5 * k})`; ctx.lineWidth = d;
-    for (const sgn of [-1, 1]) for (let i = 1; i <= 3; i++) { const o = (26 + i * 9) * d; ctx.beginPath(); ctx.moveTo(x + sgn * o, y - 3 * d); ctx.lineTo(x + sgn * o, y + 3 * d); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x - 3 * d, y + o); ctx.lineTo(x + 3 * d, y + o); ctx.stroke(); }
   }
   ctx.restore();
 }

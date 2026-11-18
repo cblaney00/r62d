@@ -23,7 +23,7 @@ import { openMapInfo, closeMapInfo } from './mapinfo.js';
 import { openPlaybook, closePlaybook } from './playbook.js';
 import { openKnowledge, closeKnowledge } from './knowledge.js';
 import { PRO_TEAMS } from '/shared/pros.js';
-import { XH_DEFAULT, XH_STYLES, XH_COLORS, cleanXhair, drawXhair, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
+import { drawReticle, drawSightLook, magnify, lensPt, lensMag } from './crosshair.js';
 import { readPad, PAD_ACTIONS, PAD_HELP } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
@@ -1292,28 +1292,7 @@ const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'sprint', 'walk',
   ['FIGHTING', ['fire', 'aimIn', 'primary', 'secondary', 'melee', 'reload', 'ability', 'gadget', 'interact']],
   ['DRONES, CAMERAS & TEAM', ['drone', 'view', 'spot', 'wheel', 'map', 'camLock', 'camCentre', 'chat', 'scoreboard']],
   ['MENUS & FREE PLAY', ['settings', 'pause', 'opNext', 'opPrev', 'opGrid']]];
-// crosshair: chosen in Settings, saved in your profile
-let xh = (() => { try { return cleanXhair(JSON.parse(localStorage.getItem('r62d-xh') || 'null')); } catch { return cleanXhair(); } })();
-function setXhair(o, save = true) {
-  xh = cleanXhair(o);
-  try { localStorage.setItem('r62d-xh', JSON.stringify(xh)); } catch {}
-  renderXhair(); if (save) saveSettings();
-}
-function renderXhair() {
-  $('xhStyle').innerHTML = XH_STYLES.map(([k, n]) => `<button data-v="${k}" class="${xh.style === k ? 'on' : ''}">${n}</button>`).join('');
-  $('xhColor').innerHTML = XH_COLORS.map(c => `<button data-v="${c}" class="sw${xh.color === c ? ' on' : ''}" style="background:${c}"></button>`).join('');
-  for (const k of ['len', 'thick', 'gap', 'alpha']) { $('xh_' + k).value = xh[k]; $('xh_' + k + 'V').textContent = xh[k]; }
-  for (const k of ['outline', 'dynamic']) { const b = $('xh_' + k); b.textContent = xh[k] ? 'ON' : 'OFF'; b.classList.toggle('on', xh[k]); }
-  const c = $('xhPreview'), x = c.getContext('2d'), k = 2;
-  x.fillStyle = '#5b6168'; x.fillRect(0, 0, c.width, c.height / 2); x.fillStyle = '#1b1e22'; x.fillRect(0, c.height / 2, c.width, c.height / 2);
-  drawXhair(x, c.width / 2, c.height / 2, xh, 0, k);
-}
-$('xhStyle').onclick = e => { const v = e.target.dataset.v; if (v) { audio.ui(); setXhair({ ...xh, style: v }); } };
-$('xhColor').onclick = e => { const v = e.target.dataset.v; if (v) { audio.ui(); setXhair({ ...xh, color: v }); } };
-for (const k of ['len', 'thick', 'gap', 'alpha']) $('xh_' + k).oninput = e => setXhair({ ...xh, [k]: +e.target.value });
-for (const k of ['outline', 'dynamic']) $('xh_' + k).onclick = () => { audio.ui(); setXhair({ ...xh, [k]: !xh[k] }); };
-$('xhReset').onclick = () => { audio.ui(); setXhair(XH_DEFAULT); };
-renderXhair();
+const xh = { dynamic: true }; // (the reticle is the gun's sight now, not a setting: drawReticle in crosshair.js)
 // graphics: fullscreen switch + quality presets
 const GFX_HINT = { auto: 'Auto — picks the quality for this computer and lowers it by itself if the game can\'t keep up.', low: 'Low — for weak computers: fewer pixels, fewer particles, flat lighting.', medium: 'Medium — a little softer picture, runs well on most computers.', high: 'High — full sharpness. Recommended.', ultra: 'Ultra — extra-sharp, smoothest edges and most effects. Needs a strong computer.' };
 let appWin = false; // play.sh's window on this desktop answers /api/window
@@ -3787,7 +3766,7 @@ function crosshair(me, now) {
   if (me.mv === 3) ctx.globalAlpha = 0.3; // sprinting: gun down
   else { st.xhFade = (st.xhFade ?? 1) + ((fq && fq.stopped ? 0.45 : 1) - (st.xhFade ?? 1)) * Math.min(1, (now - (st.xhFadeT || now)) * 14); ctx.globalAlpha = st.xhFade; } // bullets stop at a wall before it: faded, gliding (no flicker past door frames)
   st.xhFadeT = now;
-  if (!(sniperOn(me) && me.at > 0.6 && me.ct === 'body')) drawXhair(ctx, x, y, xh, spread, DPR); // (the sniper reticle takes over)
+  if (!(sniperOn(me) && me.at > 0.6 && me.ct === 'body')) drawReticle(ctx, attFromCode(me.aa).sight, x, y, spread, DPR); // the reticle of the sight on your gun (the sniper lens reticle takes over)
   ctx.globalAlpha = 1;
   // points popups under the crosshair (he asked, R6-style): newest at the top, each fades after a couple of seconds
   ptsPopups(ctx, x, y, now);
@@ -4921,7 +4900,6 @@ function applySettings(s) {
   if (s.binds && s.bindsVersion === BINDS_VERSION) applyBinds(s.binds); else if (s.binds && s.bindsVersion === 4) { applyBinds(s.binds, 4); setTimeout(saveSettings, 500); } else setTimeout(saveSettings, 500); // old layout: switch to the new defaults once
   for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens', 'steadySens', 'farSens']) if (typeof s[k] === 'number') $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
-  if (s.xh) setXhair(s.xh, false);
   if (s.lean) setLean(s.lean, false);
   if (s.cols) { setCols(s.cols); renderCols(); }
   if (AIM_MODES.includes(s.aim)) setAim(s.aimV === 2 ? s.aim : s.aim === 'pad' ? 'free' : s.aim, s.aimV !== 2); // the old default pad becomes the new Crosshair once
