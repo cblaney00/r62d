@@ -1110,7 +1110,10 @@ function pollPad(dt, view) {
   gpk.sprint = spr ? 1 : 0;
   // he asked 2026-11-16: after a sprint the move thumb keeps turning the crosshair with you (across stops too, and while
   // firing from the hip) until you aim in; aiming in goes back to moving without turning. A thumb on the aim side wins.
-  if (spr && touchActive()) st.steer = true;
+  // (he found 2026-11-18: a quick flick of the move stick to change direction counted as a sprint and dropped the pre-aim
+  // until the aim stick was touched again) only a sprint held over a third of a second turns steering on or lets go of it
+  st.sprT = spr ? (st.sprT || 0) + dt : 0; const sprLong = spr && st.sprT > 0.35;
+  if (sprLong && touchActive()) st.steer = true;
   if (st.steer && (gp.lt > 0.35 || gp.rsOn || (st.me && st.me.ad) || !st.me || st.me.ct !== 'body' || !touchActive() || !st.last || st.last.ph !== PHASE.ACTION && st.last.ph !== PHASE.PREP)) st.steer = false;
   if ((spr || st.steer) && ls.l > (spr ? 0 : 0.25) && rs.l < 0.05 && !(gp.rt > 0.35)) padAng = wrapAng(padAng + angDiff(Math.atan2(ls.y, ls.x) - (st.rot || 0), padAng) * Math.min(1, dt * 12));
   // left stick: 8 directions like WASD; a light push walks (silent)
@@ -1163,7 +1166,7 @@ function pollPad(dt, view) {
       // stays on the spot you left it on while you walk, strafe or crouch (it used to slide along with you). Sprinting,
       // steering after a sprint, or walking right up to the spot lets it go; the next touch of the stick starts from it
       const body = st.me && st.me.ct === 'body' && st.pred;
-      if (!body || spr || st.steer || gp.rsDir) st.hold = null;
+      if (!body || sprLong || st.steer || gp.rsDir) st.hold = null;
       else {
         if (!st.hold) { const p = padPointW(); st.hold = { x: p.ax, y: p.ay }; }
         const dx = st.hold.x - st.pred.x, dy = st.hold.y - st.pred.y, d = Math.hypot(dx, dy), R = reachOf(st.me);

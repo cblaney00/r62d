@@ -112,4 +112,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-18', k: 'mech', id: 'select', t: 'Operator select: the role cards show every operator\'s picture and all five roles sit side by side (no scrolling, phones too); phone operator cards always show the picture; LOCK IN and the role tabs no longer get cut off.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'sound', t: 'Breaking glass is about half as loud right beside you (back to full by ~5 m), so it carries as far as before but no longer blasts the one who broke it.', v: 0 },
   { d: '2026-11-18', k: 'mech', id: 'load', t: 'The game starts faster: map pictures are kept on your device and the sounds are made in the background (no PREPARING SOUNDS screen).', v: 0 },
+  { d: '2026-11-18', k: 'mech', id: 'touch', t: 'Phones: a quick flick of the move stick no longer drops your locked-on aim; only a real sprint (held a third of a second) does.', v: 0 },
 ];

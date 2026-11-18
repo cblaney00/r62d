@@ -67,6 +67,7 @@ async function run() {
   for (const k of [0, 1]) {
     const before = await js('(__r62d.st.me || {}).op');
     await tapVis('#freeOpsBtn'); await sleep(900); console.log('panel:', await js(pane)); await check('f2-panel-' + k);
+    await js(`(() => { const b = document.querySelector("#freeOps .foOps button:not(.on)${k ? ":nth-child(2)" : ""}"); if (b) b.scrollIntoView({ block: "center" }); return true; })()`); await sleep(300); // (the panel scrolls as one page)
     const ok = await tapVis(`#freeOps .foOps button:not(.on)${k ? ':nth-child(2)' : ''}`); await sleep(1500);
     console.log('switched operator:', before, '->', await js('(__r62d.st.me || {}).op'), ok, 'panel after:', await js(pane));
   }

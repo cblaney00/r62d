@@ -581,3 +581,11 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   version draws afresh; no version (phone without one) = no store. Second start: map pictures 0.84 s, total 3.5 s.
 - PREPARING SOUNDS screen removed: `initAudio`'s background prewarm builds the gunshots and footsteps (now the scuffs
   too) a few at a time while you are in the menus.
+
+## Phone pre-aim survives quick flicks (2026-11-18, he found it)
+- A quick flick of the move stick counted as a sprint (FIRE buttons: pushed past 1.45 radii; rings: a fast tap-flick can
+  read as the sprint double-tap), and any sprint set `st.steer` (turn with your movement) and cleared `st.hold` until the
+  aim stick was touched. Now `st.sprT` times the sprint and only one held > 0.35 s (`sprLong`, pollPad) does either.
+- New `tests/preaimflick.mjs` (rings + buttons: aim, walk, 4 quick flicks → still `hold`, no `steer`): PASS.
+  `tests/phonefree.mjs` needed a scrollIntoView before tapping an operator (the panel scrolls as one page since
+  2026-11-17); its steer-after-sprint checks pass.
