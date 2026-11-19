@@ -1498,7 +1498,7 @@ html.touchplay #prompt { left: calc(238px / var(--hudz, 1)); right: calc((330px 
 /* phones, drone / camera view (look check 2026-11-17: the arrows sat on the aim stick, the hint and list squeezed beside
    PING): the arrows left of the stick at the bottom, the hint above them in the gap, the drone/camera list under the score */
 html.touchplay #touchUI .tbtn.t3 { right: calc(330px + 70px / var(--tz, 1)); bottom: 24px; } html.touchplay #touchUI .tbtn.t2 { right: calc(330px + 70px / var(--tz, 1) + 62px); bottom: 24px; } /* (.tbtn is zoomed by --tz; the 62 px gap is zoomed with it, so ◀ and ▶ never touch on a tablet) */
-html.touchplay #viewlabel { left: calc(240px / var(--hudz, 1)); right: calc((330px * var(--tz, 1) + 70px) / var(--hudz, 1)); transform: none; max-width: none; bottom: calc(92px / var(--hudz, 1)); font-size: max(11px, var(--mf)); line-height: 1.4; }
+html.touchplay #viewlabel { left: calc(240px / var(--hudz, 1)); right: calc((330px * var(--tz, 1) + 120px) / var(--hudz, 1)); text-wrap: balance; white-space: normal; transform: none; max-width: none; bottom: calc(92px / var(--hudz, 1)); font-size: max(11px, var(--mf)); line-height: 1.4; }
 html.touchplay #cambar { top: calc(60px / var(--hudz, 1)); bottom: auto !important; } /* (!important: free play's "above its hint bar" rule) */
 #touchUI .tbtn.t6 { top: auto; bottom: 158px; } /* ⟲ TILT: above the move stick (the top-row rule pinned it onto the objective card) */
 /* ---- Fire rings and polygon buttons (he asked 2026-11-17; geometry in public/js/touchlayout.js, sizes before --tz):
@@ -1659,3 +1659,5 @@ html #settings { background-color: #0b0e13; }
 html.touch #room .roomFoot { background: #0a0d11; box-shadow: 0 -10px 14px rgba(10,13,17,0.9); }
 /* the controls list uses the width it has (on a phone it filled two thirds, with an empty strip on the right) */
 #tab-controls .controls { max-width: 1500px; }
+/* Esports TV: the casters' box stops short of the score bar's operator tiles (it covered the first ones on a 1280 screen) */
+html.tv:not(.tvsel) #tvCast { width: min(430px, 32vw, calc(50vw - 300px)); }

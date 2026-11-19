@@ -1528,7 +1528,7 @@ function renderMapPick(s) {
     b.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'map', id }); };
     el.appendChild(b);
   }
-  $('lobbyHint').textContent = `${s.md === 'zombies' ? 'Lantern Point · a harbour town on the point, overrun · ' : s.rm ? 'Random map: a surprise until the match starts · ' : MAPS[s.mp] ? MAPS[s.mp].name + ' · ' + MAPS[s.mp].desc + ' · ' : ''}${ruleLine(MODES[s.md] || MODES.quick)}`;
+  $('lobbyHint').textContent = `${s.md === 'zombies' ? 'Lantern Point · ' : s.rm ? 'Random map: a surprise until the match starts · ' : MAPS[s.mp] ? MAPS[s.mp].name + ' · ' + MAPS[s.mp].desc + ' · ' : ''}${ruleLine(MODES[s.md] || MODES.quick)}`;
 }
 function renderLobby(s) {
   renderControls(); renderMapPick(s);
@@ -2953,7 +2953,12 @@ function mapBox(V) {
   let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; for (const r of m.rooms || []) if (r.fl === V.f) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
   if (x1 < 0) { x0 = F.gx; y0 = 0; x1 = F.gx + F.w; y1 = F.h; }
   x0 = Math.max(F.gx, x0 - 6); y0 = Math.max(0, y0 - 6); x1 = Math.min(F.gx + F.w, x1 + 6); y1 = Math.min(F.h, y1 + 6);
-  const w = x1 - x0, h = y1 - y0, k = Math.min(VW * 0.42 / w, VH * 0.58 / h), pw = Math.round(w * k), ph = Math.round(h * k);
+  const w = x1 - x0, h = y1 - y0;
+  if (isTouch && !document.documentElement.classList.contains('padplay')) { // a phone: between the thumbs, clear of the right hand's buttons (it opened under them)
+    const k = Math.min(VW * 0.36 / w, VH * 0.6 / h), pw = Math.round(w * k), ph = Math.round(h * k);
+    return V.box = { f: V.f, VW, VH, x0, y0, w, h, k, pw, ph, px: Math.round(VW * 0.44 - pw / 2), py: Math.round(Math.max(108 * DPR, (VH - ph) / 2 - 4 * DPR)) };
+  }
+  const k = Math.min(VW * 0.42 / w, VH * 0.58 / h), pw = Math.round(w * k), ph = Math.round(h * k);
   return V.box = { f: V.f, VW, VH, x0, y0, w, h, k, pw, ph, px: Math.round(VW - pw - 160 * DPR), py: Math.round(Math.max((VH - ph) / 2 - 8 * DPR, 142 * DPR)) }; // (clear of the corner buttons on the right, the score and drone line at the top, the gadget list below: it touched them, review 2026-11-18)
 }
 function mapPoint() { const V = st.mapV, B = mapBox(V); if (V.cx < B.px || V.cy < B.py || V.cx > B.px + B.pw || V.cy > B.py + B.ph) return null; return { x: (B.x0 + (V.cx - B.px) / B.k) * CELL, y: (B.y0 + (V.cy - B.py) / B.k) * CELL }; }
@@ -2989,7 +2994,7 @@ function drawMapV(s, me, now) {
   for (const k of st.marks || []) if (on(k.x, k.y)) { const q = P(k.x, k.y), age = now - k.t, al = age > 5 ? 6 - age : 1, rp = (age % 1.4) / 1.4, col = pingOf(k.pk).col; c.strokeStyle = `rgba(${col},${0.8 * (1 - rp) * al})`; c.lineWidth = 2 * D; c.beginPath(); c.arc(q.x, q.y, (10 + rp * 18) * D, 0, 7); c.stroke(); drawBadge(c, k.pk, q.x, q.y, 10 * D, al); }
   c.restore();
   c.font = `600 ${12.5 * D}px Barlow Condensed, sans-serif`; c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 3 * D; c.strokeStyle = 'rgba(0,0,0,0.8)';
-  const tip = 'CLICK TO PING · HOLD AND DRAG FOR THE WHEEL'; c.strokeText(tip, B.px + B.pw, B.py - 17 * D); c.fillText(tip, B.px + B.pw, B.py - 17 * D);
+  const tip = isTouch ? 'TAP TO PING · HOLD AND DRAG FOR THE WHEEL' : 'CLICK TO PING · HOLD AND DRAG FOR THE WHEEL'; if (isTouch) { c.save(); c.textAlign = 'center'; c.strokeText(tip, B.px + B.pw / 2, B.py + B.ph + 16 * D); c.fillText(tip, B.px + B.pw / 2, B.py + B.ph + 16 * D); c.restore(); } else { c.strokeText(tip, B.px + B.pw, B.py - 17 * D); c.fillText(tip, B.px + B.pw, B.py - 17 * D); } // (a phone: under the map, clear of the score)
   if (!st.wheel) { c.translate(V.cx, V.cy); c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 1.5 * D; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 16 * D); c.lineTo(4.5 * D, 12 * D); c.lineTo(11 * D, 11 * D); c.closePath(); c.fill(); c.stroke(); }
   c.restore();
 }

@@ -234,7 +234,7 @@ export function tvDraft(s) {
     if ((cv.dataset.op || '') !== (p.op || '')) {
       cv.dataset.op = p.op || '';
       if (p.op) { portraitCached(cv, p.op); c.classList.remove('flip'); void c.offsetWidth; c.classList.add('flip'); }
-      else cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+      else { const x = cv.getContext('2d'), w = cv.width, h = cv.height; x.clearRect(0, 0, w, h); x.fillStyle = 'rgba(255,255,255,0.06)'; x.beginPath(); x.arc(w / 2, h / 2, w * 0.36, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,0.28)'; x.font = `800 ${Math.round(w * 0.38)}px Barlow Condensed, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('?', w / 2, h / 2 + w * 0.02); } // (still choosing: a quiet ?, not an empty square)
     }
   }
 }
