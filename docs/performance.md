@@ -78,3 +78,8 @@ small (a sight shape 0.12 ms, logic ~1.3 ms, actors ~1.1 ms), so the small per-f
 corpses and gadgets each frame, page look-ups) would save well under 0.1 ms and were left alone.
 Tests: `tests/wsjoin.js` (joined compressed updates unpack exactly), copy == fresh build for every map (scratch check),
 sim.js, reach, openings, shapes, stairs, pros, feeds, zombies, arena, freeplay pass; a real Firefox plays with them.
+
+# Weak-device pass (2026-11-19)
+See docs/history.md (2026-11-19). `node tests/perfclient.mjs <port> <url> [level] [map] [w] [h] [secs]` prints frame cost per PF
+section standing and while walking + spinning. Measured while another session loaded the computer (load ~17, rough):
+headless Firefox, Embassy, 6 bots, High 1600x900, standing: raise 18.1 → 4.7 ms, fog 26.9 → 13.5 ms, total 37.4 → 25.3 ms a frame.

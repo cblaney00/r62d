@@ -36,7 +36,9 @@ import * as RP from './replay.js';
 import { drawQr } from './qr.js';
 import { readCode, showCode } from '/shared/joincode.js';
 import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
-import * as rope3d from './rope3d.js';
+// The 3D rope view is off (ROPE_3D below), so its 3D library (676 KB) is only loaded when it is on (2026-11-19: weak
+// devices spent time reading it on every start). Until then these stand in for it.
+let rope3d = { active: () => false, facing: () => 0, noteFrame() {}, stop() {}, quality: () => null, debug: () => null, look() {}, aim: () => null, frame() {}, project: () => null, wallSign: () => 1 };
 import { compassRoute as sharedRoute } from '/shared/compass.js';
 import { newStick, stepStick, stickFrom } from './aimstick.js';
 import { onAimStart, touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, VIEW_RANGE, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings, padPlay, usePadNow } from './touch.js';
@@ -68,10 +70,12 @@ let DPR = 1, VW = 0, VH = 0;
 const GFX = {
   // Low looks like Medium (he asked 2026-11-18: the old Low was too ugly to play on a phone): the same picture, a few
   // fewer particles and smoke puffs. (The old Low was scale 0.6, fog 0.3, flat lighting, map 1.25, no raised walls.)
-  low:    { scale: 0.8,  fog: 0.4,  parts: 0.4,  smoke: 8,  shade: true, rays: 0.7, map: 2, grey: 1 },
-  medium: { scale: 0.8,  fog: 0.4,  parts: 0.6,  smoke: 11, shade: true, rays: 0.7, map: 2, grey: 1 },
-  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1, map: 2.5, grey: 1.5 }, // (no soft blurred edges: with the tilt they cost a third of the frame on his GPU)
-  ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2, map: 3, grey: 1.5, blur: true },
+  // He chose (2026-11-19) what else Low may drop: tiny (shell casings, each shot's room glow), tilt (straight down; the
+  // rope camera still tips) and calm (menus drawn less often). Raised walls and body shading stay at every level.
+  low:    { scale: 0.8,  fog: 0.4,  parts: 0.4,  smoke: 8,  shade: true, rays: 0.7, map: 2, tiny: false, tilt: false, calm: true },
+  medium: { scale: 0.8,  fog: 0.4,  parts: 0.6,  smoke: 11, shade: true, rays: 0.7, map: 2 },
+  high:   { scale: 1,    fog: 0.5,  parts: 1,    smoke: 16, shade: true, rays: 1, map: 2.5 }, // (no soft blurred edges: with the tilt they cost a third of the frame on his GPU)
+  ultra:  { scale: 1.25, fog: 0.75, parts: 1,    smoke: 22, shade: true, rays: 1.2, map: 3, blur: true },
 };
 const LEVELS = ['low', 'medium', 'high', 'ultra'];
 // "auto" (the default) starts from a guess about this computer and steps down by itself if the game can't keep up
@@ -99,10 +103,11 @@ function setGfx(name) {
   applyGfx();
 }
 function applyGfx() {
-  const old = gq; gq = GFX[gfxLevel()];
-  fx.quality = gq.parts; setShading(gq.shade);
+  gq = GFX[gfxLevel()];
+  fx.quality = gq.parts; fx.tiny = gq.tiny !== false; setShading(gq.shade);
+  document.documentElement.classList.toggle('calm', gq.calm === true);
   resize(); renderGfx();
-  if (S !== gq.map || old.grey !== gq.grey) { // redraw the map picture at the new detail
+  if (S !== gq.map) { // redraw the map picture at the new detail
     setMapScale(gq.map);
     if (st.rend) { st.rend.free(); st.rend = new MapRenderer(st.known, st.base); st.rend.splinters = st.splinters; st.rend.mount(mapLayer); st.warm = 4; }
   }
@@ -587,7 +592,7 @@ function winAimed(a) {
   return false;
 }
 addEventListener('resize', resize); resize();
-fx.quality = gq.parts; setShading(gq.shade);
+fx.quality = gq.parts; fx.tiny = gq.tiny !== false; setShading(gq.shade); document.documentElement.classList.toggle("calm", gq.calm === true);
 
 // ---------------- network ----------------
 function connect(mode = '', tvKey = null) { // '' = the shared match, 'tut' / 'free' = a private one
@@ -710,7 +715,7 @@ function trainInfo() {
   }).catch(() => {});
 }
 for (const b of document.querySelectorAll('.trainBtn')) b.onclick = () => { audio.ui(); fetch('/api/train', { method: 'POST' }).then(r => r.json()).then(r => { if (!r.running && r.why) for (const el of document.querySelectorAll('.trainInfo')) el.textContent = 'Can\'t train right now: ' + r.why + '.'; else trainInfo(); }); };
-setInterval(() => { if (!$('tab-tv').classList.contains('on') && $('playbookPage').classList.contains('hidden')) return; trainInfo(); }, 4000);
+setInterval(() => { if (document.hidden || !$('tab-tv').classList.contains('on') && $('playbookPage').classList.contains('hidden')) return; trainInfo(); }, 4000);
 $('tvGo').onclick = () => switchMatch(null, null, { map: tvPick.map === 'random' ? null : tvPick.map, level: tvPick.level, req: tvPick.req.slice() });
 // ---------------- free play page ----------------
 // Pick a map and how many enemy bots, then play alone with no clock, switching operator with N / B.
@@ -757,7 +762,7 @@ function loadMap(mv, tiles, hp, id, holes) {
   if (st.rend) st.rend.free();
   st.rend = new MapRenderer(st.known, st.base); st.rend.mount(mapLayer); st.rend.lowCopy(); perfWatch.skip = 2; st.warm = 4;
   st.rend.splinters = st.splinters;
-  st.corpses = []; fx.clear(); st.pending = [];
+  st.corpses = []; fx.clear(); st.pending = []; st.anim.clear(); // (2026-11-19: walk/recoil records of every drone and decoy ever seen piled up all session)
   st.loadMs = Math.round(performance.now() - t0); // map build + picture (shown in __r62d for speed checks)
 }
 
@@ -774,7 +779,7 @@ function resetMap(mv) {
   st.unseen = new Set(); st.splinters = new Set();
   R.map = st.known; R.base = st.base; R.splinters = st.splinters;
   for (const k of dirty) R.cellChanged(k);
-  st.corpses = []; fx.clear(); st.pending = [];
+  st.corpses = []; fx.clear(); st.pending = []; st.anim.clear(); // (2026-11-19: walk/recoil records of every drone and decoy ever seen piled up all session)
 }
 
 // ---------------- loading screen ----------------
@@ -998,6 +1003,8 @@ function onEvent(e, s, players) {
   }
 }
 
+// a short fingerprint of which cells a seenGrid (look.js) holds, to tell whether this frame sees the same as the last
+function seenHash(g) { if (!g) return 'n'; let h = 2166136261; const a = g.a; for (let i = 0; i < a.length; i++) h = Math.imul(h ^ a[i], 16777619); return `${g.gx},${g.gy},${g.w},${g.h},${h >>> 0}`; }
 function anim(id) { let a = st.anim.get(id); if (!a) st.anim.set(id, a = { walk: 0, recoil: 0, melee: 0, flashT: -9, lx: 0, ly: 0, stepAcc: 0 }); return a; }
 
 // ---------------- input ----------------
@@ -1378,7 +1385,7 @@ const KEY_GROUPS = [['MOVING', ['up', 'down', 'left', 'right', 'sprint', 'walk',
   ['MENUS & FREE PLAY', ['settings', 'pause', 'opNext', 'opPrev', 'opGrid']]];
 const xh = { dynamic: true }; // (the reticle is the gun's sight now, not a setting: drawReticle in crosshair.js)
 // graphics: fullscreen switch + quality presets
-const GFX_HINT = { auto: 'Auto — picks the quality for this computer and lowers it by itself if the game can\'t keep up.', low: 'Low — the Medium picture with fewer particles and smoke: lightest on phones.', medium: 'Medium — a little softer picture, runs well on most computers.', high: 'High — full sharpness. Recommended.', ultra: 'Ultra — extra-sharp, smoothest edges and most effects. Needs a strong computer.' };
+const GFX_HINT = { auto: 'Auto — picks the quality for this computer and lowers it by itself if the game can\'t keep up.', low: 'Low — the Medium picture, seen straight down, with fewer particles and smoke, no shell casings and calmer menus: lightest on phones.', medium: 'Medium — a little softer picture, runs well on most computers.', high: 'High — full sharpness. Recommended.', ultra: 'Ultra — extra-sharp, smoothest edges and most effects. Needs a strong computer.' };
 let appWin = false; // play.sh's window on this desktop answers /api/window
 const winSwitch = () => appWin || !!(window.r62dApp && window.r62dApp.toggleFull);
 const appFull = () => innerWidth >= screen.width - 1 && innerHeight >= screen.height - 1;
@@ -1916,6 +1923,7 @@ function hangWall(p) { for (const q of st.map.ropes || []) { const sx = Math.max
 // He chose (2026-11-14) to stay in the drawn top-down world on a rope rather than switch to a 3D scene (the change of
 // art style was too jarring), so the 3D rope view is off; its code stays behind ROPE_3D.
 const ROPE_3D = false;
+if (ROPE_3D) import('./rope3d.js').then(m => { rope3d = m; });
 // The tilted rope camera: on a rope the view turns so the wall is straight ahead (up the screen), tilts steeply and
 // leans in, and the walls stand up toward you, so you look over the wall line into the rooms. st.rt (0..1) eases it.
 function ropeFace() { // which way you face on a rope (into the wall), or null
@@ -2018,6 +2026,7 @@ function r3overlay(me, now, show) {
   screenFx(c, me, now, st.hurtFrom - rope3d.facing() - Math.PI / 2); // (the arrow: which way it came from, as you face)
 }
 function rope3dFrame(s, me, now, dt) {
+  if (!ROPE_3D) return; // (off: nothing to do each frame)
   rope3d.noteFrame(dt);
   const m = st.map, on = r3on();
   if (!st.r3shots) { st.r3shots = []; st.r3booms = []; }
@@ -2104,7 +2113,7 @@ function drawCompass(s, me, now) {
   const show = fxOn('compass') && s && !s.ar && me && me.a && s.ph === PHASE.ACTION && (me.tm === 'def' || s.rev) && !st.tutorialHideCompass && st.map && st.map.sites[s.site];
   box.classList.toggle('hidden', !show);
   st.cmpDir = null;
-  if (!show) return;
+  if (!show) { st.cmpKey = null; return; }
   const from = { x: st.pred.x, y: st.pred.y };
   if (!st.cmp || now - st.cmp.t > 0.35 || Math.hypot(from.x - st.cmp.x, from.y - st.cmp.y) > CELL * 2) st.cmp = { t: now, x: from.x, y: from.y, r: compassRoute(s, from) };
   const r = st.cmp.r, c = box.querySelector('canvas'), g = c.getContext('2d'), label = box.querySelector('b');
@@ -2114,13 +2123,15 @@ function drawCompass(s, me, now) {
     setText(box.querySelector('.cmpSite'), name);
     setHTML(box.querySelector('.cmpFl'), fl ? `BOMB SITE · FLOOR ${fl}${mf !== bf && st.map.floors[mf] ? ` <u>· YOU ${st.map.floors[mf].name}</u>` : ''}` : 'BOMB SITE');
   }
-  g.clearRect(0, 0, 96, 96);
-  g.fillStyle = 'rgba(8,11,15,0.78)'; g.beginPath(); g.arc(48, 48, 44, 0, 7); g.fill();
-  g.strokeStyle = 'rgba(242,193,78,0.55)'; g.lineWidth = 2; g.stroke();
-  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(48 + Math.cos(a) * 36, 48 + Math.sin(a) * 36); g.lineTo(48 + Math.cos(a) * 41, 48 + Math.sin(a) * 41); g.stroke(); }
+  // (2026-11-19) the dial is only redrawn when the needle has moved or the state changed, not every frame
+  let dial = null;
+  const face = () => { g.clearRect(0, 0, 96, 96);
+    g.fillStyle = 'rgba(8,11,15,0.78)'; g.beginPath(); g.arc(48, 48, 44, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(242,193,78,0.55)'; g.lineWidth = 2; g.stroke();
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(48 + Math.cos(a) * 36, 48 + Math.sin(a) * 36); g.lineTo(48 + Math.cos(a) * 41, 48 + Math.sin(a) * 41); g.stroke(); } };
   let text = '';
-  if (!r) { text = 'NO ROUTE KNOWN'; st.cmpNoRoute = true; }
-  else if (r.here) { text = 'ON SITE'; g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(48, 48, 9, 0, 7); g.fill(); }
+  if (!r) { text = 'NO ROUTE KNOWN'; st.cmpNoRoute = true; dial = 'n'; if (st.cmpKey !== dial) face(); }
+  else if (r.here) { text = 'ON SITE'; dial = 'h'; if (st.cmpKey !== dial) { face(); g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(48, 48, 9, 0, 7); g.fill(); } }
   else {
     // on the bomb's floor (he asked): straight at the nearest bomb spot; on another floor: the way to the stairs / hatch
     const site = st.map.sites[s.site], sameFl = floorAt(st.map, from.x, from.y) === floorAt(st.map, site.bombs[0].x, site.bombs[0].y);
@@ -2129,13 +2140,15 @@ function drawCompass(s, me, now) {
     const want = Math.atan2(ty - from.y, tx - from.x); // glide the needle so it doesn't jump when the route is worked out again
     st.cmpA = st.cmpA == null || st.cmpNoRoute ? want : st.cmpA + angDiff(want, st.cmpA) * Math.min(1, (now - (st.cmpT || now)) * 10); st.cmpT = now; st.cmpNoRoute = false;
     const a = st.cmpA + (st.rot || 0); st.cmpDir = st.cmpA; // also a small arrow by your character (he asked)
-    g.save(); g.translate(48, 48); g.rotate(a);
-    g.fillStyle = '#f2c14e'; g.strokeStyle = '#000'; g.lineWidth = 2.5;
-    g.beginPath(); g.moveTo(34, 0); g.lineTo(-10, -15); g.lineTo(-3, 0); g.lineTo(-10, 15); g.closePath(); g.stroke(); g.fill();
-    g.restore();
+    dial = Math.round(a * 200);
+    if (st.cmpKey !== dial) { face(); g.save(); g.translate(48, 48); g.rotate(a);
+      g.fillStyle = '#f2c14e'; g.strokeStyle = '#000'; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(34, 0); g.lineTo(-10, -15); g.lineTo(-3, 0); g.lineTo(-10, 15); g.closePath(); g.stroke(); g.fill();
+      g.restore(); }
     const m = Math.round(r.cells * CELL / PX_PER_M), ms = Math.round((r.toStairs || 0) * CELL / PX_PER_M);
     text = r.stairs ? `${r.stairs} ${r.hatch ? 'HATCH' : 'STAIRS'} TO ${r.to} IN ${ms} m · ${m} m IN ALL` : `${m} m AWAY`; // (the site and its floor are above this line)
   }
+  st.cmpKey = dial;
   if (label.textContent !== text) label.textContent = text;
 }
 
@@ -2225,7 +2238,14 @@ function briefPlace() {
   const got = box.getBoundingClientRect().bottom; if (box.firstChild && Math.abs(got - (base - 8)) > 1) { b = Math.round(b + (got - (base - 8)) / k); box.style.bottom = b + 'px'; } // (measured: whatever offsets the HUD has)
   if (tip) tip.style.bottom = (b + (box.firstChild ? box.firstChild.getBoundingClientRect().height / k + 6 : 0)) + 'px';
 }
-setInterval(() => { if (brief.cur || ($('tipNow') && !$('tipNow').classList.contains('hidden'))) briefPlace(); }, 300);
+// (2026-11-19) measured again only when something that moves it changed (it read the page's layout 3 times a second)
+let briefKey = '';
+setInterval(() => {
+  if (document.hidden || !(brief.cur || ($('tipNow') && !$('tipNow').classList.contains('hidden')))) return;
+  const chat = $('chatLog'), box = $('feed'), tip = $('tipNow'); let k = `${innerWidth}x${innerHeight}|${document.documentElement.className}|${$('chat').className}|${tip ? tip.className + tip.textContent.length : ''}|${box && box.firstChild ? box.firstChild.textContent : ''}|`;
+  if (chat) for (const d of chat.children) k += d.className + d.textContent.length + ',';
+  if (k === briefKey) return; briefKey = k; briefPlace();
+}, 300);
 // what killed you (he asked: fewer alert marks, more explanation, above all for an ability): shown while you are dead
 function deathCard(kc) {
   const c = causeOf(kc.w, kc.kop), K = OPERATORS[kc.kop], who = kc.self ? 'YOURSELF' : esc((kc.kn || 'Unknown').replace(/^\[\w+\] /, '')) + (K ? ` <span>· ${K.name}</span>` : '');
@@ -2428,7 +2448,7 @@ function menuRest(nowMs) {
   const s = st.last, ph = s ? s.ph : PHASE.LOBBY;
   if (st.tv || !st.map || ph === PHASE.PREP || ph === PHASE.ACTION || ph === PHASE.ROUND_END) return false;
   const covered = COVER_PAGES.some(id => !$(id).classList.contains('hidden'));
-  if (nowMs - restT < (covered ? 250 : 32)) return true;
+  if (nowMs - restT < (covered ? 250 : gq.calm ? 66 : 32)) return true; // (Low: 15 a second, he chose calmer menus 2026-11-19)
   restT = nowMs;
   if (!covered) return false;
   lastT = nowMs; screens(s, ph, nowMs / 1000); return true;
@@ -3226,8 +3246,8 @@ function draw(s, view, now, dt) {
     st.warm--;
     const k = Math.min(innerWidth / (m.W * CELL * S), innerHeight / (m.H * CELL * S));
     mapLayer.style.opacity = st.warm > 0 ? '0.02' : '';
-    mapLayer.style.transform = st.warm > 0 ? `scale(${k})` : ''; if (st.warm > 0) { st.rend.showFor(null); st.rend.c.prime(); for (const K in st.rend.copies) st.rend.copies[K].t.prime(); } // (the smaller copies and the bitmaps ready on the graphics card too)
-  } else { st.rend.showFor(z); const q = S * DPR; mapLayer.style.transform = st.rot ? `matrix(${TA / q}, ${TB / q}, ${TC / q}, ${TD / q}, ${ox / DPR}, ${oy / DPR})` : `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / q})`; }
+    mapLayer.style.transform = st.warm > 0 ? `scale(${k})` : ''; mapLayer._tf = null; if (st.warm > 0) { st.rend.showFor(null); st.rend.c.prime(); for (const K in st.rend.copies) st.rend.copies[K].t.prime(); } // (the smaller copies and the bitmaps ready on the graphics card too)
+  } else { st.rend.showFor(z); const q = S * DPR, tf = st.rot ? `matrix(${TA / q}, ${TB / q}, ${TC / q}, ${TD / q}, ${ox / DPR}, ${oy / DPR})` : `translate(${ox / DPR}px, ${oy / DPR}px) scale(${z / q})`; if (mapLayer._tf !== tf) { mapLayer.style.transform = tf; mapLayer._tf = tf; } } // (written only when it changed)
   // visible window of the map (for the grey remembered copy)
   const ex = st.rot ? Math.hypot(VW, VH) / 2 / z : VW / 2 / z, ey = st.rot ? ex : VH / 2 / z, fr = st.rot && st.floorRect; // a turned view reaches further across the map
   // what the screen really shows, through the tilt (he saw walls left flat, see-through, toward the far edge of the steep
@@ -3262,7 +3282,8 @@ function draw(s, view, now, dt) {
   }
   // corpses
   if (st.corpses.length && st.corpses.some(c => c.zbc)) { const tn = performance.now() / 1000; st.corpses = st.corpses.filter(c => !c.zbc || tn - c.t < 10); } // zombie bodies go after a while
-  for (const c of st.corpses) if (c.zbc) drawZombie(ctx, { ...c, dead: true }, now); else drawOperator(ctx, { ...c, downed: true }, now);
+  for (const c of st.corpses) { if (c.x < vx0 - 40 || c.x > vx1 + 40 || c.y < vy0 - 40 || c.y > vy1 + 40) continue; // (off screen: not drawn)
+    if (c.zbc) drawZombie(ctx, { ...c, dead: true }, now); else drawOperator(ctx, { ...c, downed: true }, now); }
   // rappel ropes: a coil on the ground under each stretch of wall you can climb (attackers), and the rope on anyone using one
   if (side === 'atk' && view) for (const r of st.map.ropes || []) {
     const bx = r.base.x, by = r.base.y; if (Math.abs(bx - view.x) > 700 || Math.abs(by - view.y) > 700) continue;
@@ -3481,7 +3502,13 @@ function draw(s, view, now, dt) {
       const X0 = Math.max(fr ? fr[0] : 0, wx0 - 40), Y0 = Math.max(fr ? fr[1] : 0, wy0 - 40), X1 = Math.min(fr ? fr[2] : m.W * CELL, wx1 + 40), Y1 = Math.min(fr ? fr[3] : m.H * CELL, wy1 + 40);
       const mr0 = st.me && st.me.ro && st.me.ro[0] && st.pred, wallSp = mr0 ? ropeWallSpots(st.me.ro[1], mr0) : null; // on a rope: the whole wall you hang on counts as seen
       const seenG = view && vpolys.length ? seenGrid(vpolys, rm, wallSp || []) : null;
-      rf = raisedFrame(st.rend, rm, eye, RH, Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1, (st.rt || 0) > 0.01, seenG, wallSp);
+      // (2026-11-19) the same view as last frame (camera still within a twentieth of a pixel, the same cells seen, no wall
+      // changed): last frame's pieces are drawn again instead of being rebuilt. Standing or holding an angle, most frames.
+      const bx = [Math.floor(X0 / CELL), Math.floor(Y0 / CELL), Math.floor(X1 / CELL) - 1, Math.floor(Y1 / CELL) - 1], ab = (st.rt || 0) > 0.01;
+      const rk = `${bx}|${RH.toFixed(5)}|${ab}|${seenHash(seenG)}|${wallSp ? wallSp.map(q => `${q.x | 0},${q.y | 0},${q.r | 0}`).join(';') : ''}|${ropeLook.on > 0.05 ? `${ropeLook.on.toFixed(2)},${ropeLook.x | 0},${ropeLook.y | 0}` : 0}`;
+      const RC = st.rfMemo, dirty = st.rend.wallsDirty && st.rend.wallsDirty.size;
+      if (RC && !dirty && RC.rend === st.rend && RC.map === rm && RC.k === rk && Math.abs(RC.ex - eye.x) < 0.05 && Math.abs(RC.ey - eye.y) < 0.05) rf = RC.rf;
+      else { rf = raisedFrame(st.rend, rm, eye, RH, bx[0], bx[1], bx[2], bx[3], ab, seenG, wallSp); st.rfMemo = { rf, rend: st.rend, map: rm, k: rk, ex: eye.x, ey: eye.y }; }
     }
     // wall tops from the small copy of the map when the screen shows less than it holds (far out)
     const pk = pass === 'fog' ? fog.width / VW * z : z, pic = st.rend.picFor(pk), upA = Math.min(1, (st.rt || 0) * 1.4);
@@ -3619,6 +3646,10 @@ function draw(s, view, now, dt) {
     st.tiltLast = p ? { x: p.x, y: p.y } : null;
     const jump = Math.hypot(vx, vy) > 600; // a floor change or respawn: no lean
     { const me2 = st.me, r = me2 && me2.ro && me2.ro[0] && st.map.ropes[me2.ro[1]], win = !!(r && me2.ro[8] && Math.abs(ropeS(r, st.pred.x, st.pred.y)) < r.half + 14); st.rtW = (st.rtW || 0) + ((win ? 1 : 0) - (st.rtW || 0)) * (1 - Math.exp(-dt * 4)); tilt.extra = (ROPE_TILT + ROPE_TILT_WIN * st.rtW + 9 * (st.swoopZ || 0)) * (st.rt || 0); } // (the swoop: a lower angle as you go through) // (the extra tilt level with a window is off: ROPE_TILT_WIN 0, he said 2026-11-14 it squeezed the whole picture)
+    // Low graphics (he chose 2026-11-19): straight down, no tilt or lean; the rope camera and the window swoop still tip
+    // the view (they are how you see the wall), easing the tilt in from flat
+    if (gq.tilt === false) { const b = Math.min(1, Math.max(st.rt || 0, st.swoopZ || 0) * 1.5); tilt.base = b; tilt.on = fxOn('tilt') && b > 0.005; tilt.lean = false; }
+    else { tilt.base = 1; tilt.on = fxOn('tilt'); tilt.lean = fxOn('lean'); }
     tilt.update(dt, jump ? 0 : (vx * cr - vy * sr) * z, jump ? 0 : (vx * sr + vy * cr) * z, shake, innerWidth, innerHeight);
     const de = document.documentElement; de.classList.toggle('tilt3d', tilt.on === true); de.classList.toggle('edgeblur', fxOn('blur') && gq.blur === true);
   }
@@ -4279,7 +4310,8 @@ function hud(s) {
     const word = first ? ((ph.split('<b>' + label(first === 'vault' ? 'vault' : 'interact') + '</b>')[1] || '').replace(/<[^>]*>/g, ' ').replace(/^\s*(HOLD|PRESS|TAP)\s+(TO\s+)?/i, '').trim().split(/\s+/)[0] || '').toUpperCase().slice(0, 9) : '';
     touchContext({ use: first === 'use', busy: !!me.bu, vault: first === 'vault', word, cams: me.ct !== 'body', drone: me.ct === 'drone', atk: side === 'atk', body: me.ct === 'body' && !me.dn, lean: st.leanT || 0, badge: st.tBadge || {} }); }
 }
-function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!el) return; if (el.innerHTML !== h) el.innerHTML = h; }
+// (2026-11-19) compares with the last text it wrote instead of reading innerHTML back (that rebuilt the text every call)
+function setHTML(id, h) { const el = typeof id === 'string' ? $(id) : id; if (!el) return; if (el._h === h && el.firstChild === el._hf) return; el.innerHTML = h; el._h = h; el._hf = el.firstChild; }
 // (he said it got laggy: the HUD rewrote about a dozen elements ten times a second even when nothing had changed)
 function setText(id, v) { const el = typeof id === 'string' ? $(id) : id, t = String(v); if (el && el.textContent !== t) el.textContent = t; }
 function setCls(el, c, on) { if (el.classList.contains(c) !== on) el.classList.toggle(c, on); }
@@ -5165,7 +5197,9 @@ let tipI = Math.floor(Math.random() * TIPS.length);
 // a phone has no keys or mouse: its tips leave out the ones that name them (he found 'aim them with the mouse' on his phone)
 function tipsNow() { const T = isTouch ? TIPS.filter(t => !/\{\w+\}|mouse|click|keyboard|\(F11/i.test(t)) : TIPS; return T.length ? T : TIPS; };
 const nextTip = () => { const el = $('tip'), T = tipsNow(); el.textContent = tipText(T[tipI++ % T.length]); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; };
-nextTip(); setInterval(nextTip, 8000);
+nextTip(); setInterval(() => { if (!document.hidden) nextTip(); }, 8000);
+// (2026-11-19) hidden = no sound processing; the screen timers above skip their work too
+document.addEventListener('visibilitychange', () => audio.hiddenPause(document.hidden));
 // every button: soft hover tick, click sound and a ripple from where you clicked
 let lastHover = 0;
 document.addEventListener('pointerover', e => {
@@ -5197,7 +5231,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { addFeed: t => addFeed(t), padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset, scr: () => { const c = cursor(), p = tilt.project(c.x / DPR, c.y / DPR), q = w2s(st.pred.x, st.pred.y), o = tilt.project(q.x / DPR, q.y / DPR); return { x: Math.round(p.x - o.x), y: Math.round(p.y - o.y) }; } }; // scr: the crosshair on screen, CSS px from your character // for automated screenshot tests
+window.__r62d = { addFeed: t => addFeed(t), padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: () => rope3d.debug(), r3q: f => rope3d.quality(f), PF, st, fx, tilt, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset, scr: () => { const c = cursor(), p = tilt.project(c.x / DPR, c.y / DPR), q = w2s(st.pred.x, st.pred.y), o = tilt.project(q.x / DPR, q.y / DPR); return { x: Math.round(p.x - o.x), y: Math.round(p.y - o.y) }; } }; // scr: the crosshair on screen, CSS px from your character // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
@@ -5279,7 +5313,7 @@ showSens();
     r.addEventListener('input', () => setTimeout(sync));
     r.after(n, unit); rows.push(sync); sync();
   }
-  setInterval(() => { if (!$('settings').classList.contains('hidden')) for (const f of rows) f(); }, 250); }
+  setInterval(() => { if (!document.hidden && !$('settings').classList.contains('hidden')) for (const f of rows) f(); }, 250); }
 function setAim(m, save = true) {
   aimMode = m; try { localStorage.setItem('r62d-aim', m); localStorage.setItem('r62d-aim2', '1'); } catch {}
   for (const b of $('aimSeg').querySelectorAll('button')) b.classList.toggle('on', b.dataset.a === m);
@@ -5345,7 +5379,7 @@ function addChat(m) {
   audio.ui('chat');
 }
 // older lines fade out unless the chat is open
-setInterval(() => { const now = performance.now(); for (const d of $('chatLog').children) d.classList.toggle('old', now - d.dataset.t > 12000); }, 500);
+setInterval(() => { if (document.hidden) return; const now = performance.now(); for (const d of $('chatLog').children) d.classList.toggle('old', now - d.dataset.t > 12000); }, 500);
 
 // The desktop app's window is already full screen (Firefox kiosk). Asking the browser for full
 // screen again there shrinks the picture into a corner, so the switch only acts in a normal browser.

@@ -25,6 +25,8 @@ export function soundJobs() {
   for (const s of Object.keys(SURF)) { for (const p of [2, 0, 3, 1]) jobs.push(() => stepBuf(s, p)); jobs.push(() => stepBuf(s, 0, true)); }
   return jobs;
 }
+// the game hidden (minimised, another tab, the phone's home screen): sound stops working the processor until it is back
+export function hiddenPause(hidden) { if (!ac || ac.offline) return; try { if (hidden && ac.state === 'running') ac.suspend(); else if (!hidden && ac.state === 'suspended') ac.resume(); } catch {} }
 export function initAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
   buildGraph(new (window.AudioContext || window.webkitAudioContext)());

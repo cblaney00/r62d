@@ -8,7 +8,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #050607; col
 canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: none; }
 #objective .flr { color: var(--gold); margin-right: 4px; }
 #loading { position: fixed; inset: 0; z-index: 100; background: #05070a; overflow: hidden; transition: opacity 0.45s ease; }
-#loading.hidden { display: block !important; opacity: 0; pointer-events: none; }
+#loading.hidden { display: block !important; opacity: 0; pointer-events: none; visibility: hidden; transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
+#loading.hidden, #loading.hidden * { animation-play-state: paused !important; } /* (2026-11-19) the drift and shine kept animating a blurred canvas behind the whole match */
+html.calm #loading.withMap #loadBg { animation-duration: 52s; } /* Low: calmer menus (he chose 2026-11-19) */
 #loadBg { position: absolute; inset: -6%; opacity: 0; transition: opacity 0.8s ease; }
 #loading.withMap #loadBg { opacity: 0.55; animation: loadDrift 26s ease-in-out infinite alternate; }
 #loadBg canvas { width: 100%; height: 100%; object-fit: cover; filter: blur(3px) saturate(0.8) brightness(0.8); }

@@ -151,8 +151,11 @@ function fillDetail(d, k, anim, compact, force) {
   // slowly animated big portrait
   cancelAnimationFrame(anim.raf);
   const cv = d.querySelector('.opBig'), x = cv.getContext('2d');
+  let lastT = -1e9;
   const loop = t => {
     if (!cv.isConnected || d.offsetParent === null) return;
+    if (document.documentElement.classList.contains('calm') && t - lastT < 48) { anim.raf = requestAnimationFrame(loop); return; } // Low graphics: 20 a second (calmer menus, he chose 2026-11-19)
+    lastT = t;
     const g = x.createRadialGradient(210, 210, 20, 210, 210, 300);
     g.addColorStop(0, shade(o.color, 0.5)); g.addColorStop(1, '#07090c');
     x.fillStyle = g; x.fillRect(0, 0, 420, 420);

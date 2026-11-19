@@ -2,30 +2,38 @@
 const MAX = 1400;
 
 export const TRAIL_LIFE = 0.45;
-export function drawTrail(ctx, x, y, x2, y2, k) { // k: 1 fresh → 0 gone
-  const g = ctx.createLinearGradient(x, y, x2, y2), a = k * k;
-  g.addColorStop(0, `rgba(255,214,140,${0.05 * a})`); g.addColorStop(0.5, `rgba(255,224,160,${0.22 * a})`); g.addColorStop(1, `rgba(255,240,200,${0.42 * a})`); // he asked: fainter, noticeable but not gigantic
+export function drawTrail(ctx, x, y, x2, y2, k, t) { // k: 1 fresh → 0 gone; t: the trail (keeps its gradient)
+  const a = k * k;
+  // (2026-11-19) the gradient is made once per trail at full strength and faded with globalAlpha: the same picture
+  let g = t && t.g && t.gc === ctx ? t.g : null;
+  if (!g) { g = ctx.createLinearGradient(x, y, x2, y2); g.addColorStop(0, 'rgba(255,214,140,0.05)'); g.addColorStop(0.5, 'rgba(255,224,160,0.22)'); g.addColorStop(1, 'rgba(255,240,200,0.42)'); if (t) { t.g = g; t.gc = ctx; } } // he asked: fainter, noticeable but not gigantic
   ctx.lineCap = 'round'; ctx.strokeStyle = `rgba(255,200,120,${0.05 * a})`; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+  const ga = ctx.globalAlpha; ctx.globalAlpha = ga * a;
   ctx.strokeStyle = g; ctx.lineWidth = 0.4 + 0.2 * k; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke(); ctx.lineCap = 'butt';
+  ctx.globalAlpha = ga;
 }
+// at most this many of each kind at once (they had no limit: a long spray by several people piled them up)
+const MAX_TRACERS = 300, MAX_LIGHTS = 40, MAX_RINGS = 60;
+const keepAlive = l => { let j = 0; for (let i = 0; i < l.length; i++) if (l[i].life > 0) l[j++] = l[i]; l.length = j; }; // (in place, no new list each frame)
+const capPush = (l, p, max) => { if (l.length >= max) l.shift(); l.push(p); };
 export class FX {
-  constructor() { this.parts = []; this.tracers = []; this.lights = []; this.rings = []; this.shake = 0; this.quality = 1; }
+  constructor() { this.parts = []; this.tracers = []; this.lights = []; this.rings = []; this.shake = 0; this.quality = 1; this.tiny = true; } // tiny: shell casings and each shot's room glow (off on Low, he chose 2026-11-19)
   clear() { this.parts = []; this.tracers = []; this.lights = []; this.rings = []; }
 
   // lower graphics quality keeps only a share of the particles
   add(p) { if (this.parts.length < MAX * this.quality && (this.quality >= 1 || Math.random() < this.quality)) this.parts.push(p); }
 
   // thin and brief (he asked: bullets are tiny, so their streaks should be too): about 2-3 frames
-  tracer(x, y, x2, y2, col = '255,220,150') { this.tracers.push({ x, y, x2, y2, life: 0.04, max: 0.04, col }); }
+  tracer(x, y, x2, y2, col = '255,220,150') { capPush(this.tracers, { x, y, x2, y2, life: 0.04, max: 0.04, col }, MAX_TRACERS); }
   // a bullet trail (he asked: to see where shots come from; subsonic ammo leaves none): lingers TRAIL_LIFE s, drawn on
   // #game under the blackout, so you only see the part that crosses what you can see
-  trail(x, y, x2, y2) { this.tracers.push({ x, y, x2, y2, life: TRAIL_LIFE, max: TRAIL_LIFE, trail: 1 }); }
+  trail(x, y, x2, y2) { capPush(this.tracers, { x, y, x2, y2, life: TRAIL_LIFE, max: TRAIL_LIFE, trail: 1 }, MAX_TRACERS); }
 
   muzzle(x, y, a) {
-    this.lights.push({ x, y, r: 115, life: 0.06, max: 0.06, col: '255,186,105', a: 0.42 }); // a shot lights up the room round it for a moment
+    if (this.tiny) { capPush(this.lights, { x, y, r: 115, life: 0.06, max: 0.06, col: '255,186,105', a: 0.42 }, MAX_LIGHTS); // a shot lights up the room round it for a moment
     // shell casing flies out to the right
     const ca = a + Math.PI / 2 + (Math.random() - 0.5) * 0.6, sp = 60 + Math.random() * 50;
-    this.add({ type: 'casing', x, y, vx: Math.cos(ca) * sp, vy: Math.sin(ca) * sp, life: 0.9, max: 0.9, rot: Math.random() * 6, vr: 20, size: 1 });
+    this.add({ type: 'casing', x, y, vx: Math.cos(ca) * sp, vy: Math.sin(ca) * sp, life: 0.9, max: 0.9, rot: Math.random() * 6, vr: 20, size: 1 }); }
     for (let i = 0; i < 2; i++) this.add({ type: 'smoke', x, y, vx: Math.cos(a) * 20 + (Math.random() - 0.5) * 10, vy: Math.sin(a) * 20 + (Math.random() - 0.5) * 10, life: 0.5, max: 0.5, size: 2 + Math.random() * 2, grow: 10, col: '180,180,180', a: 0.18 });
   }
 
@@ -89,7 +97,7 @@ export class FX {
     this.add({ type: 'smoke', x, y, vx: 0, vy: 0, life: 1.2, max: 1.2, size: 6, grow: 14, col: '200,195,185', a: 0.3 });
   }
 
-  ping(x, y, col) { this.rings.push({ x, y, r: 0, max: 170, life: 0.9, maxL: 0.9, col }); }
+  ping(x, y, col) { capPush(this.rings, { x, y, r: 0, max: 170, life: 0.9, maxL: 0.9, col }, MAX_RINGS); }
 
   update(dt) {
     this.shake *= Math.exp(-dt * 10);
@@ -100,12 +108,14 @@ export class FX {
       if (p.rot !== undefined) p.rot += (p.vr || 0) * dt * (Math.hypot(p.vx, p.vy) / 100);
       if (p.grow) p.size += p.grow * dt;
     }
-    this.parts = this.parts.filter(p => p.life > 0);
-    for (const l of [this.tracers, this.lights]) for (const p of l) p.life -= dt;
-    this.tracers = this.tracers.filter(p => p.life > 0);
-    this.lights = this.lights.filter(p => p.life > 0);
+    keepAlive(this.parts);
+    for (const p of this.tracers) p.life -= dt;
+    for (const p of this.lights) p.life -= dt;
+    keepAlive(this.tracers); keepAlive(this.lights);
     for (const r of this.rings) { r.life -= dt; r.r = r.max * (1 - r.life / r.maxL); }
-    this.rings = this.rings.filter(r => r.life > 0);
+    keepAlive(this.rings);
+    if (this.lights.length > MAX_LIGHTS) this.lights.splice(0, this.lights.length - MAX_LIGHTS);
+    if (this.rings.length > MAX_RINGS) this.rings.splice(0, this.rings.length - MAX_RINGS);
   }
 
   draw(ctx) {
@@ -117,13 +127,13 @@ export class FX {
         ctx.fillStyle = `rgba(255,${120 + 100 * k | 0},40,${0.7 * k})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + k), 0, 7); ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
       } else if (p.type === 'spark') { ctx.strokeStyle = `rgba(${p.col},${k})`; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02); ctx.stroke(); }
-      else if (p.type === 'casing') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = `rgba(214,170,70,${Math.min(1, k * 3)})`; ctx.fillRect(-1, -0.4, 2, 0.8); ctx.restore(); }
-      else if (p.type === 'chunk') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot || 0); ctx.fillStyle = `rgba(${p.col},${Math.min(1, k * 2)})`; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.7); ctx.restore(); }
+      else if (p.type === 'casing') { ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = `rgba(214,170,70,${Math.min(1, k * 3)})`; ctx.fillRect(-1, -0.4, 2, 0.8); ctx.rotate(-p.rot); ctx.translate(-p.x, -p.y); }
+      else if (p.type === 'chunk') { const r = p.rot || 0; ctx.translate(p.x, p.y); ctx.rotate(r); ctx.fillStyle = `rgba(${p.col},${Math.min(1, k * 2)})`; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.7); ctx.rotate(-r); ctx.translate(-p.x, -p.y); }
       else { ctx.fillStyle = `rgba(${p.col},${k})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.fill(); }
     }
     for (const t of this.tracers) {
       const k = t.life / t.max;
-      if (t.trail) { drawTrail(ctx, t.x, t.y, t.x2, t.y2, k); continue; }
+      if (t.trail) { drawTrail(ctx, t.x, t.y, t.x2, t.y2, k, t); continue; }
       ctx.strokeStyle = `rgba(${t.col},${0.6 * k})`; ctx.lineWidth = 0.45;
       ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(t.x2, t.y2); ctx.stroke();
     }

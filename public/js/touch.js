@@ -461,7 +461,7 @@ function dodgeHole() {
     if (dx) el.dataset.dodge = dx; else { el.removeAttribute('data-dodge'); if (inFlow) { el.style.padding = el.dataset.pad0; delete el.dataset.pad0; } }
   }
 }
-if (isTouch) setInterval(dodgeHole, 500);
+if (isTouch) setInterval(() => { if (!document.hidden) dodgeHole(); }, 500);
 window.onInsets = applyInsets; applyInsets(); addEventListener('resize', () => setTimeout(applyInsets, 150));
 fitUi(); addEventListener('resize', fitUi);
 addEventListener('touchend', goFull, true); addEventListener('click', goFull, true);

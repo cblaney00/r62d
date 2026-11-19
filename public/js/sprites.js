@@ -183,20 +183,32 @@ function limb(ctx, pts, w, col) { // outlined, two-segment limb
 }
 let SHADE = true; // off on Low graphics: flat colours instead of per-part lighting
 export function setShading(on) { SHADE = on; }
-function shaded(ctx, x, y, r, col) { // radial shading lit from the top-left
-  if (!SHADE) return col;
+// Radial shading lit from the top-left, filling the current path. (2026-11-19) The same picture as before, but one
+// gradient per colour and canvas, made at size 1 round (0, 0) and placed by moving the drawing there for the fill,
+// instead of a new gradient (and three colour look-ups) for every part of every body every frame.
+const unitShade = new WeakMap();
+function shadedFill(ctx, x, y, r, col) {
+  if (!SHADE || !(r > 0) || col[0] !== '#') { ctx.fillStyle = SHADE && r > 0 ? shadedOld(ctx, x, y, r, col) : col; ctx.fill(); return; }
+  let m = unitShade.get(ctx); if (!m) unitShade.set(ctx, m = new Map());
+  let g = m.get(col);
+  if (!g) { if (m.size > 600) m.clear(); g = ctx.createRadialGradient(LX * 0.45, LY * 0.45, 0.1, 0, 0, 1.15); g.addColorStop(0, shadeOf(col, 1.5)); g.addColorStop(0.55, col); g.addColorStop(1, shadeOf(col, 0.68)); m.set(col, g); }
+  ctx.fillStyle = g; ctx.translate(x, y); ctx.scale(r, r); ctx.fill(); ctx.scale(1 / r, 1 / r); ctx.translate(-x, -y);
+}
+const footShade = new WeakMap();
+function footShadow(ctx) { let g = footShade.get(ctx); if (!g) { g = ctx.createRadialGradient(2, 3, 2, 2, 3, 14); g.addColorStop(0, 'rgba(0,0,0,0.45)'); g.addColorStop(1, 'rgba(0,0,0,0)'); footShade.set(ctx, g); } return g; }
+function shadedOld(ctx, x, y, r, col) { // (colours not written as #rrggbb)
   const g = ctx.createRadialGradient(x + LX * r * 0.45, y + LY * r * 0.45, r * 0.1, x, y, r * 1.15);
   g.addColorStop(0, shade(col, 1.5)); g.addColorStop(0.55, col); g.addColorStop(1, shade(col, 0.68));
   return g;
 }
 function ell(ctx, x, y, rx, ry, col, outline = true) {
   ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, 7);
-  ctx.fillStyle = shaded(ctx, x, y, Math.max(rx, ry), col); ctx.fill();
+  shadedFill(ctx, x, y, Math.max(rx, ry), col);
   if (outline) { ctx.strokeStyle = OUT; ctx.lineWidth = 0.55; ctx.stroke(); }
 }
 function box(ctx, x, y, w, h, r, col, outline = true) {
   ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
-  ctx.fillStyle = shaded(ctx, x + w / 2, y + h / 2, Math.max(w, h) / 2, col); ctx.fill();
+  shadedFill(ctx, x + w / 2, y + h / 2, Math.max(w, h) / 2, col);
   if (outline) { ctx.strokeStyle = OUT; ctx.lineWidth = 0.5; ctx.stroke(); }
 }
 
@@ -347,8 +359,7 @@ export function drawOperator(ctx, p, t) {
   if (p.hang && p.wallA !== undefined && persp.h) { const [dx, dy] = liftOf(p.x, p.y, (p.zb || 0) + 0.02); ctx.translate(dx, dy); } // on a rope: the ring and shadow at their feet, up the wall
   ctx.strokeStyle = typeof p.ring === 'string' ? rgba(p.ring, 0.8) : (p.ring ?? p.ally) ? rgba(COLS.ally, 0.7) : rgba(COLS.enemy, 0.75); ctx.lineWidth = 0.9;
   ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.stroke();
-  const sg = ctx.createRadialGradient(2, 3, 2, 2, 3, 14); sg.addColorStop(0, 'rgba(0,0,0,0.45)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(2, 3, 14, 0, 7); ctx.fill();
+  ctx.fillStyle = footShadow(ctx); // (one gradient kept per canvas, 2026-11-19) ctx.beginPath(); ctx.arc(2, 3, 14, 0, 7); ctx.fill();
   // on a rope (he asked 2026-11-14: climbers solid like everyone): the same body, upright against the wall and facing it,
   // one hand up the rope and the gun in the other turned to where they aim; upside down = the heights turned over
   const hang = !!(p.hang && p.wallA !== undefined), inv = hang && p.hang === 'inv', bodyA = hang ? p.wallA : p.aim;

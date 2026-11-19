@@ -697,12 +697,12 @@ export function drawRaised(ctx, R, fr, which, pic = R.c, plain = false, upA = 1)
 // The world layers (#world) are turned in 3D: a fixed angle (11°, he asked for more than the first 7°; the top of the screen a little further away) plus a lean
 // with your movement and a kick when you shoot or something blows up close by. The mouse is turned back with untilt.
 export const tilt = {
-  on: true, lean: true, el: null, M: null, extra: 0, // extra: more tilt (degrees; the rope camera)
+  on: true, lean: true, el: null, M: null, extra: 0, base: 1, // extra: more tilt (degrees; the rope camera); base: share of the usual 11° (Low: 0 unless on a rope)
   ax: 0, ay: 0, kx: 0, ky: 0, kvx: 0, kvy: 0,
   // vx, vy: your speed across the screen (px/s, screen directions); shake: the screen-shake amount
   update(dt, vx, vy, shake, W, H) {
     if (!this.el) this.el = document.getElementById('world');
-    if (!this.on) { if (this.M) { this.el.style.transform = ''; this.M = null; } return; }
+    if (!this.on) { if (this.M) { this.el.style.transform = ''; this.M = null; this.key = null; } return; }
     const calm = 1 - Math.min(1, this.extra / 25) * 0.85; // (on a rope the camera slides along the wall: little lean, it made the steep view sway)
     const tx = this.lean ? Math.max(-1, Math.min(1, -vy / 140)) * 1.1 * calm : 0, ty = this.lean ? Math.max(-1, Math.min(1, vx / 140)) * 1.3 * calm : 0;
     const g = Math.min(1, dt * 3.5); this.ax += (tx - this.ax) * g; this.ay += (ty - this.ay) * g;
@@ -710,9 +710,14 @@ export const tilt = {
     const sk = this.lean ? Math.min(6, shake) : 0;
     this.kvx += (-this.kx * 160 - this.kvx * 16) * dt + (Math.random() - 0.5) * sk * 9; this.kvy += (-this.ky * 160 - this.kvy * 16) * dt + (Math.random() - 0.5) * sk * 9;
     this.kx += this.kvx * dt; this.ky += this.kvy * dt;
+    // (2026-11-19) standing still the tilt hardly changes: when nothing moved by a thousandth of a degree and the size has
+    // settled, keep last frame's (no new matrices, no restyle of the whole world layer)
+    const key = `${W},${H},${this.base.toFixed(3)},${this.extra.toFixed(3)},${(this.ax + this.kx).toFixed(3)},${(this.ay + this.ky).toFixed(3)}`;
+    if (key === this.key && this.M && this.need != null && Math.abs(this.need - this.sc) < 1e-4) return;
+    this.key = key;
     const P = new DOMMatrix(); P.m34 = -1 / Math.max(W, H) / 1.25;
     const make = s => new DOMMatrix().translateSelf(W / 2, H / 2).multiplySelf(P)
-      .rotateSelf(11 + this.extra + this.ax + this.kx, this.ay + this.ky, 0).scaleSelf(s, s).translateSelf(-W / 2, -H / 2 - H * 0.01 - H * this.extra * 0.006);
+      .rotateSelf(11 * this.base + this.extra + this.ax + this.kx, this.ay + this.ky, 0).scaleSelf(s, s).translateSelf(-W / 2, -H / 2 - H * 0.01 - H * this.extra * 0.006);
     // the layers must always fill the screen (he saw a lit sliver above the steep rope view): grow until all four
     // corners of the layer are off screen
     // the smallest size that still covers the screen, found exactly (it used to step by 5%, and a small sway flipped it
@@ -720,11 +725,11 @@ export const tilt = {
     const fits = sc => { this.M = make(sc); const a = this.project(0, 0), b = this.project(W, 0), c = this.project(0, H), d = this.project(W, H); return a.y <= 0 && b.y <= 0 && a.x <= 0 && b.x >= W && c.y >= H && d.y >= H && c.x <= 0 && d.x >= W; };
     let lo = 1.1 + this.extra * 0.012, need = lo;
     if (!fits(lo)) { let hi = lo * 1.1; while (!fits(hi) && hi < lo * 3) hi *= 1.15; for (let i = 0; i < 9; i++) { const mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid; } need = hi * 1.004; }
-    this.sc = !this.sc || need > this.sc ? need : this.sc + (need - this.sc) * Math.min(1, dt * 1.5);
-    const M = make(this.sc); this.M = M; this.el.style.transform = M.toString();
+    this.sc = !this.sc || need > this.sc ? need : this.sc + (need - this.sc) * Math.min(1, dt * 1.5); this.need = need;
+    const M = make(this.sc); this.M = M; const tf = M.toString(); if (this.el.style.transform !== tf) this.el.style.transform = tf;
   },
   kick(k = 1) { if (this.lean && this.on) this.kvx -= 9 * k; },
-  flat() { if (this.M) { this.el.style.transform = ''; this.M = null; document.documentElement.classList.remove('tilt3d', 'edgeblur'); } }, // menus: straight down
+  flat() { if (this.M) { this.el.style.transform = ''; this.M = null; this.key = null; document.documentElement.classList.remove('tilt3d', 'edgeblur'); } }, // menus: straight down
   // a point on the flat world layers (CSS px) → where it shows on the screen
   project(x, y) {
     const M = this.M; if (!M) return { x, y };
