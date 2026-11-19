@@ -157,6 +157,46 @@ Object.assign(LINES, {
   revived: T('mid', false, ['Thanks for the pick up.', 'Cheers, back in.', 'You saved me.', 'Back up, thanks.', 'Thank you, thought I was gone.', 'Owe you one.']),
   reload: T('mid', false, ['Reloading.', 'Reload, cover me.', 'Changing mags.', 'Empty, give me a sec.', 'Out, reloading.']),
 });
+// answers to pings (he asked 2026-11-18: more work on the bots' lines and answers to pings of every sort)
+Object.assign(LINES, {
+  ansOmw: T('mid', true, ['See you there.', 'I\'ll meet you there.', 'Okay, I\'ll come too.', 'Right behind you on that.', 'Nice, I\'ll be close.', 'Going that way as well.', 'Copy, heading to {place}.', 'I\'ll cover you getting there.', 'Okay, {place}, I\'m with you.', 'Wait for me at {place}.']),
+  ansWatchPing: T('mid', true, ['Watching it.', 'Eyes on {place}.', 'I\'ve got that angle.', 'Okay, I\'ll keep an eye there.', 'Covering {place}.', 'Got it, nobody gets through there.', 'Watching {place} for you.', 'Yep, aiming there.', 'I\'ll hold my crosshair on it.', 'Nothing comes out of {place} without me seeing.']),
+  ansEnemyPing: T('urgent', true, ['Copy, one in {place}.', 'Got it, {place}.', 'Thanks, watching {place}.', 'Okay, I\'ll play for {place}.', 'Seen it, {place}.', 'Noted, {place}.', 'Good call, {place}.', 'On it, turning to {place}.', 'Heard you, {place}.', 'Okay, careful round {place}.']),
+  ansDangerPing: T('mid', true, ['Okay, staying off it.', 'Thanks, I\'ll keep clear.', 'Avoiding {place}.', 'Good call, not going there.', 'Copy, watching it.', 'Noted, careful there.', 'Okay, other way then.', 'Got it, {place} is bad.']),
+  ansOpen: T('mid', true, ['Opening it.', 'On it, opening that.', 'Okay, making a hole.', 'I\'ll open it up.', 'Give me a second, opening.', 'Getting it open.', 'Sure, breaking through.', 'Stand back, opening it.', 'Okay, new way in coming up.']),
+  ansNoOpen: T('mid', true, ['Can\'t, that one\'s reinforced.', 'Nothing to open that with.', 'It\'s reinforced, need a hard breacher.', 'No charge for that one, sorry.', 'Too strong for me, that wall.', 'Reinforced, we need a cutter on it.']),
+  ansCamPing: T('mid', true, ['I\'ll shoot the cam.', 'Got the camera.', 'Killing that cam.', 'On it, cam\'s going.', 'Okay, taking that camera out.', 'Seen the cam, shooting it.', 'That cam is mine.', 'Thanks, breaking it.', 'Cam down in a sec.']),
+  ansTrapPing: T('mid', true, ['I see it, shooting it.', 'Got the trap.', 'Thanks, breaking that.', 'Okay, clearing it.', 'Good eyes, I\'ll get it.', 'Watch out, shooting it now.', 'On it, getting rid of that.', 'Nice spot, taking it out.']),
+  ansDronePing: T('urgent', true, ['Drone! Shooting it.', 'Got the drone.', 'I see their drone.', 'Killing the drone.', 'Okay, drone\'s mine.', 'Drone spotted, on it.']),
+  ansSitePing: T('mid', true, ['That\'s the objective, let\'s go.', 'Okay, {place}, that\'s the one.', 'Got it, site is {place}.', 'Going for {place}.', 'Right, playing {place}.', 'That\'s where it goes down.']),
+  trapSeen: T('mid', false, ['{what}, {place}.', '{what} in {place}, careful.', 'There\'s a {what} in {place}.', 'Watch the {what}, {place}.', 'Got a {what}, {place}, shooting it.', 'Careful, {what} at {place}.', '{what} spotted, {place}.']),
+  ansSiteDef: T('mid', true, ['Holding the site.', 'Okay, protecting it.', 'I\'m close to it.', 'Got it, nobody touches it.', 'We hold here.', 'Yep, playing round it.']),
+  // Copper and Bronze answering pings
+  ansCamFun: T('mid', true, ['Which one is the camera?', 'Shooting the… oh, that thing!', 'I shot it! I think. Maybe a lamp.', 'Is that a camera or a smoke alarm?', 'Pew pew pew. Did it break?']),
+  ansEnemyFun: T('urgent', true, ['Where?! Where?!', 'Okay okay okay okay.', 'I\'m not ready!', 'Is he looking at me?', 'Why did you show me that?', 'I\'ll hide. I mean, cover.']),
+  ansOpenFun: T('mid', true, ['Hitting it with my knife!', 'Open sesame!', 'Knock knock!', 'I\'m punching the wall, is that right?', 'This wall owes me money.']),
+  ansWatchFun: T('mid', true, ['Watching! Watching what?', 'I\'m staring at it really hard.', 'Okay but nothing\'s happening.', 'I blinked. Is that bad?', 'Yep, it\'s still a wall.']),
+  ansGotoFun: T('mid', true, ['Going! Which way is that?', 'On my way! Probably!', 'Coming! Wait, stairs?', 'Okay but I don\'t know where that is.', 'Running! Very loudly!']),
+  ansDangerFun: T('mid', true, ['Danger is my middle name. I\'m not going.', 'Nope. Not going there.', 'What kind of danger?', 'Okay, staying here forever.', 'Is it a spider? Please say it\'s not a spider.', 'Danger? I\'m going the other way. Fast.']),
+});
+Object.assign(FUN, { ansCamPing: 'ansCamFun', ansTrapPing: 'ansCamFun', ansEnemyPing: 'ansEnemyFun', ansOpen: 'ansOpenFun', ansWatchPing: 'ansWatchFun', ansGoto: 'ansGotoFun', ansDangerPing: 'ansDangerFun' });
+// more ways to say the everyday calls, so the same few lines don't come round again and again
+const LINES_MORE = {
+  see: ['{op} pushing {place}!', 'One in {place}, {op}!', 'Watch {place}, {op}!', 'Enemy {place}, it\'s {op}!'],
+  dead: ['Got caught by {op} in {place}.', '{op} in {place}, careful.', 'Traded by {op}, {place}.', 'I\'m out, {op} at {place}.'],
+  got: ['{op} done!', 'Took {op} out.', 'That\'s {op}, nice.', 'Got {op}, keep going!'],
+  low: ['Need a heal!', 'Anyone got health?', 'I\'m barely alive!'],
+  nice: ['Clean.', 'Huge.', 'Great play.', 'That\'s a big one.', 'Nice, keep it up.'],
+  nt: ['Close one.', 'So close.', 'Thanks, we\'ve got this.', 'Good info, we know where now.'],
+  ack: ['Roger.', 'Will do.', 'Understood.', 'Say no more.', 'Okay, doing it.'],
+  ansHelp: ['Hang on!', 'Nearly there!', 'Don\'t die, coming!', 'I\'m coming, hold on!'],
+  ansGoto: ['On my way.', 'Heading there.', 'Going now.', 'Okay, moving.', 'Be right there.', 'Coming to {place}.'],
+  revived: ['Thanks, I\'m up.', 'Up again, cheers.', 'Legend, thank you.', 'Back on my feet.'],
+  reload: ['Reloading, hold this for me.', 'Swapping mags, cover.', 'Hang on, reloading.'],
+  roundWon: ['Great work, everyone.', 'Exactly like that.', 'That\'s one for us.'],
+  roundLost: ['Head up, next round.', 'We learn from that.', 'Reset and go again.'],
+};
+for (const k in LINES_MORE) if (LINES[k]) LINES[k].lines.push(...LINES_MORE[k]);
 // the casters' extra ways
 const CAST_MORE = {
   kill: ['{name} picks off {name2}.', 'Down goes {name2}, courtesy of {name}.', 'Sharp from {name}, {name2} is out.', '{name} punishes {name2}.', '{name2} caught by {name}.', 'That\'s a big pick for {name}.', 'Excellent reaction from {name}.', '{name2} peeked into {name}.'],

@@ -1656,7 +1656,7 @@ export class Game {
       this.endRound(TEAM.DEF, 'Defuser disabled');
     } else if (b.k === 'revive') {
       const q = this.players.get(b.target);
-      q.downed = false; q.hp = 25; if (this.zb) zbUp(this, q); if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) });
+      q.downed = false; q.hp = 25; if (this.zb) zbUp(this, q); if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) }); if (q.bot && Math.random() < 0.6) talk(this, q, 'revived');
     } else if (b.k === 'reinforce' && b.hatch !== undefined) {
       if (this.map.tiles[this.map.hatches[b.hatch].cells[0]] === T.HATCH && this.reinforce > 0) { this.reinforceHatch(b.hatch); this.reinforce--; this.pts(p, 15, 'HATCH REINFORCED'); }
     } else if (b.k === 'reinforce') {
@@ -1926,6 +1926,7 @@ export class Game {
         if (q && q.alive && this.side(q) !== team && this.markOk(p)) {
           this.spot(team, q.id, DUR.spot);
           this.mark(p, q.x, q.y, 'ENEMY' + (q.op ? ' ' + OPERATORS[q.op].name : ''), q.id);
+          botPing(this, p, 'enemy', q.x, q.y, 'ENEMY', q.id);
           if (!(p.pinged || (p.pinged = new Set())).has('p' + q.id)) { p.pinged.add('p' + q.id); this.pts(p, 20, 'ENEMY SPOTTED'); } // once per enemy a round
         }
         break;
@@ -1937,7 +1938,7 @@ export class Game {
         const w = String(e.w || '').toUpperCase().replace(/[^A-Z0-9 .'-]/g, '').trim().slice(0, 28) || 'HERE';
         const pk = PING_KINDS.has(e.pk) ? e.pk : undefined;
         this.mark(p, x, y, w, typeof e.id === 'string' || typeof e.id === 'number' ? e.id : null, pk);
-        if (pk) botPing(this, p, pk, x, y);
+        botPing(this, p, pk || null, x, y, w, e.id ?? null); // bots answer every sort of ping (he asked 2026-11-18)
         { // points for pinging something worth knowing (a gadget, camera, drone, the objective...), once per thing a round
           const key = e.id != null ? 'e' + e.id : w + '@' + (roomAt(this.map, x, y) || Math.round(x / 80) + ',' + Math.round(y / 80)), worth = !pk && !/^(GO|LOOK) HERE/.test(w);
           if (worth && !(p.pinged || (p.pinged = new Set())).has(key)) { p.pinged.add(key); this.pts(p, 10, w.split(' ').slice(0, 2).join(' ') + ' PINGED'); }
@@ -2215,7 +2216,7 @@ export class Game {
         if (t !== null && t < tb) { tb = t; tgt = q; }
       }
       tgt = tgt || p;
-      if (tgt.downed) { tgt.downed = false; tgt.hp = 40; if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); }
+      if (tgt.downed) { tgt.downed = false; tgt.hp = 40; if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); if (tgt.bot && Math.random() < 0.6) talk(this, tgt, 'revived'); }
       else tgt.hp = Math.min(tgt.maxHp + 30, tgt.hp + 40);
       used();
       this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(tgt.x), y2: r1(tgt.y) });

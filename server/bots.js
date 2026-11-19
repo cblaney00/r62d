@@ -6,7 +6,7 @@
 // they only know what they see, what they hear (running footsteps, gunfire, explosions) and what their team spots.
 import { CELL, PLAYER_R, T, FL, TEAM, PHASE, PX_PER_M, DUR, blocksMove, blocksDrone, underAt, stopsBullet, PRO_LEVEL, TOP_BOT, DEFAULT_LEVEL, SWARM } from '../shared/constants.js';
 import { tileAt, los, angDiff, vaultable, castSight, canSee, walkRay, shapeAt, rayShape, rayCovers, circleBlocked, leanPoint, LEAN_PX, inBox, railBlocked, railBlockedDiag } from '../shared/physics.js';
-import { hatchNear, ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairSees, eyeH, bodyH, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
+import { ropeAt, hatchNear, ropeS, hatchOpen, cellAbove, cellBelow, peepOk, floorSpot, floorAt, localPos, stairGhost, stairLooks, stairSees, eyeH, bodyH, stairEnds, roomAt, windowViews, windowSees, wallGhost, peekSeen, floorOff, OUTCAM_ROOF, hatchSight } from '../shared/map.js';
 import { OPERATORS, WEAPONS, opsForTeam, JOBS, jobOf, hitR, HEAD_AIM, LOADOUTS, attachFor, cleanLoadout, RIOT, penOf } from '../shared/operators.js';
 import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_ROTATE } from '../shared/pros.js';
 import { furnLine, furnTopAt, EYE_STANCE, HEAD_STANCE, stanceOf } from '../shared/furniture.js';
@@ -1004,8 +1004,11 @@ export function botThink(game, p, dt) {
   // --- a camera, trap or gadget of theirs in sight (or a map camera it knows hangs close by): shoot it ---
   if (action && !(heardRecently && game.time - ai.heard.t < 1.5) && gun && gun.ammo > 0 && !p.reloadT) {
     const g = gadgetShot(game, p);
+    if (!g && ai.pinBlock && ai.pinBlock.t === game.time) { const pb = ai.pinBlock, a = Math.atan2(pb.y - p.y, pb.x - p.x); if (!ai.pinSide || game.time - (ai.pinSideT || 0) > 1.2) { ai.pinSide = ai.pinSide ? -ai.pinSide : (Math.random() < 0.5 ? 1 : -1); ai.pinSideT = game.time; } setDir(inp, Math.cos(a + Math.PI / 2 * ai.pinSide), Math.sin(a + Math.PI / 2 * ai.pinSide)); turnTo(p, a, S.turn, dt); return; } // a pinged camera with a teammate in the line: step aside
     if (g) {
       if (ai.gAt !== g.e.id) { ai.gAt = g.e.id; ai.gT = game.time; }
+      const pinned = game.pingedEnt && game.pingedEnt[team] && game.pingedEnt[team][g.e.id] > game.time; if (pinned && game.time - ai.gT > 2.9) ai.gT = game.time - 1; // (a pinged one: they keep at it)
+      if (ai.gAt === g.e.id && ai.gT === game.time && g.e.type !== 'cam' && !(game.pingedEnt && game.pingedEnt[team] && game.pingedEnt[team][g.e.id] > game.time)) talk(game, p, 'trapSeen', { what: GADGET_NAME(g.e), place: place(game, g.x, g.y) }, 'trap' + g.e.id); // a trap of theirs: say what and where
       if (game.time - ai.gT > 3) { (ai.gGive || (ai.gGive = {}))[g.e.id] = game.time + 20; ai.gAt = null; } // can't get it: leave it
       else {
         const a = Math.atan2(g.y - p.y, g.x - p.x), d = Math.hypot(g.x - p.x, g.y - p.y); turnTo(p, a, S.turn, dt); inp.ads = 1;
@@ -1587,6 +1590,7 @@ function doBreach(game, p, inp, b, dt) {
   if (Math.hypot(b.sx - p.x, b.sy - p.y) > 6) { b.t = (b.t || 0) + dt; if (b.t > 25) return 'done'; return moveTo(game, p, inp, { x: b.sx, y: b.sy }, dt); }
   p.aim = Math.atan2(b.wy - p.y, b.wx - p.x);
   if (tool.use === 'hold') { inp.ability = 1; b.held = (b.held || 0) + dt; return b.held > 4.5 || p.battery <= 0 ? 'done' : 'wait'; }
+  if (p.busy || p.prep) return 'wait'; // (still setting it: placing takes a moment)
   const before = tool.use === 'gadget' ? p.gadgetCount : p.abilityCount;
   game.event(p, { k: tool.use });
   const after = tool.use === 'gadget' ? p.gadgetCount : p.abilityCount;
@@ -1969,6 +1973,8 @@ function gadgetShot(game, p) {
     const out = e.oc !== undefined, x = out ? e.gx : e.x, y = out ? e.gy : e.y; // an outside camera: shot at its spot on the wall from the ground
     if (out ? fl !== m.groundFloor : floorAt(m, x, y) !== fl) continue;
     const d = Math.hypot(x - p.x, y - p.y); if (d > 16 * PX_PER_M || d >= bd || (HIDDEN_TRAPS.has(e.type) && d > TRAP_SEEN)) continue;
+    const pin = game.pingedEnt && game.pingedEnt[team] && game.pingedEnt[team][e.id] > game.time; // a person pinged it: shoot it
+    if (pin && !(ai.gGive && ai.gGive[e.id] > game.time) && los(m, p.x, p.y, x, y)) { if (shotClear(game, p, { x, y })) { bd = d; best = { e, x, y }; } else ai.pinBlock = { x, y, t: game.time }; continue; } // (someone in the way: step aside, below)
     const mapCam = e.type === 'cam' && !e.owner, facing = Math.abs(angDiff(Math.atan2(y - p.y, x - p.x), p.aim)) < 0.9;
     if (!facing && !(mapCam && d < 12 * PX_PER_M && (roll['m' + e.id] ??= Math.random() < K.memo))) continue; // behind them: only a camera they know hangs there
     if ((roll[e.id] ??= Math.random() < K.cams) === false || (ai.gGive && ai.gGive[e.id] > game.time)) continue;
@@ -2280,21 +2286,72 @@ export function flushReplies(game) {
   for (let i = q.length - 1; i >= 0; i--) if (game.time >= q[i].t) { const r = q.splice(i, 1)[0], w = game.players.get(r.id); if (w) sayTo(game, w, r.cat, r.slots); }
 }
 function sayTo(game, who, cat, slots = {}) {
+  if (!who.pro && lvlOf(game, who) <= 1 && FUN[cat] && LINES[FUN[cat]]) cat = FUN[cat]; // (Copper and Bronze answer their own way)
   const c = compose(writer(who), cat, slots, who.saidRecent || (who.saidRecent = [])); if (!c) return;
   who.saidT = game.time; talkTeam(game, who.squad).last = game.time;
   if (who.pro) (game.proLog || (game.proLog = [])).push({ round: game.round, squad: who.squad, team: who.pro.tag, text: c.text, who: who.pro.pl.name });
   game.chat(who, { text: c.text, team: true });
 }
-// The ping wheel: go and help send the two nearest bots to the spot, hold sends the nearest and it stays; danger calls off orders to go near it.
-export function botPing(game, p, pk, x, y) {
+// The ping wheel and plain pings (he asked 2026-11-18: bots answer pings of every sort, most of the time with a varied
+// line, and really do it). go / help / open / hold / danger / on my way / watch / enemy, and a plain ping on a camera,
+// trap or gadget of theirs (shot), a wall, door, barricade or hatch (opened), the objective, or an enemy you marked.
+const OPENABLE = new Set([T.SOFT, T.REINF, T.BARRI, T.HATCH]);
+function openPlan(game, q, x, y) { // a wall cell at the spot that can be opened, and where to stand to do it
+  const m = game.map, W = m.W, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  let k = -1, kd = Infinity;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const kk = (cy + dy) * W + cx + dx; if (cx + dx < 0 || cy + dy < 0 || cx + dx >= W || !OPENABLE.has(m.tiles[kk])) continue; const d = Math.hypot((cx + dx + 0.5) * CELL - x, (cy + dy + 0.5) * CELL - y); if (d < kd) { kd = d; k = kk; } }
+  if (k < 0) return null;
+  const tile = m.tiles[k], tool = OPERATORS[q.op] ? breachTool(q) : null, fits = tool && BREACH_TOOLS[tool].types.includes(tile);
+  if (tile === T.REINF && !fits) return { no: true };
+  const free = kk => !blocksMove(m.tiles[kk]);
+  let best = null, bd = Infinity;
+  for (const d of [1, -1, W, -W]) {
+    if (!free(k - d)) continue;
+    const sx = ((k - d) % W + 0.5) * CELL, sy = (Math.floor((k - d) / W) + 0.5) * CELL; // (the cell right beside it, like planBreach)
+    const path = findPath(m, Math.floor(q.x / CELL), Math.floor(q.y / CELL), (k - d) % W, Math.floor((k - d) / W)), dist = path ? path.length + (ropeAt(m, sx, sy) ? 500 : 0) : Infinity; if (dist < bd) { bd = dist; best = { k, d, sx, sy, wx: (k % W + 0.5) * CELL, wy: (Math.floor(k / W) + 0.5) * CELL, tile, tool: fits && tile !== T.BARRI && tile !== T.HATCH ? tool : null }; }
+  }
+  return best;
+}
+const GADGET_NAME = e => ({ claymore: 'Claymore', prox: 'Alarm', concuss: 'Shock mine', clamp: 'Clamp', mine: 'Mine', sensor: 'Sensor', jammer: 'Jammer', grid: 'Shock wire', plates: 'Plates', wire: 'Wire' })[e.type] || 'Trap';
+const GADGET_WORD = e => e.type === 'cam' ? 'cam' : e.type === 'drone' || e.type === 'bird' ? 'drone' : 'trap';
+export function botPing(game, p, pk, x, y, w = '', id = null) {
   if (game.tut || p.bot || game.tv) return;
-  const t = game.time, bots = [...game.players.values()].filter(q => q !== p && q.squad === p.squad && q.bot && q.alive && !q.downed).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
-  if (!bots.length) return;
-  const later = game.phase === PHASE.PREP ? game.timer : 0, reply = (q, cat) => (game.replyQ || (game.replyQ = [])).push({ t: t + 0.35 + Math.random() * 0.7, id: q.id, cat, slots: { place: place(game, x, y) } });
+  const t = game.time, team = game.side(p), all = [...game.players.values()].filter(q => q !== p && q.squad === p.squad && q.bot && q.alive && !q.downed).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
+  if (!all.length) return;
+  const bots = all.filter(q => q.ctrl === 'body'), first = bots[0] || all[0]; // (one on a drone or camera answers but doesn't move)
+  const later = game.phase === PHASE.PREP ? game.timer : 0, where = place(game, x, y);
+  const reply = (q, cat, slots = {}, must = false) => { if (q && (must || Math.random() < 0.75)) (game.replyQ || (game.replyQ = [])).push({ t: t + 0.35 + Math.random() * 0.7, id: q.id, cat, slots: { place: where, ...slots } }); };
   const send = (q, secs, extra) => { q.ai = q.ai || {}; q.ai.cmd = { k: 'goto', id: p.id, until: t + secs + later, x, y, ...extra }; };
-  if (pk === 'go' || pk === 'help' || pk === 'open') { const n = bots.slice(0, 2); n.forEach(q => send(q, 120, { stay: pk === 'open' ? 10 : 25 })); reply(n[0], 'ansGoto'); }
-  else if (pk === 'hold') { send(bots[0], 120, { stay: 45 }); reply(bots[0], 'ansWatch'); }
-  else if (pk === 'danger') { let n = null; for (const q of bots) if (q.ai && q.ai.cmd && q.ai.cmd.k === 'goto' && Math.hypot(q.ai.cmd.x - x, q.ai.cmd.y - y) < 6 * PX_PER_M) { q.ai.cmd = null; n = n || q; } if (n) reply(n, 'ansDrop'); }
+  const order = (q, k, secs, extra) => { q.ai = q.ai || {}; q.ai.cmd = { k, id: p.id, until: t + secs + later, ...extra }; };
+  const ent = id != null ? game.ents.find(e => String(e.id) === String(id)) : null, foe = id != null ? game.players.get(id) : null;
+  // a camera, trap, drone or gadget of theirs: everyone who can see it shoots it, the nearest goes to get a look at it
+  if (ent && ent.team && ent.team !== team && ent.hp > 0 && (!pk || pk === 'danger' || pk === 'enemy')) {
+    const pe = (game.pingedEnt || (game.pingedEnt = {}))[team] || (game.pingedEnt[team] = {}); pe[ent.id] = t + 30;
+    for (const q of all) if (q.ai && q.ai.gGive) delete q.ai.gGive[ent.id];
+    const word = GADGET_WORD(ent);
+    if (bots[0] && Math.hypot(bots[0].x - x, bots[0].y - y) > 5 * PX_PER_M) send(bots[0], 40, { drop: 6 * PX_PER_M });
+    reply(first, word === 'cam' ? 'ansCamPing' : word === 'drone' ? 'ansDronePing' : 'ansTrapPing'); return;
+  }
+  // an enemy you marked (or ENEMY HERE): everyone knows it, the nearest turns to it; nobody runs at it
+  if (pk === 'enemy' || (foe && foe.squad !== p.squad) || (!pk && /^ENEMY/.test(w))) {
+    for (const q of all) { q.ai = q.ai || {}; q.ai.heard = { x, y, t }; }
+    if (bots[0] && !(bots[0].ai.cmd)) order(bots[0], 'face', 6, { x, y });
+    reply(first, 'ansEnemyPing'); return;
+  }
+  if (!pk && /^OBJECTIVE/.test(w)) { reply(first, team === TEAM.DEF ? 'ansSiteDef' : 'ansSitePing'); return; }
+  if (!pk) return; // a plain spot on the floor: nothing to answer
+  if (pk === 'go' || pk === 'help') { const n = bots.slice(0, 2); n.forEach(q => send(q, 120, { stay: 25 })); reply(n[0] || first, pk === 'help' ? 'ansHelp' : 'ansGoto', {}, !n.length); if (!n.length) return; }
+  else if (pk === 'omw') { const q = bots[0]; if (q && !(q.ai && q.ai.cmd)) send(q, 90, { stay: 20 }); reply(first, 'ansOmw'); }
+  else if (pk === 'hold') { if (bots[0]) send(bots[0], 120, { stay: 45 }); reply(first, 'ansWatch'); }
+  else if (pk === 'watch') { const q = bots[0]; if (q) order(q, 'face', 30, { x, y }); reply(first, 'ansWatchPing'); }
+  else if (pk === 'danger') {
+    let n = null; for (const q of all) { if (q.ai && q.ai.cmd && q.ai.cmd.k === 'goto' && Math.hypot(q.ai.cmd.x - x, q.ai.cmd.y - y) < 6 * PX_PER_M) { q.ai.cmd = null; n = n || q; } if (q.ai) q.ai.heard = { x, y, t }; } // (they keep an eye on it)
+    reply(n || first, 'ansDangerPing');
+  } else if (pk === 'open') {
+    for (const q of bots) { const b = openPlan(game, q, x, y); if (!b) continue; if (b.no) { if (q === bots[bots.length - 1]) { reply(first, 'ansNoOpen', {}, true); return; } continue; }
+      order(q, 'open', 45, { b }); q.ai.path = null; reply(q, 'ansOpen'); return; }
+    if (bots.length) { bots.slice(0, 2).forEach(q => send(q, 120, { stay: 10 })); reply(bots[0], 'ansGoto'); } // a door already open: they go through it
+  }
 }
 export function botHear(game, p, text) {
   if (game.tut || p.bot || game.tv) return null;
@@ -2414,6 +2471,14 @@ function botCmd(game, p, inp, dt) {
   if (game.phase === PHASE.PREP && (p.staged || p.ctrl === 'drone')) return false; // told during prep: done once the round starts
   if (game.time > c.until || (game.phase !== PHASE.ACTION && game.phase !== PHASE.PREP) || p.downed || !o || (c.k !== 'goto' && !o.alive)) { p.ai.cmd = null; return false; }
   if (c.k === 'hold') { checkAngles(game, p, dt); inp.crouch = 1; return true; }
+  if (c.k === 'face') { turnTo(p, Math.atan2(c.y - p.y, c.x - p.x), skill(game, p).turn, dt); return true; } // watching a pinged spot
+  if (c.k === 'open') { // a pinged wall, door, barricade or hatch: a charge if it takes one, otherwise the knife
+    const b = c.b; if (b.tool) { if (doBreach(game, p, inp, b, dt) === 'done') { if (OPENABLE.has(game.map.tiles[b.k]) && game.map.tiles[b.k] !== T.REINF) b.tool = null; else p.ai.cmd = null; } return true; } // (still shut after the charge: the knife)
+    if (!OPENABLE.has(game.map.tiles[b.k])) { p.ai.cmd = null; return false; } // (open now)
+    const off = Math.hypot(b.sx - p.x, b.sy - p.y); if (off > 12) { moveTo(game, p, inp, { x: b.sx, y: b.sy }, dt); return true; }
+    if (off > 3) setDir(inp, (b.sx - p.x) / off, (b.sy - p.y) / off); // the last step straight in
+    p.aim = Math.atan2(b.wy - p.y, b.wx - p.x); game.melee(p); return true;
+  }
   if (c.k === 'goto') {
     const d = Math.hypot(c.x - p.x, c.y - p.y);
     if (d < (c.drop || 1.5 * PX_PER_M)) { if (!c.stay) { p.ai.cmd = null; return false; } if (!c.there) { c.there = true; c.until = game.time + c.stay; } checkAngles(game, p, dt); return true; }
