@@ -171,17 +171,17 @@ export const ICONS = {
   help: '<b>?</b>',
 };
 const HELP = () => [ // (a function: it follows the fire rings setting)
-  ...(fireRings() ? [['fire', 'SHOOT', 'Put a thumb down on the red ring round either stick, or just outside it: you shoot while it stays down. Drag on the right ring to aim while you shoot. A stick you are steering never shoots.'], ['ads', 'AIM IN', 'Tap the aim stick quickly (no drag) to aim in; tap again to aim out. It turns blue while aimed in.']]
+  ...(fireRings() ? [['fire', 'SHOOT', 'Thumb on a red ring: shoots while it stays down. Drag the right one to aim.'], ['ads', 'AIM IN', 'Quick tap on the aim stick: aim in (it goes blue). Again: out.']]
     : [['fire', 'FIRE', 'Shoot. Drag the right one to aim while you shoot.'], ['ads', 'AIM', 'The small button on each FIRE: tap to aim in, tap again to aim out.']]),
-  ['crouch', 'CROUCH', 'Tap to crouch. Hold to lie down. While sprinting: a slide.'], ['leanL', 'LEAN', 'Lean left or right round a corner: tap on, tap off.'],
+  ['crouch', 'CROUCH', 'Tap: crouch. Hold: lie down. Sprinting: slide.'], ['leanL', 'LEAN', 'Lean round a corner: tap on, tap off.'],
   ['reload', 'RELOAD', 'Reload your gun.'], ['swap', 'SWAP', 'Switch between your guns.'],
-  ['skill', 'SKILL', 'Your operator\'s ability. The number is how many are left.'], ['gadget', 'GADGET', 'Throw or place your gadget.'],
-  ['melee', 'MELEE', 'Knife hit. Breaks wooden boards.'], ['jump', 'JUMP', 'Hop onto furniture or over low cover (through windows too).'],
-  ['use', 'ACTION', 'Says what it will do: whatever the game is prompting (plant, defuse, revive, reinforce, open, climb, go through a window), otherwise PING what you aim at for your team. One tap does it (and keeps a hold going).'],
-  ['view', 'CAMS', 'Look through your team\'s cameras and drones (any drone of your own you drive). Tap again: back to your body.'], ['drone', 'DRONE', 'Attack: put out the drone you carry and drive it; none left: take back the one you have out. The number is how many you carry.'], ['sprint', 'SPRINT', fireRings() ? 'Double-tap the move stick and keep your thumb down; let go to stop. On a drone the crouch button sprints.' : 'Push the move stick past its edge. On a drone the crouch button sprints.'],
+  ['skill', 'SKILL', 'Your operator\'s ability (the number: how many left).'], ['gadget', 'GADGET', 'Throw or place your gadget.'],
+  ['melee', 'MELEE', 'Knife hit; breaks wooden boards.'], ['jump', 'JUMP', 'Hop onto furniture, over low cover or through windows.'],
+  ['use', 'ACTION', 'One tap: plant, defuse, revive, climb… what the game prompts; else a PING.'],
+  ['view', 'CAMS', 'Your team\'s cameras and drones. Again: back to your body.'], ['drone', 'DRONE', 'Put out and drive your drone (the number: how many you carry).'], ['sprint', 'SPRINT', fireRings() ? 'Double-tap and hold the move stick. On a drone: CROUCH.' : 'Push the move stick past its edge. On a drone the crouch button sprints.'],
   ['map', 'MAP', 'The map: tap it to ping a spot.'], ['score', 'SCORES', 'Who is up and who is down.'],
   ['prev', 'PREVIOUS / NEXT', 'Flip through cameras and drones.'], ['pause', 'PAUSE', 'The pause menu.'],
-  ['tiltc', 'LEVEL', 'Tilt to move: how you hold the phone now is level.'],
+  ['tiltc', 'LEVEL', 'Tilt to move: the way you hold it now is level.'],
 ];
 const N = 25; // (23 DRONE, 24 CAMS: he asked 2026-11-18)
 const held = new Array(N).fill(false), trig = { lt: 0, rt: 0 }, tc = { lt: 0, rt: 0 }; // tc: fingers on each trigger button
@@ -393,13 +393,17 @@ export function touchContext(c) {
 // main.js calls this every frame: show the controls only while playing (not in menus)
 export function setTouchVisible(on) {
   if (!isTouch) return;
-  on = on && !phonePad; // (playing a phone with a controller: no buttons on the screen)
+  // playing a phone with a controller: no buttons on the screen, but the same compact match layout (he found the HUD and
+  // kill feed huge until Lando touched the screen), laid out like a computer (html.padplay, style.css)
+  const inMatch = !!on; on = on && !phonePad;
+  document.documentElement.classList.toggle('padplay', inMatch && phonePad);
+  document.documentElement.classList.toggle('touchplay', inMatch);
   if (!ui) build();
   const upright = innerHeight > innerWidth;
   ui.querySelector('#tTurn').classList.toggle('hidden', !(on && upright));
   if (on === shown) return;
   if (on) { tiltLevel = null; ui.querySelector('[data-id="tiltc"]').classList.toggle('hidden', !tiltOn()); } // a match starts level
-  shown = on; ui.classList.toggle('hidden', !on); document.documentElement.classList.toggle('touchplay', on); keepAwake(on);
+  shown = on; ui.classList.toggle('hidden', !on); keepAwake(inMatch);
   if (!on) { releaseAll(); setAds(false); setUse(false); sprintLock = false; ls.x = ls.y = rs.x = rs.y = 0; held.fill(false); trig.lt = trig.rt = tc.lt = tc.rt = 0; for (const el of ui.querySelectorAll('.tbtn.on')) el.classList.remove('on'); }
 }
 // Menus and match text shrink to fit small screens (the game picture itself always fills the screen), times the

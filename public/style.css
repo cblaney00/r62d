@@ -1618,3 +1618,24 @@ html.touch #touchUI:not(.rings) .tbtn.t { margin-top: max(0px, calc(var(--st) - 
 /* PRO IDEAS (he asked 2026-11-18): section titles across the whole grid */
 #bkPage .bkGrid:has(h4.bkSec) { grid-auto-flow: row; } /* (no card jumping above a section title) */
 #bkPage .bkGrid h4.bkSec { grid-column: 1 / -1; margin: 8px 0 0; font: 800 max(13px, var(--mf)) var(--head); letter-spacing: 0.16em; color: var(--sage, #9db48a); }
+/* ---- Phone + controller (he asked 2026-11-18: Lando's HUD and kill feed were huge until he touched the screen, the chat
+   front and centre; health and gun on the bottom right). A phone played with a controller has html.touchplay (the
+   compact phone sizes above) AND html.padplay: no thumbs on the screen, so it is laid out like a computer. */
+html.touchplay.padplay #bl { top: auto; left: auto; right: 12px; bottom: 74px; width: 250px; text-align: right; }
+html.touchplay.padplay #bl #hpwrap { flex-direction: row-reverse; }
+html.touchplay.padplay #br, html.touch.padplay body:has(#status:not(:empty)) #br { top: auto; left: auto; right: 12px; bottom: 12px; text-align: right; }
+html.touchplay.padplay #allies { top: 64px; }
+html.touchplay.padplay #chat { top: auto; right: auto; left: 12px; bottom: 12px; text-align: left; width: 300px; }
+html.touchplay.padplay #prompt, html.touchplay.padplay #viewlabel, html.touchplay.padplay #tipNow { left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: 46%; margin: 0; }
+html.touchplay.padplay #prompt { bottom: 70px; } html.touchplay.padplay #viewlabel { bottom: 40px; } html.touchplay.padplay #tipNow { bottom: 12px; }
+/* touch play: chat small in the bottom left (his choice), just above the move stick's ring, last 2 lines */
+html.touchplay:not(.padplay) #chat, html.touchplay.firerings:not(.padplay) #chat { top: auto; right: auto; left: calc(96px / var(--hudz, 1)); text-align: left; width: 260px; transform: none;
+  bottom: calc(214px * var(--tz, 1) / var(--hudz, 1)); }
+/* the ? guide (he asked 2026-11-18: everything fits and looks good): 4 columns, short lines, never a scroll on a phone */
+#touchUI #tHelp { width: min(900px, 96vw); max-height: 94vh; padding: 10px 14px; }
+#touchUI #tHelp h3 { margin-bottom: 6px; }
+#touchUI #tHelp .thGrid { grid-template-columns: repeat(4, 1fr); gap: 6px 10px; }
+#touchUI #tHelp .thGrid > div { grid-template-columns: 28px 1fr; column-gap: 7px; align-items: start; }
+#touchUI #tHelp .thI { width: 28px; height: 28px; margin-top: 2px; } #touchUI #tHelp .thI svg { width: 17px; height: 17px; }
+#touchUI #tHelp small { line-height: 1.15; } #touchUI #tHelp p { margin-top: 6px; }
+html.touchplay:not(.padplay) #killfeed div:not(:nth-last-child(-n+3)) { display: none; } /* touch play: the last 3 kills, clear of the right thumb's buttons */
