@@ -137,3 +137,7 @@ His wishes so far:
   not once it has gone off or been damaged, never a teammate's (`PICKUP`, `pickTarget`, `pickUp` in game.js).
 - Sight shape (2026-11-18): rays on a map-fixed grid with edge finding, so the edges never shake as the view turns
   (`visionPolygon`); furniture stands up as its own picture's rectangle (`propBody`, look.js `solidOf`/`legsOf`).
+
+## Bots answering pings, calm fight camera (2026-11-18)
+- Every ping reaches the bots (`botPing` in server/bots.js): GO/HELP two come, HOLD one stays, WATCH one covers it (cmd `face`), ON MY WAY one comes along, ENEMY / a marked enemy goes to every bot as heard, DANGER calls off orders there, OPEN THIS a bot opens it (charge via `doBreach`, else knife; cmd `open`), a ping on an enemy camera/trap/drone gets it shot (`game.pingedEnt`). Answers ~3 in 4 times (shared/comms.js `ans*Ping` lines, Copper/Bronze `*Fun`).
+- Fight camera (main.js `st.fightK`, `FIGHT_HOLD`): while shooting / hit / bullets close, the view keeps its size and follows gently; the window climb-in camera finishes at once.
