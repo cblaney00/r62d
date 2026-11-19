@@ -38,6 +38,7 @@ going.** Every idea goes there (there is no other list), only his ideas.
 - Balance targets: attack 45–55% on every map; an operator is broken over 60% / bad under 40%.
 - GPU checks run in headless gamescope, never a window on his screen (docs/performance.md).
 - Releasing to Lando (the config pin) is never done from here; see ../CLAUDE.md.
+- Screen layout (he asked 2026-11-18/19): keep UI out of the middle of the screen and never stacked; short "what to do" notes go through main.js `addFeed` (one at a time, left above chat, softer for higher levels); on phones the camera hole is dodged piece by piece (touch.js `dodgeHole`), never by moving the whole screen.
 - He asked (2026-11-17): publish a GitHub release (`desktop/release.sh`, inside the vibe-web shell, as insideabush) after every finished version, so his phone app updates.
 
 ## Where the details are
