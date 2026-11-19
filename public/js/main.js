@@ -801,7 +801,7 @@ function runLoading(title, steps, mapId = null) {
     $('loadSub').textContent = M ? `${M.floors}  ·  ${M.desc}` : title === 'LOADING' ? 'TACTICAL BREACH  ·  5 VS 5' : '';
     $('loadKicker').textContent = M ? 'DEPLOYING TO' : '';
     if (M) { const bg = $('loadBg'); bg.innerHTML = ''; const c = mapThumb(mapId), cc = document.createElement('canvas'); cc.width = c.width; cc.height = c.height; cc.getContext('2d').drawImage(c, 0, 0); bg.appendChild(cc); }
-    if (fresh || !$('loadTip').textContent) $('loadTip').textContent = 'TIP  ' + tipText(TIPS[Math.floor(Math.random() * TIPS.length)]);
+    if (fresh || !$('loadTip').textContent) { const T = tipsNow(); $('loadTip').textContent = 'TIP  ' + tipText(T[Math.floor(Math.random() * T.length)]); }
     el.classList.remove('hidden');
     for (let i = 0; i < steps.length; i++) {
       loadSpan = [i / steps.length, (i + 1) / steps.length];
@@ -1461,7 +1461,7 @@ for (const b of $('botLevel').children) b.onclick = () => { audio.ui(); send({ t
 $('startBtn').onclick = () => { send({ t: 'lobby', a: 'start' }); };
 $('leaveBtn').onclick = () => { if (st.tutorial || st.free) return switchMatch(null); if (confirm('End the match for everyone and go back to the lobby?')) send({ t: 'lobby', a: 'end' }); };
 $('fsBtn').onclick = () => toggleFullscreen();
-$('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(musicVol()); $('muteBtn').textContent = st.muted ? '🔇' : '🔊'; };
+$('muteBtn').onclick = () => { st.muted = !st.muted; applyVol(); setMusicVolume(musicVol()); $('muteBtn').textContent = st.muted ? '🔇 Sound off' : '🔊 Sound'; }; // (a word like its neighbours: alone the icon looked like an empty button)
 function renderControls() {
   const L = id => keyName(bindsFor(id)[0]);
   const rows = [[`${L('up')}${L('left')}${L('down')}${L('right')}`, 'Move'], ['Mouse', 'Aim'], ['Left click', 'Shoot'], ['Right click', 'Aim down sights'],
@@ -2194,7 +2194,38 @@ function banner(text, sub, color) {
   const b = $('banner'); b.querySelector('.t').textContent = text; b.querySelector('.s').textContent = sub || '';
   b.querySelector('.t').style.color = color || ''; b.classList.add('show'); st.bannerT = performance.now() / 1000 + 3;
 }
-function addFeed(text) { const d = document.createElement('div'); d.textContent = text; $('feed').appendChild(d); setTimeout(() => d.remove(), 7000); }
+// The brief messages (he asked 2026-11-18: one place for short "what to do" notes, fading in and out, never stacked on
+// other UI; he chose the left side, above chat; grounding rather than obnoxious for experienced players, so how-to notes
+// show shorter and softer as your level rises, and warnings stay clear). One note at a time from a queue.
+const IMPORTANT = /EMP|lunge|blade|heartbeat|paint trap|DEFUSER|is down|can't|cannot|not allowed|wait/i;
+const brief = { q: [], cur: null, t: 0 };
+function addFeed(text, important = IMPORTANT.test(text)) {
+  if (!text || (brief.cur && brief.cur.text === text) || brief.q.some(m => m.text === text)) return; // (the same note isn't queued twice)
+  brief.q.push({ text, important });
+  while (brief.q.length > 3) { const i = brief.q.findIndex(m => !m.important); brief.q.splice(i >= 0 ? i : 0, 1); } // a pile-up: drop the oldest how-to note
+  if (!brief.cur) briefNext();
+}
+function briefLevel() { try { return levelFor(st.profile ? st.profile.xp || 0 : 0).level || 1; } catch { return 1; } }
+function briefNext() {
+  const box = $('feed'); if (!box) return;
+  const m = brief.q.shift(); brief.cur = m || null; box.textContent = ''; if (!m) return;
+  const lv = briefLevel(), calm = m.important ? 1 : lv >= 25 ? 0.55 : lv >= 10 ? 0.75 : 1; // experienced: shorter and softer
+  const d = document.createElement('div'); d.textContent = m.text; d.className = m.important ? 'imp' : ''; if (!m.important) d.style.setProperty('--bk', calm.toFixed(2));
+  const secs = Math.min(6, 2.4 + m.text.length * 0.035) * (m.important ? 1 : 0.6 + 0.4 * calm);
+  d.style.setProperty('--bt', secs.toFixed(2) + 's'); box.appendChild(d); briefPlace();
+  clearTimeout(brief.t); brief.t = setTimeout(briefNext, secs * 1000 + 120);
+}
+// above the chat: the strip sits just over the chat's visible lines (they grow upward), and the quick-match tip line
+// over that, so nothing ever covers anything else
+function briefPlace() {
+  const box = $('feed'), tip = $('tipNow'), chat = $('chatLog'); if (!box || !chat) return;
+  let top = Infinity; for (const d of chat.children) { if (getComputedStyle(d).display === 'none' || d.classList.contains('old') && !$('chat').classList.contains('open')) continue; top = Math.min(top, d.getBoundingClientRect().top); }
+  const cb = $('chat').getBoundingClientRect(), base = top === Infinity ? cb.bottom : top, par = box.offsetParent || $('ui'), pr = par.getBoundingClientRect(), k = pr.height / (par.offsetHeight || pr.height) || 1; // (the HUD may be drawn scaled)
+  let b = Math.round((pr.bottom - base + 8) / k); box.style.bottom = b + 'px';
+  const got = box.getBoundingClientRect().bottom; if (box.firstChild && Math.abs(got - (base - 8)) > 1) { b = Math.round(b + (got - (base - 8)) / k); box.style.bottom = b + 'px'; } // (measured: whatever offsets the HUD has)
+  if (tip) tip.style.bottom = (b + (box.firstChild ? box.firstChild.getBoundingClientRect().height / k + 6 : 0)) + 'px';
+}
+setInterval(() => { if (brief.cur || ($('tipNow') && !$('tipNow').classList.contains('hidden'))) briefPlace(); }, 300);
 // what killed you (he asked: fewer alert marks, more explanation, above all for an ability): shown while you are dead
 function deathCard(kc) {
   const c = causeOf(kc.w, kc.kop), K = OPERATORS[kc.kop], who = kc.self ? 'YOURSELF' : esc((kc.kn || 'Unknown').replace(/^\[\w+\] /, '')) + (K ? ` <span>· ${K.name}</span>` : '');
@@ -2892,7 +2923,7 @@ const WHEEL_CLAMP = 110;
 function openWheel(mouseHeld = false) {
   if (!st.id || st.tv || !playing() || menuOpen() || st.wheel) return;
   if (st.mapV) { const p = mapPoint(); if (!p) return; st.wheel = { sx: st.mapV.cx, sy: st.mapV.cy, x: p.x, y: p.y, map: true, dx: 0, dy: 0, t0: performance.now() }; }
-  else { if (!st.pred) return; const c = cursor(), w = screenToWorld(c.x, c.y); st.wheel = { sx: c.x, sy: c.y, x: w.x, y: w.y, dx: 0, dy: 0, t0: performance.now() }; }
+  else { if (!st.pred) return; const c = cursor(), w = screenToWorld(c.x, c.y), R = 130 * DPR; st.wheel = { sx: Math.max(R, Math.min(VW - R, c.x)), sy: Math.max(150 * DPR, Math.min(VH - R, c.y)), x: w.x, y: w.y, dx: 0, dy: 0, t0: performance.now() }; } // (the wheel itself stays clear of the score bar and the screen edges; the ping still lands where you aimed)
   st.wheelMouse = mouseHeld; audio.ui('hover');
 }
 function closeWheel(cancel) {
@@ -2922,8 +2953,8 @@ function mapBox(V) {
   let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; for (const r of m.rooms || []) if (r.fl === V.f) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
   if (x1 < 0) { x0 = F.gx; y0 = 0; x1 = F.gx + F.w; y1 = F.h; }
   x0 = Math.max(F.gx, x0 - 6); y0 = Math.max(0, y0 - 6); x1 = Math.min(F.gx + F.w, x1 + 6); y1 = Math.min(F.h, y1 + 6);
-  const w = x1 - x0, h = y1 - y0, k = Math.min(VW * 0.42 / w, VH * 0.66 / h), pw = Math.round(w * k), ph = Math.round(h * k);
-  return V.box = { f: V.f, VW, VH, x0, y0, w, h, k, pw, ph, px: Math.round(VW - pw - 125 * DPR), py: Math.round((VH - ph) / 2 - 8 * DPR) }; // (clear of the buttons and gadget list at the edges)
+  const w = x1 - x0, h = y1 - y0, k = Math.min(VW * 0.42 / w, VH * 0.58 / h), pw = Math.round(w * k), ph = Math.round(h * k);
+  return V.box = { f: V.f, VW, VH, x0, y0, w, h, k, pw, ph, px: Math.round(VW - pw - 160 * DPR), py: Math.round(Math.max((VH - ph) / 2 - 8 * DPR, 142 * DPR)) }; // (clear of the corner buttons on the right, the score and drone line at the top, the gadget list below: it touched them, review 2026-11-18)
 }
 function mapPoint() { const V = st.mapV, B = mapBox(V); if (V.cx < B.px || V.cy < B.py || V.cx > B.px + B.pw || V.cy > B.py + B.ph) return null; return { x: (B.x0 + (V.cx - B.px) / B.k) * CELL, y: (B.y0 + (V.cy - B.py) / B.k) * CELL }; }
 function mapTabAt(V, B) { const n = st.map.floors.length, w = 54 * DPR, h = 26 * DPR; if (V.cy < B.py - h - 4 * DPR || V.cy > B.py - 4 * DPR) return -1; const i = Math.floor((V.cx - B.px) / w); return i >= 0 && i < n ? i : -1; }
@@ -4097,6 +4128,7 @@ function beginnerHelp(s, me, mine, theirs) {
   const up = l => l.filter(p => p.a).length;
   setText($('leftCount').querySelector('.lcA b'), String(up(mine))); setText($('leftCount').querySelector('.lcE b'), String(up(theirs)));
   setHTML('tipNow', esc(tipNow(s, me, mine)).replace(/\[([^\]]+)\]/g, '<kbd>$1</kbd>'));
+  { const lv = briefLevel(), o = lv >= 25 ? '0.6' : lv >= 10 ? '0.8' : ''; if ($('tipNow').style.opacity !== o) $('tipNow').style.opacity = o; } // (experienced players: the tip stays, softer)
 }
 function tipNow(s, me, mine) {
   const K = id => '[' + label(id) + ']', side = me.tm, site = st.map.sites[s.site], prep = s.ph === PHASE.PREP;
@@ -4216,6 +4248,11 @@ function hud(s) {
       const ro = c.ow && c.ow !== me.id, who = ro ? `${ownerName(s, c.ow).toUpperCase()}'S ` : c.ow ? 'YOUR ' : '';
       vl = `${FEED_GROUPS[feedGroup(c)]} · ${who}${feedKind(c)} ${list.indexOf(c) + 1}/${list.length} · ${(roomAt(st.map, c.x, c.y) || 'outside').toUpperCase()} · ${ro || c.ty !== 'cam' ? 'WATCH ONLY' : 'MOUSE LOOK'} · ${label('leanL')} ${label('leanR')} SWITCH · CLICK PING${c.off || c.j ? ' · DISRUPTED' : ''}`;
     }
+  }
+  { // the long how-to line (keys and all) reads once, then folds to what you are looking at (he asked 2026-11-18: grounding, not
+    // obnoxious, for experienced players): after 6 s, or 2.5 s from level 10 up
+    const parts = vl.split(' · '), head = parts[0], t = performance.now() / 1000; if (head !== st.vlHead) { st.vlHead = head; st.vlT = t; }
+    if (parts.length > 3 && t - st.vlT > (briefLevel() >= 10 ? 2.5 : 6)) vl = parts.slice(0, me.ct === 'cam' ? 4 : 2).join(' · ');
   }
   setText('viewlabel', vl);
   camBar(s, me);
@@ -4423,11 +4460,12 @@ function camBar(s, me) {
   const list = list0.map((c, i) => [feedGroup(c), i, c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]); // grouped like the server's feeds() (he asked)
   const cur = me.ct === 'drone' ? me.did : me.fi;
   let n = 0, on = 0, lastG = -1;
+  const ownName = c => c.ow ? c.ow + '|' + c.ty + '|' + (c.tu ? 1 : 0) : null, tot = {}, seen = {}; for (const c of list) { const k = ownName(c); if (k) tot[k] = (tot[k] || 0) + 1; } // (two of the same, e.g. your two drones, get a number: both read MY DRONE)
   const html = list.map(c => {
     const g = feedGroup(c), head = g !== lastG ? `${lastG >= 0 ? '</div>' : ''}<div class="cgrp"><em>${FEED_GROUPS[g]}</em>` : ''; lastG = g;
     if (g === 1 && !on) { on = 1; n = 0; } // outdoor cameras count from 1 again
     const live = !def || c.hp > 0 || c.ty === 'bird', mine = c.ow === me.id;
-    const name = c.ow ? (mine ? 'MY ' : `${ownerName(s, c.ow).toUpperCase()}'S `) + (c.ty === 'cam' ? (c.tu ? 'TURRET' : 'STICKY') : c.ty === 'scope' ? 'SCOPE' : c.ty === 'bird' ? 'BIRD' : 'DRONE') : `CAM ${++n}`;
+    const name = c.ow ? (mine ? 'MY ' : `${ownerName(s, c.ow).toUpperCase()}'S `) + (c.ty === 'cam' ? (c.tu ? 'TURRET' : 'STICKY') : c.ty === 'scope' ? 'SCOPE' : c.ty === 'bird' ? 'BIRD' : 'DRONE') + (tot[ownName(c)] > 1 ? ' ' + (seen[ownName(c)] = (seen[ownName(c)] || 0) + 1) : '') : `CAM ${++n}`;
     return head + `<button data-id="${live ? c.id : ''}" class="${c.id === cur ? 'on' : ''} ${live ? '' : 'dead'}">${esc(name)}<small>${esc(c.oc !== undefined ? 'OUTSIDE · ' + ['EAST', 'SOUTH', 'WEST', 'NORTH'][((Math.round((c.wn || 0) / (Math.PI / 2)) % 4) + 4) % 4] + ' WALL' : (roomAt(st.map, c.x, c.y) || 'outside').toUpperCase())}${c.off || c.j ? ' · DISRUPTED' : ''}</small></button>`;
   }).join('') + (lastG >= 0 ? '</div>' : '');
   if (bar.innerHTML !== html) {
@@ -5119,7 +5157,9 @@ const TIPS = [
 ];
 const tipText = t => t.replace(/\{(\w+)\}/g, (_, id) => label(id)); // tips name your own keys
 let tipI = Math.floor(Math.random() * TIPS.length);
-const nextTip = () => { const el = $('tip'); el.textContent = tipText(TIPS[tipI++ % TIPS.length]); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; };
+// a phone has no keys or mouse: its tips leave out the ones that name them (he found 'aim them with the mouse' on his phone)
+function tipsNow() { const T = isTouch ? TIPS.filter(t => !/\{\w+\}|mouse|click|keyboard|\(F11/i.test(t)) : TIPS; return T.length ? T : TIPS; };
+const nextTip = () => { const el = $('tip'), T = tipsNow(); el.textContent = tipText(T[tipI++ % T.length]); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; };
 nextTip(); setInterval(nextTip, 8000);
 // every button: soft hover tick, click sound and a ripple from where you clicked
 let lastHover = 0;
@@ -5152,7 +5192,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset, scr: () => { const c = cursor(), p = tilt.project(c.x / DPR, c.y / DPR), q = w2s(st.pred.x, st.pred.y), o = tilt.project(q.x / DPR, q.y / DPR); return { x: Math.round(p.x - o.x), y: Math.round(p.y - o.y) }; } }; // scr: the crosshair on screen, CSS px from your character // for automated screenshot tests
+window.__r62d = { addFeed: t => addFeed(t), padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: rope3d.debug, r3q: rope3d.quality, PF, st, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset, scr: () => { const c = cursor(), p = tilt.project(c.x / DPR, c.y / DPR), q = w2s(st.pred.x, st.pred.y), o = tilt.project(q.x / DPR, q.y / DPR); return { x: Math.round(p.x - o.x), y: Math.round(p.y - o.y) }; } }; // scr: the crosshair on screen, CSS px from your character // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.

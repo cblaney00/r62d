@@ -23,7 +23,7 @@ ws.onopen = async () => {
     await call('browsingContext.setViewport', { context: ctx, viewport: { width: 1600, height: 900 } });
     for (const s of steps) {
       if (s.viewport) await call('browsingContext.setViewport', { context: ctx, viewport: { width: s.viewport[0], height: s.viewport[1] } });
-      if (s.url) await call('browsingContext.navigate', { context: ctx, url: s.url, wait: 'complete' });
+      if (s.url) for (let i = 0; ; i++) { try { await call('browsingContext.navigate', { context: ctx, url: s.url, wait: 'complete' }); break; } catch (e) { if (i > 4) throw e; await sleep(2000); } } // (the first load can be cut short; try again)
       if (s.js) {
         const r = await call('script.evaluate', { expression: s.js, target: { context: ctx }, awaitPromise: true, userActivation: !!s.act }); // act: as if the person clicked (e.g. screen recording needs that)
         if (r.result && r.result.value !== undefined) console.log('js ->', String(r.result.value).slice(0, 200000));

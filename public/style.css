@@ -193,8 +193,12 @@ input { font: 600 max(20px, var(--mf)) var(--head); padding: 10px 14px; backgrou
 #killfeed { position: absolute; top: 16px; right: 18px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; margin-top: 44px; }
 #killfeed div { background: var(--panel); padding: 4px 10px; font: 600 max(15px, var(--mf)) var(--head); letter-spacing: 0.03em; animation: fadeout 6s forwards; }
 #killfeed .a { color: var(--allyL, #8fc8ff); } #killfeed .e { color: var(--enemyL, #ffb27a); } #killfeed .w { color: var(--dim); margin: 0 8px; font-size: max(12px, var(--mf)); letter-spacing: 0.1em; }
-#feed { position: absolute; left: 18px; bottom: 140px; display: flex; flex-direction: column; gap: 3px; font: 600 max(14px, var(--mf)) var(--head); }
-#feed div { background: rgba(0,0,0,0.5); padding: 3px 8px; animation: fadeout 7s forwards; }
+/* the brief messages (he asked 2026-11-18): one at a time, on the left just above the chat (main.js briefPlace sets bottom), fading
+   in and out; how-to notes softer for experienced players (--bk), warnings (.imp) always clear */
+#feed { position: absolute; left: 18px; bottom: 230px; max-width: min(440px, 34vw); pointer-events: none; font: 600 max(14px, var(--mf)) var(--head); }
+#feed div { background: rgba(10,12,16,calc(0.62 * var(--bk, 1))); color: rgba(240,240,232,calc(0.45 + 0.55 * var(--bk, 1))); padding: 4px 10px; border-left: 3px solid rgba(157,180,138,calc(0.3 + 0.7 * var(--bk, 1))); text-shadow: 0 1px 2px #000; }
+#feed div.imp { border-left-color: var(--gold); color: #f4e6bf; background: rgba(10,12,16,0.7); }
+@keyframes briefIO { 0% { opacity: 0; transform: translateY(6px); } 8% { opacity: 1; transform: none; } 86% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes fadeout { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
 #bl { position: absolute; left: 18px; bottom: 18px; width: 340px; }
 #opname { font: 800 max(24px, var(--mf)) var(--head); letter-spacing: 0.12em; }
@@ -558,7 +562,7 @@ html.inapp .dlNav, html.touch .dlNav:not(.dlAnd), html.touch:not(.android) .dlAn
 
 /* in-game motion */
 #killfeed div { animation: slideL 0.25s both, fadeout 6s forwards; }
-#feed div { animation: rise 0.25s both, fadeout 7s forwards; }
+#feed div { animation: briefIO var(--bt, 4s) ease-out both; }
 #banner.show .t { animation: bannerIn 0.6s cubic-bezier(.2,.8,.2,1) both; }
 #countdown { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); font: 800 max(160px, var(--mf)) var(--head); color: #fff; text-shadow: 0 6px 40px rgba(0,0,0,0.8); pointer-events: none; }
 #countdown.go { animation: pop 0.9s ease-out forwards; }
@@ -1234,7 +1238,7 @@ html.tv canvas#game { cursor: default; }
 #leftCount > div { display: flex; flex-direction: column; align-items: center; } #leftCount b { font: 800 max(40px, var(--mf))/1 var(--head); text-shadow: 0 2px 6px #000; }
 #leftCount span { font: 700 max(11px, var(--mf)) var(--head); letter-spacing: 0.2em; color: #cfd6dc; text-shadow: 0 1px 3px #000; }
 #leftCount .lcA b { color: #6cc0ff; } #leftCount .lcE b { color: #ff9d5c; }
-#tipNow { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); max-width: min(760px, 80vw); text-align: center; pointer-events: none;
+#tipNow { position: absolute; bottom: 260px; left: 18px; max-width: min(440px, 34vw); text-align: left; pointer-events: none; transition: bottom 0.25s; /* (the quick-match tip: on the left with the brief messages, out of the middle of the screen) */
   font: 600 max(16px, var(--mf)) var(--body); color: #f4e6bf; background: rgba(10,12,16,0.62); border-left: 3px solid var(--gold); padding: 7px 14px; text-shadow: 0 1px 2px #000; }
 #tipNow.hidden { display: none; } #tipNow kbd { font: 700 max(13px, var(--mf)) var(--head); background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); padding: 0 5px; margin: 0 2px; color: #fff; }
 
@@ -1377,10 +1381,9 @@ html.touchplay #hud #killfeed { top: 66px; right: 10px; margin-top: 0; } html.to
 html.touchplay #chat { top: auto; left: auto; right: 10px; transform: none; text-align: right; width: 300px; font-size: max(11px, var(--mf));
   bottom: calc(282px * var(--tz, 1) / var(--hudz, 1)); } /* (just above the top row of the right thumb's buttons) */
 html.touchplay #chatLog div:not(:nth-last-child(-n+2)) { display: none; }
-html.touchplay #tipNow { bottom: 12px; left: 55%; max-width: 420px; font-size: max(13px, var(--mf)); padding: 6px 12px; }
+html.touchplay #tipNow { font-size: max(13px, var(--mf)); padding: 5px 10px; }
 html.touchplay #cambar { left: 47%; gap: 4px; } html.touchplay #cambar .cgrp { gap: 4px; } html.touchplay #cambar button { font-size: max(11px, var(--mf)); padding: 4px 8px; } html.touchplay #cambar button small { font-size: max(9px, var(--mf)); }
 html.touchplay #hud:has(#cambar:not(:empty)) #viewlabel { bottom: 92px; }
-html.touchplay #hud:has(#cambar:not(:empty)) #tipNow { bottom: 140px; }
 /* operator select + loadout on a phone: a slim header so the cards and the loadout get the height */
 html.touch #select { padding: 10px 18px 8px; gap: 8px; }
 html.touch .selhead { padding-bottom: 6px; align-items: center; }
@@ -1416,7 +1419,7 @@ html.touchplay #banner { top: 58%; } html.touchplay #banner .t { font-size: max(
 #selLoBody:has(canvas.selMap) { overflow: hidden; padding: 6px; }
 #siteChoice.lockd button { pointer-events: none; } #siteChoice.lockd button:not(.on) { opacity: 0.4; }
 #select.resel { z-index: 60; background: #07090c; } /* switching operator in preparation: over the match */
-html.touchplay #feed { left: 50%; bottom: auto; top: 184px; transform: translateX(-50%); align-items: center; } /* (short notes: under the compass, not on the left stick) */
+html.touchplay #feed, html.touchplay #tipNow { left: calc(96px / var(--hudz, 1)); max-width: 300px; } /* (phones: above the chat too, his choice) */
 html.touch #freeOps { inset: 0; } html.touch #freeOps .foHead { padding: 8px 14px; gap: 12px; } html.touch #freeOps .foHead h2 { font-size: max(20px, var(--mf)); } html.touch #freeOps .foHead span { font-size: max(12px, var(--mf)); }
 html.touch #freeOps .foOps button { min-height: 64px; } /* free play's panel on a phone: the whole screen, easy-to-tap operators */
 html.touch .op:hover, html.touch .op:hover canvas { transform: none; } /* (a mouse-hover zoom that stuck after a tap and cut the picture) */
@@ -1545,7 +1548,7 @@ html.touchplay.firerings:has(#touchUI [data-id="next"]:not(.hidden)) #chatLog di
    size that comes out at --minpx on the screen after the menus shrink to fit (--uiz), so the in-match HUD and the
    phone buttons keep their own sizes. tests/textsize.mjs lists any text that still ends up too small. */
 :root { --minpx: 12.5px; --minz: 0.6; --mf: 0px; }
-html.touch { --minpx: 12px; --minz: 0.5; }
+html.touch { --minpx: 12.2px; --minz: 0.5; } /* (12.2: the zoom is rounded to 3 places, so 12 came out a hair under) */
 #lobby, #splash > *, #select, #endscreen, .overlay > *, #settings, #pause, #quitDlg, #loading > *, #help, #conn, #freeOps, #tutInfo, .tutInfo {
   --mf: calc(var(--minpx) / max(var(--uiz, 1), var(--minz))); font-size: max(1em, var(--mf)); /* (text with no size of its own) */
 }
@@ -1607,7 +1610,7 @@ html.touch #prompt b, html.touch #winGo b, html.touch #gadgets b, html.touch #ti
    and the rounded corners (--asl.. from r62dApp.insets(), touch.js applyInsets). Phones keep at least 8 px clear. The
    game picture itself still fills the whole screen; only the HUD, menus and buttons move in. */
 :root { --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px); --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px); }
-html.touch { --sl: max(8px, env(safe-area-inset-left, 0px), var(--asl, 0px)); --sr: max(8px, env(safe-area-inset-right, 0px), var(--asr, 0px));
+html.touch { --sl: max(8px, var(--asl, 0px), var(--asr, 0px)); --sr: max(8px, var(--asl, 0px), var(--asr, 0px)); /* (left and right the same: the camera hole is dodged piece by piece, touch.js dodgeHole) */
   --st: max(8px, env(safe-area-inset-top, 0px), var(--ast, 0px)); --sb: max(8px, env(safe-area-inset-bottom, 0px), var(--asb, 0px)); }
 html.touch #ui { inset: var(--st) var(--sr) var(--sb) var(--sl); }
 /* the fire-ring layout places its pieces from the screen corners (touchlayout.js): a margin moves each in by the clear
@@ -1626,8 +1629,8 @@ html.touchplay.padplay #bl #hpwrap { flex-direction: row-reverse; }
 html.touchplay.padplay #br, html.touch.padplay body:has(#status:not(:empty)) #br { top: auto; left: auto; right: 12px; bottom: 12px; text-align: right; }
 html.touchplay.padplay #allies { top: 64px; }
 html.touchplay.padplay #chat { top: auto; right: auto; left: 12px; bottom: 12px; text-align: left; width: 300px; }
-html.touchplay.padplay #prompt, html.touchplay.padplay #viewlabel, html.touchplay.padplay #tipNow { left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: 46%; margin: 0; }
-html.touchplay.padplay #prompt { bottom: 70px; } html.touchplay.padplay #viewlabel { bottom: 40px; } html.touchplay.padplay #tipNow { bottom: 12px; }
+html.touchplay.padplay #prompt, html.touchplay.padplay #viewlabel { left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: 46%; margin: 0; }
+html.touchplay.padplay #prompt { bottom: 70px; } html.touchplay.padplay #viewlabel { bottom: 40px; }
 /* touch play: chat small in the bottom left (his choice), just above the move stick's ring, last 2 lines */
 html.touchplay:not(.padplay) #chat, html.touchplay.firerings:not(.padplay) #chat { top: auto; right: auto; left: calc(96px / var(--hudz, 1)); text-align: left; width: 260px; transform: none;
   bottom: calc(214px * var(--tz, 1) / var(--hudz, 1)); }
@@ -1639,3 +1642,20 @@ html.touchplay:not(.padplay) #chat, html.touchplay.firerings:not(.padplay) #chat
 #touchUI #tHelp .thI { width: 28px; height: 28px; margin-top: 2px; } #touchUI #tHelp .thI svg { width: 17px; height: 17px; }
 #touchUI #tHelp small { line-height: 1.15; } #touchUI #tHelp p { margin-top: 6px; }
 html.touchplay:not(.padplay) #killfeed div:not(:nth-last-child(-n+3)) { display: none; } /* touch play: the last 3 kills, clear of the right thumb's buttons */
+/* ---- Screen review (he asked 2026-11-18: a nitpicky pass, no fluff, just tightening) ---- */
+/* settings over the home menu: the big logo and the menu list stuck out round the panel; the rest of the screen dims */
+#settings:not(.hidden) { box-shadow: 0 0 0 100vmax rgba(4,6,9,0.72), 0 18px 60px rgba(0,0,0,0.6); }
+/* a tick box sits right beside its word (Far aim speed's On was far from its box) */
+#settings label.chk { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font: 600 max(14px, var(--mf)) var(--head); }
+#settings label.chk input { width: auto; margin: 0; accent-color: var(--sage, #9db48a); }
+/* free play's gun buttons: the dark guns all but vanished on the dark buttons; a lighter well behind them and a rim of light */
+#freeOps .foGuns button canvas { background: radial-gradient(ellipse at center, rgba(220,226,214,0.16), rgba(220,226,214,0) 70%); filter: brightness(1.35) drop-shadow(0 0 1px rgba(255,255,255,0.35)); }
+/* the settings panel is solid: on a phone the home menu's words showed faintly through it */
+html #settings { background-color: #0b0e13; }
+/* screen effects: a wall of solid gold ON chips shouted; on now reads as a lit sage chip, off as a dim one (his colour) */
+#settings #fxList .tog.on { background: rgba(157,180,138,0.2); color: #e9f1e1; border-color: rgba(157,180,138,0.75); box-shadow: inset 3px 0 0 var(--sage, #9db48a); }
+#settings #fxList .tog:not(.on) { background: rgba(255,255,255,0.03); color: #8b949c; border-color: rgba(255,255,255,0.1); }
+/* phone match room: the pinned footer is solid, so the team list scrolling under it doesn't show through */
+html.touch #room .roomFoot { background: #0a0d11; box-shadow: 0 -10px 14px rgba(10,13,17,0.9); }
+/* the controls list uses the width it has (on a phone it filled two thirds, with an empty strip on the right) */
+#tab-controls .controls { max-width: 1500px; }

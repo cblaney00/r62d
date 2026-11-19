@@ -236,14 +236,17 @@ public class MainActivity extends Activity {
     try {
       WindowInsets w = getWindow().getDecorView().getRootWindowInsets(); if (w == null) return;
       float d = getResources().getDisplayMetrics().density, l = 0, t = 0, r = 0, b = 0;
-      if (Build.VERSION.SDK_INT >= 28) { DisplayCutout c = w.getDisplayCutout(); if (c != null) { l = c.getSafeInsetLeft(); t = c.getSafeInsetTop(); r = c.getSafeInsetRight(); b = c.getSafeInsetBottom(); } }
+      // (he asked 2026-11-18: the whole screen moved away from the camera hole and looked lopsided; now the edges only keep
+      // clear of the rounded corners, and the hole itself goes to the page as a box, so only what would sit on it moves)
+      org.json.JSONArray holes = new org.json.JSONArray();
+      if (Build.VERSION.SDK_INT >= 28) { DisplayCutout c = w.getDisplayCutout(); if (c != null) for (android.graphics.Rect h : c.getBoundingRects()) holes.put(new JSONObject().put("x", h.left / d).put("y", h.top / d).put("w", h.width() / d).put("h", h.height() / d)); }
       if (Build.VERSION.SDK_INT >= 31) {
         RoundedCorner tl = w.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT), tr = w.getRoundedCorner(RoundedCorner.POSITION_TOP_RIGHT),
           bl = w.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT), br = w.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_RIGHT);
         float k = 0.3f, a = tl == null ? 0 : tl.getRadius() * k, e = tr == null ? 0 : tr.getRadius() * k, f = bl == null ? 0 : bl.getRadius() * k, g = br == null ? 0 : br.getRadius() * k;
         l = Math.max(l, Math.max(a, f)); r = Math.max(r, Math.max(e, g)); t = Math.max(t, Math.max(a, e)); b = Math.max(b, Math.max(f, g));
       }
-      String n = new JSONObject().put("l", l / d).put("t", t / d).put("r", r / d).put("b", b / d).toString();
+      String n = new JSONObject().put("l", l / d).put("t", t / d).put("r", r / d).put("b", b / d).put("holes", holes).toString();
       if (!n.equals(insets)) { insets = n; web.evaluateJavascript("window.onInsets && onInsets()", null); }
     } catch (Exception ex) {}
   }

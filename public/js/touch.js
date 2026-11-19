@@ -421,10 +421,47 @@ function fitUi() {
 }
 if (isTouch) document.documentElement.classList.add('touch');
 // the phone app's measured camera hole and rounded corners (style.css --sl..): page px to keep clear from each edge
+// The camera hole (he asked 2026-11-18, on his Flip 7: moving everything away from the hole made the screen lopsided; he
+// chose: use the whole screen and move only what would sit on the hole). The edges keep clear of the rounded corners
+// only (--as*, the same on both sides); the hole is a box: the phone app measures it (insets().holes), a browser only
+// tells how deep its strip is (env(safe-area-inset-left/right)), so there it is taken as a box in the middle of that
+// edge, where a phone's front camera sits when held sideways. dodgeHole slides any piece that would overlap it sideways,
+// just clear of it, and nothing else.
+let holes = [];
+const envProbe = (() => { if (!isTouch) return null; const d = document.createElement('div'); d.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)'; document.documentElement.appendChild(d); return d; })();
 function applyInsets() {
   let o = {}; try { if (window.r62dApp && window.r62dApp.insets) o = JSON.parse(window.r62dApp.insets()) || {}; } catch {}
   for (const k of ['l', 't', 'r', 'b']) document.documentElement.style.setProperty('--as' + k, Math.round(+o[k] || 0) + 'px');
+  const W = innerWidth, H = innerHeight;
+  if (Array.isArray(o.holes)) holes = o.holes.filter(h => h && h.w > 0 && h.h > 0 && h.w < W * 0.6 && h.h < H * 0.6);
+  else if (envProbe) { // a browser: the strip's depth only
+    const cs = getComputedStyle(envProbe), L = parseFloat(cs.paddingLeft) || 0, R = parseFloat(cs.paddingRight) || 0, box = (x, w) => { const h = w >= 40 ? H * 0.55 : w * 3; return { x, y: (H - h) / 2, w, h }; };
+    holes = []; if (L > 4) holes.push(box(0, L)); if (R > 4) holes.push(box(W - R, R));
+  }
+  if (window.__holeTest) holes = window.__holeTest; // (tests: a pretend hole)
+  dodgeHole();
 }
+const DODGE = '#hud > *, #touchUI > *, #touchUI .tbtn, #corner, #chat, #lobby > *, #select > *, #settings > *, #pause > *';
+function dodgeHole() {
+  if (!holes.length) { if (dodgeHole.on) { for (const el of document.querySelectorAll('[data-dodge]')) { el.style.translate = ''; if (el.dataset.pad0 !== undefined) { el.style.padding = el.dataset.pad0; delete el.dataset.pad0; } el.removeAttribute('data-dodge'); } dodgeHole.on = false; } return; }
+  dodgeHole.on = true;
+  const W = innerWidth;
+  const list = [...document.querySelectorAll(DODGE)];
+  for (let i = 0; i < list.length; i++) {
+    const el = list[i], dx0 = +(el.dataset.dodge || 0), r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
+    if (r.width > W * 0.6) { if ((el.__dd = (el.parentElement && el.parentElement.__dd || 0) + 1) <= 3 && holes.some(h => r.left <= h.x + h.w && r.right >= h.x && r.top <= h.y + h.h && r.bottom >= h.y)) list.push(...el.children); continue; } // a wide panel over the hole: its pieces move instead
+    const inFlow = ['static', 'relative'].includes(getComputedStyle(el).position), L = inFlow ? r.left : r.left - dx0, R = inFlow ? r.right : r.right - dx0; let dx = 0; // (a card in a menu grid stays in line: only what is in it moves clear, by padding)
+    for (const h of holes) {
+      const pad = 6; if (R <= h.x - pad || L >= h.x + h.w + pad || r.bottom <= h.y - pad || r.top >= h.y + h.h + pad) continue;
+      dx = h.x + h.w / 2 < W / 2 ? Math.max(dx, h.x + h.w + pad - L) : Math.min(dx, h.x - pad - R); // slide away from the edge the hole is on, just clear
+    }
+    if (dx === dx0) continue;
+    if (inFlow) { if (el.dataset.pad0 === undefined) el.dataset.pad0 = el.style.padding || ''; el.style.padding = el.dataset.pad0; if (dx) { const cs = getComputedStyle(el); if (dx > 0) el.style.paddingLeft = (parseFloat(cs.paddingLeft) + dx) + 'px'; else el.style.paddingRight = (parseFloat(cs.paddingRight) - dx) + 'px'; } }
+    else el.style.translate = dx ? `${Math.round(dx)}px 0` : '';
+    if (dx) el.dataset.dodge = dx; else { el.removeAttribute('data-dodge'); if (inFlow) { el.style.padding = el.dataset.pad0; delete el.dataset.pad0; } }
+  }
+}
+if (isTouch) setInterval(dodgeHole, 500);
 window.onInsets = applyInsets; applyInsets(); addEventListener('resize', () => setTimeout(applyInsets, 150));
 fitUi(); addEventListener('resize', fitUi);
 addEventListener('touchend', goFull, true); addEventListener('click', goFull, true);
