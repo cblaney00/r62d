@@ -893,6 +893,17 @@ function reconcile() {
 // ---------------- events from the server ----------------
 function mySide() { return st.me ? st.me.tm : null; }
 
+// A fight going on round you (he asked 2026-11-18: the view swung about while he shot someone just after climbing in):
+// your own shots, being hit, or shots passing or fired close by on your floor hold the camera still (st.fightK, frame)
+const FIGHT_HOLD = 2.5;
+function fightNear(e, now) {
+  if (!st.listen || st.tv) return;
+  if (e.id === st.id) { st.fightUntil = now + FIGHT_HOLD; return; }
+  if (!st.map) return;
+  const L = st.listen, lv = localPos(st.map, L.x, L.y), ls = localPos(st.map, e.x, e.y); if (ls.f !== lv.f) return;
+  const dx = e.x2 - e.x, dy = e.y2 - e.y, len2 = dx * dx + dy * dy || 1, tt = Math.max(0, Math.min(1, ((L.x - e.x) * dx + (L.y - e.y) * dy) / len2));
+  if (Math.hypot(e.x - L.x, e.y - L.y) < 12 * PX_PER_M || Math.hypot(e.x + dx * tt - L.x, e.y + dy * tt - L.y) < 8 * PX_PER_M) st.fightUntil = now + FIGHT_HOLD;
+}
 function onEvent(e, s, players) {
   const now = performance.now() / 1000;
   switch (e.e) {
@@ -907,6 +918,7 @@ function onEvent(e, s, players) {
       }
       if (an.lastShotSnd !== s.time) { if (!e.q) fx.muzzle(e.x, e.y, a); audio.gunshot(w ? e.w : 'AR', e.x, e.y, e.id === st.id, !!e.q); audio.casing(e.x, e.y, surfaceAt(e.x, e.y), w && w.cls === 'Shotgun'); an.lastShotSnd = s.time; }
       an.recoil = 1.6; if (!e.q) an.flashT = now; // a suppressor hides the flash
+      fightNear(e, now);
       if (e.k === 'hard') { fx.impact(e.x2, e.y2, 'hard', a); audio.impact(hardMat(e.x2, e.y2, a), e.x2, e.y2); }
       else if (e.k === 'prop') { fx.impact(e.x2, e.y2, 'prop', a); audio.impact(Math.random() < 0.5 ? 'wood' : 'metal', e.x2, e.y2); }
       // a bullet passing close to you cracks past your ear
@@ -960,7 +972,7 @@ function onEvent(e, s, players) {
     }
     case 'matchEnd': st.endT = now; st.mvp = e.mvp; showEnd(e.squad); break;
     case 'stun': if (st.me && e.id === st.me.id && !st.tv) { st.flashUntil = now + e.dur; audio.tinnitus(e.dur); } break;
-    case 'hurt': if (st.me && e.id === st.me.id) { st.hurtT = now; st.hurtFrom = e.from; } break;
+    case 'hurt': if (st.me && e.id === st.me.id) { st.hurtT = now; st.hurtFrom = e.from; st.fightUntil = now + FIGHT_HOLD; } break;
     case 'pts': if (e.to === st.id) { (st.ptsPops || (st.ptsPops = [])).push({ n: e.n, w: e.w, t: now }); if (st.ptsPops.length > 5) st.ptsPops.shift(); } break;
     case 'pingwait': if (e.to === st.id && performance.now() - (st.pingWaitT || 0) > 600) { st.pingWaitT = performance.now(); addFeed(`Ping ready in ${Math.ceil(e.t)} s`); audio.ui('back'); } break;
     case 'hitmark': if (e.to === st.id) { st.hitT = now; st.hitKill = e.kill; audio.ui(e.kill ? 'kill' : 'hit'); } break;
@@ -1921,11 +1933,12 @@ const swoopT = () => { const s = st.swoop; if (!s) return null; const T = perfor
 const sstep = s => s <= 0 ? 0 : s >= 1 ? 1 : s * s * (3 - 2 * s);
 function ropeCam(dt) {
   const f = ropeFace(); if (f != null) st.rtFace = f;
+  { const w0 = swoopT(); if (st.swoop && f == null && w0.T > w0.c && ((st.me && st.me.ad) || performance.now() / 1000 < (st.fightUntil || 0))) st.swoop.t0 -= dt * 3; } // through the window and aiming or shooting: the rise back up finishes four times quicker (he asked 2026-11-18)
   if (st.swoop && f == null) { const w = swoopT(), T = w.T;
     if (T < w.end) { const rise = sstep((T - w.hold) / SWOOP_RISE);
       st.rt = T < w.hold ? Math.max(st.rt || 0, 0.999) : 1 - rise;
       st.swoopZ = T < w.c ? sstep(T / w.c) : T < w.hold ? 1 : 1 - rise; return st.rt; }
-    st.swoop = null; st.rt = 0; st.swoopTail = performance.now() / 1000 + 1.6; } // (then the camera eases to its usual spot, no snap)
+    st.swoop = null; st.rt = 0; st.swoopTail = performance.now() / 1000 + 0.6; } // (then the camera eases to its usual spot, no snap)
   st.swoopZ = 0;
   const want = f != null ? 1 : 0; st.rt = st.rt || 0;
   st.rt += (want - st.rt) * (1 - Math.exp(-dt * (want ? 4.5 : 1.9))); if (st.rt < 0.002 && !want) st.rt = 0; // (letting go, or climbing in at a window, glides back slowly: he asked for smooth transitions in)
@@ -2496,6 +2509,10 @@ function frame(nowMs) {
   if (!st.tv) { scopeSway(dt, me, now); sendInput(dt, me, ctrl, view, s, now); }
 
   // --- camera ---
+  if (view && view.kind === 'body' && me && me.a && (mouse.l || keys.has('fire'))) st.fightUntil = now + FIGHT_HOLD; // pulling the trigger
+  { const on = !st.tv && view && view.kind === 'body' && now < (st.fightUntil || 0) ? 1 : 0; st.fightK = (st.fightK || 0) + (on - (st.fightK || 0)) * (1 - Math.exp(-dt * (on ? 14 : 1.5))); if (st.fightK < 0.003) st.fightK = 0; }
+  const fk = st.fightK; // (in a fight: one size, a gentle follow)
+  if (fk > 0.5 && st.swoopTail > now) st.swoopTail = Math.min(st.swoopTail, now + 0.25); // (just climbed in: the glide to the usual spot finishes now)
   let cx, cy;
   if (view) {
     cx = view.x; cy = view.y;
@@ -2512,7 +2529,7 @@ function frame(nowMs) {
       // ahead far enough that its far end is on screen (st.sightLead, worked out with the zoom below)
       const sl = st.sightLead || 0, al = Math.hypot(ax, ay);
       if (sl > al) { ax = Math.cos(view.ang) * sl; ay = Math.sin(view.ang) * sl; }
-      st.leadV = st.leadV || { x: ax, y: ay }; const kl = 1 - Math.exp(-dt * 2.4); // the lead swings round smoothly (and slowly) when you turn
+      st.leadV = st.leadV || { x: ax, y: ay }; const kl = 1 - Math.exp(-dt * (2.4 - 1.9 * fk)); // the lead swings round smoothly (and slowly) when you turn
       st.leadV.x += (ax - st.leadV.x) * kl; st.leadV.y += (ay - st.leadV.y) * kl;
       let lvx = st.leadV.x, lvy = st.leadV.y;
       if (isTouch) { const hw = vh * VW / VH * 0.16, hh = vh * 0.12; lvx = Math.max(-hw, Math.min(hw, lvx)); lvy = Math.max(-hh, Math.min(hh, lvy)); } // phone: you stay near the middle, clear of thumbs and panels
@@ -2544,9 +2561,9 @@ function frame(nowMs) {
   if ((st.swoopZ || 0) > 0 && st.rtFace != null) { const z = st.swoopZ, vh = st.viewH || 400, tx = st.pred.x + Math.cos(st.rtFace) * vh * 0.07, ty = st.pred.y + Math.sin(st.rtFace) * vh * 0.07; cx += (tx - cx) * z; cy += (ty - cy) * z; } // the swoop: the camera stays right on you as you go through
   const locked = camLocked(view);
   if (locked) { const t = lockedTarget(dt, view); cx = t.x; cy = t.y; }
-  const k = 1 - Math.exp(-dt * (st.swoopTail > performance.now() / 1000 ? 3.5 : 14)); // (just after the window swoop: a slow glide to the usual spot)
+  const k = 1 - Math.exp(-dt * (st.swoopTail > performance.now() / 1000 ? 3.5 : 14 - 8 * fk)); // (just after the window swoop: a slow glide to the usual spot)
   if (locked) { st.cam.x = cx; st.cam.y = cy; } else
-  if (Math.hypot(cx - st.cam.x, cy - st.cam.y) > 420 && !(st.swoopTail > performance.now() / 1000)) { st.cam.x = cx; st.cam.y = cy; if (view) st.leadV = null; } // spawned, new round: be there at once (not just after the window swoop: that glides)
+  if (Math.hypot(cx - st.cam.x, cy - st.cam.y) > (fk > 0.5 ? 900 : 420) && !(st.swoopTail > performance.now() / 1000)) { st.cam.x = cx; st.cam.y = cy; if (view) st.leadV = null; } // spawned, new round: be there at once (not just after the window swoop: that glides)
   st.cam.x += (cx - st.cam.x) * k; st.cam.y += (cy - st.cam.y) * k;
   if (view && view.kind !== 'body') { st.cam.x = cx; st.cam.y = cy; }
   // zoom: close in tight rooms, wider outside or when looking down a long sightline
@@ -2573,13 +2590,13 @@ function frame(nowMs) {
       // long view (he asked): further than 1.5x what the normal view reaches that way (the biggest room view, 470 tall)
       // opens the view right out; it closes again below 1.3x so it doesn't flicker at the edge
       const norm = Math.max(560, 470 * 2 * e - m1 - m2), sniper = me && me.ad && sniperOn(me);
-      st.longV = !st.tv && view.kind === 'body' && (sniper || st.farS > norm * (st.longV ? 1.3 : 1.5));
+      if (!(fk > 0.5) || sniper) st.longV = !st.tv && view.kind === 'body' && (sniper || st.farS > norm * (st.longV ? 1.3 : 1.5)); // (in a fight it stays as it was)
       want = Math.max(want, Math.min(st.tv ? 520 : st.longV ? LONG_H : 680, (st.farS + m1 + m2) / (2 * e))); // (TV: staring out over a yard shouldn't make a wide, empty shot)
       // outdoors (he asked 2026-11-18: it zoomed out too much there): long sightlines open the view only a little past the
       // biggest room view, unless a sniper scope is aimed in
       if (!st.tv && !sniper && !insideAt(view.x, view.y)) { want = Math.min(want, OUT_H); if (st.longV) { st.longV = false; } }
       const reach = (st.viewH || want) * e; // how far the screen reaches from its middle along your aim, right now
-      st.sightLead = Math.max(0, Math.min(reach - m1, st.farS - (reach - m2)));
+      if (!(fk > 0.5) || st.sightLead == null) st.sightLead = Math.max(0, Math.min(reach - m1, st.farS - (reach - m2))); // (in a fight it stays put)
     } else st.sightLead = 0;
   }
   // on a rope (he asked 2026-11-14: he still zoomed out aiming a room or two deep): the framing is a fixed size, not the
@@ -2591,9 +2608,10 @@ function frame(nowMs) {
   // view jump out and back), so a sightline you only pass over doesn't count
   const big = !st.envWant || Math.abs(want - st.envWant) > st.envWant * 0.15;
   st.envBigT = big ? (st.envBigT || 0) + dt : 0;
+  if (fk > 0.5 && view && view.kind === 'body') st.envBigT = 0; // in a fight the view keeps its size (he asked 2026-11-18)
   if (!st.envWant || (view && view.kind !== 'body') || st.envBigT >= ENV_HOLD) { st.envWant = want; st.envBigT = 0; }
   st.envH = st.envH || st.envWant;
-  st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * (view && view.kind === 'body' ? 3 : 6))); // a gentle glide, not a pump
+  st.envH += (st.envWant - st.envH) * (1 - Math.exp(-dt * (view && view.kind === 'body' ? 3 * (1 - fk) : 6))); // (in a fight it holds where it is) // a gentle glide, not a pump
   // aiming down sights widens the view, fast (he asked: it used to zoom in, the opposite of what you want); a 2x scope widest
   const adsZ = view && view.kind === 'body' && me && me.ad && !((st.rt || 0) > 0.5) ? (sniperOn(me) ? 1.5 : scopeOn(me) ? 1.3 : 1.12) : 1;
   st.adsZ = st.adsZ || 1;
@@ -2633,7 +2651,7 @@ function frame(nowMs) {
     const need = Math.min(FIT_MAX, fb * (1 - rtw));
     // out quickly; back in only once the smaller size has held for 0.5 s, and gently (he asked: on roofs the view pumped
     // in and out as the crosshair passed the edge, which threw the crosshair about on screen)
-    st.fitDown = need < (st.fitH || need) * 0.97 && !((st.rt || 0) > 0.02 && (st.rt || 0) < 0.98) ? (st.fitDown || 0) + dt : 0; // (never shrinks while the rope camera glides in or out)
+    st.fitDown = need < (st.fitH || need) * 0.97 && !(fk > 0.5) && !((st.rt || 0) > 0.02 && (st.rt || 0) < 0.98) ? (st.fitDown || 0) + dt : 0; // (never shrinks while the rope camera glides in or out)
     if ((st.rads || 0) > 0.05 && st.fitH) {} else // (aimed in on a rope: the size you had stays; aiming in never pulls the view back)
     st.fitH = !st.fitH ? need : need > st.fitH ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 8)) : st.fitDown > 0.5 ? st.fitH + (need - st.fitH) * (1 - Math.exp(-dt * 1.5)) : st.fitH;
     if (!locked) st.viewH = Math.max(st.viewH, st.fitH * (1 - ROPE_ADS * (st.rads || 0)));

@@ -6,6 +6,9 @@ Only ideas he asks for go in **To do** (added to the bottom). Claude never adds 
 
 ## To do
 
+- [ ] lets put more work into the bots' voice lines and their ability to respond to pings of all sorts
+- [ ] when there is shooting actively happening, the camera cannot be flying around like what just happened when i was trying to get that last kill that just happened
+- [ ] after the bot and camera items: a full, nitpicky review of every UI feature and control with every control and setting type: finish or redraw any picture that is incomplete or the wrong size, fix anything that throws off the balance of a frame (on his Flip 7 the screen looks lopsided since it moved away from the camera hole), be fussy about colour, textures and resolution, load things so nothing lags, no fluff, just tightening so there are no unexpected visual issues in the menus or in play; chat sizes right in every mode; UI kept out of the front of the screen and never stacked; brief "what to do" messages fading in and out in their own spot, grounding rather than obnoxious for experienced players (he chose 2026-11-18: full screen again, only dodge the camera hole; messages on the left above chat; hints shorter and softer as your level rises)
 
 ## Done
 - [x] (he asked 2026-11-18) update the ? menu so that everything fits and it looks good (DONE 2026-11-18: the phone's ? guide is now 4 columns with shorter lines, so every button fits on one screen with no scrolling, even on a small phone; he marked it done before trying it)
