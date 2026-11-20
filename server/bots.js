@@ -2954,8 +2954,8 @@ export function drillThink(game, p, dt) {
 
 // 1V1 small talk (he asked 2026-11-20: by personality, some more sociable than others, never annoying, not constant).
 // How chatty a bot is comes from its roster entry (`c` if set, else pushier = chattier, more patient = quieter, plus a
-// little of its own). It says at most one line a round, 20 s apart, 1 to 6 in a whole match by how chatty it is (the
-// quietest barely say anything), in all chat, and most say "gg" at the end.
+// little of its own). It says up to 1-3 lines a round by how chatty it is (he asked: 3 at most), always 20 s apart, and
+// 1 to 12 in a whole match (the quietest barely say anything), in all chat, and most say "gg" at the end.
 export function social(p) {
   if (p.pro) return 0.3 + 0.4 * ((p.persona && p.persona.aggr) ?? 0.5);
   const b = p.bio; if (!b) return 0.4;
@@ -2967,9 +2967,10 @@ function duelSay(game, p, cat, delay) {
   const s = social(p), gg = cat === 'ggWin' || cat === 'ggLose';
   if (!gg) {
     if (game.round === 1 && p.duelRd == null) p.duelAll = 0; // (a new match)
-    if (p.duelRd === game.round || (p.duelAll || 0) >= Math.round(1 + s * 5) || game.time - (p.duelT ?? -99) < 20) return;
+    if (p.duelRd !== game.round) { p.duelRd = game.round; p.duelN = 0; }
+    if (p.duelN >= 1 + Math.round(s * 2) || (p.duelAll || 0) >= Math.round(1 + s * 12) || game.time - (p.duelT ?? -99) < 20) return;
     if (Math.random() > Math.min(0.9, DUEL_ODDS[cat] * (s / 0.5) ** 1.5)) return;
-    p.duelRd = game.round; p.duelAll = (p.duelAll || 0) + 1;
+    p.duelN++; p.duelAll = (p.duelAll || 0) + 1;
   } else if (Math.random() > 0.3 + 0.6 * s) return;
   p.duelT = game.time + delay;
   const tone = !p.pro && lvlOf(game, p) <= 1 ? 'fun' : persona(p).aggr >= 0.6 ? 'cocky' : 'calm';
