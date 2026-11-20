@@ -597,7 +597,7 @@ export const ADS_START = { sniper: 64 }; // the sniper scope: as far as you can 
 export const adsStart = (sight, w) => { const g = WEAPONS[w]; return (ADS_OWN[w] ?? (g && ADS_GUN[g.cls]) ?? ADS_GUN.AR) * (ADS_SIGHT[sight] || 1); };
 // how far the crosshair can be pulled out from you, in metres, the same all the way round (he asked: a circle, bigger
 // with a stronger sight). Hip fire has the shortest reach; aiming in uses the sight's.
-export const AIM_REACH = { hip: 18, iron: 20, holo: 21, reddot: 23, prism: 36, scope: 44, sniper: 64 }; // he asked: the 1.5x, 2x and sniper further (were 28, 34, 48)
+export const AIM_REACH = { hip: 22, iron: 24, holo: 25, reddot: 28, prism: 43, scope: 53, sniper: 77 }; // he asked 2026-11-19: every reach +20% (were hip 18, iron 20, holo 21, reddot 23, prism 36, scope 44, sniper 64; before that 28, 34, 48)
 export const aimReach = (sight, ads) => (ads && AIM_REACH[sight]) || AIM_REACH.hip;
 export const attCode = a => [a.barrel, a.grip, a.sight, a.ammo || 'none'].join(',');
 export const attFromCode = s => { const [barrel, grip, sight, ammo = 'none'] = String(s || '').split(','); return { barrel, grip, sight, ammo }; };
