@@ -1518,7 +1518,7 @@ html.touchplay #cambar { top: calc(60px / var(--hudz, 1)); bottom: auto !importa
    a held stick covers its ring (the whole circle is stick) and never shoots. The aim stick turns blue while aimed in. */
 #touchUI.rings .tstick { width: 132px; height: 132px; } /* (he asked 2026-11-18: both sticks 10% bigger; were 120) */
 #touchUI.rings .tstick i { left: 38.5px; top: 38.5px; width: 55px; height: 55px; }
-#touchUI.rings #tsLeft { left: 34px; bottom: 34px; }
+#touchUI.rings #tsLeft { left: 74px; bottom: 66px; } /* = touchlayout.js LC minus the stick radius 66 */
 #touchUI.rings #tsRight { zoom: var(--tz, 1); right: 166px; bottom: 62px; opacity: 0.8; } /* (centre = touchlayout.js RC) */
 #touchUI.rings .tstick::before { content: ''; position: absolute; inset: -33px; border-radius: 50%; pointer-events: none;
   border: 31px solid rgba(200,52,40,0.26); box-shadow: inset 0 0 0 2px rgba(255,112,92,0.55), 0 0 0 2px rgba(255,112,92,0.55), 0 0 10px rgba(235,80,64,0.2);
@@ -1673,3 +1673,17 @@ html.touch #room .roomFoot { background: #0a0d11; box-shadow: 0 -10px 14px rgba(
 #tab-controls .controls { max-width: 1500px; }
 /* Esports TV: the casters' box stops short of the score bar's operator tiles (it covered the first ones on a 1280 screen) */
 html.tv:not(.tvsel) #tvCast { width: min(430px, 32vw, calc(50vw - 300px)); }
+/* (he asked 2026-11-20: no cut-off text anywhere, especially on phones; found by tests/textsize.mjs on every page) */
+#armList button .pic canvas { width: 100%; max-width: 160px; height: auto; aspect-ratio: 160 / 50; } /* (the picture made each gun card 4 px wider than the list) */
+#armList .armFolderHead { min-width: 0; white-space: normal; } #armList .armFolderHead b, #armList .armFolderHead span { min-width: 0; overflow-wrap: anywhere; }
+html.touch #armList .armFolderHead { letter-spacing: 0.06em; }
+.armTouch button { width: auto; min-width: 96px; padding: 0 12px; } .armTouch button.fire { width: 120px; }
+html.touch .mkLayers { grid-template-columns: 1fr; } /* (one column on phones: BREAKABLE WALLS didn't fit half the side bar) */
+#bkPage .pagehead { flex-wrap: wrap; row-gap: 6px; } #bkPage .bkTabs { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
+#bkPage .bkInfo { flex: 1 1 220px; min-width: 0; }
+/* names cut short with "…" or clipped now wrap onto a second line instead (he asked 2026-11-20) */
+#mapPick b, html.tv .tvCard b, #tvDraft .tdCard b, .rpWho, html.touchplay #objective small, html.touch #opgrid .op .nm, html.touch #opgrid .op .ab { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; }
+html.touch #roleBar.choose .rbOp em { white-space: normal; overflow: visible; letter-spacing: 0; overflow-wrap: anywhere; text-align: center; line-height: 1.05; }
+#freeOps .foOps b, #freeOps .foOps span { max-width: 100%; overflow-wrap: anywhere; } html.touch #freeOps .foOps b { letter-spacing: 0.02em; }
+html.touch #freeOps .foOps { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+html.touch .selLeft #opgrid .op canvas { min-height: 30%; } html.touch #opgrid .op .ab { line-height: 1.1; } /* (a skill name on two lines: the picture gives way, the card stays the same size) */

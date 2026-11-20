@@ -43,9 +43,9 @@ async function run() {
   for (const [w, h] of SIZES) {
     tag = `${mode}-${w}x${h}`;
     await call('browsingContext.setViewport', { context: ctx, viewport: { width: w, height: h } });
-    await call('browsingContext.navigate', { context: ctx, url, wait: 'complete' }); await sleep(1500);
+    try { await call('browsingContext.navigate', { context: ctx, url, wait: 'complete' }); } catch { await sleep(1500); } await sleep(1500);
     await js(`localStorage.setItem('r62d-name', 'Reader'); localStorage.removeItem('r62d-penv'); Element.prototype.requestFullscreen = () => Promise.reject(); true`);
-    await call('browsingContext.navigate', { context: ctx, url, wait: 'complete' }); await sleep(2500);
+    try { await call('browsingContext.navigate', { context: ctx, url, wait: 'complete' }); } catch { await sleep(1500); } await sleep(2500);
     await js(`Element.prototype.requestFullscreen = () => Promise.reject(); true`);
     await check('0-title');
     for (let i = 0; i < 6 && await js("!document.getElementById('splash').classList.contains('hidden')"); i++) { await js("document.getElementById('splash').click(); document.getElementById('splash').dispatchEvent(new MouseEvent('pointerdown', {bubbles: true})); true"); await sleep(1200); }
@@ -57,6 +57,14 @@ async function run() {
     await click('#setClose'); await sleep(300); await home();
     await click('[data-tab="profile"]'); await check('4-profile'); await click('#profilePage .close'); await sleep(400);
     await home(); await click('[data-tab="intel"]'); await sleep(300); await click('[data-tab="ops"]'); await check('4-operators'); await click('#opsPage .close'); await sleep(400);
+    // (he asked 2026-11-20: no cut-off text anywhere) the other pages too: ranked, every INTEL page and its tabs
+    await home(); await click('[data-tab="ranked"]'); await check('2-tab-ranked');
+    for (const [t, pg] of [['armory', 'armoryPage'], ['maps', 'mapsPage'], ['playbook', 'playbookPage'], ['knowledge', 'bkPage']]) {
+      await home(); await click('[data-tab="intel"]'); await sleep(300); await click(`[data-tab="${t}"]`); await sleep(1500); await check('4-' + t);
+      const tabs = await js(`[...document.querySelectorAll('#${pg} .pagehead button:not(.close), #${pg} .bkTabs button, #${pg} .pbTabs button')].filter(e => e.getClientRects().length).length`);
+      for (let i = 1; i < Math.min(tabs, 12); i++) { await js(`[...document.querySelectorAll('#${pg} .pagehead button:not(.close), #${pg} .bkTabs button, #${pg} .pbTabs button')].filter(e => e.getClientRects().length)[${i}]?.click(); true`); await sleep(500); await check('4-' + t + '-' + i); }
+      await click(`#${pg} .close`); await sleep(400);
+    }
     // free play: the operators / guns / god mode panel and the pause menu
     await home(); await click('[data-tab="free"]'); await sleep(300); await click('#freeGo');
     for (let i = 0; i < 30 && !(await js("!!document.getElementById('freeOpsBtn')")); i++) await sleep(500);
@@ -66,5 +74,9 @@ async function run() {
     await click('#freeOps .close'); await sleep(400);
     await js("window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' })); true"); await check('6-pause');
     await click('#pResume');
+    // in the match: the scoreboard, the map, the end screen
+    await js("window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Tab', key: 'Tab' })); true"); await check('7-scoreboard'); await js("window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Tab', key: 'Tab' })); true");
+    await js("window.dispatchEvent(new KeyboardEvent('keydown', { code: 'CapsLock', key: 'CapsLock' })); true"); await check('7-map'); await js("window.dispatchEvent(new KeyboardEvent('keydown', { code: 'CapsLock', key: 'CapsLock' })); true"); await sleep(300);
+    await js("__r62d.st.forceEnd = true; true"); await sleep(2500); await check('8-end'); await js("__r62d.st.forceEnd = false; true");
   }
 }

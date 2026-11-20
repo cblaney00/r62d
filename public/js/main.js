@@ -4244,7 +4244,7 @@ function hud(s) {
   const outName = () => { let b = null, bd = 25 * PX_PER_M; for (const sp of st.map.atkSpawns || []) { const d = Math.hypot(sp.x - st.pred.x, sp.y - st.pred.y); if (d < bd) { bd = d; b = sp.name; } } return b ? 'Outside · ' + b : 'Outside'; }; // outside: the nearest named area (the attackers' spawns)
   setHTML('objective', roomOn ? `${esc(obj)}<small>${esc(sub)}</small><span class="roomTag">${flName ? '<b class="flr">' + esc(flName) + '</b>' : ''}${esc(!where || where === 'Outside' ? outName() : where)}</span>`
     : `${esc(obj)}<small>${flName ? '<b class="flr">' + esc(flName) + '</b> ' : ''}${esc(sub)}${where ? ' · ' + esc(where) : ''}</small>`);
-  if (isTouch) { const ob = $('objective'), k = ob.innerHTML; if (k !== st.objK) { st.objK = k; requestAnimationFrame(() => { const b = ob.offsetHeight ? ob.offsetTop + ob.offsetHeight + 6 : 0; if (b) document.documentElement.style.setProperty('--objB', b + 'px'); }); } } // phones: the health block sits just under the box, however tall it is (measured only when it changes)
+  if (isTouch && !st.objRO && window.ResizeObserver) { const ob = $('objective'); st.objRO = new ResizeObserver(() => { const b = ob.offsetHeight ? ob.offsetTop + ob.offsetHeight + 6 : 0; if (b) document.documentElement.style.setProperty('--objB', b + 'px'); }); st.objRO.observe(ob); } // phones: the health block sits just under the box, however tall it is (re-measured whenever its size changes: its lines now wrap instead of being cut short, 2026-11-20)
   if (!me.a) {
     setHTML('opname', me.op ? `${OPERATORS[me.op].name}` : '');
     setText('hpnum', '—'); $('hpbar').firstElementChild.style.width = '0%';

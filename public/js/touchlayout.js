@@ -10,7 +10,7 @@
 const D = Math.PI / 180;
 export const STICK = { VR: 66, RING: 97, KNOB: 77 }; // (he asked 2026-11-18: both sticks 10% bigger; were 60, 88, 70) // stick radius, fire ring's outer radius, how far the knob travels while held
 const RC = { x: -232, y: -128 }; // (he asked 2026-11-18: buttons smaller, sticks the same, the middle of the screen more open: thinner bands, the aim stick 18 px nearer the corner) the aim stick's centre, from the bottom-right corner (style.css #touchUI.rings #tsRight)
-const LC = { x: 100, y: -100 }; // the move stick's resting centre, from the bottom-left corner (#tsLeft)
+const LC = { x: 140, y: -132 }; // the move stick's resting centre, from the bottom-left corner (#tsLeft) (he asked 2026-11-20: his thumb slid off the screen pushing it; was 100, -100: a full push now stops ~50 px from the left edge and ~45 px from the bottom, not ~20)
 const B1 = [103, 145], B2 = [149, 181], GAP = 4; // (moved out 9 px round the bigger sticks, 2026-11-18; were 94-136 and 140-172) // (were 94-150 and 156-196)
 const SPEC = [
   { id: 'crouch', at: 'br', c: RC, r: B1, a: [15, 55], is: 21 },
