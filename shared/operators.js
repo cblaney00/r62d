@@ -18,7 +18,7 @@ export const WEAPONS = {
   // above, a gun can change its class's handling: adsMul (time to aim), kickMul / swayMul (recoil), settle (s until
   // the next shot is exact again), fall (damage drop-off), burst (shots per click), quiet (built-in suppressor).
   rook:    { name: 'Rook Battle Rifle', cls: 'AR', dmg: 40, rpm: 540, mag: 20, reserve: 120, reload: 2.7, spread: 0.065, ads: 0.012, bloom: 0.016, auto: true, pellets: 1, range: 1300, len: 17,
-             pen: 0.62, adsMul: 1.15, kickMul: 1.8, swayMul: 0.7, fall: { from: 520, to: 900, min: 0.8 }, trait: 'Hits hard and keeps its damage far away, but kicks hard and holds only 20 rounds.' },
+             adsMul: 1.15, kickMul: 1.8, swayMul: 0.7, fall: { from: 520, to: 900, min: 0.8 }, trait: 'Hits hard and keeps its damage far away, but kicks hard and holds only 20 rounds.' },
   sabre:   { name: 'Sabre Bullpup', cls: 'AR', dmg: 28, rpm: 820, mag: 30, reserve: 180, reload: 2.9, spread: 0.055, ads: 0.016, bloom: 0.011, auto: true, pellets: 1, range: 1000, len: 12,
              adsMul: 0.8, kickMul: 0.85, swayMul: 1.3, trait: 'Short, quick to aim and fast-firing; slow to reload, and its spray wanders sideways.' },
   trident: { name: 'Trident Burst', cls: 'AR', dmg: 34, rpm: 900, mag: 30, reserve: 150, reload: 2.3, spread: 0.05, ads: 0.010, bloom: 0.010, auto: false, pellets: 1, range: 1150, len: 15,
@@ -32,7 +32,7 @@ export const WEAPONS = {
   tusk:    { name: 'Tusk Auto-12', cls: 'Shotgun', dmg: 18, rpm: 260, mag: 8, reserve: 48, reload: 3.4, spread: 0.15, ads: 0.11, bloom: 0, auto: false, pellets: 8, range: 520, len: 15, fall: { from: 110, to: 330, min: 0.2 }, choke: 1.8,
              kickMul: 0.7, settle: 0.3, trait: 'Semi-automatic: fires as fast as you click, but each blast is weaker and wider.' },
   anvil:   { name: 'Anvil Slug', cls: 'Shotgun', mode: 'pump-action', dmg: 66, rpm: 85, mag: 6, reserve: 36, reload: 3.2, spread: 0.07, ads: 0.008, bloom: 0.03, auto: false, pellets: 1, range: 900, len: 15,
-             pen: 0.6, kickMul: 1.3, fall: { from: 150, to: 500, min: 0.45 }, trait: 'One heavy slug: accurate, huge damage and smashes walls, but very slow to fire.' },
+             kickMul: 1.3, fall: { from: 150, to: 500, min: 0.45 }, trait: 'One heavy slug: accurate, huge damage and smashes walls, but very slow to fire.' },
   stub:    { name: 'Stub Sawn-off', cls: 'Shotgun', mode: 'double-barrel', dmg: 23, rpm: 300, mag: 2, reserve: 20, reload: 2.4, spread: 0.2, ads: 0.14, bloom: 0, auto: false, pellets: 9, range: 340, len: 9, choke: 1.9,
              fall: { from: 60, to: 250, min: 0.15 }, trait: 'A sidearm with two barrels: blow holes in walls and hatches, or end a fight at arm\'s length.' },
   ox:      { name: 'Ox Belt-Fed', cls: 'LMG', dmg: 33, /* (36 → 33, 2026-11-18: the pros' takes, 1.00 kills a round vs 0.71 for the other attack guns) */ rpm: 480, mag: 100, reserve: 100, reload: 6.0, spread: 0.10, ads: 0.022, bloom: 0.009, auto: true, pellets: 1, range: 1200, len: 18,
@@ -40,17 +40,17 @@ export const WEAPONS = {
   drummer: { name: 'Drummer LMG', cls: 'LMG', dmg: 21, rpm: 800, mag: 60, reserve: 180, reload: 3.6, spread: 0.085, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 1050, len: 16,
              adsMul: 0.8, kickMul: 0.8, swayMul: 1.5, trait: 'A light, fast-firing LMG that hoses a doorway: quick to aim and reload for its kind, but its soft bullets wander side to side.' },
   pike:    { name: 'Pike Bolt-Action', cls: 'DMR', mode: 'bolt-action', dmg: 112, rpm: 50, mag: 5, reserve: 30, reload: 3.2, spread: 0.09, ads: 0.002, bloom: 0.05, auto: false, pellets: 1, range: 1600, len: 20,
-             pen: 0.8, adsMul: 1.3, kickMul: 1.5, settle: 0.9, oneShot: true, trait: 'Aimed in through the sniper scope, one clean body shot drops anyone. A slow bolt between shots, slow to aim, hopeless from the hip; its scope glints at whoever it points at.' },
+             adsMul: 1.3, kickMul: 1.5, settle: 0.9, oneShot: true, trait: 'Aimed in through the sniper scope, one clean body shot drops anyone. A slow bolt between shots, slow to aim, hopeless from the hip; its scope glints at whoever it points at.' },
   // he asked: a sniper that feels more modern, tan, like a British L115 (our own design and name): a straight-pull bolt
   // that cycles fast, quicker to aim, a big muzzle brake that tames the kick but is loud. Still one shot to the body.
   saker:   { name: 'Saker LR', cls: 'DMR', mode: 'straight-pull', dmg: 120, rpm: 72, mag: 5, reserve: 30, reload: 2.9, spread: 0.09, ads: 0.0018, bloom: 0.05, auto: false, pellets: 1, range: 1700, len: 21,
-             pen: 0.7, adsMul: 1.15, kickMul: 1.15, settle: 0.75, oneShot: true, trait: 'Modern long-range rifle: aimed in through the sniper scope, one clean body shot drops anyone, and the straight-pull bolt is back on target faster than the Pike. Thinner walls stop more of it; loud, and its scope glints.' },
+             adsMul: 1.15, kickMul: 1.15, settle: 0.75, oneShot: true, trait: 'Modern long-range rifle: aimed in through the sniper scope, one clean body shot drops anyone, and the straight-pull bolt is back on target faster than the Pike. Thinner walls stop more of it; loud, and its scope glints.' },
   heron:   { name: 'Heron Marksman', cls: 'DMR', dmg: 44, rpm: 480, mag: 20, reserve: 100, reload: 2.4, spread: 0.055, ads: 0.007, bloom: 0.014, auto: false, pellets: 1, range: 1200, len: 16,
              adsMul: 0.85, kickMul: 0.7, settle: 0.4, trait: 'A quick-firing marksman rifle with light recoil: three fast hits drop anyone.' },
   gnat:    { name: 'Gnat Machine Pistol', cls: 'MP', dmg: 17, rpm: 1050, mag: 20, reserve: 100, reload: 1.7, spread: 0.09, ads: 0.035, bloom: 0.011, auto: true, pellets: 1, range: 700, len: 7,
              kickMul: 1.2, swayMul: 1.4, fall: { from: 200, to: 450, min: 0.55 }, trait: 'A full-auto sidearm: 20 rounds gone in about a second, fierce recoil.' },
   bison:   { name: 'Bison Revolver', cls: 'Pistol', dmg: 64, rpm: 130, mag: 6, reserve: 30, reload: 3.0, spread: 0.05, ads: 0.006, bloom: 0.05, auto: false, pellets: 1, range: 1000, len: 9,
-             pen: 0.55, kickMul: 1.8, settle: 0.6, fall: { from: 400, to: 700, min: 0.8 }, trait: 'Two body shots drop anyone. Six rounds, slow to fire and reload, very accurate.' },
+             kickMul: 1.8, settle: 0.6, fall: { from: 400, to: 700, min: 0.8 }, trait: 'Two body shots drop anyone. Six rounds, slow to fire and reload, very accurate.' },
   // he asked for side-specific weapons (no gun on both sides), so attack and defence each got the guns they were missing
   javelin: { name: 'Javelin SMG', cls: 'SMG', dmg: 25, rpm: 800, mag: 30, reserve: 180, reload: 2.2, spread: 0.065, ads: 0.019, bloom: 0.010, auto: true, pellets: 1, range: 950, len: 12,
              adsMul: 0.85, fall: { from: 320, to: 620, min: 0.65 }, trait: 'The attackers\' SMG: quick to aim, steady, good on the move.' },
@@ -74,10 +74,10 @@ export const WEAPONS = {
   ferret:  { name: 'Ferret SMG', cls: 'SMG', dmg: 23, rpm: 820, mag: 32, reserve: 160, reload: 2.1, spread: 0.06, ads: 0.024, bloom: 0.011, auto: true, pellets: 1, range: 850, len: 11,
              hipMul: 0.55, raise: 0.08, adsMul: 1.25, fall: { from: 260, to: 520, min: 0.6 }, trait: 'Built for hip fire on the move: by far the tightest hip spray and up the instant a sprint ends, but slow to aim in and its aimed shots are no better than any SMG.' },
   auger:   { name: 'Auger AP SMG', cls: 'SMG', dmg: 24, rpm: 620, mag: 35, reserve: 140, reload: 2.4, spread: 0.07, ads: 0.019, bloom: 0.010, auto: true, pellets: 1, range: 950, len: 13,
-             pen: 0.68, kickMul: 1.05, swayMul: 0.8, fall: { from: 300, to: 620, min: 0.7 }, trait: 'Armour-piercing rounds: loses barely anything through soft walls and barricades (as much as a marksman rifle), but fires slowly for an SMG.' },
+             kickMul: 1.05, swayMul: 0.8, fall: { from: 300, to: 620, min: 0.7 }, trait: 'Armour-piercing rounds: loses barely anything through soft walls and barricades (as much as a marksman rifle), but fires slowly for an SMG.' },
   // shotguns
   quill:   { name: 'Quill Flechette', cls: 'Shotgun', dmg: 32, rpm: 150, mag: 6, reserve: 36, reload: 3.0, spread: 0.06, ads: 0.035, bloom: 0, auto: false, pellets: 4, range: 800, len: 15, choke: 1.2,
-             pen: 0.55, kickMul: 0.9, fall: { from: 200, to: 560, min: 0.4 }, trait: 'Four steel darts instead of buckshot: a tight pattern that reaches two rooms and pierces walls, but each blast holds few darts, so a miss is a miss.' },
+             kickMul: 0.9, fall: { from: 200, to: 560, min: 0.4 }, trait: 'Four steel darts instead of buckshot: a tight pattern that reaches two rooms and pierces walls, but each blast holds few darts, so a miss is a miss.' },
   hedge:   { name: 'Hedge Lever-12', cls: 'Shotgun', mode: 'lever-action', dmg: 22, rpm: 120, mag: 5, reserve: 35, reload: 2.8, spread: 0.14, ads: 0.1, bloom: 0, auto: false, pellets: 8, range: 560, len: 13, fall: { from: 130, to: 380, min: 0.25 }, choke: 2,
              stagger: 0.7, adsMul: 0.75, kickMul: 1.1, trait: 'Quick to the shoulder, and anyone its pellets hit is knocked off balance: slowed for a moment. Five shells, and the lever takes time.' },
   // light machine guns
@@ -89,7 +89,7 @@ export const WEAPONS = {
   ranger:  { name: 'Ranger Lever Rifle', cls: 'DMR', mode: 'lever-action', dmg: 82, rpm: 115, mag: 7, reserve: 42, reload: 3.0, spread: 0.05, ads: 0.004, bloom: 0.03, auto: false, pellets: 1, range: 1250, len: 15,
              adsMul: 0.7, kickMul: 1.25, settle: 0.45, trait: 'A short lever-action that aims in as fast as an SMG: two body hits from point blank to across the map, but slow between shots.' },
   mammoth: { name: 'Mammoth .50', cls: 'DMR', mode: 'bolt-action', dmg: 135, rpm: 40, mag: 3, reserve: 18, reload: 3.8, spread: 0.11, ads: 0.0016, bloom: 0.06, auto: false, pellets: 1, range: 1900, len: 23,
-             pen: 0.9, adsMul: 1.5, kickMul: 1.8, settle: 1.1, oneShot: true, wallShot: 1, trait: 'Anti-materiel rifle: aimed in through the sniper scope, one body hit drops anyone even through one soft wall. Three rounds, the slowest bolt and aim of all, deafening, and its scope glints.' },
+             adsMul: 1.5, kickMul: 1.8, settle: 1.1, oneShot: true, wallShot: 1, trait: 'Anti-materiel rifle: aimed in through the sniper scope, one body hit drops anyone even through one soft wall. Three rounds, the slowest bolt and aim of all, deafening, and its scope glints.' },
   // pistols
   needle:  { name: 'Needle Target Pistol', cls: 'Pistol', dmg: 31, rpm: 300, mag: 10, reserve: 50, reload: 1.9, spread: 0.035, ads: 0.004, bloom: 0.01, auto: false, pellets: 1, range: 1200, len: 9,
              settle: 0.12, kickMul: 0.5, fall: { from: 700, to: 1100, min: 0.85 }, trait: 'A long-slide match pistol: almost no kick, exact again at once and full damage to rifle range, but it fires slowly for a pistol.' },
@@ -724,7 +724,28 @@ export const PEN = { AR: 0.5, LMG: 0.62, DMR: 0.68, SMG: 0.4, MP: 0.35, Pistol: 
 // how a gun changes your walking (Shift) and aiming-in speed (he asked): light guns move quicker, heavy ones slower
 export const GUN_MOVE = { Pistol: [1.08, 1.12], MP: [1.05, 1.08], SMG: [1.0, 1.0], Shotgun: [0.97, 0.95], AR: [0.95, 0.92], DMR: [0.92, 0.85], LMG: [0.88, 0.8] };
 export const moveOf = w => (w && (w.move || GUN_MOVE[w.cls])) || [1, 1];
-export const penOf = w => w.pen || PEN[w.cls] || 0.5;
+// Bullet penetration by gun (he asked 2026-11-20: every gun its own, fitting its calibre and job, a lever to nerf and buff
+// guns, on the stat card). pen = share of the damage left after one plain soft wall (each wall after takes the same share
+// again), walls = how many walls / boards it gets through at all, brick = what a brick wall leaves of that (a plain wall:
+// 1). Small fast rounds and buckshot lose most; battle-rifle, belt-fed, marksman and armour-piercing rounds keep most.
+// Furniture follows pen too (furnPen). Researched: R6 (calibre decides how well a gun breaks and goes through walls; its
+// patches tune damage, magazine, recoil and aim-in time) and CS2 (penetration power by weapon: pistols / SMGs / shotguns
+// lowest, rifles twice that, snipers most). docs/balance.md "Penetration".
+export const PEN_GUN = {
+  p10: [0.38, 1, 0.5], sparrow: [0.3, 1, 0.45], needle: [0.42, 1, 0.55], couplet: [0.32, 1, 0.45], vex50: [0.6, 2, 0.75], bison: [0.62, 2, 0.75], surge: [0.4, 1, 0.7],
+  hornet: [0.3, 1, 0.5], gnat: [0.25, 1, 0.45], whisper: [0.22, 1, 0.4], hatchet: [0.42, 1, 0.6],
+  wasp: [0.28, 1, 0.45], marten: [0.4, 1, 0.55], lark: [0.5, 2, 0.6], javelin: [0.38, 1, 0.55], ferret: [0.34, 1, 0.5], auger: [0.7, 3, 0.75],
+  k4: [0.5, 2, 0.7], rook: [0.66, 3, 0.8], sabre: [0.45, 2, 0.65], trident: [0.48, 2, 0.7], sentry: [0.55, 2, 0.7], verdict: [0.52, 2, 0.75], tandem: [0.5, 2, 0.7],
+  mule: [0.6, 3, 0.75], ox: [0.7, 3, 0.85], drummer: [0.5, 2, 0.65], cyclone: [0.45, 2, 0.6], trestle: [0.64, 3, 0.8],
+  longbow: [0.72, 3, 0.85], heron: [0.6, 2, 0.75], ranger: [0.62, 2, 0.8], pike: [0.8, 4, 0.9], saker: [0.68, 3, 0.8], mammoth: [0.9, 4, 0.95],
+  breaker: [0.28, 1, 0.35], tusk: [0.22, 1, 0.3], stub: [0.25, 1, 0.3], hedge: [0.26, 1, 0.35], anvil: [0.62, 2, 0.8], quill: [0.58, 2, 0.6],
+};
+const PEN_CLS = { AR: [0.5, 2, 0.7], LMG: [0.6, 3, 0.75], DMR: [0.68, 3, 0.85], SMG: [0.38, 1, 0.55], MP: [0.3, 1, 0.5], Pistol: [0.38, 1, 0.5], Shotgun: [0.26, 1, 0.35] };
+const penRow = w => (w && PEN_GUN[w.id]) || PEN_CLS[w && w.cls] || PEN_CLS.AR;
+export const penOf = w => penRow(w)[0];
+export const penWalls = w => penRow(w)[1];
+export const penBrick = w => penRow(w)[2];
+export const furnPen = (w, keep) => keep >= 1 ? 1 : Math.pow(keep, Math.max(0.6, Math.min(2, 0.5 / penOf(w)))); // a piece of furniture that leaves keep (0-1) of an ordinary bullet
 // how "hot" the gun still is: the shots of this burst, cooling to 0 over the settle time (fractions make a smaller cone)
 export const aimHeat = (w, shots, idle, m) => shots * Math.max(0, 1 - Math.max(0, idle - 60 / w.rpm * 1.05) / (settleTime(w) * (m && m.settle || 1)));
 // half-width of the cone (radians) for the next shot; shots = shots already fired in this burst

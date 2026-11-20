@@ -165,5 +165,10 @@ export const PATCH_NOTES = [
   { d: '2026-11-20', k: 'map', id: 'smallmaps', t: 'Two new small maps, made for 1v1s and in the normal rotation too: Maple Street House (a two-storey family home) and Lakeside Cabin (a timber cabin with a loft over the great room and a boathouse).', v: 0 },
   { d: '2026-11-20', k: 'mech', id: 'duel', t: 'New fun mode 1V1: one a side on the small maps, first to 4, sides swap every round, each player bans one operator before every round. Two wall reinforcements a defender (10 for five, 2 alone).', v: 0 },
   { d: '2026-11-20', k: 'mech', id: 'phonechat', t: 'Phones no longer show bot chatter, except in Esports TV.', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'pengun', t: 'Bullet penetration is now each gun\'s own: how much damage gets through a wall, how many walls, how much brick stops it. Buckshot, machine pistols and light SMGs lose most; battle rifles, belt-fed LMGs, marksman rifles, armour-piercing rounds and snipers keep most. Shown on the Armory card.', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'bomb35', t: 'The planted defuser counts down 35 s (was 45): attack won 41% of bot rounds before, 50% after.', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'defsound', t: 'The planted defuser chirps loud enough to hear all through the building and outside, quicker near the end; planting and disabling it are heard from the next rooms.', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'duelban', t: '1V1: no clock on your ban, and a NO BAN button.', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'invwalls', t: 'Fixed invisible solid furniture: sideways TVs, crate piles bigger than 2 x 2, rows of chairs and swings are now drawn over all the space they block.', v: 0 },
   { d: '2026-11-20', k: 'mech', id: 'duelchat', t: '1V1: the bot opponent now and then says something to you in all chat, in its own way: the chattiest up to three lines a round, never two within 20 s, quiet ones barely at all, most say gg at the end.', v: 0 },
 ];

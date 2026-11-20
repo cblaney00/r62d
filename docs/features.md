@@ -144,3 +144,9 @@ His wishes so far:
 
 ## 1V1 and the small maps (2026-11-20)
 - Fun mode `duel` (shared/modes.js: size 1, small maps only, first to 4, swap every round, `bans: 'round'`), new maps Maple Street House (`house`) and Lakeside Cabin (`cabin`), `small: true`, also in 5v5. Phones hide bot chat outside Esports TV (main.js `addChat`, chat messages carry `bot`). All details, tests and the playtest: docs/1v1.md.
+
+## Room line, penetration by gun, defuser sounds (2026-11-20)
+- Room you are in: the objective box's last line (floor + room; outside the nearest attacker spawn's name), main.js objective block; Settings → Screen → "Room you are in" (`fxOn('room')`). Phones: `#bl` sits under the box (`--objB`). He asked: any UI change must work for every control type, similar spots everywhere.
+- Bullet penetration by gun: shared/operators.js `PEN_GUN` [damage kept per wall, walls it passes, brick share]; server hitscan; Armory card rows "Wall penetration", "Max walls", note line and "Hits through a wall". Details and the nerf/buff levers: docs/balance.md "Penetration".
+- Defuser: countdown 35 s (`DUR.bomb`); planted chirp (audio.js `defuserAlarm`) heard through the building and outside; `arming` / `disarming` sounds while planting / disabling.
+- 1V1: no ban clock for a person, NO BAN button (`.bpNone`).

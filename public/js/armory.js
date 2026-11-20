@@ -6,7 +6,7 @@
 import { PX_PER_M } from '/shared/constants.js';
 import { drawReticle, drawSightLook, magnify, lensPt, lensMag, drawFastRing } from './crosshair.js';
 import { lockMouse } from './keys.js';
-import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, mainPellet, aimedDamage, shotOffset, recoilStep, recoilMax, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart } from '/shared/operators.js';
+import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, mainPellet, aimedDamage, shotOffset, recoilStep, recoilMax, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart, penOf, penWalls, penBrick } from '/shared/operators.js';
 import { drawTrail, TRAIL_LIFE } from './fx.js';
 import { gunPicture } from './gunart.js';
 import { drawOperator } from './sprites.js';
@@ -388,6 +388,8 @@ function stats(el) {
   const w = WEAPONS[S.w], m = modsOf(S.w), a = attOf(S.w), opts = attachFor(S.w), d = S.dist * M, f = fallAt(w, d, m.range) * m.dmg;
   const stk = hp => Math.ceil(hp / (w.pellets > 1 ? Math.max(1, aimedDamage(w, S.dist) * m.dmg) : w.dmg * f)); // a shotgun: the pellets that really land at this distance
   const ttk = hp => ((stk(hp) - 1) * 60 / w.rpm).toFixed(2);
+  const pn = penOf(w), pw = penWalls(w), pb = penBrick(w), pct = v => Math.round(v * 100) + '%';
+  const stkW = hp => Math.ceil(hp / Math.max(0.01, (w.pellets > 1 ? Math.max(1, aimedDamage(w, S.dist) * m.dmg) : w.dmg * f) * pn)); // through one plain wall
   const fo = falloffOf(w), rk = recoilOf(w).kick * ((SPRAY[w.id] || {}).k || 1);
   const bar = (v, max) => `<i style="width:${Math.min(100, v / max * 100)}%"></i>`;
   el.querySelector('#armStats').innerHTML = `
@@ -401,14 +403,18 @@ function stats(el) {
     <div class="sbar"><span>Hip accuracy</span><b>${(1 / (w.spread * m.hip)).toFixed(0)}</b><em>${bar(0.2 - w.spread * m.hip, 0.18)}</em></div>
     <div class="sbar"><span>Aimed accuracy</span><b>${(1 / (w.ads * m.adsSpread)).toFixed(0)}</b><em>${bar(0.12 - w.ads * m.adsSpread, 0.12)}</em></div>
     <div class="sbar"><span>Aim-in time</span><b>${(adsTime(w) * m.ads).toFixed(2)}s</b><em>${bar(0.6 - adsTime(w) * m.ads, 0.5)}</em></div>
+    <div class="sbar"><span>Wall penetration</span><b>${pct(pn)}</b><em>${bar(pn, 0.9)}</em></div>
+    <div class="sbar"><span>Max walls</span><b>${pw}</b><em>${bar(pw, 4)}</em></div>
     <div class="sbar"><span>Recoil</span><b>${(rk * m.kick * 1000).toFixed(0)}</b><em>${bar(rk * m.kick, 0.06)}</em></div>
     <div class="spray">${sprayPic(w, m)}<p>${sprayWords(w)}. Pull your mouse the other way to keep on target.</p></div>
     ${m.quiet ? `<p class="note">${w.quiet ? 'Built-in suppressor' : 'Suppressed'}: much quieter, no muzzle flash.</p>` : ''}
     <p class="note">Full damage up to ${fo.from >= 9999 ? 'any range' : Math.round(fo.from * m.range / M) + ' m'}${fo.from >= 9999 ? '' : `, down to ${Math.round(fo.min * 100)}% by ${Math.round(fo.to * m.range / M)} m`}. A shot through the centre of the body with your crosshair on the head is a headshot: instant kill.</p>
+    <p class="note">Through a plain wall or barricade a bullet keeps ${pct(pn)} of its damage (brick: ${pct(pn * pb)}${pw > 1 ? `, two walls: ${pct(pn * pn)}` : ''}); it goes through ${pw === 1 ? 'one wall at most' : 'up to ' + pw + ' walls'}. Furniture takes ${pn >= 0.6 ? 'less' : pn <= 0.35 ? 'more' : 'its usual share'} off it too.</p>
     <h4>At ${S.dist} m</h4>
     <table class="ttk"><tr><th></th><th>Light 100</th><th>Medium 110</th><th>Heavy 125</th></tr>
       <tr><td>Hits to down</td><td>${stk(100)}</td><td>${stk(110)}</td><td>${stk(125)}</td></tr>
-      <tr><td>Time to kill</td><td>${ttk(100)}s</td><td>${ttk(110)}s</td><td>${ttk(125)}s</td></tr></table>
+      <tr><td>Time to kill</td><td>${ttk(100)}s</td><td>${ttk(110)}s</td><td>${ttk(125)}s</td></tr>
+      <tr><td>Hits through a wall</td><td>${stkW(100)}</td><td>${stkW(110)}</td><td>${stkW(125)}</td></tr></table>
     <h4>Your shooting</h4><div id="armLive"></div>`;
   el.querySelector('#armStats .bigpic').appendChild(gunPicture(S.w, a, 300, 100));
   for (const b of el.querySelectorAll('#armStats .att')) b.onclick = () => { audio.ui(); S.att[S.w] = { ...a, [b.dataset.s]: b.dataset.v }; renderList(el); stats(el); };

@@ -143,3 +143,37 @@ Visor few kills (0.28 vs 0.77) but wins 61%: arc 0.78→0.82, bash 18→22. Glas
 - The Embassy, only with the two levers he chose: `siteSoft: 2` (breakable walls each site room keeps besides the one
   to its partner, mapkit.js `hardenWalls`; was 1) and `barricades: 1` (per defender a round, game.js; was unlimited;
   bots used 0.7 a round, max 2, so this one bites people more than bots). Attack 40 → 48% (sites 52 / 38 / 55 / 48).
+
+## Penetration, and how to nerf or buff a gun (2026-11-20, he asked)
+He asked: overhaul bullet penetration by gun ("quite unique, fitting their gun type and application"), use it to nerf and
+buff guns, show it on the stat card; also ammo, damage and accurate aim-in time are easy levers; study how tactical
+shooters, especially R6, do it.
+
+**What R6 and CS2 do** (researched 2026-11-20):
+- R6 Siege's designer's notes tune guns with: damage (Kali's CSRX 122 → 127 to hit an exact one-shot breakpoint; MK17
+  49 → 40), magazine size (C7E 30 → 25 "fewer bullets, more thought"), recoil (416-C and M762 more vertical kick;
+  Reaper's first rounds easier), aim-in time (Blackbeard's ADS recovery 0.5 → 0.9 s), attachments (ACOG removed from
+  guns), and decide with a "balancing matrix": each operator's pick rate against its win delta. Changes go in small steps
+  and are tested, then adjusted again. Calibre decides how well a gun breaks and passes walls: DMRs/LMGs open barriers
+  fastest, pistols/SMGs need more shots, shotguns blow big holes; snipers pass several soft walls.
+- CS2: every weapon has a penetration power; pistols, SMGs and shotguns lowest, rifles about twice that, snipers most.
+  Damage is lost per wall and per material; a high-damage gun is the better wallbanger.
+- So the levers, roughly from small to big: recoil / first-shot spread, aim-in time, reload time, magazine and reserve,
+  damage falloff range, penetration, fire rate, damage (watch breakpoints: hits to down 100 / 110 / 125 hp), attachments.
+  Change one at a time, a step of 5-15%, then measure (tests/balance.js: kills a carried round, win %).
+
+**Penetration in R62D** (shared/operators.js `PEN_GUN`; server game.js hitscan): each gun has three numbers.
+`pen` = damage left after one plain soft wall or barricade (each wall after takes the same share again); `walls` = how
+many it gets through at all; `brick` = how much of that a brick wall leaves. Furniture follows `pen` (`furnPen`: a gun
+with pen 0.5 takes the furniture's usual share; more pen, less off). Before: one number per class (pistols / SMGs 0.4,
+MPs 0.35, ARs 0.5, LMGs 0.62, DMRs 0.68, shotguns 0.3, a few guns their own), brick 0.7 and 3 walls for every gun.
+| Gun | pen | walls | brick | why |
+|---|---|---|---|---|
+| Whisper MP / Tusk / Gnat / Stub / Hedge / Hornet / Breaker / Wasp | 0.22-0.3 | 1 | 0.3-0.5 | subsonic, tiny or buckshot rounds |
+| Sparrow, Couplet, Ferret, P10, Javelin, Marten, Needle, Hatchet | 0.3-0.42 | 1 | 0.45-0.6 | pistol calibres (Marten .45 / Hatchet heavier) |
+| Sabre, Cyclone, Trident, K4, Tandem, Lark, Drummer, Verdict, Sentry | 0.45-0.55 | 2 | 0.6-0.75 | carbines, light LMGs; Lark's PDW round keeps more |
+| Quill, Mule, Heron, Vex .50, Bison, Ranger, Anvil, Trestle | 0.58-0.64 | 2-3 | 0.6-0.8 | darts, slugs, magnums, full rifle rounds |
+| Rook, Saker, Auger AP, Ox, Longbow | 0.66-0.72 | 3 | 0.75-0.85 | battle rifle, AP rounds, belt-fed, heavy DMR |
+| Pike, Mammoth | 0.8 / 0.9 | 4 | 0.9 / 0.95 | sniper rifles |
+The Armory card shows it ("Wall penetration": damage kept · walls), a line with brick and two walls, and "Hits through a
+wall" in the hits table.

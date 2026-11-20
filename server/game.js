@@ -13,7 +13,7 @@ import { zbSurge, zbDev, ZB, zbDown, zbUp, zbReviveTime, zbSlideEnd, zbStart, zb
 import { MODES, CLASSIC, DEFAULT_MODE, attackSquad, roundsToWin, inOvertime } from '../shared/modes.js';
 import { matchScore, START_MMR, rankOf, mmrOfRank } from '../shared/progress.js';
 import { startRec, recFrame, stopRec } from './replays.js';
-import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, mainPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
+import { LOADOUTS, GADGET_COUNT, cleanLoadout, FALLOFF, HEAD_R, onHead, hitR, cleanAtt, gunMods, attachFor, attCode, aimHeat, spreadCone, shotOffset, tracerPellet, mainPellet, recoilStep, recoilMax, adsTime, falloffOf, penOf, penWalls, penBrick, furnPen, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen } from '../shared/operators.js';
 const PING_KINDS = new Set(['go', 'omw', 'watch', 'hold', 'danger', 'help', 'enemy', 'open']); // the ping wheel (public/js/pingwheel.js)
 const VIEW_LAG_MAX = 0.35; // how far back (s) the server will rewind to honour what a shooter saw
 const BARRI_BULLET_HP = 320; // bullet damage that breaks a whole wooden barricade (he asked)
@@ -1213,7 +1213,7 @@ export class Game {
     }
     const cov = rayCovers(this.map, x0, y0, dx, dy, bestT); if (cov) { bestT = cov.t; best = null; } // a cover plate in the way
     let mult = 1, stopT = bestT, kind = best ? 'flesh' : cov ? 'cover' : 'none', pens = 0, wallT = 0, tracerWall = src && src.tracerUntil > this.time && this.shotW ? 2 : this.pierceNow ? Math.ceil(1.5 * PX_PER_M / CELL) : 0, pierced = 0; // MARK: two cells of solid wall; NAIL: a metre and a half
-    const pen = penOf(this.shotW && this.shotW.cls === cls ? this.shotW : { cls });
+    const PW = this.shotW && this.shotW.cls === cls ? this.shotW : { cls }, pen = penOf(PW), maxWalls = penWalls(PW), brick = penBrick(PW); let softN = 0; // the gun's own penetration (shared/operators.js PEN_GUN)
     const sx = Math.floor(x0 / CELL), sy = Math.floor(y0 / CELL), up = fl > (this.map.groundFloor ?? 99);
     let winK = -1; this.winCarry = null;
     // heights from the building's ground (storeys + stance), so a shot out of an upper window comes down to the target and one up at a
@@ -1237,10 +1237,10 @@ export class Game {
       // rest let part of the damage through (no hole: shooting through furniture never opens a sight line)
       if (FT && (tile === T.LOW || tile === T.TALL)) {
         const tp = FT[k], gp = this.map.fGap[k], pp = this.map.fPen[k], h = h0 + (h1 - h0) * Math.min(1, t / Math.max(1, bestT)) - (M3.floors[M3.flAt[k]] ? (M3.floors[M3.flAt[k]].i || 0) * STOREY : 0);
-        if (!tp) { if (pp < 100) mult *= pp / 100; return false; } // (railings, fences, glass: shot through)
+        if (!tp) { if (pp < 100) mult *= furnPen(PW, pp / 100); return false; } // (railings, fences, glass: shot through)
         if (h <= gp || h >= tp) return false; // over it, or under it
         if (!pp) { stopT = t; kind = 'prop'; best = null; return true; }
-        mult *= pp / 100; pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wood', x: r1(x0 + dx * t), y: r1(y0 + dy * t) });
+        mult *= furnPen(PW, pp / 100); pens++; wallT = t; if (pens === 1) this.events.push({ e: 'hit', k: 'wood', x: r1(x0 + dx * t), y: r1(y0 + dy * t) });
         return false;
       }
       if (src && src.pr >= 1 && underAt(this.map, k, tile)) return false; // lying down: shoots under the car / table it sees under
@@ -1253,9 +1253,9 @@ export class Game {
         if (tile === T.BARRI) this.barriShot(k, dmg * mult); // any bullets: 320 damage in all and the whole board goes
         // he asked: a wall takes damage off the bullet (how much depends on the gun and the wall), so spraying
         // through walls in someone's general direction doesn't win fights
-        mult *= pen * (this.map.mat[k] === MAT.BRICK ? 0.7 : tile === T.BARRI ? 1.1 : 1); pens++; wallT = t;
+        mult *= Math.min(1, pen * (this.map.mat[k] === MAT.BRICK ? brick : tile === T.BARRI ? 1.1 : 1)); pens++; softN++; wallT = t;
         if (pens === 1) this.events.push({ e: 'hit', k: 'wall', x: r1(x0 + dx * t), y: r1(y0 + dy * t) });
-        if (pens > 3) { stopT = t; kind = 'wall'; best = null; return true; }
+        if (softN > maxWalls) { stopT = t; kind = 'wall'; best = null; return true; } // past as many walls as this gun gets through
       }
       return false;
     });
