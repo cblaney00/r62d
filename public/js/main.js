@@ -708,14 +708,18 @@ function renderTv() {
 const ago = t => { const h = (Date.now() - t) / 3600000; return !t ? 'never' : h < 1 ? 'less than an hour ago' : h < 48 ? Math.round(h) + ' hours ago' : Math.round(h / 24) + ' days ago'; };
 function trainInfo() {
   fetch('/api/training').then(r => r.json()).then(t => {
-    const txt = t.running ? `Practicing now… ${t.session} of ${t.perVersion || 200} rounds` : `Last practice: ${ago(t.at)}${t.version ? ` (version ${t.version}${t.version !== t.current ? ', older than this one' : ''})` : ''}, ${t.verRounds || 0} of ${t.perVersion || 200} rounds on this version`;
+    const txt = t.held && !t.running ? 'Practice stopped: they start again next time the game opens.' : t.running ? `Practicing now… ${t.session} of ${t.perVersion || 200} rounds` : `Last practice: ${ago(t.at)}${t.version ? ` (version ${t.version}${t.version !== t.current ? ', older than this one' : ''})` : ''}, ${t.verRounds || 0} of ${t.perVersion || 200} rounds on this version`;
     for (const el of document.querySelectorAll('.trainInfo')) el.textContent = txt;
     for (const b of document.querySelectorAll('.trainBtn')) { b.disabled = t.running; b.textContent = t.running ? 'TRAINING…' : 'TRAIN THE PROS'; }
+    // on the main screen too (he asked 2026-11-20), with STOP
+    $('proPrac').classList.toggle('hidden', !t.running); $('ppText').textContent = `${t.session} of ${t.perVersion || 200} rounds`;
     st.training = t;
   }).catch(() => {});
 }
 for (const b of document.querySelectorAll('.trainBtn')) b.onclick = () => { audio.ui(); fetch('/api/train', { method: 'POST' }).then(r => r.json()).then(r => { if (!r.running && r.why) for (const el of document.querySelectorAll('.trainInfo')) el.textContent = 'Can\'t train right now: ' + r.why + '.'; else trainInfo(); }); };
-setInterval(() => { if (document.hidden || !$('tab-tv').classList.contains('on') && $('playbookPage').classList.contains('hidden')) return; trainInfo(); }, 4000);
+$('ppStop').onclick = () => { audio.ui('back'); $('proPrac').classList.add('hidden'); fetch('/api/train/stop', { method: 'POST' }).then(trainInfo, () => {}); };
+const onHome = () => !$('lobby').classList.contains('hidden') && $('lobby').classList.contains('home');
+setInterval(() => { if (document.hidden || !onHome() && !$('tab-tv').classList.contains('on') && $('playbookPage').classList.contains('hidden')) return; trainInfo(); }, 4000);
 $('tvGo').onclick = () => switchMatch(null, null, { map: tvPick.map === 'random' ? null : tvPick.map, level: tvPick.level, req: tvPick.req.slice() });
 // ---------------- free play page ----------------
 // Pick a map and how many enemy bots, then play alone with no clock, switching operator with N / B.
@@ -5117,7 +5121,7 @@ function askName(tab) { // no name yet: back home with the name box lit up; once
 }
 function goHome() {
   curPage = null;
-  $('lobby').classList.add('home'); $('lobby').classList.remove('paged');
+  $('lobby').classList.add('home'); $('lobby').classList.remove('paged'); trainInfo();
   for (const t of document.querySelectorAll('.tab')) t.classList.remove('on');
 }
 function pageBack() { audio.ui('back'); const up = curPage === 'play' && MODES[st.lastMode]?.fun ? 'fun' : PAGE_UP[curPage]; if (up) setTab(up); else goHome(); }

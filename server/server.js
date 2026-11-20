@@ -104,7 +104,8 @@ function api(req, res) {
     return;
   }
   if (u.pathname === '/api/meta') return json(200, META); // the pros' preferred loadouts: every browser's defaults
-  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, guns: training.guns, att: training.att, pro: training.pro, drills: training.drills, opinions: training.opinions, suggestions: training.suggestions, ends: training.ends, running: !!trainer, session: trainer ? trainer.rounds : 0, current: PLAY_VERSION });
+  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, guns: training.guns, att: training.att, pro: training.pro, drills: training.drills, opinions: training.opinions, suggestions: training.suggestions, ends: training.ends, running: !!trainer, held: trainHeld, session: trainer ? trainer.rounds : 0, current: PLAY_VERSION });
+  if (u.pathname === '/api/train/stop' && req.method === 'POST') { trainHeld = true; if (trainer) { stopTrainer(); console.log('Pro practice stopped by the player.'); } return json(200, { running: false, held: true }); } // STOP on the main screen
   if (u.pathname === '/api/train' && req.method === 'POST') { const r = trainCheck(true); return json(200, { running: !!trainer, why: r || '' }); } // TRAIN THE PROS button
   // REPLAYS (server/replays.js): the newest 3, a download, and opening a downloaded file again
   if (u.pathname === '/api/replays') return json(200, { list: listReplays() });
@@ -175,10 +176,14 @@ const PLAY_VERSION = playVersion() || VERSION.id;
 // (a quarter of the computer's cores, 1 to 6; R62D_TRAIN_WORKERS changes it). Still only while no match is on.
 const TRAIN_WORKERS = Math.max(1, Math.min(6, Number(process.env.R62D_TRAIN_WORKERS) || Math.floor(os.cpus().length / 4)));
 let trainer = null; // { list: workers, rounds: this session's }
+// he asked (2026-11-20): STOP on the main screen; they stay stopped until the game is next opened (or TRAIN THE PROS)
+let trainHeld = false;
 const stopTrainer = () => { if (trainer) for (const w of trainer.list) w.terminate(); trainer = null; };
 // a match being played: the main one, free play, a tutorial or Esports TV (people in the menus are fine)
 const matchOn = () => game.phase !== 'lobby' || [...tutorials].some(g => g.phase !== 'lobby' && !g.heldUntil);
 function trainCheck(force = false) {
+  if (force) trainHeld = false;
+  if (trainHeld) return 'you stopped them; they start again next time the game opens';
   const busy = matchOn();
   if (trainer && busy) { stopTrainer(); return 'a match is being played'; } // someone is playing: practice another time
   if (busy) return 'a match is being played';

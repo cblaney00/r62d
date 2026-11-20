@@ -496,6 +496,14 @@ html.inapp .dlNav, html.touch .dlNav:not(.dlAnd), html.touch:not(.android) .dlAn
 .hVer { margin-left: auto; font: 600 max(12px, var(--mf)) var(--head); letter-spacing: 0.14em; color: var(--dim); white-space: nowrap; }
 .tipLabel { font: 800 max(12px, var(--mf)) var(--head); letter-spacing: 0.3em; color: #0b0d10; background: var(--gold); padding: 2px 8px; }
 #tip { animation: fadeIn 0.6s both; }
+/* the pros practising (he asked 2026-11-20): a small sage strip in the footer with STOP */
+.proPrac { display: flex; align-items: center; gap: 10px; margin-left: auto; padding: 4px 6px 4px 12px; border: 1px solid rgba(157,180,138,0.45); background: rgba(157,180,138,0.12); white-space: nowrap; font: 500 max(13px, var(--mf)) var(--body); color: #c9d1d9; }
+.proPrac.hidden { display: none; }
+.proPrac b { font: 800 max(12px, var(--mf)) var(--head); letter-spacing: 0.16em; color: var(--sage, #9db48a); }
+.proPrac .ppDot { width: 8px; height: 8px; border-radius: 50%; background: var(--sage, #9db48a); animation: ppPulse 1.4s ease-in-out infinite; }
+@keyframes ppPulse { 50% { opacity: 0.25; } }
+.proPrac button { padding: 3px 12px; font: 800 max(12px, var(--mf)) var(--head); letter-spacing: 0.14em; }
+.proPrac + .hVer { margin-left: 0; }
 /* the top bar: home shows only your card (top right); a page shows BACK and its title */
 .mtop { position: relative; z-index: 2; flex: none; display: flex; align-items: center; gap: 28px; padding: 22px 4vw; }
 #lobby.home .mtop { position: absolute; top: 0; right: 0; padding: 4vh 4vw; } #lobby.home .back, #lobby.home .ptitle { display: none; }
