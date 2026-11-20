@@ -834,3 +834,4 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - 1V1 and the maps: docs/1v1.md (rules code, `teamSize`/`smallOnly`/`fitMode`, bans every round, two reinforcements a defender, lone-defender prep priority, `soloMode` words, maps, tests, playtest numbers, drill ideas).
 - Fixed on the way: mapkit `ratSpots` could put a hiding cabinet in front of a drone hole (both new maps; Harbor Office lost one hiding spot to it).
 - Tests: tests/duel.js PASS, tests/duelstats.js (73 rounds: attack 45%), tests/duelshots.mjs (no page errors), reach/openings/stairs/stairsides/outdoors/compass PASS on all maps, sim house/cabin/harbor PASS, modes/wsjoin/arena/defsetup/botreinforce/feeds/pickup/furniture/shapes/randommap/ranked PASS.
+- Later the same day: bots keep their personalities in 1V1 (checked), and the bot opponent now talks to you in all chat by how chatty it is (docs/1v1.md "Personalities and small talk", tests/duelchat.js PASS).

@@ -12,7 +12,7 @@ import { PRO_TEAMS, playbook, siteIntel, PRO_PEEK, PRO_PERSONA, PRO_TIMING, PRO_
 import { furnLine, furnTopAt, EYE_STANCE, HEAD_STANCE, stanceOf } from '../shared/furniture.js';
 const eyeOfBody = (game, p) => EYE_STANCE[stanceOf(p)] + (p.up ? furnTopAt(game.map, p.x, p.y) : 0); // a body's eyes above the floor (on furniture: higher)
 import { planWeight, opWeight, planRecord, training, opKey, gunKey, attKey, blend, recGuess, plainGuess, DRILL_STYLE, drillMul } from './training.js';
-import { compose, LINES, FUN, WAYS } from '../shared/comms.js';
+import { compose, LINES, FUN, WAYS, DUEL } from '../shared/comms.js';
 import { ROSTER, habit } from '../shared/botroster.js';
 import { parseCommand } from '../shared/commands.js';
 
@@ -2950,4 +2950,46 @@ export function drillThink(game, p, dt) {
   // the angle to hold: a noise heard, else the enemy side's edge of cover nearest where we already look
   const look = ai.heard && game.time - ai.heard.t < 2.5 ? ai.heard : D.angles[p.squad].reduce((b, a) => !b || Math.abs(angDiff(Math.atan2(a.y - p.y, a.x - p.x), p.aim)) < Math.abs(angDiff(Math.atan2(b.y - p.y, b.x - p.x), p.aim)) ? a : b, null);
   if (look) turnTo(p, Math.atan2(look.y - p.y, look.x - p.x), S.turn * 0.6, dt);
+}
+
+// 1V1 small talk (he asked 2026-11-20: by personality, some more sociable than others, never annoying, not constant).
+// How chatty a bot is comes from its roster entry (`c` if set, else pushier = chattier, more patient = quieter, plus a
+// little of its own). It says at most one line a round, 20 s apart, 1 to 6 in a whole match by how chatty it is (the
+// quietest barely say anything), in all chat, and most say "gg" at the end.
+export function social(p) {
+  if (p.pro) return 0.3 + 0.4 * ((p.persona && p.persona.aggr) ?? 0.5);
+  const b = p.bio; if (!b) return 0.4;
+  return b.c ?? Math.max(0.05, Math.min(0.95, 0.15 + 0.6 * b.a - 0.2 * b.p + 0.25 * hash01(b.n, 'chat')));
+}
+const DUEL_ODDS = { hi: 0.4, start: 0.06, win: 0.25, lose: 0.2, killYou: 0.2, diedTo: 0.15 };
+function duelSay(game, p, cat, delay) {
+  const foe = [...game.players.values()].find(q => q.squad !== p.squad); if (!foe || !foe.sock) return; // (only to a person)
+  const s = social(p), gg = cat === 'ggWin' || cat === 'ggLose';
+  if (!gg) {
+    if (game.round === 1 && p.duelRd == null) p.duelAll = 0; // (a new match)
+    if (p.duelRd === game.round || (p.duelAll || 0) >= Math.round(1 + s * 5) || game.time - (p.duelT ?? -99) < 20) return;
+    if (Math.random() > Math.min(0.9, DUEL_ODDS[cat] * (s / 0.5) ** 1.5)) return;
+    p.duelRd = game.round; p.duelAll = (p.duelAll || 0) + 1;
+  } else if (Math.random() > 0.3 + 0.6 * s) return;
+  p.duelT = game.time + delay;
+  const tone = !p.pro && lvlOf(game, p) <= 1 ? 'fun' : persona(p).aggr >= 0.6 ? 'cocky' : 'calm';
+  const all = DUEL[tone][cat], seen = p.duelSeen || (p.duelSeen = []), fresh = all.filter(l => !seen.includes(l)), pick = pickOne(fresh.length ? fresh : all);
+  seen.push(pick); if (seen.length > 12) seen.shift();
+  const you = String(foe.name || '').replace(/^\[[^\]]*\]\s*/, '') || 'you';
+  (game.duelQ || (game.duelQ = [])).push({ at: game.time + delay, id: p.id, text: pick.replace('{you}', you) });
+}
+// game.js calls this at the start of preparation ('start'), on a kill ('kill', {q, src}) and at round end ('round', {squad, last})
+export function duelTalk(game, moment, o = {}) {
+  if (game.rules.size !== 1 || game.tut || game.free || game.tv) return;
+  const bots = [...game.players.values()].filter(p => p.bot), wait = () => 1.2 + Math.random() * 1.8;
+  if (moment === 'start') for (const p of bots) duelSay(game, p, game.round === 1 ? 'hi' : 'start', 3 + Math.random() * 8);
+  if (moment === 'kill' && o.src && o.q && o.src.squad !== o.q.squad) for (const p of bots) { if (p === o.src) duelSay(game, p, 'killYou', wait()); else if (p === o.q) duelSay(game, p, 'diedTo', wait()); }
+  if (moment === 'round') for (const p of bots) {
+    if (o.last) duelSay(game, p, p.squad === o.squad ? 'ggWin' : 'ggLose', 3 + Math.random() * 2);
+    else duelSay(game, p, p.squad === o.squad ? 'win' : 'lose', wait());
+  }
+}
+export function duelFlush(game) {
+  const q = game.duelQ; if (!q || !q.length) return;
+  for (let i = q.length - 1; i >= 0; i--) if (game.time >= q[i].at) { const r = q.splice(i, 1)[0], w = game.players.get(r.id); if (w) { w.chatTimes = []; game.chat(w, { text: r.text, team: false }); } }
 }

@@ -165,4 +165,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-20', k: 'map', id: 'smallmaps', t: 'Two new small maps, made for 1v1s and in the normal rotation too: Maple Street House (a two-storey family home) and Lakeside Cabin (a timber cabin with a loft over the great room and a boathouse).', v: 0 },
   { d: '2026-11-20', k: 'mech', id: 'duel', t: 'New fun mode 1V1: one a side on the small maps, first to 4, sides swap every round, each player bans one operator before every round. Two wall reinforcements a defender (10 for five, 2 alone).', v: 0 },
   { d: '2026-11-20', k: 'mech', id: 'phonechat', t: 'Phones no longer show bot chatter, except in Esports TV.', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'duelchat', t: '1V1: the bot opponent now and then says something to you in all chat, in its own way: chatty bots about once a round, quiet ones barely at all, most say gg at the end.', v: 0 },
 ];

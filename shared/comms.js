@@ -57,6 +57,41 @@ export const LINES = {
 };
 
 // the casters' lines: who speaks is part of the line; the analyst uses 'desk', play-by-play 'hype'
+// 1V1 small talk (he asked 2026-11-20): the bot opponent says the odd thing to you, in all chat, in its own way.
+// fun = Copper and Bronze, cocky = the pushy ones, calm = everyone else. {you} = your name. bots.js duelTalk picks.
+export const DUEL = {
+  fun: {
+    hi: ["hiii {you}!", "Hello! Be nice to me please.", "Is this the 1v1? Hi!", "Okay {you}, I am so ready. I think.", "Good luck! You will need it. Maybe."],
+    start: ["Ready! I think.", "This round is mine. Probably.", "New plan: win.", "I have a good feeling about this one."],
+    win: ["WAIT. I won?!", "Yes! Somebody clip that!", "Did you see that, {you}?", "I meant to do that.", "Get rekt! Sorry. Not sorry."],
+    lose: ["That was lag.", "How?!", "My mouse slipped, I swear.", "Okay, you got lucky.", "I was looking the other way!"],
+    killYou: ["Got you! Wait, really?", "Haha! Sorry {you}!", "I got one! The only one!"],
+    diedTo: ["Ow!", "Where did you come from?!", "Not fair, I was reloading!"],
+    ggWin: ["GG! I am the best!", "gg {you}! Tell everyone!", "gg! I can't believe that worked."],
+    ggLose: ["gg, you're too good.", "gg! Rematch?", "gg. I need a snack."],
+  },
+  cocky: {
+    hi: ["Let's go, {you}.", "Hope you warmed up.", "First to four. Easy.", "Bring it, {you}."],
+    start: ["Again.", "Your move.", "I know where you're going.", "Same thing coming."],
+    win: ["Too easy.", "One more for me.", "Thought you had that?", "ez", "You'll have to be quicker."],
+    lose: ["Lucky.", "Okay, that one's yours.", "Fine. Now I'm awake.", "Enjoy it while it lasts."],
+    killYou: ["Heard you coming.", "Should've waited.", "Read you like a book."],
+    diedTo: ["Okay, nice shot.", "Hm. Not bad.", "Lucky angle."],
+    ggWin: ["gg. Run it back?", "gg, good effort.", "gg {you}. Close-ish."],
+    ggLose: ["gg. You earned it.", "gg, I want a rematch.", "gg, well played. Next time."],
+  },
+  calm: {
+    hi: ["glhf", "Good luck, have fun.", "Hey {you}, glhf.", "Have a good one."],
+    start: ["gl", "Here we go."],
+    win: ["nt", "Close one.", "Nice try, that was close.", "Good round."],
+    lose: ["Nice round.", "ns", "Well played.", "Good play."],
+    killYou: ["nt", "Close."],
+    diedTo: ["ns", "Nice shot.", "Clean."],
+    ggWin: ["gg", "gg wp", "gg, that was fun.", "gg {you}, good games."],
+    ggLose: ["gg wp", "gg, well played.", "gg, you were better today."],
+  },
+};
+
 export const CAST = {
   ban: T('hype', false, ['{team} take {op} off the table.', 'And {op} is banned by {team}.', '{team} ban out {op}.', '{op} is gone, that\'s {team}\'s ban.', '{team} say no to {op}.', 'No {op} this map, says {team}.', '{op} comes out, courtesy of {team}.']),
   banWhy: T('desk', false, ['Smart. {op} has been huge on this map.', '{op} was a problem for them last time, so that makes sense.', 'That ban tells you how scared they are of {op}.', 'You can see why, {op} changes how they have to play.', 'I would have done the same with {op}.', 'A respectful ban, {op} is just that good here.', 'Interesting one, I expected {op} to stay open.']),

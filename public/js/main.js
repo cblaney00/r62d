@@ -5365,7 +5365,7 @@ function chatKey(e) {
   }
 }
 function addChat(m) {
-  if (m.bot && isTouch && !st.tv) return; // (he asked 2026-11-20) phones: no bot chatter, except in Esports TV (their pings still mark the map)
+  if (m.bot && m.team && isTouch && !st.tv) return; // (he asked 2026-11-20) phones: no bot team chatter, except in Esports TV (their pings still mark the map); a 1V1 bot's odd word to you (all chat) still shows
   if (st.tv && m.from) (st.tvSay || (st.tvSay = new Map())).set(m.from, { text: m.text, t: performance.now() / 1000 }); // spoken from the character (he asked)
   if (st.tv && m.squad !== undefined) { // ESPORTS TV: the team's comms, live, under that team's player cards
     const el = $(m.squad ? 'tvCommsR' : 'tvCommsL'); if (!el) return;

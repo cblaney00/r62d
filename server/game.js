@@ -5,7 +5,7 @@ import { localPos, buildMap, windowGlass, roomAt, wallMount, MAPS, MAP_LIST, ope
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers , inBox } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
-import { arenaThink, drillThink, defSetup, botThink, botPickOp, botPrep, assignPros, botIdentity, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote } from './bots.js';
+import { arenaThink, drillThink, defSetup, botThink, botPickOp, botPrep, assignPros, botIdentity, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote, duelTalk, duelFlush } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import { furnTopAt, EYE_STANCE, CHEST_STANCE, stanceOf } from '../shared/furniture.js';
 import { arenaStart, arenaTick, arenaKill, arenaDamage, arenaSpeed, arenaEndMatch, arenaPlayer, arenaInfo } from './arena.js';
@@ -501,6 +501,7 @@ export class Game {
     if (this.rules.preBoards) { this.by = TEAM.DEF; this.preBarricade(this.rules.preBoards); this.by = null; } // (the defenders' boards: their map shows them at once)
     for (const p of this.players.values()) if (p.bot) botPrep(this, p);
     this.phase = PHASE.PREP; this.timer = DUR.prep;
+    duelTalk(this, 'start');
     if (this.rules.help) { this.siteRevealed = true; this.events.push({ e: 'found', team: TEAM.ATK }); } // Quick Match: the attackers are shown the site from the start
     this.events.push({ e: 'banner', text: 'PREPARATION PHASE', sub: '' });
   }
@@ -584,6 +585,7 @@ export class Game {
     this.phase = PHASE.ROUND_END; this.timer = DUR.roundEnd;
     this.events.push({ e: 'roundEnd', squad, side: winTeam, reason });
     roundChat(this, squad);
+    duelTalk(this, 'round', { squad, last: Math.max(...this.score) >= roundsToWin(this.rules, this.score) }); // 1V1: the bot opponent's odd word to you
     for (const p of this.players.values()) { p.busy = null; if (p.ctrl !== 'body') p.ctrl = 'body'; }
   }
 
@@ -614,6 +616,7 @@ export class Game {
   // ---------------- simulation ----------------
   tick(dt) {
     this.time += dt;
+    duelFlush(this);
     if (this.phase === PHASE.LOBBY) return;
     const held = (this.tut && this.tut.hold && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP)) || this.free;
     if (!held) this.timer -= dt;
@@ -1538,6 +1541,7 @@ export class Game {
       talk(this, q, 'dead', { op: nm(src), place: rm(src.x, src.y) });
       talk(this, src, left === 1 ? 'gotLast' : 'got', { op: nm(q) }, 'kill' + q.id);
       kindWords(this, q, src);
+      duelTalk(this, 'kill', { q, src });
     }
     q.alive = false; q.downed = false; q.hp = 0; q.deaths++; q.busy = null; q.scanning = false; q.bracing = false;
     if (q.ctrl !== 'body') q.ctrl = 'body';
