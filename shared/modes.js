@@ -12,6 +12,11 @@ export const MODES = {
     kind: 'siege', winRounds: 4, swap: 'half', half: 3, overtime: true, bans: true, ranked: false, help: false, preBoards: 0, ready: true },
   ranked: { name: 'RANKED', blurb: 'Full rules and your rank is on the line. Bots play at the lobby\'s rank',
     kind: 'siege', winRounds: 4, swap: 'half', half: 3, overtime: true, bans: true, ranked: true, help: false, preBoards: 0, ready: true },
+  // 1V1 (he asked 2026-11-20, like the 1v1s Jynxzi plays; Siege's own 1v1 playlist rules, he chose): one a side on the small maps
+  // only (MAPS[id].small), first to 4, sides swap every round, and before every round each player bans one operator of
+  // the side they will face (bans: 'round', banned for that round only). Full kit: gadgets, drones, abilities.
+  duel: { name: '1V1', blurb: 'Just you and one opponent on a small map. First to 4, sides swap every round, each of you bans one operator before every round',
+    kind: 'siege', fun: true, size: 1, small: true, winRounds: 4, swap: 'round', overtime: false, bans: 'round', ranked: false, help: false, preBoards: 0, ready: true },
   oitc: { name: 'ONE IN THE CHAMBER', blurb: 'Everyone for themselves. One pistol, one bullet, three lives. A kill gives you another bullet',
     kind: 'arena', fun: true, ready: true },
   gungame: { name: 'GUN GAME', blurb: 'Everyone for themselves. Every kill moves you to the next gun; first through the knife wins',
@@ -43,6 +48,6 @@ export function inOvertime(rules, score) { return roundsToWin(rules, score) > (r
 // the lobby's one-line rule summary
 export function ruleLine(rules) {
   if (rules.kind !== 'siege') return rules.blurb || '';
-  return [`First to ${rules.winRounds} rounds`, rules.swap === 'half' ? `Sides swap after ${rules.half || 3}` : 'Sides swap every round',
-    rules.overtime ? `Overtime at ${rules.winRounds - 1}-${rules.winRounds - 1}` : '', rules.bans ? 'Operator bans' : 'No bans', rules.ranked ? 'Rank on the line' : ''].filter(Boolean).join(' · ');
+  return [rules.size === 1 ? 'One a side, small maps only' : '', `First to ${rules.winRounds} rounds`, rules.swap === 'half' ? `Sides swap after ${rules.half || 3}` : 'Sides swap every round',
+    rules.overtime ? `Overtime at ${rules.winRounds - 1}-${rules.winRounds - 1}` : '', rules.bans === 'round' ? 'A ban each before every round' : rules.bans ? 'Operator bans' : 'No bans', rules.ranked ? 'Rank on the line' : ''].filter(Boolean).join(' · ');
 }

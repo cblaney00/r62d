@@ -1528,6 +1528,7 @@ function renderMapPick(s) {
   rnd.onclick = () => { audio.ui(); send({ t: 'lobby', a: 'map', id: 'random' }); };
   el.appendChild(rnd);
   for (const id of MAP_LIST) {
+    if (MODES[s.md] && MODES[s.md].small && !MAPS[id].small) continue; // 1V1: the small maps only
     const M = MAPS[id], b = document.createElement('button');
     b.className = id === s.mp && !s.rm ? 'on' : ''; b.title = M.desc;
     b.appendChild(mapThumb(id).cloneNode()); b.querySelector('canvas').getContext('2d').drawImage(mapThumb(id), 0, 0);
@@ -1557,7 +1558,7 @@ function renderLobby(s) {
     const list = s.players.filter(p => p.sq === sq);
     const html = list.map(p => p.b && p.bs ? `<li class="botLi${st.botOpen === p.n ? ' open' : ''}" data-bn="${esc(p.n)}" title="${esc(p.bs)}"><span>${esc(p.n)}</span><span>${rankTag(p.br)}<span class="bot">BOT</span></span><i class="botStyle">${esc(p.bs)}</i></li>` // (an everyday bot: hover or tap for how they play)
       : `<li class="${p.id === s.you ? 'me' : ''}"><span>${esc(p.n)}</span>${p.b ? '<span class="bot">BOT</span>' : rankTag(p.rn)}</li>`).join('') +
-      Array(Math.max(0, 5 - list.length)).fill('<li style="opacity:.3"><span>— empty —</span></li>').join('');
+      Array(Math.max(0, ((MODES[s.md] && MODES[s.md].size) || 5) - list.length)).fill('<li style="opacity:.3"><span>— empty —</span></li>').join('');
     if (ul.innerHTML !== html) ul.innerHTML = html;
     if (!ul.dataset.tap) { ul.dataset.tap = 1; ul.addEventListener('click', e => { const li = e.target.closest('li.botLi'); if (!li) return; st.botOpen = st.botOpen === li.dataset.bn ? null : li.dataset.bn; for (const o of document.querySelectorAll('li.botLi')) o.classList.toggle('open', o.dataset.bn === st.botOpen); }); }
   }
@@ -5092,7 +5093,7 @@ const PAGE_UP = { controls: 'intel' }; // BACK from these goes to that page, not
 const NEEDS_NAME = new Set(['play', 'unranked', 'ranked', 'ops', 'profile']);
 const MODE_TAB = { play: 'quick', unranked: 'unranked', ranked: 'ranked' }; // these pages are the one lobby, set to that mode
 // FUN MODES page (he asked): one card per fun mode; the ones not built yet say so
-const FUN_LOOK = { oitc: ['#ff7a2a', '1'], gungame: ['#f2c14e', '▲'], infected: ['#5fd08a', '☣'], zombies: ['#c0503a', '☠'] };
+const FUN_LOOK = { duel: ['#8fb996', '⚔'], oitc: ['#ff7a2a', '1'], gungame: ['#f2c14e', '▲'], infected: ['#5fd08a', '☣'], zombies: ['#c0503a', '☠'] };
 function renderFun() {
   const el = $('funGrid'); if (el.dataset.k) return; el.dataset.k = 1;
   el.innerHTML = MODE_LIST.filter(id => MODES[id].fun).map(id => { const M = MODES[id], [c, i] = FUN_LOOK[id] || ['#93a0ad', '?'];
@@ -5362,6 +5363,7 @@ function chatKey(e) {
   }
 }
 function addChat(m) {
+  if (m.bot && isTouch && !st.tv) return; // (he asked 2026-11-20) phones: no bot chatter, except in Esports TV (their pings still mark the map)
   if (st.tv && m.from) (st.tvSay || (st.tvSay = new Map())).set(m.from, { text: m.text, t: performance.now() / 1000 }); // spoken from the character (he asked)
   if (st.tv && m.squad !== undefined) { // ESPORTS TV: the team's comms, live, under that team's player cards
     const el = $(m.squad ? 'tvCommsR' : 'tvCommsL'); if (!el) return;

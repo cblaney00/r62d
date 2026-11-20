@@ -232,9 +232,9 @@ export class Game {
     else if (m.t === 'lobby' && !this.tut && !this.free) {
       if (m.a === 'addBot') this.addBot(m.squad);
       else if (m.a === 'removeBot') this.removeBot(m.squad);
-      else if (m.a === 'fillBots') { for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); }
+      else if (m.a === 'fillBots') { for (const s of [0, 1]) while (this.squadCount(s) < this.teamSize() && this.players.size < MAX_PLAYERS) this.addBot(s); }
       else if (m.a === 'switch') this.switchSquad(p);
-      else if (m.a === 'mode' && this.phase === PHASE.LOBBY && MODES[m.id] && MODES[m.id].ready && m.id !== this.mode) { this.mode = m.id; if (this.ranked) this.rankedLevel(); this.msg(`${p.name} chose ${MODES[m.id].name}${this.ranked ? `: bots play at the lobby's rank (${BOT_LEVELS[this.botLevel]})` : ''}`); }
+      else if (m.a === 'mode' && this.phase === PHASE.LOBBY && MODES[m.id] && MODES[m.id].ready && m.id !== this.mode) { this.mode = m.id; this.fitMode(); if (this.ranked) this.rankedLevel(); this.msg(`${p.name} chose ${MODES[m.id].name}${this.ranked ? `: bots play at the lobby's rank (${BOT_LEVELS[this.botLevel]})` : ''}`); }
       else if (m.a === 'ranked' && this.phase === PHASE.LOBBY) { this.ranked = !!m.on; if (this.ranked) this.rankedLevel(); this.msg(this.ranked ? `${p.name} switched on RANKED: bots play at the lobby's rank (${BOT_LEVELS[this.botLevel]})` : `${p.name} switched ranked off`); }
       else if (m.a === 'botLevel' && !this.ranked && BOT_LEVELS[m.lv] && m.lv !== this.botLevel) { this.botLevel = m.lv; assignPros(this); this.msg(m.lv === PRO_LEVEL ? `${p.name} brought in the pro teams: Northwind and Ironclad Collective` : `${p.name} set the bot skill to ${BOT_LEVELS[m.lv]}`); }
       else if (m.a === 'map' && this.phase === PHASE.LOBBY && m.id === 'random') {
@@ -245,7 +245,7 @@ export class Game {
         if (this.randomMap) this.msg(`${p.name} chose the map ${MAPS[m.id].name}`);
         this.randomMap = false;
       }
-      else if (m.a === 'map' && this.phase === PHASE.LOBBY && MAPS[m.id]) {
+      else if (m.a === 'map' && this.phase === PHASE.LOBBY && MAPS[m.id] && (!this.smallOnly() || MAPS[m.id].small) && !MAPS[m.id].zombie) {
         this.randomMap = false;
         this.mapId = m.id; this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = [];
         this.msg(`${p.name} chose the map ${MAPS[m.id].name}`);
@@ -289,12 +289,21 @@ export class Game {
     }
   }
 
+  teamSize() { return this.tut || this.free || this.tv ? TEAM_SIZE : this.rules.size || TEAM_SIZE; } // 1V1: one a side
+  smallOnly() { return !this.tut && !this.free && !this.tv && !!this.rules.small; } // 1V1: the small maps only
+  // 1V1 chosen in the lobby: bots over one a side leave, and the map becomes a small one
+  fitMode() {
+    const n = this.teamSize();
+    for (const s of [0, 1]) while (this.squadCount(s) > n) { const b = [...this.players.values()].reverse().find(q => q.bot && q.squad === s); if (!b) break; this.players.delete(b.id); }
+    if (this.smallOnly() && !MAPS[this.mapId].small) { const L = MAP_LIST.filter(k => MAPS[k].small); this.mapId = L[Math.floor(Math.random() * L.length)]; this.map = buildMap(this.mapId); this.mapVersion++; this.changed.clear(); this.newHoles = []; }
+    assignPros(this);
+  }
   squadCount(s) { let n = 0; for (const q of this.players.values()) if (q.squad === s) n++; return n; }
 
   addBot(squad) {
     if (this.players.size >= MAX_PLAYERS) return;
     if (squad !== 0 && squad !== 1) squad = this.squadCount(0) <= this.squadCount(1) ? 0 : 1;
-    if (this.squadCount(squad) >= TEAM_SIZE) return;
+    if (this.squadCount(squad) >= this.teamSize()) return;
     const b = this.blankPlayer('[BOT] Bot', true, squad);
     this.players.set(b.id, b); botIdentity(this, b);
     if (this.phase !== PHASE.LOBBY && this.phase !== PHASE.SELECT) b.alive = false;
@@ -307,7 +316,7 @@ export class Game {
   switchSquad(p) {
     if (this.phase !== PHASE.LOBBY) return;
     const to = 1 - p.squad;
-    if (this.squadCount(to) >= TEAM_SIZE) { const b = [...this.players.values()].find(q => q.bot && q.squad === to); if (b) b.squad = p.squad; else return; }
+    if (this.squadCount(to) >= this.teamSize()) { const b = [...this.players.values()].find(q => q.bot && q.squad === to); if (b) b.squad = p.squad; else return; }
     p.squad = to;
   }
 
@@ -364,17 +373,20 @@ export class Game {
   // team bans like the Esports TV bots (tvBanPick). Banned operators stay banned for the whole match.
   banning() { const B = this.banRun; return !!(this.rules.bans && !this.tv && this.phase === PHASE.SELECT && B && B.round === this.round && B.i < B.order.length); }
   playerBanStep() {
-    if (this.round !== 1) return false;
+    const each = this.rules.bans === 'round'; // 1V1: every round each player bans one operator of the side they face, for that round only
+    if (this.round !== 1 && !each) return false;
     if (!this.bans) this.bans = [];
     let B = this.banRun;
-    if (!B || B.round !== this.round) B = this.banRun = { round: this.round, order: [[0, 'atk'], [1, 'atk'], [1, 'def'], [0, 'def']], i: 0, t: null };
+    if (!B || B.round !== this.round) { const a = this.atkSquad(); if (each) this.bans = []; B = this.banRun = { round: this.round, order: each ? [[a, 'def'], [1 - a, 'atk']] : [[0, 'atk'], [1, 'atk'], [1, 'def'], [0, 'def']], i: 0, t: null }; }
     if (B.i >= B.order.length) return false;
     const [sq, sd] = B.order[B.i], people = [...this.players.values()].some(q => !q.bot && q.sock && q.squad === sq);
     if (B.t === null) { B.t = this.time + (people ? BAN_TURN : 2.5); B.people = people; }
     if (this.time >= B.t) {
       const op = B.people ? null : tvBanPick(this, sq, sd);
-      if (op) { this.bans.push({ op, sq, rd: this.round }); this.events.push({ e: 'ban', op, sq }); this.msg(`${sq ? 'BRAVO' : 'ALPHA'} banned ${OPERATORS[op].name}`); }
-      else this.msg(`${sq ? 'BRAVO' : 'ALPHA'} didn't ban ${sd === 'atk' ? 'an attacker' : 'a defender'}`);
+      const who = this.teamSize() === 1 && [...this.players.values()].find(q => q.squad === sq);
+      const tn = who ? who.name : sq ? 'BRAVO' : 'ALPHA';
+      if (op) { this.bans.push({ op, sq, rd: this.round }); this.events.push({ e: 'ban', op, sq }); this.msg(`${tn} banned ${OPERATORS[op].name}`); }
+      else this.msg(`${tn} didn't ban ${sd === 'atk' ? 'an attacker' : 'a defender'}`);
       B.i++; B.t = null;
     }
     return B.i < B.order.length;
@@ -396,10 +408,12 @@ export class Game {
   }
   startMatch() {
     if (this.players.size === 0) return;
-    if (this.randomMap) { const list = MAP_LIST.filter(k => k !== this.mapId); this.mapId = list[Math.floor(Math.random() * list.length)]; this.map = buildMap(this.mapId); }
+    if (this.smallOnly()) this.fitMode();
+    if (this.randomMap) { const list = MAP_LIST.filter(k => k !== this.mapId && (!this.smallOnly() || MAPS[k].small)); this.mapId = list[Math.floor(Math.random() * list.length)]; this.map = buildMap(this.mapId); }
     if (this.rules.kind === 'arena') { arenaStart(this); return; }
     if (this.rules.kind === 'zombies') { zbStart(this); return; } // ZOMBIES: Lantern Point, round after round // FUN MODES: one match of respawning action
-    if (this.ranked) { this.rankedLevel(); for (const s of [0, 1]) while (this.squadCount(s) < TEAM_SIZE && this.players.size < MAX_PLAYERS) this.addBot(s); } // empty slots on both teams: bots at that rank
+    if (this.ranked) { this.rankedLevel(); for (const s of [0, 1]) while (this.squadCount(s) < this.teamSize() && this.players.size < MAX_PLAYERS) this.addBot(s); } // empty slots on both teams: bots at that rank
+    if (this.smallOnly()) for (const s of [0, 1]) if (!this.squadCount(s)) this.addBot(s); // 1V1 alone: a bot to play against
     assignPros(this); this.proState = {}; this.proLast = {}; this.proLog = [];
     this.score = [0, 0]; this.round = 0; // round 1: squad 0 attacks (the tutorial: you attack, then defend)
     for (const p of this.players.values()) { p.kills = 0; p.deaths = 0; p.ms = this.blankMatchStats(); }
@@ -2619,7 +2633,7 @@ export class Game {
   mark(p, x, y, w, id, pk) {
     const team = this.side(p), room = roomAt(this.map, x, y);
     this.events.push({ e: 'mark', team, x: r1(x), y: r1(y), w, by: p.name, from: p.id, id, pk });
-    const msg = JSON.stringify({ t: 'chat', from: p.id, name: p.name, text: w + (room ? ' · ' + room : ''), team: true, squad: p.squad, ping: 1 });
+    const msg = JSON.stringify({ t: 'chat', from: p.id, name: p.name, text: w + (room ? ' · ' + room : ''), team: true, squad: p.squad, ping: 1, bot: p.bot ? 1 : undefined });
     for (const q of this.players.values()) if (q.sock && q.sock.open && q.squad === p.squad) q.sock.send(msg);
     if (this.tut && !p.bot) { const i = this.tut.info; if (!i.pings.includes(w)) i.pings.push(w); i.n++; if (p.ctrl !== 'body') i.feedPings++; }
   }
@@ -3351,7 +3365,7 @@ export class Game {
     if (p.chatTimes.length >= 5) return;
     p.chatTimes.push(now);
     const team = !!m.team;
-    const msg = JSON.stringify({ t: 'chat', from: p.id, name: p.name, text, team, squad: p.squad, dead: !p.alive && this.phase === PHASE.ACTION });
+    const msg = JSON.stringify({ t: 'chat', from: p.id, name: p.name, text, team, squad: p.squad, dead: !p.alive && this.phase === PHASE.ACTION, bot: p.bot ? 1 : undefined });
     for (const q of this.players.values()) if (q.sock && q.sock.open && (!team || q.squad === p.squad)) q.sock.send(msg);
     if (this.tv) for (const sk of this.tv.socks) if (sk.open) sk.send(msg); // TV viewers hear both teams' calls
   }
