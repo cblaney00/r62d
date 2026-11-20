@@ -290,7 +290,7 @@ export function shuffle(x, y, surf, own) {
 
 // --- foley: small sounds for nearly everything a player does ---
 export function foley(kind, x, y, own) {
-  C = kind === 'heartbeat' || kind === 'breath' || kind === 'hurt' ? 'body' : ['hammer', 'nail', 'beep', 'tick', 'place', 'throw', 'bounce', 'camSwitch', 'spot', 'droneThrow'].includes(kind) ? 'gadgets' : 'foley';
+  C = kind === 'heartbeat' || kind === 'breath' || kind === 'hurt' ? 'body' : ['hammer', 'nail', 'beep', 'tick', 'arming', 'disarming', 'place', 'throw', 'bounce', 'camSwitch', 'spot', 'droneThrow'].includes(kind) ? 'gadgets' : 'foley';
   const fx = own ? undefined : x, fy = own ? undefined : y;
   let g; const t = ac ? ac.currentTime : 0;
   switch (kind) {
@@ -319,6 +319,10 @@ export function foley(kind, x, y, own) {
     case 'nail': g = out(fx, fy, 0.55, 520, 0.2); if (g) { tone(g, t, 0.07, rnd(220, 260), 160, 'triangle', 0.5); noise(g, t, 0.06, 'bandpass', 900, 1.5, 0.6); } break;
     case 'beep': g = out(fx, fy, 0.35, 700, 0.15); if (g) { tone(g, t, 0.08, 880, 880, 'triangle', 0.3, 0.003); tone(g, t, 0.08, 440, 440, 'sine', 0.2, 0.003); } break;
     case 'tick': g = out(fx, fy, 0.3, 500, 0.1); if (g) click(g, t, 1300, 0.7, 0.012); break;
+    // planting and disabling the defuser (he asked 2026-11-20: obvious from inside and outside the house): an electronic
+    // chirp that carries through the building (range >= 1000: faint and muffled through walls, never silent nearby)
+    case 'arming': g = out(fx, fy, 0.5, 1300, 0.2); if (g) { tone(g, t, 0.09, 1250, 1250, 'square', 0.22, 0.003); tone(g, t + 0.11, 0.09, 1650, 1650, 'square', 0.22, 0.003); } break;
+    case 'disarming': g = out(fx, fy, 0.9, 1300, 0.2); if (g) { tone(g, t, 0.09, 1900, 1500, 'square', 0.4, 0.002); tone(g, t + 0.12, 0.08, 1500, 1500, 'square', 0.3, 0.002); click(g, t + 0.2, 1300, 0.9, 0.012); } break;
     case 'revive': g = out(fx, fy, 0.3, 300, 0.1); if (g) { noise(g, t, 0.3, 'bandpass', 1400, 0.8, 0.5, 0.08); tone(g, t + 0.1, 0.3, 500, 800, 'sine', 0.15); } break;
     case 'heartbeat': g = out(undefined, undefined, 0.5); if (g) { tone(g, t, 0.12, 60, 40, 'sine', 1); tone(g, t + 0.16, 0.14, 55, 38, 'sine', 0.8); } break;
     case 'breath': g = out(undefined, undefined, 0.12); if (g) { noise(g, t, 0.55, 'bandpass', 750, 0.7, 0.6, 0.25); noise(g, t + 0.7, 0.6, 'bandpass', 600, 0.7, 0.45, 0.2); } break;
@@ -646,9 +650,16 @@ export function droneLoop(id, x, y, speed, own) {
 // the defuser alarm (he asked, like the one in a siege game but our own): a pulsing two-tone siren heard all through the
 // building while the defuser runs; steady and a bit in the way, never overpowering (louder close by, muffled far off)
 let alarmL = null;
-export function defuserAlarm(on, x, y) {
+let chirpAt = 0;
+export function defuserAlarm(on, x, y, left) {
   if (!ac || (ac.state !== 'running' && !ac.offline)) return;
   const t = ac.currentTime;
+  // a planted defuser (he asked 2026-11-20: obvious and noticeable from inside and outside the house): on top of the
+  // steady alarm, a loud chirp from where it is, through walls and floors (muffled) and outside, quicker near the end
+  if (on && t >= chirpAt) {
+    const every = left === undefined ? 1 : left < 5 ? 0.3 : left < 10 ? 0.5 : left < 20 ? 0.8 : 1.1; chirpAt = t + every;
+    C = 'gadgets'; const g = out(x, y, 0.6, 2200, 0.25); if (g) { tone(g, t, 0.12, 1050, 1050, 'square', 0.3, 0.003); tone(g, t + 0.13, 0.12, 1400, 1400, 'square', 0.3, 0.003); }
+  }
   if (!on) { if (alarmL) { alarmL.g.gain.setTargetAtTime(0, t, 0.15); const L = alarmL; alarmL = null; setTimeout(() => { try { L.a.stop(); L.b.stop(); L.lfo.stop(); } catch {} L.g.disconnect(); }, 800); } return; }
   if (!alarmL) {
     const a = ac.createOscillator(), b = ac.createOscillator(); a.type = 'square'; b.type = 'square'; a.frequency.value = 880; b.frequency.value = 660;
@@ -660,8 +671,8 @@ export function defuserAlarm(on, x, y) {
     a.connect(ga); b.connect(gb); ga.connect(lp); gb.connect(lp); lp.connect(g); g.connect(sfx);
     a.start(); b.start(); lfo.start(); alarmL = { a, b, lfo, g, lp };
   }
-  const d = distTo(x, y).d, near = Math.max(0, 1 - d / 900);
-  alarmL.g.gain.setTargetAtTime((0.012 + 0.028 * near) * (MIX.loops ?? 1), t, 0.2);
+  const d = distTo(x, y).d, near = Math.max(0, 1 - d / 1600); // (it faded out by 25 m; now 45 m, and never below a clear floor)
+  alarmL.g.gain.setTargetAtTime((0.022 + 0.04 * near) * (MIX.loops ?? 1), t, 0.2);
   alarmL.lp.frequency.setTargetAtTime(700 + 2200 * near, t, 0.2);
 }
 export function pruneLoops() {
@@ -676,8 +687,8 @@ export async function measureMix(tests) {
   const res = [];
   for (const [name, fn] of tests) {
     const off = new OfflineAudioContext(2, 48000 * 2, 48000); off.offline = true;
-    buildGraph(off); listener = { x: 0, y: 0 }; occlude = () => 0; indoorAt = () => true;
-    fn(module);
+    buildGraph(off); listener = { x: 0, y: 0 }; occlude = () => 0; indoorAt = () => true; chirpAt = 0; alarmL = null;
+    fn(module, { walls: n => { occlude = () => n; } }); // (a test may put walls in the way)
     const buf = await off.startRendering();
     const L = buf.getChannelData(0), R = buf.getChannelData(1), win = 2400; // 50 ms windows
     let peak = 0, loud = 0, acc = 0;
@@ -693,7 +704,7 @@ export async function measureMix(tests) {
 }
 const module = { droneLoop: (...a) => droneLoop(...a), gunshot: (...a) => gunshot(...a), explosion: (...a) => explosion(...a), step: (...a) => step(...a), shuffle: (...a) => shuffle(...a),
   foley: (...a) => foley(...a), impact: (...a) => impact(...a), casing: (...a) => casing(...a), whiz: (...a) => whiz(...a), debris: (...a) => debris(...a),
-  play: (...a) => play(...a), ui: (...a) => ui(...a) };
+  play: (...a) => play(...a), ui: (...a) => ui(...a), defuserAlarm: (...a) => defuserAlarm(...a) };
 
 // Ears ringing after a flashbang: a high whine that fades with the flash.
 export function tinnitus(dur) {

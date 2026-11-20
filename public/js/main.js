@@ -1659,19 +1659,20 @@ function banPick(s) {
   el.classList.toggle('hidden', !q || !me);
   if (!q || !me) return;
   const [sq, sd, left, i, n] = q, ours = sq === me.sq, team = x => x === me.sq ? 'YOUR TEAM' : 'THE ENEMY', banned = new Set(bans.map(b => b[0]));
-  const solo = soloMode(s), key = [i, ours, solo, bans.map(b => b[0]).join()].join('|');
+  const solo = soloMode(s), key = [i, ours, solo, left < 0, bans.map(b => b[0]).join()].join('|'), noClock = left < 0; // 1V1: no clock (he asked), a NO BAN button instead
   if (el.dataset.k !== key) {
     el.dataset.k = key;
     const row = side => bans.filter(b => OPERATORS[b[0]] && OPERATORS[b[0]].team === side).map(b => `<div class="bpBan"><canvas width="90" height="90" data-op="${b[0]}"></canvas><b>${esc(OPERATORS[b[0]].name)}</b><span>${b[1] === me.sq ? 'YOURS' : 'THEIRS'}</span></div>`).join('') || '<span class="hint">none yet</span>';
     el.innerHTML = `<div class="bpTop"><small>BAN PHASE · ${i + 1} / ${n}</small><b class="${ours ? 'ours' : ''}">${ours ? (solo ? 'YOU: BAN' : 'YOUR TEAM: BAN') : solo ? 'YOUR OPPONENT IS BANNING' : 'THE ENEMY IS BANNING'} ${sd === 'atk' ? 'AN ATTACKER' : 'A DEFENDER'}</b><span class="bpTime"></span></div>` +
-      (ours ? `<p class="hint">${solo ? `Click the ${sd === 'atk' ? 'attacker' : 'defender'} you don't want to face this round. No click before the clock runs out: no ban.` : "Click the operator you don't want anyone to play this match. If nobody on your team picks before the clock runs out, there is no ban."}</p><div class="bpGrid">${opsForTeam(sd).filter(o => !banned.has(o)).map(o => `<button data-op="${o}"><canvas width="120" height="120" data-op="${o}"></canvas><b>${esc(OPERATORS[o].name)}</b><span>${esc(OPERATORS[o].role)}</span></button>`).join('')}</div>`
+      (ours ? `<p class="hint">${solo ? `Choose the ${sd === 'atk' ? 'attacker' : 'defender'} you don't want to face this round${noClock ? ', or NO BAN. Take your time.' : '. No choice before the clock runs out: no ban.'}` : "Click the operator you don't want anyone to play this match. If nobody on your team picks before the clock runs out, there is no ban."}</p><div class="bpGrid">${opsForTeam(sd).filter(o => !banned.has(o)).map(o => `<button data-op="${o}"><canvas width="120" height="120" data-op="${o}"></canvas><b>${esc(OPERATORS[o].name)}</b><span>${esc(OPERATORS[o].role)}</span></button>`).join('')}</div>${noClock ? '<button class="bpNone" data-none="1">NO BAN</button>' : ''}`
         : `<p class="hint bpWait">${solo ? 'Waiting for your opponent to choose…' : 'Waiting for the enemy team to choose…'}</p>`) +
       `<div class="bpRows"><div><h4>ATTACKERS BANNED</h4><div class="bpRow">${row('atk')}</div></div><div><h4>DEFENDERS BANNED</h4><div class="bpRow">${row('def')}</div></div></div>`;
     for (const c of el.querySelectorAll('canvas')) portraitCached(c, c.dataset.op);
     for (const b of el.querySelectorAll('.bpGrid button')) b.onclick = () => { audio.ui('lock'); send({ t: 'ban', op: b.dataset.op }); };
+    const nb = el.querySelector('.bpNone'); if (nb) nb.onclick = () => { audio.ui('lock'); send({ t: 'ban', op: 'none' }); };
     if (i > 0) audio.ui('lock');
   }
-  setText(el.querySelector('.bpTime'), String(Math.ceil(left)));
+  setText(el.querySelector('.bpTime'), left < 0 ? '' : String(Math.ceil(left)));
 }
 function buildSelect(s) {
   const me = st.me; if (!me) return;
@@ -3111,8 +3112,8 @@ function playerFoley(p, a, moved, own, dt) {
       const k = p.bu.k;
       if (k === 'reinforce') { audio.foley('hammer', p.x, p.y, own); a.buT = 0.36 + Math.random() * 0.1; }
       else if (k === 'barricade') { audio.foley('nail', p.x, p.y, own); a.buT = 0.28; }
-      else if (k === 'plant') { audio.foley('beep', p.x, p.y, own); a.buT = 0.7 - p.bu.p * 0.5; }
-      else if (k === 'defuse') { audio.foley('tick', p.x, p.y, own); a.buT = 0.22; }
+      else if (k === 'plant') { audio.foley('arming', p.x, p.y, own); a.buT = 0.7 - p.bu.p * 0.4; } // (he asked: heard from the next rooms and outside)
+      else if (k === 'defuse') { audio.foley('disarming', p.x, p.y, own); a.buT = 0.32; }
       else { audio.foley('cloth', p.x, p.y, own); a.buT = 0.5; }
     }
   } else a.buT = 0;
@@ -3478,7 +3479,7 @@ function draw(s, view, now, dt) {
     a.fl = (a.fl ?? 0.4) + (Math.min(1, 0.3 + sp / 150) - (a.fl ?? 0.4)) * Math.min(1, dt * 6);
     if (e.tm === side || seen(x, y)) liftDraw(x, y, e.pe ? 0.62 : 0.4, () => drawBird(ctx, { ...e, x, y, ag: own ? st.aim : e.ag, fl: a.fl }, now, e.tm === side));
   }
-  audio.pruneLoops(); audio.defuserAlarm(!!(s.pl && s.ph === PHASE.ACTION), s.pl && s.pl.x, s.pl && s.pl.y); tq = pfa('actors', tq);
+  audio.pruneLoops(); audio.defuserAlarm(!!(s.pl && s.ph === PHASE.ACTION), s.pl && s.pl.x, s.pl && s.pl.y, s.pl && s.pl.t); tq = pfa('actors', tq);
   fx.draw(ctx);
   for (const e of ents) if (e.ty === 'decoy') { // Holo Decoy: looks, moves and sounds like the real operator
     const a = anim(e.id), mv = Math.hypot(e.x - (a.dx ?? e.x), e.y - (a.dy ?? e.y)); a.dx = e.x; a.dy = e.y;

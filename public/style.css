@@ -1221,6 +1221,7 @@ html.tv canvas#game { cursor: default; }
 .bpTop small { font: 700 max(15px, var(--mf)) var(--head); letter-spacing: 0.3em; color: var(--dim); }
 .bpTop b { font: 800 max(46px, var(--mf)) var(--head); letter-spacing: 0.08em; color: #ff9d6a; } .bpTop b.ours { color: var(--gold); }
 .bpTime { font: 800 max(30px, var(--mf)) var(--head); color: #fff; }
+.bpNone { margin-top: 10px; padding: 10px 28px; font: 800 max(16px, var(--mf)) var(--head); letter-spacing: 0.08em; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.18); } .bpNone:hover { border-color: #8fb996; background: rgba(143,185,150,0.14); }
 .bpGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; width: min(1300px, 100%); }
 .bpGrid button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
 .bpGrid button:hover { border-color: #ff5a4a; background: rgba(255,90,74,0.14); }

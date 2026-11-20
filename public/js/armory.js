@@ -15,6 +15,7 @@ import * as audio from './audio.js';
 import { isTouch } from './touch.js';
 
 const M = PX_PER_M; // world pixels per metre, the same as a match
+const RING_R = 13; // the circle round each person (main.js RING_R): the targets have one too, as far as aiming in goes
 const CLASS_ORDER = ['AR', 'SMG', 'MP', 'LMG', 'DMR', 'Shotgun', 'Pistol'];
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
@@ -33,6 +34,7 @@ export function armoryHoldsEsc() {
   return performance.now() - (S.unlockT || -1e9) < 400;
 }
 
+if (typeof window !== 'undefined') window.__arm = { S: () => S, adsAim: () => adsAim() }; // (screenshot tests)
 export function openArmory(el, opts) {
   el.classList.remove('hidden');
   if (opts) O = opts;
@@ -167,7 +169,14 @@ const reach = () => aimReach(attOf(S.w).sight, !!S.mouse.r) * PX_PER_M; // the m
 const aimMin = () => 46 * O.dpr() / (S.z || 1), aimMax = () => S.reachW || 400;
 function adsAim() { // per sight, as in a match; the sniper scope jumps out to the targets (or the wall, if that is nearer)
   const l = Math.hypot(S.aim.x, S.aim.y) || 1, ux = S.aim.x / l, uy = S.aim.y / l;
-  const d = Math.max(aimMin(), Math.min(sniper() ? S.dist * M : adsStart(attOf(S.w).sight, S.w) * M, farEnd() - 2)); S.aim = { x: ux * d, y: uy * d }; // a set distance per sight (he asked), never past the backstop
+  // the targets count as people (he asked 2026-11-20), as main.js adsReset: on (within 2 m of) one, the crosshair stays;
+  // one in the line before the sight's distance, it snaps onto them (their ring's far side, never nearer than 2 m)
+  const up = S.dummies.filter(t => t.hp > 0);
+  if (up.some(t => Math.hypot(t.x - S.aim.x, t.y - S.aim.y) <= 2 * M)) return;
+  let d = Math.max(aimMin(), Math.min(sniper() ? S.dist * M : adsStart(attOf(S.w).sight, S.w) * M, farEnd() - 2)); // a set distance per sight (he asked), never past the backstop
+  for (const t of up) { const along = t.x * ux + t.y * uy, perp = Math.abs(t.y * ux - t.x * uy); if (along <= 0 || perp > RING_R) continue;
+    const edge = along - Math.sqrt(RING_R * RING_R - perp * perp); if (edge > 4 && edge < d) d = Math.min(d, Math.max(aimMin(), 2 * M, edge + RING_R)); }
+  S.aim = { x: ux * d, y: uy * d };
 }
 // the sniper scope sways in a slow figure of eight (main.js scopeSway); Shift steadies it
 function sway(dt) {

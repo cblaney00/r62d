@@ -38,6 +38,7 @@ const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free pla
 // R62D_FAST=1 shortens the menus, for quick testing.
 if (typeof process !== 'undefined' && process.env.R62D_FAST) { DUR.select = 3; DUR.prep = 6; }
 if (typeof process !== 'undefined' && +process.env.R62D_PREP) DUR.prep = +process.env.R62D_PREP; // (balance tests: another preparation length)
+if (typeof process !== 'undefined' && +process.env.R62D_BOMB) DUR.bomb = +process.env.R62D_BOMB; // (balance tests: another defuser countdown)
 
 const THROW_K = 5; // drag on thrown things: they come to rest where you aimed
 const EMP_R = 36; // buffed (he asked: it was no better than ordinary utility): ~1 m, and it fries defenders' electronics too
@@ -380,7 +381,8 @@ export class Game {
     if (!B || B.round !== this.round) { const a = this.atkSquad(); if (each) this.bans = []; B = this.banRun = { round: this.round, order: each ? [[a, 'def'], [1 - a, 'atk']] : [[0, 'atk'], [1, 'atk'], [1, 'def'], [0, 'def']], i: 0, t: null }; }
     if (B.i >= B.order.length) return false;
     const [sq, sd] = B.order[B.i], people = [...this.players.values()].some(q => !q.bot && q.sock && q.squad === sq);
-    if (B.t === null) { B.t = this.time + (people ? BAN_TURN : 2.5); B.people = people; }
+    if (B.t === null) { B.t = this.time + (people ? (each && this.teamSize() === 1 ? Infinity : BAN_TURN) : 2.5); B.people = people; } // 1V1 (he asked 2026-11-20): no clock for a person, they ban or press NO BAN
+    if (B.t === Infinity && !people) B.t = this.time; // (they left: on without a ban)
     if (this.time >= B.t) {
       const op = B.people ? null : tvBanPick(this, sq, sd);
       const who = this.teamSize() === 1 && [...this.players.values()].find(q => q.squad === sq);
@@ -392,6 +394,7 @@ export class Game {
     return B.i < B.order.length;
   }
   playerBan(p, op) {
+    if (op === 'none' && this.banning() && p.squad === this.banRun.order[this.banRun.i][0]) { const sd = this.banRun.order[this.banRun.i][1]; this.msg(`${this.teamSize() === 1 ? p.name : p.squad ? 'BRAVO' : 'ALPHA'} didn't ban ${sd === 'atk' ? 'an attacker' : 'a defender'}`); this.banRun.i++; this.banRun.t = null; return; } // NO BAN
     if (!this.banning() || !OPERATORS[op] || this.isBanned(op)) return;
     const B = this.banRun, [sq, sd] = B.order[B.i];
     if (p.squad !== sq || OPERATORS[op].team !== sd) return;
@@ -3473,7 +3476,7 @@ export class Game {
       ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, pp: this.map.peeps && this.map.peeps.length ? this.map.peeps : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
       site: this.site, slk: this.siteLk ? 1 : 0, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       tvl: this.tv ? this.botLevel : undefined, cp: this.tv ? this.colPair : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ar: arenaInfo(this), zb: zbInfo(this), ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
-      bq: (this.tv || this.rules.bans) && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], r1(Math.max(0, (this.banRun.t ?? this.time) - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
+      bq: (this.tv || this.rules.bans) && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], this.banRun.t === Infinity ? -1 : r1(Math.max(0, (this.banRun.t ?? this.time) - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, cb, hb, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];

@@ -36,7 +36,7 @@ export const BARRICADES_EACH = 999; // wooden barricades on doors and windows: u
 
 export const DUR = {
   select: 15, prep: 30, action: 160, roundEnd: 5, matchEnd: 12, // action 2:40 (he asked for slightly shorter rounds; R6 is 3:00 with smaller maps), 5 s between rounds
-  plant: 7, defuse: 7, bomb: 45, reinforce: 3, barricade: 2.5, revive: 4, // a barricade takes about as long as in R6 (he asked)
+  plant: 7, defuse: 7, bomb: 35, reinforce: 3, barricade: 2.5, revive: 4, // a barricade takes about as long as in R6 (he asked); bomb: the defuser's countdown, 45 → 35 s (he asked 2026-11-20: it ticked too long; tests/bombtime.js: attack 41% → 50%)
   bleedout: 20, spot: 5, trapArm: 1.5, // every placed trap arms after the same time (he asked: one rule)
 };
 

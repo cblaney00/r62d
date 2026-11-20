@@ -54,6 +54,16 @@ if (!D || !D.fun || D.size !== 1 || D.winRounds !== 4 || D.swap !== 'round' || D
   }
   console.log('alone: a bot opponent, bans go to the side you face');
 }
+// no clock for a person in 1V1 (he asked 2026-11-20): a minute later it still waits; NO BAN moves on
+{
+  const g = new Game(), p = person(g, 'Duel Clock');
+  g.handle(p, { t: 'lobby', a: 'mode', id: 'duel' }); g.startMatch();
+  for (let i = 0; i < 30 * 10 && !g.banning(); i++) g.tick(1 / 30);
+  for (let i = 0; i < 30 * 60 && g.banning() && g.banRun.order[g.banRun.i][0] !== p.squad; i++) g.tick(1 / 30);
+  if (g.banning()) { const i0 = g.banRun.i; for (let i = 0; i < 30 * 60; i++) g.tick(1 / 30); if (g.banRun.i !== i0) fail('1V1 ban turn ran out on its own'); g.playerBan(p, 'none'); if (g.banRun.i !== i0 + 1) fail('NO BAN did not move on'); }
+  else fail('never your turn to ban');
+  console.log('no ban clock for you in 1V1, NO BAN works');
+}
 
 // whole matches with bots
 const per = +process.argv[2] || 2;
