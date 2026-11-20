@@ -10,7 +10,7 @@
   try {
     const played = () => { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('r62dfs:') && k.endsWith('/profiles.json')) return true; } return false; };
     if (!localStorage.getItem('r62d-ctrlreset-1') && played()) { // (a phone that never played here has nothing to reset)
-      for (const k of ['r62d-keys-v5', 'r62d-sens', 'r62d-aim', 'r62d-aim2', 'r62d-lean', 'r62d-autofire', 'r62d-fire', 'r62d-gyro', 'r62d-gyroinv',
+      for (const k of ['r62d-keys-v5', 'r62d-sens', 'r62d-aim', 'r62d-aim2', 'r62d-lean', 'r62d-autofire', 'r62d-autofire2', 'r62d-fire', 'r62d-gyro', 'r62d-gyroinv',
         'r62d-gyrosens', 'r62d-input', 'r62d-sticksens', 'r62d-tilt', 'r62d-tiltdz', 'r62d-uiscale']) localStorage.removeItem(k);
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i); if (!k || !k.startsWith('r62dfs:') || !k.endsWith('/profiles.json')) continue;

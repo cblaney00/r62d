@@ -92,9 +92,10 @@ export const stickSens = () => Math.max(0.3, Math.min(1.6, +(store('r62d-stickse
 export const setStickSens = v => store('r62d-sticksens', String(v));
 export const setGyroSens = v => store('r62d-gyrosens', String(v)), setGyroInv = on => store('r62d-gyroinv', on ? '1' : '0');
 // Auto fire (same day): the gun shoots by itself while your crosshair is on an enemy you can see, so the right thumb only
-// has to aim (phone shooters offer the same). On by default on phones; Settings turns it off.
-export const autoFire = () => store('r62d-autofire') !== '0';
-export const setAutoFire = on => store('r62d-autofire', on ? '1' : '0');
+// has to aim (phone shooters offer the same). He asked 2026-11-19: off for everyone (a new name, so phones that had it on
+// start off too); Settings can still turn it on.
+export const autoFire = () => store('r62d-autofire2') === '1';
+export const setAutoFire = on => store('r62d-autofire2', on ? '1' : '0');
 let gyroAcc = 0; // radians turned since the game last asked
 const TILT_FULL = 16; // degrees past the dead zone for a full run
 let grav = null, tiltLevel = null; // smoothed gravity on the screen (x right, y up; 1 = straight down), and "level"
@@ -408,15 +409,19 @@ export function setTouchVisible(on) {
 }
 // Menus and match text shrink to fit small screens (the game picture itself always fills the screen), times the
 // player's own size setting. Menus are laid out for ~900 px tall, the match text for ~760 (and both for the width).
+const PHONE_UI = 0.75;
 function fitUi() {
   const h = Math.min(innerHeight, innerWidth > innerHeight ? innerHeight : innerWidth * 0.6), w = innerWidth, s = uiScale();
   // phones lay menus out for ~640 tall (they scroll) and match text for ~520, so text stays readable (he found it too small)
   const fit = isTouch ? Math.min(1, h / 640, w / 1150) : Math.min(1, h / 900, w / 1500);
   const hud = isTouch ? Math.min(1, h / 520, w / 1000) : Math.min(1, h / 760, w / 1300);
   const room = isTouch ? Math.min(h / 640, w / 1150) : Math.min(h / 900, w / 1500); // bigger than this and menus spill off the screen
-  document.documentElement.style.setProperty('--uiz', Math.max(0.3, Math.min(fit * s, Math.max(fit, room))).toFixed(3));
-  document.documentElement.style.setProperty('--hudz', Math.max(0.4, Math.min(1.4, hud * s)).toFixed(3));
-  document.documentElement.style.setProperty('--tz', Math.max(0.7, Math.min(1.15, h / 430)).toFixed(3)); // touch buttons: smaller on short screens
+  // phones (he asked 2026-11-19): the match HUD and touch buttons a quarter smaller; menus too, but never under 0.5, where
+  // their text would drop below the minimum size (style.css --minz) and spill out of its boxes
+  const P = isTouch ? PHONE_UI : 1;
+  document.documentElement.style.setProperty('--uiz', Math.max(isTouch ? 0.5 : 0.3, Math.min(fit * s, Math.max(fit, room)) * P).toFixed(3));
+  document.documentElement.style.setProperty('--hudz', Math.max(0.3, Math.min(1.4, hud * s) * P).toFixed(3));
+  document.documentElement.style.setProperty('--tz', (Math.max(0.7, Math.min(1.15, h / 430)) * P).toFixed(3)); // touch buttons: smaller on short screens
   document.documentElement.classList.toggle('fitui', isTouch || fit < 1 || s !== 1);
 }
 if (isTouch) document.documentElement.classList.add('touch');

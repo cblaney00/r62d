@@ -822,3 +822,8 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 
 ## 2026-11-19 — crosshair reach +20%
 - He asked: up the maximum reticle distance of all sights by 20%; he chose hip fire too. shared/operators.js `AIM_REACH`: hip 18→22, iron 20→24, holo 21→25, reddot 23→28, prism 36→43, scope 44→53, sniper 64→77 m. Everything reads it through `aimReach` (main.js `reachOf`, phone/controller reach, Armory, sniper glare range).
+
+## 2026-11-20 — auto fire off, phone screen a quarter smaller
+- He asked: turn off all automatic shooting options and make the mobile UI 25% smaller. Auto fire was the only one: touch.js `autoFire` now reads `r62d-autofire2` (default off, so phones that had it on start off; shim.js keeps it), still in Settings.
+- touch.js `fitUi`: `PHONE_UI` 0.75 times --uiz, --hudz and --tz on touch devices. Menus never go under --uiz 0.5 on phones (below that their text, held at the minimum size by style.css --minz 0.5, spilled out of its boxes: tried and measured, 521 small texts / many cut-offs). Free play's phone operator cards 112 → 128 px wide for the same reason.
+- Checked in headless phone Firefox: tests/textsize.mjs phone 0 small text and no cut-offs (only #loading's drifting picture past the edge, hidden anyway), tests/phonebuttons.mjs no overlaps (gaps exactly 2.5 px between some buttons), old vs new match screenshots.
