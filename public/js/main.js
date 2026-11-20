@@ -1343,7 +1343,7 @@ setLean(leanMode, false);
 const leanNow = () => leanMode === 'toggle' ? st.leanT || 0 : (keys.has('leanR') ? 1 : 0) - (keys.has('leanL') ? 1 : 0);
 // screen effects anyone can switch off (he asked), remembered on this computer
 const FX_OPTS = [['shake', 'Screen shake'], ['hurt', 'Red edges when hurt'], ['hit', 'Hit markers'], ['pts', 'Points pop-ups'], ['sight', 'Sight glow when aiming in'],
-  ['compass', 'Bomb-site compass'], ['pip', 'Stairs preview window'], ['site', 'Bomb-site found card'], ['vignette', 'Dark screen corners'],
+  ['room', 'Room you are in'], ['compass', 'Bomb-site compass'], ['pip', 'Stairs preview window'], ['site', 'Bomb-site found card'], ['vignette', 'Dark screen corners'],
   ['tilt', 'Camera tilt'], ['lean', 'Camera lean and kick'], ['walls3d', 'Raised walls'], ['lights', 'Room lighting'], ['blur', 'Soft screen edges']];
 let fxOff = new Set(); try { fxOff = new Set(JSON.parse(localStorage.getItem('r62d-fxoff') || '[]')); } catch {}
 const fxOn = k => !fxOff.has(k);
@@ -4234,7 +4234,13 @@ function hud(s) {
   if (s.zb) [obj, sub] = zbObjective(s, me);
   const fi = me.a && me.x !== undefined ? floorAt(st.map, st.pred.x, st.pred.y) : -1;
   const flName = fi >= 0 && st.map.floors.length > 1 ? st.map.floors[fi].name : '';
-  setHTML('objective', `${esc(obj)}<small>${flName ? '<b class="flr">' + esc(flName) + '</b> ' : ''}${esc(sub)}${where ? ' · ' + esc(where) : ''}</small>`);
+  // the room you are in (he asked 2026-11-20): its own line in the objective box, the same spot on a computer, a phone or
+  // a controller, so callouts are easy for new players; Settings → Screen → Room you are in switches it off
+  const roomOn = fxOn('room') && me.a && me.x !== undefined;
+  const outName = () => { let b = null, bd = 25 * PX_PER_M; for (const sp of st.map.atkSpawns || []) { const d = Math.hypot(sp.x - st.pred.x, sp.y - st.pred.y); if (d < bd) { bd = d; b = sp.name; } } return b ? 'Outside · ' + b : 'Outside'; }; // outside: the nearest named area (the attackers' spawns)
+  setHTML('objective', roomOn ? `${esc(obj)}<small>${esc(sub)}</small><span class="roomTag">${flName ? '<b class="flr">' + esc(flName) + '</b>' : ''}${esc(!where || where === 'Outside' ? outName() : where)}</span>`
+    : `${esc(obj)}<small>${flName ? '<b class="flr">' + esc(flName) + '</b> ' : ''}${esc(sub)}${where ? ' · ' + esc(where) : ''}</small>`);
+  if (isTouch) { const ob = $('objective'), k = ob.innerHTML; if (k !== st.objK) { st.objK = k; requestAnimationFrame(() => { const b = ob.offsetHeight ? ob.offsetTop + ob.offsetHeight + 6 : 0; if (b) document.documentElement.style.setProperty('--objB', b + 'px'); }); } } // phones: the health block sits just under the box, however tall it is (measured only when it changes)
   if (!me.a) {
     setHTML('opname', me.op ? `${OPERATORS[me.op].name}` : '');
     setText('hpnum', '—'); $('hpbar').firstElementChild.style.width = '0%';
@@ -5168,7 +5174,7 @@ function updateCard() {
   $('pcName').textContent = p.name; $('pcLevel').textContent = L.level;
   $('pcXp').style.width = (L.into / L.need * 100) + '%'; $('pcXpText').innerHTML = `LEVEL ${L.level} · ${L.into} / ${L.need} XP ${rankTag(p.rank)} <span style="opacity:.6">${p.mmr ?? ''} MMR</span>`;
 }
-const TIPS = [
+const TIPS = ['The box in the top left shows the room you are in: use its name when you call out where an enemy is (Settings, Screen, to hide it).', 
   'Put a trap, camera, shield or wire in the wrong spot? Hold {interact} on it to pick it back up and place it again. Only your own, never a teammate\'s.',
   'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',
   'Aiming in moves your crosshair out to your sight\'s distance, unless it is already on an enemy you can see (within 2 m): then it stays right where you put it.',

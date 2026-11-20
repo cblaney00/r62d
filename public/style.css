@@ -192,6 +192,7 @@ input { font: 600 max(20px, var(--mf)) var(--head); padding: 10px 14px; backgrou
 .icons div.unknown { color: var(--dim); }
 #objective { position: absolute; top: 16px; left: 18px; max-width: 360px; background: var(--panel); border-left: 3px solid var(--gold); padding: 8px 12px; font: 600 max(15px, var(--mf)) var(--head); letter-spacing: 0.05em; }
 #objective small { display: block; color: var(--dim); font-size: max(13px, var(--mf)); margin-top: 2px; }
+#objective .roomTag { display: block; margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); font: 700 max(14px, var(--mf)) var(--head); letter-spacing: 0.08em; color: #e8ecef; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* the room you are in */
 #killfeed { position: absolute; top: 16px; right: 18px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; margin-top: 44px; }
 #killfeed div { background: var(--panel); padding: 4px 10px; font: 600 max(15px, var(--mf)) var(--head); letter-spacing: 0.03em; animation: fadeout 6s forwards; }
 #killfeed .a { color: var(--allyL, #8fc8ff); } #killfeed .e { color: var(--enemyL, #ffb27a); } #killfeed .w { color: var(--dim); margin: 0 8px; font-size: max(12px, var(--mf)); letter-spacing: 0.1em; }
@@ -1376,8 +1377,8 @@ html.touchplay #tiL, html.touchplay #tiR { display: none; }
 html.touchplay #topbar { top: 8px; }
 html.touchplay #leftCount { top: 10px; width: 380px; } html.touchplay #leftCount b { font-size: max(26px, var(--mf)); } html.touchplay #leftCount span { font-size: max(8px, var(--mf)); letter-spacing: 0.1em; }
 html.touchplay #compass { top: 112px; left: 50%; } html.touchplay #outWarn { top: 112px; } html.touchplay #outWarn:not(.hidden) ~ #compass { top: 150px; }
-html.touchplay #objective { top: 8px; left: 12px; max-width: 290px; padding: 5px 10px; font-size: max(13px, var(--mf)); } html.touchplay #objective small { font-size: max(11px, var(--mf)); }
-html.touchplay #bl { top: 64px; left: 12px; width: 250px; }
+html.touchplay #objective { top: 8px; left: 12px; max-width: 290px; padding: 5px 10px; font-size: max(13px, var(--mf)); } html.touchplay #objective small { font-size: max(11px, var(--mf)); } html.touchplay #objective .roomTag { font-size: max(12px, var(--mf)); margin-top: 3px; padding-top: 2px; }
+html.touchplay #bl { top: max(64px, var(--objB, 64px)); left: 12px; width: 250px; } /* (under the objective box, which grows with the room line) */
 html.touchplay #br { top: 150px; left: 12px; }
 html.touchplay #allies { top: 206px; left: 12px; font-size: max(12px, var(--mf)); } html.touchplay #allies div { margin: 1px 0; }
 html.touchplay #hud #killfeed { top: 66px; right: 10px; margin-top: 0; } html.touchplay #killfeed div { font-size: max(13px, var(--mf)); padding: 3px 8px; }
