@@ -71,6 +71,24 @@ export const OUTDOORS = {
       'Back Gate': { cover: ['dumpster', 'hedge'], ground: [FL.CONCRETE, 8], path: FL.CONCRETE, pieces: [['fence', -13, 7, 18, 1, 1], ['fence', 13, 7, 18, 1, 1], ['pier', -3, 7, 2, 2, 1], ['pier', 3, 7, 2, 2, 1], ['dumpster', 8, 2, 3, 2, 1], ['dumpster', 12, 2, 3, 2, 1], HEDGE(-9, 2), TREE(-13, -4)] },
     },
   },
+  house: {
+    edge: 'fence', scatter: [['tree', 2, 2, 1], ['bush', 2, 2, 1], ['hedge', 5, 2, 1]],
+    spawns: {
+      'Maple Street': { cover: ['car', 'van'], road: [FL.ASPHALT, 8, 0], marks: ['lanes'], pieces: [CAR(-11, 1, 'u'), CAR(12, 1, 'u'), ['lamp', -5, 6, 1, 1, 1], TREE(15, 7), BUSH(-15, 6)] },
+      'Driveway': { cover: ['car', 'dumpster'], ground: [FL.ASPHALT, 10], pieces: [CAR(-8, -2), ['dumpster', 8, 3, 3, 2, 1], ['bikerack', 9, -4, 4, 1, 2], HEDGE(-12, 4)] },
+      'Back Yard': { cover: ['hedge', 'hedge'], ground: [FL.GRASS, 12], pieces: [HEDGE(9, 2), ['bench', 4, -5, 3, 1, 2], TREE(-13, 4), TREE(12, -6), ['planter', 0, 4, 2, 2, 2], ['swings', -8, -6, 7, 3, 1]] },
+      'Side Path': { cover: ['hedge', 'car'], ground: [FL.CONCRETE, 8], path: FL.CONCRETE, pieces: [HEDGE(-9, 2), HEDGE(9, 2), CAR(0, -8, 'u'), TREE(-13, -4), TREE(13, -5)] },
+    },
+  },
+  cabin: {
+    edge: 'rock', scatter: [['tree', 2, 2, 1], ['rock', 3, 3, 1], ['bush', 2, 2, 1]],
+    spawns: {
+      'Lake Road': { cover: ['van', 'logs'], road: [FL.ASPHALT, 7, 0], pieces: [VEH('van', -11, -1, 'u'), ['logs', 10, 4, 5, 3, 1], TREE(-16, 6), TREE(16, 6), ROCK(14, -5)] },
+      'Pine Grove': { cover: ['logs', 'rock'], ground: [FL.GRASS, 12], pieces: [TREE(-7, 2), TREE(7, 3), TREE(-11, -4), TREE(11, -4), ['logs', -8, -8, 5, 3, 1], ['firepit', 6, -7, 3, 3, 2], ROCK(-13, 5)] },
+      'East Clearing': { cover: ['truck', 'logs'], ground: [FL.GRASS, 12], pieces: [VEH('truck', 10, -2), ['logs', -9, 3, 5, 3, 1], TREE(-12, -5), TREE(13, 6), ['bench', -4, -6, 3, 1, 2]] },
+      'Boat Dock': { cover: ['crates', 'rock'], ground: [FL.WOOD, 6], pieces: [CRATES(-6, 2), CRATES(6, 2), BARRELS(-9, -2), ROCK(10, -3)] },
+    },
+  },
   dust: {
     edge: 'wall', scatter: [['rock', 3, 3, 1], ['barrels', 2, 2, 2], ['ruin', 5, 2, 1], ['palm', 2, 2, 1]],
     spawns: {

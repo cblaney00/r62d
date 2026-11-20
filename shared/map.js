@@ -7,6 +7,8 @@ import { build as villa } from './maps/villa.js';
 import { build as depot } from './maps/depot.js';
 import { build as embassy } from './maps/embassy.js';
 import { build as lodge } from './maps/lodge.js';
+import { build as house } from './maps/house.js';
+import { build as cabin } from './maps/cabin.js';
 import { build as school } from './maps/school.js';
 import { build as dust } from './maps/dust.js';
 import { build as lantern } from './maps/lantern.js';
@@ -19,6 +21,8 @@ export const MAPS = {
   embassy: { name: 'The Embassy', floors: 'B · 1F · 2F', desc: 'A consulate round an open courtyard, with a vault and cells below.', build: embassy },
   lodge: { name: 'Alpine Lodge', floors: '1F · 2F', desc: 'A timber mountain lodge with a great hall, bar and guest suites.', build: lodge },
   school: { name: 'Clocktower School', floors: '1F · 2F · 3F', desc: 'An old school with a gym, labs upstairs and a clock tower on top.', build: school },
+  house: { name: 'Maple Street House', floors: '1F · 2F', desc: 'A small two-storey family home: garage, kitchen and bedrooms. Made for 1v1s.', build: house, small: true },
+  cabin: { name: 'Lakeside Cabin', floors: '1F · 2F', desc: 'A small timber cabin by a lake, a loft over the great room and a boathouse. Made for 1v1s.', build: cabin, small: true },
   lantern: { name: 'Lantern Point', floors: '1F · 2F · 3F', desc: 'A harbour town on the point, overrun. Zombies only.', build: lantern, zombie: true },
   dust: { name: 'Dust Town', floors: '1F · 2F', desc: 'A desert town laid out like a classic: a long road, a middle street and a tight tunnel to two sites.', build: dust },
   drill: { name: 'Drill Hall', floors: '1F', desc: 'The pros\' practice room.', build: drill, zombie: true, drill: true }, // (pro drills only: server/drills.js)

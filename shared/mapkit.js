@@ -536,6 +536,7 @@ export function makeMap({ id, name, floors }) {
     for (const o of openings) if (o.kind === 'door') { const sides = new Set(); for (const k of o.cells) for (const d of [1, -1, W, -W]) if (roomOf[k + d] >= 0) sides.add(roomOf[k + d]); if ([...sides].some(i => site.has(i))) for (const i of sides) near.add(i); }
     for (const i of site) near.add(i);
     const opened = new Uint8Array(N); for (const o of openings) for (const k of o.cells) opened[k] = 1;
+    const byHole = new Uint8Array(N); for (let k = 0; k < N; k++) if (dhole[k]) for (const d of (tiles[k - W] === T.SOFT || tiles[k - W] === T.HARD) && (tiles[k + W] === T.SOFT || tiles[k + W] === T.HARD) ? [1, 2, -1, -2] : [W, 2 * W, -W, -2 * W]) if (k + d >= 0 && k + d < N) byHole[k + d] = 1; // (2026-11-20) never a hiding cabinet in front of a drone hole
     const free = k => k >= 0 && k < N && tiles[k] === T.FLOOR && !shape[k] && !propAt(k) && portal[k] < 0 && hatchAt[k] < 0 && hatchBelow[k] < 0 && ![1, -1, W, -W].some(d => opened[k + d]);
     const blocks = k => { const t = tiles[k]; return !(t === T.FLOOR || t === T.LOW || t === T.STAIR || t === T.HATCH || opened[k]) || shape[k]; };
     const sees = (ax, ay, bx, by, extra) => { const L = Math.hypot(bx - ax, by - ay), n = Math.ceil(L * 4); for (let i = 1; i < n; i++) { const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n, k = Math.floor(y) * W + Math.floor(x); if (extra.has(k) || blocks(k)) return false; } return true; };
@@ -551,7 +552,7 @@ export function makeMap({ id, name, floors }) {
       for (const t of tries) {
         const c = (u, v) => t.along === 'x' ? (t.cy + v * t.sy) * W + t.cx + u * t.sx : (t.cy + u * t.sy) * W + t.cx + v * t.sx; // u along the wall, v out from it
         const nook = [c(0, 0), c(1, 0)], cab = [c(0, 1), c(1, 1)], entry = [c(2, 0), c(2, 1)];
-        if (![...nook, ...cab].every(free) || !entry.every(k => k >= 0 && tiles[k] === T.FLOOR && !propAt(k) && !shape[k])) continue;
+        if (![...nook, ...cab].every(free) || cab.some(k => byHole[k]) || !entry.every(k => k >= 0 && tiles[k] === T.FLOOR && !propAt(k) && !shape[k])) continue;
         if ([...nook, ...cab, ...entry].some(k => roomOf[k] !== ri)) continue;
         const wall = new Set(cab);
         if (eyes.some(([ex, ey]) => nook.some(k => sees(ex, ey, k % W + 0.5, Math.floor(k / W) + 0.5, wall)))) continue; // a doorway sees in: no good
