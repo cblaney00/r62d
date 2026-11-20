@@ -162,4 +162,7 @@ export const PATCH_NOTES = [
   { d: '2026-11-19', k: 'mech', id: 'screenpass', t: 'Screen tidy-up: short messages one at a time on the left above chat (softer for experienced players), the phone camera hole dodged piece by piece (no more lopsided screen), the floor map and ping wheel kept clear of other buttons, numbered drones, calmer colours in Settings, and many small fixes on phones and Esports TV.', v: 0 },
   { d: '2026-11-19', k: 'mech', id: 'reach20', t: 'The crosshair reaches 20% further with every sight and from the hip: hip 22 m, iron 24, holo 25, red dot 28, 1.5x 43, 2x 53, sniper 77.', v: 0 },
   { d: '2026-11-20', k: 'mech', id: 'phonesmall', t: 'Phones: Auto fire is now off for everyone (Settings can still switch it on), and the match screen and touch buttons are a quarter smaller, so you see more of the game; menus shrink too, as far as readable text allows.', v: 0 },
+  { d: '2026-11-20', k: 'map', id: 'smallmaps', t: 'Two new small maps, made for 1v1s and in the normal rotation too: Maple Street House (a two-storey family home) and Lakeside Cabin (a timber cabin with a loft over the great room and a boathouse).', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'duel', t: 'New fun mode 1V1: one a side on the small maps, first to 4, sides swap every round, each player bans one operator before every round. Two wall reinforcements a defender (10 for five, 2 alone).', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'phonechat', t: 'Phones no longer show bot chatter, except in Esports TV.', v: 0 },
 ];

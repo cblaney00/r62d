@@ -2,7 +2,7 @@
 // lobby, the ban step, operator select, preparation and the action on a small map, with screenshots and page errors.
 // Usage like tests/shoot.mjs: node tests/duelshots.mjs <port> <outdir> <gameUrl> [map]
 import { writeFileSync, mkdirSync } from 'node:fs';
-const [port, out, url, mapId] = process.argv.slice(2);
+const [port, out, url, mapId, side] = process.argv.slice(2); // side 'def': switch team first, so you defend round 1
 mkdirSync(out, { recursive: true });
 const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
 let id = 0; const waiting = new Map(), logs = [];
@@ -25,13 +25,14 @@ async function run() {
   await nav(); await sleep(1000);
   await js(`localStorage.setItem('r62d-name', 'Duelist'); true`);
   await nav(); await sleep(3000);
-  await js(`document.getElementById('splash').click(); true`); await sleep(1500);
+  await js(`document.getElementById('splash').click(); true`); await until(`document.getElementById('loading').classList.contains('hidden')`, 60000); await sleep(1500);
   await js(`document.querySelector('[data-tab="fun"]').click(); true`); await sleep(1200);
   await shot('01-fun');
   await js(`document.querySelector('#funGrid [data-mode="duel"]').click(); true`);
   await until(`__r62d.st.last && __r62d.st.last.md === 'duel'`);
   await sleep(1500); await shot('02-lobby');
   if (mapId) { await send({ t: 'lobby', a: 'map', id: mapId }); await sleep(1500); }
+  if (side === 'def') { await send({ t: 'lobby', a: 'addBot', squad: 1 }); await sleep(300); await send({ t: 'lobby', a: 'switch' }); await sleep(1500); await shot('02b-lobby-switched'); }
   console.log('lobby players', await js(`JSON.stringify(__r62d.st.last.players.map(p => [p.n, p.sq, p.b]))`), 'map', await js(`__r62d.st.last.mp`));
   await send({ t: 'lobby', a: 'start' });
   await until(`__r62d.st.last && __r62d.st.last.bq`, 15000); await sleep(800);

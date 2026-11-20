@@ -827,3 +827,10 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - He asked: turn off all automatic shooting options and make the mobile UI 25% smaller. Auto fire was the only one: touch.js `autoFire` now reads `r62d-autofire2` (default off, so phones that had it on start off; shim.js keeps it), still in Settings.
 - touch.js `fitUi`: `PHONE_UI` 0.75 times --uiz, --hudz and --tz on touch devices. Menus never go under --uiz 0.5 on phones (below that their text, held at the minimum size by style.css --minz 0.5, spilled out of its boxes: tried and measured, 521 small texts / many cut-offs). Free play's phone operator cards 112 → 128 px wide for the same reason.
 - Checked in headless phone Firefox: tests/textsize.mjs phone 0 small text and no cut-offs (only #loading's drifting picture past the edge, hidden anyway), tests/phonebuttons.mjs no overlaps (gaps exactly 2.5 px between some buttons), old vs new match screenshots.
+
+## 2026-11-20 — phone bot chatter, 1V1, two small maps
+- He asked: no bot chatter on phones unless Esports TV; a 1v1 mode like Jynxzi's 1v1s on small maps only; small 2-floor maps good for 1v1; then (mid-way) to playtest 1V1 hard, two passes, screens and play, and look for things bots never do that drills could teach. He chose: Siege's 1v1 rules, a suburban house and a lake cabin, in 5v5 too, the card in Fun Modes.
+- Server chat messages carry `bot: 1`; main.js `addChat` drops them on `isTouch` unless `st.tv`.
+- 1V1 and the maps: docs/1v1.md (rules code, `teamSize`/`smallOnly`/`fitMode`, bans every round, two reinforcements a defender, lone-defender prep priority, `soloMode` words, maps, tests, playtest numbers, drill ideas).
+- Fixed on the way: mapkit `ratSpots` could put a hiding cabinet in front of a drone hole (both new maps; Harbor Office lost one hiding spot to it).
+- Tests: tests/duel.js PASS, tests/duelstats.js (73 rounds: attack 45%), tests/duelshots.mjs (no page errors), reach/openings/stairs/stairsides/outdoors/compass PASS on all maps, sim house/cabin/harbor PASS, modes/wsjoin/arena/defsetup/botreinforce/feeds/pickup/furniture/shapes/randommap/ranked PASS.

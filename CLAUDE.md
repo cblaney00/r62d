@@ -53,6 +53,7 @@ Search these with grep for a feature, a function name or a test name before chan
 | `docs/performance.md` | frame-rate work, GPU measuring recipe |
 | `docs/testing.md` | headless browser screenshots (`tests/shoot.mjs`), thumbs test |
 | `docs/balance.md` | balance reports and past changes |
+| `docs/1v1.md` | the 1V1 mode, the small maps (house, cabin), its tests and playtest |
 | `docs/drills.md` | pro drills, patch notes, pro opinions |
 | `docs/sound.md` | sound mix |
 | `docs/notes-next.md`, `docs/batch-*.md`, `docs/sniper-wip.md`, `docs/voice.md` | older plans and leftovers |
@@ -152,7 +153,7 @@ only add to this file if it is a rule every session needs.
   `node tests/balance.js 12` is the balance report (see docs/balance.md for how to read it and past changes).
   `tests/shoot.mjs` drives a hidden Firefox (run as insideabush, via WebDriver BiDi,
   `--remote-debugging-port`) to take screenshots; see `docs/testing.md`.
-- **Status:** full game — 60 operators, 40 guns, 7 maps, gadgets, drones, cameras, reinforcement, rappelling,
+- **Status:** full game — 60 operators, 40 guns, 9 maps (two small: house, cabin; 1V1 plays only those), gadgets, drones, cameras, reinforcement, rappelling,
   barricades, destruction, defuser, DBNO, bots, tutorial, free play, Armory, Map Knowledge, points, HUD, scoreboard.
   **His idea list is `r6-todo.md` — work through it top to bottom, tick items off, keep going.**
   Every idea goes in `r6-todo.md` (there is no other list). Sound mix notes: `docs/sound.md`.
