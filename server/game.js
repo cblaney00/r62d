@@ -434,7 +434,7 @@ export class Game {
     this.site = this.tut ? 0 : open[Math.floor(Math.random() * open.length)];
     this.siteRevealed = false;
     this.spots = { atk: new Map(), def: new Map() };
-    this.reinforce = REINF_EACH;
+    this.reinforce = Math.round(REINF_EACH * this.teamSize() / TEAM_SIZE); // two a defender: 10 for five, 2 in a 1V1 (2026-11-20)
     this.spawnName = this.map.atkSpawns[Math.floor(Math.random() * this.map.atkSpawns.length)].name;
     this.spawnPlan = this.makeSpawnPlan(); this.insideCache = null;
     for (const p of this.players.values()) { p.op = null; p.alive = false; p.ctrl = 'body'; p.busy = null; p.hasDefuser = false; p.locked = false; p.spawn = null; p.staged = false; p.job = null; p.placed = false; }

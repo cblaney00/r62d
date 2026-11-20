@@ -300,7 +300,7 @@ function prepWork(game, p, inp, dt, heard) {
   let t = ai.task;
   if (!t) {
     let bi = 0, bd = Infinity;
-    for (let i = 0; i < ai.tasks.length; i++) { const q = ai.tasks[i], d = q.x == null ? 1e6 : Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; bi = i; } }
+    for (let i = 0; i < ai.tasks.length; i++) { const q = ai.tasks[i], d = (q.x == null ? 1e6 : Math.hypot(q.x - p.x, q.y - p.y)) - (q.pri || 0) * 1e7; if (d < bd) { bd = d; bi = i; } } // (pri: done first, 1V1)
     t = ai.tasks.splice(bi, 1)[0];
     if (t.pick) { const g = t.pick(); if (!g) return true; Object.assign(t, g); }
     t.left = t.wait; t.T = 0; ai.task = t;
@@ -347,10 +347,11 @@ export function botPrep(game, p) {
   // boards (he asked: not boarding yourselves in): the site's doors to the held rooms stay open; the held rooms' outer
   // doors and the other site doors are shared out, one board each, a board takes as long as a person's
   const mates = [...game.players.values()].filter(q => q.bot && game.side(q) === TEAM.DEF), mi = Math.max(0, mates.indexOf(p)), n = Math.max(1, mates.length);
-  const boards = [...ds.outerBoards, ...ds.siteBoards].filter((id, i) => i % n === mi && m.tiles[m.openings[id].cells[0]] === T.OPEN && Math.random() < boardP);
+  const solo = game.teamSize && game.teamSize() === 1; // 1V1 (2026-11-20): alone, a defender reinforces first and boards only the site's own doors (boarding every door ate the whole preparation)
+  const boards = (solo ? ds.siteBoards.slice(0, 3) : [...ds.outerBoards, ...ds.siteBoards]).filter((id, i) => i % n === mi && m.tiles[m.openings[id].cells[0]] === T.OPEN && Math.random() < boardP);
   for (const id of boards) { const s = opSpot(id); later(s.x, s.y, () => { if (p.barri > 0 && game.barricade(id, T.BARRI)) p.barri--; }, DUR.barricade, { face: cxy(m.openings[id].cells[0]) }); }
   // reinforcing: two each, picked when it is their turn (walls already done or claimed are skipped)
-  for (let i = 0; i < 2; i++) tasks.push({ x: site.bombs[0].x, y: site.bombs[0].y, pick: () => reinforceTarget(game), wait: DUR.reinforce });
+  for (let i = 0; i < 2; i++) tasks.push({ x: site.bombs[0].x, y: site.bombs[0].y, pick: () => reinforceTarget(game), wait: DUR.reinforce, pri: solo ? 1 : 0 });
   // a rotation hole (Gold up, and Silver half the time): the first bot free knocks it open, wall then stub
   if (lvl >= 3 || (lvl === 2 && Math.random() < 0.5)) for (const h of ds.holes) if (!ds.holeBy.has(h)) { ds.holeBy.set(h, p.id); const c = cxy(h.cells[0]); tasks.push({ x: c.x, y: c.y, melee: h.cells, d: h.d }); break; }
   const bomb = site.bombs[Math.floor(Math.random() * 2)];

@@ -1558,7 +1558,7 @@ function renderLobby(s) {
     const list = s.players.filter(p => p.sq === sq);
     const html = list.map(p => p.b && p.bs ? `<li class="botLi${st.botOpen === p.n ? ' open' : ''}" data-bn="${esc(p.n)}" title="${esc(p.bs)}"><span>${esc(p.n)}</span><span>${rankTag(p.br)}<span class="bot">BOT</span></span><i class="botStyle">${esc(p.bs)}</i></li>` // (an everyday bot: hover or tap for how they play)
       : `<li class="${p.id === s.you ? 'me' : ''}"><span>${esc(p.n)}</span>${p.b ? '<span class="bot">BOT</span>' : rankTag(p.rn)}</li>`).join('') +
-      Array(Math.max(0, ((MODES[s.md] && MODES[s.md].size) || 5) - list.length)).fill('<li style="opacity:.3"><span>— empty —</span></li>').join('');
+      Array(Math.max(0, ((MODES[s.md] && MODES[s.md].size) || 5) - list.length)).fill(MODES[s.md] && MODES[s.md].size === 1 ? '<li style="opacity:.3"><span>— a bot plays you, unless a friend joins —</span></li>' : '<li style="opacity:.3"><span>— empty —</span></li>').join('');
     if (ul.innerHTML !== html) ul.innerHTML = html;
     if (!ul.dataset.tap) { ul.dataset.tap = 1; ul.addEventListener('click', e => { const li = e.target.closest('li.botLi'); if (!li) return; st.botOpen = st.botOpen === li.dataset.bn ? null : li.dataset.bn; for (const o of document.querySelectorAll('li.botLi')) o.classList.toggle('open', o.dataset.bn === st.botOpen); }); }
   }
@@ -1652,18 +1652,20 @@ function showSelMap(s, me, side) {
 // Unranked / Ranked bans (he asked, like R6): before round 1 the teams take turns banning an attacker or a defender.
 // On your team's turn you see every operator of that side and click one to ban it (the first click on the team counts);
 // otherwise you see who is banning. Banned operators are shown in two rows the whole time.
+// 1V1: one a side, so the words are about you and your opponent, not teams
+const soloMode = s => !!(s && MODES[s.md] && MODES[s.md].size === 1);
 function banPick(s) {
   const el = $('banPick'), me = st.me, q = s.bq, bans = s.bn || [];
   el.classList.toggle('hidden', !q || !me);
   if (!q || !me) return;
   const [sq, sd, left, i, n] = q, ours = sq === me.sq, team = x => x === me.sq ? 'YOUR TEAM' : 'THE ENEMY', banned = new Set(bans.map(b => b[0]));
-  const key = [i, ours, bans.map(b => b[0]).join()].join('|');
+  const solo = soloMode(s), key = [i, ours, solo, bans.map(b => b[0]).join()].join('|');
   if (el.dataset.k !== key) {
     el.dataset.k = key;
     const row = side => bans.filter(b => OPERATORS[b[0]] && OPERATORS[b[0]].team === side).map(b => `<div class="bpBan"><canvas width="90" height="90" data-op="${b[0]}"></canvas><b>${esc(OPERATORS[b[0]].name)}</b><span>${b[1] === me.sq ? 'YOURS' : 'THEIRS'}</span></div>`).join('') || '<span class="hint">none yet</span>';
-    el.innerHTML = `<div class="bpTop"><small>BAN PHASE · ${i + 1} / ${n}</small><b class="${ours ? 'ours' : ''}">${ours ? 'YOUR TEAM: BAN' : 'THE ENEMY IS BANNING'} ${sd === 'atk' ? 'AN ATTACKER' : 'A DEFENDER'}</b><span class="bpTime"></span></div>` +
-      (ours ? `<p class="hint">Click the operator you don't want anyone to play this match. If nobody on your team picks before the clock runs out, there is no ban.</p><div class="bpGrid">${opsForTeam(sd).filter(o => !banned.has(o)).map(o => `<button data-op="${o}"><canvas width="120" height="120" data-op="${o}"></canvas><b>${esc(OPERATORS[o].name)}</b><span>${esc(OPERATORS[o].role)}</span></button>`).join('')}</div>`
-        : `<p class="hint bpWait">Waiting for the enemy team to choose…</p>`) +
+    el.innerHTML = `<div class="bpTop"><small>BAN PHASE · ${i + 1} / ${n}</small><b class="${ours ? 'ours' : ''}">${ours ? (solo ? 'YOU: BAN' : 'YOUR TEAM: BAN') : solo ? 'YOUR OPPONENT IS BANNING' : 'THE ENEMY IS BANNING'} ${sd === 'atk' ? 'AN ATTACKER' : 'A DEFENDER'}</b><span class="bpTime"></span></div>` +
+      (ours ? `<p class="hint">${solo ? `Click the ${sd === 'atk' ? 'attacker' : 'defender'} you don't want to face this round. No click before the clock runs out: no ban.` : "Click the operator you don't want anyone to play this match. If nobody on your team picks before the clock runs out, there is no ban."}</p><div class="bpGrid">${opsForTeam(sd).filter(o => !banned.has(o)).map(o => `<button data-op="${o}"><canvas width="120" height="120" data-op="${o}"></canvas><b>${esc(OPERATORS[o].name)}</b><span>${esc(OPERATORS[o].role)}</span></button>`).join('')}</div>`
+        : `<p class="hint bpWait">${solo ? 'Waiting for your opponent to choose…' : 'Waiting for the enemy team to choose…'}</p>`) +
       `<div class="bpRows"><div><h4>ATTACKERS BANNED</h4><div class="bpRow">${row('atk')}</div></div><div><h4>DEFENDERS BANNED</h4><div class="bpRow">${row('def')}</div></div></div>`;
     for (const c of el.querySelectorAll('canvas')) portraitCached(c, c.dataset.op);
     for (const b of el.querySelectorAll('.bpGrid button')) b.onclick = () => { audio.ui('lock'); send({ t: 'ban', op: b.dataset.op }); };
@@ -1732,9 +1734,9 @@ function buildSelect(s) {
     sc.dataset.k = sk;
     // defenders pick the site; each attacker picks where they start (he asked)
     sc.innerHTML = side === 'def' ? '<span>CHOOSE THE SITE TO DEFEND</span>' + st.map.sites.map((x, i) => used.includes(i) && i !== s.site ? `<button data-n="${i}" class="used" disabled title="Already played this match">${esc(x.name)}</button>` : `<button data-n="${i}" class="${i === s.site ? 'on' : ''}">${esc(x.name)}</button>`).join('')
-      : '<span>CHOOSE YOUR SPAWN</span>' + `<button data-n="-1" class="${me.sr ? 'on atk' : 'atk'}" title="The team spreads out: usually two groups and one player on their own">RANDOM</button>` // the default (he asked)
+      : '<span>CHOOSE YOUR SPAWN</span>' + `<button data-n="-1" class="${me.sr ? 'on atk' : 'atk'}" title="${soloMode(s) ? 'A spawn picked at random' : 'The team spreads out: usually two groups and one player on their own'}">RANDOM</button>` // the default (he asked)
         + spawns.map((x, i) => `<button data-n="${i}" class="${!me.sr && i === me.spn ? 'on atk' : 'atk'}">${esc(x.name)}${me.sr && i === me.spn ? ' ✓' : ''}</button>`).join('')
-        + `<button data-dq="1" class="${me.dq ? 'on atk' : 'atk'}" title="The defuser goes to one of the attackers who asked for it (anyone, if nobody asks)">${me.dq ? '✓ ' : ''}REQUEST DEFUSER${dqN ? ` · ${dqN} ASKED` : ''}</button>`; // (he asked 2026-11-15)
+        + (soloMode(s) ? '' : `<button data-dq="1" class="${me.dq ? 'on atk' : 'atk'}" title="The defuser goes to one of the attackers who asked for it (anyone, if nobody asks)">${me.dq ? '✓ ' : ''}REQUEST DEFUSER${dqN ? ` · ${dqN} ASKED` : ''}</button>`); // (he asked 2026-11-15)
     for (const b of sc.querySelectorAll('button')) b.onclick = () => { audio.ui(); send(b.dataset.dq ? { t: 'defreq', on: !me.dq } : side === 'def' ? { t: 'site', n: +b.dataset.n } : { t: 'spawn', n: +b.dataset.n }); };
   }
   drawSpawnMap(side === 'atk' && placed ? mates : null, me);
@@ -1768,9 +1770,9 @@ function placeList(s, me, side, rb) {
   if (side === 'def') rb.innerHTML = '<div class="rbHead">CHOOSE THE SITE TO DEFEND</div>' + m.sites.map((x, i) => {
     const gone = used.includes(i) && i !== s.site, fl = [...new Set(x.bombs.map(b => m.floors[Math.max(0, floorAt(m, b.x, b.y))].name))].join(' + ');
     return `<button data-n="${i}" class="${i === s.site ? 'on' : ''}" ${gone ? 'disabled' : ''}><b>${esc(x.name.toUpperCase())}</b><span>${esc(x.bombs.map(b => b.id + ': ' + b.room).join(' · '))}</span><small>${esc(fl)}${gone ? ' · ALREADY PLAYED' : ''}</small></button>`; }).join('');
-  else rb.innerHTML = '<div class="rbHead">CHOOSE YOUR SPAWN</div>' + `<button data-n="-1" class="${me.sr ? 'on' : ''}"><b>RANDOM</b><span>The team spreads out: usually two groups and one player on their own</span></button>`
+  else rb.innerHTML = '<div class="rbHead">CHOOSE YOUR SPAWN</div>' + `<button data-n="-1" class="${me.sr ? 'on' : ''}"><b>RANDOM</b><span>${soloMode(s) ? 'A spawn picked at random' : 'The team spreads out: usually two groups and one player on their own'}</span></button>`
     + m.atkSpawns.map((x, i) => `<button data-n="${i}" class="${!me.sr && i === me.spn ? 'on' : ''}"><b>${esc(x.name.toUpperCase())}</b></button>`).join('')
-    + `<button data-dq="1" class="${me.dq ? 'on' : ''}"><b>${me.dq ? '✓ ' : ''}REQUEST DEFUSER</b><span>The defuser goes to one of the attackers who asked for it</span></button>`;
+    + (soloMode(s) ? '' : `<button data-dq="1" class="${me.dq ? 'on' : ''}"><b>${me.dq ? '✓ ' : ''}REQUEST DEFUSER</b><span>The defuser goes to one of the attackers who asked for it</span></button>`);
   // (he asked 2026-11-18: clicking a site or spawn is the choice and moves on; only the operator and loadout step has a LOCK IN)
   for (const b of rb.querySelectorAll('button')) b.onclick = () => { if (b.dataset.dq) { audio.ui(); send({ t: 'defreq', on: !(st.me && st.me.dq) }); return; } audio.ui('lock'); send(side === 'def' ? { t: 'site', n: +b.dataset.n } : { t: 'spawn', n: +b.dataset.n }); send({ t: 'place' }); };
 }
