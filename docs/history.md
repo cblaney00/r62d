@@ -835,3 +835,7 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Fixed on the way: mapkit `ratSpots` could put a hiding cabinet in front of a drone hole (both new maps; Harbor Office lost one hiding spot to it).
 - Tests: tests/duel.js PASS, tests/duelstats.js (73 rounds: attack 45%), tests/duelshots.mjs (no page errors), reach/openings/stairs/stairsides/outdoors/compass PASS on all maps, sim house/cabin/harbor PASS, modes/wsjoin/arena/defsetup/botreinforce/feeds/pickup/furniture/shapes/randommap/ranked PASS.
 - Later the same day: bots keep their personalities in 1V1 (checked), and the bot opponent now talks to you in all chat by how chatty it is (docs/1v1.md "Personalities and small talk", tests/duelchat.js PASS).
+
+## Invisible walls (2026-11-20, he found one)
+- He: "a wall between the place i was proning and the site that is invisible", right of A on Lakeside Cabin. It was the Den TV (1x3, standing sideways): mapdraw `tv` only drew a strip at the top of its box. Sideways TVs now draw whole (screen on the wall side); the cabin TV moved to (44,31) against the wall.
+- A check of every solid prop on every map, drawn in a hidden browser and measured cell by cell (scratch script, like tests/shoot.mjs), found the same fault in: `crates` (always drew 2x2), `chairs` rows (w > h drew one seat), outdoor `swings` (a solid 3x7 drawn as a bar; now drawn with their frame and LOW). After: 0 under-drawn cells.

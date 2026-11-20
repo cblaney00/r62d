@@ -64,7 +64,7 @@ export const OUTDOORS = {
   school: {
     edge: 'fence', scatter: [['tree', 2, 2, 1], ['bush', 2, 2, 1]],
     spawns: {
-      'Playground': { cover: ['climbframe', 'slide'], ground: [FL.ASPHALT, 15], marks: ['court'], pieces: [['climbframe', -10, -2, 6, 5, 1], ['slide', 9, -3, 3, 6, 1], ['swings', 0, -9, 7, 3, 1], ['bench', -5, 4, 3, 1, 2], ['bench', 5, 4, 3, 1, 2], TREE(-14, 5), TREE(14, 5)] },
+      'Playground': { cover: ['climbframe', 'slide'], ground: [FL.ASPHALT, 15], marks: ['court'], pieces: [['climbframe', -10, -2, 6, 5, 1], ['slide', 9, -3, 3, 6, 1], ['swings', 0, -9, 7, 3, 2], ['bench', -5, 4, 3, 1, 2], ['bench', 5, 4, 3, 1, 2], TREE(-14, 5), TREE(14, 5)] },
       'Bus Stop': { cover: ['schoolbus', 'schoolbus'], road: [FL.ASPHALT, 9, 0], marks: ['lanes', 'crossing'], pieces: [VEH('schoolbus', -12, -1, 'u'), VEH('schoolbus', 13, -1, 'u'), ['shelter', 9, 6, 6, 2, 1], ['bench', -6, 6, 3, 1, 2], ['lamp', -14, 6, 1, 1, 1]] },
       'Sports Field': { cover: ['bleachers', 'bleachers'], ground: [FL.GRASS, 16], marks: ['field'], pieces: [['bleachers', -10, 4, 9, 3, 1], ['bleachers', 10, 4, 9, 3, 1], ['goal', 0, -12, 6, 2, 1], ['bench', -13, -3, 3, 1, 2], ['bench', 13, -3, 3, 1, 2]] },
       'Teacher Parking': { cover: ['car', 'van'], ground: [FL.ASPHALT, 14], marks: ['bays'], pieces: [CAR(-12, -6), CAR(-8, -6), CAR(9, -6), CAR(13, -6), ['bikerack', -11, 4, 6, 1, 2], ['bush', 11, 4, 2, 2, 1]] },
@@ -76,7 +76,7 @@ export const OUTDOORS = {
     spawns: {
       'Maple Street': { cover: ['car', 'van'], road: [FL.ASPHALT, 8, 0], marks: ['lanes'], pieces: [CAR(-11, 1, 'u'), CAR(12, 1, 'u'), ['lamp', -5, 6, 1, 1, 1], TREE(15, 7), BUSH(-15, 6)] },
       'Driveway': { cover: ['car', 'dumpster'], ground: [FL.ASPHALT, 10], pieces: [CAR(-8, -2), ['dumpster', 8, 3, 3, 2, 1], ['bikerack', 9, -4, 4, 1, 2], HEDGE(-12, 4)] },
-      'Back Yard': { cover: ['hedge', 'hedge'], ground: [FL.GRASS, 12], pieces: [HEDGE(9, 2), ['bench', 4, -5, 3, 1, 2], TREE(-13, 4), TREE(12, -6), ['planter', 0, 4, 2, 2, 2], ['swings', -8, -6, 7, 3, 1]] },
+      'Back Yard': { cover: ['hedge', 'hedge'], ground: [FL.GRASS, 12], pieces: [HEDGE(9, 2), ['bench', 4, -5, 3, 1, 2], TREE(-13, 4), TREE(12, -6), ['planter', 0, 4, 2, 2, 2], ['swings', -8, -6, 7, 3, 2]] },
       'Side Path': { cover: ['hedge', 'car'], ground: [FL.CONCRETE, 8], path: FL.CONCRETE, pieces: [HEDGE(-9, 2), HEDGE(9, 2), CAR(0, -8, 'u'), TREE(-13, -4), TREE(13, -5)] },
     },
   },

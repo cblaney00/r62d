@@ -1049,6 +1049,15 @@ export function drawProp(ctx, p, m) {
       break;
     }
     case 'tv': {
+      if (p.h > p.w) { // standing sideways (he found one 2026-11-20 that was only drawn at its top end: a solid wall nobody could see): screen on the wall side, cabinet in front of it
+        const solid = t => t === T.HARD || t === T.SOFT || t === T.REINF, my = p.y + (p.h >> 1), wallR = m && solid(m.tiles[my * m.W + p.x + p.w]) || !(m && solid(m.tiles[my * m.W + p.x - 1]));
+        const sx = wallR ? X + W - 7 : X + 3, cx = wallR ? X + W - 15 : X + 6;
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(cx + (wallR ? -2 : 4), Y + 2, 5, H);
+        ctx.fillStyle = '#3a3026'; ctx.fillRect(cx, Y - 4, 9, H + 8);
+        ctx.fillStyle = '#0b0c0e'; ctx.fillRect(sx, Y, 4, H);
+        ctx.fillStyle = 'rgba(80,140,200,0.35)'; ctx.fillRect(wallR ? sx + 0.2 : sx + 3.2, Y + 1, 0.6, H - 2);
+        break;
+      }
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(X + 2, Y + 6, W, 5);
       ctx.fillStyle = '#3a3026'; ctx.fillRect(X - 4, Y + 6, W + 8, 9);
       ctx.fillStyle = '#0b0c0e'; ctx.fillRect(X, Y + 3, W, 4);
@@ -1101,6 +1110,7 @@ export function drawProp(ctx, p, m) {
       break;
     }
     case 'chairs': {
+      if (p.w > p.h) { for (let i = 0; i < p.w * 2; i++) { const cx = X + 4 + i * 8; ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(cx + 1, Y + 3, 7, 12); ctx.fillStyle = '#2e4058'; rr(ctx, cx, Y + 2, 7, 12, 2); ctx.fill(); ctx.fillStyle = '#22303f'; ctx.fillRect(cx, Y + 2, 7, 3); } break; } // a row across (it only drew the first seat)
       for (let i = 0; i < p.h * 2; i++) { const cy = Y + 4 + i * 8; ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(X + 3, cy + 1, 12, 7); ctx.fillStyle = '#2e4058'; rr(ctx, X + 2, cy, 12, 7, 2); ctx.fill(); ctx.fillStyle = '#22303f'; ctx.fillRect(X + 2, cy, 3, 7); }
       break;
     }
@@ -1128,8 +1138,8 @@ export function drawProp(ctx, p, m) {
       ctx.restore();
       break;
     }
-    case 'crates': {
-      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+    case 'crates': { // one crate a cell, as big as the pile (it always drew 2 x 2: a 3-wide pile had a solid column nobody could see, he found 2026-11-20)
+      for (let i = 0; i < p.w; i++) for (let j = 0; j < p.h; j++) {
         const cx = X + i * 16, cy = Y + j * 16;
         ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(cx + 2, cy + 3, 15, 15);
         ctx.fillStyle = shade('#9a7448', 0.85 + h(i * 2 + j) * 0.3); ctx.fillRect(cx + 0.5, cy + 0.5, 15, 15);

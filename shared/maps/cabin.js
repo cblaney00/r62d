@@ -44,7 +44,7 @@ export function build() {
   G.prop('locker', 43, 20, 1, 2, T.TALL); G.prop('bench', 40, 24, 3, 1, T.LOW);
   G.prop('bed', 16, 27, 3, 4, T.LOW); G.prop('bed', 21, 27, 2, 4, T.LOW);
   G.prop('sink', 26, 32, 2, 1, T.LOW);
-  G.prop('couch', 33, 27, 1, 5, T.LOW); G.prop('tv', 43, 28, 1, 3, T.TALL); G.prop('coffeetable', 37, 28, 3, 3, T.LOW);
+  G.prop('couch', 33, 27, 1, 5, T.LOW); G.prop('tv', 44, 31, 1, 2, T.TALL); // (against the east wall: it stood loose a cell off it, by the door) G.prop('coffeetable', 37, 28, 3, 3, T.LOW);
   G.prop('boat', 52, 27, 3, 8, T.LOW); G.prop('workbench', 58, 25, 4, 1, T.LOW); G.prop('rack', 62, 31, 1, 2, T.TALL); G.prop('barrels', 59, 34, 2, 2, T.TALL);
   // the lake along the south edge, a pebble shore before it
   G.prop('sea', 0, 46, 50, 8, T.LOW); G.prop('sea', 55, 46, 17, 8, T.LOW); G.prop('sea', 50, 50, 5, 4, T.LOW);
