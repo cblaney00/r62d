@@ -858,3 +858,15 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - tests/pickup.js counted every entity on the map (other things expiring made it fail by chance): now only the player's own. The mason dshield case fails now and then on old versions too (space to place it).
 - Phones: touch.js sprint = a flick (FLICK_MS 230 from under FLICK_FROM 0.35 to FLICK_EDGE 0.95, path at least 80% straight), off below SPRINT_OFF 0.6; the double-tap and the tap-to-aim on the aim stick are gone; AIM is a ring piece on the aim stick's inner band at -176..-137° (touchlayout.js). A tap button now registers its finger (AIM, ACTION, ?): the same finger reported again when the other thumb landed flipped it back. tests/thumbs.mjs SCENARIO=rings updated.
 - Phones, buttons never hide enemies: main.js `coverDodge` (touch.js `coverShapes`: stick circles with rings, button boxes): seen enemies (st.foesNow, filled while drawing), the sightline's far end and the aim stick's far point are pushed out from under covers by sliding the camera (towards the middle, at most 32% / 30% of the screen, never putting you under a button), in at rate 5, back at 1.5 after 0.8 s clear (held while anything is within 40 px). tests/phonecover.mjs (st.testFoe stands in for a seen enemy).
+
+## 2026-11-20 — 1V1 meta test (he asked: which operators are so strong they should be perma-banned; "Wraith is an example")
+- `node tests/duelmeta.js [rounds] [level] [workers] [--save f.json] [--add a.json,...]`: bot-only 1V1 rounds on the small
+  maps in worker processes; each round each side gets its least-played operator (ties random), bans off, select 2 s. Win rate
+  is moved onto a 50% scale for its side ("strength", because attack won 45%), Wilson 90% range; PERMA-BAN? = strength
+  over 60% and its range above 55%. Checks every round that the given operator and its gear were kept. ~1 CPU-second a round:
+  12,600 rounds took 11 minutes on 15 workers.
+- Result (level 5, 12,600 rounds, ~400 a operator, ±4%): MASON 63%, SHUNT 62%, ECHO 62% (PERMA-BAN?); TALON 59, HUSH 59,
+  HAZE 57, HOIST 56 (strong); weakest PERCH 36 (WEAK), LOCKJAW 40, NAIL/KESTREL/LATCH/BRAMBLE 41, OSPREY 42. WRAITH 50%.
+  Lone-defender site lockers (Mason's steel panels, Shunt's anti-breach grid) shut the bots' entry; Echo's spikes find the
+  lone defender. Bots scan with WRAITH only when they hear something or now and then and only walk to the blip, so the test
+  cannot judge how strong the scanner is in a person's hands. Nothing changed in the game: perma-bans wait for his choice.
