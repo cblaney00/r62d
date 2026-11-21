@@ -155,3 +155,4 @@ His wishes so far:
 - **Outdoor zoom (2026-11-20, he asked):** outside the view rests at a room's size (OUT_H 470); only dragging the crosshair out widens it.
 - **Phone sprint / AIM (2026-11-20, he chose):** sprint = a quick, fairly straight push of the move stick to its edge; AIM = a button beside the aim stick, tap on / tap off.
 - **Phones: buttons never hide enemies (2026-11-20, he asked):** coverDodge slides the camera so seen enemies, your sightline and aim point come out from under the thumb controls; tests/phonecover.mjs.
+- Balance answers (he chose 2026-11-20, done 2026-11-21): FERRO hammer = soft-wall see-through holes + reinforced hatches in 3 swings; armour health 136/132/128; bots play for the plant (`planPush`) and act on team information (`ai.intel`); Dust Town A has the Spice Passage and fewer ways in. Numbers: docs/balance.md.

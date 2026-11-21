@@ -889,6 +889,11 @@ export function botThink(game, p, dt) {
     if (game.time - (ai.spotT[id] || -99) < 8 || Math.hypot(q.x - p.x, q.y - p.y) > 420 || floorAt(map, q.x, q.y) !== floorAt(map, p.x, p.y)) continue;
     ai.spotT[id] = game.time; ai.heard = { x: q.x, y: q.y, t: game.time }; break;
   }
+  // he chose 2026-11-20: bots act on information (a scan, a camera, a teammate's callout), not just collect it: the nearest
+  // enemy the team knows about is kept as ai.intel, and they aim where that enemy will appear, wait for them, or hold for them
+  if (!NOINTEL && (p.pro || lvlOf(game, p) >= 3) && game.spots[team]) { let best = null, bd = 600;
+    for (const [id, until] of game.spots[team]) { if (until < game.time) continue; const q = game.players.get(id); if (!q || !q.alive || floorAt(map, q.x, q.y) !== floorAt(map, p.x, p.y)) continue; const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = q; } }
+    if (best) ai.intel = { x: best.x, y: best.y, t: game.time, id: best.id, aim: best.aim }; }
   const heardRecently = ai.heard && game.time - ai.heard.t < 4;
   if (heardRecently && ai.heard.t !== ai.heardSaid && game.phase === PHASE.ACTION && Math.random() < 0.1) { ai.heardSaid = ai.heard.t;
     const up = floorAt(map, ai.heard.x, ai.heard.y) !== floorAt(map, p.x, p.y); if (up) talk(game, p, 'heardFloor', {}, 'hearUp'); else talk(game, p, 'heard', { place: place(game, ai.heard.x, ai.heard.y) }, 'hear' + place(game, ai.heard.x, ai.heard.y)); }
@@ -1081,6 +1086,7 @@ export function botThink(game, p, dt) {
   if (ai.cmd && botCmd(game, p, inp, dt)) return; // a person on the team asked for something
   if (team === TEAM.DEF && !game.planted && prepWork(game, p, inp, dt, heardRecently)) return; // preparation: boards, walls, traps, rotation holes
   if (action && !p.downed && rankHabits(game, p, inp, dt, team, site, gun)) return; // by rank: wandering off alone, trading a teammate, shooting through walls
+  if (team === TEAM.ATK && action && !game.planted && !p.hasDefuser && !p.downed && intelWait(game, p, inp, dt)) return; // a known defender looking our way: wait for them to look away
   if (p.pro && (action || game.phase === PHASE.PREP) && proAct(game, p, inp, dt, team)) return;
 
   // --- objective ---
@@ -1118,7 +1124,7 @@ export function botThink(game, p, dt) {
       goal = ai.hold || (ai.hold = nearBomb(game, site, 70));
       // (he asked 2026-11-18) from Platinum up a defender waits for information: stays on the hold longer and, hearing
       // someone, turns to the sound and lets them come instead of going to look
-      if (p.pro || lvlOf(game, p) >= 4) { if (ai.holdT && !ai.patientT) { ai.holdT += 12; ai.patientT = 1; } if (heardRecently && ai.heard) ai.watch = { x: ai.heard.x, y: ai.heard.y }; }
+      if (p.pro || lvlOf(game, p) >= 4) { if (ai.holdT && !ai.patientT) { ai.holdT += 12; ai.patientT = 1; } if (heardRecently && ai.heard) ai.watch = { x: ai.heard.x, y: ai.heard.y }; else if (intelNow(game, p)) ai.watch = { x: ai.intel.x, y: ai.intel.y }; }
       if (ai.holdT && game.time > ai.holdT) ai.patientT = 0;
     }
   }
@@ -1759,6 +1765,7 @@ function moveTo(game, p, inp, goal, dt, hold = false) {
     if ((ai.threatT = (ai.threatT || 0) - dt) <= 0) { ai.threatT = 0.7; ai.threat = threatPoint(game, p, dirA); }
     if (ai.threat) lookA = Math.atan2(ai.threat.y - p.y, ai.threat.x - p.x);
   }
+  { const iv = intelNow(game, p); if (iv && iv.d < 450 && preAims(game, p)) { const c = angleOn(game, p, iv); if (c) lookA = Math.atan2(c.y - p.y, c.x - p.x); } } // (he chose 2026-11-20) a known enemy: pre-aim the corner they will come round
   turnTo(p, lookA, skill(game, p).turn * 0.8, dt);
   if (vaultable(map, next) && Math.hypot(nx - p.x, ny - p.y) < 24) { // climb over it, or note it can't be done and go round
     if (game.startVault(p, dirA)) feat(p, 'vault'); else { (ai.noVault || (ai.noVault = new Set())).add(next); ai.path = null; }
@@ -2742,6 +2749,20 @@ function spreadSpot(game, p, base, gap, look = null) {
 }
 // One pro's part of the plan this tick. true: handled (movement set); false: the ordinary bot behaviour carries on.
 const site0 = game => game.map.sites[game.site];
+const NOINTEL = !!process.env.R62D_NOINTEL, NOPLANT = !!process.env.R62D_NOPLANT, NOWAIT = !!process.env.R62D_NOWAIT; // (tests only: switch the 2026-11-20 bot changes off to compare)
+// Play for the plant (he chose 2026-11-20): the attackers are a player up, a teammate is on the site, or the clock is under a minute.
+function planPush(game, squad) {
+  let a = 0, d = 0; for (const q of game.players.values()) if (q.alive && !q.downed) { if (q.squad === squad) a++; else d++; }
+  if (a > d || game.timer < 60) return true;
+  const bombs = site0(game).bombs; // or a teammate already stands on the site
+  for (const q of game.players.values()) if (q.alive && !q.downed && q.squad === squad && !q.hasDefuser && bombs.some(b => Math.hypot(b.x - q.x, b.y - q.y) < 110)) return true;
+  return false;
+}
+// the two attackers nearest the defuser carrier walk with them to the plant
+function escorts(game, car) {
+  return [...game.players.values()].filter(q => q !== car && q.alive && !q.downed && q.squad === car.squad && Math.hypot(q.x - car.x, q.y - car.y) < 500)
+    .sort((a, b) => Math.hypot(a.x - car.x, a.y - car.y) - Math.hypot(b.x - car.x, b.y - car.y)).slice(0, 2);
+}
 function proAct(game, p, inp, dt, team) {
   const side = team === TEAM.ATK ? 'atk' : 'def', st = proPlan(game, p.squad, side), plan = st.plan; if (!plan) return false;
   const ai = p.ai, j = plan.jobs[p.pro.pl.jobs[side]] || plan.jobs[jobOf(p.op)]; if (!j) return false;
@@ -2750,6 +2771,7 @@ function proAct(game, p, inp, dt, team) {
   else if (!st.called && game.phase === PHASE.PREP && side === 'def') { st.called = true; proCall(game, p.squad, `${plan.name}: ${plan.idea}`, 'plan', { plan: plan.name }); }
   const watch = (pt, crouch) => { // hold an angle like a person: a noise first, now and then the other ways in, else the job's angle
     if (ai.heard && game.time - ai.heard.t < 2.5) pt = ai.heard;
+    else if (intelNow(game, p)) pt = ai.intel; // a scan or callout: aim where they will come from
     else { if ((ai.chkT = (ai.chkT ?? 3 + Math.random() * 3) - dt) <= 0) { ai.chkT = 3 + Math.random() * 4; ai.chk = Math.random() < 0.4 ? threatPoint(game, p, p.aim + (Math.random() - 0.5) * 3) : null; ai.chkUntil = game.time + 1.2; }
       if (ai.chk && game.time < ai.chkUntil) pt = ai.chk; }
     pt = angleOn(game, p, pt); if (pt) turnTo(p, Math.atan2(pt.y - p.y, pt.x - p.x), S.turn * 0.6, dt); inp.crouch = crouch ? 1 : 0; // he asked: crosshair placement matters most — held still on the spot, no drifting
@@ -2766,6 +2788,18 @@ function proAct(game, p, inp, dt, team) {
     if (action && game.planted) return postPlant(game, p, inp, dt, watch); // the objective now: protect the defuser
     if (!action || ai.inSite) return false;
     if (p.hasDefuser && site0(game).bombs.some(b => near(p, b, 130)) && !visibleEnemy(game, p, skill(game, p).see)) { ai.inSite = true; return false; } // the carrier at the site with nobody in sight: plant now (he asked: play for the plant)
+    // he chose 2026-11-20: play for the plant. Once the push is on and the team is a player up (or the clock is under a
+    // minute), the carrier stops hunting and goes to plant, and the nearest two teammates walk with them watching the ways in.
+    if (!NOPLANT && el >= st.go && planPush(game, p.squad)) {
+      if (p.hasDefuser && !visibleEnemy(game, p, S.see)) { ai.goPlant = true; ai.inSite = true; feat(p, 'goPlant'); return false; }
+      const car = [...game.players.values()].find(q => q.alive && !q.downed && q.squad === p.squad && q.hasDefuser);
+      if (car && car !== p && escorts(game, car).includes(p) && !visibleEnemy(game, p, S.see)) {
+        const b = site0(game).bombs.reduce((a, c) => Math.hypot(c.x - car.x, c.y - car.y) < Math.hypot(a.x - car.x, a.y - car.y) ? c : a);
+        const a = Math.atan2(b.y - car.y, b.x - car.x) + (escorts(game, car)[0] === p ? 1.2 : -1.2), spot = { x: car.x + Math.cos(a) * 34, y: car.y + Math.sin(a) * 34 };
+        if (!near(p, spot, 18)) { moveTo(game, p, inp, spot, dt); inp.walk = near(p, car, 140) ? 1 : 0; } else watch(threatPoint(game, p, Math.atan2(b.y - p.y, b.x - p.x)), false);
+        return true;
+      }
+    }
     if (game.timer < 35) return false; // the clock: forget the plan, everyone to the bomb
     const dropped = game.ents.find(e => e.type === 'defuser');
     if (dropped) { const mates = [...game.players.values()].filter(q => q.alive && !q.downed && q.squad === p.squad); const nearest = mates.sort((a, b) => Math.hypot(a.x - dropped.x, a.y - dropped.y) - Math.hypot(b.x - dropped.x, b.y - dropped.y))[0]; if (nearest === p) return false; } // the closest one fetches a dropped defuser
@@ -3014,4 +3048,23 @@ export function duelTalk(game, moment, o = {}) {
 export function duelFlush(game) {
   const q = game.duelQ; if (!q || !q.length) return;
   for (let i = q.length - 1; i >= 0; i--) if (game.time >= q[i].at) { const r = q.splice(i, 1)[0], w = game.players.get(r.id); if (w) { w.chatTimes = []; game.chat(w, { text: r.text, team: false }); } }
+}
+
+// Information (he chose 2026-11-20): the enemy the team knows about, if it is fresh (3 s) and within 500 px
+function intelNow(game, p) {
+  const i = p.ai && p.ai.intel; if (!i || game.time - i.t > 3) return null;
+  const d = Math.hypot(i.x - p.x, i.y - p.y); return d > 500 ? null : { x: i.x, y: i.y, aim: i.aim, d };
+}
+// An attacker who knows a defender close by is aiming their way waits a few seconds on the corner (pre-aimed) instead of
+// walking into the crosshair, once per contact; then goes (or the defender looked away, or came to them).
+function intelWait(game, p, inp, dt) {
+  const ai = p.ai, iv = intelNow(game, p);
+  if (NOWAIT) return false;
+  if (!iv) { ai.iwait = 0; return false; }
+  if (iv.d > 280 || game.timer < 50 || visibleEnemy(game, p, skill(game, p).see)) return false;
+  const toMe = Math.atan2(p.y - iv.y, p.x - iv.x), looking = Math.abs(angDiff(iv.aim || 0, toMe)) < 0.7;
+  if (!looking) return false;
+  if (!ai.iwait) { ai.iwait = game.time + 2 + Math.random() * 2; feat(p, 'intelWait'); }
+  if (game.time > ai.iwait) return false;
+  const c = angleOn(game, p, iv) || iv; turnTo(p, Math.atan2(c.y - p.y, c.x - p.x), skill(game, p).turn * 0.7, dt); inp.crouch = 1; return true;
 }

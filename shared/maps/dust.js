@@ -30,9 +30,9 @@ export function build() {
   G.box(6, 4, 35, 17, T.SOFT, MAT.BRICK);
   G.wall(21, 5, 21, 16);
   G.door(21, 9, 21, 10);                     // bazaar <-> granary
-  G.door(12, 17, 14, 17, true); G.door(27, 17, 29, 17, true); // out to the A yard
+  G.door(12, 17, 14, 17, true);              // out to the A yard (he chose 2026-11-20: the Granary's south door is now a wall the defenders can reinforce)
   G.door(35, 10, 35, 11, true);              // granary east door, from the connector by the hotel
-  G.window(6, 10, 6, 11); G.window(28, 4, 29, 4);
+  G.window(28, 4, 29, 4);                    // (he chose 2026-11-20: fewer ways in, the bazaar's west window off Long Road is gone)
   G.pillar([[6, 4], [35, 4], [6, 17], [35, 17], [21, 4], [21, 17]]);
   // A yard: open ground in front of the site, walled to the south; Long Road comes in from the west, Short Gate from the square
   G.wall(15, 32, 37, 32, T.HARD, MAT.CONCRETE);
@@ -48,6 +48,11 @@ export function build() {
   G.door(40, 7, 40, 8, true);                // west, to the connector and A
   G.door(62, 7, 62, 8, true);                // east, to B Alley
   G.pillar([[40, 3], [62, 3], [40, 20], [62, 20], [52, 3], [52, 20]]);
+  // the Spice Passage (he chose 2026-11-20): a covered way from the Hotel into the Granary, so defenders can rotate to A
+  // without crossing open ground
+  G.room('Spice Passage', 36, 6, 4, 7, FL.CONCRETE);
+  G.box(35, 5, 40, 13, T.SOFT, MAT.BRICK);
+  G.door(35, 10, 35, 11, true); G.door(40, 7, 40, 8, true); // (again after the box: they sit on its walls)
 
   // ---- B site: the Water Works and the Pump House (north-east) ----
   G.room('Water Works', 67, 4, 15, 13, FL.CONCRETE);
@@ -131,7 +136,7 @@ export function build() {
   G.box(6, -12, 24, 4, T.SOFT, MAT.BRICK); G.wall(17, -11, 17, 3);
   G.pillar([[6, -12], [24, -12], [24, 4], [17, -12], [17, 4]]);
   G.door(12, 4, 13, 4);                      // bazaar <-> warehouse
-  G.door(17, -4, 17, -3); G.door(13, -12, 14, -12, true); G.door(6, -5, 6, -4, true); G.door(24, -8, 24, -7, true);
+  G.door(17, -4, 17, -3); G.door(13, -12, 14, -12, true); G.door(24, -8, 24, -7, true); // (the west door off Long Road is gone, he chose 2026-11-20)
   G.window(20, -12, 21, -12); G.window(24, 0, 24, 1);
   G.prop('crates', 8, -6, 2, 3, T.TALL); G.prop('shelf', 15, -10, 1, 6, T.TALL); G.prop('marketstall', 9, 0, 4, 1, T.LOW);
   G.prop('crates', 19, -10, 2, 2, T.TALL); G.prop('workbench', 22, -5, 1, 4, T.LOW);
@@ -210,7 +215,7 @@ export function build() {
   const g = G.c;
   return finish({
     sites: [
-      { name: 'A: Spice Bazaar / Granary', bombs: [{ id: 'A', ...g(14, 10), room: 'Spice Bazaar' }, { id: 'B', ...g(28, 11), room: 'Granary' }], rooms: ['Spice Bazaar', 'Granary'] },
+      { name: 'A: Spice Bazaar / Granary', bombs: [{ id: 'A', ...g(14, 10), room: 'Spice Bazaar' }, { id: 'B', ...g(28, 11), room: 'Granary' }], rooms: ['Spice Bazaar', 'Granary'], win: 0 }, // win 0: no extra windows added (he chose 2026-11-20: fewer ways in; the Granary keeps its north window)
       { name: 'B: Water Works / Pump House', bombs: [{ id: 'A', ...g(74, 10), room: 'Water Works' }, { id: 'B', ...g(90, 11), room: 'Pump House' }], rooms: ['Water Works', 'Pump House'] },
     ], // (the middle site in the hotel was removed, he asked: just A and B, like a classic desert town)
     cams: [g(20, 25), g(50, 23), g(80, 25), g(7, 50), g(52, 48), g(88, 50), g(46, 6), g(12, -5), g(90, -7), g(46, -8), g(50, -14)],

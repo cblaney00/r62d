@@ -883,3 +883,16 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
 - Bot fix: PERCH Overwatch (0 → 0.5 a round). Lesson: practice.js without `R62D_DATA` writes a fresh data/ in the project.
 - Checked: skilldrills 21/21, abilities, oldops, newops, drills, duel, botroster, sim PASS; pickup failed once by chance
   (mason dshield, known) and passed again; textsize pc 0; BALL KNOWLEDGE screenshots.
+
+## 2026-11-21: his answers to five balance questions (Ferro, 1V1 heavies, plants, intel, Dust Town A)
+- He chose (plan phase 2026-11-20): FERRO's hammer for soft-wall holes + reinforced hatches; a smaller armour gap; teach bots
+  to play for the plant; teach bots to use information, then trim WRAITH/ECHO only if too strong; Dust A: an extra
+  reinforceable wall, a safer rotation and fewer ways in. Details and numbers: docs/balance.md (2026-11-21).
+- Code: game.js hammer branch (`sawHole` on `T.SOFT`, `p.hammerHatch` for `T.HATCHR`); operators.js `ARMOR_HP` 136/132/128;
+  bots.js `BREACH_TOOLS.hammer` (`swings`), roof plan with FERRO, `planPush`/`escorts` in proAct, `ai.intel`/`intelNow`/
+  `intelWait`; mapkit.js site `win` (how many windows the kit adds, default 2); maps/dust.js (Spice Passage, closed openings);
+  tweaks.js root `ARMOR_HP`; tests/bombtime.js `R62D_LVL`; tests/oldops.js FERRO checks.
+- Checked: oldops 47/47, newops, abilities, feeds, ropebots, botroster, duelends, sim, reach (dust 0), openings PASS;
+  stuckbots 2 (known by chance), pickup mason dshield (known; fails on the old version too). Screenshot of the Spice Passage.
+- Lesson: a background job started with `&` inside `nix develop --command sh -c` dies with that shell; run the whole
+  comparison as one background command instead.

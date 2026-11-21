@@ -210,3 +210,15 @@ average, so he isn't overpowered; he is a heavy with a good gun and a skill with
 4. Intel skills (WRAITH, ECHO, GLINT...): bots collect information but don't act on it, so their numbers are a floor
    (docs/bot-limits.md).
 5. Dust Town A (Spice Bazaar / Granary): the pros' most-backed hole (attack 74% of 33 rounds): a map change.
+
+## 2026-11-21: his answers to the five questions (he chose in the plan phase, 2026-11-20)
+| Question | He chose | What was done | Result |
+|---|---|---|---|
+| FERRO's hammer has no job | holes in soft walls + reinforced hatches | each swing on a soft wall knocks a round see-through hole (`sawHole`, up to ~4 a cell); a reinforced hatch breaks in 3 loud swings (`p.hammerHatch`); bots: `BREACH_TOOLS.hammer` (3 swings at a site wall), roof plans may use a reinforced hatch when FERRO is in the squad | swings 0.3 → 1.2 a round in breaking-in drills; win 45% with / 50% locked (120 drills, ±7): bots don't yet shoot through the holes they make, so it still shows nothing in bot tests |
+| 1V1 heavy defenders 60-65% | smaller armour gap, every mode | `ARMOR_HP` 150/132/120 → 136/132/128 | 1V1 (1400 rounds): heavies 61 → 57% on average, attack 39 → 43%. 5v5 (300): attack 50 → 46%, inside the target. MASON and SHUNT still about 61% with the new bots (their panels/grid, not their health) |
+| plants in 6% of rounds | teach bots to play for it | pro attackers: when a player up, a teammate on the site, or under a minute, the carrier goes to plant and the two nearest walk with them (`planPush`, `escorts` in bots.js) | 5v5 pros: plants 9% → 12% of rounds (about 400 rounds); 1V1 21 → 26% |
+| intel skills undersold | both: teach bots, then trim only if too strong | bots (Gold up, pros) keep the nearest enemy the team knows about (`ai.intel`, from `game.spots`: cameras, scans, callouts), pre-aim the corner it will come round (moveTo, pro `watch`), defenders hold for it, attackers wait 2-4 s once when a known defender close by aims their way (`intelWait`) | 1V1 (2100): WRAITH 54 → 55%, ECHO 60 → 57%, GLINT 52 → 55%: none clearly over 60%, so no trim. 5v5: attack about 54 → 44% (four runs, ±4): information helps defenders most (their cameras) |
+| Dust Town A 74% attack | extra reinforceable wall + safer rotation + fewer ways in | the Granary's south door is now a wall, the Bazaar's west window and the warehouse's west door are gone (`win: 0` on the site stops the kit adding windows back), and the Spice Passage (a covered room from the Hotel's west door into the Granary, its walls soft and reinforceable) | attack on A 73% (15 rounds) → 50% (34) and 67% (18), about 56% together; B 60% |
+Test switches (tests only): `R62D_NOINTEL=1`, `R62D_NOPLANT=1`, `R62D_NOWAIT=1` turn the new bot behaviours off for comparisons;
+`ARMOR_HP` can be tried with `R62D_TWEAK`; `R62D_LVL=7 node tests/bombtime.js` counts plants with the pros.
+**Open:** 5v5 attack is now about 44%, just under the 45-55% target, because bots use information; watch it in the next practice.

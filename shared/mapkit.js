@@ -282,8 +282,10 @@ export function makeMap({ id, name, floors }) {
     const outsideOk = k => tiles[k] === T.GROUND || tiles[k] === T.VOID || tiles[k] === T.FLOOR && !roomAt(k);
     const wallT = t => t === T.SOFT || t === T.HARD;
     const bxy = k => { const f = fl[flAt[k]]; return { x: k % W - f.gx + f.x0, y: ((k / W) | 0) + f.y0 }; }; // building frame
+  // (a site can ask for fewer: `win` in the map's site, he chose 2026-11-20 for Dust Town A: fewer ways in)
     for (const s of sites || []) for (const name of s.rooms || []) {
       const r = rooms.find(q => q.name === name); if (!r || r.fl < groundI) continue;
+      const want = s.win ?? 2;
       const touches = o => o.cells.some(k => [1, -1, W, -W].some(d => roomAt(k + d) === r));
       let have = openings.filter(o => o.kind === 'window' && touches(o)).length;
       const busy = openings.filter(touches).flatMap(o => o.cells);
@@ -304,7 +306,7 @@ export function makeMap({ id, name, floors }) {
       }
       cands.sort((p, q) => q.sc - p.sc);
       for (const c of cands) {
-        if (have >= 2) break;
+        if (have >= want) break;
         if (c.cells.some(k => busy.some(q => Math.hypot(q % W - k % W, ((q / W) | 0) - ((k / W) | 0)) < 3))) continue;
         for (const k of c.cells) { tiles[k] = T.OPEN; hp[k] = 0; openId[k] = openings.length; win[k] = 1; busy.push(k); }
         openings.push({ id: openings.length, cells: c.cells, kind: 'window', ext: true, auto: true }); have++;
