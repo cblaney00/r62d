@@ -870,3 +870,16 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   Lone-defender site lockers (Mason's steel panels, Shunt's anti-breach grid) shut the bots' entry; Echo's spikes find the
   lone defender. Bots scan with WRAITH only when they hear something or now and then and only walk to the blip, so the test
   cannot judge how strong the scanner is in a person's hands. Nothing changed in the game. He said: no bans yet, major changes are coming; rerun the test after them.
+
+## 2026-11-20: Ferro's skill count, skill drills, testable pro suggestions, balance patch, bot limits
+- He asked (5 items): why FERRO looks strong but uses his skill 0.0 times a round; drills for every operator's skill with
+  the pros suggesting drill changes; detailed pro suggestions testable in balance patches; a balance patch with notes in
+  VibeNote for what numbers can't fix; the limits of bot tests (WRAITH in 1V1).
+- Skill uses: game.js `p.abUsed` (limited skills counted from every drop in `abilityCount`, reset on equip; never-ending ones
+  where they start: hammer `used()`, scan start, shroud on, brace switch, a stretch of lance/weld). train-worker x[5] uses it;
+  opx grew to 10 numbers (uses start over). tests/balance.js prints uses a round, main-gun share and the two patterns.
+- Skill drills, pros' drill ideas, R62D_TWEAK, tests/protry.js, tests/skillgap.js, BALL KNOWLEDGE (DRILLS → SKILL DRILLS, PRO
+  IDEAS: the change and its test): docs/drills.md. Bot limits: docs/bot-limits.md. Balance: docs/balance.md.
+- Bot fix: PERCH Overwatch (0 → 0.5 a round). Lesson: practice.js without `R62D_DATA` writes a fresh data/ in the project.
+- Checked: skilldrills 21/21, abilities, oldops, newops, drills, duel, botroster, sim PASS; pickup failed once by chance
+  (mason dshield, known) and passed again; textsize pc 0; BALL KNOWLEDGE screenshots.

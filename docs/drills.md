@@ -27,3 +27,29 @@
 - Shown in BALL KNOWLEDGE (tabs GUNS, ATTACHMENTS, MAPS, DRILLS, PRO TAKES with the patch notes), PRO IDEAS and on each pro's
   PLAYBOOK page (THE WORST THING IN THE GAME, IN THE DRILLS).
 - Tests: `node tests/drills.js [n]`; a throwaway practice: `R62D_DATA=<tmp> node server/practice.js 40`.
+
+## Skill drills (2026-11-20, he asked: "drills so the operators can train using the characters utility in a variety of situations")
+- `server/skilldrills.js`: a 1V1 round on a small map (`runSkillDrill`), set up as a situation (`SITUATIONS`: entry, upstairs,
+  retake, hold, roam, late; `SKILL_SIT` = where each skill should pay off). Every drill is played with the skill and with it
+  locked (`p.abLock`: game.js useAbility and held skills ignore it) → `training.skillDrills.sit['op|sit']` =
+  [with: rounds, won, locked: rounds, won, uses].
+- Learning: `training.skill[pro][op].eager`, tried ×1.12 and ÷1.12 in drills; moves toward the one that wins (4+ each), read
+  in every match by bots.js `skillEager` (multiplies the random "use it now" chances and shortens the waits in `botAbility`).
+  `R62D_EAGER=<n>` sets it for every bot (tests).
+- Per session: 30 pairs per practice thread (`train-worker.js` → `addSkillDrills`; `closeSkillSession` adds each pro's win rate per
+  situation to `prog`).
+- The pros' drill ideas (opinions.js `formDrillIdeas`): stuck (no better over 3 sessions → longer clock or the other map),
+  no help (with ≤ locked over 8+ each → drill it in its best other situation), not real (after-the-plant drills while under 12%
+  of rounds get a plant). Two pros backing one change within 3 sessions adopts it (he chose) → `skillDrills.tweaks`
+  (`sitFor`, `time`, `map`), read by the next session. Shown in BALL KNOWLEDGE → DRILLS (SKILL DRILLS).
+- Tests: `node tests/skilldrills.js [pairs]`; `node tests/skillgap.js` (docs/bot-limits.md).
+
+## Detailed, testable suggestions (2026-11-20, he asked)
+- opinions.js `ideas()`: an operator suggestion carries `fix` (exact `{ path, to }` changes) and `focus`; `strongFix` /
+  `weakFix` pick one small step (main gun damage ±6%, a skill use more or less, a recharge a fifth shorter). Site and
+  mechanic ideas stay words (a map change or a rule is his decision).
+- `shared/tweaks.js`: `R62D_TWEAK` (JSON `[{path, to|mul}]`, roots OPERATORS, WEAPONS, PEN_GUN, DUR, LOADOUTS) applied at server
+  start; worker threads and child processes get it.
+- `node tests/protry.js [rounds] [--5v5] [--top n] [--save] [--fix '<json>' --focus a,b]` (tests/_measure.js): each fix
+  without/with, the focus operators forced into every round; `--save` writes `training.tested[id]` (set R62D_DATA to the real
+  data folder), shown under the idea in PRO IDEAS ("The change … Tested …").

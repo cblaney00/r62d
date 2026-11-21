@@ -183,7 +183,7 @@ function renderDrills() {
 // SKILL DRILLS (he asked 2026-11-20): what each skill is worth in each situation (won with it minus won with it locked), the
 // pros who drill a skill and use it more readily for it, and their ideas for the drills (adopted when two back one)
 const SIT_NAME = { entry: 'Breaking in', upstairs: 'Upstairs site', retake: 'After the plant', hold: 'Site anchor', roam: 'Roamer', late: 'Last 45 seconds' };
-const CHANGE_TXT = c => !c ? '' : c.type === 'sit' ? `drill ${esc(c.ab)} in ${SIT_NAME[c.to] || c.to} instead of ${SIT_NAME[c.from] || c.from}` : c.type === 'time' ? `${SIT_NAME[c.sit] || c.sit}: ${c.add} s more on the clock` : `${SIT_NAME[c.sit] || c.sit} on ${esc((MAPS[c.to] || {}).name || c.to)}`;
+const CHANGE_TXT = c => !c ? '' : c.type === 'sit' ? `drill ${esc((Object.values(OPERATORS).find(o => o.ability.id === c.ab) || { ability: { name: c.ab } }).ability.name)} in ${SIT_NAME[c.to] || c.to} instead of ${SIT_NAME[c.from] || c.from}` : c.type === 'time' ? `${SIT_NAME[c.sit] || c.sit}: ${c.add} s more on the clock` : `${SIT_NAME[c.sit] || c.sit} on ${esc((MAPS[c.to] || {}).name || c.to)}`;
 function renderSkillDrills() {
   const d = S.data || {}, T = d.skillDrills; if (!T || !T.n) return '<h4 class="bkSec">SKILL DRILLS</h4><p class="hint">No skill drills yet: they come with the next practice.</p>';
   const rows = Object.entries(T.sit || {}).filter(([, a]) => a[0] >= 6 && a[2] >= 6).map(([k, a]) => { const [op, sit] = k.split('|'); return { op, sit, d: a[1] / a[0] - a[3] / a[2], a }; }).filter(x => OPERATORS[x.op]).sort((a, b) => b.d - a.d);

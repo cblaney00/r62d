@@ -174,4 +174,7 @@ export const PATCH_NOTES = [
   { d: '2026-11-20', k: 'mech', id: 'walkin', t: 'The action phase starts with the attackers jogging in from the edge of the map to their spawn spots (3 s); nobody can move or shoot until it ends, and the round clock waits.', v: 0 },
   { d: '2026-11-20', k: 'mech', id: 'outzoom', t: 'Outside, the view rests at a normal room\'s size instead of opening wide; drag the crosshair out to see further.', v: 0 },
   { d: '2026-11-20', k: 'mech', id: 'phonesprint', t: 'Phones: sprint with a quick, straight push of the move stick to its edge (no more double-tap); aim in with the new AIM button beside the aim stick. The camera slides so enemies you can see are not hidden under the buttons.', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'skilldrills', t: 'Skill drills: the pros practise every operator\'s skill in short 1V1 situations (breaking in, an upstairs site, after the plant, against an anchor or a roamer, the last 45 seconds), each with the skill and with it locked, and learn how readily to use it; their drill ideas change the drills when two of them agree.', v: 0 },
+  { d: '2026-11-20', k: 'op', id: 'perch', t: 'PERCH bots now use Overwatch: they stop and aim in on the angle they hold (before, bots never used it).', v: 1 },
+  { d: '2026-11-20', k: 'mech', id: 'skilluse', t: 'Skill uses a round are counted for every operator (FERRO, WRAITH, HUSH, RIVET, BULWARK and SOLDER always showed 0.0 before), and the pros\' suggestions now come with an exact change that is tested in bot matches.', v: 0 },
 ];

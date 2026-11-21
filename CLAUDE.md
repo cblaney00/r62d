@@ -75,7 +75,7 @@ only add to this file if it is a rule every session needs.
 - Map rules: doors at least 2 cells wide, 2 free rows beyond both ends of every staircase;
   doors/windows on a shared wall go AFTER the wing's `box`; never run a shape through
   furniture, doors or stairs. `node tests/reach.js`, `tests/openings.js` must pass.
-- Tests import `tests/_tmpdata.js` first so they never write to the real `data/`.
+- Tests import `tests/_tmpdata.js` first so they never write to the real `data/`. Real pro practice (`server/practice.js`) needs `R62D_DATA=/home/insideabush/.local/share/r62d/data`, or it starts a fresh, empty data/ in the project.
 - Test browser profiles in /tmp (`r62d-ff.*`, `r62d-gpu.*`, `r62d-gs.*`) are 140-270 MB each: delete each one when its run ends (they piled up to 104 GB by 2026-11-18). Never chown `/tmp/claude-0` (it must stay root-owned or new Claude chats refuse to start).
 - Menu text has a minimum size (he asked 2026-11-17): write every font size in style.css as `max(<size>, var(--mf))` (see the end of style.css); `tests/textsize.mjs` must list 0 small text for `pc` and `phone`.
 - Node is not on PATH in a plain session: run tests through
@@ -151,6 +151,7 @@ only add to this file if it is a rule every session needs.
   `node tests/wsjoin.js`: game updates compressed once for everyone still unpack to exactly each player's text.
   `node tests/furniture.js`: seeing and shooting by height over and under furniture (shared/furniture.js `FURN_H`, `furnLine`; castSight takes an eye height).
   `node tests/balance.js 12` is the balance report (see docs/balance.md for how to read it and past changes).
+  `node tests/skilldrills.js` (skill drills), `tests/protry.js` (the pros' suggestions tried with `R62D_TWEAK`), `tests/skillgap.js` (what bots don't do with skills: docs/bot-limits.md).
   `tests/shoot.mjs` drives a hidden Firefox (run as insideabush, via WebDriver BiDi,
   `--remote-debugging-port`) to take screenshots; see `docs/testing.md`.
 - **Status:** full game — 60 operators, 40 guns, 9 maps (two small: house, cabin; 1V1 plays only those), gadgets, drones, cameras, reinforcement, rappelling,

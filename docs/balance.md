@@ -177,3 +177,36 @@ MPs 0.35, ARs 0.5, LMGs 0.62, DMRs 0.68, shotguns 0.3, a few guns their own), br
 | Pike, Mammoth | 0.8 / 0.9 | 4 | 0.9 / 0.95 | sniper rifles |
 The Armory card shows it ("Wall penetration": damage kept · walls), a line with brick and two walls, and "Hits through a
 wall" in the hits table.
+
+## 2026-11-20: balance patch after skill drills and the pros' tested suggestions (he asked)
+Fresh practice first (400 rounds on this version, `R62D_DATA=~/.local/share/r62d/data node server/practice.js 400`;
+**set R62D_DATA**: without it practice writes a new, empty data/ in the project). Then each candidate tested with
+`tests/protry.js` (paired bot rounds without and with the change; one operator forced into every round).
+| Change tried | Mode, rounds each way | Result | Kept? |
+|---|---|---|---|
+| Ranger 82 → 77 dmg (Kaze, Juno: GIMLET too strong) | 5v5, 500 | GIMLET 48 → 46% | no: GIMLET is average when forced in; his 68% in practice was 62 rounds of pick luck |
+| Pace Beacon 2 → 3 (Moth, Pax: RALLY weak) | 5v5, 500 | RALLY 52 → 53% | no: RALLY is average when forced in |
+| FERRO without the Mule | 1V1 600 / 5v5 500 | 44 → 42% / 44 → 48% | no: FERRO is average (attack 44%) |
+| SHUNT medium armour | 1V1, 600 | 64 → 61% | no: too small for a character change |
+| SHUNT without the Drummer | 1V1, 600 | 61 → 60% | no |
+| Cyclone damage −7% | 1V1, 800 | SHUNT 61 → 69, MASON 65 → 63% | no (noise) |
+| ECHO 1 spike fewer | 1V1, 600 | 56 → 55% | no |
+Result: **no operator or gun number changes in this patch.** One bot fix: PERCH never used Overwatch (0.00 a round);
+now about 0.5. FERRO's skill text said 2.5 s between swings, the game used 2 s; the text now says 2 s (`ability.cd`).
+
+**FERRO** (the item that started this): "strong but 0.0 skill uses" was a counting bug (skills that never run out were
+never counted). Real numbers: the hammer goes out 0.3-0.4 times a round. In skill drills it is worth nothing
+(breaking in: 51% with it, 53% locked; site anchor: 41% / 47%, 70 drills each). His kills come from the Mule LMG (84%
+of his practice rounds, 1.07 kills a round on him) and his 150 hp. Forced into matches he wins 44%, exactly the attack
+average, so he isn't overpowered; he is a heavy with a good gun and a skill with no job. That is a design question
+(VibeNote), not a number.
+
+**What numbers can't fix** (questions for him, in VibeNote and below):
+1. FERRO's hammer has no job (only boards, braces, shields, hatches; never walls).
+2. In 1V1 the heavy defenders (MASON, SHUNT, DEADFALL, SOLDER) win 60-65% and attack only 37-44% while they're on;
+   neither their guns nor their armour alone moves it, so it is how 1V1 plays (one defender holding a small house).
+3. Plants happen in only 6% of practice rounds, so skills made for after the plant hardly matter (the pros' drill
+   ideas say the same).
+4. Intel skills (WRAITH, ECHO, GLINT...): bots collect information but don't act on it, so their numbers are a floor
+   (docs/bot-limits.md).
+5. Dust Town A (Spice Bazaar / Granary): the pros' most-backed hole (attack 74% of 33 rounds): a map change.
