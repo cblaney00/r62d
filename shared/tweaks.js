@@ -1,12 +1,12 @@
 // Trying a change without editing the game (he asked 2026-11-20: the pros' suggestions are tested during balance patches).
 // R62D_TWEAK = a JSON list of { path, to } (or { path, mul }), applied once when the server starts, e.g.
 //   [{"path":"WEAPONS.mule.dmg","to":27},{"path":"OPERATORS.ferro.ability.cd","to":2.5},{"path":"DUR.bomb","mul":0.9}]
-// Roots: OPERATORS, WEAPONS, PEN_GUN, DUR, LOADOUTS (e.g. {"path":"LOADOUTS.ferro.primaries","to":["tusk","k4"]}). Worker threads and child processes share the environment, so practice and the
+// Roots: OPERATORS, WEAPONS, PEN_GUN, DUR, LOADOUTS, ARMOR_HP (e.g. {"path":"LOADOUTS.ferro.primaries","to":["tusk","k4"]}). Worker threads and child processes share the environment, so practice and the
 // tests' workers get it too. tests/protry.js uses it; nothing sets it in normal play.
-import { OPERATORS, WEAPONS, PEN_GUN, LOADOUTS } from './operators.js';
+import { OPERATORS, WEAPONS, PEN_GUN, LOADOUTS, ARMOR_HP } from './operators.js';
 import { DUR } from './constants.js';
 
-export const ROOTS = { OPERATORS, WEAPONS, PEN_GUN, DUR, LOADOUTS };
+export const ROOTS = { OPERATORS, WEAPONS, PEN_GUN, DUR, LOADOUTS, ARMOR_HP };
 export function applyTweak(list) {
   const done = [];
   for (const t of list || []) {

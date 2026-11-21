@@ -43,13 +43,15 @@ fresh(); setup(a, 'prism', X, Y, 0); use(a); const dc = g.ents.find(e => e.type 
 fresh(); setup(a, 'volt', X, Y, 0); g.ents.push({ id: g.eid(), type: 'jammer', x: X + 80, y: Y, team: TEAM.DEF, owner: d.id, hp: 1 }); use(a); ok(!g.ents.some(e => e.type === 'jammer'), 'VOLT arc gun did not destroy the gadget in line');
 fresh(); setup(a, 'tether', wx - 18, wy, 0); use(a); const sc = g.ents.find(e => e.type === 'scope'); ok(sc && sc.x > wx && g.feeds(TEAM.ATK).includes(sc), 'TETHER scope not through the wall or not in the feeds');
 fresh(); setup(a, 'strider', X, Y, 0); use(a); g.ents.push({ id: g.eid(), type: 'mine', x: X + 4, y: Y, ang: 0, team: TEAM.DEF, owner: d.id, arm: 0, hp: 1 }); ticks(0.3); ok(g.ents.some(e => e.type === 'mine'), 'STRIDER ghost step set off a mine');
-// FERRO: no walls (he asked); one swing clears a whole barricade or a floor hatch, and 2.5 s before the next
-fresh(); setup(a, 'ferro', wx - 18, wy, 0); use(a); ok(m.tiles[wk] === T.SOFT, 'FERRO hammer should not break a soft wall');
+// FERRO (he chose 2026-11-20): a soft wall stays standing but gets a small see-through hole; one swing clears a barricade or a floor hatch; a reinforced hatch takes three
+fresh(); setup(a, 'ferro', wx - 18, wy, 0); use(a); ok(m.tiles[wk] === T.SOFT && m.holes[wk] && m.holes[wk].length >= 20, 'FERRO hammer should knock a small hole in a soft wall (and not break it)');
 if (door) { const [c0, c1] = door.cells; for (const c of door.cells) { m.tiles[c] = T.BARRI; m.hp[c] = 60; } a.hammerCd = 0; a.meleeCd = 0;
   setup(a, 'ferro', (c0 % W + 0.5) * CELL - 18, (Math.floor(c0 / W) + 0.5) * CELL + (c1 === c0 + W ? 8 : 0), 0); use(a);
   ok(door.cells.every(c => m.tiles[c] === T.OPEN), 'FERRO hammer did not clear the barricade'); for (const c of door.cells) m.tiles[c] = T.OPEN; }
 const hz = m.hatches.find(h => m.tiles[h.cells[0]] === T.HATCH);
 if (hz) { a.hammerCd = 0; a.meleeCd = 0; setup(a, 'ferro', hz.x - 6, hz.y, 0); use(a); ok(m.tiles[hz.cells[0]] === T.HOLE, 'FERRO hammer did not open the floor hatch'); }
+const hr = m.hatches.find(h => m.tiles[h.cells[0]] === T.HATCH && h !== hz);
+if (hr) { for (const c of hr.cells) m.tiles[c] = T.HATCHR; setup(a, 'ferro', hr.x - 6, hr.y, 0); for (let i = 0; i < 2; i++) { a.hammerCd = 0; a.meleeCd = 0; use(a); } ok(m.tiles[hr.cells[0]] === T.HATCHR, 'FERRO broke a reinforced hatch in under three swings'); a.hammerCd = 0; a.meleeCd = 0; use(a); ok(m.tiles[hr.cells[0]] === T.HOLE, 'FERRO hammer did not break the reinforced hatch in three swings'); }
 
 // ---------- defence ----------
 if (door) { const c = door.cells[0], cx = (c % W + 0.5) * CELL, cy = (Math.floor(c / W) + 0.5) * CELL;

@@ -2262,7 +2262,7 @@ export class Game {
       used(); this.events.push({ e: 'arc', v: 1, x: r1(p.x), y: r1(p.y), x2: r1(p.x + ca * bt), y2: r1(p.y + sa * bt) }); // v: VOLT's, the quiet one
     } else if (id === 'hammer') { // he asked: only door and window barricades go in one swing (no soft walls), and a real wait between swings
       if (p.meleeCd > 0 || this.time < (p.hammerCd || 0)) return;
-      const f = this.facingCell(p, 30), hs = !f || ![T.BARRI, T.BEAM, T.DSHIELD].includes(f.t) ? this.hatchSpot(p, [T.HATCH]) : null;
+      const f = this.facingCell(p, 30), hs = !f || ![T.BARRI, T.BEAM, T.DSHIELD].includes(f.t) ? this.hatchSpot(p, [T.HATCH]) : null; let hr = null;
       if (f && [T.BARRI, T.BEAM, T.DSHIELD].includes(f.t)) { // a barricade, steel brace or deployable shield: gone in one swing
         const across = Math.abs(ca) > Math.abs(sa) ? [0, 1] : [1, 0];
         for (const d of [0, 1, -1]) {
@@ -2274,6 +2274,17 @@ export class Game {
       } else if (hs) { // an unreinforced floor hatch at your feet: smashed through in one swing
         this.destroyCell(hs.k);
         this.events.push({ e: 'hit', k: 'wood', x: r1(hs.x), y: r1(hs.y) }); this.events.push({ e: 'snd', s: 'break', x: r1(p.x), y: r1(p.y) });
+      } else if ((hr = this.hatchSpot(p, [T.HATCHR]))) { // he chose 2026-11-20: a reinforced hatch goes in three loud swings
+        p.hammerHatch = p.hammerHatch && p.hammerHatch.k === hr.k ? p.hammerHatch : { k: hr.k, n: 0 };
+        if (++p.hammerHatch.n >= 3) { this.destroyCell(hr.k); p.hammerHatch = null; this.events.push({ e: 'snd', s: 'break', x: r1(p.x), y: r1(p.y) }); }
+        this.events.push({ e: 'hit', k: 'spark', x: r1(hr.x), y: r1(hr.y) }); this.noise(p.x, p.y, team, 700);
+      } else if (f && f.t === T.SOFT) { // he chose 2026-11-20: a small round hole in a soft wall (see and shoot through, not walk)
+        const k = f.cy * this.map.W + f.cx, h = this.map.holes[k], n = h ? h.length / 2 : 0;
+        if (n >= 55) return;
+        const cx = (f.cx + 0.5) * CELL, cy = (f.cy + 0.5) * CELL, along = Math.abs(ca) > Math.abs(sa); // spread new holes along the wall
+        const off = [0, 4, -4][Math.min(2, Math.floor(n / 13))];
+        this.glassBreak(k); this.sawHole(k, r1(cx + (along ? 0 : off)), r1(cy + (along ? off : 0)));
+        this.events.push({ e: 'hit', k: 'wood', x: r1(cx), y: r1(cy) }); this.events.push({ e: 'snd', s: 'break', x: r1(p.x), y: r1(p.y) }); this.noise(p.x, p.y, team, 420);
       } else {
         const q = [...this.players.values()].find(q => q.alive && q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 30 &&
           Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.1);

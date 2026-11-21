@@ -772,7 +772,7 @@ const BREACH_TOOLS = {
   slug: { types: [T.SOFT], use: 'ability', back: 0 },
   sticky: { types: [T.SOFT], use: 'ability', back: 2.5, blow: true }, // SALVO: stick a round, step back, set it off
   saw: { types: [T.SOFT], use: 'ability', back: 0 }, // TORQUE: a see-through slit onto the site
-  // (FERRO's hammer can't break walls: he swings at barricades, braces and hatches instead, in botAbility)
+  hammer: { types: [T.SOFT], use: 'ability', back: 0, swings: 3 }, // FERRO (he chose 2026-11-20): three swings knock small see-through holes onto the site
   breach: { types: [T.SOFT], use: 'gadget', back: 3.5 },
 };
 function breachTool(p) {
@@ -1416,9 +1416,10 @@ function roofPick(game, p) {
     let plan = null;
     const site = m.sites[game.site], bf = floorAt(m, site.bombs[0].x, site.bombs[0].y);
     if (m.roofFloor !== undefined && bf === m.roofFloor - 1 || (m.hatches || []).some(h => h.roof && floorAt(m, h.bx, h.by) === bf)) {
+      const ferro = [...game.players.values()].some(q => q.bot && q.alive && q.squad === p.squad && q.op === 'ferro'); // FERRO's hammer breaks reinforced hatches (he chose 2026-11-20)
       let best = null, bd = 14 * PX_PER_M;
       for (const h of m.hatches || []) {
-        if (!h.roof || floorAt(m, h.bx, h.by) !== bf || m.tiles[h.cells[0]] === T.HATCHR) continue;
+        if (!h.roof || floorAt(m, h.bx, h.by) !== bf || m.tiles[h.cells[0]] === T.HATCHR && !ferro) continue;
         const d = Math.min(...site.bombs.map(b => Math.hypot(b.x - h.bx, b.y - h.by)));
         if (d < bd) { bd = d; best = h; }
       }
@@ -1430,7 +1431,7 @@ function roofPick(game, p) {
       const into = best && site.rooms && site.rooms.includes(best.siteRoom); // a hatch straight into the site (2026-11-16): the roof is the main way up
       const tr = team.reduce((a, q) => a + habit(q, 'r'), 0) / Math.max(1, team.length), chance = Math.min(0.95, (into ? Math.max(ROOF_SITE[lvl], ROOF_CHANCE[lvl]) : ROOF_CHANCE[lvl]) * tr); // (some bots love the roof)
       if (rope && team.length >= 2 && Math.random() < (hoist ? Math.max(0.75, chance) : chance)) {
-        const pref = q => q.op === 'hoist' && q.abilityCount > 0 ? -1 : (q.pro ? ROOF_JOBS.includes(q.pro.pl.jobs.atk) : ['flank', 'intel'].includes(q.ai && q.ai.role)) ? 0 : 1;
+        const pref = q => q.op === 'ferro' && m.tiles[best.cells[0]] === T.HATCHR ? -2 : q.op === 'hoist' && q.abilityCount > 0 ? -1 : (q.pro ? ROOF_JOBS.includes(q.pro.pl.jobs.atk) : ['flank', 'intel'].includes(q.ai && q.ai.role)) ? 0 : 1;
         const ids = team.filter(q => !q.hasDefuser).sort((a, b) => pref(a) - pref(b) || Math.random() - 0.5).slice(0, (lvl >= 5 || (into && lvl >= 3)) && team.length >= 4 ? 2 : 1).map(q => q.id);
         plan = { h: best, rope, top: top(rope), ids, dropAt: 40 + Math.random() * 25 };
       }
@@ -1563,7 +1564,7 @@ function roofPlay(game, p, inp, dt) {
     return { x: h.x + 26, y: h.y };
   })());
   if (st.s === 'open') {
-    if (tile === T.HATCHR) { st.s = 'leave'; teamSay(game, p, 'Roof hatch is reinforced, coming down.', 'roofR'); return true; }
+    if (tile === T.HATCHR) { if (p.op === 'ferro') { if (Math.hypot(edge.x - p.x, edge.y - p.y) > 8) { moveTo(game, p, inp, edge, dt); return true; } aimAt(p, h.x, h.y); if (hatchNear(m, p.x, p.y, Math.atan2(h.y - p.y, h.x - p.x), 14) !== h) { moveTo(game, p, inp, { x: h.x, y: h.y }, dt); return true; } if (p.meleeCd <= 0) game.event(p, { k: 'ability' }); return true; } st.s = 'leave'; teamSay(game, p, 'Roof hatch is reinforced, coming down.', 'roofR'); return true; }
     if (tile === T.HATCH) { if (Math.hypot(edge.x - p.x, edge.y - p.y) > 8) { moveTo(game, p, inp, edge, dt); return true; } aimAt(p, h.x, h.y); if (hatchNear(m, p.x, p.y, Math.atan2(h.y - p.y, h.x - p.x), 14) !== h) { moveTo(game, p, inp, { x: h.x, y: h.y }, dt); return true; } inp.crouch = 1; if (p.meleeCd <= 0) game.event(p, { k: 'melee' }); return true; } // (step in until a swing reaches it: from the edge spot it could miss forever, stuckbots found)
     st.s = 'util';
   }
@@ -1611,6 +1612,7 @@ function doBreach(game, p, inp, b, dt) {
   p.aim = Math.atan2(b.wy - p.y, b.wx - p.x);
   if (tool.use === 'hold') { inp.ability = 1; b.held = (b.held || 0) + dt; return b.held > 4.5 || p.battery <= 0 ? 'done' : 'wait'; }
   if (p.busy || p.prep) return 'wait'; // (still setting it: placing takes a moment)
+  if (tool.swings) { if (p.meleeCd > 0 || game.time < (p.hammerCd || 0)) return 'wait'; game.event(p, { k: 'ability' }); b.n = (b.n || 0) + 1; return b.n >= tool.swings ? 'done' : 'wait'; }
   const before = tool.use === 'gadget' ? p.gadgetCount : p.abilityCount;
   game.event(p, { k: tool.use });
   const after = tool.use === 'gadget' ? p.gadgetCount : p.abilityCount;

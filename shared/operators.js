@@ -105,7 +105,7 @@ export const WEAPONS = {
 export const SIDEARMS = new Set(['p10', 'vex50', 'bison', 'gnat', 'stub', 'sparrow', 'needle', 'couplet', 'whisper', 'hatchet']);
 
 // armor: 1 = heavy/slow, 2 = medium, 3 = light/fast. HP follows armor.
-export const ARMOR_HP = { 1: 150, 2: 132, 3: 120 }; // he asked: everyone a bit tougher (+20%); the Pike still kills with one body shot
+export const ARMOR_HP = { 1: 136, 2: 132, 3: 128 }; // he asked: everyone a bit tougher (+20%); the Pike still kills with one body shot. He chose 2026-11-20 a smaller gap (was 150/132/120): 1V1 heavy defenders 61 → 57%
 // build follows armor too: heavies stay broad, mediums and lights are skinnier (drawn narrower AND harder to hit).
 // HIT_R is how close (px) a bullet must pass to a body's centre to hit it; walls still use PLAYER_R for bumping.
 export const BODY_W = { 1: 0.8, 2: 0.71, 3: 0.64 }; // he asked: everyone skinnier (was 0.95 / 0.84 / 0.76)
@@ -170,7 +170,7 @@ export const OPERATORS = {
              ability: {id: "ghost",name: "Ghost Step",count: 2,desc: "For 6 seconds your footsteps are silent and you set off no traps, sensors, scanners or darts — but you move 15% slower while you concentrate."},
              gadget: 'frag', gadgetCount: 2, color: '#8ab4d8', helmet: '#2b3a48', look: 'hood' },
   ferro   : { team: 'atk', name: 'FERRO', role: 'Soft Breacher', armor: 1, primary: 'tusk', secondary: 'p10',
-             ability: {id: "hammer",name: "Breaching Hammer",count: 0,cd: 2,desc: "A sledgehammer that never runs out: smashes a door or window barricade, a steel brace, a deployable shield or an unreinforced floor hatch open in one swing, or flattens anyone in reach — each swing needs 2 seconds to recover. It can't break walls."}, // cd: seconds between swings (was 4, then 2.5, then 2: attackers' skills stronger 2026-11-10)
+             ability: {id: "hammer",name: "Breaching Hammer",count: 0,cd: 2,desc: "A sledgehammer that never runs out: smashes a door or window barricade, a steel brace, a deployable shield or an unreinforced floor hatch open in one swing, breaks a reinforced hatch in three loud swings, knocks a small see-through hole in a soft wall with each swing, or flattens anyone in reach — each swing needs 2 seconds to recover."}, // cd: seconds between swings (was 4, then 2.5, then 2: attackers' skills stronger 2026-11-10)
              gadget: 'stun', gadgetCount: 2, color: '#b0703c', helmet: '#4a3828', look: 'helmet' },
   // ---- added to fill every role to 5 (he asked) ----
   salvo: { team: 'atk', name: 'SALVO', role: 'Launcher Breacher', armor: 2, primary: 'rook', secondary: 'p10',
