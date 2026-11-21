@@ -11,7 +11,7 @@ if (ARMOR_HP[1] !== 150 || ARMOR_HP[3] !== 120) fail('health not raised', ARMOR_
 const g = new Game({ free: true });
 for (let i = 0; i < 2; i++) g.addBot();
 g.mapId = 'harbor'; g.map = buildMap('harbor'); g.startMatch();
-for (let i = 0; i < 400 && g.phase !== PHASE.ACTION; i++) g.tick(1 / 30);
+for (let i = 0; i < 400 && (g.phase !== PHASE.ACTION || g.introT > 0); i++) g.tick(1 / 30);
 const [p, q] = [...g.players.values()];
 for (const [w, want, sight = 'sniper', ads = 1] of [['pike', 'dead'], ['saker', 'dead'], ['pike', 'alive', 'prism'], ['saker', 'alive', 'prism'], ['saker', 'alive', 'sniper', 0], ['longbow', 'alive'], ['k4', 'alive']]) {
   p.guns[p.slot] = { w, att: { sight }, m: {} }; p.adsT = ads;

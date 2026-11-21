@@ -150,3 +150,8 @@ His wishes so far:
 - Bullet penetration by gun: shared/operators.js `PEN_GUN` [damage kept per wall, walls it passes, brick share]; server hitscan; Armory card rows "Wall penetration", "Max walls", note line and "Hits through a wall". Details and the nerf/buff levers: docs/balance.md "Penetration".
 - Defuser: countdown 35 s (`DUR.bomb`); planted chirp (audio.js `defuserAlarm`) heard through the building and outside; `arming` / `disarming` sounds while planting / disabling.
 - 1V1: no ban clock for a person, NO BAN button (`.bpNone`).
+
+- **Walk-in (2026-11-20, he asked):** the action phase starts with the attackers jogging in from the map edge to their spawn spots (3 s, every round, you follow your own operator); nobody moves until then, the clock waits. game.js startIntro; tests/intro.js.
+- **Outdoor zoom (2026-11-20, he asked):** outside the view rests at a room's size (OUT_H 470); only dragging the crosshair out widens it.
+- **Phone sprint / AIM (2026-11-20, he chose):** sprint = a quick, fairly straight push of the move stick to its edge; AIM = a button beside the aim stick, tap on / tap off.
+- **Phones: buttons never hide enemies (2026-11-20, he asked):** coverDodge slides the camera so seen enemies, your sightline and aim point come out from under the thumb controls; tests/phonecover.mjs.

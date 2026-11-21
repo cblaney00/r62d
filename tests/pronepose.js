@@ -3,7 +3,7 @@
 import './_tmpdata.js';
 import { Game } from '../server/game.js';
 import { PHASE } from '../shared/constants.js';
-const g = new Game(); for (let i = 0; i < 10; i++) g.addBot(); g.startMatch(); while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+const g = new Game(); for (let i = 0; i < 10; i++) g.addBot(); g.startMatch(); while ((g.phase !== PHASE.ACTION || g.introT > 0)) g.tick(1 / 30);
 const p = [...g.players.values()].find(q => q.alive); for (const q of g.players.values()) { q.bot = false; q.input = {}; }
 const run = (n, inp) => { for (let i = 0; i < n; i++) { p.input = { prone: 1, ...inp }; p.aim = 0; g.applyMove(p, 1 / 30); g.tick(1 / 30); } };
 const pn = () => g.snapshotFor ? null : (p.pr >= 1 ? (p.pose === 'sit' ? 2 : 1) : 0);

@@ -14,7 +14,7 @@ for (const id of MAP_LIST) {
   const g = new Game();
   for (let i = 0; i < 2; i++) g.addBot();
   g.mapId = id; g.map = buildMap(id); g.startMatch();
-  while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+  while ((g.phase !== PHASE.ACTION || g.introT > 0)) g.tick(1 / 30);
   for (const q of g.players.values()) q.bot = false;
   const p = [...g.players.values()][0], m = g.map, W = m.W;
   // every window: walking into it stops you; vaulting from in front of it lands you on the other side

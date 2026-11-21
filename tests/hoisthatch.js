@@ -14,7 +14,7 @@ function setup(mapId) {
     g = new Game(); g.mapId = mapId; g.map = buildMap(mapId);
     for (let i = 0; i < 10; i++) g.addBot();
     g.startMatch();
-    while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+    while ((g.phase !== PHASE.ACTION || g.introT > 0)) g.tick(1 / 30);
     p = [...g.players.values()].find(q => g.side(q) === 'atk' && q.alive);
   } while (!p);
   p.op = 'hoist'; g.equip(p); p.bot = false; p.ctrl = 'body'; // (a bot may have been flying its drone)

@@ -25,7 +25,7 @@ for (let lv = 0; lv < 7; lv++) {
     if (!bots.every(b => ROSTER[5].includes(b.bio))) bad('rank change kept the old bots'); else console.log('rank change: now ' + bots.map(b => b.name.replace('[BOT] ', '')).join(', ')); }
 }
 { // WRAITH
-  const g = new Game(); for (let i = 0; i < 10; i++) g.addBot(); g.startMatch(); while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+  const g = new Game(); for (let i = 0; i < 10; i++) g.addBot(); g.startMatch(); while ((g.phase !== PHASE.ACTION || g.introT > 0)) g.tick(1 / 30);
   const p = [...g.players.values()].find(q => g.side(q) === 'def' && q.alive); for (const q of g.players.values()) { q.bot = false; q.input = {}; }
   p.op = 'wraith'; g.equip(p); const full = OPERATORS.wraith.ability.battery;
   const tap = () => { p.input = { ability: 1 }; g.tick(1 / 30); p.input = {}; g.tick(1 / 30); };

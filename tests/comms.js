@@ -41,7 +41,7 @@ function make(side = TEAM.ATK) {
   const g = new Game({ free: false }); g.botLevel = 2;
   for (let i = 0; i < 10; i++) g.addBot(i % 2);
   g.startMatch(); for (const p of g.players.values()) if (p.op == null) g.pickOp?.(p, null);
-  let guard = 0; while (g.phase !== PHASE.ACTION && guard++ < 6000) g.tick(1 / 30);
+  let guard = 0; while ((g.phase !== PHASE.ACTION || g.introT > 0) && guard++ < 6000) g.tick(1 / 30);
   const team = [...g.players.values()].filter(q => g.side(q) === side), me = team[0]; me.bot = false; me.hold = {}; me.ai = null;
   const said = []; const ch = g.chat.bind(g); g.chat = (q, m) => { if (q.squad === me.squad) said.push(`${q.name}: ${m.text}`); ch(q, m); };
   return { g, me, said, team };

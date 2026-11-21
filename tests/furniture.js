@@ -15,7 +15,7 @@ const fail = (...a) => { fails++; console.log('FAIL', ...a); };
 const ok = (c, ...a) => { if (!c) fail(...a); else console.log('ok  ', ...a); };
 const g = new Game(); g.mapId = 'harbor'; g.map = buildMap('harbor');
 for (let i = 0; i < 2; i++) g.addBot();
-g.startMatch(); while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+g.startMatch(); while ((g.phase !== PHASE.ACTION || g.introT > 0)) g.tick(1 / 30);
 const m = g.map, W = m.W;
 // an open stretch: 12 cells wide, 3 tall, all plain floor on one floor
 let spot = null;

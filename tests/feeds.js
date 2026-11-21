@@ -11,7 +11,7 @@ const fail = (...a) => { fails++; console.log('FAIL', ...a); };
 const g = new Game();
 for (let i = 0; i < 10; i++) g.addBot();
 g.mapId = MAP_LIST[0]; g.map = buildMap(g.mapId); g.startMatch();
-while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+while ((g.phase !== PHASE.ACTION || g.introT > 0)) g.tick(1 / 30);
 const ps = [...g.players.values()];
 const [d1, d2] = ps.filter(p => g.side(p) === TEAM.DEF && p.alive), [a1, a2] = ps.filter(p => g.side(p) === TEAM.ATK && p.alive);
 for (const p of [d1, d2, a1, a2]) { p.bot = false; p.ctrl = 'body'; p.busy = null; p.downed = false; }

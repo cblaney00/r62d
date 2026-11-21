@@ -48,7 +48,7 @@ for (let n = 0; n < per; n++) for (const id of only ? [only] : MAP_LIST) {
       for (const h of g.map.hatches.slice(hb)) if (h.dyn) A.floorHoles++;
       A.peeps += (g.map.peeps || []).length - pb;
       for (const e of g.ents) if (e.type === 'htrap' && !A.traps.has(e.id)) A.traps.set(e.id, { rig: e.rig, gone: false });
-      for (const [eid, tr] of A.traps) if (!tr.gone && !g.ents.some(e => e.id === eid)) { tr.gone = true; tr.end = g.phase !== PHASE.ACTION; tr.open = g.map.hatches[tr.rig] && g.map.tiles[g.map.hatches[tr.rig].cells[0]] === T.HOLE; }
+      for (const [eid, tr] of A.traps) if (!tr.gone && !g.ents.some(e => e.id === eid)) { tr.gone = true; tr.end = (g.phase !== PHASE.ACTION || g.introT > 0); tr.open = g.map.hatches[tr.rig] && g.map.tiles[g.map.hatches[tr.rig].cells[0]] === T.HOLE; }
       for (const p of g.players.values()) {
         if (!p.alive || p.staged || p.ctrl !== 'body') continue;
         const f1 = floorAt(g.map, p.x, p.y);

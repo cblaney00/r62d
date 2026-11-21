@@ -12,12 +12,14 @@ const R = 62; // stick radius in CSS px
 const SPRINT_PUSH = 1.45; // (FIRE buttons setting) the move thumb this far out (stick radii) sprints
 // Fire rings (he asked 2026-11-17: "in a ring around the joysticks there should be the fire button built behind the
 // joysticks so the players can naturally flick either finger right next to the joystick to shoot"; then: a pulled
-// stick must never shoot, and it covers its ring while held): a finger put down on a ring shoots (build(): ringFire). His choices: a quick tap on the aim stick aims in / out; sprint is a
-// double-tap and hold on the move stick (its edge shoots now). The old FIRE buttons stay as a Settings choice.
+// stick must never shoot, and it covers its ring while held): a finger put down on a ring shoots (build(): ringFire). His choices (2026-11-20, the
+// double-tap sprint and tap-to-aim didn't feel good): an AIM button by the aim stick, tap on / tap off; sprint is a quick, fairly straight push of
+// the move stick out to its edge (FLICK_*), held while it stays out. The old FIRE buttons stay as a Settings choice.
 const MOVE_SETTLE = 150, MOVE_SLIP = 12, MOVE_DEAD = 0.14; // the move thumb's settling time (ms) and slide (px), and the dead zone (share of a full push)
 const NEAR_RING = 26; // (fire rings) how far past the red ring a thumb still shoots (design px)
 const MOVE_R = 81; // (fire rings) how far the move thumb pushes for a full run (was R, 62: he asked for a bigger stick)
-const TAP_MS = 250, TAP_PX = 12, DOUBLE_MS = 300; // a quick tap; two of them for sprint
+const TAP_MS = 250, TAP_PX = 12; // a quick tap
+const FLICK_MS = 230, FLICK_STRAIGHT = 0.8, FLICK_EDGE = 0.95, FLICK_FROM = 0.35, SPRINT_OFF = 0.6; // (fire rings) sprint: from near the middle (under FLICK_FROM of a full push) out to the edge within FLICK_MS, the path at least FLICK_STRAIGHT straight; it stops below SPRINT_OFF
 export const fireRings = () => store('r62d-fire') !== 'buttons';
 export function setFireRings(on) { store('r62d-fire', on ? 'rings' : 'buttons'); if (ui) { releaseAll(); ui.remove(); ui = null; shown = false; } } // rebuilt with the other buttons when the match shows them
 
@@ -172,14 +174,14 @@ export const ICONS = {
   help: '<b>?</b>',
 };
 const HELP = () => [ // (a function: it follows the fire rings setting)
-  ...(fireRings() ? [['fire', 'SHOOT', 'Thumb on a red ring: shoots while it stays down. Drag the right one to aim.'], ['ads', 'AIM IN', 'Quick tap on the aim stick: aim in (it goes blue). Again: out.']]
+  ...(fireRings() ? [['fire', 'SHOOT', 'Thumb on a red ring: shoots while it stays down. Drag the right one to aim.'], ['ads', 'AIM', 'Tap AIM, by the aim stick, to aim in (it goes gold). Again: out.']]
     : [['fire', 'FIRE', 'Shoot. Drag the right one to aim while you shoot.'], ['ads', 'AIM', 'The small button on each FIRE: tap to aim in, tap again to aim out.']]),
   ['crouch', 'CROUCH', 'Tap: crouch. Hold: lie down. Sprinting: slide.'], ['leanL', 'LEAN', 'Lean round a corner: tap on, tap off.'],
   ['reload', 'RELOAD', 'Reload your gun.'], ['swap', 'SWAP', 'Switch between your guns.'],
   ['skill', 'SKILL', 'Your operator\'s ability (the number: how many left).'], ['gadget', 'GADGET', 'Throw or place your gadget.'],
   ['melee', 'MELEE', 'Knife hit; breaks wooden boards.'], ['jump', 'JUMP', 'Hop onto furniture, over low cover or through windows.'],
   ['use', 'ACTION', 'One tap: plant, defuse, revive, climb… what the game prompts; else a PING.'],
-  ['view', 'CAMS', 'Your team\'s cameras and drones. Again: back to your body.'], ['drone', 'DRONE', 'Put out and drive your drone (the number: how many you carry).'], ['sprint', 'SPRINT', fireRings() ? 'Double-tap and hold the move stick. On a drone: CROUCH.' : 'Push the move stick past its edge. On a drone the crouch button sprints.'],
+  ['view', 'CAMS', 'Your team\'s cameras and drones. Again: back to your body.'], ['drone', 'DRONE', 'Put out and drive your drone (the number: how many you carry).'], ['sprint', 'SPRINT', fireRings() ? 'Push the move stick out to its edge quickly. On a drone: CROUCH.' : 'Push the move stick past its edge. On a drone the crouch button sprints.'],
   ['map', 'MAP', 'The map: tap it to ping a spot.'], ['score', 'SCORES', 'Who is up and who is down.'],
   ['prev', 'PREVIOUS / NEXT', 'Flip through cameras and drones.'], ['pause', 'PAUSE', 'The pause menu.'],
   ['tiltc', 'LEVEL', 'Tilt to move: the way you hold it now is level.'],
@@ -196,7 +198,7 @@ const setUse = on => { useLatch = on; held[0] = on; if (useEl) useEl.classList.t
 const setAds = on => { adsLatch = on; trig.lt = on ? 1 : 0; if (ui) { for (const el of ui.querySelectorAll('.tbtn.aim')) el.classList.toggle('on', on); ui.querySelector('#tsRight').classList.toggle('aimed', on); } };
 // fire rings: each thumb on a ring counts as one finger on the trigger, like a FIRE button did
 const trigger = on => { tc.rt = Math.max(0, tc.rt + (on ? 1 : -1)); trig.rt = tc.rt ? 1 : 0; };
-let lastLeftTap = 0; // when a quick tap on the move stick last ended (a second one straight after sprints) // AIM: tap on, tap off // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
+// AIM: tap on, tap off // sprintLock: the move stick pushed past its ring (sprint until you ease off or let go) // the right stick's value comes from dragging FIRE: it turns you but keeps how far ahead you look
 let aimStart = () => null; export function onAimStart(f) { aimStart = f; } // main.js: where you aim now, as a stick vector (length 0..1)
 let ui = null, shown = false, recentre = () => {}, aimOn = false, aimPx = null, aimPxN = 0; // aimPx: the aiming finger (aim stick or dragged FIRE) in screen px; aimPxN changes with each new finger
 export const touchAimReset = () => recentre();
@@ -217,11 +219,11 @@ export const touchActive = () => isTouch && shown;
 function build() {
   ui = document.createElement('div'); ui.id = 'touchUI'; const rings = fireRings(); ui.className = 'hidden' + (rings ? ' rings' : '');
   document.documentElement.classList.toggle('firerings', rings);
-  const buttons = rings ? BUTTONS.filter(b => !/^(fireL|fireR|ads|adsL)$/.test(b.id)) : BUTTONS;
+  const buttons = rings ? BUTTONS.filter(b => !/^(fireL|fireR|adsL)$/.test(b.id)) : BUTTONS; // (AIM: one, by the aim stick)
   ui.innerHTML = `<div class="tzone" id="tzRight"></div><div class="tzone" id="tzLeft"></div>
     <div class="tstick" id="tsLeft"><i></i></div><div class="tstick dyn" id="tsRight"><i></i></div>
     ${buttons.map(b => `<button class="tbtn ico ${b.cls}" data-id="${b.id}" data-label="${b.label}" aria-label="${b.label}">${ICONS[b.id] || (b.id.startsWith('fire') ? ICONS.fire : b.id === 'adsL' ? ICONS.ads : b.label)}</button>`).join('')}
-    <div id="tHelp" class="hidden"><h3>WHAT THE BUTTONS DO</h3><div class="thGrid">${HELP().map(([i, n, d]) => `<div><span class="thI">${ICONS[i]}</span><b>${n}</b><small>${d}</small></div>`).join('')}</div><p>${rings ? "Left side: the move stick (double-tap and hold to sprint). Right side: drag anywhere to aim, a quick tap on the aim stick to aim in. Tap a red ring to shoot." : "Left side: the move stick (push past its ring to sprint). Right side: drag anywhere to aim."} Tap to close.</p></div>
+    <div id="tHelp" class="hidden"><h3>WHAT THE BUTTONS DO</h3><div class="thGrid">${HELP().map(([i, n, d]) => `<div><span class="thI">${ICONS[i]}</span><b>${n}</b><small>${d}</small></div>`).join('')}</div><p>${rings ? "Left side: the move stick (push it out to the edge quickly to sprint). Right side: the aim stick, and AIM beside it to aim in. Tap a red ring to shoot." : "Left side: the move stick (push past its ring to sprint). Right side: drag anywhere to aim."} Tap to close.</p></div>
     <div id="tTurn" class="hidden"><b>⟳</b>Turn your phone sideways to play</div>`;
   document.body.appendChild(ui);
   const base = ui.querySelector('#tsLeft'), dyn = ui.querySelector('#tsRight');
@@ -301,7 +303,6 @@ function build() {
           rs.x = u; rs.y = v; aimKnob(K);
         },
         end() {
-          if (rings && performance.now() - t0 < TAP_MS && mv < TAP_PX) setAds(!adsLatch); // a quick tap aims in / out (his choice)
           aimF = null; aimOn = false; aimPx = null; rs.x = rs.y = 0; k0 = { x: 0, y: 0 }; knob(dyn, rs, K); dyn.classList.remove('held');
         },
       });
@@ -310,31 +311,35 @@ function build() {
       // (with the rings the stick is a bit bigger, he asked: a longer push for a full run, and it covers its ring while held)
       leftF = id; const z = tz(), r = (rings ? MOVE_R : R) * z, half = rings ? STICK.VR : 62, K = rings ? STICK.KNOB : R, t0 = performance.now(); let cx = x, cy = y, mv = 0, settled = false;
       if (!rings) { base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; base.style.bottom = 'auto'; } base.classList.add('held'); // (fire rings: the stick stays put, the knob starts in its middle)
-      if (rings && t0 - lastLeftTap < DOUBLE_MS) { setAds(false); sprintLock = true; } // double-tap and hold: sprint until you let go (his choice)
-      lastLeftTap = 0;
+      let fl = { t: t0, x, y, path: 0 }, px = x, py = y; // the push being watched for a sprint flick: where and when it left the middle, how far the thumb has travelled
       // A thumb put down is not a push (he asked 2026-11-18: landing on the stick often walked already): while it settles
       // (its first MOVE_SETTLE ms, or until it travels MOVE_SLIP px) the stick's centre slides along under it, and after
       // that a small dead zone in the middle walks nowhere, the push growing smoothly from its edge.
       const move = (x, y) => {
         if (!settled) { const now = performance.now(), d = Math.hypot(x - cx, y - cy); if (now - t0 < MOVE_SETTLE && d < MOVE_SLIP * z) { cx = x; cy = y; if (!rings) { base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; } } else settled = true; }
         let u = (x - cx) / r, v = (y - cy) / r; const l0 = Math.hypot(u, v), dz = l0 < MOVE_DEAD ? 0 : (l0 - MOVE_DEAD) / (1 - MOVE_DEAD) / l0; u *= dz; v *= dz; const l = Math.hypot(u, v); mv = Math.max(mv, l * r); if (l > 0.4 && useLatch) setUse(false);
+        if (rings) { // sprint: a quick, fairly straight push out to the edge (he asked 2026-11-20); a slow push to the edge only runs
+          const now = performance.now(); if (fl) fl.path += Math.hypot(x - px, y - py); px = x; py = y;
+          if (l < FLICK_FROM) fl = { t: now, x, y, path: 0 };
+          else if (!sprintLock && l >= FLICK_EDGE && fl) { if (now - fl.t <= FLICK_MS && Math.hypot(x - fl.x, y - fl.y) >= FLICK_STRAIGHT * fl.path) { setAds(false); sprintLock = true; } fl = null; } // (one try per push: back to the middle for another)
+          if (sprintLock && l < SPRINT_OFF) sprintLock = false;
+        }
         if (!rings) { if (l >= SPRINT_PUSH) { if (!sprintLock) setAds(false); sprintLock = true; } else if (l < 0.6) sprintLock = false; } // (FIRE buttons: push past the ring to sprint, like phone shooters)
         base.classList.toggle('spr', sprintLock); if (l > 1) { u /= l; v /= l; } ls.x = u; ls.y = v; knob(base, ls, K);
       };
       move(x, y);
       fingers.set(id, { move, end() {
-        if (rings && !sprintLock && performance.now() - t0 < TAP_MS && mv < TAP_PX) lastLeftTap = performance.now(); // a quick tap: the first half of a double-tap
         leftF = null; sprintLock = false; base.classList.remove('spr'); ls.x = ls.y = 0; knob(base, ls, K); base.style.left = base.style.top = base.style.bottom = ''; base.classList.remove('held'); } });
     }
   };
   // buttons: held while the finger that pressed them is down (wherever it slides)
   const pressButton = (id, el, x0, y0) => {
     const b = BUTTONS.find(q => q.id === el.dataset.id);
-    if (b.id === 'ads' || b.id === 'adsL') { setAds(!adsLatch); return; } // a tap switches aiming in on or off (either AIM)
+    if (b.id === 'ads' || b.id === 'adsL') { setAds(!adsLatch); fingers.set(id, { move() {}, end() {} }); return; } // a tap switches aiming in on or off (either AIM); the finger is noted, so the same finger reported again when another thumb lands doesn't switch it back
     if (b.id === 'use' && el.dataset.act === 'ping') { held[12] = true; el.classList.add('on'); fingers.set(id, { move() {}, end() { held[12] = false; el.classList.remove('on'); } }); return; } // ACTION as PING
     if (b.id === 'use' && el.dataset.act === 'vault') { held[10] = true; el.classList.add('on'); fingers.set(id, { move() {}, end() { held[10] = false; el.classList.remove('on'); } }); return; } // ACTION as a vault: pressed while the finger is down
-    if (b.id === 'use') { useEl = el; useLostT = 0; setUse(!useLatch); return; } // a tap starts using, and it carries on
-    if (b.id === 'help') { const h = ui.querySelector('#tHelp'); h.classList.toggle('hidden'); return; } // the guide (tap it to close)
+    if (b.id === 'use') { useEl = el; useLostT = 0; setUse(!useLatch); fingers.set(id, { move() {}, end() {} }); return; } // a tap starts using, and it carries on
+    if (b.id === 'help') { const h = ui.querySelector('#tHelp'); h.classList.toggle('hidden'); fingers.set(id, { move() {}, end() {} }); return; } // the guide (tap it to close)
     if (b.b === null) { tiltLevelNow(); el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 200); return; } // ⟲ TILT: how you hold it now is level
     const set = on => { el.classList.toggle('on', on); if (b.b === 'lt' || b.b === 'rt') { tc[b.b] = Math.max(0, tc[b.b] + (on ? 1 : -1)); trig[b.b] = tc[b.b] ? 1 : 0; } else held[b.b] = on; };
     set(true);
@@ -362,6 +367,20 @@ function build() {
   addEventListener('pointerup', e => { if (e.pointerType !== 'touch') release('p' + e.pointerId); }); addEventListener('pointercancel', e => { if (e.pointerType !== 'touch') release('p' + e.pointerId); });
   ui.addEventListener('contextmenu', e => e.preventDefault());
   releaseAll = () => { for (const id of [...fingers.keys()]) release(id); };
+}
+
+// What the thumb controls cover on the screen (he asked 2026-11-20: buttons mustn't hide enemies or sightlines; main.js
+// coverDodge slides the camera so nothing important sits under them): circles for the sticks with their rings, boxes for
+// the buttons, in CSS px; worked out again every half second
+let covers = [], coversT = 0;
+export function coverShapes() {
+  if (!ui || !shown) return [];
+  const now = performance.now(); if (now - coversT < 500) return covers; coversT = now; covers = [];
+  for (const s of ['#tsLeft', '#tsRight']) { const el = ui.querySelector(s), b = el && el.getBoundingClientRect(); if (!b || !b.width) continue;
+    const rv = b.width / 2, ro = ui.classList.contains('rings') ? STICK.RING * rv / STICK.VR : rv;
+    covers.push({ c: [b.left + rv, b.top + rv, ro] }); }
+  for (const el of ui.querySelectorAll('.tbtn:not(.hidden)')) { const b = el.getBoundingClientRect(); if (b.width && b.height) covers.push({ r: [b.left, b.top, b.right, b.bottom] }); }
+  return covers;
 }
 
 // main.js says each frame what the context buttons can do ({ use, vault, cams }); one under a finger stays until let go

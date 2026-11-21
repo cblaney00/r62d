@@ -171,4 +171,7 @@ export const PATCH_NOTES = [
   { d: '2026-11-20', k: 'mech', id: 'duelban', t: '1V1: no clock on your ban, and a NO BAN button.', v: 0 },
   { d: '2026-11-20', k: 'mech', id: 'invwalls', t: 'Fixed invisible solid furniture: sideways TVs, crate piles bigger than 2 x 2, rows of chairs and swings are now drawn over all the space they block.', v: 0 },
   { d: '2026-11-20', k: 'mech', id: 'duelchat', t: '1V1: the bot opponent now and then says something to you in all chat, in its own way: the chattiest up to three lines a round, never two within 20 s, quiet ones barely at all, most say gg at the end.', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'walkin', t: 'The action phase starts with the attackers jogging in from the edge of the map to their spawn spots (3 s); nobody can move or shoot until it ends, and the round clock waits.', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'outzoom', t: 'Outside, the view rests at a normal room\'s size instead of opening wide; drag the crosshair out to see further.', v: 0 },
+  { d: '2026-11-20', k: 'mech', id: 'phonesprint', t: 'Phones: sprint with a quick, straight push of the move stick to its edge (no more double-tap); aim in with the new AIM button beside the aim stick. The camera slides so enemies you can see are not hidden under the buttons.', v: 0 },
 ];

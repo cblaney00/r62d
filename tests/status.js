@@ -5,7 +5,7 @@ import { Game } from '../server/game.js';
 import { PHASE, TEAM } from '../shared/constants.js';
 let fails = 0; const fail = (...a) => { fails++; console.log('FAIL', ...a); };
 const g = new Game(); for (let i = 0; i < 10; i++) g.addBot(); g.startMatch();
-while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+while ((g.phase !== PHASE.ACTION || g.introT > 0)) g.tick(1 / 30);
 const atk = [...g.players.values()].find(p => g.side(p) === TEAM.ATK), def = [...g.players.values()].find(p => g.side(p) === TEAM.DEF);
 for (const p of g.players.values()) p.bot = false;
 const efOf = q => g.efOut(q) || [];

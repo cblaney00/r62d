@@ -12,7 +12,7 @@ for (const id of MAP_LIST) {
   const g = new Game();
   for (let i = 0; i < 10; i++) g.addBot();
   g.mapId = id; g.map = buildMap(id); g.startMatch();
-  while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+  while ((g.phase !== PHASE.ACTION || g.introT > 0)) g.tick(1 / 30);
   const cams = g.ents.filter(e => e.type === 'cam' && !e.owner && !e.tu && e.oc === undefined) // (outside cameras: tests/outcams.js);
   const atk = [...g.players.values()].find(q => g.side(q) !== cams[0].team && q.alive);
   for (const q of g.players.values()) if (q !== atk) { q.x = -9000; q.y = -9000; q.bot = false; } // nobody standing in the line of fire

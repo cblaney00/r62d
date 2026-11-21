@@ -16,7 +16,7 @@ pick(); run(1);
 if (g.phase !== PHASE.PREP) fail('operator select did not end', g.phase);
 run(5); if (g.phase !== PHASE.PREP) fail('preparation did not wait for the coach');
 g.handle(p, { t: 'tut', a: 'go' }); run(5);
-if (g.phase !== PHASE.ACTION) fail('no action phase', g.phase);
+if ((g.phase !== PHASE.ACTION || g.introT > 0)) fail('no action phase', g.phase);
 watch(40); // bots are defending; walk into them: they never hurt you
 const site = g.map.sites[g.site], b = site.bombs[0];
 p.x = b.x; p.y = b.y; p.hasDefuser = false;

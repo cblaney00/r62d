@@ -29,7 +29,7 @@ for (const o of ['javelin', 'wasp', 'lark', 'marten', 'auger']) if (spreadCone(F
 const g = new Game({ free: true });
 for (let i = 0; i < 2; i++) g.addBot();
 g.mapId = 'harbor'; g.map = buildMap('harbor'); g.startMatch();
-for (let i = 0; i < 400 && g.phase !== PHASE.ACTION; i++) g.tick(1 / 30);
+for (let i = 0; i < 400 && (g.phase !== PHASE.ACTION || g.introT > 0); i++) g.tick(1 / 30);
 const [p, q] = [...g.players.values()];
 q.hold = true; p.hold = true; // bots stand still
 // Tandem

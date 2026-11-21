@@ -41,7 +41,7 @@ import { MODES, MODE_LIST, ruleLine } from '/shared/modes.js';
 let rope3d = { active: () => false, facing: () => 0, noteFrame() {}, stop() {}, quality: () => null, debug: () => null, look() {}, aim: () => null, frame() {}, project: () => null, wallSign: () => 1 };
 import { compassRoute as sharedRoute } from '/shared/compass.js';
 import { newStick, stepStick, stickFrom } from './aimstick.js';
-import { onAimStart, touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, VIEW_RANGE, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings, padPlay, usePadNow } from './touch.js';
+import { onAimStart, touchPad, touchContext, touchActive, isTrackpad, stickSens, setStickSens, setTouchVisible, touchAimReset, isTouch, needsInputChoice, setInputChoice, uiScale, viewMul, VIEW_RANGE, setUiScale, setViewMul, tiltOn, tiltDead, setTilt, setTiltDead, gyroMode, gyroSens, gyroInv, setGyro, setGyroSens, setGyroInv, autoFire, setAutoFire, fireRings, setFireRings, padPlay, usePadNow, coverShapes } from './touch.js';
 import { blocksSight, FL, underAt, blocksMove } from '/shared/constants.js';
 import { EYE_H } from '/shared/map.js';
 import { META } from '/shared/meta.js';
@@ -210,7 +210,7 @@ const scopeOn = me => !!me && /scope|sniper/.test(String(me.aa || '')), sniperOn
 const reachOf = (me, ads) => aimReach(me && me.aa ? attFromCode(me.aa).sight : 'iron', ads ?? !!(me && me.ad)) * PX_PER_M;
 // Long sightlines (he asked): looking down a line more than 1.5x the normal range, the view opens right out the way you
 // face, up to LONG_H world px tall, and you see out to LONG_R. The sniper scope always gets that view while aimed in.
-const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45, OUT_H = 640; // OUT_H: the widest view outdoors (world px tall), sniper scope aside
+const LONG_H = 1500, LONG_R = 2400, ENV_HOLD = 0.45, OUT_H = 470; // OUT_H: the view outdoors (world px tall), sniper scope aside: a normal room's size (he asked 2026-11-20: it started very zoomed out outside; only dragging the crosshair out widens it there, was up to 640)
 // Crispy aim (he asked 2026-11-09): the crosshair follows the mouse 1:1 in every direction, like a pointer (the old
 // sideways flick help and the 1.3x faster outward pull are gone). Past the edge of your normal view (st.trackHH, the
 // room-size view before it grows to fit the crosshair) the mouse moves it by Settings → Far aim sensitivity (0.5),
@@ -2426,6 +2426,44 @@ function scoreTable(s) {
 
 // ---------------- interpolation ----------------
 const DELAY = 0.1;
+// the attackers' walk-in at the start of the action phase (server startIntro): nobody controls their operator yet
+const introNow = () => !!(st.last && st.last.it > 0);
+// Phones (he asked 2026-11-20: the buttons mustn't hide operators or sightlines, "especially enemies coming from the
+// corner of the screen"): enemies you can see (drawn last frame, st.foesNow), the far end of where you look and the aim
+// stick's far point are checked against what the thumb controls cover (touch.js coverShapes); one under them slides the
+// camera just enough to bring it out (towards the middle, at most a fifth of the screen), never putting you under a
+// button. The slide comes in quickly and goes back gently once nothing has needed it for a moment.
+const COVER_M = 10, COVER_MAX = [0.32, 0.3]; // (the most it slides: a share of the screen's width, height)
+function coverDodge(view, now, dt) {
+  const sh = coverShapes(), foes = (st.foesNow || []).concat(st.testFoe ? [st.testFoe] : []); st.foesNow = []; // (testFoe: tests/phonecover.mjs)
+  const W = VW / DPR, H = VH / DPR, toS = (x, y) => { const p = w2s(x, y); return tilt.project(p.x / DPR, p.y / DPR); };
+  const out = (p, dx, dy, M) => { // the screen shift that takes point p out from under every cover, M px clear (0 if it is)
+    let x = p.x + dx, y = p.y + dy, mx = 0, my = 0;
+    for (let pass = 0; pass < 4; pass++) { const x0p = x, y0p = y; for (const c of sh) {
+      if (c.c) { const [a, b, r] = c.c, d = Math.hypot(x - a, y - b), R = r + M; if (d < R) { const ux = d > 1 ? (x - a) * (R - d) / d : (W / 2 > a ? R : -R), uy = d > 1 ? (y - b) * (R - d) / d : 0; mx += ux; my += uy; x += ux; y += uy; } }
+      else { const [x0, y0, x1, y1] = c.r; if (x > x0 - M && x < x1 + M && y > y0 - M && y < y1 + M) {
+        const opts = [[x0 - M - x, 0], [x1 + M - x, 0], [0, y0 - M - y], [0, y1 + M - y]].filter(([u, v]) => (u === 0 || Math.sign(u) === Math.sign(W / 2 - x)) && (v === 0 || Math.sign(v) === Math.sign(H / 2 - y))); // (only towards the middle)
+        const best = (opts.length ? opts : [[0, 0]]).sort((p, q) => Math.hypot(...p) - Math.hypot(...q))[0]; mx += best[0]; my += best[1]; x += best[0]; y += best[1]; } }
+    } if (x === x0p && y === y0p) break; } // (out from under one button can be under the next: again until clear)
+    return { x: mx, y: my };
+  };
+  const pts = foes.slice(0, 6);
+  { const d = castSight(st.map, view.x, view.y, view.ang, 520, null); pts.push({ x: view.x + Math.cos(view.ang) * d * 0.85, y: view.y + Math.sin(view.ang) * d * 0.85, low: 1 }); } // where you look
+  if (touchFar()) { const q = padPointW(); pts.push({ x: q.ax, y: q.ay, low: 1 }); } // the aim stick's far point
+  let sx = 0, sy = 0, near = false;
+  for (const q of pts) { const p = toS(q.x, q.y), o = out(p, 0, 0, COVER_M), w = q.low ? 0.6 : 1;
+    if (Math.abs(o.x * w) > Math.abs(sx)) sx = o.x * w; if (Math.abs(o.y * w) > Math.abs(sy)) sy = o.y * w;
+    if (!near) { const o2 = out(p, 0, 0, COVER_M + 40); near = !!(o2.x || o2.y); } } // (close to a cover: the slide holds, so it doesn't pump at the edge)
+  const z = st.zoom / DPR, C = st.coverOff || (st.coverOff = { x: 0, y: 0, t: 0 });
+  // the slide so far plus what is still needed, at most a fifth of the screen
+  let tx = C.x - sx / z, ty = C.y - sy / z; const lx = W * COVER_MAX[0] / z, ly = H * COVER_MAX[1] / z; tx = Math.max(-lx, Math.min(lx, tx)); ty = Math.max(-ly, Math.min(ly, ty));
+  const me = toS(st.pred.x, st.pred.y); // never slide you yourself under a button
+  for (let i = 0; i < 4; i++) { const o = out(me, -(tx - C.x) * z, -(ty - C.y) * z, 4); if (!o.x && !o.y) break; tx = C.x + (tx - C.x) * 0.5; ty = C.y + (ty - C.y) * 0.5; }
+  if (sx || sy || near) C.t = now;
+  if (sx || sy) { const k = 1 - Math.exp(-dt * 5); C.x += (tx - C.x) * k; C.y += (ty - C.y) * k; }
+  else if (now - C.t > 0.8) { const k = 1 - Math.exp(-dt * 1.5); C.x -= C.x * k; C.y -= C.y * k; } // back to normal gently, once all has been clear for 0.8 s
+  return C;
+}
 function interp(id, kind) {
   const snaps = st.snaps; if (!snaps.length) return null;
   const rt = performance.now() / 1000 - DELAY;
@@ -2484,7 +2522,7 @@ function frame(nowMs) {
   if (coach.active) coach.update(s, me);
 
   // --- view source ---
-  if (st.tv && me && me.a) { // ride along: their position and aim, smoothed like everyone else's
+  if ((st.tv || introNow()) && me && me.a) { // ride along: their position and aim, smoothed like everyone else's (the walk-in too: the server walks you in)
     const pv = me.ct === 'drone' ? interp(me.did, 'ents') : interp(me.id, 'players');
     if (pv && Number.isFinite(pv.x) && Number.isFinite(pv.y)) { st.pred.x = pv.x; st.pred.y = pv.y; st.pred.vx = pv.vx || 0; st.pred.vy = pv.vy || 0; st.pred.gait = Number.isFinite(pv.gt) ? pv.gt : 0; } // no position for a moment (waiting off the map, just died): keep the last one
     const pa = interp(me.id, 'players'); if (pa && Number.isFinite(pa.ag)) st.aim = st.tvAimS = smoothAng(st.tvAimS, pa.ag, dt);
@@ -2532,14 +2570,15 @@ function frame(nowMs) {
   // (It used to follow the loose pointer, and the camera sliding after it made everything bounce — he noticed.)
   // Spawning (he asked 2026-11-18: everyone always spawns like this): the crosshair starts 2 m straight above you on the
   // screen, whatever the aiming mode, each time you come alive, each new round and each change of operator
-  { const k = !st.tv && me && me.a && !me.dn && me.ct === 'body' && s ? `${s.rd}|${me.op}` : null;
+  { const k = !st.tv && !introNow() && me && me.a && !me.dn && me.ct === 'body' && s ? `${s.rd}|${me.op}` : null; // (after the walk-in)
     if (k && k !== st.spawnKey) {
       const a = -Math.PI / 2 - (st.rot || 0), d = 2 * PX_PER_M;
       aimOff = { x: Math.cos(a) * d, y: Math.sin(a) * d }; padAng = a; st.aim = a; st.dzAng = a;
+      st.envH = st.envWant = 0; st.envBigT = 0; st.fitH = 0; st.farS = undefined; st.longV = false; // (and the view starts at its resting size for where you are, not whatever it was before)
       mouse.x = VW / 2; mouse.y = VH / 2 - d * (st.zoom || 1); // (Cursor mode: the pointer itself, you being in the middle as you spawn)
     }
     st.spawnKey = k; }
-  if (!st.tv && view && (view.kind === 'body' || view.kind === 'drone')) {
+  if (!st.tv && !introNow() && view && (view.kind === 'body' || view.kind === 'drone')) {
     const c = cursor(), mw = screenToWorld(c.x, c.y);
     st.aim = freeLive() ? aimAng() : Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x); // (Crosshair mode: its own direction, held in the close dead zone)
     if (sliding()) st.aim = slideAim(st.aim);
@@ -2618,6 +2657,7 @@ function frame(nowMs) {
     else { keepT(st.pred.x, st.pred.y, 80 * DPR / st.zoom); keepT(q.ax, q.ay, AHEAD() * 1.3 / st.zoom); } // (80: clear of the corner panels)
   }
   if ((st.swoopZ || 0) > 0 && st.rtFace != null) { const z = st.swoopZ, vh = st.viewH || 400, tx = st.pred.x + Math.cos(st.rtFace) * vh * 0.07, ty = st.pred.y + Math.sin(st.rtFace) * vh * 0.07; cx += (tx - cx) * z; cy += (ty - cy) * z; } // the swoop: the camera stays right on you as you go through
+  if (isTouch && touchActive() && view && view.kind === 'body' && !st.tv && st.zoom) { const o = coverDodge(view, now, dt); cx += o.x; cy += o.y; } else { st.coverOff = null; st.foesNow = []; }
   const locked = camLocked(view);
   if (locked) { const t = lockedTarget(dt, view); cx = t.x; cy = t.y; }
   const k = 1 - Math.exp(-dt * (st.swoopTail > performance.now() / 1000 ? 3.5 : 14 - 8 * fk)); // (just after the window swoop: a slow glide to the usual spot)
@@ -2653,7 +2693,7 @@ function frame(nowMs) {
       want = Math.max(want, Math.min(st.tv ? 520 : st.longV ? LONG_H : 680, (st.farS + m1 + m2) / (2 * e))); // (TV: staring out over a yard shouldn't make a wide, empty shot)
       // outdoors (he asked 2026-11-18: it zoomed out too much there): long sightlines open the view only a little past the
       // biggest room view, unless a sniper scope is aimed in
-      if (!st.tv && !sniper && !insideAt(view.x, view.y)) { want = Math.min(want, OUT_H); if (st.longV) { st.longV = false; } }
+      if (!st.tv && !sniper && !insideAt(view.x, view.y)) { want = OUT_H; if (st.longV) { st.longV = false; } } // (the long sightlines out there don't widen it; the crosshair fit below does)
       const reach = (st.viewH || want) * e; // how far the screen reaches from its middle along your aim, right now
       if (!(fk > 0.5) || st.sightLead == null) st.sightLead = Math.max(0, Math.min(reach - m1, st.farS - (reach - m2))); // (in a fight it stays put)
     } else st.sightLead = 0;
@@ -2814,7 +2854,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (steadying()) k.sprint = 0; // scoped in, the sprint key only steadies the scope
   if (k.sprint) k.sa = Math.round(st.aim * 1000) / 1000; // what the server will go by for which way you sprint
   if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
-  if (typing || menuOpen()) { for (const key in k) k[key] = 0; ev.length = 0; }
+  if (typing || menuOpen() || introNow()) { for (const key in k) k[key] = 0; ev.length = 0; } // (the walk-in: nothing counts yet)
   { const r = moveTurn(); if (r) k.rot = Math.round(r * 1000) / 1000; } // Rotate view, Face aiming, sprint + W: the keys turn with you
   if (me && me.ro && me.ro[0] && !r3on()) { const cr = keys.has('crouch') || keys.has('crouchTap'), tn = performance.now() / 1000; if (cr && !st.r3cr) st.r3invT = tn; st.r3cr = cr; k.inv = tn - (st.r3invT ?? -9) < 0.1 ? 1 : 0; k.crouch = 0; } // on a rope: crouch flips upside down
   if (r3on() && me && me.ro) { // the 3D rope view (he asked, R6's keys): W/S up and down a floor, A/D along the wall as you face it, crouch upside down
@@ -3397,7 +3437,8 @@ function draw(s, view, now, dt) {
     }
     // Silent Shroud: drones and cameras can't see her, only eyes can
     let vis = ally || isMe || (p.sh ? !view || teamSeesBody(p.x, p.y) : seen(p.x, p.y));
-    if (vis && !ally && !isMe && view && st.map.fTop) vis = teamSees(p.x, p.y, HEAD_STANCE[stanceOf(p)] + (p.el === 1 ? furnTopAt(st.map, p.x, p.y) : 0)); // (by height: the top of them must show over the furniture between)
+    if (vis && !ally && !isMe && view && st.map.fTop) vis = teamSees(p.x, p.y, HEAD_STANCE[stanceOf(p)] + (p.el === 1 ? furnTopAt(st.map, p.x, p.y) : 0));
+    if (vis && !ally && !isMe && isTouch) (st.foesNow || (st.foesNow = [])).push({ x: p.x, y: p.y }); // (phones: kept out from under the buttons, coverDodge) // (by height: the top of them must show over the furniture between)
     if (vis && !ally && !isMe && p.rp && !p.ry && view && p.rr !== undefined && st.map.ropes[p.rr]) { const r = st.map.ropes[p.rr]; if ((view.x - p.x) * -Math.cos(r.out) + (view.y - p.y) * -Math.sin(r.out) > 6 && floorAt(st.map, view.x, view.y) === r.f) vis = false; } // off-level on a rope: hidden from inside (only the rope gives them away)
     if (st.tv) (st.tvPos || (st.tvPos = new Map())).set(p.id, { x: p.x, y: p.y, p });
     if (!vis) { // ESPORTS TV (he asked): everyone's outline shows through walls; only the followed player's sight is live
@@ -4001,7 +4042,7 @@ function scopeLens(p, r, M) {
 }
 function drawWheelNow() { if (st.wheel) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); drawWheel(ctx, st.wheel, DPR); ctx.restore(); } }
 function crosshair(me, now) {
-  if (st.tv) return; // watching: no crosshair of your own on the broadcast
+  if (st.tv || introNow()) return; // watching: no crosshair of your own on the broadcast (nor in the walk-in, when you can't aim yet)
   const w = WEAPONS[me.w];
   const gm = gunMods(me.w, attFromCode(me.aa));
   // recoil kicks the crosshair round your character: pull the mouse against it
@@ -5204,7 +5245,7 @@ const TIPS = ['The box in the top left shows the room you are in: use its name w
   'Cameras see a cone: aim them with the mouse and switch with {leanL} and {leanR}.',
   'Change your loadout for every operator on the Operators page.',
   'Smashed barricades leave splinters that crack underfoot.',
-  'On a phone: put a thumb down on (or just outside) the red ring round either stick to shoot; only the sticks themselves move and aim, tap the aim stick to aim in, and double-tap and hold the move stick to sprint.',
+  'On a phone: put a thumb down on (or just outside) the red ring round either stick to shoot; only the sticks themselves move and aim, tap AIM beside the aim stick to aim in, and push the move stick out to its edge quickly to sprint.',
 ];
 const tipText = t => t.replace(/\{(\w+)\}/g, (_, id) => label(id)); // tips name your own keys
 let tipI = Math.floor(Math.random() * TIPS.length);
@@ -5245,7 +5286,7 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { addFeed: t => addFeed(t), padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: () => rope3d.debug(), r3q: f => rope3d.quality(f), PF, st, fx, tilt, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset, scr: () => { const c = cursor(), p = tilt.project(c.x / DPR, c.y / DPR), q = w2s(st.pred.x, st.pred.y), o = tilt.project(q.x / DPR, q.y / DPR); return { x: Math.round(p.x - o.x), y: Math.round(p.y - o.y) }; } }; // scr: the crosshair on screen, CSS px from your character // for automated screenshot tests
+window.__r62d = { addFeed: t => addFeed(t), face: a => { padAng = a; st.aim = a; st.dzAng = a; aimOff = { x: Math.cos(a) * 150, y: Math.sin(a) * 150 }; }, toScr: (x, y) => { const q = w2s(x, y); return tilt.project(q.x / DPR, q.y / DPR); }, covers: () => coverShapes(), coverOff: () => st.coverOff, padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: () => rope3d.debug(), r3q: f => rope3d.quality(f), PF, st, fx, tilt, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset, scr: () => { const c = cursor(), p = tilt.project(c.x / DPR, c.y / DPR), q = w2s(st.pred.x, st.pred.y), o = tilt.project(q.x / DPR, q.y / DPR); return { x: Math.round(p.x - o.x), y: Math.round(p.y - o.y) }; } }; // scr: the crosshair on screen, CSS px from your character // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.

@@ -13,7 +13,7 @@ const g = new Game();
 g.addBot(0); g.addBot(0); g.addBot(0); g.botLevel = 4;
 g.mode = 'zombies'; g.startMatch();
 const m = g.map, Zs = g.zb;
-if (!Zs || g.phase !== PHASE.ACTION || m.id !== 'lantern') fail('did not start on Lantern Point');
+if (!Zs || (g.phase !== PHASE.ACTION || g.introT > 0) || m.id !== 'lantern') fail('did not start on Lantern Point');
 const ps = [...g.players.values()];
 if (ps.some(p => p.guns.length !== 1 || p.guns[0].w !== 'p10' || p.zb.pts !== 500)) fail('wrong start: pistol and 500 points');
 if (Zs.gates.some(gt => gt.cells.some(k => m.tiles[k] !== T.BEAM))) fail('gates not closed');

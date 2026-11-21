@@ -28,7 +28,7 @@ for (const op of OP_LIST) {
     g = new Game();
     for (let i = 0; i < 10; i++) g.addBot();
     g.startMatch();
-    while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+    while ((g.phase !== PHASE.ACTION || g.introT > 0)) g.tick(1 / 30);
     p = [...g.players.values()].find(q => g.side(q) === team && q.alive);
   } while (!p);
   p.op = op; g.equip(p); p.bot = false; // a still body that only uses its ability

@@ -17,12 +17,12 @@ for (const mapId of MAP_LIST) for (const bots of [0, 3]) {
   g.handle(p, { t: 'free', a: 'start', map: mapId, bots });
   const tag = `${mapId} bots=${bots}:`;
   if (g.mapId !== mapId) fail(tag, 'wrong map', g.mapId);
-  if (g.phase !== PHASE.ACTION) fail(tag, 'not in action phase', g.phase);
+  if ((g.phase !== PHASE.ACTION || g.introT > 0)) fail(tag, 'not in action phase', g.phase);
   if (!p.alive || !p.op || g.side(p) !== TEAM.ATK) fail(tag, 'not spawned as an attacker', p.alive, p.op);
   const botList = [...g.players.values()].filter(q => q.bot);
   if (botList.length !== bots || botList.some(q => !q.alive || g.side(q) !== TEAM.DEF)) fail(tag, 'enemy bots wrong', botList.length);
   for (let i = 0; i < 30 * 20; i++) g.tick(1 / 30); // 20 s: the clock must not move, no round end
-  if (g.phase !== PHASE.ACTION) fail(tag, 'left the action phase', g.phase);
+  if ((g.phase !== PHASE.ACTION || g.introT > 0)) fail(tag, 'left the action phase', g.phase);
   // go round every operator, forwards then backwards, checking each comes out alive, armed, on the right side
   for (const dir of [1, -1]) for (let i = 0; i < ALL.length; i++) {
     const before = p.op, x = p.x, y = p.y, was = p.alive;
@@ -39,7 +39,7 @@ for (const mapId of MAP_LIST) for (const bots of [0, 3]) {
   if (p.alive) fail(tag, 'did not die');
   for (let i = 0; i < 30 * 4 && !p.alive; i++) g.tick(1 / 30);
   if (!p.alive) fail(tag, 'no respawn after 4 s');
-  if (g.phase !== PHASE.ACTION) fail(tag, 'dying ended the round', g.phase);
+  if ((g.phase !== PHASE.ACTION || g.introT > 0)) fail(tag, 'dying ended the round', g.phase);
   if (g.saveMatch(0) !== null) fail(tag, 'free play would be saved');
 }
 console.log(fails ? `${fails} failure(s)` : 'PASS free play');

@@ -35,7 +35,7 @@ if (atk.op !== op2) fail('attacker could not switch operator in preparation');
 if (atk.droneId !== drone || atk.ctrl !== 'drone' || !atk.staged) fail('switching lost the drone / spawn wait');
 const dop2 = freeOp(def, dop); g.handle(def, { t: 'pick', op: dop2 }); if (def.op !== dop) fail('defender switched in preparation');
 for (let i = 0; i < 30 * 40 && g.phase === PHASE.PREP; i++) g.tick(1 / 30);
-if (g.phase !== PHASE.ACTION) fail('no action phase:', g.phase);
+if ((g.phase !== PHASE.ACTION || g.introT > 0)) fail('no action phase:', g.phase);
 g.handle(atk, { t: 'pick', op: freeOp(atk, op2) }); if (atk.op !== op2) fail('attacker switched in the action phase');
 console.log(fails ? `${fails} failures` : 'PASS selectflow');
 process.exit(fails ? 1 : 0);

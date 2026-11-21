@@ -146,9 +146,9 @@ async function run() {
       { const pt = [Math.round(R.x), Math.round(R.y)]; await run1('on the aim stick, dragged up', [pt, [pt[0], Math.round(pt[1] - 50 * R.u), 300]], 400, (r, n) => check(n + ': aims, no shots', r.turned > 0 && r.shots === 0, r)); }
       console.log(bad ? `FAIL zones (${bad})` : 'PASS zones');
     }
-    if (process.env.SCENARIO === 'rings') { // he asked 2026-11-17: fire rings round both sticks, a quick tap on the aim stick aims in, double-tap and hold the move stick sprints
+    if (process.env.SCENARIO === 'rings') { // he asked 2026-11-17: fire rings round both sticks, AIM beside the aim stick aims in (2026-11-20), a quick straight push of the move stick to its edge sprints
       await js("localStorage.setItem('r62d-autofire', '0'); __r62d.st.ws.send(JSON.stringify({ t: 'free', a: 'clearBots' })); true"); await sleep(800);
-      console.log('FIRE / AIM buttons on screen:', await js("document.querySelectorAll('#touchUI .tbtn.fire, #touchUI .tbtn.aim').length"), '(want 0)');
+      console.log('FIRE / AIM buttons on screen:', await js("document.querySelectorAll('#touchUI .tbtn.fire').length"), await js("document.querySelectorAll('#touchUI .tbtn.aim').length"), '(want 0 1)');
       await js(`window.__rec = []; (function rec() { const s = __r62d.st; if (s.pred && s.me) { const p = __r62d.padFar(); __rec.push([Math.round(performance.now()), Math.round(Math.hypot(p.ax - s.pred.x, p.ay - s.pred.y)), Math.round((s.aim || 0) * 57.3), window.__fires, s.me.ad ? 1 : 0, s.pred.spr ? 1 : 0, Math.round(s.pred.x), Math.round(s.pred.y), document.getElementById('tsRight').classList.contains('firing') || document.getElementById('tsLeft').classList.contains('firing') ? 1 : 0]); } requestAnimationFrame(rec); })(); true`);
       const take = async () => { const r = JSON.parse(await js('JSON.stringify(__rec.splice(0))')); return r; };
       const sum = (name, r, want) => { if (!r.length) return console.log(name, 'no frames'); const t0 = r[0][0];
@@ -156,26 +156,30 @@ async function run() {
         if (process.env.ROWS) for (const q of r.filter((_, i) => i % 6 === 0)) console.log('   t', q[0] - t0, 'dist', q[1], 'aim', q[2], 'shots', q[3], 'ring', q[8]); };
       const Ra = 62 / 0.7 * 1.5, r = 62 * Math.max(0.7, Math.min(1.15, H / 430)); // the aim stick's thumb travel (normal sensitivity) and the move stick's radius
       const RA = await centre('#tsRight'); // (he asked 2026-11-18: only the stick itself aims, so the aim thumb starts on it)
-      const at = (k, deg) => [Math.round(RA[0] + Math.cos(deg / 57.3) * Ra * k), Math.round(RA[1] + Math.sin(deg / 57.3) * Ra * k)];
+      const at = (k, deg) => [Math.min(+W - 2, Math.round(RA[0] + Math.cos(deg / 57.3) * Ra * k)), Math.min(+H - 2, Math.round(RA[1] + Math.sin(deg / 57.3) * Ra * k))]; // (kept on the screen)
       await take();
       await touch(finger('R', [RA, [...at(0.6, 0), 250]], 500)); await sleep(300); let q = await take(); sum('A1 aim thumb out 0.6 (inside the stick)', q, 'no shots'); const d1 = q[q.length - 1][1];
       await touch(finger('R', [RA, [...at(0.6, 0), 250], [...at(0.6, 0), 300], [...at(1.4, 0), 120], [...at(1.4, 0), 600], [...at(1.4, -30), 300], [...at(1.4, -30), 300], [...at(0.6, -30), 150]], 500)); await sleep(300);
       q = await take(); sum('A2 ... then pulled far out, round 30°, back in', q, 'NO shots: a pulled stick never shoots');
       const onRing = q.filter(x => x[8]); if (onRing.length) console.log('   crosshair distance before the ring', d1, '| on the ring', Math.min(...onRing.map(x => x[1])), '-', Math.max(...onRing.map(x => x[1])), '| aim on the ring', onRing[0][2], '->', onRing[onRing.length - 1][2], '| last frames off the ring:', q.slice(-5).map(x => x[8]).join(''));
       const st = await centre('#tsRight');
-      await touch(finger('T', [st, [st[0], st[1], 60]])); await sleep(500); sum('B1 quick tap on the aim stick', await take(), 'aimed in 1');
-      console.log('   aim stick lit blue:', await js("document.getElementById('tsRight').classList.contains('aimed')"));
-      await touch(finger('T', [st, [st[0], st[1], 60]])); await sleep(500); sum('B2 another quick tap', await take(), 'aimed in back to 0');
+      await touch(finger('T', [st, [st[0], st[1], 60]])); await sleep(500); sum('B0 quick tap on the aim stick', await take(), 'aimed in 0 (AIM is its own button now)');
+      const ab = await centre('#touchUI [data-id="ads"]');
+      await touch(finger('T', [ab, [ab[0], ab[1], 60]])); await sleep(500); sum('B1 tap AIM', await take(), 'aimed in 1');
+      console.log('   AIM lit:', await js("document.querySelector('#touchUI [data-id=\"ads\"]').classList.contains('on')"));
+      { const p = touch(finger('T', [ab, [ab[0], ab[1], 60]]), finger('R', [RA, [...at(0.6, 40), 250]], 400)); await p; } await sleep(500); sum('B2 tap AIM again while the aim thumb steers', await take(), 'aimed in back to 0');
+      console.log('   AIM lit after B2:', await js("document.querySelector('#touchUI [data-id=\"ads\"]').classList.contains('on')"));
+      if (await js("__r62d.st.me.ad === 1")) { await touch(finger('T', [ab, [ab[0], ab[1], 60]])); await sleep(500); sum('B2b tap AIM on its own', await take(), 'aimed in back to 0'); }
       const ringAt = async sel => JSON.parse(await js(`(() => { const b = document.querySelector('${sel}').getBoundingClientRect(), rv = b.width / 2; return JSON.stringify([Math.round(b.left + rv - rv * 74 / 60), Math.round(b.top + rv)]); })()`)); // the middle of a stick's red ring, on its left
       const ringPt = await ringAt('#tsRight');
       await touch(finger('T', [ringPt, [ringPt[0] - 2, ringPt[1], 400]], 300)); await sleep(300); sum('B3 thumb lands straight on the drawn aim ring', await take(), 'shots');
       const up = k => [L[0], Math.round(L[1] - r * k)];
       await touch(finger('L', [L, [...up(0.6), 200]], 600)); await sleep(300); sum('C1 move thumb up 0.6', await take(), 'moves, no shots');
       await touch(finger('L', [L, [...up(0.6), 200], [...up(1.5), 120]], 900)); await sleep(300); sum('C2 move thumb pulled out over its ring', await take(), 'NO shots, still moves');
-      await touch(finger('L', [L, [Math.round(L[0] + r * 2.2), L[1], 250]], 900)); await sleep(300); sum('D  move thumb pushed far right (old sprint push)', await take(), 'no sprint, NO shots');
-      await touch(finger('L', [L, [L[0], L[1], 60]])); await sleep(120);
-      await touch(finger('L', [L, [Math.round(L[0] + r * 0.9), L[1], 200]], 1300)); await sleep(300); sum('E  double-tap (right) and hold the move stick', await take(), 'sprint 1, no shots');
-      await touch(finger('L', [L, [Math.round(L[0] - r * 0.9), L[1], 200]], 800)); await sleep(300); sum('E2 (left) a single press later', await take(), 'sprint 0');
+      await touch(finger('L', [L, [Math.round(L[0] + r * 1.1), L[1], 700]], 900)); await sleep(300); sum('D  move thumb pushed slowly out to the edge', await take(), 'sprint 0, NO shots');
+      await touch(finger('L', [L, [Math.round(L[0] + r * 1.1), L[1], 120]], 1300)); await sleep(300); sum('E  a quick straight push out to the edge, held', await take(), 'sprint 1, no shots');
+      await touch(finger('L', [L, [Math.round(L[0] + r * 0.5), Math.round(L[1] - r * 0.6), 60], [Math.round(L[0] + r * 1.1), L[1], 60]], 900)); await sleep(300); sum('E1 a quick push that bends', await take(), 'sprint 0');
+      await touch(finger('L', [L, [L[0], Math.round(L[1] - r * 1.1), 120], [L[0], Math.round(L[1] - r * 1.1), 600], [L[0], Math.round(L[1] - r * 0.3), 200]], 800)); await sleep(300); q = await take(); sum('E2 quick push up, held, then eased back in', q, 'sprint 1 then 0'); console.log('   sprinting at the end:', q[q.length - 1][5]);
       await touch(finger('L', [L, [L[0], Math.round(L[1] + r * 0.7), 200]], 1000), finger('R', [ringPt, [ringPt[0] - 3, ringPt[1], 300]], 500, 100)); await sleep(300); sum('F  both thumbs: move + a finger on the aim ring', await take(), 'shots and moves');
       const lr = await ringAt('#tsLeft');
       await touch(finger('L', [[lr[0] + 0, lr[1]], [lr[0] + 2, lr[1], 400]], 300)); await sleep(300); sum('G  a finger put down on the move stick\'s ring', await take(), 'shots, no movement');

@@ -22,7 +22,7 @@ for (const id of MAP_LIST) {
   const g = new Game();
   for (let i = 0; i < 4; i++) g.addBot();
   g.mapId = id; g.map = buildMap(id); g.startMatch();
-  while (g.phase !== PHASE.ACTION) g.tick(1 / 30);
+  while ((g.phase !== PHASE.ACTION || g.introT > 0)) g.tick(1 / 30);
   for (const q of g.players.values()) q.bot = false; // hold still: this test moves them by hand
   for (const h of g.map.hatches) for (const k of h.cells) if (g.map.tiles[k] === T.HATCHR) { g.map.tiles[k] = T.HATCH; g.map.hp[k] = CELL_HP[T.HATCH]; } // bots reinforce hatches over the site in prep: start from plain ones
   const ps = [...g.players.values()], def = ps.find(q => g.side(q) === TEAM.DEF), atk = ps.find(q => g.side(q) === TEAM.ATK);
@@ -82,7 +82,7 @@ for (const id of MAP_LIST) {
   }
   // a breaching charge set on a hatch blows it open
   const g2 = new Game(); g2.addBot(); g2.mapId = id; g2.map = buildMap(id); g2.startMatch();
-  while (g2.phase !== PHASE.ACTION) g2.tick(1 / 30);
+  while ((g2.phase !== PHASE.ACTION || g2.introT > 0)) g2.tick(1 / 30);
   const h = g2.map.hatches[0], p = [...g2.players.values()][0];
   g2.explode({ x: h.x, y: h.y, team: TEAM.ATK, owner: p.id }, { r: 40, dmg: 0, cellR: 21, cells: [T.SOFT, T.BARRI, T.HATCH], kind: 'breach', at: h.cells[0] });
   if (g2.map.tiles[h.cells[0]] !== T.HOLE) fail(id, 'a breaching charge did not open a hatch');

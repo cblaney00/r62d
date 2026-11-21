@@ -32,6 +32,7 @@ const SPRINT_RAISE = 0.3, SPRINT_LOUD = 520; // seconds to get the gun back up a
 const ROPE_SLIDE = 0.3; // s per storey sliding down when you let go (2026-11-15, he asked: faster, to help attackers; was 0.45)
 const EMPTY_INPUT = { up: 0, down: 0, left: 0, right: 0, walk: 0, sprint: 0, sa: 0, crouch: 0, prone: 0, fire: 0, ads: 0, interact: 0, ability: 0, lean: 0, la: 0, jump: 0, rw: 0, rv: 0, inv: 0 }; // rw / rv / inv: the 3D rope view's along-the-wall, up/down and upside-down keys
 const JAM_R = 90;
+const INTRO = 3, INTRO_TURN = 0.45; // the walk-in at the start of the action phase (he asked 2026-11-20: 3 s every round, nobody moves until it ends); the last INTRO_TURN s they turn to face the map
 const VAULT_TIME = 0.6, VAULT_RECOVER = 0.35, WIN_VAULT = 0.85; // WIN_VAULT: through a window 15% quicker (he asked 2026-11-18) // climbing over (no shooting, gun down), then a moment before you can aim again
 const FREE_OPS = [...opsForTeam(TEAM.ATK), ...opsForTeam(TEAM.DEF)]; // free play's switching order
 
@@ -199,6 +200,7 @@ export class Game {
   side(p) { if (this.zb) return p.zombie ? TEAM.DEF : TEAM.ATK; if (this.arena) return this.arena.ffa ? 'f' + p.squad : p.squad === 0 ? TEAM.ATK : TEAM.DEF; return p.squad === this.atkSquad() ? TEAM.ATK : TEAM.DEF; } // fun modes: everyone for themselves = a side each (survivors attack, the infected defend)
 
   resetToLobby() {
+    this.introT = 0;
     if (this.rec) stopRec(this, true); // ended early: kept if a round was finished
     if (this.arena) arenaEndMatch(this);
     if (this.zb) zbEnd(this);
@@ -219,9 +221,10 @@ export class Game {
       if (typeof m.ax === 'number') { p.aimX = m.ax; p.aimY = m.ay; }
       if (typeof m.vt === 'number' && isFinite(m.vt)) p.viewTime = m.vt; // server time of the world this player is looking at
       { const f = !!(m.k && m.k.fire); if (f && !p.msgFire && !p.click) p.click = { a: p.aim, vt: p.viewTime, ax: p.aimX, ay: p.aimY }; p.msgFire = f; } // a click keeps the aim it was made with, even if more input arrives before the next tick
-      this.applyMove(p, Math.max(0, Math.min(0.05, Number(m.dt) || 0)));
+      if (this.introT > 0) { p.input = { ...EMPTY_INPUT }; p.click = null; if (p.introAim !== undefined && !p.intro) p.aim = p.introAim; } // the walk-in: nothing you press counts yet
+      else this.applyMove(p, Math.max(0, Math.min(0.05, Number(m.dt) || 0)));
       p.lastSeq = m.s | 0;
-      if (Array.isArray(m.ev)) for (const e of m.ev.slice(0, 10)) this.event(p, e);
+      if (Array.isArray(m.ev) && !(this.introT > 0)) for (const e of m.ev.slice(0, 10)) this.event(p, e);
     } else if (m.t === 'ping') {
       if (p.sock && p.sock.open) p.sock.send(JSON.stringify({ t: 'pong', c: m.c }));
       if (typeof m.rtt === 'number' && isFinite(m.rtt)) p.rtt = Math.max(0, Math.min(9999, Math.round(m.rtt)));
@@ -453,6 +456,7 @@ export class Game {
   siteOpen(n) { return !(this.sitesUsed || []).includes(n); }
 
   beginPrep() {
+    this.introT = 0;
     const map = this.map;
     if (!this.tut && !this.free && this.sitesUsed && !this.sitesUsed.includes(this.site)) this.sitesUsed.push(this.site);
     for (const p of this.players.values()) {
@@ -569,6 +573,49 @@ export class Game {
       p.busy = null;
     }
     this.phase = PHASE.ACTION; this.timer = DUR.action;
+    if (!this.tut && !this.free && !this.arena && !this.zb && !this.drill) this.startIntro();
+    else this.events.push({ e: 'banner', text: 'ACTION PHASE', sub: '' });
+  }
+
+  // The walk-in (he asked 2026-11-20): when the action starts the attackers walk in from the edge of the map (the street,
+  // the bushes) to their spawn spots, about 3 s, while nobody can move, turn or shoot; then the clock starts. Each one
+  // starts on the longest clear straight line back from their spot, leaning towards the way out of the map.
+  startIntro() {
+    const map = this.map, want = M_S.sprint * PX_PER_M * (INTRO - INTRO_TURN - 0.15), mx = map.W * CELL / 2, my = map.H * CELL / 2;
+    const free = (x, y) => x > CELL && y > CELL && x < (map.W - 1) * CELL && y < (map.H - 1) * CELL && !circleBlocked(map, x, y, PLAYER_R + 1, blocksMove);
+    for (const p of this.players.values()) {
+      p.intro = null; p.introAim = p.aim;
+      if (this.side(p) !== TEAM.ATK || !p.alive || p.ctrl !== 'body') continue;
+      const tx = p.x, ty = p.y, out = Math.atan2(ty - my, tx - mx);
+      let best = null;
+      for (let i = 0; i < 32; i++) {
+        const a = i / 32 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); let d = 0;
+        while (d < want && free(tx + c * (d + 6), ty + s * (d + 6))) d += 6;
+        const sc = d + 60 * Math.cos(angDiff(a, out)); // (the longest walk, from the outside of the map where it can)
+        if (!best || sc > best.sc) best = { sc, d, c, s };
+      }
+      if (!best || best.d < 24) continue; // boxed in: they are just there
+      p.x = tx + best.c * best.d; p.y = ty + best.s * best.d; p.vx = p.vy = 0;
+      p.intro = { tx, ty, face: p.aim }; p.aim = Math.atan2(ty - p.y, tx - p.x);
+    }
+    this.introT = INTRO;
+    this.events.push({ e: 'intro', t: INTRO });
+  }
+  introStep(p, dt) { // one tick of the walk-in for a player: walking on to their spot, else standing still
+    p.input = { ...EMPTY_INPUT }; p.click = null; p.prevInput = p.input;
+    const w = p.intro;
+    if (!w) { p.aim = p.introAim ?? p.aim; p.moving = 0; return; }
+    const dx = w.tx - p.x, dy = w.ty - p.y, d = Math.hypot(dx, dy);
+    if (d > 3 && this.introT > INTRO_TURN) {
+      const a = Math.atan2(dy, dx); p.aim = a;
+      const v = M_S.sprint * PX_PER_M, st = Math.min(d, v * dt); // (at a sprint) along the line startIntro found clear (teammates walking side by side pass through each other)
+      p.x += dx / d * st; p.y += dy / d * st; p.vx = dx / d * v; p.vy = dy / d * v;
+      p.moving = 3; p.gait = (p.gait || 0) + st / PX_PER_M;
+    } else { p.moving = 0; p.vx = p.vy = 0; p.aim = p.aim + angDiff(w.face, p.aim) * Math.min(1, dt * 9); }
+  }
+  endIntro() {
+    for (const p of this.players.values()) { if (p.intro) { p.aim = p.intro.face; p.intro = null; } p.vx = p.vy = 0; }
+    this.introT = 0;
     this.events.push({ e: 'banner', text: 'ACTION PHASE', sub: '' });
   }
 
@@ -660,6 +707,15 @@ export class Game {
     if (this.phase === PHASE.MATCH_END) { if (this.timer <= 0) { this.resetToLobby(); if (this.tv && this.tv.socks.size) this.tvStart(null); } return; } // TV: the next match, on another map
 
     // PREP / ACTION
+    if (this.introT > 0) { // the walk-in: the clock waits, nobody acts
+      if (!held) this.timer += dt;
+      this.introT -= dt;
+      for (const p of this.players.values()) { this.introStep(p, dt); this.tickPlayer(p, dt); p.prevInput = p.input; }
+      this.tickEnts(dt); // (gadgets and cameras carry on)
+      this.recordHistory(); this.recordCam();
+      if (this.introT <= 0) this.endIntro();
+      return;
+    }
     for (const p of this.players.values()) if (p.ms && p.alive) p.ms.playSeconds += dt;
     if (this.free) this.freeRespawns();
     if (this.arena) arenaTick(this, dt);
@@ -730,7 +786,7 @@ export class Game {
     const beingRevived = p.downed && [...this.players.values()].some(q => q.busy && q.busy.k === 'revive' && q.busy.target === p.id); // he asked: revives kept failing — the downed crawled out of reach
     const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || !!p.rope || !!p.grapple || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') || beingRevived ||
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
-      (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK);
+      (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK) || this.introT > 0; // (the walk-in moves them itself)
     const gw = p.guns && p.guns[p.slot] ? moveOf(WEAPONS[p.guns[p.slot].w]) : [1, 1];
     const box = this.phase === PHASE.PREP && this.prepBox && this.side(p) === TEAM.DEF && p.ctrl === 'body' ? this.prepBox : undefined; // (shared/map.js prepBox)
     const boxShow = box && this.prepSiteBox ? 1 : undefined; // (the outline is drawn only for the site box)
@@ -3473,7 +3529,7 @@ export class Game {
     const spots = { atk: [...this.spots.atk.keys()], def: [...this.spots.def.keys()] };
     const common = JSON.stringify({
       ou: [...this.players.values()].filter(p => p.outside && p.alive).map(p => p.id),
-      ph: this.phase, tm: r1(Math.max(0, this.timer)), rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, pp: this.map.peeps && this.map.peeps.length ? this.map.peeps : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
+      ph: this.phase, tm: r1(Math.max(0, this.timer)), it: this.introT > 0 ? r2(this.introT) : undefined, rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, pp: this.map.peeps && this.map.peeps.length ? this.map.peeps : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
       site: this.site, slk: this.siteLk ? 1 : 0, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       tvl: this.tv ? this.botLevel : undefined, cp: this.tv ? this.colPair : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ar: arenaInfo(this), zb: zbInfo(this), ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
       bq: (this.tv || this.rules.bans) && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], this.banRun.t === Infinity ? -1 : r1(Math.max(0, (this.banRun.t ?? this.time) - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,

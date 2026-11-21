@@ -24,7 +24,7 @@ for (const id of only ? [only] : MAP_LIST) for (let n = 0; n < per; n++) {
   let t = 0;
   while (t < 60 * 25 && !(g.phase === PHASE.LOBBY && t > 5)) {
     g.tick(1 / 30); t += 1 / 30; g.events = [];
-    if (g.phase !== PHASE.ACTION) { prev.clear(); continue; }
+    if ((g.phase !== PHASE.ACTION || g.introT > 0)) { prev.clear(); continue; }
     for (const p of g.players.values()) {
       if (!p.alive || p.downed || p.ctrl !== 'body' || !p.ai) continue;
       const e = visibleEnemy(g, p, 700), pr = prev.get(p.id) || {};

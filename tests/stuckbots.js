@@ -21,7 +21,7 @@ for (const id of arg('--only') ? [arg('--only')] : MAP_LIST) {
   while (t < 60 * 20) {
     g.tick(dt); t += dt; g.events = [];
     if (g.phase === PHASE.LOBBY && t > 5) break;
-    if (g.phase !== PHASE.ACTION) { still.clear(); swings.clear(); continue; }
+    if ((g.phase !== PHASE.ACTION || g.introT > 0)) { still.clear(); swings.clear(); continue; }
     for (const p of g.players.values()) {
       if (!p.alive || p.downed) continue;
       const sw = (swings.get(p.id) || []).filter(s => g.time - s.t < 15 && Math.hypot(s.x - p.x, s.y - p.y) < 30);

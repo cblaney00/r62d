@@ -23,6 +23,7 @@ const SPEC = [
   { id: 'melee', at: 'br', c: RC, r: B2, a: [-66, -30], is: 17 },
   { id: 'next', at: 'br', c: RC, r: B2, a: [-100, -66], is: 18 }, { id: 'prev', at: 'br', c: RC, r: B2, a: [-134, -100], is: 18 },
   { id: 'leanR', at: 'bl', c: LC, r: [103, 137], a: [-25, 10], is: 18 }, { id: 'leanL', at: 'bl', c: LC, r: [103, 137], a: [-60, -25], is: 18 }, // (right of the stick, clear of the team list above it)
+  { id: 'ads', at: 'br', c: RC, r: B1, a: [-176, -137], is: 22 }, // AIM (he asked 2026-11-20: a button, tap on / tap off, not a tap on the stick): up and left of the aim stick, next to GADGET
   { id: 'tiltc', at: 'bl', c: LC, r: [103, 137], a: [10, 38], is: 16 },
 ];
 const TOP = ['pause', 'help', 'score', 'view', 'drone', 'map']; // right to left: flat-topped hexagons, every other one half a step down

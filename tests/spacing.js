@@ -14,7 +14,7 @@ for (const id of MAP_LIST) {
   let t = 0;
   while (t < 60 * 12 && !(g.phase === PHASE.LOBBY && t > 5)) {
     g.tick(1 / 30); t += 1 / 30; g.events = [];
-    if (g.phase !== PHASE.ACTION || Math.round(t * 30) % 15) continue;
+    if ((g.phase !== PHASE.ACTION || g.introT > 0) || Math.round(t * 30) % 15) continue;
     const ps = [...g.players.values()].filter(p => p.alive && !p.downed && p.ctrl === 'body' && p.moving);
     for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
       const a = ps[i], b = ps[j]; if (a.squad !== b.squad || floorAt(g.map, a.x, a.y) !== floorAt(g.map, b.x, b.y)) continue;

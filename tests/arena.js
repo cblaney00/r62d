@@ -17,7 +17,7 @@ for (const mode of ['oitc', 'gungame', 'infected']) {
   g.botLevel = 3;
   const before = [...g.players.values()].map(p => p.squad).join();
   g.mode = mode; g.startMatch();
-  if (!g.arena || g.phase !== PHASE.ACTION) { fail(mode, 'did not start'); continue; }
+  if (!g.arena || (g.phase !== PHASE.ACTION || g.introT > 0)) { fail(mode, 'did not start'); continue; }
   const ps = [...g.players.values()];
   if (mode !== 'infected' && new Set(ps.map(p => g.side(p))).size !== ps.length) fail(mode, 'players share a side in everyone-for-themselves');
   if (mode === 'oitc' && ps.some(p => p.guns.length !== 1 || p.guns[0].w !== OITC_GUN || p.guns[0].ammo !== 1)) fail('oitc: wrong starting gun');
