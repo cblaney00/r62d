@@ -869,4 +869,4 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   HAZE 57, HOIST 56 (strong); weakest PERCH 36 (WEAK), LOCKJAW 40, NAIL/KESTREL/LATCH/BRAMBLE 41, OSPREY 42. WRAITH 50%.
   Lone-defender site lockers (Mason's steel panels, Shunt's anti-breach grid) shut the bots' entry; Echo's spikes find the
   lone defender. Bots scan with WRAITH only when they hear something or now and then and only walk to the blip, so the test
-  cannot judge how strong the scanner is in a person's hands. Nothing changed in the game: perma-bans wait for his choice.
+  cannot judge how strong the scanner is in a person's hands. Nothing changed in the game. He said: no bans yet, major changes are coming; rerun the test after them.

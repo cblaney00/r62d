@@ -53,7 +53,7 @@ Search these with grep for a feature, a function name or a test name before chan
 | `docs/performance.md` | frame-rate work, GPU measuring recipe |
 | `docs/testing.md` | headless browser screenshots (`tests/shoot.mjs`), thumbs test |
 | `docs/balance.md` | balance reports and past changes; per-gun penetration and how to nerf or buff a gun |
-| `docs/1v1.md` | the 1V1 mode, the small maps (house, cabin), its tests and playtest |
+| `docs/1v1.md` | the 1V1 mode, the small maps (house, cabin), its tests and playtest, the meta test (`tests/duelmeta.js`: which operators win too often; no bans until he says) |
 | `docs/drills.md` | pro drills, patch notes, pro opinions |
 | `docs/sound.md` | sound mix |
 | `docs/notes-next.md`, `docs/batch-*.md`, `docs/sniper-wip.md`, `docs/voice.md` | older plans and leftovers |
