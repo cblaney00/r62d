@@ -7,6 +7,7 @@ import { OPERATORS, WEAPONS } from '../shared/operators.js';
 import { PHASE, TEAM } from '../shared/constants.js';
 import { planKey, opKey, gunKey, attKey, training } from './training.js';
 import { drillSession } from './drills.js';
+import { skillSession } from './skilldrills.js';
 
 const PTS_FEAT = { 'DEFUSER PLANTED': 'plant', 'DEFUSER DISABLED': 'defuse', 'REVIVE': 'revive', 'ENEMY SPOTTED': 'spot', 'DRONE DESTROYED': 'droneKill', 'CAMERA DESTROYED': 'camKill', 'GADGET DESTROYED': 'gadgetKill', 'DRONE CAPTURED': 'droneKill', 'WALL REINFORCED': 'reinforce', 'HATCH REINFORCED': 'reinforce' };
 const until = Date.now() + (workerData.minutes || 15) * 60 * 1000, dt = 1 / 30;
@@ -78,4 +79,6 @@ while (Date.now() < until && left > 0) {
 }
 // the drills (he asked 2026-11-14): one-minute constrained gunfights, with this session's styles
 if (workerData.drills !== 0) { const D = drillSession(workerData.drills || 60, training.drills.style); if (D.crash) parentPort.postMessage({ crash: D.crash, map: 'drill' }); delete D.crash; parentPort.postMessage({ drills: D }); }
+// the skill drills (he asked 2026-11-20): short 1V1 rounds where the skill should pay off, each played with it and with it locked
+if (workerData.skillDrills !== 0) { const D = skillSession(workerData.skillDrills || 30, training.skill || {}, training.skillDrills || {}); if (D.crash) parentPort.postMessage({ crash: D.crash, map: 'skill drill' }); delete D.crash; parentPort.postMessage({ skillDrills: D }); }
 parentPort.postMessage({ done: true });

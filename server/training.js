@@ -127,3 +127,35 @@ export function playVersion() {
   const h = crypto.createHash('sha1'), walk = d => { for (const f of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (f.name.endsWith('.js') && !(d.endsWith('server') && NOT_PLAY.has(f.name)) && f.name !== 'joincode.js') h.update(f.name).update(fs.readFileSync(p)); } };
   try { for (const d of ['server', 'shared']) walk(path.join(ROOT, d)); return 'p' + h.digest('hex').slice(0, 7); } catch { return null; }
 }
+// SKILL DRILLS (server/skilldrills.js, he asked 2026-11-20): a session's results added up.
+// training.skillDrills: { n, sessions, sit: { 'op|situation': [rounds with the skill, won, rounds locked, won, skill uses] },
+//   prog: { pro: { situation: [win rate each session, last 8] } }, ideas: [...] (opinions.js formDrillIdeas), tweaks: (adopted) }
+// training.skill[pro][op] = { eager, hi: [won, n], lo: [won, n] }: tried a step higher and lower in drills; it moves to whichever wins
+// more (once both have 4+ drills), read in every match by bots.js skillEager.
+export function addSkillDrills(D) {
+  const T = training.skillDrills || (training.skillDrills = { n: 0, sessions: 0, sit: {}, prog: {}, ideas: [], tweaks: {} });
+  T.n += D.n || 0; T.at = Date.now();
+  for (const [k, a] of Object.entries(D.sit || {})) { const x = T.sit[k] || (T.sit[k] = [0, 0, 0, 0, 0]); a.forEach((v, i) => { x[i] += v; }); }
+  const S = training.skill || (training.skill = {});
+  for (const [name, ops] of Object.entries(D.eag || {})) for (const [op, e] of Object.entries(ops)) {
+    const x = (S[name] || (S[name] = {}))[op] || (S[name][op] = { eager: 1, hi: [0, 0], lo: [0, 0] });
+    for (const h of ['hi', 'lo']) { x[h][0] += e[h][0]; x[h][1] += e[h][1]; }
+    if (x.hi[1] >= 4 && x.lo[1] >= 4) {
+      const d = (x.hi[0] + 1) / (x.hi[1] + 2) - (x.lo[0] + 1) / (x.lo[1] + 2);
+      if (Math.abs(d) > 0.05) x.eager = Math.max(0.6, Math.min(2.5, x.eager * (d > 0 ? 1.12 : 1 / 1.12)));
+      x.hi = [0, 0]; x.lo = [0, 0]; // (a fresh comparison round the new number)
+    }
+  }
+  T.pending = T.pending || {}; // this session's per-pro results; folded into prog once per session (closeSkillSession)
+  for (const [name, sits] of Object.entries(D.pro || {})) for (const [sit, [n, w]] of Object.entries(sits)) { const x = (T.pending[name] || (T.pending[name] = {}))[sit] || (T.pending[name][sit] = [0, 0]); x[0] += n; x[1] += w; }
+}
+// end of a practice session: each pro's win rate per situation joins their progress line (with how many drills it came from)
+export function closeSkillSession() {
+  const T = training.skillDrills; if (!T || !T.pending) return;
+  T.sessions = (T.sessions || 0) + 1;
+  for (const [name, sits] of Object.entries(T.pending)) for (const [sit, [n, w]] of Object.entries(sits)) {
+    const line = (T.prog[name] || (T.prog[name] = {}))[sit] || (T.prog[name][sit] = []);
+    line.push([Math.round(w / n * 100), n]); if (line.length > 8) line.splice(0, line.length - 8);
+  }
+  T.pending = {};
+}

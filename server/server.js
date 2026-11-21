@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import { attachWebSocket } from './ws.js';
 import { Worker } from 'node:worker_threads';
 import dgram from 'node:dgram';
-import { training, addResults, saveTraining, needsTraining, newVersion, roundsLeft, playVersion, addDrills } from './training.js';
+import { training, addResults, saveTraining, needsTraining, newVersion, roundsLeft, playVersion, addDrills, addSkillDrills, closeSkillSession } from './training.js';
 import { formOpinions } from './opinions.js';
 import { refreshMeta } from './metaloadouts.js';
 import { META } from '../shared/meta.js';
@@ -104,7 +104,7 @@ function api(req, res) {
     return;
   }
   if (u.pathname === '/api/meta') return json(200, META); // the pros' preferred loadouts: every browser's defaults
-  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, guns: training.guns, att: training.att, pro: training.pro, drills: training.drills, opinions: training.opinions, suggestions: training.suggestions, ends: training.ends, running: !!trainer, held: trainHeld, session: trainer ? trainer.rounds : 0, current: PLAY_VERSION });
+  if (u.pathname === '/api/training') return json(200, { version: training.version, at: training.at, rounds: training.rounds, verRounds: training.verRounds || 0, perVersion: 200, plans: training.plans, ops: training.ops, opx: training.opx, guns: training.guns, att: training.att, pro: training.pro, drills: training.drills, opinions: training.opinions, suggestions: training.suggestions, skillDrills: training.skillDrills, skill: training.skill, tested: training.tested, ends: training.ends, running: !!trainer, held: trainHeld, session: trainer ? trainer.rounds : 0, current: PLAY_VERSION });
   if (u.pathname === '/api/train/stop' && req.method === 'POST') { trainHeld = true; if (trainer) { stopTrainer(); console.log('Pro practice stopped by the player.'); } return json(200, { running: false, held: true }); } // STOP on the main screen
   if (u.pathname === '/api/train' && req.method === 'POST') { const r = trainCheck(true); return json(200, { running: !!trainer, why: r || '' }); } // TRAIN THE PROS button
   // REPLAYS (server/replays.js): the newest 3, a download, and opening a downloaded file again
@@ -194,7 +194,7 @@ function trainCheck(force = false) {
   for (let i = 0; i < n; i++) { // the rounds shared out between the threads
     const w = new Worker(new URL('./train-worker.js', import.meta.url), { resourceLimits: { maxOldGenerationSizeMb: 512 }, workerData: { minutes: Number(process.env.R62D_TRAIN_MIN) || 60, rounds: Math.ceil((left - i) / n), duty: 1 } });
     me.list.push(w);
-    w.on('message', m => { if (trainer !== me) return; if (m.crash) { console.log('A practice match crashed on ' + m.map + ' (skipped):\n' + m.crash); return; } if (m.drills) { addDrills(m.drills); saveTraining(); return; } if (m.done) { if (--me.live === 0) { training.at = Date.now(); formOpinions(PLAY_VERSION); refreshMeta(); console.log(`Pro teams trained on version ${PLAY_VERSION}: ${training.rounds} practice rounds so far.`); } } else { addResults(m); me.rounds += m.rounds || 0; } saveTraining(); });
+    w.on('message', m => { if (trainer !== me) return; if (m.crash) { console.log('A practice match crashed on ' + m.map + ' (skipped):\n' + m.crash); return; } if (m.drills) { addDrills(m.drills); saveTraining(); return; } if (m.skillDrills) { addSkillDrills(m.skillDrills); saveTraining(); return; } if (m.done) { if (--me.live === 0) { training.at = Date.now(); closeSkillSession(); formOpinions(PLAY_VERSION); refreshMeta(); console.log(`Pro teams trained on version ${PLAY_VERSION}: ${training.rounds} practice rounds so far.`); } } else { addResults(m); me.rounds += m.rounds || 0; } saveTraining(); });
     w.on('error', e => console.log('Pro training stopped:', e.message));
     w.on('exit', () => { w.done = true; if (trainer === me && me.list.every(x => x.done)) trainer = null; });
   }

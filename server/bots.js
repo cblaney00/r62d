@@ -899,7 +899,7 @@ export function botThink(game, p, dt) {
   // --- held abilities: let go unless something below holds them again ---
   if (abId === 'shroud') { const want = heardRecently && p.battery > 1.5 && !p.downed; inp.ability = want !== !!p.shrouded && !(p.prevInput && p.prevInput.ability) ? 1 : 0; } // go dark while enemies are close by (a toggle: press to switch)
   if (abId === 'scan' && action && !p.downed) { // a few seconds of scanning when something is heard, or every so often
-    ai.scanT = (ai.scanT ?? 8 + Math.random() * 10) - dt;
+    ai.scanT = (ai.scanT ?? 8 + Math.random() * 10) - dt * skillEager(game, p);
     if ((heardRecently || ai.scanT < 0) && p.battery >= OPERATORS[p.op].ability.battery - 1e-6) { inp.ability = 1; if (ai.scanT < -3) ai.scanT = 15 + Math.random() * 15; }
     if (p.scanBlips && p.scanBlips.size) { const z = [...p.scanBlips.values()][0]; ai.heard = { x: z.x, y: z.y, t: game.time }; ai.heardSaid = game.time; talk(game, p, 'scanHit', { place: place(game, z.x, z.y) }, 'scan'); }
   }
@@ -907,7 +907,7 @@ export function botThink(game, p, dt) {
   // --- fight ---
   const enemy = p.downed ? null : visibleEnemy(game, p, S.see);
   if (enemy && abId === 'adrenal' && p.abilityCount > 0 && !(game.time < (p.boostUntil || 0))) useAbility();
-  if (enemy && ['tracer', 'burst', 'saw'].includes(abId) && p.abilityCount > 0 && Math.random() < dt * 0.6) useAbility(); // (the saw disc goes at the enemy too)
+  if (enemy && ['tracer', 'burst', 'saw'].includes(abId) && p.abilityCount > 0 && Math.random() < dt * 0.6 * skillEager(game, p)) useAbility(); // (the saw disc goes at the enemy too)
   if (enemy && abId === 'lunge' && p.abilityCount > 0 && !(p.lungeUntil > game.time) && Math.hypot(enemy.x - p.x, enemy.y - p.y) < 80) useAbility(); // CROW: close enough to lunge
   if (abId === 'lunge' && p.lungeUntil > game.time && enemy && Math.hypot(enemy.x - p.x, enemy.y - p.y) < 2 * PX_PER_M + 8) { aimAt(p, enemy.x, enemy.y); game.event(p, { k: 'melee' }); }
   if (abId === 'sticky') { // SALVO: once her rounds are stuck and she is clear of them, blow them
@@ -1264,8 +1264,19 @@ function drillSpot(game, p, bomb) {
   }
   return out.length ? out[Math.floor(Math.random() * out.length)] : null;
 }
+// SKILL DRILLS (he asked 2026-11-20): how readily a bot reaches for its skill. 1 = the usual. A pro's own number comes from the
+// skill drills (training.skill[name][op].eager, learned in server/skilldrills.js); p.skillEager overrides it (a drill's trainee);
+// R62D_EAGER=<n> sets it for every bot (tests/skillgap.js: "uses it whenever it could help", the ceiling bots never reach).
+export const EAGER_MIN = 0.6, EAGER_MAX = 2.5;
+export function skillEager(game, p) {
+  if (process.env.R62D_EAGER) return +process.env.R62D_EAGER || 1;
+  if (p.skillEager) return p.skillEager;
+  const x = p.pro && training.skill && training.skill[p.pro.pl.name] && training.skill[p.pro.pl.name][p.op];
+  return x && x.eager ? Math.max(EAGER_MIN, Math.min(EAGER_MAX, x.eager)) : 1;
+}
 function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp, dt) {
-  const ok = () => p.abilityCount > 0 && game.time > (ai.abT || 0), done = (wait = 4) => { ai.abT = game.time + wait; };
+  const eg = skillEager(game, p), dtE = dt * eg; // (skill drills, 2026-11-20: how readily this bot reaches for the skill; 1 = as before)
+  const ok = () => p.abilityCount > 0 && game.time > (ai.abT || 0), done = (wait = 4) => { ai.abT = game.time + wait / eg; };
   const d = enemy ? Math.hypot(enemy.x - p.x, enemy.y - p.y) : Infinity, bomb = site.bombs[0];
   const toBomb = Math.min(...site.bombs.map(b => Math.hypot(b.x - p.x, b.y - p.y)));
   // the snipers (2026-11-10): PERCH sets the bipod whenever crouched or lying still, MOSS wraps up on contact,
@@ -1284,7 +1295,7 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
   }
   if (abId === 'grapple') {
     if (enemy || !ok() || !(lb.f > lp.f) || p.grapple || p.abilityCount <= 0) return;
-    if ((game.grappleTarget(p) || (() => { const h = game.hatchToBlast(p); return h && !h.reinforced; })()) && Math.random() < dt * 2) { useAbility(); done(5); ai.hoistTo = null; return; }
+    if ((game.grappleTarget(p) || (() => { const h = game.hatchToBlast(p); return h && !h.reinforced; })()) && Math.random() < dtE * 2) { useAbility(); done(5); ai.hoistTo = null; return; }
     // (2026-11-18: in practice the pros never met a shut hatch, so they said take the charge out) the site is upstairs:
     // now and then HOIST goes looking for a shut, unreinforced hatch up into the site's floor, blows it and climbs
     if (ai.hoistTo === undefined) {
@@ -1305,28 +1316,28 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
     if (!enemy && ai.watch && (p.adsT || 0) >= 0.6 && ok()) { useAbility(); done(25); }
     return; }
   if (abId === 'ghillie') { if ((enemy || heard) && ok() && !(p.ghillieUntil > game.time)) { useAbility(); done(14); } return; }
-  if (abId === 'spotter') { if ((enemy || heard) && ok() && !(p.spotterUntil > game.time) && Math.random() < dt * 1.5) { useAbility(); done(10); } return; }
-  if (abId === 'pierce') { if ((enemy || heard) && ok() && !p.pierceShot && Math.random() < dt) { useAbility(); done(5); } return; }
+  if (abId === 'spotter') { if ((enemy || heard) && ok() && !(p.spotterUntil > game.time) && Math.random() < dtE * 1.5) { useAbility(); done(10); } return; }
+  if (abId === 'pierce') { if ((enemy || heard) && ok() && !p.pierceShot && Math.random() < dtE) { useAbility(); done(5); } return; }
   if (abId === 'dash' || abId === 'pick') { // RUSH bursts through a board in the way, WREN takes it apart quietly
     const f = game.facingCell(p, abId === 'dash' ? 40 : 28);
     if (f && f.t === T.BARRI && !enemy && ok()) { useAbility(); done(3); }
-    else if (abId === 'dash' && enemy && d < 90 && ok() && Math.random() < dt * 2) { useAbility(); done(5); } // close the gap
+    else if (abId === 'dash' && enemy && d < 90 && ok() && Math.random() < dtE * 2) { useAbility(); done(5); } // close the gap
   } else if (abId === 'hammer') { // FERRO: one swing through a board, brace or shield in the way, or at someone in reach
     const f = game.facingCell(p, 28);
     if (f && [T.BARRI, T.BEAM, T.DSHIELD].includes(f.t) && !enemy && p.meleeCd <= 0) game.event(p, { k: 'ability' });
     else if (enemy && d < 28 && p.meleeCd <= 0) { aimAt(p, enemy.x, enemy.y); game.event(p, { k: 'ability' }); }
   } else if (abId === 'flare') { // BLAZE: into the room the defenders are heard in, before going in
     if (!enemy && heard && ok()) { const h = ai.heard, hd = Math.hypot(h.x - p.x, h.y - p.y);
-      if (hd > 90 && hd < 300 && floorAt(game.map, h.x, h.y) === floorAt(game.map, p.x, p.y) && Math.random() < dt * 0.8) { aimAt(p, h.x, h.y); useAbility(); done(8); } }
+      if (hd > 90 && hd < 300 && floorAt(game.map, h.x, h.y) === floorAt(game.map, p.x, p.y) && Math.random() < dtE * 0.8) { aimAt(p, h.x, h.y); useAbility(); done(8); } }
   } else if (abId === 'medkit') { // PATCH: onto a hurt teammate in sight, or at their own feet
     if (!enemy && ok()) {
       const hurt = [...game.players.values()].find(q => q.alive && !q.downed && game.side(q) === team && q.hp < q.maxHp * 0.6 && Math.hypot(q.x - p.x, q.y - p.y) < 150 && los(game.map, p.x, p.y, q.x, q.y));
       if (hurt) { aimAt(p, hurt.x, hurt.y); useAbility(); done(6); }
     }
   } else if (abId === 'spike') { // ECHO: by the objective, to hear defenders moving round it
-    if (!enemy && toBomb < 260 && ok() && Math.random() < dt * 0.5) { useAbility(); done(15); }
+    if (!enemy && toBomb < 260 && ok() && Math.random() < dtE * 0.5) { useAbility(); done(15); }
   } else if (abId === 'cover') { // TRENCH: cover between them and someone shooting from far, and for the plant
-    if (enemy && d > 140 && ok() && Math.random() < dt * 0.8) { aimAt(p, enemy.x, enemy.y); useAbility(); done(8); }
+    if (enemy && d > 140 && ok() && Math.random() < dtE * 0.8) { aimAt(p, enemy.x, enemy.y); useAbility(); done(8); }
     else if (!enemy && ok() && toBomb < 90 && (p.hasDefuser || game.planted || [...game.players.values()].some(q => q.busy && q.busy.k === 'plant' && game.side(q) === team))) {
       const from = (heard && ai.heard) || [...game.players.values()].filter(q => q.alive && game.side(q) !== team && game.spots[team].has(q.id))[0];
       const ang = from ? Math.atan2(from.y - p.y, from.x - p.x) : Math.atan2(p.y - bomb.y, p.x - bomb.x); // toward the threat, else away from the bomb
@@ -1336,7 +1347,7 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
     if (enemy && d < 400 && ok() && ai.react > 0) { aimAt(p, enemy.x, enemy.y); useAbility(); done(6); }
   } else if (abId === 'echobox') { // RUSE: fake footsteps out by a way into the site, early in the round
     const el = DUR.action - game.timer;
-    if (!enemy && el > 8 && el < 90 && ok() && Math.random() < dt * 0.08) {
+    if (!enemy && el > 8 && el < 90 && ok() && Math.random() < dtE * 0.08) {
       const m = game.map, cl = m.openings.filter(q => { const c = q.cells[0], d = Math.hypot((c % m.W + 0.5) * CELL - p.x, (Math.floor(c / m.W) + 0.5) * CELL - p.y); return d > 60 && d < 260 && los(m, p.x, p.y, (c % m.W + 0.5) * CELL, (Math.floor(c / m.W) + 0.5) * CELL); });
       const o = cl[Math.floor(Math.random() * cl.length)], k = o && o.cells[0];
       if (o) { aimAt(p, (k % m.W + 0.5) * CELL, (Math.floor(k / m.W) + 0.5) * CELL); useAbility(); done(20); }
@@ -1344,8 +1355,8 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
   } else if (abId === 'periscope') { // LENS: a periscope into the room above or below while holding
     const el = DUR.action - game.timer, siteF = floorAt(game.map, bomb.x, bomb.y), myF = floorAt(game.map, p.x, p.y);
     if (!game.periscopeSpot(p)) {} // no floor above or below here
-    else if (!enemy && ok() && el > 5 && el < 40 && Math.abs(siteF - myF) === 1 && Math.random() < dt * 0.5) { p.periDir = siteF > myF ? 'up' : 'down'; useAbility(); done(25); } // early: eyes on the site's floor
-    else if (!enemy && ok() && (heard || Math.random() < dt * 0.06)) { useAbility(); done(20); }
+    else if (!enemy && ok() && el > 5 && el < 40 && Math.abs(siteF - myF) === 1 && Math.random() < dtE * 0.5) { p.periDir = siteF > myF ? 'up' : 'down'; useAbility(); done(25); } // early: eyes on the site's floor
+    else if (!enemy && ok() && (heard || Math.random() < dtE * 0.06)) { useAbility(); done(20); }
   } else if (abId === 'weld' && !ai.cmd) { // SOLDER: weld a broken wall back when one is close and nobody is shooting (an order from a person comes first)
     if (!enemy && p.battery > 0.5 && game.baseTiles) {
       const m = game.map, cx = Math.floor(p.x / CELL), cy = Math.floor(p.y / CELL);

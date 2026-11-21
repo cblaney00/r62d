@@ -8,6 +8,7 @@ import { PATCH_NOTES } from '../shared/patchnotes.js';
 import { PRO_TEAMS, PRO_PERSONA, JOB_NAME } from '../shared/pros.js';
 import { OPERATORS, WEAPONS, ATTACH, SIDEARMS, gunSide } from '../shared/operators.js';
 import { MAPS, MAP_LIST, buildMap } from '../shared/map.js';
+import { SITUATIONS, sitsFor, SMALL as SMALL_MAPS } from './skilldrills.js';
 
 const pct = x => Math.round(x * 100) + '%';
 const LOG_MAX = 40;
@@ -93,6 +94,7 @@ function candidates(pl) {
 // every pro forms (or keeps) their view; a log line is added each session, marked when it changed
 export function formOpinions(version) {
   try { formSuggestions(version); } catch (e) { console.log('pro suggestions failed:', e.message); }
+  try { formDrillIdeas(version); } catch (e) { console.log('pro drill ideas failed:', e.message); }
   const O = training.opinions || (training.opinions = {}), session = (training.sessions = (training.sessions || 0) + 1);
   for (const team of PRO_TEAMS) for (const pl of team.players) {
     const c = candidates(pl); if (!c.length) continue;
@@ -177,3 +179,72 @@ export function formSuggestions(version) {
   }
   return O;
 }
+
+// ---------------- the pros' drill ideas (he asked 2026-11-20) ----------------
+// After each practice every pro may speak up about a SKILL DRILL (server/skilldrills.js), with one exact change:
+//   STUCK: their win rate in a situation hasn't gone up over their last three sessions → a longer clock (last 45 s, after the
+//     plant) or the other small map;
+//   NO HELP: in a situation drilled for a skill they play, rounds with the skill win no more than rounds with it locked
+//     (8+ of each) → drill that skill in the situation where it measured best instead;
+//   NOT REAL: a skill drilled after the plant while real matches almost never get a plant (under 12% of practice rounds).
+// Kept in training.skillDrills.ideas (last 60). Two or more pros backing the same change within three sessions adopts it
+// (he chose): it goes into skillDrills.tweaks, which the next practice's drills read.
+const SIT_WORDS = { entry: 'breaking into a ground-floor site', upstairs: 'the upstairs site', retake: 'the after-the-plant drill', hold: 'playing against a site anchor', roam: 'playing against a roamer', late: 'the last-45-seconds drill' };
+const DRILL_OPEN = ['Coach, about the drills:', 'Honest drill feedback:', 'I\'ve put the hours into these drills, so:', 'One thing about the training room:', 'Quick one on the drills:'];
+export function formDrillIdeas(version) {
+  const T = training.skillDrills; if (!T) return [];
+  const sessions = T.sessions || 0, tweaks = T.tweaks || (T.tweaks = {}), ideas = T.ideas || (T.ideas = []);
+  const ends = Object.values(training.ends || {}).reduce((a, e) => { for (const [k, v] of Object.entries(e)) { a.n += v; if (k.startsWith('Defuser')) a.p += v; } return a; }, { n: 0, p: 0 });
+  const plantShare = ends.n >= 50 ? ends.p / ends.n : null;
+  const worth = (ab, sit) => { let on = 0, won = 0, off = 0, woff = 0; for (const [k, a] of Object.entries(T.sit)) { const [op, s] = k.split('|'); if (s !== sit || !OPERATORS[op] || OPERATORS[op].ability.id !== ab) continue; on += a[0]; won += a[1]; off += a[2]; woff += a[3]; } return { on, off, d: on && off ? won / on - woff / off : null, won, woff }; };
+  const said = [];
+  for (const team of PRO_TEAMS) for (const pl of team.players) {
+    const c = [], myOps = [...(pl.pool.atk || []), ...(pl.pool.def || [])].filter(o => OPERATORS[o]);
+    // stuck: no better over their last three sessions in a situation
+    for (const [sit, line] of Object.entries((T.prog || {})[pl.name] || {})) {
+      if (line.length < 3) continue; const l3 = line.slice(-3); if (l3[2][0] > l3[0][0] || l3.reduce((a, x) => a + x[1], 0) < 6) continue;
+      const longer = sit === 'late' || sit === 'retake', cur = tweaks.map && tweaks.map[sit], to = cur ? SMALL_MAPS.find(m => m !== cur) : SMALL_MAPS[sessions % SMALL_MAPS.length]; // (the same for everyone this session, so pros who agree back one change)
+      const change = longer ? { type: 'time', sit, add: 15 } : { type: 'map', sit, to };
+      c.push({ id: longer ? `time:${sit}:+15` : `map:${sit}:${to}`, s: 1 + (l3[0][0] - l3[2][0]) / 20, change, kind: 'stuck', why: `${SITUATIONS_NAME(sit)}: ${l3.map(x => x[0] + '%').join(' → ')} over their last three sessions`,
+        text: `I'm not getting better at ${SIT_WORDS[sit]}: ${l3.map(x => x[0] + '%').join(', then ')}. ${longer ? 'Fifteen more seconds on that clock, so there is time to actually use the skill instead of just rushing it.' : `Put it on ${MAPS[to].name} for a while: I've learned that room by heart, not the skill.`}` });
+    }
+    // no help: the skill does nothing for this situation
+    for (const op of myOps) {
+      const ab = OPERATORS[op].ability.id, sits = sitsFor(ab, OPERATORS[op].team, tweaks);
+      for (const sit of sits) {
+        const w = worth(ab, sit); if (w.on < 8 || w.off < 8 || w.d > 0) continue;
+        const alt = Object.keys(SIT_WORDS).filter(s => !sits.includes(s)).map(s => ({ s, d: worth(ab, s).d })).sort((a, b) => (b.d ?? 0.02) - (a.d ?? 0.02))[0]; if (!alt) continue;
+        c.push({ id: `sit:${ab}:${sit}>${alt.s}`, s: 1.2 - w.d * 2, change: { type: 'sit', ab, from: sit, to: alt.s }, kind: 'nohelp', why: `${OPERATORS[op].ability.name} in ${SITUATIONS_NAME(sit)}: wins ${pct(w.won / w.on)} with it, ${pct(w.woff / w.off)} without (${w.on} + ${w.off} drills)`,
+          text: `The ${OPERATORS[op].ability.name} drill in ${SIT_WORDS[sit]} teaches nothing: with the skill I win ${pct(w.won / w.on)}, with it locked ${pct(w.woff / w.off)}. In a real match that's not where you use it. Drill it in ${SIT_WORDS[alt.s]} instead.` });
+      }
+      // not real: a plant drill when real rounds hardly ever see a plant
+      if (plantShare !== null && plantShare < 0.12 && sits.includes('retake')) {
+        const alt = Object.keys(SIT_WORDS).find(s => !sits.includes(s));
+        c.push({ id: `sit:${ab}:retake>${alt}`, s: 0.8, change: { type: 'sit', ab, from: 'retake', to: alt }, kind: 'unreal', why: `only ${pct(plantShare)} of practice rounds get a plant`,
+          text: `We drill ${OPERATORS[op].ability.name} after the plant, but only ${pct(plantShare)} of real rounds ever get one. Train it where the rounds are actually decided: ${SIT_WORDS[alt]}.` });
+      }
+    }
+    if (!c.length) continue;
+    for (const x of c) x.sc = x.s * (0.75 + 0.5 * quirk(pl.name, 'drill' + x.id));
+    c.sort((a, b) => b.sc - a.sc);
+    const pick = c[0], intro = DRILL_OPEN[Math.floor(quirk(pl.name, 'dopen') * DRILL_OPEN.length)];
+    const rec = { at: Date.now(), v: version, s: sessions, name: pl.name, id: pick.id, kind: pick.kind, change: pick.change, why: pick.why, text: `${intro} ${pick.text}` };
+    ideas.push(rec); said.push(rec);
+  }
+  // two or more pros behind the same change in the last three sessions: adopted
+  const recent = ideas.filter(x => x.s >= sessions - 2);
+  for (const id of new Set(said.map(x => x.id))) {
+    const backers = [...new Set(recent.filter(x => x.id === id).map(x => x.name))];
+    for (const x of recent.filter(x => x.id === id)) x.backers = backers.length;
+    if (backers.length < 2 || (T.adopted || []).some(a => a.id === id)) continue;
+    const ch = said.find(x => x.id === id).change;
+    if (ch.type === 'sit') { const S = tweaks.sitFor || (tweaks.sitFor = {}), op = Object.keys(OPERATORS).find(o => OPERATORS[o].ability.id === ch.ab); const cur = sitsFor(ch.ab, OPERATORS[op].team, tweaks); S[ch.ab] = [...new Set(cur.map(s => s === ch.from ? ch.to : s))]; }
+    if (ch.type === 'time') { const t = tweaks.time || (tweaks.time = {}); t[ch.sit] = Math.min(45, (t[ch.sit] || 0) + ch.add); }
+    if (ch.type === 'map') { (tweaks.map || (tweaks.map = {}))[ch.sit] = ch.to; }
+    (T.adopted || (T.adopted = [])).push({ id, s: sessions, at: Date.now(), change: ch, backers });
+    for (const x of recent.filter(x => x.id === id)) x.adopted = 1;
+  }
+  if (ideas.length > 60) ideas.splice(0, ideas.length - 60);
+  return said;
+}
+const SITUATIONS_NAME = s => (SITUATIONS[s] || { name: s }).name;

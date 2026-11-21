@@ -901,6 +901,7 @@ export class Game {
     }
 
     // held abilities
+    if (p.abLock) inp.ability = 0; // (a skill drill's locked run: tests/skilldrills.js)
     const op = OPERATORS[p.op];
     if (op.ability.id === 'brace') { // shield up (can't shoot) or rifle out (shield on the back); Q switches, which takes a moment
       if (p.shieldMode === undefined) p.shieldMode = 'shield';
@@ -2165,6 +2166,7 @@ export class Game {
   }
 
   useAbility(p) {
+    if (p.abLock) return; // (a skill drill's locked run)
     const op = OPERATORS[p.op], team = this.side(p), id = op.ability.id;
     if (id === 'gas' && p.gasId) { const n = this.ent(p.gasId); p.gasId = null; if (n) this.detonate(n); return; } // second press releases the gas
     if (id === 'sticky') { // SALVO (he asked: remote detonation): with rounds stuck and waiting, the button blows them all
