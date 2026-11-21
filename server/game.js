@@ -4,7 +4,7 @@ import { plantBomb, floorSpot, addHatch, cellBelow, cellAbove, peepOk, addPeep, 
 import { localPos, buildMap, windowGlass, roomAt, wallMount, MAPS, MAP_LIST, openHatch, hatchNear, hatchAtPoint, stairGhost, stairSees, eyeH, bodyH, STOREY, stairLooks, floorAt, ropeAt, roofRopeAt, ropeWindowOpen, ropeWindowBoarded, ropeGround, ropeS, ropeAtWindow, ropeVaultZone, ropeOutAt, prepBox, ropeAimLimit, ROPE_CLIMB, ROPE_DROP, wallGhost, peekSeen, floorOff, windowViews, windowFoot, WIN_RANGE, OUTCAM_TURN, hatchSight, aimUpHatch } from '../shared/map.js';
 import { findVault, M_S, leanPoint, throughHole, coverOf, rayCovers , inBox } from '../shared/physics.js';
 import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, castSight, canSee, takeStairs, facingCell, BASE_SPEED, shapeAt, rayShape, pointSolid, circleBlocked } from '../shared/physics.js';
-import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
+import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, BLAST_ARMOR, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
 import { arenaThink, drillThink, defSetup, botThink, botPickOp, botPrep, assignPros, botIdentity, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote, duelTalk, duelFlush } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
 import './../shared/tweaks.js'; // (R62D_TWEAK: balance tests trying a change)
@@ -877,7 +877,7 @@ export class Game {
     if (p.downed) {
       p.hp -= dt; p.busy = null;
       if (!this.zb && SELF_UP.has(p.op) && (p.selfUp = (p.selfUp || 0) + dt) >= SELF_UP_TIME) { // SOLACE / TONIC / RALLY: slowly back on their feet
-        p.downed = false; p.hp = 20; p.selfUp = 0; this.events.push({ e: 'snd', s: 'revive', x: r1(p.x), y: r1(p.y) }); return;
+        p.downed = false; p.hp = 15; p.selfUp = 0; this.events.push({ e: 'snd', s: 'revive', x: r1(p.x), y: r1(p.y) }); return;
       }
       if (p.hp <= 0) this.kill(p, this.players.get(p.downedBy), 'Bled out');
       if (!this.zb || !p.alive) return; // (ZOMBIES: last stand, the pistol still shoots)
@@ -940,7 +940,7 @@ export class Game {
           const fx = (f.cx + 0.5) * CELL, fy = (f.cy + 0.5) * CELL, grid = this.gridNear(fx, fy, other(team));
           if (grid) { // a static grid on that wall shocks you instead
             p.lanceT = 0; p.shockT -= dt;
-            if (p.shockT <= 0) { p.shockT = 0.5; this.damage(p, 8, this.players.get(grid.owner), 'Static Grid', 0); this.events.push({ e: 'arc', x: r1(grid.x), y: r1(grid.y), x2: r1(p.x), y2: r1(p.y) }); }
+            if (p.shockT <= 0) { p.shockT = 0.5; this.damage(p, 6 * this.blastArmor(p), this.players.get(grid.owner), 'Static Grid', 0); this.events.push({ e: 'arc', x: r1(grid.x), y: r1(grid.y), x2: r1(p.x), y2: r1(p.y) }); }
           } else {
             p.lanceT += dt;
             if (f.t === T.BARRI || f.t === T.DSHIELD || this.hatchSpot(p, [T.HATCH, T.HATCHR])?.k === f.k) { if (p.lanceT >= 1.3) { p.lanceT = 0; this.destroyCell(f.k); this.events.push({ e: 'hit', k: 'spark', x: r1(fx), y: r1(fy) }); } }
@@ -1010,7 +1010,7 @@ export class Game {
           const t = rayCircle(c.x, c.y, dx, dy, q.x, q.y, hitR(q.op));
           if (t !== null && t < bt) { bt = t; hit = q; }
         }
-        if (hit) this.damage(hit, 7, p, 'Turret Camera', a);
+        if (hit) this.damage(hit, 5 * this.blastArmor(hit), p, 'Turret Camera', a);
         this.events.push({ e: 'laser', x: r1(c.x), y: r1(c.y), x2: r1(c.x + dx * bt), y2: r1(c.y + dy * bt) });
       }
     }
@@ -1566,6 +1566,9 @@ export class Game {
     }
   }
 
+  // the damage scale (docs/damage.md): armour only softens blasts and gadgets, never bullets or melee; zombies keep their own rules
+  blastArmor(q) { return this.zb || q.zombie ? 1 : (BLAST_ARMOR[OPERATORS[q.op]?.armor] ?? 1); }
+
   damage(q, amount, src, wname, ang) {
     if (!q.alive || amount <= 0) return;
     if (this.free && !q.bot && q.sock) return; // free play: god mode, nothing hurts you
@@ -1582,7 +1585,7 @@ export class Game {
     q.hp -= amount;
     if (q.hp <= 0) {
       const up = [...this.players.values()].filter(o => o.alive && !o.downed && this.side(o) === this.side(q)).length;
-      if (this.zb ? zbCanGoDown(this, q) : !this.headshot && q.hp > -35 && up > 1 && this.phase === PHASE.ACTION && !this.arena) {
+      if (this.zb ? zbCanGoDown(this, q) : !this.headshot && q.hp > -27 && up > 1 && this.phase === PHASE.ACTION && !this.arena) {
         q.downT = this.time; // (fun modes: no going down, straight out)
         if (src && src.ms && src !== q) src.ms.downs++;
         if (src && src !== q && this.side(src) !== this.side(q)) this.pts(src, 50, 'ENEMY DOWNED');
@@ -1739,7 +1742,7 @@ export class Game {
       this.endRound(TEAM.DEF, 'Defuser disabled');
     } else if (b.k === 'revive') {
       const q = this.players.get(b.target);
-      q.downed = false; q.hp = 25; if (this.zb) zbUp(this, q); if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) }); if (q.bot && Math.random() < 0.6) talk(this, q, 'revived');
+      q.downed = false; q.hp = 19; if (this.zb) zbUp(this, q); if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); this.events.push({ e: 'snd', s: 'revive', x: r1(q.x), y: r1(q.y) }); if (q.bot && Math.random() < 0.6) talk(this, q, 'revived');
     } else if (b.k === 'reinforce' && b.hatch !== undefined) {
       if (this.map.tiles[this.map.hatches[b.hatch].cells[0]] === T.HATCH && this.reinforce > 0) { this.reinforceHatch(b.hatch); this.reinforce--; this.pts(p, 15, 'HATCH REINFORCED'); }
     } else if (b.k === 'reinforce') {
@@ -2134,7 +2137,7 @@ export class Game {
         if (this.hasShield(q) && !q.downed && q.ctrl === 'body' && Math.abs(angDiff(Math.atan2(p.y - q.y, p.x - q.x), q.aim)) < 0.8 && !(this.time < (q.shieldDownUntil || 0))) {
           q.shieldDownUntil = this.time + 1.0; p.meleeCd = 1.3; p.fireCd = Math.max(p.fireCd, 0.9); this.events.push({ e: 'hit', k: 'shield', x: r1(q.x), y: r1(q.y) }); this.events.push({ e: 'snd', s: 'panel', x: r1(q.x), y: r1(q.y) }); return;
         }
-        this.damage(q, q.downed ? 999 : 55, p, 'Melee', p.aim); return;
+        this.damage(q, q.downed ? 999 : 42, p, 'Melee', p.aim); return;
       }
     }
     for (const e of this.ents) {
@@ -2258,7 +2261,7 @@ export class Game {
         if (t !== null && t < bt) { bt = t; hitQ = q; hitE = null; }
       }
       if (hitE) { if (hitE.tu) hitE.offUntil = this.time + 10; else this.hitEnt(hitE, p); }
-      if (hitQ) { this.damage(hitQ, 15, p, 'Arc Gun', p.aim); this.effect(hitQ, 'stun', 0.5, p); }
+      if (hitQ) { this.damage(hitQ, 11 * this.blastArmor(hitQ), p, 'Arc Gun', p.aim); this.effect(hitQ, 'stun', 0.5, p); }
       used(); this.events.push({ e: 'arc', v: 1, x: r1(p.x), y: r1(p.y), x2: r1(p.x + ca * bt), y2: r1(p.y + sa * bt) }); // v: VOLT's, the quiet one
     } else if (id === 'hammer') { // he asked: only door and window barricades go in one swing (no soft walls), and a real wait between swings
       if (p.meleeCd > 0 || this.time < (p.hammerCd || 0)) return;
@@ -2289,7 +2292,7 @@ export class Game {
         const q = [...this.players.values()].find(q => q.alive && q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 30 &&
           Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) < 1.1);
         if (!q) return;
-        this.damage(q, 75, p, 'Breaching Hammer', p.aim);
+        this.damage(q, 57, p, 'Breaching Hammer', p.aim);
       }
       p.meleeCd = 0.9; p.hammerCd = this.time + (op.ability.cd || 2); used(); this.events.push({ e: 'melee', id: p.id });
     } else if (id === 'prox') place('prox', 10, { arm: DUR.trapArm });
@@ -2311,8 +2314,8 @@ export class Game {
         if (t !== null && t < tb) { tb = t; tgt = q; }
       }
       tgt = tgt || p;
-      if (tgt.downed) { tgt.downed = false; tgt.hp = 40; if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); if (tgt.bot && Math.random() < 0.6) talk(this, tgt, 'revived'); }
-      else tgt.hp = Math.min(tgt.maxHp + 30, tgt.hp + 40);
+      if (tgt.downed) { tgt.downed = false; tgt.hp = 30; if (p.ms) p.ms.revives++; this.pts(p, 75, 'REVIVE'); if (tgt.bot && Math.random() < 0.6) talk(this, tgt, 'revived'); }
+      else tgt.hp = Math.min(tgt.maxHp + 23, tgt.hp + 30);
       used();
       this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(tgt.x), y2: r1(tgt.y) });
     }
@@ -2416,7 +2419,7 @@ export class Game {
       }
       if (hitQ) this.spot(team, hitQ.id, 10);
       used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x + ca * bt), y2: r1(p.y + sa * bt), tag: 1 });
-    } else if (id === 'rally') { p.hp = Math.min(p.maxHp, p.hp + 40); p.boostUntil = this.time + 4; used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x), y2: r1(p.y) }); }
+    } else if (id === 'rally') { p.hp = Math.min(p.maxHp, p.hp + 30); p.boostUntil = this.time + 4; used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x), y2: r1(p.y) }); }
     else if (id === 'periscope') { // LENS (he asked: no copy of TETHER's scope): up through the ceiling or down through the floor
       // he asked: make it clear. It says why when it can't go here, and where it went (and how to watch it) when it does
       const spot = this.periscopeSpot(p);
@@ -2426,7 +2429,7 @@ export class Game {
       this.events.push({ e: 'deny', id: p.id, why: `Periscope pushed ${spot.dir === 'up' ? 'UP into' : 'DOWN into'} ${roomAt(this.map, spot.x, spot.y) || 'the floor ' + spot.dir} — open the camera feeds to watch it` });
     } else if (id === 'radar') place('radar', 8, { life: 15, t: 0 });
     else if (id === 'swarm') this.releaseSwarm(p, p);
-    else if (id === 'station') place('station', 14, { pool: 100 });
+    else if (id === 'station') place('station', 14, { pool: 76 });
     else if (id === 'catcher') place('catcher', 10, { c: 2 });
   }
 
@@ -2477,7 +2480,7 @@ export class Game {
       for (const q of this.players.values()) if (q !== p && q.alive && Math.hypot(q.x - nx, q.y - ny) < PLAYER_R * 2) hit.add(q);
       x = nx; y = ny;
     }
-    for (const q of hit) { q.staggerUntil = this.time + 0.7; this.effect(q, 'slow', 1, p); this.damage(q, 10, p, 'Breaching Dash', p.aim); }
+    for (const q of hit) { q.staggerUntil = this.time + 0.7; this.effect(q, 'slow', 1, p); this.damage(q, 8, p, 'Breaching Dash', p.aim); }
     if (Math.hypot(x - p.x, y - p.y) < 8) return false;
     p.vault = { x0: p.x, y0: p.y, x1: x, y1: y, t: 0, dur: 0.28 };
     this.events.push({ e: 'snd', s: 'vault', x: r1(p.x), y: r1(p.y), id: p.id });
@@ -3010,9 +3013,9 @@ export class Game {
           if (e.life <= 0) { this.removeEnt(e); break; }
           if (e.t <= 0) { e.t = 0.35 + Math.random() * 0.2; const shot = Math.random() < 0.18; this.noise(e.x, e.y, e.team, shot ? 950 : 320); this.events.push({ e: 'snd', s: shot ? 'fakeShot' : 'fakeStep', x: r1(e.x + (Math.random() - 0.5) * 20), y: r1(e.y + (Math.random() - 0.5) * 20) }); }
           break;
-        case 'healzone': case 'station': { // PATCH's kit (5 s) and TONIC's station (100 health in all)
+        case 'healzone': case 'station': { // PATCH's kit (5 s) and TONIC's station (76 health in all)
           if (e.type === 'healzone') { e.life -= dt; if (e.life <= 0) { this.removeEnt(e); break; } }
-          const r = e.type === 'healzone' ? e.r : 24, rate = e.type === 'healzone' ? 10 : 6;
+          const r = e.type === 'healzone' ? e.r : 24, rate = e.type === 'healzone' ? 8 : 5;
           for (const q of this.players.values()) {
             if (!q.alive || q.downed || this.side(q) !== e.team || q.hp >= q.maxHp || Math.hypot(q.x - e.x, q.y - e.y) > r) continue;
             const h = Math.min(rate * dt, q.maxHp - q.hp, e.type === 'station' ? e.pool : 99); q.hp += h;
@@ -3102,7 +3105,7 @@ export class Game {
           break;
         case 'dropch': // DEADFALL: the fuse runs, then the floor goes
           if (!this.jammedAt(e.x, e.y)) e.t -= dt;
-          if (e.t <= 0) { this.removeEnt(e); this.explode(e, { r: 34, dmg: 45, cellR: 0, cells: [], kind: 'breach', at: e.cell, floor: true }); }
+          if (e.t <= 0) { this.removeEnt(e); this.explode(e, { r: 34, dmg: 34, cellR: 0, cells: [], kind: 'breach', at: e.cell, floor: true }); }
           break;
         case 'htrap': { // LOCKJAW: once the hatch is open, the first attacker by either side of it
           if (e.arm > 0) { e.arm -= dt; break; }
@@ -3126,7 +3129,7 @@ export class Game {
             else if (e.type === 'concuss') this.detonate(e);
             else { // clamp: held fast and badly hurt
               this.effect(q, 'snare', 2, e.team); this.spot(e.team, q.id, 3);
-              this.damage(q, 20, this.players.get(e.owner), 'Clamp Trap', 0);
+              this.damage(q, 15 * this.blastArmor(q), this.players.get(e.owner), 'Clamp Trap', 0);
               this.events.push({ e: 'snd', s: 'clamp', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e);
             }
             break;
@@ -3144,7 +3147,7 @@ export class Game {
         case 'plates':
           for (const q of this.players.values()) {
             if (!q.alive || q.plated || q.downed || this.side(q) !== e.team || Math.hypot(q.x - e.x, q.y - e.y) > 18) continue;
-            q.plated = true; q.maxHp += 15; q.hp += 15; e.c--;
+            q.plated = true; q.maxHp += 11; q.hp += 11; e.c--;
             this.events.push({ e: 'snd', s: 'place', x: r1(q.x), y: r1(q.y) });
             if (e.c <= 0) { this.removeEnt(e); break; }
           }
@@ -3154,7 +3157,7 @@ export class Game {
           if (e.tick <= 0) {
             e.tick = 0.5;
             for (const q of this.players.values()) if (q.alive && Math.hypot(q.x - e.x, q.y - e.y) < e.r) // toxin hurts everyone in it
-              this.damage(q, 6, this.players.get(e.owner), 'Toxin Canister', 0);
+              this.damage(q, 5 * this.blastArmor(q), this.players.get(e.owner), 'Toxin Canister', 0);
           }
           if (e.life <= 0) this.removeEnt(e);
           break;
@@ -3228,7 +3231,7 @@ export class Game {
     });
     if (hitQ && (stopT === null || hitT < stopT)) {
       const src = this.players.get(e.owner);
-      this.damage(hitQ, 60, src || null, 'Saw Disc', Math.atan2(dy, dx)); this.removeEnt(e);
+      this.damage(hitQ, 45 * this.blastArmor(hitQ), src || null, 'Saw Disc', Math.atan2(dy, dx)); this.removeEnt(e);
       this.events.push({ e: 'hit', k: 'flesh', x: r1(hitQ.x), y: r1(hitQ.y) }); return;
     }
     if (stopT !== null) { this.events.push({ e: 'hit', k: 'spark', x: r1(e.x + dx * stopT), y: r1(e.y + dy * stopT) }); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e); return; }
@@ -3256,20 +3259,20 @@ export class Game {
     const kind = e.type === 'nade' ? e.kind : e.type;
     const SOFTISH = [T.SOFT, T.BARRI, T.HATCH, T.RUBBLE, T.BEAM];
     switch (kind) {
-      case 'frag': this.explode(e, { r: 75, dmg: 130, cellR: 14, cells: SOFTISH, kind: 'frag' }); break;
-      case 'impact': this.explode(e, { r: 34, dmg: 40, cellR: 22, cells: SOFTISH, kind: 'impact' }); break;
-      case 'nitro': this.explode(e, { r: 70, dmg: 140, cellR: 20, cells: SOFTISH, kind: 'nitro', floor: true }); break; // nitro on an upper floor blows a hole in it
-      case 'slug': this.explode(e, { r: 36, dmg: 75, cellR: 21, cells: SOFTISH, kind: 'slug', selfMul: 0.3 }); break;
-      case 'breach': this.explode(e, { r: 40, dmg: 60, cellR: 21, cells: SOFTISH, kind: 'breach', at: e.cell, floor: e.floor }); break;
-      case 'claymore': this.explode(e, { r: 50, dmg: 95, cellR: 0, cells: [], kind: 'frag', cone: e.ang }); break;
+      case 'frag': this.explode(e, { r: 75, dmg: 100, cellR: 14, cells: SOFTISH, kind: 'frag' }); break;
+      case 'impact': this.explode(e, { r: 34, dmg: 30, cellR: 22, cells: SOFTISH, kind: 'impact' }); break;
+      case 'nitro': this.explode(e, { r: 70, dmg: 106, cellR: 20, cells: SOFTISH, kind: 'nitro', floor: true }); break; // nitro on an upper floor blows a hole in it
+      case 'slug': this.explode(e, { r: 36, dmg: 57, cellR: 21, cells: SOFTISH, kind: 'slug', selfMul: 0.3 }); break;
+      case 'breach': this.explode(e, { r: 40, dmg: 45, cellR: 21, cells: SOFTISH, kind: 'breach', at: e.cell, floor: e.floor }); break;
+      case 'claymore': this.explode(e, { r: 50, dmg: 72, cellR: 0, cells: [], kind: 'frag', cone: e.ang }); break;
       case 'mine': {
-        this.explode(e, { r: 32, dmg: 40, cellR: 0, cells: [], kind: 'mine' });
+        this.explode(e, { r: 32, dmg: 30, cellR: 0, cells: [], kind: 'mine' });
         for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < 40) {
           this.effect(q, 'slow', 3, e.team); this.spot(e.team, q.id, 4);
         }
         break;
       }
-      case 'cutter': this.explode(e, { r: 30, dmg: 40, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD, T.HATCH, T.HATCHR, T.RUBBLE, T.BEAM], kind: 'cutter', at: e.cell, floor: e.floor }); break;
+      case 'cutter': this.explode(e, { r: 30, dmg: 30, cellR: 40, cells: [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD, T.HATCH, T.HATCHR, T.RUBBLE, T.BEAM], kind: 'cutter', at: e.cell, floor: e.floor }); break;
       case 'sonar': {
         let any = false;
         // measured in the building (he asked: it couldn't reach up the stairs): the floor above or below counts too, a bit less far
@@ -3281,9 +3284,9 @@ export class Game {
       }
       case 'gas': this.ents.push({ id: this.eid(), type: 'gascloud', x: e.x, y: e.y, r: 58, life: 8, team: e.team, owner: e.owner }); this.events.push({ e: 'snd', s: 'smoke', x: r1(e.x), y: r1(e.y) }); break;
       case 'cam': this.ents.push({ id: this.eid(), type: 'cam', x: e.x, y: e.y, team: e.team, owner: e.owner, hp: 1, offUntil: 0, ang: Math.atan2(e.vy || 0, e.vx || 1) }); this.events.push({ e: 'snd', s: 'place', x: r1(e.x), y: r1(e.y) }); break;
-      case 'prox': this.explode(e, { r: 48, dmg: 90, cellR: 0, cells: [], kind: 'frag' }); break;
+      case 'prox': this.explode(e, { r: 48, dmg: 68, cellR: 0, cells: [], kind: 'frag' }); break;
       case 'concuss': {
-        this.explode(e, { r: 30, dmg: 15, cellR: 0, cells: [], kind: 'impact' });
+        this.explode(e, { r: 30, dmg: 11, cellR: 0, cells: [], kind: 'impact' });
         for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < 50) {
           this.effect(q, 'slow', 4, e.team); this.effect(q, 'daze', 4, e.team); this.events.push({ e: 'daze', id: q.id, dur: 4 });
         }
@@ -3309,8 +3312,8 @@ export class Game {
       case 'medkit': this.ents.push({ id: this.eid(), type: 'healzone', x: e.x, y: e.y, r: 40, life: 5, team: e.team, owner: e.owner }); this.events.push({ e: 'snd', s: 'place', x: r1(e.x), y: r1(e.y) }); break;
       case 'echobox': this.ents.push({ id: this.eid(), type: 'echobox', x: e.x, y: e.y, life: 8, t: 0, team: e.team, owner: e.owner, hp: 1 }); break;
       case 'sticky': { // through the wall it stuck to: a blast this side, and one in the room behind
-        this.explode(e, { r: 38, dmg: 70, cellR: 21, cells: [T.SOFT, T.BARRI, T.HATCH, T.RUBBLE], kind: 'slug', selfMul: 0.3 });
-        if (e.bx !== undefined) this.explode({ x: e.bx, y: e.by, team: e.team, owner: e.owner }, { r: 36, dmg: 55, cellR: 0, cells: [], kind: 'impact' });
+        this.explode(e, { r: 38, dmg: 53, cellR: 21, cells: [T.SOFT, T.BARRI, T.HATCH, T.RUBBLE], kind: 'slug', selfMul: 0.3 });
+        if (e.bx !== undefined) this.explode({ x: e.bx, y: e.by, team: e.team, owner: e.owner }, { r: 36, dmg: 42, cellR: 0, cells: [], kind: 'impact' });
         break;
       }
       case 'stun': {
@@ -3389,7 +3392,7 @@ export class Game {
         return false;
       });
       if (blocked) continue;
-      const dmg = o.dmg * (1 - (d / o.r) * 0.75) * (self ? (o.selfMul ?? 1) : 1);
+      const dmg = o.dmg * (1 - (d / o.r) * 0.75) * (self ? (o.selfMul ?? 1) : 1) * this.blastArmor(q);
       this.damage(q, dmg, owner, this.blastName(e, o), Math.atan2(q.y - e.y, q.x - e.x));
     }
     for (const g of [...this.ents]) {

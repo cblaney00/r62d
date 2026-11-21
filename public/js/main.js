@@ -4305,7 +4305,7 @@ function hud(s) {
   setHTML('opname', `${o.name}<small>${o.role.toUpperCase()}</small>`);
   setText('hpnum', me.hp);
   const bar = $('hpbar').firstElementChild;
-  const barW = Math.min(100, me.hp / me.mhp * 100) + '%', barC = me.hp > me.mhp ? 'over' : me.hp < 35 || me.dn ? 'low' : '';
+  const barW = Math.min(100, me.hp / me.mhp * 100) + '%', barC = me.hp > me.mhp ? 'over' : me.hp < 27 || me.dn ? 'low' : '';
   if (bar.style.width !== barW) bar.style.width = barW;
   if (bar.className !== barC) bar.className = barC;
   setText('status', me.dn ? `${s.zb ? 'LAST STAND' : 'DOWNED'} — BLEEDING OUT · ${Math.ceil(me.hp)}s` : me.df ? 'DEFUSER CARRIER' : '');
@@ -4519,8 +4519,8 @@ function fovFor(p) {
 function bodySounds(me, dt) {
   if (!me || !me.a || !st.last || st.last.ph !== PHASE.ACTION) return;
   st.hbT = (st.hbT || 0) - dt; st.brT = (st.brT || 0) - dt;
-  if ((me.dn || me.hp < 35) && st.hbT <= 0) { audio.foley('heartbeat'); st.hbT = me.dn ? 0.85 : 1.15; }
-  if (me.hp < 35 && !me.dn && st.brT <= 0) { audio.foley('breath'); st.brT = 3.2; }
+  if ((me.dn || me.hp < 27) && st.hbT <= 0) { audio.foley('heartbeat'); st.hbT = me.dn ? 0.85 : 1.15; }
+  if (me.hp < 27 && !me.dn && st.brT <= 0) { audio.foley('breath'); st.brT = 3.2; }
 }
 
 // Everything your team can look through (the server's feeds()): defence every working camera, map,

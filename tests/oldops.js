@@ -74,7 +74,7 @@ d.hold = { ability: 1 }; ticks(0.1, d); d.hold = null; ticks(0.1, d); ok(!d.shro
 fresh(); setup(d, 'solace', X, Y, 0); d.downed = true; d.hp = 20; d.selfUp = 0; ticks(12.2, d); ok(d.alive && !d.downed, 'SOLACE did not get up by himself');
 fresh(); setup(d, 'mason', X, Y, 0); d.downed = true; d.hp = 30; d.selfUp = 0; ticks(12.2, d); ok(d.downed, 'MASON should stay down');
 fresh(); setup(d, 'shade', X, Y, 0); use(d); setup(a, 'ember', X + 120, Y, 0); a.moving = 2; ticks(0.6); ok(sees('def', a), 'SHADE sensor did not hear a running attacker');
-fresh(); setup(d, 'rampart', X, Y, 0); use(d); const pb = g.ents.find(e => e.type === 'plates'); setup(d2, 'lynx', pb.x, pb.y, 0); d2.plated = false; ticks(0.1); ok(d2.maxHp === 115, 'RAMPART plates did not add health', d2.maxHp);
+fresh(); setup(d, 'rampart', X, Y, 0); use(d); const pb = g.ents.find(e => e.type === 'plates'); setup(d2, 'lynx', pb.x, pb.y, 0); d2.plated = false; ticks(0.1); ok(d2.maxHp === 111, 'RAMPART plates did not add health', d2.maxHp);
 fresh(); setup(d, 'miasma', X, Y, 0); setup(a, 'ember', X + 60, Y, 0); a.hp = a.maxHp = 500; g.detonate({ type: 'nade', kind: 'gas', x: X + 60, y: Y, team: TEAM.DEF, owner: d.id }); ticks(1.5); ok(a.hp < 500, 'MIASMA gas did not hurt');
 fresh(); setup(d, 'snare', X, Y, 0); use(d); ticks(1.6); const cl = g.ents.find(e => e.type === 'clamp'); setup(a, 'ember', cl.x, cl.y, 0); ticks(0.1); ok(a.clampUntil > g.time, 'SNARE clamp did not hold');
 fresh(); setup(d, 'argus', X, Y, 0); g.detonate({ type: 'nade', kind: 'cam', x: X + 40, y: Y, vx: 1, vy: 0, team: TEAM.DEF, owner: d.id }); ok(g.feeds(TEAM.DEF).some(e => e.type === 'cam'), 'ARGUS sticky cam is not in the camera feeds');

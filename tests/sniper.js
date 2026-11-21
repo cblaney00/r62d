@@ -7,7 +7,7 @@ import { PHASE, TEAM } from '../shared/constants.js';
 import { WEAPONS, ARMOR_HP } from '../shared/operators.js';
 
 let fails = 0; const fail = (...a) => { fails++; console.log('FAIL', ...a); };
-if (ARMOR_HP[1] !== 150 || ARMOR_HP[3] !== 120) fail('health not raised', ARMOR_HP);
+if (ARMOR_HP[1] !== 100 || ARMOR_HP[3] !== 100) fail('everyone should have 100 health (the damage scale)', ARMOR_HP);
 const g = new Game({ free: true });
 for (let i = 0; i < 2; i++) g.addBot();
 g.mapId = 'harbor'; g.map = buildMap('harbor'); g.startMatch();

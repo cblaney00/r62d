@@ -3,109 +3,114 @@ import { META } from './meta.js'; // the pros' preferred loadouts (server/metalo
 import { PX_PER_M as PX_PER_M_OP } from './constants.js';
 
 export const WEAPONS = {
-  k4:      { name: 'K4 Carbine',   cls: 'AR',      dmg: 31, rpm: 720, mag: 30, reserve: 150, reload: 2.4, spread: 0.06, ads: 0.014, bloom: 0.012, auto: true,  pellets: 1, range: 1100, len: 15,
+  k4:      { name: 'K4 Carbine',   cls: 'AR',      dmg: 23, rpm: 720, mag: 30, reserve: 150, reload: 2.4, spread: 0.06, ads: 0.014, bloom: 0.012, auto: true,  pellets: 1, range: 1100, len: 15,
              trait: 'The all-rounder: nothing it does badly, nothing it does best.' },
-  breaker: { name: 'Breaker-12',   cls: 'Shotgun', mode: 'pump-action', dmg: 27, rpm: 78,  mag: 7,  reserve: 42,  reload: 3.1, spread: 0.14, ads: 0.075,  bloom: 0,     auto: false, pellets: 8, range: 600,  len: 14, fall: { from: 180, to: 460, min: 0.25 }, choke: 2.3 },
-  mule:    { name: 'Mule LMG',     cls: 'LMG',     dmg: 29, rpm: 640, mag: 80, reserve: 160, reload: 4.4, spread: 0.09, ads: 0.024, bloom: 0.008, auto: true,  pellets: 1, range: 1100, len: 17,
+  breaker: { name: 'Breaker-12',   cls: 'Shotgun', mode: 'pump-action', dmg: 20, rpm: 78,  mag: 7,  reserve: 42,  reload: 3.1, spread: 0.14, ads: 0.075,  bloom: 0,     auto: false, pellets: 8, range: 600,  len: 14, fall: { from: 180, to: 460, min: 0.25 }, choke: 2.3 },
+  mule:    { name: 'Mule LMG',     cls: 'LMG',     dmg: 22, rpm: 640, mag: 80, reserve: 160, reload: 4.4, spread: 0.09, ads: 0.024, bloom: 0.008, auto: true,  pellets: 1, range: 1100, len: 17,
              adsMul: 1.1, kickMul: 0.85, swayMul: 0.8, trait: 'The steady LMG: 80 rounds that stay where you put them, a little slow to aim.' },
-  longbow: { name: 'Longbow DMR',  cls: 'DMR',     dmg: 66, rpm: 260, mag: 10, reserve: 50,  reload: 2.7, spread: 0.06, ads: 0.004, bloom: 0.02,  auto: false, pellets: 1, range: 1300, len: 18,
+  longbow: { name: 'Longbow DMR',  cls: 'DMR',     dmg: 50, rpm: 260, mag: 10, reserve: 50,  reload: 2.7, spread: 0.06, ads: 0.004, bloom: 0.02,  auto: false, pellets: 1, range: 1300, len: 18,
              kickMul: 1.4, settle: 0.6, trait: 'A heavy marksman rifle: two body shots drop anyone, but it jumps hard and needs a moment between shots.' },
-  hornet:  { name: 'Hornet MP',    cls: 'MP',      dmg: 24, rpm: 760, mag: 30, reserve: 150, reload: 1.6, spread: 0.08, ads: 0.03,  bloom: 0.010, auto: true,  pellets: 1, range: 800,  len: 8,
+  hornet:  { name: 'Hornet MP',    cls: 'MP',      dmg: 18, rpm: 760, mag: 30, reserve: 150, reload: 1.6, spread: 0.08, ads: 0.03,  bloom: 0.010, auto: true,  pellets: 1, range: 800,  len: 8,
              kickMul: 0.7, swayMul: 0.7, fall: { from: 200, to: 480, min: 0.55 }, trait: 'A machine pistol tamed for control: easy to keep on target and quick to reload, but it loses its punch past one room.' },
-  vex50:   { name: 'Vex .50',      cls: 'Pistol',  dmg: 50, rpm: 210, mag: 7,  reserve: 35,  reload: 2.0, spread: 0.06, ads: 0.012, bloom: 0.04,  auto: false, pellets: 1, range: 900,  len: 8 },
-  p10:     { name: 'P10 Sidearm',  cls: 'Pistol',  dmg: 34, rpm: 420, mag: 15, reserve: 60,  reload: 1.6, spread: 0.05, ads: 0.016, bloom: 0.02,  auto: false, pellets: 1, range: 900,  len: 7 },
+  vex50:   { name: 'Vex .50',      cls: 'Pistol',  dmg: 38, rpm: 210, mag: 7,  reserve: 35,  reload: 2.0, spread: 0.06, ads: 0.012, bloom: 0.04,  auto: false, pellets: 1, range: 900,  len: 8 },
+  p10:     { name: 'P10 Sidearm',  cls: 'Pistol',  dmg: 26, rpm: 420, mag: 15, reserve: 60,  reload: 1.6, spread: 0.05, ads: 0.016, bloom: 0.02,  auto: false, pellets: 1, range: 900,  len: 7 },
   // More guns (he asked: "every gun should have its own properties, none of them too similar"). Besides the numbers
   // above, a gun can change its class's handling: adsMul (time to aim), kickMul / swayMul (recoil), settle (s until
   // the next shot is exact again), fall (damage drop-off), burst (shots per click), quiet (built-in suppressor).
-  rook:    { name: 'Rook Battle Rifle', cls: 'AR', dmg: 40, rpm: 540, mag: 20, reserve: 120, reload: 2.7, spread: 0.065, ads: 0.012, bloom: 0.016, auto: true, pellets: 1, range: 1300, len: 17,
+  rook:    { name: 'Rook Battle Rifle', cls: 'AR', dmg: 30, rpm: 540, mag: 20, reserve: 120, reload: 2.7, spread: 0.065, ads: 0.012, bloom: 0.016, auto: true, pellets: 1, range: 1300, len: 17,
              adsMul: 1.15, kickMul: 1.8, swayMul: 0.7, fall: { from: 520, to: 900, min: 0.8 }, trait: 'Hits hard and keeps its damage far away, but kicks hard and holds only 20 rounds.' },
-  sabre:   { name: 'Sabre Bullpup', cls: 'AR', dmg: 28, rpm: 820, mag: 30, reserve: 180, reload: 2.9, spread: 0.055, ads: 0.016, bloom: 0.011, auto: true, pellets: 1, range: 1000, len: 12,
+  sabre:   { name: 'Sabre Bullpup', cls: 'AR', dmg: 21, rpm: 820, mag: 30, reserve: 180, reload: 2.9, spread: 0.055, ads: 0.016, bloom: 0.011, auto: true, pellets: 1, range: 1000, len: 12,
              adsMul: 0.8, kickMul: 0.85, swayMul: 1.3, trait: 'Short, quick to aim and fast-firing; slow to reload, and its spray wanders sideways.' },
-  trident: { name: 'Trident Burst', cls: 'AR', dmg: 34, rpm: 900, mag: 30, reserve: 150, reload: 2.3, spread: 0.05, ads: 0.010, bloom: 0.010, auto: false, pellets: 1, range: 1150, len: 15,
+  trident: { name: 'Trident Burst', cls: 'AR', dmg: 26, rpm: 900, mag: 30, reserve: 150, reload: 2.3, spread: 0.05, ads: 0.010, bloom: 0.010, auto: false, pellets: 1, range: 1150, len: 15,
              burst: 3, burstGap: 0.28, kickMul: 0.8, trait: 'Three-round burst with every click: deadly accurate in bursts, but it can\'t spray.' },
-  wasp:    { name: 'Wasp SMG', cls: 'SMG', dmg: 18, rpm: 1100, mag: 30, reserve: 180, reload: 2.3, spread: 0.08, ads: 0.026, bloom: 0.011, auto: true, pellets: 1, range: 800, len: 11,
+  wasp:    { name: 'Wasp SMG', cls: 'SMG', dmg: 14, rpm: 1100, mag: 30, reserve: 180, reload: 2.3, spread: 0.08, ads: 0.026, bloom: 0.011, auto: true, pellets: 1, range: 800, len: 11,
              kickMul: 1.1, swayMul: 2.1, adsMul: 1.15, fall: { from: 160, to: 420, min: 0.5 }, trait: 'The fastest-firing gun there is and deadly within a few metres, but 30 rounds go in under two seconds, it kicks hard sideways and its damage falls away fast.' },
-  marten:  { name: 'Marten .45', cls: 'SMG', dmg: 26, rpm: 640, mag: 25, reserve: 150, reload: 2.1, spread: 0.065, ads: 0.020, bloom: 0.010, auto: true, pellets: 1, range: 850, len: 13,
+  marten:  { name: 'Marten .45', cls: 'SMG', dmg: 19, rpm: 640, mag: 25, reserve: 150, reload: 2.1, spread: 0.065, ads: 0.020, bloom: 0.010, auto: true, pellets: 1, range: 850, len: 13,
              quiet: true, kickMul: 0.75, swayMul: 0.6, settle: 0.26, fall: { from: 240, to: 520, min: 0.6 }, trait: 'Built-in suppressor with no damage lost: quiet, steady and slow-firing.' },
-  lark:    { name: 'Lark PDW', cls: 'SMG', dmg: 21, rpm: 860, mag: 50, reserve: 200, reload: 2.6, spread: 0.07, ads: 0.018, bloom: 0.010, auto: true, pellets: 1, range: 1000, len: 12,
+  lark:    { name: 'Lark PDW', cls: 'SMG', dmg: 16, rpm: 860, mag: 50, reserve: 200, reload: 2.6, spread: 0.07, ads: 0.018, bloom: 0.010, auto: true, pellets: 1, range: 1000, len: 12,
              kickMul: 0.95, fall: { from: 380, to: 700, min: 0.75 }, trait: 'A 50-round magazine that keeps its damage at rifle range, but each bullet is weak.' },
-  tusk:    { name: 'Tusk Auto-12', cls: 'Shotgun', dmg: 18, rpm: 260, mag: 8, reserve: 48, reload: 3.4, spread: 0.15, ads: 0.11, bloom: 0, auto: false, pellets: 8, range: 520, len: 15, fall: { from: 110, to: 330, min: 0.2 }, choke: 1.8,
+  tusk:    { name: 'Tusk Auto-12', cls: 'Shotgun', dmg: 14, rpm: 260, mag: 8, reserve: 48, reload: 3.4, spread: 0.15, ads: 0.11, bloom: 0, auto: false, pellets: 8, range: 520, len: 15, fall: { from: 110, to: 330, min: 0.2 }, choke: 1.8,
              kickMul: 0.7, settle: 0.3, trait: 'Semi-automatic: fires as fast as you click, but each blast is weaker and wider.' },
-  anvil:   { name: 'Anvil Slug', cls: 'Shotgun', mode: 'pump-action', dmg: 66, rpm: 85, mag: 6, reserve: 36, reload: 3.2, spread: 0.07, ads: 0.008, bloom: 0.03, auto: false, pellets: 1, range: 900, len: 15,
+  anvil:   { name: 'Anvil Slug', cls: 'Shotgun', mode: 'pump-action', dmg: 50, rpm: 85, mag: 6, reserve: 36, reload: 3.2, spread: 0.07, ads: 0.008, bloom: 0.03, auto: false, pellets: 1, range: 900, len: 15,
              kickMul: 1.3, fall: { from: 150, to: 500, min: 0.45 }, trait: 'One heavy slug: accurate, huge damage and smashes walls, but very slow to fire.' },
-  stub:    { name: 'Stub Sawn-off', cls: 'Shotgun', mode: 'double-barrel', dmg: 23, rpm: 300, mag: 2, reserve: 20, reload: 2.4, spread: 0.2, ads: 0.14, bloom: 0, auto: false, pellets: 9, range: 340, len: 9, choke: 1.9,
+  stub:    { name: 'Stub Sawn-off', cls: 'Shotgun', mode: 'double-barrel', dmg: 17, rpm: 300, mag: 2, reserve: 20, reload: 2.4, spread: 0.2, ads: 0.14, bloom: 0, auto: false, pellets: 9, range: 340, len: 9, choke: 1.9,
              fall: { from: 60, to: 250, min: 0.15 }, trait: 'A sidearm with two barrels: blow holes in walls and hatches, or end a fight at arm\'s length.' },
-  ox:      { name: 'Ox Belt-Fed', cls: 'LMG', dmg: 33, /* (36 → 33, 2026-11-18: the pros' takes, 1.00 kills a round vs 0.71 for the other attack guns) */ rpm: 480, mag: 100, reserve: 100, reload: 6.0, spread: 0.10, ads: 0.022, bloom: 0.009, auto: true, pellets: 1, range: 1200, len: 18,
+  ox:      { name: 'Ox Belt-Fed', cls: 'LMG', dmg: 25, /* (36 → 33, 2026-11-18: the pros' takes, 1.00 kills a round vs 0.71 for the other attack guns) */ rpm: 480, mag: 100, reserve: 100, reload: 6.0, spread: 0.10, ads: 0.022, bloom: 0.009, auto: true, pellets: 1, range: 1200, len: 18,
              adsMul: 1.35, kickMul: 1.3, swayMul: 0.5, trait: '100 rounds that hit like a battle rifle and climb straight up, but it fires slowly, is very slow to aim and takes an age to reload.' },
-  drummer: { name: 'Drummer LMG', cls: 'LMG', dmg: 21, rpm: 800, mag: 60, reserve: 180, reload: 3.6, spread: 0.085, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 1050, len: 16,
+  drummer: { name: 'Drummer LMG', cls: 'LMG', dmg: 16, rpm: 800, mag: 60, reserve: 180, reload: 3.6, spread: 0.085, ads: 0.026, bloom: 0.009, auto: true, pellets: 1, range: 1050, len: 16,
              adsMul: 0.8, kickMul: 0.8, swayMul: 1.5, trait: 'A light, fast-firing LMG that hoses a doorway: quick to aim and reload for its kind, but its soft bullets wander side to side.' },
-  pike:    { name: 'Pike Bolt-Action', cls: 'DMR', mode: 'bolt-action', dmg: 112, rpm: 50, mag: 5, reserve: 30, reload: 3.2, spread: 0.09, ads: 0.002, bloom: 0.05, auto: false, pellets: 1, range: 1600, len: 20,
+  pike:    { name: 'Pike Bolt-Action', cls: 'DMR', mode: 'bolt-action', dmg: 85, rpm: 50, mag: 5, reserve: 30, reload: 3.2, spread: 0.09, ads: 0.002, bloom: 0.05, auto: false, pellets: 1, range: 1600, len: 20,
              adsMul: 1.3, kickMul: 1.5, settle: 0.9, oneShot: true, trait: 'Aimed in through the sniper scope, one clean body shot drops anyone. A slow bolt between shots, slow to aim, hopeless from the hip; its scope glints at whoever it points at.' },
   // he asked: a sniper that feels more modern, tan, like a British L115 (our own design and name): a straight-pull bolt
   // that cycles fast, quicker to aim, a big muzzle brake that tames the kick but is loud. Still one shot to the body.
-  saker:   { name: 'Saker LR', cls: 'DMR', mode: 'straight-pull', dmg: 120, rpm: 72, mag: 5, reserve: 30, reload: 2.9, spread: 0.09, ads: 0.0018, bloom: 0.05, auto: false, pellets: 1, range: 1700, len: 21,
+  saker:   { name: 'Saker LR', cls: 'DMR', mode: 'straight-pull', dmg: 91, rpm: 72, mag: 5, reserve: 30, reload: 2.9, spread: 0.09, ads: 0.0018, bloom: 0.05, auto: false, pellets: 1, range: 1700, len: 21,
              adsMul: 1.15, kickMul: 1.15, settle: 0.75, oneShot: true, trait: 'Modern long-range rifle: aimed in through the sniper scope, one clean body shot drops anyone, and the straight-pull bolt is back on target faster than the Pike. Thinner walls stop more of it; loud, and its scope glints.' },
-  heron:   { name: 'Heron Marksman', cls: 'DMR', dmg: 44, rpm: 480, mag: 20, reserve: 100, reload: 2.4, spread: 0.055, ads: 0.007, bloom: 0.014, auto: false, pellets: 1, range: 1200, len: 16,
+  heron:   { name: 'Heron Marksman', cls: 'DMR', dmg: 34, rpm: 480, mag: 20, reserve: 100, reload: 2.4, spread: 0.055, ads: 0.007, bloom: 0.014, auto: false, pellets: 1, range: 1200, len: 16,
              adsMul: 0.85, kickMul: 0.7, settle: 0.4, trait: 'A quick-firing marksman rifle with light recoil: three fast hits drop anyone.' },
-  gnat:    { name: 'Gnat Machine Pistol', cls: 'MP', dmg: 17, rpm: 1050, mag: 20, reserve: 100, reload: 1.7, spread: 0.09, ads: 0.035, bloom: 0.011, auto: true, pellets: 1, range: 700, len: 7,
+  gnat:    { name: 'Gnat Machine Pistol', cls: 'MP', dmg: 13, rpm: 1050, mag: 20, reserve: 100, reload: 1.7, spread: 0.09, ads: 0.035, bloom: 0.011, auto: true, pellets: 1, range: 700, len: 7,
              kickMul: 1.2, swayMul: 1.4, fall: { from: 200, to: 450, min: 0.55 }, trait: 'A full-auto sidearm: 20 rounds gone in about a second, fierce recoil.' },
-  bison:   { name: 'Bison Revolver', cls: 'Pistol', dmg: 64, rpm: 130, mag: 6, reserve: 30, reload: 3.0, spread: 0.05, ads: 0.006, bloom: 0.05, auto: false, pellets: 1, range: 1000, len: 9,
+  bison:   { name: 'Bison Revolver', cls: 'Pistol', dmg: 48, rpm: 130, mag: 6, reserve: 30, reload: 3.0, spread: 0.05, ads: 0.006, bloom: 0.05, auto: false, pellets: 1, range: 1000, len: 9,
              kickMul: 1.8, settle: 0.6, fall: { from: 400, to: 700, min: 0.8 }, trait: 'Two body shots drop anyone. Six rounds, slow to fire and reload, very accurate.' },
   // he asked for side-specific weapons (no gun on both sides), so attack and defence each got the guns they were missing
-  javelin: { name: 'Javelin SMG', cls: 'SMG', dmg: 25, rpm: 800, mag: 30, reserve: 180, reload: 2.2, spread: 0.065, ads: 0.019, bloom: 0.010, auto: true, pellets: 1, range: 950, len: 12,
+  javelin: { name: 'Javelin SMG', cls: 'SMG', dmg: 19, rpm: 800, mag: 30, reserve: 180, reload: 2.2, spread: 0.065, ads: 0.019, bloom: 0.010, auto: true, pellets: 1, range: 950, len: 12,
              adsMul: 0.85, fall: { from: 320, to: 620, min: 0.65 }, trait: 'The attackers\' SMG: quick to aim, steady, good on the move.' },
-  sentry:  { name: 'Sentry Carbine', cls: 'AR', dmg: 33, rpm: 600, mag: 25, reserve: 125, reload: 2.3, spread: 0.058, ads: 0.016, bloom: 0.012, auto: true, pellets: 1, range: 900, len: 13,
+  sentry:  { name: 'Sentry Carbine', cls: 'AR', dmg: 25, rpm: 600, mag: 25, reserve: 125, reload: 2.3, spread: 0.058, ads: 0.016, bloom: 0.012, auto: true, pellets: 1, range: 900, len: 13,
              adsMul: 0.85, kickMul: 0.6, fall: { from: 260, to: 520, min: 0.65 }, trait: 'A slow, hard-hitting defender\'s carbine: very easy to control and quick to the shoulder, but only 25 rounds and it weakens down long halls.' },
   // ZOMBIES only (zb: true, never in a loadout, the Armory or free play): the mystery crate's rare wonder weapon. An energy
   // bolt that bursts where it lands (server/zombies.js zbSurge); a little of the burst stings you too
   surge: { name: 'Surge Caster', cls: 'Pistol', dmg: 1000, rpm: 180, mag: 20, reserve: 160, reload: 2.6, spread: 0.02, ads: 0.01, bloom: 0.01, auto: false, pellets: 1, range: 1100, len: 7, zb: true, surge: true,
              trait: 'Zombies only. A bolt of energy that bursts where it lands: kills a crowd, stings you up close.' },
-  sparrow: { name: 'Sparrow Compact', cls: 'Pistol', dmg: 28, rpm: 520, mag: 17, reserve: 68, reload: 1.4, spread: 0.05, ads: 0.017, bloom: 0.018, auto: false, pellets: 1, range: 850, len: 6,
+  sparrow: { name: 'Sparrow Compact', cls: 'Pistol', dmg: 21, rpm: 520, mag: 17, reserve: 68, reload: 1.4, spread: 0.05, ads: 0.017, bloom: 0.018, auto: false, pellets: 1, range: 850, len: 6,
              trait: 'A light, quick pistol: fast to fire and reload, but hits softer.' },
   // He asked (2026-11-10): two more of every type, each one unique ("I would rather a gun not be in the game than be
   // effectively a remake of another"). Every gun below does one thing no other gun does: its own rule (spin, bipod,
   // dual, tandem, raise, stagger, wallShot) or a niche nobody else fills.
   // assault rifles
-  verdict: { name: 'Verdict DMR-Carbine', cls: 'AR', dmg: 26, rpm: 700, mag: 24, reserve: 120, reload: 2.5, spread: 0.065, ads: 0.010, bloom: 0.013, auto: true, pellets: 1, range: 1250, len: 16,
-             dual: { dmg: 47, rpm: 330 }, kickMul: 1.1, trait: 'Two guns in one: full-auto from the hip, but aimed in it fires single heavy rounds (47 damage, three body hits drop anyone). Weak spraying aimed in, weak shots from the hip.' },
-  tandem:  { name: 'Tandem Carbine', cls: 'AR', dmg: 30, rpm: 680, mag: 28, reserve: 140, reload: 2.9, spread: 0.06, ads: 0.015, bloom: 0.012, auto: true, pellets: 1, range: 1000, len: 14,
+  verdict: { name: 'Verdict DMR-Carbine', cls: 'AR', dmg: 19, rpm: 700, mag: 24, reserve: 120, reload: 2.5, spread: 0.065, ads: 0.010, bloom: 0.013, auto: true, pellets: 1, range: 1250, len: 16,
+             dual: { dmg: 36, rpm: 330 }, kickMul: 1.1, trait: 'Two guns in one: full-auto from the hip, but aimed in it fires single heavy rounds (36 damage, three body hits drop anyone). Weak spraying aimed in, weak shots from the hip.' },
+  tandem:  { name: 'Tandem Carbine', cls: 'AR', dmg: 23, rpm: 680, mag: 28, reserve: 140, reload: 2.9, spread: 0.06, ads: 0.015, bloom: 0.012, auto: true, pellets: 1, range: 1000, len: 14,
              tandem: 1.0, kickMul: 0.9, trait: 'Two magazines taped together: every other reload is a 1-second flip, the next one a slow full change (2.9 s). Count your reloads.' },
   // submachine guns
-  ferret:  { name: 'Ferret SMG', cls: 'SMG', dmg: 23, rpm: 820, mag: 32, reserve: 160, reload: 2.1, spread: 0.06, ads: 0.024, bloom: 0.011, auto: true, pellets: 1, range: 850, len: 11,
+  ferret:  { name: 'Ferret SMG', cls: 'SMG', dmg: 17, rpm: 820, mag: 32, reserve: 160, reload: 2.1, spread: 0.06, ads: 0.024, bloom: 0.011, auto: true, pellets: 1, range: 850, len: 11,
              hipMul: 0.55, raise: 0.08, adsMul: 1.25, fall: { from: 260, to: 520, min: 0.6 }, trait: 'Built for hip fire on the move: by far the tightest hip spray and up the instant a sprint ends, but slow to aim in and its aimed shots are no better than any SMG.' },
-  auger:   { name: 'Auger AP SMG', cls: 'SMG', dmg: 24, rpm: 620, mag: 35, reserve: 140, reload: 2.4, spread: 0.07, ads: 0.019, bloom: 0.010, auto: true, pellets: 1, range: 950, len: 13,
+  auger:   { name: 'Auger AP SMG', cls: 'SMG', dmg: 18, rpm: 620, mag: 35, reserve: 140, reload: 2.4, spread: 0.07, ads: 0.019, bloom: 0.010, auto: true, pellets: 1, range: 950, len: 13,
              kickMul: 1.05, swayMul: 0.8, fall: { from: 300, to: 620, min: 0.7 }, trait: 'Armour-piercing rounds: loses barely anything through soft walls and barricades (as much as a marksman rifle), but fires slowly for an SMG.' },
   // shotguns
-  quill:   { name: 'Quill Flechette', cls: 'Shotgun', dmg: 32, rpm: 150, mag: 6, reserve: 36, reload: 3.0, spread: 0.06, ads: 0.035, bloom: 0, auto: false, pellets: 4, range: 800, len: 15, choke: 1.2,
+  quill:   { name: 'Quill Flechette', cls: 'Shotgun', dmg: 24, rpm: 150, mag: 6, reserve: 36, reload: 3.0, spread: 0.06, ads: 0.035, bloom: 0, auto: false, pellets: 4, range: 800, len: 15, choke: 1.2,
              kickMul: 0.9, fall: { from: 200, to: 560, min: 0.4 }, trait: 'Four steel darts instead of buckshot: a tight pattern that reaches two rooms and pierces walls, but each blast holds few darts, so a miss is a miss.' },
-  hedge:   { name: 'Hedge Lever-12', cls: 'Shotgun', mode: 'lever-action', dmg: 22, rpm: 120, mag: 5, reserve: 35, reload: 2.8, spread: 0.14, ads: 0.1, bloom: 0, auto: false, pellets: 8, range: 560, len: 13, fall: { from: 130, to: 380, min: 0.25 }, choke: 2,
+  hedge:   { name: 'Hedge Lever-12', cls: 'Shotgun', mode: 'lever-action', dmg: 17, rpm: 120, mag: 5, reserve: 35, reload: 2.8, spread: 0.14, ads: 0.1, bloom: 0, auto: false, pellets: 8, range: 560, len: 13, fall: { from: 130, to: 380, min: 0.25 }, choke: 2,
              stagger: 0.7, adsMul: 0.75, kickMul: 1.1, trait: 'Quick to the shoulder, and anyone its pellets hit is knocked off balance: slowed for a moment. Five shells, and the lever takes time.' },
   // light machine guns
-  cyclone: { name: 'Cyclone Rotary', cls: 'LMG', dmg: 21, rpm: 1150, mag: 150, reserve: 150, reload: 6.5, spread: 0.10, ads: 0.03, bloom: 0.008, auto: true, pellets: 1, range: 950, len: 18,
+  cyclone: { name: 'Cyclone Rotary', cls: 'LMG', dmg: 16, rpm: 1150, mag: 150, reserve: 150, reload: 6.5, spread: 0.10, ads: 0.03, bloom: 0.008, auto: true, pellets: 1, range: 950, len: 18,
              spin: { from: 0.35, t: 1.4 }, adsMul: 1.2, kickMul: 0.7, swayMul: 1.1, trait: 'A spinning barrel: starts slow (400 rpm) and winds up over 1.4 s to the fastest fire in the game. 150 rounds and an endless reload. Let go and it winds down.' },
-  trestle: { name: 'Trestle LMG', cls: 'LMG', dmg: 32, rpm: 560, mag: 75, reserve: 150, reload: 4.8, spread: 0.11, ads: 0.022, bloom: 0.010, auto: true, pellets: 1, range: 1150, len: 17,
+  trestle: { name: 'Trestle LMG', cls: 'LMG', dmg: 24, rpm: 560, mag: 75, reserve: 150, reload: 4.8, spread: 0.11, ads: 0.022, bloom: 0.010, auto: true, pellets: 1, range: 1150, len: 17,
              bipod: 0.4, kickMul: 1.35, swayMul: 1.2, adsMul: 1.15, trait: 'Wild on its feet, but crouched or lying still the bipod comes down and the recoil drops by 60%: a fixed gun for holding a long angle.' },
   // marksman rifles
-  ranger:  { name: 'Ranger Lever Rifle', cls: 'DMR', mode: 'lever-action', dmg: 82, rpm: 115, mag: 7, reserve: 42, reload: 3.0, spread: 0.05, ads: 0.004, bloom: 0.03, auto: false, pellets: 1, range: 1250, len: 15,
+  ranger:  { name: 'Ranger Lever Rifle', cls: 'DMR', mode: 'lever-action', dmg: 62, rpm: 115, mag: 7, reserve: 42, reload: 3.0, spread: 0.05, ads: 0.004, bloom: 0.03, auto: false, pellets: 1, range: 1250, len: 15,
              adsMul: 0.7, kickMul: 1.25, settle: 0.45, trait: 'A short lever-action that aims in as fast as an SMG: two body hits from point blank to across the map, but slow between shots.' },
-  mammoth: { name: 'Mammoth .50', cls: 'DMR', mode: 'bolt-action', dmg: 135, rpm: 40, mag: 3, reserve: 18, reload: 3.8, spread: 0.11, ads: 0.0016, bloom: 0.06, auto: false, pellets: 1, range: 1900, len: 23,
+  mammoth: { name: 'Mammoth .50', cls: 'DMR', mode: 'bolt-action', dmg: 102, rpm: 40, mag: 3, reserve: 18, reload: 3.8, spread: 0.11, ads: 0.0016, bloom: 0.06, auto: false, pellets: 1, range: 1900, len: 23,
              adsMul: 1.5, kickMul: 1.8, settle: 1.1, oneShot: true, wallShot: 1, trait: 'Anti-materiel rifle: aimed in through the sniper scope, one body hit drops anyone even through one soft wall. Three rounds, the slowest bolt and aim of all, deafening, and its scope glints.' },
   // pistols
-  needle:  { name: 'Needle Target Pistol', cls: 'Pistol', dmg: 31, rpm: 300, mag: 10, reserve: 50, reload: 1.9, spread: 0.035, ads: 0.004, bloom: 0.01, auto: false, pellets: 1, range: 1200, len: 9,
+  needle:  { name: 'Needle Target Pistol', cls: 'Pistol', dmg: 23, rpm: 300, mag: 10, reserve: 50, reload: 1.9, spread: 0.035, ads: 0.004, bloom: 0.01, auto: false, pellets: 1, range: 1200, len: 9,
              settle: 0.12, kickMul: 0.5, fall: { from: 700, to: 1100, min: 0.85 }, trait: 'A long-slide match pistol: almost no kick, exact again at once and full damage to rifle range, but it fires slowly for a pistol.' },
-  couplet: { name: 'Couplet Pistol', cls: 'Pistol', dmg: 24, rpm: 1100, mag: 18, reserve: 72, reload: 1.7, spread: 0.055, ads: 0.016, bloom: 0.02, auto: false, pellets: 1, range: 800, len: 7,
+  couplet: { name: 'Couplet Pistol', cls: 'Pistol', dmg: 18, rpm: 1100, mag: 18, reserve: 72, reload: 1.7, spread: 0.055, ads: 0.016, bloom: 0.02, auto: false, pellets: 1, range: 800, len: 7,
              burst: 2, burstGap: 0.24, kickMul: 1.1, trait: 'Fires two rounds with every pull, the second landing almost on the first: two quick pulls drop anyone up close. Nine pulls a magazine.' },
   // machine pistols
-  whisper: { name: 'Whisper MP', cls: 'MP', dmg: 20, rpm: 880, mag: 30, reserve: 120, reload: 1.9, spread: 0.08, ads: 0.03, bloom: 0.011, auto: true, pellets: 1, range: 700, len: 9,
+  whisper: { name: 'Whisper MP', cls: 'MP', dmg: 15, rpm: 880, mag: 30, reserve: 120, reload: 1.9, spread: 0.08, ads: 0.03, bloom: 0.011, auto: true, pellets: 1, range: 700, len: 9,
              quiet: true, fall: { from: 180, to: 420, min: 0.5 }, trait: 'Built-in suppressor: the only quiet attacker gun. Weak past a room.' },
-  hatchet: { name: 'Hatchet MP', cls: 'MP', dmg: 33, rpm: 600, mag: 15, reserve: 75, reload: 1.8, spread: 0.085, ads: 0.028, bloom: 0.014, auto: true, pellets: 1, range: 650, len: 8,
+  hatchet: { name: 'Hatchet MP', cls: 'MP', dmg: 25, rpm: 600, mag: 15, reserve: 75, reload: 1.8, spread: 0.085, ads: 0.028, bloom: 0.014, auto: true, pellets: 1, range: 650, len: 8,
              kickMul: 1.6, swayMul: 0.8, fall: { from: 160, to: 380, min: 0.5 }, trait: 'A heavy-calibre machine pistol: four hits drop anyone, but only 15 rounds and it climbs hard.' },
 };
 // guns only carried as a sidearm (second slot)
 export const SIDEARMS = new Set(['p10', 'vex50', 'bison', 'gnat', 'stub', 'sparrow', 'needle', 'couplet', 'whisper', 'hatchet']);
 
 // armor: 1 = heavy/slow, 2 = medium, 3 = light/fast. HP follows armor.
-export const ARMOR_HP = { 1: 136, 2: 132, 3: 128 }; // he asked: everyone a bit tougher (+20%); the Pike still kills with one body shot. He chose 2026-11-20 a smaller gap (was 150/132/120): 1V1 heavy defenders 61 → 57%
+// THE DAMAGE SCALE (he chose 2026-11-21, docs/damage.md): everyone has 100 health, so every damage number is a share of one
+// person: scratch under 10, a little 10-25, a lot 25-50, most of you 50-99, deadly 100+. Bullets hurt every armour the same
+// (was 136/132/128, before that 150/132/120); armour only softens blasts and gadgets (BLAST_ARMOR).
+export const HP = 100;
+export const ARMOR_HP = { 1: HP, 2: HP, 3: HP };
+export const BLAST_ARMOR = { 1: 0.75, 2: 0.9, 3: 1 }; // share of explosion / gadget damage taken: heavy 25% less, medium 10% less
 // build follows armor too: heavies stay broad, mediums and lights are skinnier (drawn narrower AND harder to hit).
 // HIT_R is how close (px) a bullet must pass to a body's centre to hit it; walls still use PLAYER_R for bumping.
 export const BODY_W = { 1: 0.8, 2: 0.71, 3: 0.64 }; // he asked: everyone skinnier (was 0.95 / 0.84 / 0.76)
@@ -301,7 +306,7 @@ export const OPERATORS = {
              ability: { id: 'radar', name: 'Drone Radar', count: 2, desc: 'Drop a drone radar: every attacker drone within 15 metres is pinged for your team, again and again for 15 seconds.' },
              gadget: 'impact', gadgetCount: 2, color: '#5ad0c0', helmet: '#3a4846', look: 'goggles' },
   tonic: { team: 'def', name: 'TONIC', role: 'Heal Station', armor: 2, primary: 'breaker', secondary: 'vex50',
-             ability: { id: 'station', name: 'Heal Station', count: 1, desc: 'Place a heal station. Teammates standing next to it heal 6 health a second, up to 100 in total. Passive: if downed, gets back up by himself after 12 seconds.' },
+             ability: { id: 'station', name: 'Heal Station', count: 1, desc: 'Place a heal station. Teammates standing next to it heal 5 health a second, up to 76 in total. Passive: if downed, gets back up by himself after 12 seconds.' },
              gadget: 'wire', gadgetCount: 2, color: '#6ad08a', helmet: '#3e4a42', look: 'helmet' },
   ward: { team: 'def', name: 'WARD', role: 'Grenade Catcher', armor: 2, primary: 'marten', secondary: 'vex50',
              ability: { id: 'catcher', name: 'Grenade Catcher', count: 2, desc: 'Place a grenade catcher. It zaps the first two attacker grenades, launcher rounds or flares that come near it.' },

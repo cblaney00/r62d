@@ -1056,7 +1056,7 @@ export function botThink(game, p, dt) {
     if (d < 20) { p.aim = Math.atan2(mate.y - p.y, mate.x - p.x); inp.interact = 1; inp.crouch = 1; return; }
     return moveTo(game, p, inp, mate, dt);
   }
-  if (abId === 'stim' && p.abilityCount > 1 && p.hp < 45 && action) { useAbility(); return; } // patch yourself up (the dart lands on you when no teammate is in line)
+  if (abId === 'stim' && p.abilityCount > 1 && p.hp < 34 && action) { useAbility(); return; } // patch yourself up (the dart lands on you when no teammate is in line)
   if (abId === 'stim' && p.abilityCount > 1 && action) { // a hurt teammate in sight (between fights): heal them from range, keeping one dart for a revive
     const hurt = [...game.players.values()].find(q => q !== p && q.alive && !q.downed && game.side(q) === team && q.hp < q.maxHp * 0.6
       && Math.hypot(q.x - p.x, q.y - p.y) < 380 && floorAt(map, q.x, q.y) === floorAt(map, p.x, p.y) && los(map, p.x, p.y, q.x, q.y));

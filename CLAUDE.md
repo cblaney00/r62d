@@ -36,6 +36,7 @@ going.** Every idea goes there (there is no other list), only his ideas.
 - Don't start long background runs (e.g. 20-minute pro practice) without asking him.
 - Bot ranks: Copper/Bronze dumb, Silver/Gold casual, Diamond dedicated, Champion top 0.8%, Pros best.
 - Balance targets: attack 45–55% on every map; an operator is broken over 60% / bad under 40%.
+- Damage scale (he chose 2026-11-21, docs/damage.md): 100 health for everyone, bullets hurt every armour the same, armour only softens blasts/gadgets (heavy 25%, medium 10%). Pick a scale word (scratch / a little / a lot / most of you / deadly) before a number for anything new. The words stay behind the scenes.
 - GPU checks run in headless gamescope, never a window on his screen (docs/performance.md).
 - Releasing to Lando (the config pin) is never done from here; see ../CLAUDE.md.
 - Screen layout (he asked 2026-11-18/19): keep UI out of the middle of the screen and never stacked; short "what to do" notes go through main.js `addFeed` (one at a time, left above chat, softer for higher levels); on phones the camera hole is dodged piece by piece (touch.js `dodgeHole`), never by moving the whole screen.
@@ -53,6 +54,7 @@ Search these with grep for a feature, a function name or a test name before chan
 | `docs/performance.md` | frame-rate work, GPU measuring recipe |
 | `docs/testing.md` | headless browser screenshots (`tests/shoot.mjs`), thumbs test |
 | `docs/balance.md` | balance reports and past changes; per-gun penetration and how to nerf or buff a gun |
+| `docs/damage.md` | the damage scale (he chose 2026-11-21): 100 health for everyone, the five words scratch / a little / a lot / most of you / deadly with their number bands, armour vs blasts; pick a word first for anything new |
 | `docs/1v1.md` | the 1V1 mode, the small maps (house, cabin), its tests and playtest, the meta test (`tests/duelmeta.js`: which operators win too often; no bans until he says) |
 | `docs/drills.md` | pro drills, patch notes, pro opinions |
 | `docs/sound.md` | sound mix |

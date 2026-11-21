@@ -23,7 +23,7 @@ export const OITC_GUN = 'sparrow';
 export const LADDER = ['k4', 'wasp', 'breaker', 'mule', 'longbow', 'rook', 'hornet', 'tusk', 'marten', 'ox', 'pike', 'sabre', 'javelin', 'anvil', 'vex50', 'p10'];
 const SURVIVOR_GUNS = ['k4', 'rook', 'sentry', 'wasp', 'marten', 'javelin', 'tusk'];
 const RESPAWN = 2.5;
-const INFECTED_HP = 160, INFECTED_SPEED = 1.15;
+const INFECTED_HP = 121, INFECTED_SPEED = 1.15;
 
 const note = (game, p, text) => { if (p.sock) game.events.push({ e: 'pts', to: p.id, n: 0, w: text }); }; // a popup under the crosshair
 const rnd = (a, b) => a + Math.random() * (b - a);

@@ -31,7 +31,7 @@ ok(m.tiles[wk] !== T.SOFT, 'salvo did not open the wall'); ok(d.hp < 500, 'salvo
 // TORQUE: the saw disc slits the soft wall (see-through, still standing) and cuts the defender behind it; a reinforced wall stops it
 fresh(); delete m.holes[wk]; setup(a, 'torque', wx - 40, wy, 0); setup(d, 'lynx', wx + 50, wy, Math.PI); d.hp = d.maxHp = 200; use(a); run(0.5);
 ok(m.tiles[wk] === T.SOFT, 'the saw disc should slit the wall, not knock it down'); ok((m.holes[wk] || []).length >= 20, 'no slit in the wall', (m.holes[wk] || []).length);
-ok(d.hp === 140, 'the disc did not cut the defender behind the wall', d.hp); ok(!g.ents.some(e => e.type === 'saw'), 'the disc should stop in the person it hits');
+ok(d.hp === 155, 'the disc did not cut the defender behind the wall', d.hp); ok(!g.ents.some(e => e.type === 'saw'), 'the disc should stop in the person it hits');
 ok(castSight(m, wx - 40, wy, 0, 200, null) > 80, 'cannot see through the slit');
 fresh(); delete m.holes[wk]; for (const k of [wk - W, wk, wk + W]) m.tiles[k] = T.REINF; setup(a, 'torque', wx - 40, wy, 0); setup(d, 'lynx', wx + 50, wy, Math.PI); d.hp = d.maxHp = 200; use(a); run(0.5);
 ok(!(m.holes[wk] || []).length && d.hp === 200 && !g.ents.some(e => e.type === 'saw'), 'a reinforced wall should stop the disc');
@@ -67,7 +67,7 @@ a.meleeCd = 0; use(a); ok(a.lungeUntil > g.time, 'lunge not ready'); g.time += 1
 setup(a, 'crow', X, Y, 0); a.meleeCd = 0; setup(d, 'lynx', X + 50, Y, 0); d.hp = d.maxHp = 100; use(a); g.time += 1.6; g.melee(a); run(0.3); ok(!d.alive || d.downed, 'the lunge did not down the defender (from behind)');
 setup(a, 'crow', X, Y, 0); a.meleeCd = 0; setup(d, 'lynx', X + 50, Y, 0); d.hp = d.maxHp = 100; use(a); g.time += 1.6; use(a); run(0.3); ok(!d.alive || d.downed, 'pressing the skill again (2026-11-16) did not lunge')
 setup(a, 'crow', X, Y, 0); a.meleeCd = 0; setup(d, 'lynx', X + 50, Y, 0); d.hp = d.maxHp = 100; use(a); g.time += 0.3; use(a); run(0.3); ok(d.alive && !d.downed, 'the skill pressed again before the blade is ready should not lunge')
-setup(a, 'crow', X, Y, 0); setup(d, 'lynx', X + 18, Y, Math.PI); d.hp = d.maxHp = 100; a.meleeCd = 0; g.melee(a); ok(d.alive && d.hp === 45, 'a front melee should be a normal hit', d.hp);
+setup(a, 'crow', X, Y, 0); setup(d, 'lynx', X + 18, Y, Math.PI); d.hp = d.maxHp = 100; a.meleeCd = 0; g.melee(a); ok(d.alive && d.hp === 58, 'a front melee should be a normal hit', d.hp);
 // BLAZE: blinds a defender facing the flare, not one looking away
 fresh(); setup(a, 'blaze', X, Y, 0); setup(d, 'lynx', X + 150, Y, Math.PI); const d2 = g.addPlayer('Def2', false); d2.squad = d.squad; setup(d2, 'lynx', X + 150, Y + 20, 0);
 d.stunUntil = d2.stunUntil = 0; g.detonate({ type: 'nade', kind: 'flare', x: X + 60, y: Y + 10, team: TEAM.ATK, owner: a.id });

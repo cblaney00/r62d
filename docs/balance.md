@@ -222,3 +222,9 @@ average, so he isn't overpowered; he is a heavy with a good gun and a skill with
 Test switches (tests only): `R62D_NOINTEL=1`, `R62D_NOPLANT=1`, `R62D_NOWAIT=1` turn the new bot behaviours off for comparisons;
 `ARMOR_HP` can be tried with `R62D_TWEAK`; `R62D_LVL=7 node tests/bombtime.js` counts plants with the pros.
 **Open:** 5v5 attack is now about 44%, just under the 45-55% target, because bots use information; watch it in the next practice.
+
+## 2026-11-21: the damage scale (docs/damage.md)
+
+100 health for everyone, bullets equal on every armour, armour softens blasts/gadgets only. 1V1 by armour
+(1200 rounds, level 5): attackers heavy 45%, medium 46%, light 53%; defenders heavy 51%, medium 49%, light 57%.
+Still high: Shunt 68% (grid lock). Overall 1V1 attack 48%. 5v5 (balance.js 6, 227 rounds): attack 50%.

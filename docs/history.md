@@ -896,3 +896,20 @@ for me to craft the best scheme for two human thumbs and a gyroscope, with a han
   stuckbots 2 (known by chance), pickup mason dshield (known; fails on the old version too). Screenshot of the Spice Passage.
 - Lesson: a background job started with `&` inside `nix develop --command sh -c` dies with that shell; run the whole
   comparison as one background command instead.
+
+## 2026-11-21 (later): one damage scale
+
+He asked for guns, health and gadget damage to be tuned together so "a little" and "a lot" mean something. He chose
+the scale in docs/damage.md: 100 health for everyone, five words (scratch / a little / a lot / most of you / deadly),
+bullets the same on every armour, armour softens blasts and gadgets only (`BLAST_ARMOR`, `blastArmor` in game.js:
+heavy 0.75, medium 0.9). He chose to keep the words behind the scenes.
+- Every gun ×100/132, nudged to keep its body shots on a medium (41 guns, none changed count; Verdict aimed 36).
+  Gadgets, heals, revive health, down limit, low-health warning, arena infected (121) scaled the same way.
+  Zombies keep their toughness (`ZB_OLD_SCALE` 1.32 in zombies.js).
+- Results: 1V1 (1200 rounds, pros) attack 48% (was 43%); heavy defenders 51% (were ~57%), Shunt still 68% (his grid,
+  not health); light defenders 57%. 5v5 balance (227 rounds) attack 50% (was ~44-46%).
+- Checked: snipers, newguns, shotguns, zombies, abilities, pickup, sim PASS; oldops/newops/sniper updated to the
+  new numbers and pass (sniper's Saker check sometimes misses on furniture, by chance).
+- He asked: pictures in the chat only show at the top of his view. Open pictures on his screen
+  (`play-on-desktop insideabush imv <png>`) and write choices out in words. He put a pop-out feature for his
+  computer on his own notes list (~/notes-list.txt) to do later himself.

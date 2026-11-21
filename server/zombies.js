@@ -412,6 +412,7 @@ export function zbStation(game, p) {
 
 // ---------------- hits, going down, kills ----------------
 // game.js: hitscan calls with how the bullet landed (head / neck), damage() with the amount
+const ZB_OLD_SCALE = 1.32; // the damage scale change: player guns now do 100/132 of what they did
 export function zbDamage(game, q, amount, src, wname) {
   const Zs = game.zb;
   if (q.zombie && src && src.zombie) return 0;
@@ -423,7 +424,7 @@ export function zbDamage(game, q, amount, src, wname) {
   if (!src || !src.zb) return amount; // the nuke
   if (Zs.insta > game.time) amount = q.hp + 1;
   else if (wname === 'Melee') amount = ZB.knifeDmg;
-  else { const g = src.guns[src.slot]; if (g && g.up && WEAPONS[g.w] && wname === WEAPONS[g.w].name) amount *= ZB.forgeMul; } // a forged gun's bullets
+  else { amount *= ZB_OLD_SCALE; const g = src.guns[src.slot]; if (g && g.up && WEAPONS[g.w] && wname === WEAPONS[g.w].name) amount *= ZB.forgeMul; } // (ZB_OLD_SCALE: guns and blasts were cut to the 100-health scale on 2026-11-21; zombies stay as tough as before) // a forged gun's bullets
   if (amount < q.hp && wname !== 'Melee') pay(game, src, ZB.hit, ''); // a hit that doesn't kill: 10
   return amount;
 }
