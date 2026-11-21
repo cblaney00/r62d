@@ -170,7 +170,7 @@ export const OPERATORS = {
              ability: {id: "ghost",name: "Ghost Step",count: 2,desc: "For 6 seconds your footsteps are silent and you set off no traps, sensors, scanners or darts — but you move 15% slower while you concentrate."},
              gadget: 'frag', gadgetCount: 2, color: '#8ab4d8', helmet: '#2b3a48', look: 'hood' },
   ferro   : { team: 'atk', name: 'FERRO', role: 'Soft Breacher', armor: 1, primary: 'tusk', secondary: 'p10',
-             ability: {id: "hammer",name: "Breaching Hammer",count: 0,desc: "A sledgehammer that never runs out: smashes a door or window barricade, a steel brace, a deployable shield or an unreinforced floor hatch open in one swing, or flattens anyone in reach — each swing needs 2.5 seconds to recover. It can't break walls."},
+             ability: {id: "hammer",name: "Breaching Hammer",count: 0,cd: 2,desc: "A sledgehammer that never runs out: smashes a door or window barricade, a steel brace, a deployable shield or an unreinforced floor hatch open in one swing, or flattens anyone in reach — each swing needs 2 seconds to recover. It can't break walls."}, // cd: seconds between swings (was 4, then 2.5, then 2: attackers' skills stronger 2026-11-10)
              gadget: 'stun', gadgetCount: 2, color: '#b0703c', helmet: '#4a3828', look: 'helmet' },
   // ---- added to fill every role to 5 (he asked) ----
   salvo: { team: 'atk', name: 'SALVO', role: 'Launcher Breacher', armor: 2, primary: 'rook', secondary: 'p10',

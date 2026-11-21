@@ -141,9 +141,14 @@ function ideas(pl) {
   const all = Object.entries(training.opx || {}).filter(([op, x]) => OPERATORS[op] && x[0] >= 40), side = {};
   for (const [op, x] of all) { const t = OPERATORS[op].team, a = side[t] || (side[t] = [0, 0]); a[0] += x[0]; a[1] += x[1]; }
   for (const [op, x] of all) {
-    const sa = side[OPERATORS[op].team], avg = sa[1] / Math.max(1, sa[0]), wr = (x[1] + 1) / (x[0] + 2), kpr = x[2] / x[0]; if (wr > avg - 0.07) continue;
-    out.push({ kind: 'hole', id: 'op:' + op, s: (avg - wr) * 4 * Math.min(1, x[0] / 120) * w('op'), why: `the team with ${OPERATORS[op].name} wins ${pct(wr)} of rounds, ${Math.round((avg - wr) * 100)} points under the average, ${kpr.toFixed(2)} kills a round`,
-      text: `${OPERATORS[op].name} has a hole in the kit: picking them makes your team worse right now. Give them one thing only they can do, or people will stop playing them and they\'ll be gone in all but name.` });
+    const sa = side[OPERATORS[op].team], avg = sa[1] / Math.max(1, sa[0]), wr = (x[1] + 1) / (x[0] + 2), kpr = x[2] / x[0];
+    if (wr > avg + 0.08 && x[0] >= 60) { const f = strongFix(op, x, sa); // (2026-11-20) too strong: an exact, small cut to test
+      out.push({ kind: 'hole', id: 'opS:' + op, s: (wr - avg) * 4 * Math.min(1, x[0] / 120) * w('op'), fix: f.fix, focus: [op], why: `the team with ${OPERATORS[op].name} wins ${pct(wr)} of rounds, ${Math.round((wr - avg) * 100)} points over the average, ${kpr.toFixed(2)} kills a round`,
+        text: `${OPERATORS[op].name} is over the line right now. The problem: ${f.why}. The fix I'd test: ${f.say}. That's one small step, not a gutting; it should bring them back toward the pack without changing how they play.` }); continue; }
+    if (wr > avg - 0.07) continue;
+    const f = weakFix(op, x, sa);
+    out.push({ kind: 'hole', id: 'op:' + op, s: (avg - wr) * 4 * Math.min(1, x[0] / 120) * w('op'), fix: f.fix, focus: [op], why: `the team with ${OPERATORS[op].name} wins ${pct(wr)} of rounds, ${Math.round((avg - wr) * 100)} points under the average, ${kpr.toFixed(2)} kills a round`,
+      text: `${OPERATORS[op].name} has a hole in the kit: picking them makes your team worse right now. The problem: ${f.why}. The fix I'd test: ${f.say}. If that's not enough, give them one thing only they can do, or people will stop playing them and they\'ll be gone in all but name.` });
   }
   // holes: rounds that run out the clock (nobody can get the defuser in)
   for (const [m, e] of Object.entries(training.ends || {})) {
@@ -174,7 +179,7 @@ export function formSuggestions(version) {
     const log = O[pl.name] || (O[pl.name] = []), last = log[log.length - 1], pick = last && c.find(x => x.id === last.id && x.sc > c[0].sc * 0.85) || c[0];
     said[pick.id] = (said[pick.id] || 0) + 1;
     const intro = CARE[Math.floor(quirk(pl.name, 'care') * CARE.length)];
-    log.push({ at: Date.now(), v: version, s: session, kind: pick.kind, id: pick.id, text: `${intro} ${pick.text}`, why: pick.why, changed: !last || last.id !== pick.id ? 1 : 0 });
+    log.push({ at: Date.now(), v: version, s: session, kind: pick.kind, id: pick.id, text: `${intro} ${pick.text}`, why: pick.why, fix: pick.fix, focus: pick.focus, changed: !last || last.id !== pick.id ? 1 : 0 });
     if (log.length > 20) log.splice(0, log.length - 20);
   }
   return O;
@@ -248,3 +253,26 @@ export function formDrillIdeas(version) {
   return said;
 }
 const SITUATIONS_NAME = s => (SITUATIONS[s] || { name: s }).name;
+
+// ---------------- exact changes for the pros' suggestions (he asked 2026-11-20) ----------------
+// So a suggestion can be tested in a balance patch (tests/protry.js, shared/tweaks.js), each comes with one small change: a
+// gun's damage a step (5-7%) down or up, a skill one use more or less, a recharge a fifth shorter. x = training.opx[op]
+// ([rounds, wins, kills, deaths, skill kills, skill uses, headshots, opening kills, rounds the uses were counted in]).
+function mainGunOf(op) { // the main gun that operator is played with most in practice
+  let best = null; for (const [k, a] of Object.entries(training.guns || {})) { const [o, g] = k.split('|'); if (o !== op || !WEAPONS[g] || SIDEARMS.has(g)) continue; if (!best || a[0] > best.n) best = { g, n: a[0], k: a[2] / Math.max(1, a[0]) }; }
+  return best || { g: OPERATORS[op].primary, n: 0, k: 0 };
+}
+const step = (v, m) => Math.max(1, Math.round(v * m));
+function strongFix(op, x, sa) {
+  const O = OPERATORS[op], ab = O.ability, g = mainGunOf(op), W = WEAPONS[g.g], skr = x[4] / x[0], kpr = x[2] / x[0];
+  if (ab.count > 1 && skr >= 0.08) return { fix: [{ path: `OPERATORS.${op}.ability.count`, to: ab.count - 1 }], why: `the ${ab.name} gets ${skr.toFixed(2)} kills a round on its own`, say: `${ab.name} ${ab.count} → ${ab.count - 1} uses` };
+  if (W) { const to = step(W.dmg, 0.94); return { fix: [{ path: `WEAPONS.${g.g}.dmg`, to }], why: `it's the ${W.name} doing the work (${g.k.toFixed(2)} kills a round with it${x[8] ? `, the skill only ${(x[5] / x[8]).toFixed(1)} times a round` : ''})`, say: `${W.name} damage ${W.dmg} → ${to}` }; }
+  return { fix: [], why: 'they win more than the rest', say: 'a look at the whole kit' };
+}
+function weakFix(op, x, sa) {
+  const O = OPERATORS[op], ab = O.ability, g = mainGunOf(op), W = WEAPONS[g.g], per = x[8] ? x[5] / x[8] : null;
+  if (ab.count && (per === null || per >= ab.count * 0.6)) return { fix: [{ path: `OPERATORS.${op}.ability.count`, to: ab.count + 1 }], why: per === null ? `${ab.count} ${ab.name} uses a round aren't enough to swing a round` : `they spend every ${ab.name} they have (${per.toFixed(1)} of ${ab.count} a round) and it's still not enough`, say: `${ab.name} ${ab.count} → ${ab.count + 1} uses` };
+  if (!ab.count && ab.cd) return { fix: [{ path: `OPERATORS.${op}.ability.cd`, to: +(ab.cd * 0.8).toFixed(2) }], why: `the ${ab.name} is too slow to matter`, say: `${ab.cd} s → ${(ab.cd * 0.8).toFixed(1)} s between uses` };
+  if (W) { const to = step(W.dmg, 1.06); return { fix: [{ path: `WEAPONS.${g.g}.dmg`, to }], why: per !== null && per < 0.3 ? `the ${ab.name} hardly comes out (${per.toFixed(1)} a round), so they live on the ${W.name}, and it isn't enough` : `the ${W.name} loses too many fights`, say: `${W.name} damage ${W.dmg} → ${to}` }; }
+  return { fix: [], why: 'nothing in the kit wins rounds', say: 'a look at the whole kit' };
+}

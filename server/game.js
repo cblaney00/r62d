@@ -7,6 +7,7 @@ import { SLIDE, stepMove, moveCircle, walkRay, rayCircle, los, tileAt, angDiff, 
 import { OPERATORS, WEAPONS, GADGETS, ARMOR_HP, opsForTeam, JOBS, jobOf, shieldPose, RIOT, riotArc, SELF_UP, SELF_UP_TIME, moveOf, HEAD_AIM, SIDEARMS } from '../shared/operators.js';
 import { arenaThink, drillThink, defSetup, botThink, botPickOp, botPrep, assignPros, botIdentity, proSay, talk, kindWords, botHear, botPing, roundChat, tvTalk, tvBanPick, proLoadout, siteVote, duelTalk, duelFlush } from './bots.js';
 import { store, cleanName, publicProfile } from './store.js';
+import './../shared/tweaks.js'; // (R62D_TWEAK: balance tests trying a change)
 import { furnTopAt, EYE_STANCE, CHEST_STANCE, stanceOf } from '../shared/furniture.js';
 import { arenaStart, arenaTick, arenaKill, arenaDamage, arenaSpeed, arenaEndMatch, arenaPlayer, arenaInfo } from './arena.js';
 import { zbSurge, zbDev, ZB, zbDown, zbUp, zbReviveTime, zbSlideEnd, zbStart, zbTick, zombieThink, zbSpeed, zbDamage, zbKill, zbCanGoDown, zbReloadMul, zbBlocksVault, zbUse, zbEnd, zbPlayer, zbInfo } from './zombies.js';
@@ -44,7 +45,6 @@ if (typeof process !== 'undefined' && +process.env.R62D_BOMB) DUR.bomb = +proces
 const THROW_K = 5; // drag on thrown things: they come to rest where you aimed
 const EMP_R = 36; // buffed (he asked: it was no better than ordinary utility): ~1 m, and it fries defenders' electronics too
 const LANCE_STEP = 0.5; // RIVET: seconds per burnt-through point (the first is a bullet-sized hole)
-const HAMMER_CD = 2; // was 4, then 2.5 (he asked: Ferro stronger; 2026-11-10 attackers' skills stronger as a whole)
 const WINDUP_T = 0.5, SETUP_T = 1.2;
 const REVIVE_REACH = 34; // see startInteract
 // Picking your own gadgets back up (he asked 2026-11-18: hold Use on it, any time, not once it has gone off or been
@@ -2280,7 +2280,7 @@ export class Game {
         if (!q) return;
         this.damage(q, 75, p, 'Breaching Hammer', p.aim);
       }
-      p.meleeCd = 0.9; p.hammerCd = this.time + HAMMER_CD; used(); this.events.push({ e: 'melee', id: p.id });
+      p.meleeCd = 0.9; p.hammerCd = this.time + (op.ability.cd || 2); used(); this.events.push({ e: 'melee', id: p.id });
     } else if (id === 'prox') place('prox', 10, { arm: DUR.trapArm });
     else if (id === 'concuss') place('concuss', 10, { arm: DUR.trapArm });
     else if (id === 'clamp') place('clamp', 14, { arm: DUR.trapArm });

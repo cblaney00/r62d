@@ -178,7 +178,33 @@ function renderDrills() {
   const kinds = card('THE DRILLS', 'the Drill Hall: two blocks, a line nobody crosses, no skills, one minute', 'a draw is a loss for everyone', list(Object.entries(D.kinds || {}).map(([k, x]) => `<b>${esc(({ duel: 'Block duel', trade: 'Two on two', hold: 'Hold or swing', clutch: 'Clutch' })[k] || k)}</b>: ${x.n} played, ${pct(x.draws, x.n)} ran out of time, ${(x.time / Math.max(1, x.n)).toFixed(0)} s on average`)), '#f2c14e');
   const pros = PRO_TEAMS.flatMap(t => t.players.map(pl => ({ pl, t }))).filter(x => D.pro[x.pl.name]).sort((a, b) => { const A = D.pro[a.pl.name], B = D.pro[b.pl.name]; return B.w / Math.max(1, B.n) - A.w / Math.max(1, A.n); }).map(({ pl, t }) => { const p = D.pro[pl.name], sty = (D.style || {})[pl.name];
     return card(`[${esc(t.tag)}] ${esc(pl.name)}`, `${p.n} drills · ${Math.round(p.pts / Math.max(1, p.n))} points a drill`, `won ${pct(p.w, p.n)}`, list(drillSkills(D, pl.name).map(s => `${esc(s.n)}: <b>${s.f}</b>`).concat(sty ? [`Style learned: leans ${pct(sty.lean, 1)}, crouches ${pct(sty.crouch, 1)}, jiggles ${pct(sty.strafe, 1)}, holds ${sty.patience.toFixed(1)} s before swinging`] : [])), t.colour); });
-  return what + matters + kinds + pros.join('');
+  return what + matters + kinds + pros.join('') + renderSkillDrills();
+}
+// SKILL DRILLS (he asked 2026-11-20): what each skill is worth in each situation (won with it minus won with it locked), the
+// pros who drill a skill and use it more readily for it, and their ideas for the drills (adopted when two back one)
+const SIT_NAME = { entry: 'Breaking in', upstairs: 'Upstairs site', retake: 'After the plant', hold: 'Site anchor', roam: 'Roamer', late: 'Last 45 seconds' };
+const CHANGE_TXT = c => !c ? '' : c.type === 'sit' ? `drill ${esc(c.ab)} in ${SIT_NAME[c.to] || c.to} instead of ${SIT_NAME[c.from] || c.from}` : c.type === 'time' ? `${SIT_NAME[c.sit] || c.sit}: ${c.add} s more on the clock` : `${SIT_NAME[c.sit] || c.sit} on ${esc((MAPS[c.to] || {}).name || c.to)}`;
+function renderSkillDrills() {
+  const d = S.data || {}, T = d.skillDrills; if (!T || !T.n) return '<h4 class="bkSec">SKILL DRILLS</h4><p class="hint">No skill drills yet: they come with the next practice.</p>';
+  const rows = Object.entries(T.sit || {}).filter(([, a]) => a[0] >= 6 && a[2] >= 6).map(([k, a]) => { const [op, sit] = k.split('|'); return { op, sit, d: a[1] / a[0] - a[3] / a[2], a }; }).filter(x => OPERATORS[x.op]).sort((a, b) => b.d - a.d);
+  const line = x => `<b>${esc(OPERATORS[x.op].name)}</b> · ${esc(SIT_NAME[x.sit] || x.sit)}: ${pct(x.a[1], x.a[0])} with the ${esc(OPERATORS[x.op].ability.name)}, ${pct(x.a[3], x.a[2])} without (${(x.a[4] / x.a[0]).toFixed(1)} uses)`;
+  const best = card('WHERE A SKILL WINS ROUNDS', `from ${T.n} skill drills, each played with and without it`, 'the biggest gaps', rows.length ? list(rows.slice(0, 8).map(line)) : '<p class="hint">Needs a few more drills.</p>', '#9fc08f');
+  const worst = card('WHERE IT DOES NOTHING', 'won as often with the skill locked', 'a drill to rethink, or a skill to look at', rows.length ? list(rows.slice(-6).reverse().map(line)) : '<p class="hint">Needs a few more drills.</p>', '#c98a6a');
+  const eag = Object.entries(d.skill || {}).flatMap(([n, ops]) => Object.entries(ops).filter(([o, x]) => OPERATORS[o] && Math.abs((x.eager || 1) - 1) > 0.05).map(([o, x]) => ({ n, o, e: x.eager }))).sort((a, b) => b.e - a.e);
+  const learned = card('WHAT THE PROS LEARNED', 'how readily each one reaches for a skill now', '1.0 = as before the drills', eag.length ? list(eag.slice(0, 10).map(x => `<b>${esc(x.n)}</b> on ${esc(OPERATORS[x.o].name)}: ${x.e.toFixed(2)}× ${x.e > 1 ? '(uses it more)' : '(holds it longer)'}`)) : '<p class="hint">Nothing settled yet: it moves after a few sessions.</p>', '#8fb0c9');
+  const ideas = (T.ideas || []).slice(-8).reverse();
+  const said = card('THE PROS ON THE DRILLS', `${(T.adopted || []).length} change${(T.adopted || []).length === 1 ? '' : 's'} adopted so far`, 'two pros backing one change adopts it', ideas.length ? list(ideas.map(x => `<b>${esc(x.name)}</b>${x.adopted ? ' <span class="bkTag">ADOPTED</span>' : x.backers > 1 ? ` (${x.backers} back it)` : ''}: “${esc(x.text.replace(/^[^:]*:\s*/, ''))}” <small>${esc(CHANGE_TXT(x.change))}</small>`)) : '<p class="hint">No complaints yet.</p>', '#f2c14e');
+  return '<h4 class="bkSec">SKILL DRILLS</h4>' + best + worst + learned + said;
+}
+// a suggestion's exact change, in words (he asked 2026-11-20: detailed suggestions that can be tested)
+const FIX_TXT = f => { const [root, a, b, c] = f.path.split('.'), to = f.mul !== undefined ? `×${f.mul}` : f.to;
+  if (root === 'WEAPONS' && WEAPONS[a]) return `${WEAPONS[a].name} ${b === 'dmg' ? 'damage' : b} ${WEAPONS[a][b]} → ${to}`;
+  if (root === 'OPERATORS' && OPERATORS[a] && b === 'ability') return `${OPERATORS[a].name}'s ${OPERATORS[a].ability.name} ${c === 'count' ? 'uses' : c === 'cd' ? 'seconds between uses' : c} ${OPERATORS[a].ability[c]} → ${to}`;
+  return `${f.path} → ${to}`; };
+function fixBlock(cur) {
+  if (!cur || !cur.fix || !cur.fix.length) return '';
+  const t = ((S.data || {}).tested || {})[cur.id], r = x => x && x[1] ? pct(x[0], x[1]) : '-';
+  return `<p class="hint"><b>The change:</b> ${cur.fix.map(f => esc(FIX_TXT(f))).join('; ')}</p>` + (t ? `<p class="hint"><b>Tested</b> (${t.mode}, ${t.before[1]} + ${t.after[1]} rounds, ${new Date(t.at).toLocaleDateString()}): ${esc((t.focus || []).map(o => (OPERATORS[o] || { name: o }).name).join(', '))} won ${r(t.before)} → ${r(t.after)}</p>` : '<p class="hint">Not tested yet: the next balance patch tries it.</p>');
 }
 function renderTakes() {
   const O = (S.data || {}).opinions || {};
@@ -194,11 +220,11 @@ function renderIdeas() {
   const O = (S.data || {}).suggestions || {}, all = PRO_TEAMS.flatMap(t => t.players.map(pl => ({ pl, t, cur: (O[pl.name] || []).slice(-1)[0] })));
   const by = {}; for (const x of all) if (x.cur) (by[x.cur.id] || (by[x.cur.id] = [])).push(x);
   const top = Object.values(by).sort((a, b) => b.length - a.length).slice(0, 3).map(g => card(g[0].cur.kind === 'remove' ? 'TAKE IT OUT' : 'A HOLE IN THE GAME', `backed by ${g.length} pro${g.length === 1 ? '' : 's'}`, g.map(x => esc(x.pl.name)).join(', '),
-    `<p class="bkTake">${esc(g[0].cur.text.replace(/^[^:]*:\s*/, ''))}</p><p class="hint">Why: ${esc(g[0].cur.why || '')}</p>`, g[0].cur.kind === 'remove' ? '#f2c14e' : '#ff7a5a'));
+    `<p class="bkTake">${esc(g[0].cur.text.replace(/^[^:]*:\s*/, ''))}</p><p class="hint">Why: ${esc(g[0].cur.why || '')}</p>${fixBlock(g[0].cur)}`, g[0].cur.kind === 'remove' ? '#f2c14e' : '#ff7a5a'));
   const cards = all.map(({ pl, t, cur }) => { const log = O[pl.name] || [];
     if (!cur) return card(`[${esc(t.tag)}] ${esc(pl.name)}`, '', 'no idea yet', '<p class="hint">Forms after their next practice session.</p>', t.colour);
     const hist = log.filter(x => x.changed).slice(-4).reverse().map(x => `<li><small>session ${x.s} · ${new Date(x.at).toLocaleDateString()}</small> ${esc(x.text.replace(/^[^:]*:\s*/, ''))}</li>`).join('');
-    return card(`[${esc(t.tag)}] ${esc(pl.name)}`, cur.kind === 'remove' ? 'would take something out' : 'found a hole', 'WHAT I WOULD CHANGE', `<p class="bkTake">“${esc(cur.text)}”</p><p class="hint">Why: ${esc(cur.why || '')}</p>${hist ? `<h5>EARLIER IDEAS</h5><ul class="bkLog">${hist}</ul>` : ''}`, t.colour); });
+    return card(`[${esc(t.tag)}] ${esc(pl.name)}`, cur.kind === 'remove' ? 'would take something out' : 'found a hole', 'WHAT I WOULD CHANGE', `<p class="bkTake">“${esc(cur.text)}”</p><p class="hint">Why: ${esc(cur.why || '')}</p>${fixBlock(cur)}${hist ? `<h5>EARLIER IDEAS</h5><ul class="bkLog">${hist}</ul>` : ''}`, t.colour); });
   return (top.length ? '<h4 class="bkSec">WHAT MOST OF THEM WOULD CHANGE</h4>' + top.join('') + '<h4 class="bkSec">EACH PRO</h4>' : '') + cards.join('');
 }
 function renderMore(el) {

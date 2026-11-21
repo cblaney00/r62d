@@ -1687,3 +1687,5 @@ html.touch #roleBar.choose .rbOp em { white-space: normal; overflow: visible; le
 #freeOps .foOps b, #freeOps .foOps span { max-width: 100%; overflow-wrap: anywhere; } html.touch #freeOps .foOps b { letter-spacing: 0.02em; }
 html.touch #freeOps .foOps { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
 html.touch .selLeft #opgrid .op canvas { min-height: 30%; } html.touch #opgrid .op .ab { line-height: 1.1; } /* (a skill name on two lines: the picture gives way, the card stays the same size) */
+/* SKILL DRILLS (2026-11-20): an adopted drill idea */
+.bkTag { display: inline-block; padding: 0 5px; border-radius: 3px; background: rgba(159, 192, 143, 0.18); color: #b8d4a8; font-size: max(10px, var(--mf)); letter-spacing: 0.06em; }
