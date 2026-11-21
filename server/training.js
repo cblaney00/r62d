@@ -21,6 +21,9 @@ if (!training.drills) training.drills = { n: 0, kinds: {}, pro: {}, feats: {}, s
 // skill uses were counted wrong before (defender bots set their traps before the count started, and bots never
 // headshot): those two numbers start again from zero; x[8] = rounds the uses were counted in
 for (const x of Object.values(training.opx || {})) if (x.length < 9) { x[5] = 0; x[6] = 0; x[8] = 0; }
+// (2026-11-20) skills that never run out (FERRO's hammer, WRAITH's scan, HUSH, RIVET, BULWARK, SOLDER) were never counted, and picking a
+// gadget back up hid a use: uses start again from zero; x[9] = rounds counted this way
+for (const x of Object.values(training.opx || {})) if (x.length < 10) { x[5] = 0; x[8] = 0; x[9] = 0; }
 export function saveTraining() { try { fs.mkdirSync(DIR, { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(training)); } catch {} }
 
 const rate = r => (r ? (r.w + 1) / (r.n + 2) : 0.5); // wins out of rounds, nudged towards 50% while there are few

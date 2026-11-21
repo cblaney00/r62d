@@ -38,7 +38,7 @@ while (Date.now() < until && left > 0) {
     }
     g.events = [];
     if (g.phase !== last) {
-      if (g.phase === PHASE.PREP) { rs = {}; for (const p of g.players.values()) if (p.op) { const g1 = p.guns[0], g2 = p.guns[1]; p.feat = {}; rs[p.id] = { dist: 0, fd: 0, op: p.op, sq: p.squad, ab: OPERATORS[p.op].ability.count, k: 0, d: 0, sk: 0, hs: 0, fk: 0, k2: 0, pro: p.pro && p.pro.pl.name, g1: p.riot || (g1 && g1.w), a1: !p.riot && g1 && g1.att, g2: g2 && g2.w, a2: g2 && g2.att, g2n: g2 && WEAPONS[g2.w].name }; } }
+      if (g.phase === PHASE.PREP) { rs = {}; for (const p of g.players.values()) if (p.op) { const g1 = p.guns[0], g2 = p.guns[1]; p.feat = {}; rs[p.id] = { dist: 0, fd: 0, op: p.op, sq: p.squad, ab: p.abAt || 0, k: 0, d: 0, sk: 0, hs: 0, fk: 0, k2: 0, pro: p.pro && p.pro.pl.name, g1: p.riot || (g1 && g1.w), a1: !p.riot && g1 && g1.att, g2: g2 && g2.w, a2: g2 && g2.att, g2n: g2 && WEAPONS[g2.w].name }; } }
       if (g.phase === PHASE.ROUND_END && g.winner !== null && g.winner !== undefined) {
         const res = { plans: {}, ops: {}, rounds: 1, ends: { [id]: { [g.reason || '?']: 1 } } }; // (how each round ended, per map: the pros' suggestions read it)
         for (const sq of [0, 1]) {
@@ -47,8 +47,8 @@ while (Date.now() < until && left > 0) {
           if (st && st.plan) res.plans[planKey(id, st.site, side, st.plan.id)] = [1, win];
           for (const p of g.players.values()) if (p.squad === sq && p.op) { const k = opKey(id, side, p.op), o = res.ops[k] || (res.ops[k] = [0, 0]); o[0]++; o[1] += win; }
         }
-        if (rs) { res.opx = {}; for (const [id, r] of Object.entries(rs)) { if (id === 'first') continue; const p = g.players.get(id), u = p && OPERATORS[r.op].ability.count ? Math.max(0, r.ab - p.abilityCount) : 0;
-          const x = res.opx[r.op] || (res.opx[r.op] = [0, 0, 0, 0, 0, 0, 0, 0, 0]); x[0]++; x[8]++; x[1] += g.winner === r.sq ? 1 : 0; x[2] += r.k; x[3] += r.d; x[4] += r.sk; x[5] += u; x[6] += r.hs; x[7] += r.fk; } } // rounds, wins, kills, deaths, skill kills, skill uses, headshots, opening kills, rounds the uses were counted in
+        if (rs) { res.opx = {}; for (const [id, r] of Object.entries(rs)) { if (id === 'first') continue; const p = g.players.get(id), u = p ? Math.max(0, (p.abUsed || 0) - r.ab) : 0; if (p) p.abAt = p.abUsed || 0; // (from the end of the last round: defenders set traps on the first tick of preparation)
+          const x = res.opx[r.op] || (res.opx[r.op] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]); x[0]++; x[8]++; x[9]++; x[1] += g.winner === r.sq ? 1 : 0; x[2] += r.k; x[3] += r.d; x[4] += r.sk; x[5] += u; x[6] += r.hs; x[7] += r.fk; } } // rounds, wins, kills, deaths, skill kills, skill uses, headshots, opening kills, rounds the uses were counted in; x[9] the same, counted since every skill use is (2026-11-20)
         if (rs) { // guns and attachments (all pros, and per pro): [rounds, wins, kills, deaths]; the main gun gets the kills not made with the sidearm
           Object.assign(res, { guns: {}, att: {}, pro: {} });
           const add = (tbl, k, a) => { const x = tbl[k] || (tbl[k] = [0, 0, 0, 0]); a.forEach((v, i) => { x[i] += v; }); };

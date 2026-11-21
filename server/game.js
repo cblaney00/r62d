@@ -654,7 +654,7 @@ export class Game {
     p.slot = 0; p.fireCd = 0; p.reloadT = 0; p.bloom = 0; p.vx = 0; p.vy = 0; p.gait = 0;
     p.adsT = 0; p.rc = 0; p.shots = 0; p.rcDir = Math.random() < 0.5 ? 1 : -1; p.viewTime = null;
     p.barri = o.team === TEAM.DEF ? (this.map.barricades ?? BARRICADES_EACH) : 0; // (a map may set its own number a round, he asked 2026-11-18: map.barricades)
-    p.abilityCount = o.ability.count; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
+    p.abilityCount = o.ability.count; p.abLast = p.abilityCount; p.gadgetCount = GADGET_COUNT[p.gadget] || 1;
     p.battery = o.ability.battery || 0; p.scanning = false; p.bracing = false; p.shields = []; p.stash = {}; // (shields and leftovers to pick back up: this round, this operator)
     p.rope = null; p.pinged = null; p.sprints = DRONE_SPRINT.charges; p.sprintUntil = 0; p.sprintCd = 0;
     p.drones = 0; p.droneId = null; p.ctrl = 'body'; p.busy = null; p.slowUntil = 0; p.stunUntil = 0; p.ef = null; p.staged = false;
@@ -725,6 +725,9 @@ export class Game {
       if (p.bot && !p.hold) { (p.zombie ? zombieThink : this.drill ? drillThink : this.arena || this.zb ? arenaThink : botThink)(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
       this.tickPlayer(p, dt);
       p.prevInput = p.input;
+      // skill uses (BALL KNOWLEDGE's uses a round, 2026-11-20): every drop in a limited skill's count, wherever it happens (bots set
+      // traps straight from botPrep); skills that never run out (count 0) add to abUsed themselves where they start
+      if (p.op && OPERATORS[p.op] && OPERATORS[p.op].ability.count) { if (p.abilityCount < (p.abLast ?? p.abilityCount)) p.abUsed = (p.abUsed || 0) + p.abLast - p.abilityCount; p.abLast = p.abilityCount; }
     }
     this.by = null;
     this.tickEnts(dt);
@@ -901,14 +904,14 @@ export class Game {
     const op = OPERATORS[p.op];
     if (op.ability.id === 'brace') { // shield up (can't shoot) or rifle out (shield on the back); Q switches, which takes a moment
       if (p.shieldMode === undefined) p.shieldMode = 'shield';
-      if (inp.ability && !prev.ability && p.ctrl === 'body' && !p.downed && !(p.switchUntil > this.time)) { p.switchUntil = this.time + 0.6; p.shieldMode = p.shieldMode === 'shield' ? 'gun' : 'shield'; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); }
+      if (inp.ability && !prev.ability && p.ctrl === 'body' && !p.downed && !(p.switchUntil > this.time)) { p.switchUntil = this.time + 0.6; p.shieldMode = p.shieldMode === 'shield' ? 'gun' : 'shield'; p.abUsed = (p.abUsed || 0) + 1; this.events.push({ e: 'snd', s: 'swap', x: r1(p.x), y: r1(p.y), id: p.id }); }
       p.bracing = p.shieldMode === 'shield' && !(p.switchUntil > this.time);
     }
     if (p.riot) p.bracing = !p.riotBroken && !p.downed && p.ctrl === 'body' && !(p.switchUntil > this.time); // a riot shield is always up (until it cracks)
     if (op.ability.id === 'scan') {
       // a toggle (he asked): press to start, press again to stop; it stops by itself after 4 s or when the battery runs out
       const press = inp.ability && !p.scanIn; p.scanIn = !!inp.ability;
-      if (press) { if (p.scanOn) p.scanOn = false; else if (p.battery >= op.ability.battery - 1e-6 && p.ctrl === 'body') { p.scanOn = true; p.scanRun = 0; } } // only from a full charge (he asked: one scan every 50 s)
+      if (press) { if (p.scanOn) p.scanOn = false; else if (p.battery >= op.ability.battery - 1e-6 && p.ctrl === 'body') { p.scanOn = true; p.scanRun = 0; p.abUsed = (p.abUsed || 0) + 1; } } // only from a full charge (he asked: one scan every 50 s)
       if (p.scanOn && p.battery > 0 && p.ctrl === 'body' && (p.scanRun || 0) < 4) {
         p.scanning = true; p.battery = Math.max(0, p.battery - dt); p.scanRun = (p.scanRun || 0) + dt;
         for (const q of this.players.values())
@@ -976,11 +979,13 @@ export class Game {
       const was = p.shrouded;
       if (inp.ability && !(prev && prev.ability) && p.ctrl === 'body' && !p.downed) p.shrouded = !p.shrouded && p.battery > 0.5 && !(p.shroudCd > this.time);
       if (p.shrouded && (p.battery <= 0 || p.downed || p.ctrl !== 'body')) p.shrouded = false;
+      if (!was && p.shrouded) p.abUsed = (p.abUsed || 0) + 1;
       if (was && !p.shrouded) p.shroudCd = this.time + 15; // he asked: 15 s before it is ready again
       if (p.shrouded) p.battery = Math.max(0, p.battery - dt);
       else p.battery = Math.min(op.ability.battery, p.battery + dt * op.ability.battery / 15);
     }
 
+    if (op.ability.id === 'lance' || op.ability.id === 'weld') { const on = p.lancing || p.welding; if (on && this.time - (p.heldT ?? -9) > 1) p.abUsed = (p.abUsed || 0) + 1; if (on) p.heldT = this.time; } // a held skill: one use per stretch of holding it
     // interaction (hold E)
     if (inp.interact && p.ctrl === 'body' && !p.rope && !p.ropeHeld && !p.downed) {
       if (this.zb && zbUse(this, p, dt, inp)) p.busy = null; // ZOMBIES: buying and boarding windows
@@ -2181,7 +2186,7 @@ export class Game {
     };
     // the far side of the wall you face (for gadgets that push through it)
     const through = w => { const cx = (w.cx + 0.5) * CELL, cy = (w.cy + 0.5) * CELL, dx = Math.sign(Math.round(cx - w.x)), dy = Math.sign(Math.round(cy - w.y)); return { dx, dy, x: cx + dx * (CELL / 2 + 5), y: cy + dy * (CELL / 2 + 5) }; };
-    const used = () => { p.abilityCount--; };
+    const used = () => { p.abilityCount--; if (!op.ability.count) p.abUsed = (p.abUsed || 0) + 1; }; // (a skill that never runs out counts its own uses; the rest are counted in tick from abilityCount)
     if (id === 'cutter') {
       const w = this.wallInFront(p, [T.SOFT, T.REINF, T.BARRI, T.PANEL, T.DSHIELD]) || this.hatchSpot(p, [T.HATCH, T.HATCHR]) || (!p.bot && this.floorCharge(p));
       if (!w) return;
@@ -2800,7 +2805,7 @@ export class Game {
     const o = OPERATORS[p.op]; if (!o) return;
     p.hp = Math.max(p.hp, p.maxHp); p.downed = false;
     for (const g of p.guns || []) { g.ammo = WEAPONS[g.w].mag; g.reserve = WEAPONS[g.w].reserve; }
-    if (o.ability.count) p.abilityCount = o.ability.count;
+    if (o.ability.count) p.abilityCount = p.abLast = o.ability.count;
     if (o.ability.battery && !p.shrouded && !p.scanning && !p.lancing && !p.welding) p.battery = o.ability.battery;
     p.gadgetCount = Math.max(p.gadgetCount || 0, GADGET_COUNT[p.gadget] || 1);
     p.drones = Math.max(p.drones || 0, 2); p.sprints = DRONE_SPRINT.charges; p.sprintCd = 0; p.pingReady = 0;
