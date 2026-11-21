@@ -1313,7 +1313,15 @@ function botAbility(game, p, ai, abId, enemy, heard, team, site, useAbility, inp
     return;
   }
   if (abId === 'overwatch') { // PERCH (2026-11-15): holding an angle aimed in with nobody in sight, lock the watch cone on it
-    if (!enemy && ai.watch && (p.adsT || 0) >= 0.6 && ok()) { useAbility(); done(25); }
+    // (2026-11-20: bots never aim in while holding an angle, so it was never used, 0.00 a round: now PERCH stops, aims in at the
+    // angle held or the noise heard, and locks it)
+    const at = ai.watch || (heard && ai.heard);
+    if (!enemy && at && ok() && ((ai.owT || 0) > game.time || Math.random() < dtE * 0.5)) {
+      if (!((ai.owT || 0) > game.time)) ai.owT = game.time + 2;
+      aimAt(p, at.x, at.y); inp.ads = 1; inp.crouch = 1;
+      if ((p.adsT || 0) >= 0.6) { useAbility(); done(25); ai.owT = 0; }
+      return true;
+    }
     return; }
   if (abId === 'ghillie') { if ((enemy || heard) && ok() && !(p.ghillieUntil > game.time)) { useAbility(); done(14); } return; }
   if (abId === 'spotter') { if ((enemy || heard) && ok() && !(p.spotterUntil > game.time) && Math.random() < dtE * 1.5) { useAbility(); done(10); } return; }
