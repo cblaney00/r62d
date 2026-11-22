@@ -4886,6 +4886,16 @@ function drawHatchView(s, me, now, up) {
       if (!ally && !p.dn) st.heads.push(toScr(p.x, p.y));
     }
     c.fillStyle = 'rgba(8,10,14,0.32)'; c.fillRect(x0, y0, x1 - x0, y1 - y0); // a floor away: a little darker
+    // the patch's edge (he asked 2026-11-21: an outline, soft white, thin solid line): each clip shape stroked twice as
+    // wide inside all the clips, so only the inner half shows, just along the edge of what you really see
+    const px1 = DPR / ((st.zoom || 1) * kp), edge = () => {
+      c.beginPath(); c.moveTo(P[0], P[1]); for (let i = 2; i < P.length; i += 2) c.lineTo(P[i], P[i + 1]); c.closePath();
+      c.moveTo(Q[0][0], Q[0][1]); for (const [x, y] of Q.slice(1)) c.lineTo(x, y); c.closePath();
+      if (K.lim) c.rect(x0, y0, x1 - x0, y1 - y0);
+    };
+    c.lineJoin = 'round'; edge();
+    c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 6 * px1; c.stroke(); // a faint shadow, so it shows on light floors too
+    c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 3 * px1; c.stroke();
     c.restore();
     const L = v.up ? '▼ BELOW' : '▲ ABOVE', T0 = w2s(v.up ? v.h.x : v.h.bx, v.up ? v.h.y : v.h.by);
     octx.save(); octx.setTransform(1, 0, 0, 1, 0, 0);

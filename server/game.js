@@ -1639,6 +1639,7 @@ export class Game {
   }
 
   hitEnt(e, src) {
+    if (this.tutSafe(e, src)) { this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) }); return; } // tutorial bots never break your things (he asked 2026-11-21)
     if (e.shieldUntil > this.time) { this.events.push({ e: 'hit', k: 'shield', x: r1(e.x), y: r1(e.y) }); return; } // TETHER's scope: shielded for its first 3 s
     if (src && e.team && e.team !== this.side(src) && (e.hp || e.type === 'drone')) this.pts(src, e.type === 'drone' ? 20 : 25, e.type === 'drone' ? 'DRONE DESTROYED' : e.type === 'bird' ? 'BIRD DESTROYED' : e.type === 'cam' ? 'CAMERA DESTROYED' : 'GADGET DESTROYED');
     if (e.type === 'cam') { e.hp = 0; this.events.push({ e: 'hit', k: 'spark', x: r1(e.x), y: r1(e.y) }); this.events.push({ e: 'snd', s: 'break', x: r1(e.x), y: r1(e.y) }); return; }
@@ -1648,6 +1649,7 @@ export class Game {
     if (e.type === 'drone' || e.type === 'bird') this.droneLost(e, src);
   }
 
+  tutSafe(e, src) { const o = this.tut && e.owner !== undefined && this.players.get(e.owner); return !!(o && !o.bot && (!src || src.bot)); }
   // a drone has 1 hp: one bullet, hit, blast or zap and it's gone; its pilot drops back into their body
   droneLost(e, src) {
     const o = this.players.get(e.owner);
@@ -3398,7 +3400,7 @@ export class Game {
     for (const g of [...this.ents]) {
       if (g === e || g.team === e.team || Math.hypot(g.x - e.x, g.y - e.y) > o.r) continue;
       if (g.type === 'cam') g.hp = 0;
-      else if (['drone', 'bird', 'jammer', 'mine', 'wire', 'claymore', 'dart', 'cutter', 'breach'].includes(g.type)) { this.removeEnt(g); if (g.type === 'drone' || g.type === 'bird') this.droneLost(g); }
+      else if (['drone', 'bird', 'jammer', 'mine', 'wire', 'claymore', 'dart', 'cutter', 'breach'].includes(g.type) && !this.tutSafe(g, owner)) { this.removeEnt(g); if (g.type === 'drone' || g.type === 'bird') this.droneLost(g); }
     }
   }
 

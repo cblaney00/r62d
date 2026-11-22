@@ -18,6 +18,15 @@ run(5); if (g.phase !== PHASE.PREP) fail('preparation did not wait for the coach
 g.handle(p, { t: 'tut', a: 'go' }); run(5);
 if ((g.phase !== PHASE.ACTION || g.introT > 0)) fail('no action phase', g.phase);
 watch(40); // bots are defending; walk into them: they never hurt you
+// your drone in front of every defender: nothing they do breaks it (he asked 2026-11-21)
+{ const bots = [...g.players.values()].filter(q => q.bot && q.alive && g.side(q) === TEAM.DEF), ids = [];
+  for (const q of bots) { const d = { id: g.eid(), type: 'drone', owner: p.id, team: TEAM.ATK, x: q.x + Math.cos(q.aim) * 40, y: q.y + Math.sin(q.aim) * 40, hp: 1, ang: q.aim + Math.PI }; g.ents.push(d); ids.push(d.id); }
+  let shot = 0; for (let i = 0; i < 20 * 30; i++) { g.tick(1 / 30); for (const q of bots) if (q.ai && q.ai.droneSeen) shot++; }
+  const lost = ids.filter(id => !g.ents.some(e => e.id === id)).length;
+  if (!bots.length) fail('no defender bots to test the drone with');
+  if (lost) fail('bots broke', lost, 'of', ids.length, 'of your drones');
+  if (shot) fail('bots turned to shoot your drone');
+  for (const id of ids) { const e = g.ents.find(e => e.id === id); if (e) g.removeEnt(e); } }
 const site = g.map.sites[g.site], b = site.bombs[0];
 p.x = b.x; p.y = b.y; p.hasDefuser = false;
 g.planted = { x: b.x, y: b.y, bomb: b.id, t: 3 }; // as if you planted (the tutorial shortens the wait)

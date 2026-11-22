@@ -983,7 +983,7 @@ export function botThink(game, p, dt) {
   if (p.slot !== 0 && p.guns[0] && p.guns[0].ammo + p.guns[0].reserve > 0) game.event(p, { k: 'slot', n: 0 }); // back to the main gun once it's quiet
 
   // --- an enemy drone in sight: turn and shoot it (one hit breaks it) ---
-  const drone = p.downed ? null : enemyDrone(game, p);
+  const drone = p.downed || game.tut ? null : enemyDrone(game, p); // tutorial bots leave your drone alone (he asked 2026-11-21)
   if (drone) {
     if (ai.droneSeen !== drone.id) { ai.droneSeen = drone.id; ai.droneReact = -S.drone - Math.random() * 0.4; }
     ai.droneReact += dt;

@@ -38,7 +38,7 @@ public/js/look.js, the map picture in public/js/mapdraw.js.
 ## C. `#over` (above the blackout, in this order)
 
 1. Black over the neighbouring floors (only when there is no ground-below picture).
-2. **Views onto a lower floor**: down a staircase, down through a hatch, out of a window to the ground (moved 2026-11-15:
+2. **Views onto a lower floor**: down a staircase, down through a hatch (a thin soft-white outline round the patch, he asked 2026-11-21), out of a window to the ground (moved 2026-11-15:
    they were drawn last and could cover this floor's walls).
 3. Smoke and gas you have a line to.
 4. Raised walls in sight (`raise(ctx, 'lit')`, look.js), in this order:

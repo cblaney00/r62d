@@ -913,3 +913,15 @@ heavy 0.75, medium 0.9). He chose to keep the words behind the scenes.
 - He asked: pictures in the chat only show at the top of his view. Open pictures on his screen
   (`play-on-desktop insideabush imv <png>`) and write choices out in words. He put a pop-out feature for his
   computer on his own notes list (~/notes-list.txt) to do later himself.
+
+## 2026-11-21 (later): hatch view outline, safe tutorial
+- He asked: an outline on the views up and down through hatches. He chose soft white, thin solid line. main.js
+  `drawHatchView`: inside the three clips (sight polygon, opening, ring from below) each clip path is stroked at twice
+  the width, so only the inner half shows: exactly the edge of the patch. Dark pass 3 px, white 1.5 px (screen, DPR).
+- He asked: look through the tutorial, don't let the bots kill you or the drone. `damage()` already ignored tutorial
+  bots and they never shot people, but the drone branch of botThink (`enemyDrone`) had no tutorial check. Now
+  `game.tut` skips it, and game.js `tutSafe(e, src)` keeps a human's gadgets/drones/cameras from a bot's hit
+  (`hitEnt`) or blast (`explode`). tests/tutorial.js now puts a drone in front of every defender for 20 s (fails
+  on the old code: 2 of 2 drones broken).
+- Checked: tutorial, hatches (one chance fail on Lodge reinforce, passes 3/3 again), abilities PASS; hidden-browser
+  shots of both views on Harbor.

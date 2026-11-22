@@ -182,4 +182,6 @@ export const PATCH_NOTES = [
   { d: '2026-11-21', k: 'mech', id: 'botsintel', t: 'Bots act on what their team knows: they aim at the corner a spotted or scanned enemy will come round, defenders wait for them, and attackers hold a moment when a known defender is aiming their way. Pro attackers play for the plant once they are a player up, someone is on the site, or under a minute is left.', v: 0 },
   { d: '2026-11-21', k: 'map', id: 'dusta', t: 'Dust Town A: the Granary\'s south door is now a wall, the Bazaar\'s west window and the Spice Warehouse\'s west door are gone, and a covered Spice Passage links the Hotel to the Granary.', v: 1 },
   { d: '2026-11-21', k: 'mech', id: 'dmgscale', t: 'One damage scale for everything: everyone now has 100 health, so damage is a share of one person (a rifle bullet about 23, a pistol round 26, a frag grenade 100 at its centre). Every gun still takes the same number of body shots as before, and now the same on every armour. Armour instead softens explosions and gadgets: heavies take 25% less, mediums 10% less.', v: 1 },
+  { d: '2026-11-21', k: 'mech', id: 'hatchview', t: 'The view through a hatch, up or down, has a thin soft-white outline round what you can see.', v: 0 },
+  { d: '2026-11-21', k: 'mech', id: 'tutorial', t: 'Tutorial bots never shoot or break your drone, cameras or gadgets.', v: 1 },
 ];
