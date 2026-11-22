@@ -184,4 +184,6 @@ export const PATCH_NOTES = [
   { d: '2026-11-21', k: 'mech', id: 'dmgscale', t: 'One damage scale for everything: everyone now has 100 health, so damage is a share of one person (a rifle bullet about 23, a pistol round 26, a frag grenade 100 at its centre). Every gun still takes the same number of body shots as before, and now the same on every armour. Armour instead softens explosions and gadgets: heavies take 25% less, mediums 10% less.', v: 1 },
   { d: '2026-11-21', k: 'mech', id: 'hatchview', t: 'The view through a hatch, up or down, has a thin soft-white outline round what you can see.', v: 0 },
   { d: '2026-11-21', k: 'mech', id: 'tutorial', t: 'Tutorial bots never shoot or break your drone, cameras or gadgets.', v: 1 },
+  { d: '2026-11-22', k: 'mech', id: 'sprintturn', t: 'Sprinting in a new direction on a computer turns you round smoothly (a full about-turn takes 0.4 s) instead of snapping, and letting go of sprint swings you back to the crosshair the same way. Shooting or aiming in finishes the turn at once.', v: 1 },
+  { d: '2026-11-22', k: 'mech', id: 'adsnear', t: 'Aiming in puts the crosshair nearer: 20% with iron sights and red dots, 10% with the holo, prism and 2x scope.', v: 1 },
 ];

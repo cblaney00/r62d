@@ -1101,7 +1101,9 @@ function trySlide() { if (!st.pred || !st.pred.spr || st.pred.scd > 0 || !st.me 
 // sprint with S, A or D (and no W) is sent as sprint + W alone, so you run where you aim
 // Sprint on a computer (he asked 2026-11-18: 8-directional, never following the mouse; W+A sprints north-west): the keys pick one
 // of the eight directions on the screen and you turn to face it and sprint that way; the world angle, or null
-const SPRINT_TURN_VIS = 24; // how fast what you see turns after a sprint-direction snap (per second; ~0.1 s to get there)
+// (he asked 2026-11-22, Chris S's first remark: sprint turns too sharp) a sprint turn is a real, steady turn: a full
+// about-turn takes 0.4 s (his pick), and letting go of sprint swings you back to the crosshair at the same speed
+const SPRINT_TURN = Math.PI / 0.4; // radians per second
 function sprintDiag() {
   const me = st.me;
   if (isTouch || gpRecent() || !me || me.ct !== 'body' || !me.a || me.dn || !keys.has('sprint') || steadying() || st.tv) return null;
@@ -2585,15 +2587,21 @@ function frame(nowMs) {
     { const R = ropeOf(); if (R) st.aim = ropeAimLimit(R, st.aim); }
     if (r3on() && rope3d.active()) { const a = rope3d.aim(); if (a) { st.aim = a.ang; aimOff = { x: a.x - st.pred.x, y: a.y - st.pred.y }; st.r3aim = a; } } else st.r3aim = null; // the 3D rope view: where its crosshair is
     if (now < (st.dazeUntil || 0)) st.aim += Math.sin(now * 6.3) * 0.05 + Math.sin(now * 2.1) * 0.04; // dazed: the aim sways
-    if (view.kind === 'body') { const d = sprintDiag(); if (d !== null) st.aim = d; // sprinting a screen diagonal: you face the way you run (the crosshair comes back when you stop)
-      // (he asked 2026-11-18: the sprint turn stays instant underneath, but looks smoother) a picked sprint direction, or
-      // letting go of it, glides what you SEE (your body, your sight cone) round in about a tenth of a second; st.aim
-      // (what the server and the gun go by) still snaps. Shooting or aiming in ends the glide at once.
-      const dk = d === null ? null : Math.round(d * 100); if (dk !== st.sprDk) { st.sprDk = dk; if (st.aimVis != null) st.visGlide = now + 0.35; }
-      if (mouse.l || keys.has('fire') || adsHeld()) st.visGlide = 0;
-      if (st.aimVis == null || now >= (st.visGlide || 0)) st.aimVis = st.aim;
-      else { const df = angDiff(st.aim, st.aimVis); st.aimVis += df * (1 - Math.exp(-dt * SPRINT_TURN_VIS)); if (Math.abs(df) < 0.01) { st.aimVis = st.aim; st.visGlide = 0; } }
-    } else st.aimVis = null;
+    if (view.kind === 'body') { const d = sprintDiag(); // sprinting a screen direction: you turn to face the way you run (the crosshair comes back when you stop)
+      // st.aim (what the server, sprint speed and the gun go by) turns at SPRINT_TURN toward the sprint direction, and back
+      // to the crosshair once you stop; mid-turn you run at normal speed (the server sprints only within ~60° of the aim).
+      // Shooting, aiming in, or anything else that holds the aim (rope, slide, down) ends the turn at once.
+      const want = d !== null ? d : st.aim;
+      if (mouse.l || keys.has('fire') || adsHeld() || sliding() || ropeOf() || !me.a || me.dn) st.sprAim = null;
+      else if (d !== null || st.sprAim != null) {
+        if (st.sprAim == null) st.sprAim = st.aimVis ?? st.aim; // start from where you faced last frame
+        const df = angDiff(want, st.sprAim), stp = SPRINT_TURN * dt;
+        st.sprAim = Math.abs(df) <= stp ? want : st.sprAim + Math.sign(df) * stp;
+        st.aim = st.sprAim;
+        if (d === null && st.sprAim === want) st.sprAim = null; // back on the crosshair: the turn is over
+      }
+      st.aimVis = st.aim;
+    } else { st.aimVis = null; st.sprAim = null; }
   } else if (view && view.kind === 'cam') {
     if (st.lastCam !== view.cam.id) { // switching cameras: start from that camera's current direction
       st.lastCam = view.cam.id; st.aim = view.cam.ag || 0; view.ang = st.aim; audio.foley('camSwitch');

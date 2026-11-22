@@ -925,3 +925,13 @@ heavy 0.75, medium 0.9). He chose to keep the words behind the scenes.
   on the old code: 2 of 2 drones broken).
 - Checked: tutorial, hatches (one chance fail on Lodge reinforce, passes 3/3 again), abilities PASS; hidden-browser
   shots of both views on Harbor.
+
+## 2026-11-22: smooth sprint turns, nearer aim-in
+- Chris S's first remark was that the view turns too sharply; he meant sprinting. On a computer the 8-direction sprint
+  snapped `st.aim` round at once (only the picture glided ~0.1 s). Now the aim itself turns at `SPRINT_TURN` (180° in
+  0.4 s, his pick) into the sprint and back to the crosshair after (his pick: smooth too). Because the server sprints
+  only within ~60° of the aim, you run at normal speed mid-turn. Shooting or aiming in ends a turn at once.
+- He asked: aiming in puts the crosshair 20% nearer with iron sights and red dot, 10% nearer with the rest
+  (`ADS_PULL`); the sniper scope still goes as far as you can see.
+- Checked: `tests/sprintturn.mjs` (hidden browser: 90° and 180° turns in steps of at most 23° a frame, the let-go swing,
+  a click mid-turn lands on the crosshair at once), `sim.js --only house` PASS, `abilities.js` PASS.

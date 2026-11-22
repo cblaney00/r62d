@@ -597,9 +597,11 @@ export function gunMods(w, a) {
 // distances 15% nearer, the sight stretch widened from 1.8x to 2.5x; the sniper's sight lines fan out half as wide (main.js)
 export const ADS_GUN = { Shotgun: 2.1, MP: 2.6, Pistol: 3, SMG: 3.8, AR: 5.1, LMG: 6, DMR: 7.6 };
 export const ADS_OWN = { stub: 1.7, anvil: 4.2, bison: 3.8, heron: 6.8, pike: 9.4, saker: 9.4, verdict: 6, quill: 3.8, ranger: 5.1, mammoth: 10.2, needle: 4.2, ferret: 3.4 };
+// (he asked 2026-11-22: "pull back" the snap another 20% for iron and red dot, the rest less: they are 10% nearer)
+export const ADS_PULL = { iron: 0.8, reddot: 0.8, holo: 0.9, prism: 0.9, scope: 0.9 };
 export const ADS_SIGHT = { iron: 1, reddot: 1.15, holo: 1.35, prism: 1.8, scope: 2.5 };
 export const ADS_START = { sniper: 64 }; // the sniper scope: as far as you can see (main.js adsReset), up to its reach
-export const adsStart = (sight, w) => { const g = WEAPONS[w]; return (ADS_OWN[w] ?? (g && ADS_GUN[g.cls]) ?? ADS_GUN.AR) * (ADS_SIGHT[sight] || 1); };
+export const adsStart = (sight, w) => { const g = WEAPONS[w]; return (ADS_OWN[w] ?? (g && ADS_GUN[g.cls]) ?? ADS_GUN.AR) * (ADS_SIGHT[sight] || 1) * (ADS_PULL[sight] || 1); };
 // how far the crosshair can be pulled out from you, in metres, the same all the way round (he asked: a circle, bigger
 // with a stronger sight). Hip fire has the shortest reach; aiming in uses the sight's.
 export const AIM_REACH = { hip: 22, iron: 24, holo: 25, reddot: 28, prism: 43, scope: 53, sniper: 77 }; // he asked 2026-11-19: every reach +20% (were hip 18, iron 20, holo 21, reddot 23, prism 36, scope 44, sniper 64; before that 28, 34, 48)
