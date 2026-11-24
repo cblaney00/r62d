@@ -3,7 +3,7 @@
 import { CELL, PHASE, T, MAT, PX_PER_M, PRO_LEVEL, OVERWATCH, LUNGE_M, PLAYER_R } from '/shared/constants.js';
 import { PINGS, pingOf, wheelPick, drawWheel, drawPing, drawBadge } from './pingwheel.js';
 import { parseCommand } from '/shared/commands.js';
-import { roofRopeAt, hatchAtPoint, plantBomb, PLANT_R, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, stairLift, stairSees, eyeH, bodyH, EYE_H3, BODY_H3, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch } from '/shared/map.js';
+import { roofRopeAt, hatchAtPoint, plantBomb, PLANT_R, buildMap, roomAt, floorAt, localPos, MAPS, MAP_LIST, holePortal, syncDyn, syncPeeps, hatchOpen, hatchNear, stairGhost, stairLooks, stairEnds, stairLift, stairSees, eyeH, bodyH, EYE_H3, BODY_H3, ropeAt, ropeAtWindow, ropeVaultZone, ropeOutAt, ropeAimLimit, ropeS, ropeWindowOpen, ropeWindowBoarded, windowViews, windowFoot, windowState, wallGhost, peekSeen, floorOff, viewSrc, OUTCAM_ROOF, OUTCAM_RANGE, hatchSight, aimUpHatch, HATCH_EYE } from '/shared/map.js';
 import { SLIDE, stepMove, castSight, canSee, facingCell, angDiff, BASE_SPEED, DRONE_SPEED, coverOf } from '/shared/physics.js';
 import { OPERATORS, WEAPONS, GADGETS, riotArc, opsForTeam, CLASS_NAME, SIDEARMS, gunMods, attFromCode, ATTACH, ATTACH_SLOTS, attachFor, adsStart, aimReach, spreadCone, aimHeat, JOBS, jobOf, HEAD_AIM, shieldPose, causeOf, hitR, fireAuto } from '/shared/operators.js';
 import { gunPicture } from './gunart.js';
@@ -998,6 +998,7 @@ function onEvent(e, s, players) {
     case 'lungeWarn': if (e.id === st.id) { addFeed('CROW drew a blade on you: a lunge can come in 1 s'); audio.play('unsheathe', st.pred.x, st.pred.y); st.lungeWarnT = now; } break;
     case 'deny': if (e.id === st.id) addFeed(e.why); break;
     case 'emped': if (e.id === st.id) { addFeed('EMP! Your skill and gadget are fried for 8 seconds'); audio.foley('beep', st.pred.x, st.pred.y); st.empUntil = now + e.dur; } break; // TALON
+    case 'intel': if (e.id === st.id) addFeed(e.w); break; // your skill or gadget found someone (he asked 2026-11-23)
     case 'scanned': if (e.id === st.id) { addFeed('A scanner just picked up your heartbeat'); audio.foley('beep', st.pred.x, st.pred.y); } break; // WRAITH
     case 'paint': if (e.id === st.id) addFeed('You walked into a paint trap — the defenders can see you for 12 s'); fx.ping(e.x, e.y, '120,255,90'); break; // LYNX
     case 'ping': if (e.team === mySide()) { fx.ping(e.x, e.y, e.any ? '255,90,60' : '79,179,169'); audio.foley('beep', e.x, e.y); } break;
@@ -1349,7 +1350,7 @@ setLean(leanMode, false);
 const leanNow = () => leanMode === 'toggle' ? st.leanT || 0 : (keys.has('leanR') ? 1 : 0) - (keys.has('leanL') ? 1 : 0);
 // screen effects anyone can switch off (he asked), remembered on this computer
 const FX_OPTS = [['shake', 'Screen shake'], ['hurt', 'Red edges when hurt'], ['hit', 'Hit markers'], ['pts', 'Points pop-ups'], ['sight', 'Sight glow when aiming in'],
-  ['room', 'Room you are in'], ['compass', 'Bomb-site compass'], ['pip', 'Stairs preview window'], ['site', 'Bomb-site found card'], ['vignette', 'Dark screen corners'],
+  ['room', 'Room you are in'], ['compass', 'Bomb-site compass'], ['minimap', 'Bomb-site minimap'], ['pip', 'Stairs preview window'], ['site', 'Bomb-site found card'], ['vignette', 'Dark screen corners'],
   ['tilt', 'Camera tilt'], ['lean', 'Camera lean and kick'], ['walls3d', 'Raised walls'], ['lights', 'Room lighting'], ['blur', 'Soft screen edges']];
 let fxOff = new Set(); try { fxOff = new Set(JSON.parse(localStorage.getItem('r62d-fxoff') || '[]')); } catch {}
 const fxOn = k => !fxOff.has(k);
@@ -2162,6 +2163,60 @@ function drawCompass(s, me, now) {
   if (label.textContent !== text) label.textContent = text;
 }
 
+// The bomb-site minimap (he asked 2026-11-23: small, for every player, to give new players direction; not on phones).
+// He chose: top left under the objective box; the floor you are on, you (a dot pointing where you face) and the site's
+// rooms in gold, with a ▲/▼ line when the site is on another floor; attackers see the site only once it is found (the
+// compass's rule). The floor's picture is drawn once per floor/site/state into its own small canvas; each frame only
+// copies that small picture and the dot, and only when the dot has moved.
+function miniPic(m, fl, site, showSite, Wc, Hc) {
+  const c = document.createElement('canvas'); c.width = Wc; c.height = Hc; const g = c.getContext('2d');
+  let x0 = m.W, y0 = m.H, x1 = 0, y1 = 0;
+  const OUT = new Set([FL.GRASS, FL.ASPHALT, FL.SAND, FL.SNOW, FL.VOID]); // framed on the building, not the gardens and streets round it
+  for (let k = 0; k < m.tiles.length; k++) if (m.flAt[k] === fl && m.tiles[k] !== T.VOID && m.tiles[k] !== T.GROUND && !OUT.has(m.floor[k])) { const x = k % m.W, y = (k / m.W) | 0; if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+  if (x1 < x0) return null;
+  x0 -= 2; y0 -= 2; x1 += 2; y1 += 2;
+  const sc = Math.min(Wc / (x1 - x0 + 1), Hc / (y1 - y0 + 1)), ox = (Wc - (x1 - x0 + 1) * sc) / 2, oy = (Hc - (y1 - y0 + 1) * sc) / 2;
+  const rooms = showSite ? m.rooms.filter(r => site.rooms.includes(r.name)) : [];
+  const inSite = (x, y) => rooms.some(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+  for (let y = Math.max(0, y0); y <= Math.min(m.H - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(m.W - 1, x1); x++) {
+    const k = y * m.W + x, t = m.tiles[k]; if (m.flAt[k] !== fl || t === T.VOID || t === T.GROUND || (t === T.LOW && m.floor[k] === FL.VOID)) continue;
+    g.fillStyle = t === T.HARD || t === T.SOFT || t === T.REINF || t === T.PANEL ? '#8e98a2' : t === T.STAIR ? '#59616b' : t === T.OPEN || t === T.BARRI ? '#6f5a40' : inSite(x, y) ? '#8a6c22' : '#262d35';
+    g.fillRect(ox + (x - x0) * sc, oy + (y - y0) * sc, Math.ceil(sc), Math.ceil(sc));
+  }
+  const P = (wx, wy) => ({ x: ox + (wx / CELL - x0) * sc, y: oy + (wy / CELL - y0) * sc });
+  if (showSite) for (const b of site.bombs) { if (floorAt(m, b.x, b.y) !== fl) continue; const q = P(b.x, b.y), r = Math.max(3, Hc * 0.035);
+    g.fillStyle = '#f2c14e'; g.strokeStyle = '#000'; g.lineWidth = Math.max(1, r * 0.35); g.beginPath(); g.arc(q.x, q.y, r, 0, 7); g.fill(); g.stroke(); }
+  return { c, P };
+}
+function drawMinimap(s, me) {
+  const box = $('minimap'), m = st.map, site = m && m.sites && s ? m.sites[s.site] : null;
+  const show = !isTouch && fxOn('minimap') && s && !s.ar && !st.tv && me && me.a && (s.ph === PHASE.ACTION || s.ph === PHASE.PREP) && (me.ct === 'body' || me.ct === 'drone') && !st.tutorialHideCompass && site && m.flAt;
+  setCls(box, 'hidden', !show);
+  if (!show) return;
+  const c = box.querySelector('canvas'), Wc = Math.round(168 * DPR), Hc = Math.round(124 * DPR);
+  if (c.width !== Wc || c.height !== Hc) { c.width = Wc; c.height = Hc; st.miniK = ''; }
+  const at = me.ct === 'body' ? st.pred : st.cam, fl = Math.max(0, floorAt(m, at.x, at.y)), showSite = me.tm === 'def' || !!s.rev;
+  const pk = `${s.mp}|${fl}|${s.site}|${showSite}|${Wc}`;
+  if (!st.mini || st.mini.k !== pk) st.mini = { k: pk, p: miniPic(m, fl, site, showSite, Wc, Hc) };
+  const pic = st.mini.p; if (!pic) return;
+  const q0 = pic.P(at.x, at.y), q = { x: Math.max(6 * DPR, Math.min(Wc - 6 * DPR, q0.x)), y: Math.max(6 * DPR, Math.min(Hc - 6 * DPR, q0.y)) }, a = (me.ct === 'body' ? st.aim : null) ?? 0, rot = st.rot || 0;
+  const fk = `${pk}|${Math.round(q.x)}|${Math.round(q.y)}|${Math.round(a * 20)}|${Math.round(rot * 20)}`;
+  if (st.miniK !== fk) { st.miniK = fk;
+    const g = c.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, Wc, Hc);
+    g.save(); if (rot) { g.translate(Wc / 2, Hc / 2); g.rotate(rot); g.translate(-Wc / 2, -Hc / 2); } // (the controller's "Rotate" aim: turned like the view)
+    g.drawImage(pic.c, 0, 0);
+    const r = 4 * DPR; g.translate(q.x, q.y); g.rotate(a);
+    g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 1.5 * DPR;
+    g.beginPath(); g.moveTo(r * 1.9, 0); g.lineTo(-r, -r * 1.1); g.lineTo(-r * 0.4, 0); g.lineTo(-r, r * 1.1); g.closePath(); g.stroke(); g.fill();
+    g.restore();
+  }
+  let text = '';
+  if (!showSite) text = 'FIND THE BOMB SITE';
+  else { const bf = floorAt(m, site.bombs[0].x, site.bombs[0].y);
+    if (bf !== fl && m.floors[bf]) text = `${bf > fl ? '▲' : '▼'} SITE ON ${m.floors[bf].name}`; }
+  const b = box.querySelector('b'); if (b.textContent !== text) b.textContent = text;
+}
+
 // Free play's attachments (he asked): a row per gun in your hands, every attachment that fits it; redrawn when the
 // snapshot's `ga` (gun:barrel,grip,sight for each held gun) changes
 function freeAttDraw() {
@@ -2428,8 +2483,9 @@ function scoreTable(s) {
 
 // ---------------- interpolation ----------------
 const DELAY = 0.1;
-// the attackers' walk-in at the start of the action phase (server startIntro): nobody controls their operator yet
-const introNow = () => !!(st.last && st.last.it > 0);
+// the attackers' walk-in at the start of the action phase (server startIntro): attackers don't control their operator yet
+// (defenders play on, he asked 2026-11-23: they froze; watching TV counts as held so the broadcast rides along)
+const introNow = () => !!(st.last && st.last.it > 0 && (st.tv || !st.me || st.me.tm !== 'def'));
 // Phones (he asked 2026-11-20: the buttons mustn't hide operators or sightlines, "especially enemies coming from the
 // corner of the screen"): enemies you can see (drawn last frame, st.foesNow), the far end of where you look and the aim
 // stick's far point are checked against what the thumb controls cover (touch.js coverShapes); one under them slides the
@@ -2509,6 +2565,7 @@ function frame(nowMs) {
   requestAnimationFrame(frame);
   if (FRAME_MIN && nowMs - frameAt < FRAME_MIN) return;
   frameAt = nowMs;
+  if (!st.xhRan) { scopeVeil(null); scopeLens(null); } st.xhRan = false; // the sniper veil only stays while the crosshair is drawn (he found 2026-11-23: it was left over into the next match)
   if (menuRest(nowMs)) return;
   const rawGap = nowMs - lastT, dt = Math.min(0.05, rawGap / 1000); lastT = nowMs;
   const now = nowMs / 1000;
@@ -2824,7 +2881,7 @@ function frame(nowMs) {
   bodySounds(me, dt);
   draw(s, view, now, dt); ctx = ctx0;
   rope3dFrame(s, me, now, dt);
-  drawOutWarn(st.last, st.me); drawCompass(st.last, st.me, now); drawAllies(st.last, st.me, now);
+  drawOutWarn(st.last, st.me); drawCompass(st.last, st.me, now); drawMinimap(st.last, st.me); drawAllies(st.last, st.me, now);
   pfa('total', T0);
   watchPerf(rawGap, performance.now() - T0);
   perfRep.gaps.push(rawGap); perfRep.work.push(performance.now() - T0);
@@ -4051,6 +4108,7 @@ function scopeLens(p, r, M) {
 function drawWheelNow() { if (st.wheel) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); drawWheel(ctx, st.wheel, DPR); ctx.restore(); } }
 function crosshair(me, now) {
   if (st.tv || introNow()) return; // watching: no crosshair of your own on the broadcast (nor in the walk-in, when you can't aim yet)
+  st.xhRan = true;
   const w = WEAPONS[me.w];
   const gm = gunMods(me.w, attFromCode(me.aa));
   // recoil kicks the crosshair round your character: pull the mouse against it
@@ -4293,7 +4351,7 @@ function hud(s) {
   const outName = () => { let b = null, bd = 25 * PX_PER_M; for (const sp of st.map.atkSpawns || []) { const d = Math.hypot(sp.x - st.pred.x, sp.y - st.pred.y); if (d < bd) { bd = d; b = sp.name; } } return b ? 'Outside · ' + b : 'Outside'; }; // outside: the nearest named area (the attackers' spawns)
   setHTML('objective', roomOn ? `${esc(obj)}<small>${esc(sub)}</small><span class="roomTag">${flName ? '<b class="flr">' + esc(flName) + '</b>' : ''}${esc(!where || where === 'Outside' ? outName() : where)}</span>`
     : `${esc(obj)}<small>${flName ? '<b class="flr">' + esc(flName) + '</b> ' : ''}${esc(sub)}${where ? ' · ' + esc(where) : ''}</small>`);
-  if (isTouch && !st.objRO && window.ResizeObserver) { const ob = $('objective'); st.objRO = new ResizeObserver(() => { const b = ob.offsetHeight ? ob.offsetTop + ob.offsetHeight + 6 : 0; if (b) document.documentElement.style.setProperty('--objB', b + 'px'); }); st.objRO.observe(ob); } // phones: the health block sits just under the box, however tall it is (re-measured whenever its size changes: its lines now wrap instead of being cut short, 2026-11-20)
+  if (!st.objRO && window.ResizeObserver) { const ob = $('objective'); st.objRO = new ResizeObserver(() => { const b = ob.offsetHeight ? ob.offsetTop + ob.offsetHeight + 6 : 0; if (b) document.documentElement.style.setProperty('--objB', b + 'px'); }); st.objRO.observe(ob); } // phones: the health block sits just under the box, however tall it is (computers: the minimap does, 2026-11-23) (re-measured whenever its size changes: its lines now wrap instead of being cut short, 2026-11-20)
   if (!me.a) {
     setHTML('opname', me.op ? `${OPERATORS[me.op].name}` : '');
     setText('hpnum', '—'); $('hpbar').firstElementChild.style.width = '0%';
@@ -4608,7 +4666,7 @@ function teamViewers(s, view, me, inGame) {
     if (body) { const hv = hatchSight(m, h, view.x, view.y, stance); if (hv) vs.push(hv); } // your own eyes: only what the opening shows from where you are (drawHatchView)
     let up = false, down = false;
     for (let i = body ? 1 : 0; i < n; i++) { const v = vs[i]; if (!up && canSee(m, v, h.x, h.y, sm)) up = true; if (!down && canSee(m, v, h.bx, h.by, sm)) down = true; }
-    if (up) vs.push({ x: h.bx, y: h.by, ang: 0, fov: Math.PI * 2, range: 72, near: 72, kind: 'hatch' });
+    if (up) vs.push({ x: h.bx, y: h.by, ang: 0, fov: Math.PI * 2, range: 72, near: 72, kind: 'hatch', eye: HATCH_EYE }); // (looked into from above: furniture below doesn't cut it)
     if (down) vs.push({ x: h.x, y: h.y, ang: 0, fov: Math.PI * 2, range: 40, near: 40, kind: 'hatch' });
   }
   return vs;
@@ -5237,7 +5295,7 @@ function updateCard() {
   $('pcName').textContent = p.name; $('pcLevel').textContent = L.level;
   $('pcXp').style.width = (L.into / L.need * 100) + '%'; $('pcXpText').innerHTML = `LEVEL ${L.level} · ${L.into} / ${L.need} XP ${rankTag(p.rank)} <span style="opacity:.6">${p.mmr ?? ''} MMR</span>`;
 }
-const TIPS = ['The box in the top left shows the room you are in: use its name when you call out where an enemy is (Settings, Screen, to hide it).', 
+const TIPS = ['The small map in the top left shows the floor you are on and, once your team knows it, the bomb site in gold (Settings, Screen, to hide it).', 'The box in the top left shows the room you are in: use its name when you call out where an enemy is (Settings, Screen, to hide it).', 
   'Put a trap, camera, shield or wire in the wrong spot? Hold {interact} on it to pick it back up and place it again. Only your own, never a teammate\'s.',
   'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',
   'Aiming in moves your crosshair out to your sight\'s distance, unless it is already on an enemy you can see (within 2 m): then it stays right where you put it.',

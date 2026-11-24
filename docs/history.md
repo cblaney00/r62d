@@ -935,3 +935,22 @@ heavy 0.75, medium 0.9). He chose to keep the words behind the scenes.
   (`ADS_PULL`); the sniper scope still goes as far as you can see.
 - Checked: `tests/sprintturn.mjs` (hidden browser: 90° and 180° turns in steps of at most 23° a frame, the let-go swing,
   a click mid-turn lands on the crosshair at once), `sim.js --only house` PASS, `abilities.js` PASS.
+
+## 2026-11-23: walk-on, hole view, scope veil, ability notes, minimap
+- Walk-on: only attackers are held (`introHeld(p)` in game.js: input, events, `frozen`, damage). Defenders run the
+  normal tick (bots think) during `introT`; walking-on attackers can't be hurt (he chose). Client `introNow()` is true
+  only for attackers (and TV). tests/intro.js now expects defenders to move; tests/introdef.js checks both rules.
+- DEADFALL's hole / any hatch, looking down: `hatchSight` (shared/map.js) gives the view `eye: HATCH_EYE` (ceiling
+  height, 116 px), and the team's look-into-hatch view too, so furniture below only hides what is under/behind it
+  (castSight by eye height, furnLine for bodies). Checked: ~1 in 5 of 500 hole spots used to have the view cut.
+- Sniper veil/lens: they were only hidden from inside `crosshair()`, so any frame without a crosshair (end screen,
+  drone, next match) left them up. `frame()` hides them when the last frame drew no crosshair (`st.xhRan`).
+- Ability notes: `spot(team, id, dur, src)` → `intel(src, qid)` sends `{ e: 'intel', id: owner, w }` (no bots), at
+  most every `INTEL_AGAIN` 8 s per gadget+enemy; also WRAITH's scan (unnamed) and AUDIT's drone radar. Client shows
+  it through `addFeed`. tests/intel.js.
+- Minimap: `#minimap` under `#objective` (top `--objB`, measured by the objective's ResizeObserver now on computers
+  too), `drawMinimap`/`miniPic` in main.js beside the compass. Picture per floor/site/state cached in `st.mini`
+  (framed on indoor cells only), redrawn per frame only when your arrow moves. Hidden on phones (`isTouch`,
+  `html.touchplay`), TV, arena; setting `minimap` in Screen effects. `#allies` moves down while it shows.
+- Checked: intel, introdef, intro, abilities, oldops, newops, furniture, shapes, prepff, feeds, sim PASS;
+  textsize pc 0 small; hidden-browser shots as attacker and defender on Harbor.

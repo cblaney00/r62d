@@ -55,6 +55,7 @@ public/js/look.js, the map picture in public/js/mapdraw.js.
 9. Window plates (what each upper window looked like from below).
 10. Esports TV team sight tints, then markers: pings, spotted enemies, teammates' outlines, death marks, status
     badges, names, the compass, hit markers, the crosshair and its bracket, point pop-ups.
+   (The HUD on top, HTML not canvas: objective box, the bomb-site minimap `#minimap` under it (2026-11-23), compass, feed.)
 
 ## Rules that keep it right
 

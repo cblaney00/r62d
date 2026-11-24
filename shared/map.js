@@ -1,6 +1,6 @@
 // All maps. Each map file builds its floors with the kit in mapkit.js.
 import { CELL, T, FL } from './constants.js';
-import { castSight, angDiff, los } from './physics.js';
+import { castSight, angDiff, los, EYE_STAND } from './physics.js';
 import { buildFurniture } from './furniture.js';
 import { build as harbor } from './maps/harbor.js';
 import { build as villa } from './maps/villa.js';
@@ -581,6 +581,9 @@ export function hatchAtPoint(map, x, y) {
 export const hatchOpen = (m, h) => !!h.peep || m.tiles[h.cells[0]] === T.HOLE;
 export const PEEP_HALF = 5; // half the width of GIMLET's peephole, px
 export const HATCH_H = 3.2, EYE_H = { stand: 1.6, crouch: 1.05, prone: 0.3 }, BODY_Z = 1.0, HATCH_LOOK = 7 * CELL;
+// looking down through a hatch or a blown hole (he asked 2026-11-23: DEADFALL could not see past tables) the view of the room
+// below starts from ceiling height there, so furniture only hides what is under or right behind it, not the floor around it
+export const HATCH_EYE = Math.round(HATCH_H / EYE_H.stand * EYE_STAND);
 // From below (he asked: you shouldn't see too much up through a hatch) the patch is also cut to HATCH_UP_SEE past the
 // opening's edge (mask.lim, other floor coords), so only a small ring round the hole shows, from wherever you stand.
 export const HATCH_UP_SEE = 36;
@@ -592,14 +595,14 @@ export function hatchSight(m, h, x, y, stance = 'stand') {
   if (!up && f0 !== fb) return null;
   const cx = up ? h.x : h.bx, cy = up ? h.y : h.by, d = Math.hypot(cx - x, cy - y);
   if (d > HATCH_LOOK || d < 1) return null;
-  if (castSight(m, x, y, Math.atan2(cy - y, cx - x), d, null) < d - CELL * 1.2) return null; // something in the way of the opening itself
+  if (castSight(m, x, y, Math.atan2(cy - y, cx - x), d, null) < d - CELL * 1.2) return null; // something in the way of the opening itself (judged standing: low furniture never hides it)
   const e = EYE_H[stance] || EYE_H.stand, f = up ? e / (HATCH_H + e - BODY_Z) : (HATCH_H - e) / (HATCH_H + BODY_Z - e);
   const o = up ? { x: h.bx - h.x, y: h.by - h.y } : { x: h.x - h.bx, y: h.y - h.by }, ox = up ? h.bx : h.x, oy = up ? h.by : h.y;
   const hw = h.peep ? PEEP_HALF : CELL; // a drilled peephole is a small opening
   const mask = { ex: x + o.x, ey: y + o.y, f, x0: ox - hw, y0: oy - hw, x1: ox + hw, y1: oy + hw };
   if (!up) { const r = hw + HATCH_UP_SEE; mask.lim = { x0: ox - r, y0: oy - r, x1: ox + r, y1: oy + r }; }
   let far = 0; for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) far = Math.max(far, Math.hypot(ox + sx * hw - mask.ex, oy + sy * hw - mask.ey));
-  return { x: ox, y: oy, ang: 0, fov: Math.PI * 2, range: up ? Math.min(16 * 36, far / f + 4) : (hw + HATCH_UP_SEE) * 1.42, near: 0, kind: 'hatch', mask, h, up, o };
+  return { x: ox, y: oy, ang: 0, fov: Math.PI * 2, range: up ? Math.min(16 * 36, far / f + 4) : (hw + HATCH_UP_SEE) * 1.42, near: 0, kind: 'hatch', mask, h, up, o, eye: up ? HATCH_EYE : undefined };
 }
 // Aiming up through a hatch (he asked: others should see it, a raised-gun pose): on the floor under a hatch, within
 // HATCH_LOOK of it, with the crosshair point on its opening (an open hole: anywhere in the small patch it shows). The hatch or null.

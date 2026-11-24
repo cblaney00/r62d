@@ -186,4 +186,8 @@ export const PATCH_NOTES = [
   { d: '2026-11-21', k: 'mech', id: 'tutorial', t: 'Tutorial bots never shoot or break your drone, cameras or gadgets.', v: 1 },
   { d: '2026-11-22', k: 'mech', id: 'sprintturn', t: 'Sprinting in a new direction on a computer turns you round smoothly (a full about-turn takes 0.4 s) instead of snapping, and letting go of sprint swings you back to the crosshair the same way. Shooting or aiming in finishes the turn at once.', v: 1 },
   { d: '2026-11-22', k: 'mech', id: 'adsnear', t: 'Aiming in puts the crosshair nearer: 20% with iron sights and red dots, 10% with the holo, prism and 2x scope.', v: 1 },
+  { d: '2026-11-23', k: 'op', id: 'deadfall', t: 'Looking down through a blown hole or an open hatch, furniture in the room below no longer cuts the view off: it only hides what is under or right behind it.', v: 1 },
+  { d: '2026-11-23', k: 'mech', id: 'walkin', t: 'Defenders play on during the attackers\' walk-on (move, set up, shoot); the attackers walking on cannot be hurt until it ends.', v: 1 },
+  { d: '2026-11-23', k: 'mech', id: 'intel', t: 'When your skill or gadget finds an enemy (sensors, traps, darts, scans, overwatch, spotting) you get a short note saying what it found.', v: 1 },
+  { d: '2026-11-23', k: 'mech', id: 'minimap', t: 'A small minimap in the top left on computers shows your floor, you and the bomb site (attackers once they have found it).', v: 1 },
 ];

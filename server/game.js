@@ -67,6 +67,7 @@ const BAN_TURN = 15; // Unranked / Ranked: seconds a team with people on it gets
 
 const SCAN_RECHARGE = 50; // s from empty to a full charge (WRAITH, he asked 2026-11-18)
 const SCAN_BEAT = 0.8, SCAN_BLUR = 1.5 * PX_PER_M; // WRAITH's scanner: a new blip per heartbeat, this far off the real spot at most
+const INTEL_AGAIN = 8; // an ability's note about the same enemy at most this often (s)
 // aimed in through the sniper scope (the Pike's and Saker's one-shot body kill needs it, he asked)
 const REINF_HALF = 1;
 const REINF_EACH = +process.env.R62D_REINF || 10; // wall reinforcements a defending team gets each round (7 was tried 2026-11-10 and made no measurable difference; he chose 10 again)
@@ -221,10 +222,10 @@ export class Game {
       if (typeof m.ax === 'number') { p.aimX = m.ax; p.aimY = m.ay; }
       if (typeof m.vt === 'number' && isFinite(m.vt)) p.viewTime = m.vt; // server time of the world this player is looking at
       { const f = !!(m.k && m.k.fire); if (f && !p.msgFire && !p.click) p.click = { a: p.aim, vt: p.viewTime, ax: p.aimX, ay: p.aimY }; p.msgFire = f; } // a click keeps the aim it was made with, even if more input arrives before the next tick
-      if (this.introT > 0) { p.input = { ...EMPTY_INPUT }; p.click = null; if (p.introAim !== undefined && !p.intro) p.aim = p.introAim; } // the walk-in: nothing you press counts yet
+      if (this.introHeld(p)) { p.input = { ...EMPTY_INPUT }; p.click = null; if (p.introAim !== undefined && !p.intro) p.aim = p.introAim; } // the walk-in: nothing an attacker presses counts yet (defenders carry on, he asked 2026-11-23)
       else this.applyMove(p, Math.max(0, Math.min(0.05, Number(m.dt) || 0)));
       p.lastSeq = m.s | 0;
-      if (Array.isArray(m.ev) && !(this.introT > 0)) for (const e of m.ev.slice(0, 10)) this.event(p, e);
+      if (Array.isArray(m.ev) && !this.introHeld(p)) for (const e of m.ev.slice(0, 10)) this.event(p, e);
     } else if (m.t === 'ping') {
       if (p.sock && p.sock.open) p.sock.send(JSON.stringify({ t: 'pong', c: m.c }));
       if (typeof m.rtt === 'number' && isFinite(m.rtt)) p.rtt = Math.max(0, Math.min(9999, Math.round(m.rtt)));
@@ -601,6 +602,7 @@ export class Game {
     this.introT = INTRO;
     this.events.push({ e: 'intro', t: INTRO });
   }
+  introHeld(p) { return this.introT > 0 && this.side(p) === TEAM.ATK; } // during the walk-in only the attackers are held (and can't be hurt)
   introStep(p, dt) { // one tick of the walk-in for a player: walking on to their spot, else standing still
     p.input = { ...EMPTY_INPUT }; p.click = null; p.prevInput = p.input;
     const w = p.intro;
@@ -707,10 +709,16 @@ export class Game {
     if (this.phase === PHASE.MATCH_END) { if (this.timer <= 0) { this.resetToLobby(); if (this.tv && this.tv.socks.size) this.tvStart(null); } return; } // TV: the next match, on another map
 
     // PREP / ACTION
-    if (this.introT > 0) { // the walk-in: the clock waits, nobody acts
+    if (this.introT > 0) { // the walk-in: the clock waits, the attackers walk on, the defenders play on (he asked 2026-11-23: they froze)
       if (!held) this.timer += dt;
       this.introT -= dt;
-      for (const p of this.players.values()) { this.introStep(p, dt); this.tickPlayer(p, dt); p.prevInput = p.input; }
+      for (const p of this.players.values()) {
+        this.by = this.side(p);
+        if (this.introHeld(p)) this.introStep(p, dt);
+        else if (p.bot && !p.hold) { botThink(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
+        this.tickPlayer(p, dt); p.prevInput = p.input;
+      }
+      this.by = null;
       this.tickEnts(dt); // (gadgets and cameras carry on)
       this.recordHistory(); this.recordCam();
       if (this.introT <= 0) this.endIntro();
@@ -789,7 +797,7 @@ export class Game {
     const beingRevived = p.downed && [...this.players.values()].some(q => q.busy && q.busy.k === 'revive' && q.busy.target === p.id); // he asked: revives kept failing — the downed crawled out of reach
     const frozen = !p.alive || p.ctrl !== 'body' || !!p.vault || !!p.rope || !!p.grapple || this.time < (p.clampUntil || 0) || !!(p.busy && p.busy.k !== 'revive') || beingRevived ||
       this.phase === PHASE.SELECT || this.phase === PHASE.ROUND_END || this.phase === PHASE.MATCH_END ||
-      (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK) || this.introT > 0; // (the walk-in moves them itself)
+      (this.phase === PHASE.PREP && this.side(p) === TEAM.ATK) || this.introHeld(p); // (the walk-in moves attackers itself)
     const gw = p.guns && p.guns[p.slot] ? moveOf(WEAPONS[p.guns[p.slot].w]) : [1, 1];
     const box = this.phase === PHASE.PREP && this.prepBox && this.side(p) === TEAM.DEF && p.ctrl === 'body' ? this.prepBox : undefined; // (shared/map.js prepBox)
     const boxShow = box && this.prepSiteBox ? 1 : undefined; // (the outline is drawn only for the site box)
@@ -920,6 +928,7 @@ export class Game {
             // he asked: no more wallhacks. Only WRAITH sees it, as a fuzzy blip up to SCAN_BLUR off, moved on each heartbeat
             const b = (p.scanBlips || (p.scanBlips = new Map())); let z = b.get(q.id);
             if (!z || this.time - z.t > SCAN_BEAT) { const a = Math.random() * 6.283, r = (0.4 + Math.random() * 0.6) * SCAN_BLUR; z = { t: this.time, x: q.x + Math.cos(a) * r, y: q.y + Math.sin(a) * r }; b.set(q.id, z); }
+            this.intel(p, q.id, 'HEARTBEAT NEARBY', false); // (he asked 2026-11-23: a note when a skill finds someone)
             if (!(q.scanWarnT > this.time)) { q.scanWarnT = this.time + 2; this.events.push({ e: 'scanned', id: q.id }); } // ...and they hear it
           }
       } else { if (p.scanning) p.battery = 0; p.scanOn = false; p.scanning = false; p.scanRun = 0; p.battery = Math.min(op.ability.battery, p.battery + dt * op.ability.battery / SCAN_RECHARGE); } // a scan, however short, uses the whole charge; back to 100% in 50 s
@@ -1052,7 +1061,7 @@ export class Game {
         const d = Math.hypot(q.x - p.x, q.y - p.y);
         if (d > 70 * PX_PER_M || Math.abs(angDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) > 0.45 || !los(this.map, p.x, p.y, q.x, q.y, sm)) continue; // (2026-11-15 buff: 0.35 → 0.45)
         if (!(q.spotFrom && q.spotFrom > this.time)) this.pts(p, 10, 'Spotted an enemy');
-        q.spotFrom = this.time + 6; this.spot(team, q.id, 6); // (2026-11-15 buff: marked 4 → 6 s)
+        q.spotFrom = this.time + 6; this.spot(team, q.id, 6, p); // (2026-11-15 buff: marked 4 → 6 s)
       }
     }
   }
@@ -1347,7 +1356,7 @@ export class Game {
       const fall = stopT <= fo.from ? 1 : stopT >= fo.to ? fo.min : 1 - (1 - fo.min) * (stopT - fo.from) / (fo.to - fo.from);
       const small = OPERATORS[q.op] && OPERATORS[q.op].ability.id === 'brace' ? 0.6 : 1; // BULWARK: a smaller head to hit (he asked); the shield still covers it from the front
       const sa = this.shotAim, head = miss < HEAD_R * small && (!sa || Math.hypot(sa.x - at.x, sa.y - at.y) <= HEAD_AIM * small);
-      if (src && src.tracerUntil > this.time && this.side(q) !== this.side(src)) this.spot(this.side(src), q.id, 4); // MARK's tracer rounds
+      if (src && src.tracerUntil > this.time && this.side(q) !== this.side(src)) this.spot(this.side(src), q.id, 4, src); // MARK's tracer rounds
       this.shotPens = pens; // the death card says "through a wall"
       if (this.zb && q.zombie) { this.headshot = !!head; this.zbNeck = !head && miss < HEAD_R * 1.7; this.damage(q, dmg * mult * fall * (head ? ZB.headMul : this.zbNeck ? 1.5 : 1), src, wname, ang); this.headshot = false; this.zbNeck = false; } // ZOMBIES: the head takes more, never a one-shot
       else if (head && !q.downed && !pellet && !pens) { this.headshot = true; this.damage(q, 9999, src, wname, ang); this.headshot = false; }
@@ -1574,6 +1583,7 @@ export class Game {
     if (this.free && !q.bot && q.sock) return; // free play: god mode, nothing hurts you
     if (this.phase === PHASE.PREP && src && this.side(src) === this.side(q)) return; // no friendly fire (or hurting yourself) while setting up (he asked)
     if (this.tut && src && src.bot && !q.bot) return; // tutorial bots never hurt you (he asked)
+    if (this.introHeld(q)) return; // attackers walking on can't be hurt: they can't fight back yet (he chose 2026-11-23)
     if (this.arena) { amount = arenaDamage(this, q, amount, src, wname); if (amount <= 0) return; }
     if (this.zb) { amount = zbDamage(this, q, amount, src, wname); if (amount <= 0) return; }
     amount = Math.round(amount);
@@ -2419,7 +2429,7 @@ export class Game {
         const t = rayCircle(p.x, p.y, ca, sa, q.x, q.y, hitR(q.op));
         if (t !== null && t < bt) { bt = t; hitQ = q; }
       }
-      if (hitQ) this.spot(team, hitQ.id, 10);
+      if (hitQ) this.spot(team, hitQ.id, 10, p);
       used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x + ca * bt), y2: r1(p.y + sa * bt), tag: 1 });
     } else if (id === 'rally') { p.hp = Math.min(p.maxHp, p.hp + 30); p.boostUntil = this.time + 4; used(); this.events.push({ e: 'stim', x: r1(p.x), y: r1(p.y), x2: r1(p.x), y2: r1(p.y) }); }
     else if (id === 'periscope') { // LENS (he asked: no copy of TETHER's scope): up through the ceiling or down through the floor
@@ -2906,10 +2916,24 @@ export class Game {
     for (const k in p.ef) { const [u, sd] = p.ef[k]; if (u > this.time) out.push([k, r1(u - this.time), sd]); else delete p.ef[k]; }
     return out.length ? out : undefined;
   }
-  spot(team, id, dur) {
+  spot(team, id, dur, src) {
     const until = this.time + dur;
     if (!this.spots[team]) return; // (fun modes: everyone for themselves has no team to tell)
     if ((this.spots[team].get(id) || 0) < until) this.spots[team].set(id, until);
+    if (src) this.intel(src, id);
+  }
+  // He asked (2026-11-23): an operator whose skill or gadget finds an enemy gets a short note about it (main.js addFeed).
+  // src is the player (OSPREY's scope, MARK's tracers, HOUND's dart) or the gadget that found them; once per enemy per
+  // gadget every INTEL_AGAIN seconds, so a sensor watching someone doesn't repeat itself.
+  intel(src, qid, word = 'SPOTTED', named = true) {
+    const owner = src.owner !== undefined ? this.players.get(src.owner) : src.op ? src : null;
+    if (!owner || owner.bot || !owner.op || !OPERATORS[owner.op]) return;
+    const q = this.players.get(qid), key = (src.id ?? 'p') + ':' + qid, told = owner.intelT || (owner.intelT = new Map());
+    if (this.time - (told.get(key) ?? -1e9) < INTEL_AGAIN) return;
+    told.set(key, this.time);
+    const ab = OPERATORS[owner.op].ability, what = src === owner || src.type === ab.id || !GADGETS[src.type] ? ab.name : GADGETS[src.type].name;
+    const who = !named ? 'ENEMY' : q && q.op && OPERATORS[q.op] ? OPERATORS[q.op].name : q ? 'ENEMY' : 'DRONE';
+    this.events.push({ e: 'intel', id: owner.id, w: `${what.toUpperCase()}: ${who} ${word}` });
   }
 
   tickEnts(dt) {
@@ -2925,7 +2949,7 @@ export class Game {
             const d = Math.hypot(q.x - e.x, q.y - e.y);
             if (d > OVERWATCH.range || Math.abs(angDiff(Math.atan2(q.y - e.y, q.x - e.x), e.ang)) > OVERWATCH.half || !los(this.map, e.x, e.y, q.x, q.y, sm)) continue;
             now.add(q.id); if (seen.has(q.id)) continue;
-            q.spotFrom = this.time + 4; this.spot(e.team, q.id, 4); if (o) this.pts(o, 10, 'Spotted an enemy');
+            q.spotFrom = this.time + 4; this.spot(e.team, q.id, 4, e); if (o) this.pts(o, 10, 'Spotted an enemy');
             this.events.push({ e: 'snd', s: 'beep', x: r1(e.x), y: r1(e.y), id: e.owner });
           }
           e.seen = now; // (leaving and coming back pings again)
@@ -2977,12 +3001,12 @@ export class Game {
           if (e.t > 0) break;
           if (e.type === 'spike') { // ECHO: defenders running near it show up
             e.t = 0.5; let any = false;
-            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving >= 2 && Math.hypot(q.x - e.x, q.y - e.y) < 10 * PX_PER_M) { this.spot(e.team, q.id, 1.5); any = true; }
+            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving >= 2 && Math.hypot(q.x - e.x, q.y - e.y) < 10 * PX_PER_M) { this.spot(e.team, q.id, 1.5, e); any = true; }
             e.pingT -= 0.5; if (any && e.pingT <= 0) { e.pingT = 1.5; this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); }
           } else { // AUDIT: every attacker drone nearby is marked for the defenders, again and again
             e.t = 1.5; const o = this.players.get(e.owner), seen = e.seen || (e.seen = {});
             for (const d of this.ents) if (d.type === 'drone' && d.team !== e.team && Math.hypot(d.x - e.x, d.y - e.y) < 15 * PX_PER_M && (!seen[d.id] || this.time - seen[d.id].t > 10 && Math.hypot(d.x - seen[d.id].x, d.y - seen[d.id].y) > 3 * PX_PER_M) && (seen[d.id] = { t: this.time, x: d.x, y: d.y })) // he asked: fewer drone pings — once, then only when it has moved on
-              this.events.push({ e: 'mark', team: e.team, x: r1(d.x), y: r1(d.y), w: 'DRONE', by: o ? o.name : 'Radar', from: e.owner, id: d.id });
+              { this.intel(e, 'd' + d.id, 'FOUND'); this.events.push({ e: 'mark', team: e.team, x: r1(d.x), y: r1(d.y), w: 'DRONE', by: o ? o.name : 'Radar', from: e.owner, id: d.id }); }
           }
           break;
         }
@@ -3065,7 +3089,7 @@ export class Game {
             e.ping = 1.5;
             let any = false; const sm = this.smokeList(), fl = floorAt(this.map, e.x, e.y);
             // only who it can see from where it sits (he asked: nothing through walls, floors or anything solid)
-            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 230 && floorAt(this.map, q.x, q.y) === fl /* (2026-11-15 buff: 170 → 230) */ && los(this.map, e.x, e.y, q.x, q.y, sm)) { this.spot(e.team, q.id, 1.6); any = true; }
+            for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && !this.ghost(q) && Math.hypot(q.x - e.x, q.y - e.y) < 230 && floorAt(this.map, q.x, q.y) === fl /* (2026-11-15 buff: 170 → 230) */ && los(this.map, e.x, e.y, q.x, q.y, sm)) { this.spot(e.team, q.id, 1.6, e); any = true; }
             this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any });
           }
           if (e.life <= 0) this.removeEnt(e);
@@ -3116,7 +3140,7 @@ export class Game {
           const near = [...this.players.values()].filter(q => q.alive && this.side(q) !== e.team && [[h.x, h.y], [h.bx, h.by]].some(([x, y]) => Math.hypot(q.x - x, q.y - y) < HTRAP_R && floorAt(this.map, q.x, q.y) === floorAt(this.map, x, y)));
           if (!near.length) break;
           this.removeEnt(e); this.events.push({ e: 'boom', x: r1(h.bx), y: r1(h.by), r: 30, kind: 'stun' }); this.events.push({ e: 'snd', s: 'beep', x: r1(h.x), y: r1(h.y) });
-          for (const q of near) { this.effect(q, 'blind', 3, e.team); this.events.push({ e: 'stun', id: q.id, dur: 3 }); this.spot(e.team, q.id, 6); }
+          for (const q of near) { this.effect(q, 'blind', 3, e.team); this.events.push({ e: 'stun', id: q.id, dur: 3 }); this.spot(e.team, q.id, 6, e); }
           const o = this.players.get(e.owner); if (o) this.pts(o, 20 * near.length, 'Hatch trap');
           break;
         }
@@ -3130,7 +3154,7 @@ export class Game {
             if (e.type === 'prox') { e.fuse = 0.9; this.events.push({ e: 'snd', s: 'beep', x: r1(e.x), y: r1(e.y) }); }
             else if (e.type === 'concuss') this.detonate(e);
             else { // clamp: held fast and badly hurt
-              this.effect(q, 'snare', 2, e.team); this.spot(e.team, q.id, 3);
+              this.effect(q, 'snare', 2, e.team); this.spot(e.team, q.id, 3, e);
               this.damage(q, 15 * this.blastArmor(q), this.players.get(e.owner), 'Clamp Trap', 0);
               this.events.push({ e: 'snd', s: 'clamp', x: r1(e.x), y: r1(e.y) }); this.removeEnt(e);
             }
@@ -3142,7 +3166,7 @@ export class Game {
           e.t -= dt; e.pingT -= dt; if (e.t > 0) break; e.t = 0.5;
           let any = false;
           for (const q of this.players.values())
-            if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving >= 2 && Math.hypot(q.x - e.x, q.y - e.y) < 190) { this.spot(e.team, q.id, 1.5); any = true; }
+            if (q.alive && this.side(q) !== e.team && !this.ghost(q) && !q.shrouded && q.moving >= 2 && Math.hypot(q.x - e.x, q.y - e.y) < 190) { this.spot(e.team, q.id, 1.5, e); any = true; }
           if (any && e.pingT <= 0) { e.pingT = 1.5; this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any: true }); }
           break;
         }
@@ -3172,7 +3196,7 @@ export class Game {
             const inCone = e.type === 'mine' ? d < 22 : d < 44 && Math.abs(angDiff(Math.atan2(q.y - e.y, q.x - e.x), e.ang)) < 0.7;
             if (inCone && los(this.map, e.x, e.y, q.x, q.y)) {
               if (e.type === 'mine') { // LYNX's paint trap (he asked: one job each): no bang, the attacker glows for the defenders for 12 s
-                this.spot(e.team, q.id, 12); q.paintUntil = this.time + 12; this.removeEnt(e);
+                this.spot(e.team, q.id, 12, e); q.paintUntil = this.time + 12; this.removeEnt(e);
                 this.events.push({ e: 'paint', id: q.id, x: r1(q.x), y: r1(q.y) }); this.events.push({ e: 'snd', s: 'clamp', x: r1(e.x), y: r1(e.y) });
               } else this.detonate(e);
               break;
@@ -3270,7 +3294,7 @@ export class Game {
       case 'mine': {
         this.explode(e, { r: 32, dmg: 30, cellR: 0, cells: [], kind: 'mine' });
         for (const q of this.players.values()) if (q.alive && this.side(q) !== e.team && Math.hypot(q.x - e.x, q.y - e.y) < 40) {
-          this.effect(q, 'slow', 3, e.team); this.spot(e.team, q.id, 4);
+          this.effect(q, 'slow', 3, e.team); this.spot(e.team, q.id, 4, e);
         }
         break;
       }
@@ -3280,7 +3304,7 @@ export class Game {
         // measured in the building (he asked: it couldn't reach up the stairs): the floor above or below counts too, a bit less far
         const le = localPos(this.map, e.x, e.y);
         for (const q of this.players.values()) { if (!q.alive || this.side(q) === e.team || this.ghost(q)) continue; const lq = localPos(this.map, q.x, q.y), df = Math.abs(lq.f - le.f);
-          if (df <= 1 && Math.hypot(lq.x - le.x, lq.y - le.y) + df * 60 < 230) { this.spot(e.team, q.id, 2.5); any = true; } }
+          if (df <= 1 && Math.hypot(lq.x - le.x, lq.y - le.y) + df * 60 < 230) { this.spot(e.team, q.id, 2.5, e); any = true; } }
         this.events.push({ e: 'ping', x: r1(e.x), y: r1(e.y), team: e.team, any, big: 1 });
         break;
       }
