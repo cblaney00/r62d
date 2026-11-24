@@ -3049,6 +3049,42 @@ function drawMarks(view, now) {
   }
 }
 
+// The tutorial's marker (he chose 2026-11-24): a gold ring on the spot the coach wants you at, with what it is and how far,
+// and when it is off screen a gold arrow at the edge of the screen pointing to it. Only in the tutorial.
+function drawCoachMark(view, now) {
+  coach.setView(view);
+  const P0 = view && coach.target(); if (!P0) return;
+  const m = st.map, vf = floorAt(m, view.x, view.y), f = floorAt(m, P0.x, P0.y);
+  let x = P0.x, y = P0.y, tag = '';
+  if (vf >= 0 && f >= 0 && f !== vf) { const o = floorOff(m, f, vf); x += o.x; y += o.y; tag = f > vf ? '▲ UPSTAIRS' : '▼ DOWNSTAIRS'; }
+  const D = DPR, P = w2s(x, y), pad = 40 * D, top = 70 * D, bot = 150 * D;
+  const on = P.x > pad && P.x < VW - pad && P.y > top && P.y < VH - bot;
+  const dist = tag || `${Math.max(1, Math.round(Math.hypot(P0.x - view.x, P0.y - view.y) / PX_PER_M))} m`, pulse = 0.5 + 0.5 * Math.sin(now * 5);
+  ctx.save(); ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+  if (on) {
+    const r = (11 + 3 * pulse) * D;
+    ctx.strokeStyle = 'rgba(242,193,78,0.35)'; ctx.lineWidth = 6 * D; ctx.beginPath(); ctx.arc(P.x, P.y, r, 0, 7); ctx.stroke();
+    ctx.strokeStyle = '#f2c14e'; ctx.lineWidth = 2.2 * D; ctx.beginPath(); ctx.arc(P.x, P.y, r, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#f2c14e'; ctx.beginPath(); ctx.moveTo(P.x, P.y - r - 14 * D); ctx.lineTo(P.x - 7 * D, P.y - r - 24 * D); ctx.lineTo(P.x + 7 * D, P.y - r - 24 * D); ctx.closePath(); ctx.fill(); // a little arrow pointing down at it
+    ctx.font = `800 ${14 * D}px Barlow Condensed, sans-serif`; ctx.lineWidth = 3.5 * D; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.strokeText(P0.w || 'GO HERE', P.x, P.y - r - 30 * D); ctx.fillText(P0.w || 'GO HERE', P.x, P.y - r - 30 * D);
+    ctx.font = `600 ${12 * D}px Barlow Condensed, sans-serif`; ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeText(dist, P.x, P.y + r + 16 * D); ctx.fillText(dist, P.x, P.y + r + 16 * D);
+  } else { // off screen: an arrow at the edge, pointing at it
+    const cx = VW / 2, cy = VH / 2, a = Math.atan2(P.y - cy, P.x - cx), hw = VW / 2 - pad, hh = Math.min(cy - top, VH - bot - cy);
+    const k = Math.min(hw / Math.max(1e-6, Math.abs(Math.cos(a))), hh / Math.max(1e-6, Math.abs(Math.sin(a)))), ex = cx + Math.cos(a) * k, ey = cy + Math.sin(a) * k;
+    ctx.translate(ex, ey); ctx.save(); ctx.rotate(a);
+    const s = (1 + 0.12 * pulse) * D;
+    ctx.fillStyle = '#f2c14e'; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 2 * D;
+    ctx.beginPath(); ctx.moveTo(14 * s, 0); ctx.lineTo(-8 * s, -11 * s); ctx.lineTo(-3 * s, 0); ctx.lineTo(-8 * s, 11 * s); ctx.closePath(); ctx.stroke(); ctx.fill();
+    ctx.restore();
+    const lx = -Math.cos(a) * 34 * D, ly = -Math.sin(a) * 26 * D;
+    ctx.font = `700 ${12 * D}px Barlow Condensed, sans-serif`; ctx.lineWidth = 3.5 * D; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.fillStyle = '#f2c14e';
+    ctx.strokeText(dist, lx, ly + 4 * D); ctx.fillText(dist, lx, ly + 4 * D);
+  }
+  ctx.restore();
+}
+
 // ---------------- ping wheel and map (he asked, instead of talking to the bots) ----------------
 // Hold the wheel key at a spot, drag toward a ping, let go. The map key opens a map of the floors; click it to ping, or hold
 // the click (or the wheel key) and drag for the wheel. You keep moving meanwhile; only your aim and gun wait.
@@ -3908,6 +3944,7 @@ function draw(s, view, now, dt) {
   if (!st.r3full) screenFx(ctx, me, now, st.hurtFrom); // (in the 3D rope view they go on its own layer, #r3fx)
   if (st.tv && inGame) TV.tvBubbles(now);
   if (inGame) drawMarks(view, now);
+  if (inGame && coach.active) drawCoachMark(view, now);
   if (inGame && me && !menuOpen() && !st.tv) { if (st.mapV) drawMapV(s, me, now); } else if (st.mapV || st.wheel) { st.mapV = null; closeWheel(true); }
   if (st.wheel && (!playing() || menuOpen())) closeWheel(true);
   if (inGame && me && me.a && me.ct === 'body' && !st.mapV && !st.wheel && (!me.br || me.ri)) crosshair(me, now); // a riot shield's holder aims round it

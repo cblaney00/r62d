@@ -656,19 +656,34 @@ html.inapp .dlNav, html.touch .dlNav:not(.dlAnd), html.touch:not(.android) .dlAn
 .tutInfo h4 { font: 800 max(15px, var(--mf)) var(--head); letter-spacing: 0.18em; color: #f2c14e; margin: 0 0 4px; }
 .tutInfo p { margin: 0; line-height: 1.45; color: #cfd6dd; }
 kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid rgba(255,255,255,0.35); border-bottom-width: 2px; border-radius: 3px; font: 700 max(0.85em, var(--mf)) var(--head); text-align: center; background: rgba(255,255,255,0.08); }
-#coach { position: fixed; left: 18px; top: 92px; width: min(420px, 34vw); z-index: 40; background: rgba(10,14,18,0.9); border: 1px solid rgba(255,255,255,0.1); border-left: 3px solid #f2c14e; padding: 14px 16px; color: #e6ebf0; font-size: max(15px, var(--mf)); line-height: 1.4; box-shadow: 0 8px 30px rgba(0,0,0,0.5); animation: fadeIn 0.3s both; }
+/* the tutorial's objective list (he chose 2026-11-24): small, top-left under the objective line, never in the middle;
+   a checklist that ticks itself, one short tip at a time; the end cards use the same place, a little bigger */
+#coach { position: fixed; left: 18px; top: calc(var(--objB, 96px) + 4px); width: min(350px, 30vw); z-index: 40; background: rgba(10,14,18,0.9); border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid #f2c14e; padding: 10px 14px 11px; color: #e6ebf0; font-size: max(15px, var(--mf)); line-height: 1.35; box-shadow: 0 6px 22px rgba(0,0,0,0.45); animation: fadeIn 0.3s both; pointer-events: none; }
 #coach .cHead { font: 700 max(12px, var(--mf)) var(--head); letter-spacing: 0.2em; color: #f2c14e; display: flex; justify-content: space-between; }
-#coach .cHead span { color: var(--dim); }
-#coach .cDots { display: flex; gap: 4px; margin: 8px 0 10px; } #coach .cDots i { flex: 1; height: 3px; background: rgba(255,255,255,0.12); } #coach .cDots i.d { background: #f2c14e88; } #coach .cDots i.on { background: #f2c14e; }
-#coach .cTitle { font: 800 max(22px, var(--mf)) var(--head); letter-spacing: 0.06em; margin-bottom: 6px; }
-#coach .cBody ul, #coach .cBody ol { margin: 6px 0; padding-left: 20px; } #coach .cBody li { margin: 3px 0; } #coach small { color: var(--dim); }
-#coach .cFoot { margin-top: 10px; font: 600 max(12px, var(--mf)) var(--head); letter-spacing: 0.12em; color: var(--dim); }
-#coach .cPings { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; } #coach .cPings span { background: rgba(242,193,78,0.18); color: #f2c14e; font: 700 max(12px, var(--mf)) var(--head); letter-spacing: 0.08em; padding: 1px 6px; }
-#coach .cBtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-#select ~ #coach, #coach { pointer-events: auto; }
+#coach .cHead span { color: var(--dim); letter-spacing: 0.1em; }
+#coach .cDots { height: 3px; background: rgba(255,255,255,0.12); margin: 6px 0 7px; } #coach .cDots i { display: block; height: 100%; background: #f2c14e; transition: width 0.4s; }
+#coach .cTitle { font: 800 max(20px, var(--mf)) var(--head); letter-spacing: 0.06em; margin-bottom: 4px; }
+#coach .cList { list-style: none; margin: 0; padding: 0; }
+#coach .cList li { margin: 3px 0; padding-left: 2px; color: rgba(230,235,240,0.45); font-size: max(14px, var(--mf)); }
+#coach .cList li.ok { color: #9db48a; text-decoration: line-through; text-decoration-color: rgba(157,180,138,0.5); }
+#coach .cList li.on { color: #fff; font-size: max(16px, var(--mf)); font-weight: 600; background: rgba(242,193,78,0.1); margin: 5px -6px; padding: 4px 6px; border-radius: 2px; }
+#coach.pop .cList li.ok:last-of-type { animation: fadeIn 0.4s both; }
+#coach .cTip { margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(255,255,255,0.08); color: #c9d2da; font-size: max(13px, var(--mf)); animation: fadeIn 0.5s both; }
+#coach .cTip::before { content: 'TIP  '; color: #f2c14e; font: 700 max(11px, var(--mf)) var(--head); letter-spacing: 0.16em; }
+#coach .cNow { color: #c9d2da; }
+#coach .cFoot { margin-top: 7px; font: 600 max(12px, var(--mf)) var(--head); letter-spacing: 0.12em; color: var(--dim); }
+#coach .cBody { margin-top: 4px; }
+#coach .cBtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+#coach button { pointer-events: auto; }
+#coach.end { width: min(440px, 40vw); padding: 16px 20px; } #coach.end .cTitle { font-size: max(28px, var(--mf)); }
+#coach.sel { top: auto; bottom: 74px; left: auto; right: 140px; width: min(420px, 32vw); } /* operator select: clear of the role list and the cards */
+html.tutorial #stairPip { left: auto; right: 18px; top: 300px; } html.tutorial #minimap { left: auto; right: 18px; top: 130px; } html.tutorial #minimap b { text-align: right; } /* the stair picture and the site minimap move out of the list's way */
+html.touch #coach { top: calc(var(--objB, 56px) + 4px); width: min(300px, 40vw); padding: 7px 10px; font-size: max(13px, var(--mf)); }
+html.touch #coach .cTitle { font-size: max(16px, var(--mf)); } html.touch #coach .cList li.on { font-size: max(14px, var(--mf)); }
+html.touch #coach button[data-skip] { padding: 5px 12px; font: 700 max(13px, var(--mf)) var(--head); letter-spacing: 0.1em; }
+html.touch #coach.sel { top: auto; bottom: 26px; left: auto; right: 12px; width: min(360px, 44vw); }
 #chatLog .tag.ping { background: #f2c14e; color: #111; } #chatLog .pingTxt { color: #f2c14e; font-weight: 600; }
 .hint.addr { color: #f2c14e; margin-top: 4px; }
-#coach.sel { top: auto; bottom: 74px; left: auto; right: 140px; transform: none; width: 600px; }
 
 #armStats .spray { display: flex; gap: 12px; align-items: center; margin: 8px 0; }
 #armStats .spray svg { flex: none; background: rgba(0,0,0,0.3); border: 1px solid var(--line); }
@@ -707,15 +722,6 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 .mkLayers button.on { opacity: 1; border-color: rgba(255,255,255,0.35); }
 .mkLayers button i { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 #stairPip.right { left: auto; right: 18px; top: 130px; }
-/* tutorial (he asked: bigger text, the focal point): a card in the middle to read and dismiss, a banner at the top to do */
-#coach.center { left: 50%; top: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); width: min(720px, 86vw); padding: 26px 32px; font-size: max(20px, var(--mf)); line-height: 1.5;
-  border-left: 0; border-top: 4px solid #f2c14e; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.55), 0 12px 50px rgba(0,0,0,0.7); z-index: 60; }
-#coach.center .cTitle { font-size: max(38px, var(--mf)); margin-bottom: 10px; }
-#coach.center .cHead { font-size: max(14px, var(--mf)); } #coach.center .cFoot { font-size: max(15px, var(--mf)); margin-top: 18px; color: #f2c14e; }
-#coach.task { left: 50%; top: 150px; right: auto; bottom: auto; transform: translateX(-50%); width: min(820px, 64vw); padding: 18px 26px; font-size: max(19px, var(--mf)); line-height: 1.45;
-  border-left: 0; border-top: 4px solid #f2c14e; }
-#coach.task .cTitle { font-size: max(32px, var(--mf)); } #coach.task .cHead { font-size: max(13px, var(--mf)); } #coach.task .cFoot { font-size: max(13px, var(--mf)); }
-#coach.task.sel { top: auto; bottom: 64px; left: 50%; right: auto; transform: translateX(-50%); width: min(760px, 56vw); }
 #coach kbd { font-size: max(0.85em, var(--mf)); }
 /* Operators page: attack / defence, then each role and its operators (he asked: like in a match) */
 #opsList { width: 300px; }
@@ -846,10 +852,6 @@ html.fitui:not(.touch) .overlay .page { width: min(1400px, calc(96vw / var(--uiz
 
 /* tutorial on a phone: the "do this" banner sits small at the top, and touches pass through it to the controls (only its
    SKIP button takes a tap), so a thumb aiming on the right never skips a step by accident */
-html.touch #coach.task { top: 74px; width: min(560px, 54vw); padding: 10px 16px; font-size: max(14px, var(--mf)); line-height: 1.35; pointer-events: none; }
-html.touch #coach.task .cTitle { font-size: max(19px, var(--mf)); margin-bottom: 3px; } html.touch #coach.task .cDots { display: none; }
-html.touch #coach.task .cFoot { margin-top: 6px; } html.touch #coach button[data-skip] { pointer-events: auto; padding: 6px 12px; font: 700 max(13px, var(--mf)) var(--head); letter-spacing: 0.1em; }
-html.touch #coach.task.sel { top: auto; bottom: 26px; left: auto; right: 12px; transform: none; width: min(520px, 52vw); } /* operator select: over the loadout, clear of the cards */
 /* phone: menu pages (operators, armory, map knowledge, profile) fill the screen, with slim dark scroll bars */
 html.touch .overlay .page { width: calc(100vw / var(--uiz, 1)); height: calc(100vh / var(--uiz, 1)); max-height: none; overflow: hidden; border: none; }
 * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; } /* dark thin scrollbars everywhere (the default white ones looked broken) */

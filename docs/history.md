@@ -954,3 +954,22 @@ heavy 0.75, medium 0.9). He chose to keep the words behind the scenes.
   `html.touchplay`), TV, arena; setting `minimap` in Screen effects. `#allies` moves down while it shows.
 - Checked: intel, introdef, intro, abilities, oldops, newops, furniture, shapes, prepff, feeds, sim PASS;
   textsize pc 0 small; hidden-browser shots as attacker and defender on Harbor.
+
+## 2026-11-24 — Tutorial: out of the middle, much more handholding
+He asked: the centre cards covered everything; more handholding like the Counter-Strike / Valorant tutorials. He chose
+(asked together at the start): a top-left objective list, a gold marker + metres + an edge arrow when off screen,
+the reading parts as one-sentence tips with no pause, and a longer run (about 6–8 minutes).
+- tutorial.js rewritten: `STAGES` (part, phase, title, `tips`, `goals` with `t`/`done`/`at`), flattened into `GOALS`
+  (33). The panel shows the stage, a checklist (✓ done, ▸ now) and a tip that changes every 7 s. Nothing blocks any
+  more (`blocking` is always false); Space skips a goal in select/prep, finishes on the last goal; phones get SKIP.
+  New drills: drone drive/sprint/into the building/through a drone hole, run, walk, crouch, sprint, lean L/R (not on
+  phones), aim in, shoot, reload, the marked way in; defending: go to site, reinforce, barricade (marked), open
+  cameras, flip, ping, back to body, stand by the objective, crouch, take both down.
+- Markers: `coach.target()` (nearest spot on your floor: outside openings `ext`, drone holes, the site's soft walls
+  and open doorways, bombs); main.js `drawCoachMark` after `drawMarks` draws the gold ring/label/metres, or an arrow at
+  the edge; another floor says ▲ UPSTAIRS / ▼ DOWNSTAIRS.
+- Server: `tutTrack` counts what you do (metres moved/walked/sprinted, seconds crouched/leaning/aimed, shots, reloads,
+  vaults, drone metres/sprints/drone hole, cameras opened/flipped) into `tut.info`; `tutInfo()` rounds it for the
+  snapshot (rounding per tick lost everything: a tick adds 0.03). The tutorial's action clock no longer runs.
+- CSS: `#coach` sits under `#objective` (`--objB`); in the tutorial (`html.tutorial`) the minimap and stair picture
+  move to the right so they don't stack under the list.

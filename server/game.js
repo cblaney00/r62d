@@ -670,7 +670,8 @@ export class Game {
     this.time += dt;
     duelFlush(this);
     if (this.phase === PHASE.LOBBY) return;
-    const held = (this.tut && this.tut.hold && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP)) || this.free;
+    // the tutorial's action clock waits too (2026-11-24: the drills take as long as you need)
+    const held = (this.tut && (this.phase === PHASE.ACTION || this.tut.hold && (this.phase === PHASE.SELECT || this.phase === PHASE.PREP))) || this.free;
     if (!held) this.timer -= dt;
     if (this.phase === PHASE.SELECT) {
       if (this.tv) { if (this.tvBanStep()) return; tvTalk(this); if (this.allLocked()) this.beginPrep(); return; } // ESPORTS TV: bans, 15 s of team talk, then go
@@ -732,6 +733,7 @@ export class Game {
       this.by = this.side(p); // a bot's own work (boards, reinforcing in preparation) is its side's
       if (p.bot && !p.hold) { (p.zombie ? zombieThink : this.drill ? drillThink : this.arena || this.zb ? arenaThink : botThink)(this, p, dt); this.applyMove(p, dt); p.viewTime = null; }
       this.tickPlayer(p, dt);
+      if (this.tut && !p.bot) this.tutTrack(p, dt);
       p.prevInput = p.input;
       // skill uses (BALL KNOWLEDGE's uses a round, 2026-11-20): every drop in a limited skill's count, wherever it happens (bots set
       // traps straight from botPrep); skills that never run out (count 0) add to abUsed themselves where they start
@@ -1069,6 +1071,7 @@ export class Game {
   startReload(p) {
     const gun = p.guns[p.slot];
     if (!gun || p.reloadT > 0 || gun.reserve <= 0 || gun.ammo >= WEAPONS[gun.w].mag) return;
+    if (this.tut && !p.bot) this.tut.info.rel++;
     const rw = WEAPONS[gun.w]; p.reloadT = p.reloadLen = reloadLen(rw, gun) * (this.zb ? zbReloadMul(this, p) : 1); if (rw.tandem) gun.tap = !gun.tap; // the Tandem: the taped magazine, then a full change
     this.events.push({ e: 'snd', s: 'reload', x: r1(p.x), y: r1(p.y), id: p.id });
   }
@@ -1083,6 +1086,7 @@ export class Game {
     this.noise(p.x, p.y, this.side(p), (gun.m && gun.m.quiet) ? 260 : 950);
     if (this.time - (p.lastShot ?? -9) > 0.25) p.spinFrom = this.time; // the Cyclone winds up from here (and down when you let go)
     const at0 = p.adsT || 0;
+    if (this.tut && !p.bot) this.tut.info.shots++;
     gun.ammo--; p.fireCd = Math.max(p.fireCd, -1 / 30) + 60 / fireRpm(w, at0, this.time - p.spinFrom); // keep the leftover: guns fire at their real rate, not rounded up to whole ticks
     if (this.zb && p.zb && p.zb.perks.includes('rapid')) p.fireCd -= 60 / fireRpm(w, at0, this.time - p.spinFrom) * 0.25; // DOUBLE BARREL
     if (p.ms) p.ms.shots += w.pellets;
@@ -2735,7 +2739,36 @@ export class Game {
   }
 
   // ---------------- tutorial ----------------
-  blankTutInfo() { return { reinf: 0, barri: 0, pings: [], n: 0, feedPings: 0 }; }
+  blankTutInfo() { return { reinf: 0, barri: 0, pings: [], n: 0, feedPings: 0, mv: 0, wk: 0, cr: 0, spr: 0, lL: 0, lR: 0, ads: 0, shots: 0, rel: 0, vlt: 0, dm: 0, dsp: 0, hole: 0, cam: 0, flip: 0 }; }
+  // (he asked 2026-11-24: much more handholding) what you have done so far, so the coach's checklist ticks itself:
+  // metres moved / walked / sprinted, seconds crouched / leaning / aimed in, shots, reloads, vaults, the drone's metres,
+  // drone sprints, a drone hole passed, cameras opened and flipped through. Only you, only in the tutorial.
+  tutInfo() { const o = { ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 }; for (const [k, v] of Object.entries(this.tut.info)) o[k] = typeof v === 'number' ? Math.round(v * 10) / 10 : v; return o; }
+  tutTrack(p, dt) {
+    const I = this.tut.info, inp = p.input || {}, t1 = v => v; // (rounded only when sent: tutInfo)
+    if (!p.alive) return;
+    if (p.ctrl === 'body' && !p.staged) {
+      const d = p._tx === undefined ? 0 : Math.hypot(p.x - p._tx, p.y - p._ty); p._tx = p.x; p._ty = p.y;
+      if (d > 0 && d < 30) { const m = d / PX_PER_M; I.mv = t1(I.mv + m); if (inp.walk && !inp.sprint) I.wk += m; if (inp.sprint && !inp.walk && !inp.crouch) I.spr += m; }
+      if (inp.crouch) I.cr = t1(I.cr + dt);
+      if (inp.lean < 0) I.lL = t1(I.lL + dt); else if (inp.lean > 0) I.lR = t1(I.lR + dt);
+      if (inp.ads) I.ads = t1(I.ads + dt);
+      if (p.vault && !p._tv) I.vlt++;
+      p._tv = !!p.vault;
+    } else p._tx = undefined;
+    if (p.ctrl === 'drone') {
+      const e = this.ent(p.droneId);
+      if (e) {
+        const d = e._tx === undefined ? 0 : Math.hypot(e.x - e._tx, e.y - e._ty); e._tx = e.x; e._ty = e.y;
+        if (d < 30) I.dm = t1(I.dm + d / PX_PER_M);
+        const spr = this.time < (p.sprintUntil || 0); if (spr && !p._tds) I.dsp++; p._tds = spr;
+        const M = this.map, cx = Math.floor(e.x / CELL), cy = Math.floor(e.y / CELL), k = cy * M.W + cx;
+        if (M.dhole[k] || (M.dhole[k - 1] && e.x - cx * CELL < 4) || (M.dhole[k + 1] && (cx + 1) * CELL - e.x < 4) || (M.dhole[k - M.W] && e.y - cy * CELL < 4) || (M.dhole[k + M.W] && (cy + 1) * CELL - e.y < 4)) I.hole = 1;
+      }
+    }
+    if (p.ctrl === 'cam') { if (p._tc !== 'cam') I.cam++; else if (p.feedId !== p._tf) I.flip++; p._tf = p.feedId; }
+    p._tc = p.ctrl;
+  }
   // 'start' / 'retry' sets up a lesson: you alone against two easy bots on Harbor Office.
   // 'go' moves on when the coach is done with a held phase (operator select, preparation).
   tutAction(p, m) {
@@ -3579,7 +3612,7 @@ export class Game {
       ph: this.phase, tm: r1(Math.max(0, this.timer)), it: this.introT > 0 ? r2(this.introT) : undefined, rd: this.round, sc: this.score, mv: this.mapVersion, dh: this.map.dyn && this.map.dyn.length ? this.map.dyn : undefined, pp: this.map.peeps && this.map.peeps.length ? this.map.peeps : undefined, mp: this.mapId, rm: this.randomMap ? 1 : 0,
       site: this.site, slk: this.siteLk ? 1 : 0, su: this.sitesUsed || [], rev: this.siteRevealed ? 1 : 0, pl: this.planted ? { x: r1(this.planted.x), y: r1(this.planted.y), b: this.planted.bomb, t: r1(this.planted.t) } : null,
       tvl: this.tv ? this.botLevel : undefined, cp: this.tv ? this.colPair : undefined, md: this.tut || this.free || this.tv ? undefined : this.mode, ar: arenaInfo(this), zb: zbInfo(this), ot: inOvertime(this.rules, this.score) ? 1 : undefined, wr: roundsToWin(this.rules, this.score), bn: (this.tv || this.rules.bans) && this.bans ? this.bans.map(b => [b.op, b.sq, b.rd]) : undefined,
-      bq: (this.tv || this.rules.bans) && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], this.banRun.t === Infinity ? -1 : r1(Math.max(0, (this.banRun.t ?? this.time) - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? { ...this.tut.info, ls: this.tut.lesson, hold: this.tut.hold ? 1 : 0 } : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
+      bq: (this.tv || this.rules.bans) && this.phase === PHASE.SELECT && this.banRun && this.banRun.round === this.round && this.banRun.i < this.banRun.order.length ? [...this.banRun.order[this.banRun.i], this.banRun.t === Infinity ? -1 : r1(Math.max(0, (this.banRun.t ?? this.time) - this.time)), this.banRun.i, this.banRun.order.length] : undefined, rf: this.reinforce, win: this.winner, tu: this.tut ? this.tutInfo() : undefined, why: this.reason, spawn: this.spawnName, fp: this.free ? 1 : undefined, bl: this.botLevel, rk: this.ranked ? 1 : 0,
       players, ents, cells, holes, cb, hb, ev: this.events, spots, time: r2(this.time),
     });
     this.events = [];
