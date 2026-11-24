@@ -191,4 +191,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-23', k: 'mech', id: 'intel', t: 'When your skill or gadget finds an enemy (sensors, traps, darts, scans, overwatch, spotting) you get a short note saying what it found.', v: 1 },
   { d: '2026-11-23', k: 'mech', id: 'minimap', t: 'A small minimap in the top left on computers shows your floor, you and the bomb site (attackers once they have found it).', v: 1 },
   { d: '2026-11-24', k: 'mech', id: 'tutorial', t: 'The tutorial no longer covers the middle of the screen: a small list in the top left says what to do next and ticks itself off, a gold marker shows where to go, and every control gets its own short step.', v: 1 },
+  { d: '2026-11-24', k: 'mech', id: 'aim', t: 'Shots go exactly where the reticle is while leaning (they used to land a lean\'s width to the side you lean), and with the reticle on someone, exactly at that part of their body; the red head circle matches the headshot rule.', v: 1 },
 ];

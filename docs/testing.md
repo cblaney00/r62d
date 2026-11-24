@@ -54,3 +54,8 @@ size (font size × menu zoom) is under `MIN` (12; use `MIN=11.9` on phones) plus
 A Firefox test profile in /tmp is 140-270 MB, and they piled up to 104 GB (found 2026-11-18). After a run: kill the
 browser, wait until no process still uses the profile (`pgrep -u insideabush -f r62d-ff` empty), then `rm -rf` it; a
 profile deleted while Firefox is still closing comes back half-written.
+
+## Aim accuracy (rope and on foot)
+`tests/ropeaim.mjs <port> <url>` with a fast server (same setup as Screenshots above): the crosshair on a dummy's drawn
+head/chest from a rope at a window (`FOOT=1` standing inside), leaning (`LEANS=0,-1,1`); each shot must pass within
+1.5 px of the real body and head aims must count. Spots out of your sight are skipped. Must print PASS.

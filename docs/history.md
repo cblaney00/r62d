@@ -973,3 +973,20 @@ the reading parts as one-sentence tips with no pause, and a longer run (about 6â
   snapshot (rounding per tick lost everything: a tick adds 0.03). The tutorial's action clock no longer runs.
 - CSS: `#coach` sits under `#objective` (`--objB`); in the tutorial (`html.tutorial`) the minimap and stair picture
   move to the right so they don't stack under the list.
+
+## 2026-11-24 â€” Aim exactly on the reticle (rope, leaning)
+He asked: aiming and shooting through windows on a rope must be perfectly accurate to the reticle; with the Saker LR
+and 2x scope his shots seemed to go right.
+- Cause: the server fires from `leanPoint` (the tipped upper body) but the client sent the aim angle from your feet
+  (`st.pred`), so a leaning shot ran parallel to the crosshair line, `LEAN_PX` (6 px) to the lean side (lean right =
+  right). sendInput now aims from `leanPoint` too (also when raised walls are off).
+- Body under the crosshair: where people are drawn, main.js `draw` pushes each body (not you) to `st.cols` (real spot,
+  lean, base height `bz` = furniture/stair/rope height, `zk` crouch/prone, upside down); sendInput `bodyAim` finds the
+  drawn body column (0..0.6 of a body, `BODY_PICK` 9 px) nearest the crosshair: the bullet goes at the matching spot of
+  the real body, and the sent `ax/ay` is as far from their real middle as the crosshair is from their drawn head (0.49),
+  so the red head zone is exactly the headshot rule. Off any body, the old general correction (a standing head) stays.
+  Head zones/rings now use the same base and height as drawOperator (a climber from the rope height, upside down).
+- Test: `tests/ropeaim.mjs <port> <url>` (fast server): hangs you at a window (boards opened; `BOARDS=1` keeps them),
+  Saker + 2x scope aimed in, a still dummy at 7-9 spots inside, the crosshair kept on its drawn head or chest each frame,
+  fires; prints how far each bullet passed from the real body. `FOOT=1` the same standing inside, `LEANS=0,-1,1`.
+  Before: no lean 0-3.5 px (chest), leaning 6-9 px. After: worst 0.14 px on a rope, 0.05 px on foot; head aims all count.

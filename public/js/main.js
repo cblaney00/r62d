@@ -2903,6 +2903,25 @@ const PF = { frames: 0 }; function pfa(k, t) { const n = performance.now(); PF[k
 
 
 
+// The crosshair on someone as they are drawn standing up (st.cols, filled where people are drawn): the bullet goes at
+// the matching spot of their real body, and the aim point sent for the headshot rule is as far from their real middle as
+// the crosshair is from their drawn head (the red head zone). Each body's own height counts (crouched, lying, on furniture,
+// on a stair, on a rope, upside down), where the general correction below can only guess a standing head (he asked
+// 2026-11-24: perfectly accurate to the reticle). null when the crosshair is on nobody.
+const BODY_PICK = 9; // world px from the drawn body's middle line (a body is PLAYER_R 6, its hit circle a little more)
+function bodyAim(mw) {
+  if (!persp.h || !st.cols || !st.cols.length) return null;
+  let best = null, bd = BODY_PICK;
+  for (const c of st.cols) {
+    const R = c.lo ? leanPoint(st.map, c.x, c.y, c.ag, c.lo) : c, b = liftOf(R.x, R.y, c.bz);
+    const at = z => { const u = liftBody(R.x, R.y, (c.inv ? 0.6 - z : z) * c.zk); return { x: R.x + b[0] + u[0], y: R.y + b[1] + u[1] }; };
+    const p0 = at(0), p1 = at(0.6), vx = p1.x - p0.x, vy = p1.y - p0.y, L2 = vx * vx + vy * vy;
+    const t = L2 > 1e-6 ? Math.max(0, Math.min(1, ((mw.x - p0.x) * vx + (mw.y - p0.y) * vy) / L2)) : 0;
+    const qx = p0.x + vx * t, qy = p0.y + vy * t, d = Math.hypot(mw.x - qx, mw.y - qy);
+    if (d < bd) { bd = d; const H = at(0.49); best = { shot: { x: R.x + mw.x - qx, y: R.y + mw.y - qy }, head: { x: R.x + mw.x - H.x, y: R.y + mw.y - H.y } }; }
+  }
+  return best;
+}
 function sendInput(dt, me, ctrl, view, s, now) {
   const ev = st.evq; st.evq = [];
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
@@ -2968,14 +2987,21 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const msg = { t: 'input', s: ++st.seq, k, a: Math.round(st.aim * 100000) / 100000, dt: Math.round(dt * 10000) / 10000 };
   const c = cursor(), mw = freeLive() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
   if (st.r3aim) { mw.x = st.r3aim.x; mw.y = st.r3aim.y; } // (the 3D rope view's crosshair)
-  if (persp.h) { // (bodies stand up at most as if persp.cap from the eye: liftBody)
+  const body = ctrl === 'body' && !st.r3aim ? bodyAim(mw) : null; // the crosshair on someone as they are drawn: exactly their body
+  let shot = mw;
+  if (body) { shot = body.shot; mw.x = body.head.x; mw.y = body.head.y; }
+  else if (persp.h) { // (bodies stand up at most as if persp.cap from the eye: liftBody)
     const hh = persp.h * 0.46, dx = mw.x - persp.x, dy = mw.y - persp.y, d = Math.hypot(dx, dy), k = d / (1 + hh) <= persp.cap ? 1 / (1 + hh) : Math.max(0, d - persp.cap * hh) / Math.max(1e-6, d);
     mw.x = persp.x + dx * k; mw.y = persp.y + dy * k; } // a head is drawn where its height shows it (look.js persp): back to where it really is
-  if (st.winKp && st.winKp < 1 && st.winViewsOn && st.map && winAimed(st.aim)) { mw.x = st.pred.x + (mw.x - st.pred.x) / st.winKp; mw.y = st.pred.y + (mw.y - st.pred.y) / st.winKp; } // aiming down out of a window: the ground there is drawn shrunk toward you (drawWindowView)
-  for (const H of st.hatchKp || []) if (H.kp !== 1 && mw.x >= H.x0 && mw.x <= H.x1 && mw.y >= H.y0 && mw.y <= H.y1) { mw.x = H.ex + (mw.x - H.ex) / H.kp; mw.y = H.ey + (mw.y - H.ey) / H.kp; break; } // aiming into a hatch view (drawHatchView): back to the real spot
+  if (!body && st.winKp && st.winKp < 1 && st.winViewsOn && st.map && winAimed(st.aim)) { mw.x = st.pred.x + (mw.x - st.pred.x) / st.winKp; mw.y = st.pred.y + (mw.y - st.pred.y) / st.winKp; } // aiming down out of a window: the ground there is drawn shrunk toward you (drawWindowView)
+  if (!body) for (const H of st.hatchKp || []) if (H.kp !== 1 && mw.x >= H.x0 && mw.x <= H.x1 && mw.y >= H.y0 && mw.y <= H.y1) { mw.x = H.ex + (mw.x - H.ex) / H.kp; mw.y = H.ey + (mw.y - H.ey) / H.kp; break; } // aiming into a hatch view (drawHatchView): back to the real spot
   // the bullet flies toward that real spot, not the drawn one: with the tilt a head is drawn away from the body, so a shot
   // along the drawn direction passed beside the real body and missed (he noticed 2026-11-16: headshots missing on computer)
-  if (persp.h && ctrl === 'body' && !st.r3aim && Math.hypot(mw.x - st.pred.x, mw.y - st.pred.y) > 8) msg.a = Math.round(Math.atan2(mw.y - st.pred.y, mw.x - st.pred.x) * 100000) / 100000;
+  // ...and from where the bullet starts: leaning, that is your tipped upper body (physics leanPoint, as the server fires),
+  // not your feet; aimed from the feet, the shot ran beside the crosshair line, a lean's width to that side (he noticed
+  // 2026-11-24 on a rope with the Saker LR: shots going right, leaning right round a window's edge)
+  const lo = ctrl === 'body' ? st.pred.lo || 0 : 0, sh = lo ? leanPoint(st.map, st.pred.x, st.pred.y, st.aim, lo) : st.pred;
+  if ((persp.h || lo) && ctrl === 'body' && !st.r3aim && Math.hypot(shot.x - sh.x, shot.y - sh.y) > 8) msg.a = Math.round(Math.atan2(shot.y - sh.y, shot.x - sh.x) * 100000) / 100000;
   msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
   st.aimUp = ctrl === 'body' && me && me.a && !me.dn && !!aimUpHatch(st.map, st.pred.x, st.pred.y, mw.x, mw.y); // your own aim-up pose, without waiting for the server
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
@@ -3494,7 +3520,7 @@ function draw(s, view, now, dt) {
   }
 
   // players
-  const drawn = []; st.heads = []; st.rings = []; // st.rings: everyone drawn but you, for the orange/blue marker (it stops on their circle) // enemies you can see: their head zones show while you aim in
+  const drawn = []; st.heads = []; st.rings = []; st.cols = []; // st.rings: everyone drawn but you, for the orange/blue marker (it stops on their circle) // enemies you can see: their head zones show while you aim in
   for (const sp of s.players) {
     if (!sp.a || sp.sg) continue; // an attacker waiting off the map during preparation
     const isMe = me && sp.id === me.id;
@@ -3578,7 +3604,10 @@ function draw(s, view, now, dt) {
       if (elv || sa > 0.04) c.restore(); }); };
     upDraw(ctx); if ((elv || hangW !== undefined || slz > 0.3) && persp.h) (st.upDraws || (st.upDraws = [])).push(upDraw);
     else if (persp.h) (st.ghostDraws || (st.ghostDraws = [])).push(upDraw); // (shown faintly again over the raised walls)
-    const zk = p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = elv ? fTop : slz, lb = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.37 * zk)), lh = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, 0.49 * zk)); // (drawn standing up: rings and head zones where they show)
+    // (drawn standing up: rings and head zones where they show; the same numbers as drawOperator: a climber from the rope height, upside down from the top)
+    const hg = hangW !== undefined, inv = p.rp === 3, zk = hg ? 1 : p.pn || p.dn || p.sd ? 0.18 : p.cr ? 0.66 : 1, ez0 = hg ? ((isMe ? st.ropeH : p.rz) ?? 0.5) - 0.55 : elv ? fTop : slz;
+    const lb = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, (inv ? 0.6 - 0.37 : 0.37) * zk)), lh = addL(liftOf(p.x, p.y, ez0), liftBody(p.x, p.y, (inv ? 0.6 - 0.49 : 0.49) * zk));
+    if (!isMe && persp.h) st.cols.push({ x: p.x, y: p.y, lo: p.le || 0, ag: p.ag, bz: ez0, zk, inv }); // the body as drawn, for aiming at it (sendInput bodyAim)
     drawn.push(p); if (!isMe) st.rings.push({ id: p.id, x: p.x + lb[0], y: p.y + lb[1] });
     if (!ally && !isMe && !p.dn) st.heads.push({ x: p.x + lh[0], y: p.y + lh[1] });
     if (String(sp.aa).includes('laser') && !p.dn) { // a laser sight shows a beam everyone can see
