@@ -84,10 +84,44 @@ export function drawFastRing(ctx, x, y, R, out, k) {
   ctx.globalAlpha = out ? 0.75 : 0.42; ctx.strokeStyle = '#a9c4a2'; ctx.lineWidth = 1.2 * k; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.stroke();
   ctx.restore();
 }
-export function drawReticle(ctx, sight, x, y, spread, k, sz = 1) {
+// Easier to find (he asked 2026-11-26: it got lost on the fly; he chose all four): Settings → Mouse & Aim → Reticle
+// highlight, a strength (0-100%) and Glow / Bold / Line. reticleHelp() is called once a frame before drawReticle (main.js
+// and the Armory, each with its own state object): it tracks how fast the reticle moves on the screen, draws the faint
+// line from you to it and the glow while it moves fast (fading a moment after it stops), and returns the options for
+// drawReticle. Plain strokes and one small gradient only (GPU lesson: no filters, shadows or odd composite ops).
+export const XHI_DEFAULT = { hi: 100, glow: true, bold: true, line: true };
+export function reticleHelp(S, ctx, x, y, px, py, now, o, k, line = true) {
+  const f = Math.max(0, Math.min(1, (o.hi ?? 100) / 100)), dt = Math.min(0.1, Math.max(0, now - (S.t || now)));
+  const rx = x - px, ry = y - py; // measured from you, so the camera gliding or you walking doesn't count: only your aim moving
+  const v = dt > 0 && S.x !== undefined ? Math.hypot(rx - S.x, ry - S.y) / k / dt : 0; S.x = rx; S.y = ry; S.t = now;
+  S.v = (S.v || 0) + (v - (S.v || 0)) * (1 - Math.exp(-dt / 0.05)); // speed in CSS px a second, smoothed
+  const want = o.glow ? Math.max(0, Math.min(1, (S.v - 350) / 900)) : 0;
+  S.g = want > (S.g || 0) ? (S.g || 0) + (want - (S.g || 0)) * (1 - Math.exp(-dt / 0.04)) : (S.g || 0) * Math.exp(-dt / 0.3);
+  const glow = S.g * f, bold = o.bold ? f : 0;
+  if (o.line && line && f > 0) { // a faint thin line from just outside your body to just short of the reticle
+    const dx = x - px, dy = y - py, d = Math.hypot(dx, dy), a0 = 12 * k, a1 = d - 16 * k;
+    if (a1 > a0 + 6 * k) {
+      const ux = dx / d, uy = dy / d; ctx.save(); ctx.lineCap = 'round';
+      ctx.globalAlpha *= f * (0.22 + 0.28 * S.g);
+      for (const [c, w] of [['rgba(0,0,0,0.8)', 2.6], ['#e8f2e4', 1.1]]) { ctx.strokeStyle = c; ctx.lineWidth = w * k; ctx.beginPath(); ctx.moveTo(px + ux * a0, py + uy * a0); ctx.lineTo(px + ux * a1, py + uy * a1); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+  return { glow, bold };
+}
+
+export function drawReticle(ctx, sight, x, y, spread, k, sz = 1, opt = null) {
   x = Math.round(x) + 0.5; y = Math.round(y) + 0.5;
-  const g = Math.max(0, spread) * k, A = 0.82, ek = k * Math.max(0.6, 0.8 * sz); k *= 1.35 * 0.8 * sz; // (a third bigger than a plain pixel, then 20% smaller: he asked 2026-11-18) // g = how far it opens up, ek = the dark edge
-  const edge = 'rgba(0,0,0,0.55)';
+  const bold = opt ? opt.bold || 0 : 0, glow = opt ? opt.glow || 0 : 0;
+  if (glow > 0.01) { // the glow while it moves: a soft light halo and a thin bright ring round it
+    const R = 26 * k * Math.max(0.7, sz), gr = ctx.createRadialGradient(x, y, 2 * k, x, y, R);
+    gr.addColorStop(0, `rgba(235,255,230,${0.42 * glow})`); gr.addColorStop(0.55, `rgba(169,196,162,${0.22 * glow})`); gr.addColorStop(1, 'rgba(169,196,162,0)');
+    ctx.save(); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
+    ctx.globalAlpha *= glow * 0.8; ctx.lineWidth = 3 * k; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(x, y, R * 0.62, 0, 7); ctx.stroke();
+    ctx.lineWidth = 1.4 * k; ctx.strokeStyle = '#f2fff0'; ctx.stroke(); ctx.restore();
+  }
+  const g = Math.max(0, spread) * k, A = 0.82 + 0.18 * bold, ek = k * Math.max(0.6, 0.8 * sz) * (1 + 0.5 * bold); k *= 1.35 * 0.8 * sz * (1 + 0.12 * bold); // (a third bigger than a plain pixel, then 20% smaller: he asked 2026-11-18; Bold: solid, a thicker edge, 12% bigger) // g = how far it opens up, ek = the dark edge
+  const edge = `rgba(0,0,0,${0.55 + 0.3 * bold})`;
   // every shape is drawn twice: a wider dark stroke under, then the colour
   const both = (col, w, path, fill) => { ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.strokeStyle = edge; ctx.lineWidth = w * k + 2 * ek; ctx.beginPath(); path(); ctx.stroke(); if (fill) { ctx.fillStyle = edge; ctx.fill(); }

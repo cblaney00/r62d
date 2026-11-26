@@ -23,7 +23,7 @@ import { openMapInfo, closeMapInfo } from './mapinfo.js';
 import { openPlaybook, closePlaybook } from './playbook.js';
 import { openKnowledge, closeKnowledge } from './knowledge.js';
 import { PRO_TEAMS } from '/shared/pros.js';
-import { drawReticle, drawSightLook, magnify, lensPt, lensMag, drawFastRing } from './crosshair.js';
+import { drawReticle, drawSightLook, magnify, lensPt, lensMag, drawFastRing, reticleHelp, XHI_DEFAULT } from './crosshair.js';
 import { readPad, PAD_ACTIONS, PAD_HELP, XBOX_ACTIONS } from './gamepad.js';
 import { startMusic, stopMusic, setMood, setMusicVolume } from './music.js';
 import { levelFor, RANKS, RANK_COL } from '/shared/progress.js';
@@ -4126,10 +4126,14 @@ function gunHeat(me, w, now) {
 // down to 55% from 21 m. Its gap is not scaled (crosshair.js drawReticle).
 const XH_REF_H = 470 * REST_ZOOM;
 function xhSize(x, y, px, py) {
-  const z = st.zoom || 1, zk = Math.max(0.45, Math.min(1, XH_REF_H / (st.viewH || XH_REF_H)));
+  const o = xhOpt(), b = o.bold ? o.hi / 100 : 0; // Bold (he asked 2026-11-26): it shrinks less (down to 75%, not 55%)
+  const z = st.zoom || 1, zk = Math.max(0.45 + 0.2 * b, Math.min(1, XH_REF_H / (st.viewH || XH_REF_H)));
   const dm = Math.hypot(x - px, y - py) / z / PX_PER_M;
-  return zk * Math.max(0.55, 1 - Math.max(0, dm - 3) * 0.025);
+  return zk * Math.max(0.55 + 0.2 * b, 1 - Math.max(0, dm - 3) * 0.025);
 }
+// Reticle highlight (he asked 2026-11-26; crosshair.js reticleHelp): strength and Glow / Bold / Line, Settings → Mouse & Aim
+const xhOpt = () => { const r = $('xhHi'); return r ? { hi: +r.value, glow: $('xhGlow').checked, bold: $('xhBold').checked, line: $('xhLine').checked } : XHI_DEFAULT; };
+const xhHelp = {};
 const sightLook = (sight, x, y, k) => drawSightLook(ctx, sight, x, y, k, DPR, scopeLensR()); // in crosshair.js, shared with the Armory
 // the sniper's clear lens, in canvas px, and the blurred, dimmed view round it (#scopeVeil; its CSS only changes when it
 // moves a pixel, so the browser isn't asked to redo the blur's mask every frame for nothing)
@@ -4244,7 +4248,8 @@ function crosshair(me, now) {
   if (me.mv === 3) ctx.globalAlpha = 0.3; // sprinting: gun down
   else { st.xhFade = (st.xhFade ?? 1) + ((fq && fq.stopped ? 0.45 : 1) - (st.xhFade ?? 1)) * Math.min(1, (now - (st.xhFadeT || now)) * 14); ctx.globalAlpha = st.xhFade; } // bullets stop at a wall before it: faded, gliding (no flicker past door frames)
   st.xhFadeT = now;
-  if (!(sniperOn(me) && me.at > 0.6 && me.ct === 'body')) drawReticle(ctx, attFromCode(me.aa).sight, x, y, spread, DPR, xhSize(x, y, px, py)); // the reticle of the sight on your gun (the sniper lens reticle takes over)
+  const lensUp = sniperOn(me) && me.at > 0.6 && me.ct === 'body', hl = reticleHelp(xhHelp, ctx, x, y, px, py, now, xhOpt(), DPR, me.ct === 'body' && !lensUp);
+  if (!lensUp) drawReticle(ctx, attFromCode(me.aa).sight, x, y, spread, DPR, xhSize(x, y, px, py), hl); // the reticle of the sight on your gun (the sniper lens reticle takes over)
   ctx.globalAlpha = 1;
   // points popups under the crosshair (he asked, R6-style): newest at the top, each fades after a couple of seconds
   ptsPopups(ctx, x, y, now);
@@ -5315,7 +5320,7 @@ function setTab(tab) {
   if (NEEDS_NAME.has(tab) && !st.token) { askName(tab); return; }
   if (tab === 'ops') { showOps(); return; }
   if (tab === 'profile') { showProfile(); return; }
-  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR, steady: () => $('steadySens').value / 100, fast: () => farOn() ? [farFast(), farFastPx()] : null, low: () => gfxLevel() === 'low' }); return; }
+  if (tab === 'armory') { audio.ui('open'); openArmory($('armoryPage'), { xhOpt, sens: ads => ($('sens').value / 100) * (ads ? $('adsSens').value / 100 : 1), xh: () => xh, mode: () => aimMode, dpr: () => DPR, steady: () => $('steadySens').value / 100, fast: () => farOn() ? [farFast(), farFastPx()] : null, low: () => gfxLevel() === 'low' }); return; }
   if (tab === 'maps') { audio.ui('open'); openMapInfo($('mapsPage')); return; }
   if (tab === 'knowledge') { audio.ui('open'); openKnowledge($('bkPage')); return; }
   if (tab === 'playbook') { audio.ui('open'); trainInfo(); openPlaybook($('playbookPage')); return; }
@@ -5364,7 +5369,7 @@ function updateCard() {
   $('pcName').textContent = p.name; $('pcLevel').textContent = L.level;
   $('pcXp').style.width = (L.into / L.need * 100) + '%'; $('pcXpText').innerHTML = `LEVEL ${L.level} · ${L.into} / ${L.need} XP ${rankTag(p.rank)} <span style="opacity:.6">${p.mmr ?? ''} MMR</span>`;
 }
-const TIPS = ['The small map in the top left shows the floor you are on and, once your team knows it, the bomb site in gold (Settings, Screen, to hide it).', 'The box in the top left shows the room you are in: use its name when you call out where an enemy is (Settings, Screen, to hide it).', 
+const TIPS = ['Lose your reticle? Settings, Mouse & Aim, Reticle highlight: it glows while you move it fast, and a faint line runs from you to it.', 'The small map in the top left shows the floor you are on and, once your team knows it, the bomb site in gold (Settings, Screen, to hide it).', 'The box in the top left shows the room you are in: use its name when you call out where an enemy is (Settings, Screen, to hide it).', 
   'Put a trap, camera, shield or wire in the wrong spot? Hold {interact} on it to pick it back up and place it again. Only your own, never a teammate\'s.',
   'Push your crosshair past the edge of the screen to look further: it reaches anywhere you can see. Aim in (right click) for a wider view and to see head zones.',
   'Aiming in moves your crosshair out to your sight\'s distance, unless it is already on an enemy you can see (within 2 m): then it stays right where you put it.',
@@ -5431,13 +5436,14 @@ try {
 } catch {}
 setMusicVolume(musicVol());
 $('volMusic').oninput = () => { setMusicVolume(musicVol()); try { localStorage.setItem('r62d-music2', $('volMusic').value); } catch {} };
-window.__r62d = { addFeed: t => addFeed(t), face: a => { padAng = a; st.aim = a; st.dzAng = a; aimOff = { x: Math.cos(a) * 150, y: Math.sin(a) * 150 }; }, toScr: (x, y) => { const q = w2s(x, y); return tilt.project(q.x / DPR, q.y / DPR); }, covers: () => coverShapes(), coverOff: () => st.coverOff, padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: () => rope3d.debug(), r3q: f => rope3d.quality(f), PF, st, fx, tilt, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset, scr: () => { const c = cursor(), p = tilt.project(c.x / DPR, c.y / DPR), q = w2s(st.pred.x, st.pred.y), o = tilt.project(q.x / DPR, q.y / DPR); return { x: Math.round(p.x - o.x), y: Math.round(p.y - o.y) }; } }; // scr: the crosshair on screen, CSS px from your character // for automated screenshot tests
+window.__r62d = { xhHelp, xhOpt, addFeed: t => addFeed(t), face: a => { padAng = a; st.aim = a; st.dzAng = a; aimOff = { x: Math.cos(a) * 150, y: Math.sin(a) * 150 }; }, toScr: (x, y) => { const q = w2s(x, y); return tilt.project(q.x / DPR, q.y / DPR); }, covers: () => coverShapes(), coverOff: () => st.coverOff, padFar: () => padPointW(), pick: (sx, sy) => { const u = tilt.untilt(sx, sy); return screenToWorld(u.x * DPR, u.y * DPR); }, r3: () => rope3d.debug(), r3q: f => rope3d.quality(f), PF, st, fx, tilt, assist: () => ({ tgt: assistTgt, on: assistOn(), seen: (st.foesSeen || []).length }), fxOff: () => fxOff, applyFx: () => applyFx(), switchMatch, showEnd, playXp, siteFound, pad: () => ({ padAng, padReach, padOn }), freeMove, turnMove, faceMove, setAim, aimOff: () => aimOff, aimTo: (x, y) => { aimOff = { x: x - st.pred.x, y: y - st.pred.y }; }, aimMode: () => aimMode, freeAimPoint, adsReset, scr: () => { const c = cursor(), p = tilt.project(c.x / DPR, c.y / DPR), q = w2s(st.pred.x, st.pred.y), o = tilt.project(q.x / DPR, q.y / DPR); return { x: Math.round(p.x - o.x), y: Math.round(p.y - o.y) }; } }; // scr: the crosshair on screen, CSS px from your character // for automated screenshot tests
 
 // ---------------- settings saved per profile ----------------
 // Keys and volumes live in your profile on the game computer, so they follow you to any browser.
 function currentSettings() {
   try { localStorage.setItem('r62d-sens', JSON.stringify([+$('sens').value, +$('adsSens').value, +$('steadySens').value, 0, +$('farFast').value, +$('farFastM').value, $('farOn').checked ? 1 : 0])); localStorage.setItem('r62d-sensv', String(SENS_V)); } catch {}
-  return { bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sv: SENS_V, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, farFast: +$('farFast').value, farFastM: +$('farFastM').value, farOn: $('farOn').checked ? 1 : 0, aim: aimMode, aimV: 2, xh, lean: leanMode, cols: { ...COLS } };
+  const xo = xhOpt(); try { localStorage.setItem('r62d-xhhi', JSON.stringify([xo.hi, +xo.glow, +xo.bold, +xo.line])); } catch {}
+  return { xhHi: [xo.hi, +xo.glow, +xo.bold, +xo.line], bindsVersion: BINDS_VERSION, binds: getBinds(), volMaster: +$('volMaster').value, volSfx: +$('volSfx').value, volMusic: +$('volMusic').value, vc: 2, sv: SENS_V, sens: +$('sens').value, adsSens: +$('adsSens').value, steadySens: +$('steadySens').value, farFast: +$('farFast').value, farFastM: +$('farFastM').value, farOn: $('farOn').checked ? 1 : 0, aim: aimMode, aimV: 2, xh, lean: leanMode, cols: { ...COLS } };
 }
 let saveTimer = 0;
 // Settings → COLOURS (he asked 2026-11-14): ready colours + a custom picker for each (teamcol.js)
@@ -5463,6 +5469,7 @@ function applySettings(s) {
   const sensOld = s.sv !== SENS_V; if (sensOld) setTimeout(saveSettings, 500); // saved before the new mouse defaults: everyone starts on them once
   for (const k of ['volMaster', 'volSfx', 'volMusic', 'sens', 'adsSens', 'steadySens', 'farFast', 'farFastM']) if (typeof s[k] === 'number' && !(sensOld && /ens$/.test(k))) $(k).value = VOL_DEF[k] !== undefined && s.vc !== 2 ? fromOld(k, s[k]) : s[k];
   if (typeof s.farOn === 'number') $('farOn').checked = !!s.farOn; // (the far aim speed switch)
+  if (Array.isArray(s.xhHi)) setXhHi(s.xhHi); // (the reticle highlight)
   if (s.vc !== 2 && typeof s.volMaster === 'number') setTimeout(saveSettings, 500); // saved before the loudness curve: store the converted values
   if (s.lean) setLean(s.lean, false);
   if (s.cols) { setCols(s.cols); renderCols(); }
@@ -5490,6 +5497,10 @@ $('pResume').addEventListener('click', () => { if (playing() && !isTouch && !st.
 const showSens = () => { $('sensVal').textContent = ($('sens').value / 100).toFixed(2); $('adsSensVal').textContent = ($('adsSens').value / 100).toFixed(2) + '×'; $('steadySensVal').textContent = ($('steadySens').value / 100).toFixed(2) + '×'; $('farFastVal').textContent = (+$('farFast').value > 0 ? '+' : '') + $('farFast').value + '%'; $('farFastMVal').textContent = (+$('farFastM').value).toFixed(1) + ' m'; };
 for (const id of ['sens', 'adsSens', 'steadySens', 'farFast', 'farFastM']) { $(id).addEventListener('input', showSens); $(id).addEventListener('change', saveSettings); }
 $('farOn').addEventListener('change', saveSettings); // the far aim speed's On/Off switch
+// the reticle highlight (he asked 2026-11-26): strength + Glow / Bold / Line, kept on this computer too
+function setXhHi(v) { if (!$('xhHi')) return; if (typeof v[0] === 'number') $('xhHi').value = v[0]; ['xhGlow', 'xhBold', 'xhLine'].forEach((id, i) => { if (v[i + 1] != null) $(id).checked = !!v[i + 1]; }); showXhHi(); }
+function showXhHi() { $('xhHiVal').textContent = $('xhHi').value + '%'; }
+if ($('xhHi')) { $('xhHi').addEventListener('input', showXhHi); for (const id of ['xhHi', 'xhGlow', 'xhBold', 'xhLine']) $(id).addEventListener('change', saveSettings); try { const v = JSON.parse(localStorage.getItem('r62d-xhhi') || 'null'); if (v) setXhHi(v); } catch {} showXhHi(); }
 // (he asked 2026-11-18: the mouse 30% quicker by default, 1.00 → 1.30, and everyone moved onto it once: SENS_V)
 try { const v = localStorage.getItem('r62d-sensv') === String(SENS_V) ? JSON.parse(localStorage.getItem('r62d-sens') || 'null') : null; if (v) { $('sens').value = v[0]; $('adsSens').value = v[1]; if (v[2]) $('steadySens').value = v[2]; if (v[4] != null) $('farFast').value = v[4]; if (v[5]) $('farFastM').value = v[5]; if (v[6] != null) $('farOn').checked = !!v[6]; } } catch {}
 showSens();

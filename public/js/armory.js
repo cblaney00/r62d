@@ -4,7 +4,8 @@
 // match (he asked): the mouse is captured on the first click, the crosshair moves with your sensitivity and aiming mode,
 // it is your own crosshair, distances are real metres, the view widens when you aim in and follows the crosshair out.
 import { PX_PER_M } from '/shared/constants.js';
-import { drawReticle, drawSightLook, magnify, lensPt, lensMag, drawFastRing } from './crosshair.js';
+import { drawReticle, drawSightLook, magnify, lensPt, lensMag, drawFastRing, reticleHelp } from './crosshair.js';
+const xhHelp = {}; // the reticle highlight's state (crosshair.js reticleHelp)
 import { lockMouse } from './keys.js';
 import { aimReach, WEAPONS, OPERATORS, OP_LIST, HEAD_R, HEAD_AIM, onHead, HIT_R, ARMOR_HP, CLASS_NAME, CLASS_TIP, ATTACH, ATTACH_SLOTS, attachFor, cleanAtt, gunMods, aimHeat, spreadCone, tracerPellet, mainPellet, aimedDamage, shotOffset, recoilStep, recoilMax, fireAuto, fireDmg, fireRpm, bipodOn, reloadLen, adsTime, recoilOf, falloffOf, sprayWords, SPRAY, gunSide, adsStart, penOf, penWalls, penBrick } from '/shared/operators.js';
 import { drawTrail, TRAIL_LIFE } from './fx.js';
@@ -355,7 +356,8 @@ function draw(cv, dt) {
   if (S.adsT > 0.05) drawSightLook(c, attOf(S.w).sight, x, y, Math.min(1, S.adsT), dpr, lensR(cv));
   veil(S.adsT > 0.3 && sniper() ? { x, y } : null, cv);
   if (O.fast && O.fast() && O.mode() !== 'cursor') { const F = O.fast(); drawFastRing(c, O0.x, O0.y, F[1] * z, Math.hypot(S.aim.x, S.aim.y) >= F[1], dpr); } // the far aim ring
-  if (!(sniper() && S.adsT > 0.6)) drawReticle(c, attOf(S.w).sight, x, y, Math.tan(cone) * Math.hypot(Q.x - O0.x, Q.y - O0.y) / dpr, dpr);
+  const lensUp = sniper() && S.adsT > 0.6, hl = O.xhOpt ? reticleHelp(xhHelp, c, x, y, O0.x, O0.y, performance.now() / 1000, O.xhOpt(), dpr, !lensUp) : null; // as in a match
+  if (!lensUp) drawReticle(c, attOf(S.w).sight, x, y, Math.tan(cone) * Math.hypot(Q.x - O0.x, Q.y - O0.y) / dpr, dpr, 1, hl);
   const dm = q.d / M;
   if (dm >= 8) {
     c.font = `700 ${12 * dpr}px Barlow Condensed, sans-serif`; c.textAlign = 'left'; c.textBaseline = 'top';

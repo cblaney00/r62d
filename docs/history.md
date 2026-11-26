@@ -1001,3 +1001,12 @@ A player found the phone's movement delayed (the aim stick felt fine). Causes an
   was swallowed for the whole 150 ms. Now from where the thumb landed, `MOVE_SETTLE` 70 ms, `MOVE_SLIP` 7 px. `MOVE_R` 81 → 70.
 - Tests: `tests/touchmove.js` (physics, mv vs keys), `tests/phonemove.mjs` (thumbs setup: angle exact, 20 px walks, 50 px runs);
   preaimflick.mjs and thumbs.mjs SCENARIO=rings still as before.
+
+## 2026-11-26 — reticle easier to find
+He said the reticle often gets lost on the screen on the fly. He chose all four helpers:
+- Bold (solid, thicker dark edge, 12% bigger, shrinks to 75% far out instead of 55%), Glow while moving it fast
+  (radial halo + thin bright ring; speed measured from your body so camera glide doesn't trigger it), a faint line
+  from you to it, and Settings → Mouse & Aim → Reticle highlight 0-100% with Glow / Bold / Line switches.
+- Code: crosshair.js `reticleHelp`/`drawReticle(..., opt)`, main.js `xhOpt`/`xhHelp`/`setXhHi`, armory.js via `O.xhOpt`.
+- Checked: `tests/reticlelook.mjs` screenshots (still: solid, no glow, faint line; flicking: glow), textsize pc + phone 0,
+  `tests/aim.js` 0 fails, GPU (headless gamescope, 1600×900, spinning the aim) 83/82 fps on vs 80/82 off: no cost.
