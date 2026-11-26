@@ -920,6 +920,7 @@ function onEvent(e, s, players) {
       if (st.r3shots && st.map && r3sees(players.get(e.id), e.x, e.y, e.x2, e.y2)) st.r3shots.push({ f: floorAt(st.map, e.x, e.y), x: e.x, y: e.y, x2: e.x2, y2: e.y2, k: e.k }); // (the 3D rope view: only shots your side could see, like the top-down streaks under the blackout)
       const w = WEAPONS[e.w]; const a = Math.atan2(e.y2 - e.y, e.x2 - e.x);
       if (e.nt || e.pl) fx.tracer(e.x, e.y, e.x2, e.y2); else fx.trail(e.x, e.y, e.x2, e.y2); // subsonic ammo: only the old brief streak; a shotgun's other pellets (pl) too
+      if (e.id === st.id && !e.pl) { (st.myShots || (st.myShots = [])).push({ x: e.x, y: e.y, x2: e.x2, y2: e.y2, t: performance.now() / 1000 }); if (st.myShots.length > 12) st.myShots.shift(); } // your own: a clear streak (ownShots)
       const an = anim(e.id);
       if (an.lastShotSnd !== s.time && st.listen && st.map && !e.q && e.id !== st.id) { // gunfire on the floor above or below: an arrow towards it
         const lv = localPos(st.map, st.listen.x, st.listen.y), ls = localPos(st.map, e.x, e.y), fd = ls.f - lv.f;
@@ -2924,6 +2925,20 @@ function bodyAim(mw) {
   }
   return best;
 }
+// The crosshair on a camera, drone or gadget as it is drawn (lifted to its height, gadgetZ): the bullet goes at its real
+// spot, by the same offset (he found 2026-11-26: on a camera as drawn, shots passed 2-11 px off it, and it is 6 across).
+const UTIL_PICK = 7; // world px round the drawn gadget
+function utilAim(mw) {
+  if (!persp.h || !st.last || !st.me) return null;
+  let best = null, bd = UTIL_PICK;
+  for (const e of st.last.ents || []) {
+    if (e.x === undefined || e.tm === st.me.tm || NOT_UTIL.has(e.ty)) continue;
+    const z = gadgetZ(e); if (z < 0.08) continue; // (flat on the floor: drawn where it is)
+    const [lx, ly] = liftOf(e.x, e.y, z), d = Math.hypot(mw.x - e.x - lx, mw.y - e.y - ly);
+    if (d < bd) { bd = d; best = { x: mw.x - lx, y: mw.y - ly }; }
+  }
+  return best;
+}
 function sendInput(dt, me, ctrl, view, s, now) {
   const ev = st.evq; st.evq = [];
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
@@ -2991,8 +3006,10 @@ function sendInput(dt, me, ctrl, view, s, now) {
   const c = cursor(), mw = freeLive() && ctrl === 'body' ? (q => ({ x: q.ax, y: q.ay }))(freeAimPoint()) : screenToWorld(c.x, c.y);
   if (st.r3aim) { mw.x = st.r3aim.x; mw.y = st.r3aim.y; } // (the 3D rope view's crosshair)
   const body = ctrl === 'body' && !st.r3aim ? bodyAim(mw) : null; // the crosshair on someone as they are drawn: exactly their body
+  const util = !body && ctrl === 'body' && !st.r3aim ? utilAim(mw) : null; // ...or on a camera, drone or gadget as it is drawn
   let shot = mw;
   if (body) { shot = body.shot; mw.x = body.head.x; mw.y = body.head.y; }
+  else if (util) shot = util;
   else if (persp.h) { // (bodies stand up at most as if persp.cap from the eye: liftBody)
     const hh = persp.h * 0.46, dx = mw.x - persp.x, dy = mw.y - persp.y, d = Math.hypot(dx, dy), k = d / (1 + hh) <= persp.cap ? 1 / (1 + hh) : Math.max(0, d - persp.cap * hh) / Math.max(1e-6, d);
     mw.x = persp.x + dx * k; mw.y = persp.y + dy * k; } // a head is drawn where its height shows it (look.js persp): back to where it really is
@@ -4134,6 +4151,29 @@ function xhSize(x, y, px, py) {
 // Reticle highlight (he asked 2026-11-26; crosshair.js reticleHelp): strength and Glow / Bold / Line, Settings → Mouse & Aim
 const xhOpt = () => { const r = $('xhHi'); return r ? { hi: +r.value, glow: $('xhGlow').checked, bold: $('xhBold').checked, line: $('xhLine').checked } : XHI_DEFAULT; };
 const xhHelp = {};
+// Bullets fly at a standing chest-to-head height: the reticle off anyone means that height (sendInput turns it back to
+// the real spot with the same rule), so the line from your gun and your own bullet streaks are drawn at it too, and all
+// three line up (he asked 2026-11-26: one line, and the bullet's path through a soft wall must be obvious).
+const BULLET_Z = 0.46;
+const bulletLift = (x, y) => { if (!persp.h) return { x, y }; const u = liftBody(x, y, BULLET_Z); return { x: x + u[0], y: y + u[1] }; };
+function gunPoint() { // your muzzle as drawn, in the world (lifted to bullet height)
+  const lo = st.pred.lo || 0, sh = lo ? leanPoint(st.map, st.pred.x, st.pred.y, st.aim, lo) : st.pred;
+  return bulletLift(sh.x + Math.cos(st.aim) * 10, sh.y + Math.sin(st.aim) * 10);
+}
+const OWN_SHOT_T = 0.45;
+function ownShots(now) { // drawn over the blackout: you always see where your own bullet went, through a wall too, and where it stopped
+  const L = st.myShots; if (!L || !L.length) return;
+  ctx.save(); ctx.lineCap = 'round';
+  for (let i = L.length - 1; i >= 0; i--) {
+    const s = L[i], f = 1 - (now - s.t) / OWN_SHOT_T; if (f <= 0) { L.splice(i, 1); continue; }
+    const A = bulletLift(s.x, s.y), B = bulletLift(s.x2, s.y2), P = w2s(A.x, A.y), Q = w2s(B.x, B.y);
+    ctx.globalAlpha = f * 0.9;
+    for (const [col, w] of [['rgba(0,0,0,0.7)', 2.6], ['rgba(255,240,200,1)', 1.1]]) { ctx.strokeStyle = col; ctx.lineWidth = w * DPR; ctx.beginPath(); ctx.moveTo(P.x, P.y); ctx.lineTo(Q.x, Q.y); ctx.stroke(); }
+    const r = 3 * DPR; // where it stopped: a small cross
+    for (const [col, w] of [['rgba(0,0,0,0.7)', 3], ['rgba(255,240,200,1)', 1.4]]) { ctx.strokeStyle = col; ctx.lineWidth = w * DPR; ctx.beginPath(); ctx.moveTo(Q.x - r, Q.y - r); ctx.lineTo(Q.x + r, Q.y + r); ctx.moveTo(Q.x + r, Q.y - r); ctx.lineTo(Q.x - r, Q.y + r); ctx.stroke(); }
+  }
+  ctx.restore();
+}
 const sightLook = (sight, x, y, k) => drawSightLook(ctx, sight, x, y, k, DPR, scopeLensR()); // in crosshair.js, shared with the Armory
 // the sniper's clear lens, in canvas px, and the blurred, dimmed view round it (#scopeVeil; its CSS only changes when it
 // moves a pixel, so the browser isn't asked to redo the blur's mask every frame for nothing)
@@ -4248,7 +4288,11 @@ function crosshair(me, now) {
   if (me.mv === 3) ctx.globalAlpha = 0.3; // sprinting: gun down
   else { st.xhFade = (st.xhFade ?? 1) + ((fq && fq.stopped ? 0.45 : 1) - (st.xhFade ?? 1)) * Math.min(1, (now - (st.xhFadeT || now)) * 14); ctx.globalAlpha = st.xhFade; } // bullets stop at a wall before it: faded, gliding (no flicker past door frames)
   st.xhFadeT = now;
-  const lensUp = sniperOn(me) && me.at > 0.6 && me.ct === 'body', hl = reticleHelp(xhHelp, ctx, x, y, px, py, now, xhOpt(), DPR, me.ct === 'body' && !lensUp);
+  // the line starts at your gun, at the height bullets fly (BULLET_Z): it is the bullet's real path, ending on the reticle
+  // (he asked 2026-11-26: only one line, and the reticle must be where the shot goes)
+  const G0 = gunPoint(), GS = w2s(G0.x, G0.y), gun = { x: px + (GS.x - px) * c - (GS.y - py) * s2, y: py + (GS.x - px) * s2 + (GS.y - py) * c };
+  const lensUp = sniperOn(me) && me.at > 0.6 && me.ct === 'body', hl = reticleHelp(xhHelp, ctx, x, y, px, py, now, xhOpt(), DPR, me.ct === 'body' && !lensUp, gun);
+  ownShots(now); // your own bullets: a clear streak over everything, through walls too, to where each stopped
   if (!lensUp) drawReticle(ctx, attFromCode(me.aa).sight, x, y, spread, DPR, xhSize(x, y, px, py), hl); // the reticle of the sight on your gun (the sniper lens reticle takes over)
   ctx.globalAlpha = 1;
   // points popups under the crosshair (he asked, R6-style): newest at the top, each fades after a couple of seconds
@@ -4259,8 +4303,7 @@ function crosshair(me, now) {
     if (q.blocked) { // something in the way: a tick on it and a dotted line on to the crosshair
       const [lwx, lwy] = q.person ? [0, 0] : liftOf(q.wx, q.wy, 0.45); // at chest height, where walls and window openings show (he asked: it must work looking in at windows)
       let G = w2s(q.wx + lwx, q.wy + lwy), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
-      ctx.setLineDash([2 * DPR, 3 * DPR]); ctx.lineWidth = 1.2 * DPR; ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-      ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+      // (the dotted line from it on to the crosshair is gone, he asked 2026-11-26: only one line, the one from your gun)
       const na = Math.atan2(y - gy, x - gx) + Math.PI / 2, tl = 5 * DPR;
       ctx.lineCap = 'round';
       if (q.mk) { // the barrier: a bracket lying along its face, orange; held on the same thing 1.5 s it turns blue (aiming in then goes onto it)

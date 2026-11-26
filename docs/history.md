@@ -1010,3 +1010,19 @@ He said the reticle often gets lost on the screen on the fly. He chose all four 
 - Code: crosshair.js `reticleHelp`/`drawReticle(..., opt)`, main.js `xhOpt`/`xhHelp`/`setXhHi`, armory.js via `O.xhOpt`.
 - Checked: `tests/reticlelook.mjs` screenshots (still: solid, no glow, faint line; flicking: glow), textsize pc + phone 0,
   `tests/aim.js` 0 fails, GPU (headless gamescope, 1600×900, spinning the aim) 83/82 fps on vs 80/82 off: no cost.
+
+## 2026-11-26 — shots land on the reticle on gadgets; one line; your own streaks; hatch shots both ways
+He saw two lines meeting at the reticle (the new line + the old dotted line from the wall tick) and found a test shot at a
+camera went off the reticle. Measured (`tests/camaim.mjs`, aimed in): the reticle on a camera as drawn (lifted by
+`liftOf(gadgetZ)`) sent the shot at the floor point under it, 9-13 px beside the camera (hit radius 6): always a miss.
+- main.js `utilAim(mw)` (`UTIL_PICK` 7 px): the crosshair within 7 px of an enemy gadget/camera/drone as drawn (z ≥ 0.08)
+  aims at its real spot by the same offset (no standing-head correction). After: 0.0-1.3 px, every shot hits.
+- One line: the dotted line from the wall tick to the crosshair is gone (the tick/bracket stays). The reticle line now
+  starts at your muzzle at bullet height (`gunPoint`, `BULLET_Z` 0.46 = the same height sendInput's off-body correction
+  assumes), so it is the bullet's real path (crosshair.js `reticleHelp(..., from)`).
+- Your own bullets (`st.myShots` from 'shot' events, `ownShots` in crosshair(), `OWN_SHOT_T` 0.45 s): a bright streak
+  lifted to `BULLET_Z` drawn over the blackout, a small cross where it stopped: through a soft wall you see the path
+  (he asked). `tests/wallshot.mjs` screenshot: the streak passes through the reticle.
+- Hatches (he asked: both sides, up and down, DEADFALL too): `tests/hatchshots.js`, every hatch on 9 maps + a
+  `blowFloor` DEADFALL hole per upper floor (12), attacker and defender each shooting down and up: 400 shots, PASS.
+  Nothing needed fixing. `tests/hatches.js` PASS, `tests/aim.js` 0 fails.

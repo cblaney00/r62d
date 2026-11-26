@@ -90,7 +90,7 @@ export function drawFastRing(ctx, x, y, R, out, k) {
 // line from you to it and the glow while it moves fast (fading a moment after it stops), and returns the options for
 // drawReticle. Plain strokes and one small gradient only (GPU lesson: no filters, shadows or odd composite ops).
 export const XHI_DEFAULT = { hi: 100, glow: true, bold: true, line: true };
-export function reticleHelp(S, ctx, x, y, px, py, now, o, k, line = true) {
+export function reticleHelp(S, ctx, x, y, px, py, now, o, k, line = true, from = null) { // from = where the line starts (the gun), else your middle
   const f = Math.max(0, Math.min(1, (o.hi ?? 100) / 100)), dt = Math.min(0.1, Math.max(0, now - (S.t || now)));
   const rx = x - px, ry = y - py; // measured from you, so the camera gliding or you walking doesn't count: only your aim moving
   const v = dt > 0 && S.x !== undefined ? Math.hypot(rx - S.x, ry - S.y) / k / dt : 0; S.x = rx; S.y = ry; S.t = now;
@@ -99,11 +99,11 @@ export function reticleHelp(S, ctx, x, y, px, py, now, o, k, line = true) {
   S.g = want > (S.g || 0) ? (S.g || 0) + (want - (S.g || 0)) * (1 - Math.exp(-dt / 0.04)) : (S.g || 0) * Math.exp(-dt / 0.3);
   const glow = S.g * f, bold = o.bold ? f : 0;
   if (o.line && line && f > 0) { // a faint thin line from just outside your body to just short of the reticle
-    const dx = x - px, dy = y - py, d = Math.hypot(dx, dy), a0 = 12 * k, a1 = d - 16 * k;
+    const sx = from ? from.x : px, sy = from ? from.y : py, dx = x - sx, dy = y - sy, d = Math.hypot(dx, dy), a0 = (from ? 3 : 12) * k, a1 = d - 16 * k;
     if (a1 > a0 + 6 * k) {
       const ux = dx / d, uy = dy / d; ctx.save(); ctx.lineCap = 'round';
       ctx.globalAlpha *= f * (0.22 + 0.28 * S.g);
-      for (const [c, w] of [['rgba(0,0,0,0.8)', 2.6], ['#e8f2e4', 1.1]]) { ctx.strokeStyle = c; ctx.lineWidth = w * k; ctx.beginPath(); ctx.moveTo(px + ux * a0, py + uy * a0); ctx.lineTo(px + ux * a1, py + uy * a1); ctx.stroke(); }
+      for (const [c, w] of [['rgba(0,0,0,0.8)', 2.6], ['#e8f2e4', 1.1]]) { ctx.strokeStyle = c; ctx.lineWidth = w * k; ctx.beginPath(); ctx.moveTo(sx + ux * a0, sy + uy * a0); ctx.lineTo(sx + ux * a1, sy + uy * a1); ctx.stroke(); }
       ctx.restore();
     }
   }
