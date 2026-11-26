@@ -1123,7 +1123,7 @@ function moveTurn() {
 // Vaulting goes the way you're moving, or where you look when standing still.
 function vaultDir() {
   const mx = sprintBack() ? 0 : (keys.has('right') || gpk.right ? 1 : 0) - (keys.has('left') || gpk.left ? 1 : 0), my = sprintBack() ? -1 : (keys.has('down') || gpk.down ? 1 : 0) - (keys.has('up') || gpk.up ? 1 : 0);
-  return mx || my ? Math.atan2(my, mx) + moveTurn() : st.aim;
+  return mx || my ? (st.padMv != null && !sprintBack() ? st.padMv : Math.atan2(my, mx)) + moveTurn() : st.aim;
 }
 // Read the controller once a frame and turn it into the same actions as the keyboard and mouse.
 // phone auto fire: is the aim line on a seen enemy's body (within reach)? Semi-automatic guns get separate taps.
@@ -1202,12 +1202,14 @@ function pollPad(dt, view) {
   if (sprLong && touchActive()) st.steer = true;
   if (st.steer && (gp.lt > 0.35 || gp.rsOn || (st.me && st.me.ad) || !st.me || st.me.ct !== 'body' || !touchActive() || !st.last || st.last.ph !== PHASE.ACTION && st.last.ph !== PHASE.PREP)) st.steer = false;
   if ((spr || st.steer) && ls.l > (spr ? 0 : 0.25) && rs.l < 0.05 && !(gp.rt > 0.35)) padAng = wrapAng(padAng + angDiff(Math.atan2(ls.y, ls.x) - (st.rot || 0), padAng) * Math.min(1, dt * 12));
-  // left stick: 8 directions like WASD; a light push walks (silent)
+  // left stick: the direction keys (a phone also sends its exact way as mv); a light push walks (silent)
   const nx = ls.l ? ls.x / ls.l : 0, ny = ls.l ? ls.y / ls.l : 0; st.padStill = !ls.l;
   gpk.right = ls.l && nx > 0.38 ? 1 : 0; gpk.left = ls.l && nx < -0.38 ? 1 : 0;
   gpk.down = ls.l && ny > 0.38 ? 1 : 0; gpk.up = ls.l && ny < -0.38 ? 1 : 0;
   // on a drone, walk = sprint: held on B (a light push used to start one by accident)
-  gpk.walk = st.me && st.me.ct === 'drone' ? (gp.held[1] ? 1 : 0) : ls.l && ls.l < 0.55 ? 1 : 0;
+  // a phone's stick (2026-11-26, a player found it slow): the direction goes as it is, not rounded to 8, and only the first third walks
+  st.padMv = !xb && ls.l ? Math.atan2(ls.y, ls.x) : null;
+  gpk.walk = st.me && st.me.ct === 'drone' ? (gp.held[1] ? 1 : 0) : ls.l && ls.l < (xb ? 0.55 : 0.33) ? 1 : 0;
   if (gp.rt > 0.35 && !gpk.fire) mouse.wl++; // a trigger pull also counts as a click (next teammate, ping in a camera)
   const aimReset = gp.lt > 0.35 && !gpk.ads && touchActive();
   if (aimReset && st.hold && !sniperOn(st.me)) touchAimReset(); // a pre-aimed spot stays put when you aim in (sniper scopes still snap out)
@@ -2939,13 +2941,14 @@ function sendInput(dt, me, ctrl, view, s, now) {
   if (k.sprint) k.sa = Math.round(st.aim * 1000) / 1000; // what the server will go by for which way you sprint
   if (k.lean) k.la = Math.round(st.aim * 1000) / 1000;
   if (typing || menuOpen() || introNow()) { for (const key in k) k[key] = 0; ev.length = 0; } // (the walk-in: nothing counts yet)
-  { const r = moveTurn(); if (r) k.rot = Math.round(r * 1000) / 1000; } // Rotate view, Face aiming, sprint + W: the keys turn with you
+  { const r = moveTurn(); if (r) k.rot = Math.round(r * 1000) / 1000; }
+  if (st.padMv != null && (k.up || k.down || k.left || k.right) && !sprintBack() && !(me && me.ro)) k.mv = Math.round(st.padMv * 1000) / 1000; // the phone stick's exact way (physics stepMoveFree) // Rotate view, Face aiming, sprint + W: the keys turn with you
   if (me && me.ro && me.ro[0] && !r3on()) { const cr = keys.has('crouch') || keys.has('crouchTap'), tn = performance.now() / 1000; if (cr && !st.r3cr) st.r3invT = tn; st.r3cr = cr; k.inv = tn - (st.r3invT ?? -9) < 0.1 ? 1 : 0; k.crouch = 0; } // on a rope: crouch flips upside down
   if (r3on() && me && me.ro) { // the 3D rope view (he asked, R6's keys): W/S up and down a floor, A/D along the wall as you face it, crouch upside down
     const r = st.map.ropes[me.ro[1]];
     k.rw = r ? ((k.right ? 1 : 0) - (k.left ? 1 : 0)) * rope3d.wallSign(r) : 0; k.rv = k.up ? 1 : k.down ? -1 : 0;
     const cr = keys.has('crouch') || keys.has('crouchTap'), tn = performance.now() / 1000; if (cr && !st.r3cr) st.r3invT = tn; st.r3cr = cr; k.inv = tn - (st.r3invT ?? -9) < 0.1 ? 1 : 0; // (held a tenth of a second: a single frame could fall between two server ticks)
-    k.up = k.down = k.left = k.right = 0; k.crouch = 0; k.sprint = 0; delete k.rot;
+    k.up = k.down = k.left = k.right = 0; k.crouch = 0; k.sprint = 0; delete k.rot; delete k.mv;
   }
   // ping whatever is under your aim: an enemy you can see, else a gadget, camera or the objective, else the wall, door or floor you point at
   const trySpot = () => {

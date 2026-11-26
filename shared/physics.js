@@ -180,6 +180,7 @@ export function stepMove(map, o, input, dt, mods) {
 function stepMoveFree(map, o, input, dt, mods) {
   let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   let my = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+  if ((mx || my) && Number.isFinite(input.mv)) { mx = Math.cos(input.mv); my = Math.sin(input.mv); } // a phone's move stick: exactly the way the thumb points (2026-11-26: 8 directions felt slow and clumsy)
   if (input.rot && isFinite(input.rot) && (mx || my)) { const c = Math.cos(input.rot), s = Math.sin(input.rot); [mx, my] = [mx * c - my * s, mx * s + my * c]; } // keys relative to a turned view
   if (mods.frozen) { mx = 0; my = 0; }
   const len = Math.hypot(mx, my);

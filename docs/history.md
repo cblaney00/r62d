@@ -990,3 +990,14 @@ and 2x scope his shots seemed to go right.
   Saker + 2x scope aimed in, a still dummy at 7-9 spots inside, the crosshair kept on its drawn head or chest each frame,
   fires; prints how far each bullet passed from the real body. `FOOT=1` the same standing inside, `LEANS=0,-1,1`.
   Before: no lean 0-3.5 px (chest), leaning 6-9 px. After: worst 0.14 px on a rope, 0.05 px on foot; head aims all count.
+
+## 2026-11-26 — phone move stick feels instant
+A player found the phone's movement delayed (the aim stick felt fine). Causes and fixes:
+- 8 directions only: the stick became WASD keys. Now main.js `pollPad` keeps `st.padMv` (the stick's exact angle, touch only, not a real
+  controller), sendInput sends it as `k.mv` (not on ropes), and physics `stepMoveFree` uses it instead of the keys' way (server and
+  prediction alike); `vaultDir` too. Keys still go as well, so everything that reads them is unchanged.
+- Walk zone: touch walks under 0.33 of a push (was 0.55; a real controller keeps 0.55). He chose "a small walk zone".
+- Settling ate pushes: touch.js measured the 12 px slip from the centre that slid along with the thumb, so a push that began slowly
+  was swallowed for the whole 150 ms. Now from where the thumb landed, `MOVE_SETTLE` 70 ms, `MOVE_SLIP` 7 px. `MOVE_R` 81 → 70.
+- Tests: `tests/touchmove.js` (physics, mv vs keys), `tests/phonemove.mjs` (thumbs setup: angle exact, 20 px walks, 50 px runs);
+  preaimflick.mjs and thumbs.mjs SCENARIO=rings still as before.

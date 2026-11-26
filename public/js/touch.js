@@ -15,9 +15,9 @@ const SPRINT_PUSH = 1.45; // (FIRE buttons setting) the move thumb this far out 
 // stick must never shoot, and it covers its ring while held): a finger put down on a ring shoots (build(): ringFire). His choices (2026-11-20, the
 // double-tap sprint and tap-to-aim didn't feel good): an AIM button by the aim stick, tap on / tap off; sprint is a quick, fairly straight push of
 // the move stick out to its edge (FLICK_*), held while it stays out. The old FIRE buttons stay as a Settings choice.
-const MOVE_SETTLE = 150, MOVE_SLIP = 12, MOVE_DEAD = 0.14; // the move thumb's settling time (ms) and slide (px), and the dead zone (share of a full push)
+const MOVE_SETTLE = 70, MOVE_SLIP = 7, MOVE_DEAD = 0.14; // the move thumb's settling time (ms) and slide (px), and the dead zone (share of a full push)
 const NEAR_RING = 26; // (fire rings) how far past the red ring a thumb still shoots (design px)
-const MOVE_R = 81; // (fire rings) how far the move thumb pushes for a full run (was R, 62: he asked for a bigger stick)
+const MOVE_R = 70; // (fire rings) how far the move thumb pushes for a full run (was R, 62: he asked for a bigger stick; 81 felt slow to a player 2026-11-26)
 const TAP_MS = 250, TAP_PX = 12; // a quick tap
 const FLICK_MS = 230, FLICK_STRAIGHT = 0.8, FLICK_EDGE = 0.95, FLICK_FROM = 0.35, SPRINT_OFF = 0.6; // (fire rings) sprint: from near the middle (under FLICK_FROM of a full push) out to the edge within FLICK_MS, the path at least FLICK_STRAIGHT straight; it stops below SPRINT_OFF
 export const fireRings = () => store('r62d-fire') !== 'buttons';
@@ -309,14 +309,14 @@ function build() {
     } else if (side === 'L') { // the move stick (FIRE buttons setting: it jumps to wherever the thumb lands on the lower left)
       if (leftF !== null) return;
       // (with the rings the stick is a bit bigger, he asked: a longer push for a full run, and it covers its ring while held)
-      leftF = id; const z = tz(), r = (rings ? MOVE_R : R) * z, half = rings ? STICK.VR : 62, K = rings ? STICK.KNOB : R, t0 = performance.now(); let cx = x, cy = y, mv = 0, settled = false;
+      leftF = id; const z = tz(), r = (rings ? MOVE_R : R) * z, half = rings ? STICK.VR : 62, K = rings ? STICK.KNOB : R, t0 = performance.now(), x0 = x, y0 = y; let cx = x, cy = y, mv = 0, settled = false;
       if (!rings) { base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; base.style.bottom = 'auto'; } base.classList.add('held'); // (fire rings: the stick stays put, the knob starts in its middle)
       let fl = { t: t0, x, y, path: 0 }, px = x, py = y; // the push being watched for a sprint flick: where and when it left the middle, how far the thumb has travelled
       // A thumb put down is not a push (he asked 2026-11-18: landing on the stick often walked already): while it settles
       // (its first MOVE_SETTLE ms, or until it travels MOVE_SLIP px) the stick's centre slides along under it, and after
       // that a small dead zone in the middle walks nowhere, the push growing smoothly from its edge.
       const move = (x, y) => {
-        if (!settled) { const now = performance.now(), d = Math.hypot(x - cx, y - cy); if (now - t0 < MOVE_SETTLE && d < MOVE_SLIP * z) { cx = x; cy = y; if (!rings) { base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; } } else settled = true; }
+        if (!settled) { const now = performance.now(), d = Math.hypot(x - x0, y - y0); if (now - t0 < MOVE_SETTLE && d < MOVE_SLIP * z) { cx = x; cy = y; if (!rings) { base.style.left = `${cx / z - half}px`; base.style.top = `${cy / z - half}px`; } } else settled = true; } // (d from where it landed: measured from the sliding centre, a push that started slowly was swallowed whole)
         let u = (x - cx) / r, v = (y - cy) / r; const l0 = Math.hypot(u, v), dz = l0 < MOVE_DEAD ? 0 : (l0 - MOVE_DEAD) / (1 - MOVE_DEAD) / l0; u *= dz; v *= dz; const l = Math.hypot(u, v); mv = Math.max(mv, l * r); if (l > 0.4 && useLatch) setUse(false);
         if (rings) { // sprint: a quick, fairly straight push out to the edge (he asked 2026-11-20); a slow push to the edge only runs
           const now = performance.now(); if (fl) fl.path += Math.hypot(x - px, y - py); px = x; py = y;
