@@ -1030,3 +1030,12 @@ camera went off the reticle. Measured (`tests/camaim.mjs`, aimed in): the reticl
   `tests/sprintturn.mjs` now only checks "never faster" (the headless browser at ~10 fps stretches real time) and PASSes.
 - The orange/blue wall marker sits on the bullet's real path (he asked: in line with the new aim line): sendInput keeps
   `st.shotRay` (shoulder + the sent angle); crosshair() slides the tick/bracket onto it (`shift`, lifted by `bulletLift`).
+- Sprint turns take the same time whatever the angle (he asked: an about-turn as fast as a quarter turn): `SPRINT_TURN_T`
+  0.4 s; the speed is set from the angle left each time the wanted way changes by > 0.2 rad (`st.sprWant`/`st.sprRate`),
+  never below `SPRINT_TURN`. `tests/sprintturn.mjs` checks the about-turn takes at most 1.4× the quarter turn: PASS.
+- Lag on Harbor's lobby stairs (he found: shooting up them): the stairs view (`drawStairView`) cost ~37 ms a frame on the
+  GPU (headless gamescope, `tests/stairlag.mjs`: 76 fps with it off, ~20 on). Cost scaled with its canvas area (1182 px).
+  Now: `STAIR_RES` 0.5 of its screen size, at most `STAIR_MAX` 640 px, redrawn `STAIR_HZ` 15 times a second (an
+  ImageBitmap of it drawn in between, `st.stairBm`), the map read from `R.picFor(zc)` (a smaller copy), the inside-of-
+  the-building cut is a clip while drawing (`insidePath(fi, box)` of only the pieces in the box) instead of a
+  destination-in pass. After: ~52-54 fps on vs 54 off in one run (another, with the card busy, 33 vs 41).

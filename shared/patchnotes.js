@@ -196,4 +196,5 @@ export const PATCH_NOTES = [
   { d: '2026-11-26', k: 'mech', id: 'reticle', t: 'The reticle is easier to find: solid with a thicker edge, glows while you move it fast, a faint line from you to it (Settings: Reticle highlight).', v: 1 },
   { d: '2026-11-26', k: 'mech', id: 'aim', t: 'A reticle on a camera, drone or gadget hits it (before, shots went to the floor under the picture and missed). Your own shots leave a clear streak, even through walls.', v: 1 },
   { d: '2026-11-26', k: 'mech', id: 'sprint', t: 'Turning into a sprint is twice as slow: a full about-turn takes 0.8 s.', v: -1 },
+  { d: '2026-11-26', k: 'mech', id: 'sprint', t: 'Every sprint turn takes 0.4 s: a full about-turn is as quick as a quarter turn.', v: 1 },
 ];

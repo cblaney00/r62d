@@ -83,3 +83,8 @@ sim.js, reach, openings, shapes, stairs, pros, feeds, zombies, arena, freeplay p
 See docs/history.md (2026-11-19). `node tests/perfclient.mjs <port> <url> [level] [map] [w] [h] [secs]` prints frame cost per PF
 section standing and while walking + spinning. Measured while another session loaded the computer (load ~17, rough):
 headless Firefox, Embassy, 6 bots, High 1600x900, standing: raise 18.1 → 4.7 ms, fog 26.9 → 13.5 ms, total 37.4 → 25.3 ms a frame.
+
+## Stairs view (2026-11-26)
+Harbor lobby stairs, on the steps with the view up showing: 76 fps without the view, ~20 with it (the view canvas, 1182 px,
+redrawn every frame). Drawn at half size (max 640 px), 15 times a second, from a smaller map copy, with the inside cut as a
+clip: ~52-54 vs 54 fps. Measure with `tests/stairlag.mjs` in headless gamescope.
