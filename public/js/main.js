@@ -1105,7 +1105,7 @@ function trySlide() { if (!st.pred || !st.pred.spr || st.pred.scd > 0 || !st.me 
 // of the eight directions on the screen and you turn to face it and sprint that way; the world angle, or null
 // (he asked 2026-11-22, Chris S's first remark: sprint turns too sharp) a sprint turn is a real, steady turn: a full
 // about-turn takes 0.4 s (his pick), and letting go of sprint swings you back to the crosshair at the same speed
-const SPRINT_TURN = Math.PI / 0.4; // radians per second
+const SPRINT_TURN = Math.PI / 0.8; // radians per second: a full about-turn in 0.8 s (he chose 2026-11-26: 0.4 s was still too fast)
 function sprintDiag() {
   const me = st.me;
   if (isTouch || gpRecent() || !me || me.ct !== 'body' || !me.a || me.dn || !keys.has('sprint') || steadying() || st.tv) return null;
@@ -3022,6 +3022,7 @@ function sendInput(dt, me, ctrl, view, s, now) {
   // 2026-11-24 on a rope with the Saker LR: shots going right, leaning right round a window's edge)
   const lo = ctrl === 'body' ? st.pred.lo || 0 : 0, sh = lo ? leanPoint(st.map, st.pred.x, st.pred.y, st.aim, lo) : st.pred;
   if ((persp.h || lo) && ctrl === 'body' && !st.r3aim && Math.hypot(shot.x - sh.x, shot.y - sh.y) > 8) msg.a = Math.round(Math.atan2(shot.y - sh.y, shot.x - sh.x) * 100000) / 100000;
+  st.shotRay = ctrl === 'body' ? { x: sh.x, y: sh.y, a: msg.a } : null; // where the bullet really goes (the wall marker sits on this line: crosshair())
   msg.ax = Math.round(mw.x * 10) / 10; msg.ay = Math.round(mw.y * 10) / 10; // tenths: headshots need the crosshair on the head
   st.aimUp = ctrl === 'body' && me && me.a && !me.dn && !!aimUpHatch(st.map, st.pred.x, st.pred.y, mw.x, mw.y); // your own aim-up pose, without waiting for the server
   const vt = viewServerTime(); if (vt !== null) msg.vt = Math.round(vt * 1000) / 1000; // what moment of the match you're seeing
@@ -4301,13 +4302,16 @@ function crosshair(me, now) {
   if (fq) {
     const q = fq, dm = q.ad / PX_PER_M;
     if (q.blocked) { // something in the way: a tick on it and a dotted line on to the crosshair
-      const [lwx, lwy] = q.person ? [0, 0] : liftOf(q.wx, q.wy, 0.45); // at chest height, where walls and window openings show (he asked: it must work looking in at windows)
-      let G = w2s(q.wx + lwx, q.wy + lwy), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
+      // the marker sits on the bullet's real path, where the aim line from your gun crosses what it hit (he asked
+      // 2026-11-26: in line with the new aim line): the same spot slid onto that line (sendInput st.shotRay, BULLET_Z)
+      const RY = st.shotRay, shift = (wx, wy, z = 0.45) => { if (!RY || !persp.h) return [0, 0]; const [lx, ly] = liftOf(wx, wy, z), d = Math.hypot(wx - RY.x, wy - RY.y), B = bulletLift(RY.x + Math.cos(RY.a) * d, RY.y + Math.sin(RY.a) * d); return [B.x - wx - lx, B.y - wy - ly]; };
+      const [lwx, lwy] = q.person ? [0, 0] : liftOf(q.wx, q.wy, 0.45), [swx, swy] = q.person ? [0, 0] : shift(q.wx, q.wy); // at chest height, where walls and window openings show (he asked: it must work looking in at windows)
+      let G = w2s(q.wx + lwx + swx, q.wy + lwy + swy), gx = px + (G.x - px) * c - (G.y - py) * s2, gy = py + (G.x - px) * s2 + (G.y - py) * c;
       // (the dotted line from it on to the crosshair is gone, he asked 2026-11-26: only one line, the one from your gun)
       const na = Math.atan2(y - gy, x - gx) + Math.PI / 2, tl = 5 * DPR;
       ctx.lineCap = 'round';
       if (q.mk) { // the barrier: a bracket lying along its face, orange; held on the same thing 1.5 s it turns blue (aiming in then goes onto it)
-        const M = q.mk, P = (wx, wy) => { const [lx, ly] = M.person ? [0, 0] : liftOf(wx, wy, M.z ?? 0.45), Q = w2s(wx + lx, wy + ly); return [px + (Q.x - px) * c - (Q.y - py) * s2, py + (Q.x - px) * s2 + (Q.y - py) * c]; };
+        const M = q.mk, [mdx, mdy] = M.person ? [0, 0] : shift(M.x, M.y, M.z ?? 0.45), P = (wx, wy) => { const [lx, ly] = M.person ? [0, 0] : liftOf(wx, wy, M.z ?? 0.45), Q = w2s(wx + lx + mdx, wy + ly + mdy); return [px + (Q.x - px) * c - (Q.y - py) * s2, py + (Q.x - px) * s2 + (Q.y - py) * c]; };
         if (!M.person) [gx, gy] = P(M.x, M.y); // (on the face exactly, at half the height of what it hit)
         const U = blueUtil(q); if (U) { // a camera / gadget there: a blue ring round it (aiming in goes onto it)
           const [lx, ly] = liftOf(U.x, U.y, gadgetZ(U)), Q = w2s(U.x + lx, U.y + ly), ux0 = px + (Q.x - px) * c - (Q.y - py) * s2, uy0 = py + (Q.x - px) * s2 + (Q.y - py) * c, rr = 9 * DPR * (1 + 0.12 * Math.sin(now * 9));

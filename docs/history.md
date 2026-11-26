@@ -1026,3 +1026,7 @@ camera went off the reticle. Measured (`tests/camaim.mjs`, aimed in): the reticl
 - Hatches (he asked: both sides, up and down, DEADFALL too): `tests/hatchshots.js`, every hatch on 9 maps + a
   `blowFloor` DEADFALL hole per upper floor (12), attacker and defender each shooting down and up: 400 shots, PASS.
   Nothing needed fixing. `tests/hatches.js` PASS, `tests/aim.js` 0 fails.
+- Later the same day: sprint turns twice as slow (he chose 0.8 s for an about-turn): main.js `SPRINT_TURN` π/0.8;
+  `tests/sprintturn.mjs` now only checks "never faster" (the headless browser at ~10 fps stretches real time) and PASSes.
+- The orange/blue wall marker sits on the bullet's real path (he asked: in line with the new aim line): sendInput keeps
+  `st.shotRay` (shoulder + the sent angle); crosshair() slides the tick/bracket onto it (`shift`, lifted by `bulletLift`).

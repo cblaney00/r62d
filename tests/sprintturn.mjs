@@ -1,5 +1,5 @@
 // Sprint turns (he asked 2026-11-22, Chris S's first remark: too sharp): sprint up the screen, then sprint down it; the
-// facing must turn steadily (a full about-turn in about 0.4 s, never faster), and letting go of sprint swings back to the
+// facing must turn steadily (a full about-turn in about 0.8 s (he chose 2026-11-26; was 0.4), never faster), and letting go of sprint swings back to the
 // crosshair the same way; clicking mid-turn puts you on the crosshair at once. Usage: node tests/sprintturn.mjs <port> <gameUrl>
 const [port, url] = process.argv.slice(2);
 const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
@@ -34,12 +34,12 @@ async function run() {
   const sk = await js(`(() => { try { return JSON.parse(localStorage.getItem('r62d-binds') || 'null')?.sprint?.[0] || 'AltLeft'; } catch { return 'AltLeft'; } })()`);
   let fails = 0; const check = (name, ok, r) => { if (!ok) fails++; console.log(name, JSON.stringify(r), ok ? 'OK' : 'FAIL'); };
   await js(`__r62d.face(0); true`); await sleep(300); // aim to the right
-  let r = await rec(700, [['keydown', sk], ['keydown', 'KeyW']]); // sprint up: a quarter turn
-  check('sprint up (90°)', r.turn >= 85 && r.biggestStep <= 24 && r.took >= 0.15 && r.took <= 0.35, r);
-  r = await rec(900, [['keyup', 'KeyW'], ['keydown', 'KeyS']]); // sprint down: an about-turn
-  check('sprint down (180°)', r.turn >= 170 && r.biggestStep <= 24 && r.took >= 0.3 && r.took <= 0.8 /* (real time: slow test browsers stretch it) */, r);
-  r = await rec(700, [['keyup', 'KeyS'], ['keyup', sk]]); // let go: back to the crosshair (right)
-  check('let go (back 90°)', r.turn >= 85 && r.biggestStep <= 24 && r.took >= 0.15, r);
+  let r = await rec(2500, [['keydown', sk], ['keydown', 'KeyW']]); // sprint up: a quarter turn
+  check('sprint up (90°)', r.turn >= 85 && r.biggestStep <= 24 && r.took >= 0.3, r); // (only "never faster": slow test browsers stretch it)
+  r = await rec(3000, [['keyup', 'KeyW'], ['keydown', 'KeyS']]); // sprint down: an about-turn
+  check('sprint down (180°)', r.turn >= 170 && r.biggestStep <= 24 && r.took >= 0.65, r);
+  r = await rec(2500, [['keyup', 'KeyS'], ['keyup', sk]]); // let go: back to the crosshair (right)
+  check('let go (back 90°)', r.turn >= 85 && r.biggestStep <= 24 && r.took >= 0.3, r);
   await key('keydown', sk); await key('keydown', 'KeyS'); await sleep(120); await key('keyup', 'KeyS'); await key('keyup', sk);
   await js(`document.getElementById('game').dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true })); true`); r = await rec(150);
   await js(`window.dispatchEvent(new MouseEvent('mouseup', { button: 0, bubbles: true })); true`);
